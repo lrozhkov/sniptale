@@ -25,7 +25,13 @@ it('projects identity and inverse points without losing the decorated header coo
       const matrix = quickEditPlaneProjection(
         base,
         target,
-        quickEditSpatialTargetCamera(region).spatial!
+        quickEditSpatialTargetCamera(region).spatial ?? {
+          rotation: [0, 0, 0, 1],
+          perspective: 0,
+          windowMotion: 0,
+          lockBackground: false,
+          focus: [],
+        }
       );
       const inverse = invertQuickEditProjection(matrix)!;
       for (const point of [

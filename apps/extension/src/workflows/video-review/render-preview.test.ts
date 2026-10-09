@@ -267,6 +267,22 @@ it('reuses one spatial renderer over admitted frames and releases it when prepar
   renderer.dispose();
 });
 
+it('prepares a neutral enabled pose without acquiring a GPU renderer', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const input = scene();
+  input.zoomRegions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'neutral', at: 0 }),
+      perspective: { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0.9 },
+    },
+  ];
+  const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
+  renderer.render(prepared, frame()).release();
+  expect(io.spatial).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
 it('reuses scene preparation across request leases and rejects a released lease', async () => {
   const { resources } = setup();
   const renderer = createReviewPreviewRenderer({ resources });

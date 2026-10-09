@@ -547,6 +547,28 @@ function previewButton(key: string) {
   return button;
 }
 
+it('opens focus controls for a new Zoom and preserves stored focus values when switching Off', async () => {
+  const authored = region();
+  const onCommit = vi.fn();
+  renderPreview({ region: authored, spatialEdit: { region: authored, revision: 'new', onCommit } });
+  await act(async () => Promise.resolve());
+  await act(async () => previewButton('spatialToolFocus').click());
+  expect(previewButton('spatialFocusCenter').disabled).toBe(false);
+  expect(onCommit).not.toHaveBeenCalled();
+  await act(async () => previewButton('depthModeArea').click());
+  expect(onCommit.mock.calls[0]?.[1]?.depthOfField).toMatchObject({ enabled: true, mode: 'area' });
+  const configured = spatialRegion();
+  renderPreview({
+    region: configured,
+    spatialEdit: { region: configured, revision: 'configured', onCommit },
+  });
+  await act(async () => Promise.resolve());
+  await act(async () => previewButton('depthModeOff').click());
+  expect(onCommit).toHaveBeenLastCalledWith('configured', {
+    depthOfField: { ...configured.depthOfField, enabled: false },
+  });
+});
+
 it('keeps spatial navigation read-only, restores framing, and owns just one decoded frame', async () => {
   const authored = spatialRegion();
   const onCommit = vi.fn();
@@ -578,10 +600,11 @@ it('keeps spatial navigation read-only, restores framing, and owns just one deco
 });
 
 it.each([
+  ['spatialToolPosition', 'spatialResetPosition', { scale: 1.5, centerX: 0.5, centerY: 0.5 }],
   [
     'spatialToolTilt',
     'spatialResetTilt',
-    { perspective: { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 12, strength: 0.65 } },
+    { perspective: { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 12, strength: 0.5 } },
   ],
   [
     'spatialToolRotation',
@@ -593,7 +616,7 @@ it.each([
     'spatialResetFocus',
     {
       depthOfField: {
-        enabled: true,
+        enabled: false,
         mode: 'depth',
         x: 0.5,
         y: 0.5,

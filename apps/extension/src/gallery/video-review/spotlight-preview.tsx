@@ -76,7 +76,7 @@ export function ReviewSpotlightPreview(props: {
         style={{
           background: previewBackgroundPaint(props.background ?? { enabled: false }),
           transformOrigin: '0 0',
-          transform: `translate(${motion.x}px, ${motion.y}px) scale(${motion.scale})`,
+          transform: `translate(${motion.x}px, ${motion.y}px) scale(${motion.backgroundScale})`,
         }}
       >
         {props.imageUrl && props.background?.enabled && props.background.type === 'image' ? (

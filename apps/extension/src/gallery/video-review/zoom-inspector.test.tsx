@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useContext } from 'react';
+import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
@@ -38,6 +39,35 @@ const region: QuickEditZoomRegion = {
 };
 
 const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+
+it('shares disposable tool navigation between the preview and exact fields', () => {
+  const onChange = vi.fn();
+  function PreviewTools() {
+    const selection = useContext(ReviewSpatialToolContext)!;
+    return <button onClick={() => selection.onTool('rotation')}>Rotate preview</button>;
+  }
+  act(() =>
+    root.render(
+      <ReviewZoomInspector
+        region={region}
+        onChange={onChange}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+        preview={<PreviewTools />}
+      />
+    )
+  );
+  expect(field('gallery.videoReview.zoomScale')).not.toBeNull();
+  act(() =>
+    [...host.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Rotate preview')!
+      .click()
+  );
+  expect(field('gallery.videoReview.zoomScale')).toBeNull();
+  expect(field('gallery.videoReview.perspectiveZ')).not.toBeNull();
+  expect(field('gallery.videoReview.perspectiveX')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+});
 
 const type = async (node: HTMLInputElement, value: string) => {
   await act(async () => {
@@ -114,16 +144,13 @@ it('edits transition type and duration in separate enter/exit sections', async (
   const change = vi.fn((_patch: QuickEditZoomRegionPatch) => undefined);
   const inspector = renderInspector(change);
   const typeIn = host.querySelector<HTMLButtonElement>(
-    'fieldset[aria-label$="zoomTransitionIn"] button[aria-label$="zoomTransitionType"]'
+    'fieldset[aria-label$="zoomTransitionIn"] [aria-label$="zoomTransitionType"] button[title$="transitionLinear"]'
   )!;
   const typeOut = host.querySelector<HTMLButtonElement>(
-    'fieldset[aria-label$="zoomTransitionOut"] button[aria-label$="zoomTransitionType"]'
+    'fieldset[aria-label$="zoomTransitionOut"] [aria-label$="zoomTransitionType"] button[title$="transitionLinear"]'
   )!;
   expect(typeIn).not.toBe(typeOut);
   await act(async () => typeIn.click());
-  await act(async () =>
-    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
-  );
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'linear', duration: 0.3 } });
   const durationIn = host.querySelector<HTMLInputElement>(
     'fieldset[aria-label$="zoomTransitionIn"] input[aria-label$="zoomTransitionDuration"]'
@@ -175,12 +202,9 @@ it('edits link easing, shows the derived gap duration, and removes explicitly', 
   const panel = host.querySelector('[data-ui="gallery.videoReview.zoomLinkInspector"]')!;
   expect(panel.textContent).toContain('2.0');
   const easing = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.zoomLinkEasing"]'
+    '[aria-label="gallery.videoReview.zoomLinkEasing"] button[title="gallery.videoReview.transitionLinear"]'
   )!;
   await act(async () => easing.click());
-  await act(async () =>
-    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
-  );
   expect(change).toHaveBeenLastCalledWith({ linkEasing: 'linear' });
   await act(async () =>
     host
@@ -251,6 +275,12 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
     const section = phase
       ? host.querySelector(`fieldset[aria-label="gallery.videoReview.${phase}"]`)!
       : host;
+    if (label === 'focusReveal') {
+      await act(async () =>
+        section.querySelector<HTMLButtonElement>(`[title="gallery.videoReview.${option}"]`)!.click()
+      );
+      return;
+    }
     await act(async () =>
       section
         .querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!
@@ -518,9 +548,6 @@ it('configures entrance and exit blur separately, starts disabled and retains th
     '[data-phase="enter"] [aria-label="gallery.videoReview.motionBlur"]'
   )!;
   await act(async () => enter.click());
-  await act(async () =>
-    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
-  );
   expect(change).toHaveBeenLastCalledWith({
     motionBlur: { enter: { enabled: true, strength: 0.5 } },
   });
@@ -545,9 +572,6 @@ it('configures entrance and exit blur separately, starts disabled and retains th
     '[data-phase="exit"] [aria-label="gallery.videoReview.motionBlur"]'
   )!;
   await act(async () => exit.click());
-  await act(async () =>
-    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
-  );
   expect(change).toHaveBeenLastCalledWith({
     motionBlur: { enter: configured.motionBlur.enter, exit: { enabled: true, strength: 0.8 } },
   });
@@ -575,9 +599,6 @@ it('edits only outgoing link exposure in the selected transition inspector', asy
     '[data-phase="link"] [aria-label="gallery.videoReview.motionBlur"]'
   )!;
   await act(async () => toggle.click());
-  await act(async () =>
-    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
-  );
   expect(change).toHaveBeenLastCalledWith({
     motionBlur: { enter: source.motionBlur.enter, link: { enabled: true, strength: 0.5 } },
   });

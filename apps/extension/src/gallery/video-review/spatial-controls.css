@@ -9,6 +9,10 @@
   gap: 0.125rem;
   min-width: 0;
 }
+.review-spatial-context {
+  height: 2rem;
+  min-width: 0;
+}
 .review-spatial-tools button[aria-pressed='true'] {
   background: var(--sniptale-color-surface-input);
 }

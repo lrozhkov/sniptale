@@ -1,4 +1,5 @@
 import type { ReviewFrameExportInput } from './render-export-input';
+import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
 import { createReviewWatermarkRenderer, type ReviewWatermarkRenderer } from './render-watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
@@ -571,7 +572,7 @@ export async function renderRenderWindowFrames(args: {
     (r) =>
       !r.dormant &&
       quickEditFocusType(r) === 'zoom' &&
-      (r.perspective?.enabled || r.depthOfField?.enabled)
+      (hasQuickEditPerspective(r.perspective) || r.depthOfField?.enabled)
   )
     ? createReviewSpatialRenderer()
     : undefined;

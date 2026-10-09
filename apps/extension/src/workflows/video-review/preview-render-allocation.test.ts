@@ -287,6 +287,18 @@ function runtimeInput(): PreviewRuntimeAllocationInput {
   };
 }
 
+it('reserves no spatial surfaces for neutral enabled poses and admits an actual rotation', () => {
+  const runtime = runtimeInput();
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'neutral', at: 0 }),
+    perspective: { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0.5 },
+  };
+  runtime.scene.zoomRegions = [region];
+  expect(resolvePreviewRenderAllocation(runtime).scene.spatial).toBeNull();
+  runtime.scene.zoomRegions = [{ ...region, perspective: { ...region.perspective, rotateZ: 5 } }];
+  expect(resolvePreviewRenderAllocation(runtime).scene.spatial).not.toBeNull();
+});
+
 it('resolves a plain runtime graph without inventing a pre-capture source allocation', () => {
   const runtime = runtimeInput();
   const graph = resolvePreviewRenderAllocation(runtime);

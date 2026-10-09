@@ -1,4 +1,5 @@
 import type { PreviewScene as Scene, PreviewSceneDimensions as Dimensions } from './preview-scene';
+import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
 import {
   presentationMainColorOpacity,
   presentationMainColor,
@@ -457,7 +458,7 @@ export function createReviewPreviewRenderer(args: {
               !region.dormant &&
               !region.border &&
               !region.spotlight &&
-              (region.perspective?.enabled || region.depthOfField?.enabled)
+              (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
           )
         )
           assets.spatial = createReviewSpatialRenderer(args.onContextLost, args.resources);

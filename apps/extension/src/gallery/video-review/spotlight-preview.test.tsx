@@ -434,7 +434,7 @@ for (const type of ['border', 'spotlight'] as const) {
         title: 'Header',
       };
       for (const windowHeader of [header, undefined, header]) {
-        for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
+        for (const zoomBehavior of ['fixed', 'follow-video', 'window', 'content'] as const) {
           const background: QuickEditBackgroundSettings = {
             enabled: true,
             type: 'solid',
@@ -483,6 +483,15 @@ for (const type of ['border', 'spotlight'] as const) {
                 )
               )
             );
+            if (
+              surface === 'inspector' &&
+              (zoomBehavior === 'window' || zoomBehavior === 'content')
+            ) {
+              const paint = host.querySelector<HTMLElement>(
+                '.pointer-events-none.absolute.inset-0'
+              )!;
+              expect(paint.style.transform).toBe('translate(0px, 0px) scale(1)');
+            }
             const frame = host.querySelector<HTMLElement>('[data-focus-frame]')!;
             expect(parseFloat(frame.style.top)).toBeCloseTo((expected.y / output.height) * 100);
             expect(parseFloat(frame.style.height)).toBeCloseTo(

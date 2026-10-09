@@ -2,8 +2,6 @@ import { ReviewButton } from './controls';
 import { ReviewPresentationBinding } from './presentation-binding';
 import { ReviewWatermarkInspector } from './watermark-inspector';
 import type { ComponentProps } from 'react';
-import { quickEditSpatialSpan } from '../../features/video/review/advanced/spatial';
-import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { Scan, Wallpaper, Stamp, AudioLines, PanelTop, Clapperboard } from 'lucide-react';
 import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
@@ -160,14 +158,6 @@ export function ReviewSceneProperties(props: {
               icon: Wallpaper,
               content: (
                 <ReviewBackgroundInspector
-                  perspectiveFixed={
-                    props.focus
-                      ? quickEditSpatialSpan(
-                          resolveQuickEditEffectiveState(props.focus.advanced).zoomRegions,
-                          props.focus.time
-                        )
-                      : false
-                  }
                   background={props.background}
                   pending={props.pending}
                   onImportImage={props.onImportImage}

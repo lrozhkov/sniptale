@@ -162,7 +162,8 @@ export function computeZoomPreviewArea(
   output: { width: number; height: number }
 ): QuickEditRect {
   const source =
-    !background.enabled || background.zoomBehavior !== 'follow-video'
+    background.zoomBehavior !== 'window' &&
+    (!background.enabled || background.zoomBehavior !== 'follow-video')
       ? computeQuickEditVisibleSourceRect(layout, background, output)
       : {
           x: -layout.videoTransform.x / layout.videoTransform.width,

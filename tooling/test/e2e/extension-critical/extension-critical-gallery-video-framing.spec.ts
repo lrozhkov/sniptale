@@ -141,6 +141,7 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.scene').click();
       await button('gallery.videoReview.backgroundSolid').click();
+      await button('gallery.videoReview.backgroundZoomContent').click();
       await setNumber('gallery.videoReview.backgroundPadding', '20');
       await setNumber('gallery.videoReview.backgroundCornerRadius', '0');
       await button('gallery.videoReview.zoomAdd').click();
@@ -163,17 +164,11 @@ for (const variant of [
       await checkFramingGeometry(page, false, variant.locale);
       const sceneMode = async (follow: boolean, padding: string) => {
         await button('gallery.videoReview.scene').click();
-        await button('gallery.videoReview.backgroundZoom').click();
-        await page
-          .getByRole('option', {
-            name: label(
-              follow
-                ? 'gallery.videoReview.backgroundZoomFollow'
-                : 'gallery.videoReview.backgroundZoomFixed'
-            ),
-            exact: true,
-          })
-          .click();
+        await button(
+          follow
+            ? 'gallery.videoReview.backgroundZoomWindow'
+            : 'gallery.videoReview.backgroundZoomContent'
+        ).click();
         await setNumber('gallery.videoReview.backgroundPadding', padding);
         await button('gallery.videoReview.zoomRegionLabel').click();
         await expect(preview).toHaveAttribute('data-status', 'ready');
@@ -195,11 +190,18 @@ for (const variant of [
       const box = (await preview.locator('canvas').boundingBox())!;
       await page.mouse.click(box.x + box.width * 0.12, box.y + box.height / 2);
       await expect.poll(() => persistedFocus(page)).toEqual(before);
+      await expect(preview).toHaveAttribute('data-status', 'ready');
       const video = dialog.locator('video');
       await video.evaluate((node) => {
         node.currentTime = 0;
       });
+      await expect(preview).toHaveAttribute('data-status', 'ready');
       await button('gallery.videoReview.play').click();
+      // Transport intentionally clears edit selection. Reopen the focus while it plays.
+      await dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first()
+        .click();
       await expect(preview).toHaveAttribute('data-playing', 'true');
       await expect.poll(() => video.evaluate((node) => node.currentTime)).toBeGreaterThan(0.1);
       await expect.poll(width).toBeLessThan(99);

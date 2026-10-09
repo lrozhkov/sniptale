@@ -1,6 +1,6 @@
 import { reviewSelectFieldClassName, ReviewDetails } from './controls';
 import { translate } from '../../platform/i18n';
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { ReviewNumberRow } from './number-row';
 import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
 import type { QuickEditSpotlight } from '../../features/video/review/advanced/types';
@@ -97,8 +97,10 @@ export function ReviewSpotlightAnimation(props: {
 }) {
   const field = props.phase === 'enter' ? 'reveal' : 'exitReveal';
   return (
-    <SelectField
-      className={reviewSelectFieldClassName}
+    <SegmentedRow
+      columns={2}
+      layout="stacked"
+      ariaLabel={translate('gallery.videoReview.focusReveal')}
       label={translate('gallery.videoReview.focusReveal')}
       value={props.value[field]}
       options={[

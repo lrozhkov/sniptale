@@ -1,7 +1,7 @@
-import { useLayoutEffect, useState, type RefObject } from 'react';
+import { createContext, useLayoutEffect, useState, type ReactNode, type RefObject } from 'react';
 import { Focus, Move, RotateCcw, RotateCw, Scan } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
@@ -21,15 +21,21 @@ const toolLabels = {
 } as const;
 const toolIcons = { position: Move, tilt: Scan, rotation: RotateCw, focus: Focus };
 
+/** The inspector owns navigation; its preview and numeric fields share this disposable choice. */
+export const ReviewSpatialToolContext = createContext<{
+  tool: SpatialTool;
+  onTool(tool: SpatialTool): void;
+} | null>(null);
+
 /** Navigation stays outside the canvas capture scope and never mutates the selected target. */
 export function ReviewSpatialToolbar(props: {
   tool: SpatialTool;
   axis: SpatialAxis;
-  region: QuickEditZoomRegion;
   disabled: boolean;
   onTool(tool: SpatialTool): void;
   onAxis(axis: SpatialAxis): void;
   onReset(): void;
+  children?: ReactNode;
 }) {
   return (
     <div className="review-spatial-toolbar" data-ui="gallery.videoReview.spatialTools">
@@ -40,11 +46,6 @@ export function ReviewSpatialToolbar(props: {
       >
         {(['position', 'tilt', 'rotation', 'focus'] as const).map((tool) => {
           const Icon = toolIcons[tool];
-          const available =
-            tool === 'position' ||
-            (tool === 'focus'
-              ? props.region.depthOfField?.enabled
-              : props.region.perspective?.enabled);
           return (
             <ContentToolbarButton
               type="button"
@@ -53,7 +54,7 @@ export function ReviewSpatialToolbar(props: {
               tone="utility"
               aria-pressed={props.tool === tool}
               title={translate(toolLabels[tool])}
-              disabled={props.disabled || !available}
+              disabled={props.disabled}
               onClick={() => props.onTool(tool)}
             >
               <Icon size={15} aria-hidden />
@@ -61,42 +62,45 @@ export function ReviewSpatialToolbar(props: {
           );
         })}
         <span className="review-spatial-tool-name">{translate(toolLabels[props.tool])}</span>
-        {props.tool !== 'position' ? (
-          <ContentToolbarButton
-            type="button"
-            size="compact"
-            tone="utility"
-            title={translate(
-              props.tool === 'tilt'
+        <ContentToolbarButton
+          type="button"
+          size="compact"
+          tone="utility"
+          title={translate(
+            props.tool === 'position'
+              ? 'gallery.videoReview.spatialResetPosition'
+              : props.tool === 'tilt'
                 ? 'gallery.videoReview.spatialResetTilt'
                 : props.tool === 'rotation'
                   ? 'gallery.videoReview.spatialResetRotation'
                   : 'gallery.videoReview.spatialResetFocus'
-            )}
-            disabled={props.disabled}
-            onClick={props.onReset}
-          >
-            <RotateCcw size={14} aria-hidden />
-          </ContentToolbarButton>
-        ) : null}
+          )}
+          disabled={props.disabled}
+          onClick={props.onReset}
+        >
+          <RotateCcw size={14} aria-hidden />
+        </ContentToolbarButton>
       </div>
-      {props.tool === 'tilt' ? (
-        <SegmentedSwitch<SpatialAxis>
-          density="compact"
-          ariaLabel={translate('gallery.videoReview.spatialAxis')}
-          activeId={props.axis}
-          options={[
-            {
-              id: 'both',
-              label: translate('gallery.videoReview.spatialAxisBoth'),
-              disabled: props.disabled,
-            },
-            { id: 'x', label: 'X', disabled: props.disabled },
-            { id: 'y', label: 'Y', disabled: props.disabled },
-          ]}
-          onChange={props.onAxis}
-        />
-      ) : null}
+      <div className="review-spatial-context">
+        {props.tool === 'tilt' ? (
+          <SegmentedRow<SpatialAxis>
+            ariaLabel={translate('gallery.videoReview.spatialAxis')}
+            value={props.axis}
+            options={[
+              {
+                value: 'both',
+                label: translate('gallery.videoReview.spatialAxisBoth'),
+                disabled: props.disabled,
+              },
+              { value: 'x', label: 'X', disabled: props.disabled },
+              { value: 'y', label: 'Y', disabled: props.disabled },
+            ]}
+            onChange={props.onAxis}
+          />
+        ) : (
+          props.children
+        )}
+      </div>
     </div>
   );
 }

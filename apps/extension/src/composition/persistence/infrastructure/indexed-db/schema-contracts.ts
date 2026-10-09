@@ -74,7 +74,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 11,
+    schemaVersion: 12,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -438,6 +438,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         )
       )
         throw new Error('Scene appearance workspace stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 11, to: 12 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 12,
+    toDatabaseVersion: 13,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      )
+        throw new Error('Window zoom workspace stores are unavailable.');
       return undefined;
     },
   },

@@ -111,21 +111,15 @@ function key(node: HTMLElement, name: string, shiftKey = false) {
   );
 }
 
-it('uses native disabled toolbar buttons from authored enable state and navigates without reset', () => {
+it('makes all tools available without enabling authored effects or resetting them', () => {
   const view = mount();
   const onTool = vi.fn(),
     onAxis = vi.fn(),
     onReset = vi.fn();
-  const disabledRegion = {
-    ...region,
-    perspective: { ...region.perspective, enabled: false },
-    depthOfField: { ...region.depthOfField, enabled: false },
-  };
   view.render(
     <ReviewSpatialToolbar
       tool="position"
       axis="both"
-      region={disabledRegion}
       disabled={false}
       onTool={onTool}
       onAxis={onAxis}
@@ -134,10 +128,11 @@ it('uses native disabled toolbar buttons from authored enable state and navigate
   );
   for (const name of ['spatialToolTilt', 'spatialToolRotation', 'spatialToolFocus']) {
     const node = button(view.host, name);
-    expect(node.disabled).toBe(true);
+    expect(node.disabled).toBe(false);
     act(() => node.click());
   }
-  expect(onTool).not.toHaveBeenCalled();
+  expect(onTool.mock.calls).toEqual([['tilt'], ['rotation'], ['focus']]);
+  onTool.mockClear();
   expect(button(view.host, 'spatialToolPosition').disabled).toBe(false);
   expect(button(view.host, 'spatialToolPosition').type).toBe('button');
   expect(button(view.host, 'spatialToolPosition').getAttribute('aria-pressed')).toBe('true');
@@ -145,7 +140,6 @@ it('uses native disabled toolbar buttons from authored enable state and navigate
     <ReviewSpatialToolbar
       tool="position"
       axis="both"
-      region={region}
       disabled={false}
       onTool={onTool}
       onAxis={onAxis}
@@ -159,6 +153,7 @@ it('uses native disabled toolbar buttons from authored enable state and navigate
 });
 
 it.each([
+  ['position', 'spatialResetPosition'],
   ['tilt', 'spatialResetTilt'],
   ['rotation', 'spatialResetRotation'],
   ['focus', 'spatialResetFocus'],
@@ -277,9 +272,9 @@ it.each([0, 90, 180, -90])(
   }
 );
 
-it('uses authored enable state for the real gesture even when rendered transient perspective is enabled', () => {
+it('blocks read-only gestures even when rendered transient perspective is enabled', () => {
   const authored = { ...region, perspective: { ...region.perspective, enabled: false } };
-  const view = controls({ tool: 'tilt', region: authored, renderedRegion: region });
+  const view = controls({ tool: 'tilt', region: authored, renderedRegion: region, enabled: false });
   const node = button(view.host, 'spatialDragTilt');
   expect(node.disabled).toBe(true);
   key(node, 'ArrowRight');

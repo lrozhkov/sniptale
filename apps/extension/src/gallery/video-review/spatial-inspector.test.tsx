@@ -18,35 +18,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('starts collapsed and marks enabled settings without modifying the document', () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const host = document.createElement('div');
-  document.body.append(host);
-  hosts.push(host);
-  const root = createRoot(host);
-  roots.push(root);
-  const onChange = vi.fn();
-  const region = {
-    ...createQuickEditZoomRegion({ id: 'zoom', at: 0 }),
-    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 35 },
-  };
-  act(() => root.render(<ReviewSpatialInspector region={region} onChange={onChange} />));
-  const groups = host.querySelectorAll('details');
-  expect(groups).toHaveLength(2);
-  expect([...groups].every((group) => !group.open)).toBe(true);
-  expect(groups[0]?.querySelector('summary')?.textContent).toContain(
-    'gallery.videoReview.spatialOn'
-  );
-  expect(groups[1]?.querySelector('summary')?.textContent).not.toContain(
-    'gallery.videoReview.spatialOn'
-  );
-  expect(onChange).not.toHaveBeenCalled();
-  const reset = [...groups[0]!.querySelectorAll('button')].find(
-    (b) => b.getAttribute('aria-label') === 'gallery.videoReview.spatialReset'
-  )!;
-  act(() => reset.click());
-  expect(onChange).toHaveBeenCalledWith({ perspective: DEFAULT_QUICK_EDIT_PERSPECTIVE });
-});
+it.each(['tilt', 'rotation', 'focus'] as const)(
+  'shows only the selected %s fields without Apply or document mutation',
+  (tool) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    hosts.push(host);
+    const root = createRoot(host);
+    roots.push(root);
+    const onChange = vi.fn();
+    const region = createQuickEditZoomRegion({ id: 'zoom', at: 0 });
+    act(() =>
+      root.render(<ReviewSpatialInspector tool={tool} region={region} onChange={onChange} />)
+    );
+    expect(host.querySelector('[aria-label="gallery.videoReview.spatialEnabled"]')).toBeNull();
+    expect(!!host.querySelector('input[aria-label="gallery.videoReview.perspectiveX"]')).toBe(
+      tool === 'tilt'
+    );
+    expect(!!host.querySelector('input[aria-label="gallery.videoReview.perspectiveZ"]')).toBe(
+      tool === 'rotation'
+    );
+    expect(!!host.querySelector('input[aria-label="gallery.videoReview.depthStrength"]')).toBe(
+      tool === 'focus'
+    );
+    expect(onChange).not.toHaveBeenCalled();
+  }
+);
 
 it.each(['pointerup', 'pointercancel', 'Escape'])(
   'shows a scrub draft and handles %s without leaking intermediate edits',
@@ -65,7 +63,12 @@ it.each(['pointerup', 'pointercancel', 'Escape'])(
     };
     act(() =>
       root.render(
-        <ReviewSpatialInspector region={region} onChange={onChange} onPreview={onPreview} />
+        <ReviewSpatialInspector
+          tool="tilt"
+          region={region}
+          onChange={onChange}
+          onPreview={onPreview}
+        />
       )
     );
     const field = host.querySelector<HTMLInputElement>(
@@ -107,7 +110,44 @@ it.each(['pointerup', 'pointercancel', 'Escape'])(
   }
 );
 
-it('edits depth mode, focus area and strength through the existing unit fields', async () => {
+it.each(['tilt', 'rotation', 'focus'] as const)(
+  'enables %s with a changed number, but not an unchanged Enter',
+  async (tool) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    hosts.push(host);
+    const root = createRoot(host);
+    roots.push(root);
+    const onChange = vi.fn();
+    const region = createQuickEditZoomRegion({ id: 'disabled', at: 0 });
+    act(() =>
+      root.render(<ReviewSpatialInspector tool={tool} region={region} onChange={onChange} />)
+    );
+    const name =
+      tool === 'focus' ? 'depthStrength' : tool === 'tilt' ? 'perspectiveX' : 'perspectiveZ';
+    const input = host.querySelector<HTMLInputElement>(
+      `input[aria-label="gallery.videoReview.${name}"]`
+    )!;
+    const enter = () =>
+      act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    act(() => input.focus());
+    enter();
+    expect(onChange).not.toHaveBeenCalled();
+    act(() => input.focus());
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '35');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    enter();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const patch = onChange.mock.calls[0]![0];
+    expect(tool === 'focus' ? patch.depthOfField.enabled : patch.perspective.enabled).toBe(true);
+    expect(document.activeElement).not.toBe(input);
+  }
+);
+
+it('edits focus area and strength through the existing unit fields', async () => {
   const { DEFAULT_QUICK_EDIT_DEPTH } = await import('../../features/video/review/advanced/spatial');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
@@ -124,34 +164,14 @@ it('edits depth mode, focus area and strength through the existing unit fields',
   };
   act(() =>
     root.render(
-      <ReviewSpatialInspector region={region} onChange={onChange} onPreview={onPreview} />
+      <ReviewSpatialInspector
+        tool="focus"
+        region={region}
+        onChange={onChange}
+        onPreview={onPreview}
+      />
     )
   );
-  const groups = host.querySelectorAll('details');
-  const choose = async (scope: ParentNode, label: string, option: string) => {
-    await act(async () =>
-      scope
-        .querySelector<HTMLButtonElement>(`button[aria-label="gallery.videoReview.${label}"]`)!
-        .click()
-    );
-    await act(async () =>
-      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-        .find((node) => node.textContent === `gallery.videoReview.${option}`)!
-        .click()
-    );
-  };
-  await choose(groups[0]!, 'spatialEnabled', 'motionBlurOff');
-  expect(onChange).toHaveBeenLastCalledWith({
-    perspective: { ...region.perspective, enabled: false },
-  });
-  await choose(groups[1]!, 'spatialEnabled', 'motionBlurOff');
-  expect(onChange).toHaveBeenLastCalledWith({
-    depthOfField: { ...region.depthOfField, enabled: false },
-  });
-  await choose(groups[1]!, 'depthMode', 'depthModeArea');
-  expect(onChange).toHaveBeenLastCalledWith({
-    depthOfField: { ...region.depthOfField, mode: 'area' },
-  });
   for (const [name, key] of [
     ['depthX', 'x'],
     ['depthY', 'y'],
@@ -176,16 +196,10 @@ it('edits depth mode, focus area and strength through the existing unit fields',
       depthOfField: { ...region.depthOfField, [key]: 0.6 },
     });
   }
-  act(() =>
-    groups[1]!
-      .querySelector<HTMLButtonElement>('button[aria-label="gallery.videoReview.spatialReset"]')!
-      .click()
-  );
-  expect(onChange).toHaveBeenLastCalledWith({ depthOfField: DEFAULT_QUICK_EDIT_DEPTH });
 });
 
 it.each([
-  ['perspectiveY', 'perspectiveZ', 'perspective', 'rotateY', 35],
+  ['perspectiveY', 'perspectiveX', 'perspective', 'rotateY', 35],
   ['depthWidth', 'depthSoftness', 'depthOfField', 'width', 0.35],
 ] as const)(
   'accepts %s once on Enter, clears its preview and leaves numeric editing',
@@ -207,7 +221,12 @@ it.each([
     };
     act(() =>
       root.render(
-        <ReviewSpatialInspector region={region} onChange={onChange} onPreview={onPreview} />
+        <ReviewSpatialInspector
+          tool={group === 'perspective' ? 'tilt' : 'focus'}
+          region={region}
+          onChange={onChange}
+          onPreview={onPreview}
+        />
       )
     );
     const field = host.querySelector<HTMLInputElement>(
@@ -216,7 +235,6 @@ it.each([
     const next = host.querySelector<HTMLInputElement>(
       `input[aria-label="gallery.videoReview.${nextLabel}"]`
     )!;
-    field.closest('details')!.open = true;
     act(() => field.focus());
     expect(document.activeElement).toBe(field);
     await act(async () => {

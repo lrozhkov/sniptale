@@ -66,7 +66,7 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
         view={view}
         offsetX={offsetX}
         offsetY={offsetY}
-        scale={motion.scale}
+        scale={motion.backgroundScale}
       />
       {spatialFailure ? (
         <div role="alert" className="relative z-20 p-2 text-xs">

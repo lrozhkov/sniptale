@@ -137,7 +137,7 @@ function useStageInteractionGeometry(
   const motion =
     sceneLayout && props.scene
       ? computeQuickEditSceneCamera(sceneLayout, props.scene.background)
-      : { x: 0, y: 0, scale: 1 };
+      : { x: 0, y: 0, scale: 1, backgroundScale: 1 };
   const window = sceneLayout
     ? computeQuickEditSpatialWindow(sceneLayout, props.scene?.background ?? { enabled: false })
     : null;
@@ -744,7 +744,7 @@ function ReviewStageBackground({
   paint,
 }: {
   props: ReviewStageProps;
-  motion: { x: number; y: number; scale: number };
+  motion: { x: number; y: number; backgroundScale: number };
   paint: string | null;
 }) {
   const background = props.scene?.background;
@@ -760,7 +760,7 @@ function ReviewStageBackground({
       style={{
         background: paint ?? undefined,
         transformOrigin: '0 0',
-        transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.scale})`,
+        transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.backgroundScale})`,
       }}
     >
       {blurred ? (

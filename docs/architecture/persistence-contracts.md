@@ -20,6 +20,8 @@ Gallery scene watermarks require physical version 6 and the mediaLibrary logical
 
 Gallery presentation join settings require physical version 10 and mediaLibrary contract 9. The additive 9→10 step retains every workspace, history, recovery draft, asset and native usage index. Advanced version 8 admits versions 2–7 without injecting join defaults into legacy settings or replay operations. Earlier applications refuse the newer database before ordinary mutations.
 
+Gallery window zoom modes require physical version 13 and mediaLibrary contract 12. Advanced version 11 adds explicit whole-window and fixed-frame zoom over a stationary background; the header always transforms with the video. Existing fixed/follow-video and absent settings retain their legacy rendering. The additive 12→13 admission step leaves workspace rows, history, recovery drafts and immutable media untouched. Only newly created workspaces start in whole-window mode; explicit author edits select either new mode through ordinary history.
+
 ## Alpha reset and recovery
 
 Use `sniptale-video-db` only in alpha-reset and privacy-erasure inventories. Under the persistent-data barrier, Gallery records a browser-storage journal, removes alpha IndexedDB and OPFS data plus preview cache, verifies absence, and clears the journal. Resume an interrupted reset from that journal. Do not migrate or export alpha data.

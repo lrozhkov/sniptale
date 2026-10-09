@@ -1,3 +1,4 @@
+import { galleryVideoReviewAnimationMessages } from './video-review-animation';
 import { galleryVideoReviewPresentationMessages } from './video-review-presentation';
 import { galleryVideoReviewPreviewMessages } from './video-review-preview';
 import { galleryVideoReviewSceneMessages } from './video-review-scene';
@@ -10,6 +11,7 @@ import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewAnimationMessages,
   ...galleryVideoReviewPresentationMessages,
   ...galleryVideoReviewPreviewMessages,
   ...galleryVideoReviewSceneMessages,

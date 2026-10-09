@@ -2,8 +2,16 @@ import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
 } from '../../features/video/review/advanced/spatial-geometry';
-import { DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/review/advanced/spatial';
-import { ReviewSpatialToolbar, ReviewSpatialControls } from './spatial-controls';
+import {
+  DEFAULT_QUICK_EDIT_DEPTH,
+  DEFAULT_QUICK_EDIT_PERSPECTIVE,
+  interpolateQuickEditSpatial,
+} from '../../features/video/review/advanced/spatial';
+import {
+  ReviewSpatialToolbar,
+  ReviewSpatialControls,
+  ReviewSpatialToolContext,
+} from './spatial-controls';
 import type { SpatialTool, SpatialAxis } from './spatial-gesture';
 import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
@@ -14,7 +22,7 @@ import { evaluateQuickEditBordersAtTime } from '../../features/video/review/adva
 import { useReviewWindowHeader } from './use-window-header';
 import { ZoomPreviewCanvas } from './zoom-preview-canvas';
 import { ReviewSpotlightPreview } from './spotlight-preview';
-import { useMemo, useRef, useState, type RefObject } from 'react';
+import { useContext, useMemo, useRef, useState, type RefObject } from 'react';
 import { useReviewBackgroundImage } from './use-review-background';
 import { translate } from '../../platform/i18n';
 import type {
@@ -28,8 +36,12 @@ import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
 } from '../../features/video/review/advanced/scene';
-import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
+import {
+  createQuickEditZoomRegion,
+  type QuickEditZoomRegionPatch,
+} from '../../features/video/review/advanced/zoom';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { ReviewButton } from './controls';
 import { previewBackgroundPaint } from './zoom-preview-paint';
 import { useZoomPreviewFrame, type ZoomPreviewFrameLoader } from './use-zoom-preview-source';
@@ -106,17 +118,24 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
       aria-label={translate('gallery.videoReview.zoomPreview')}
       className="space-y-2"
     >
-      <ZoomPreviewHeading region={region} controls={controls} />
+      {overlay || !props.spatialEdit ? (
+        <ZoomPreviewHeading region={region} controls={controls} />
+      ) : null}
       {!overlay && props.spatialEdit ? (
         <ReviewSpatialToolbar
           tool={tool}
           axis={axis}
-          region={props.spatialEdit.region}
           disabled={!spatialInteractive}
           onTool={controls.setTool}
           onAxis={controls.setAxis}
           onReset={() => resetPreviewTool(props.spatialEdit, tool, spatialInteractive)}
-        />
+        >
+          <ZoomPreviewContext
+            controls={controls}
+            edit={props.spatialEdit}
+            disabled={!spatialInteractive}
+          />
+        </ReviewSpatialToolbar>
       ) : null}
       <div
         ref={bounds}
@@ -205,15 +224,14 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
 /** Owns temporary tool/view choices without changing the authored target or transport. */
 function usePreviewToolSelection(props: ZoomPreviewProps) {
   const [zoomView, setView] = useState<'area' | 'result'>('area');
-  const [selectedTool, setTool] = useState<SpatialTool>('position');
+  const [localTool, setLocalTool] = useState<SpatialTool>('position');
+  const shared = useContext(ReviewSpatialToolContext);
+  const selectedTool = shared?.tool ?? localTool;
+  const setTool = shared?.onTool ?? setLocalTool;
   const [axis, setAxis] = useState<SpatialAxis>('both');
   const { region } = props;
   const overlay = !!(region.spotlight || region.border);
-  const unavailable =
-    !props.spatialEdit ||
-    overlay ||
-    (selectedTool === 'focus' && !region.depthOfField?.enabled) ||
-    ((selectedTool === 'tilt' || selectedTool === 'rotation') && !region.perspective?.enabled);
+  const unavailable = !props.spatialEdit || overlay;
   const tool = unavailable ? 'position' : selectedTool;
   const view = overlay ? 'area' : tool === 'position' ? zoomView : 'result';
   return { tool, axis, overlay, view, setTool, setAxis, setView };
@@ -272,8 +290,17 @@ function resolveSpatialControlGeometry(
   layout: ReturnType<typeof computeQuickEditSceneLayout>,
   background: QuickEditBackgroundSettings
 ) {
-  const spatial = camera.spatial;
-  if (!spatial) return null;
+  const spatial =
+    camera.spatial ??
+    interpolateQuickEditSpatial(
+      null,
+      {
+        ...region,
+        perspective: DEFAULT_QUICK_EDIT_PERSPECTIVE,
+        depthOfField: DEFAULT_QUICK_EDIT_DEPTH,
+      },
+      1
+    );
   return {
     plane: layout.windowRect,
     projection: quickEditPlaneProjection(
@@ -294,12 +321,72 @@ function resetPreviewTool(
 ) {
   if (!edit || !interactive) return;
   const perspective = edit.region.perspective;
-  if (tool === 'tilt' && perspective)
-    edit.onCommit(edit.revision, { perspective: { ...perspective, rotateX: 0, rotateY: 0 } });
+  if (tool === 'position') {
+    const { transform } = createQuickEditZoomRegion({ id: edit.region.id, at: edit.region.start });
+    edit.onCommit(edit.revision, transform);
+  } else if (tool === 'tilt' && perspective)
+    edit.onCommit(edit.revision, {
+      perspective: {
+        ...perspective,
+        rotateX: 0,
+        rotateY: 0,
+        strength: DEFAULT_QUICK_EDIT_PERSPECTIVE.strength,
+      },
+    });
   else if (tool === 'rotation' && perspective)
     edit.onCommit(edit.revision, { perspective: { ...perspective, rotateZ: 0 } });
   else if (tool === 'focus' && edit.region.depthOfField)
-    edit.onCommit(edit.revision, { depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true } });
+    edit.onCommit(edit.revision, { depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH } });
+}
+
+/** One reserved row keeps the canvas stationary as the editing tool changes. */
+function ZoomPreviewContext(props: {
+  controls: ReturnType<typeof usePreviewToolSelection>;
+  edit: NonNullable<ZoomPreviewProps['spatialEdit']>;
+  disabled: boolean;
+}) {
+  const { controls, edit, disabled } = props;
+  if (controls.tool === 'position')
+    return (
+      <div data-ui="gallery.videoReview.previewMode">
+        <SegmentedRow<'area' | 'result'>
+          ariaLabel={translate('gallery.videoReview.zoomPreview')}
+          columns={2}
+          value={controls.view}
+          options={[
+            { value: 'area', label: translate('gallery.videoReview.zoomPreviewArea'), disabled },
+            {
+              value: 'result',
+              label: translate('gallery.videoReview.zoomPreviewResult'),
+              disabled,
+            },
+          ]}
+          onChange={controls.setView}
+        />
+      </div>
+    );
+  if (controls.tool !== 'focus') return null;
+  const depth = edit.region.depthOfField ?? DEFAULT_QUICK_EDIT_DEPTH;
+  return (
+    <SegmentedRow<'off' | 'area' | 'depth'>
+      ariaLabel={translate('gallery.videoReview.depthMode')}
+      value={depth.enabled ? depth.mode : 'off'}
+      options={[
+        { value: 'off', label: translate('gallery.videoReview.depthModeOff'), disabled },
+        { value: 'area', label: translate('gallery.videoReview.depthModeArea'), disabled },
+        { value: 'depth', label: translate('gallery.videoReview.depthModeDepth'), disabled },
+      ]}
+      onChange={(mode) =>
+        edit.onCommit(edit.revision, {
+          depthOfField: {
+            ...depth,
+            enabled: mode !== 'off',
+            mode: mode === 'off' ? depth.mode : mode,
+          },
+        })
+      }
+    />
+  );
 }
 
 /** Framing mode remains available only for ordinary Zoom positioning. */

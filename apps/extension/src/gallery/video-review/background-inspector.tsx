@@ -25,7 +25,6 @@ function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
 
 /** Canvas background owner: kind, paint, and layout belong to the whole frame. */
 export function ReviewBackgroundInspector(props: {
-  perspectiveFixed?: boolean | undefined;
   pending?: boolean;
   onImportImage?: ((file: File, originMediaId?: string) => void) | undefined;
   background: QuickEditBackgroundSettings;
@@ -78,6 +77,7 @@ export function ReviewBackgroundInspector(props: {
             }}
           />
         </div>
+        <ReviewZoomObject background={background} onChange={onChange} />
         {imageRequested || (background.enabled && background.type === 'image') ? (
           <BackgroundImagePicker
             pending={props.pending ?? false}
@@ -108,7 +108,6 @@ export function ReviewBackgroundInspector(props: {
       </div>
       {background.enabled ? (
         <ReviewBackgroundLayoutControls
-          perspectiveFixed={props.perspectiveFixed}
           background={background}
           onChange={onChange}
           onPreview={props.onPreview}
@@ -120,12 +119,10 @@ export function ReviewBackgroundInspector(props: {
 
 /** Frame geometry and camera participation, independent of the selected paint kind. */
 function ReviewBackgroundLayoutControls({
-  perspectiveFixed,
   background,
   onChange,
   onPreview,
 }: {
-  perspectiveFixed?: boolean | undefined;
   background: Extract<QuickEditBackgroundSettings, { enabled: true }>;
   onChange(patch: QuickEditBackgroundPatch): void;
   onPreview?: ((patch: QuickEditBackgroundPatch | null) => void) | undefined;
@@ -155,28 +152,6 @@ function ReviewBackgroundLayoutControls({
   );
   return (
     <div className="space-y-2">
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.backgroundZoom')}
-        disabled={perspectiveFixed}
-        value={perspectiveFixed ? 'fixed' : (background.zoomBehavior ?? 'fixed')}
-        options={[
-          { value: 'fixed', label: translate('gallery.videoReview.backgroundZoomFixed') },
-          {
-            value: 'follow-video',
-            label: translate('gallery.videoReview.backgroundZoomFollow'),
-          },
-        ]}
-        onChange={(zoomBehavior) => {
-          if (!perspectiveFixed && (zoomBehavior === 'fixed' || zoomBehavior === 'follow-video'))
-            onChange({ zoomBehavior });
-        }}
-      />
-      {perspectiveFixed ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.perspectiveBackground')}
-        </p>
-      ) : null}
       {background.type !== 'solid' ? (
         <ReviewPreviewNumberRow
           enterBehavior="blur"
@@ -239,5 +214,48 @@ function ReviewBackgroundLayoutControls({
         onPreviewReset={() => onPreview?.(null)}
       />
     </div>
+  );
+}
+
+/** New modes are explicit; saved legacy framing remains visible until the author changes it. */
+function ReviewZoomObject(props: {
+  background: QuickEditBackgroundSettings;
+  onChange(patch: QuickEditBackgroundPatch): void;
+}) {
+  const value = props.background.zoomBehavior ?? 'fixed';
+  const modes = [
+    { value: 'window' as const, label: translate('gallery.videoReview.backgroundZoomWindow') },
+    { value: 'content' as const, label: translate('gallery.videoReview.backgroundZoomContent') },
+  ];
+  if (value === 'window' || value === 'content')
+    return (
+      <SegmentedRow
+        columns={2}
+        ariaLabel={translate('gallery.videoReview.backgroundZoom')}
+        label={translate('gallery.videoReview.backgroundZoom')}
+        layout="stacked"
+        value={value}
+        options={modes}
+        onChange={(zoomBehavior) => props.onChange({ zoomBehavior })}
+      />
+    );
+  return (
+    <SelectField<NonNullable<QuickEditBackgroundSettings['zoomBehavior']>>
+      className={reviewSelectFieldClassName}
+      label={translate('gallery.videoReview.backgroundZoom')}
+      value={value}
+      options={[
+        {
+          value,
+          label: translate(
+            value === 'fixed'
+              ? 'gallery.videoReview.backgroundZoomLegacyFixed'
+              : 'gallery.videoReview.backgroundZoomLegacyFollow'
+          ),
+        },
+        ...modes,
+      ]}
+      onChange={(zoomBehavior) => props.onChange({ zoomBehavior })}
+    />
   );
 }

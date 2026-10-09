@@ -32,6 +32,13 @@ export const DEFAULT_QUICK_EDIT_DEPTH: QuickEditDepthOfField = {
   strength: 0.5,
 };
 const identityRotation: SpatialQuaternion = [0, 0, 0, 1];
+
+/** An enabled neutral pose has no spatial transform and must not change framing or GPU admission. */
+export function hasQuickEditPerspective(
+  value: QuickEditPerspective | undefined
+): value is QuickEditPerspective {
+  return !!value?.enabled && (value.rotateX !== 0 || value.rotateY !== 0 || value.rotateZ !== 0);
+}
 const bounded = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 
@@ -123,8 +130,8 @@ export function interpolateQuickEditSpatial(
   to: QuickEditZoomRegion,
   progress: number
 ): QuickEditSpatialFrame {
-  const a = from?.perspective,
-    b = to.perspective;
+  const a = hasQuickEditPerspective(from?.perspective) ? from.perspective : undefined,
+    b = hasQuickEditPerspective(to.perspective) ? to.perspective : undefined;
   const t = Math.max(0, Math.min(1, progress));
   const start = a?.enabled ? a.strength : 0;
   const end = b?.enabled ? b.strength : 0;
@@ -182,7 +189,7 @@ export function quickEditSpatialSpan(
     if (
       time >= active[start]!.start &&
       time < active[end]!.end &&
-      active.slice(start, end + 1).some((r) => r.perspective?.enabled)
+      active.slice(start, end + 1).some((r) => hasQuickEditPerspective(r.perspective))
     )
       return true;
     start = end + 1;
@@ -196,7 +203,7 @@ export function quickEditSpatialTargetCamera(
 ): QuickEditCameraTransform {
   if (
     quickEditFocusType(region) !== 'zoom' ||
-    (!region.perspective?.enabled && !region.depthOfField?.enabled)
+    (!hasQuickEditPerspective(region.perspective) && !region.depthOfField?.enabled)
   )
     return region.transform;
   return { ...region.transform, spatial: interpolateQuickEditSpatial(null, region, 1) };

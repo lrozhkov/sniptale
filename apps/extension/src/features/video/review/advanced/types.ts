@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 10;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 11;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -150,8 +150,8 @@ export type QuickEditBackgroundSettings = {
   rememberedLayout?: QuickEditBackgroundLayout;
   /** Last image retained while another background kind is active; reuses its project asset. */
   rememberedImage?: { assetId: string; imageFit: 'cover' | 'contain' };
-  /** Absent on legacy workspaces means a stationary background. */
-  zoomBehavior?: 'fixed' | 'follow-video';
+  /** New modes zoom the joined video/header window over a fixed canvas; legacy values retain their rendering. */
+  zoomBehavior?: 'fixed' | 'follow-video' | 'window' | 'content';
 } & (
   | { enabled: false }
   | {

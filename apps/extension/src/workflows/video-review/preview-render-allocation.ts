@@ -1,4 +1,5 @@
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
+import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
@@ -467,7 +468,7 @@ function focusAllocation(
       !region.dormant &&
       !region.border &&
       !region.spotlight &&
-      (region.perspective?.enabled || region.depthOfField?.enabled)
+      (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
   );
   return {
     spatial: spatialRetained ? { backing, halfFloat: input.spatialHalfFloat ?? true } : null,

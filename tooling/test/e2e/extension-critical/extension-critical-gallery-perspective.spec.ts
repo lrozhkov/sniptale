@@ -16,7 +16,10 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
   const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
   const dialog = page.locator('dialog');
   const button = (key: Parameters<typeof translate>[0]) =>
-    dialog.getByRole('button', { name: label(key), exact: true });
+    (key.startsWith('gallery.videoReview.spatialTool')
+      ? dialog.locator('[data-ui="gallery.videoReview.spatialTools"]')
+      : dialog
+    ).getByRole('button', { name: label(key), exact: true });
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
@@ -53,10 +56,7 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
       .click();
     await button('gallery.videoReview.scene').click();
     await button('gallery.videoReview.backgroundSolid').click();
-    await button('gallery.videoReview.backgroundZoom').click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.backgroundZoomFollow'), exact: true })
-      .click();
+    await button('gallery.videoReview.backgroundZoomWindow').click();
     const padding = dialog.getByRole('textbox', {
       name: label('gallery.videoReview.backgroundPadding'),
       exact: true,
@@ -65,17 +65,8 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
     await padding.press('Enter');
     await dialog.getByRole('button', { name: label('windowHeader.browser'), exact: true }).click();
     await button('gallery.videoReview.zoomAdd').click();
-    const group = dialog.locator('details[data-level="group"]').filter({
-      has: page.locator('summary h4', { hasText: label('gallery.videoReview.perspective') }),
-    });
-    await expect(group).not.toHaveAttribute('open');
-    await group.locator('summary').click();
-    await group
-      .getByRole('button', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.motionBlurOn'), exact: true })
-      .click();
+    await button('gallery.videoReview.spatialToolTilt').click();
+    const group = dialog;
     const tilt = group.getByRole('textbox', {
       name: label('gallery.videoReview.perspectiveY'),
       exact: true,
@@ -100,27 +91,15 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
     await expect(
       dialog.getByText(label('gallery.videoReview.spatialUnavailable'), { exact: true })
     ).toHaveCount(0);
+    await button('gallery.videoReview.spatialToolPosition').click();
     await button('gallery.videoReview.zoomPreviewResult').click();
     await expect(dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]')).toHaveAttribute(
       'data-status',
       'ready'
     );
-    const depth = dialog.locator('details[data-level="group"]').filter({
-      has: page.locator('summary h4', { hasText: label('gallery.videoReview.depthOfField') }),
-    });
-    await depth.locator('summary').click();
-    await depth
-      .getByRole('button', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.motionBlurOn'), exact: true })
-      .click();
-    await depth
-      .getByRole('button', { name: label('gallery.videoReview.depthMode'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.depthModeArea'), exact: true })
-      .click();
+    await button('gallery.videoReview.spatialToolFocus').click();
+    await button('gallery.videoReview.depthModeArea').click();
+    const depth = dialog;
     const blur = depth.getByRole('textbox', {
       name: label('gallery.videoReview.depthStrength'),
       exact: true,
@@ -128,8 +107,10 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
     await blur.fill('100');
     await blur.press('Enter');
     await expect.poll(async () => (await persistedFocus(page))?.depthOfField?.strength).toBe(1);
+    await button('gallery.videoReview.spatialToolFocus').click();
     await blur.scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('depth-inspector.png'), fullPage: false });
+    await button('gallery.videoReview.spatialToolTilt').click();
     await tilt.scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('perspective-inspector.png'), fullPage: false });
     const clickCanvas = stage.locator('[data-ui="gallery.videoReview.clickAnimation"]');
@@ -148,6 +129,7 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
       .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
       .first()
       .click();
+    await button('gallery.videoReview.spatialToolTilt').click();
     await expect(tilt).toHaveValue('35');
     const downloadPromise = page.waitForEvent('download');
     await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
@@ -209,9 +191,9 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
     });
     await page.mouse.click(rulerBox.x + (5 * rulerBox.width) / duration, rulerBox.y + 10);
     await button('gallery.videoReview.scene').click();
-    await expect(button('gallery.videoReview.backgroundZoom')).toBeDisabled();
+    await expect(button('gallery.videoReview.backgroundZoomWindow')).toBeEnabled();
     await page.mouse.click(rulerBox.x + (7 * rulerBox.width) / duration, rulerBox.y + 10);
-    await expect(button('gallery.videoReview.backgroundZoom')).toBeEnabled();
+    await expect(button('gallery.videoReview.backgroundZoomWindow')).toBeEnabled();
     await dialog
       .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
       .first()
@@ -234,6 +216,8 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
         await page.mouse.move(box.x + box.width / 2 - (target - current), box.y + box.height / 2);
         await page.mouse.up();
         await expect.poll(contentWidth).toBe(target);
+        await button('gallery.videoReview.spatialToolFocus').click();
+        await button('gallery.videoReview.spatialToolFocus').click();
         await blur.scrollIntoViewIfNeeded();
         await expect(blur).toBeVisible();
         await page.screenshot({
@@ -243,6 +227,7 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
       }
     }
     await page.setViewportSize({ width: 1100, height: 560 });
+    await button('gallery.videoReview.spatialToolFocus').click();
     await blur.scrollIntoViewIfNeeded();
     await expect(blur).toBeVisible();
     await page.screenshot({
@@ -297,16 +282,22 @@ test('unavailable perspective preserves settings and can retry', async ({ page }
         { once: true }
       );
     });
-    const group = dialog.locator('details[data-level="group"]').filter({
-      has: page.locator('summary h4', { hasText: label('gallery.videoReview.perspective') }),
+    await dialog
+      .getByRole('button', { name: label('gallery.videoReview.spatialToolTilt'), exact: true })
+      .click();
+    const tilt = dialog.getByRole('textbox', {
+      name: label('gallery.videoReview.perspectiveY'),
+      exact: true,
     });
-    await group.locator('summary').click();
-    await group
-      .getByRole('button', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.motionBlurOn'), exact: true })
-      .click();
+    const changeTilt = async (value: string) => {
+      await dialog
+        .locator('[data-ui="gallery.videoReview.spatialTools"]')
+        .getByRole('button', { name: label('gallery.videoReview.spatialToolTilt'), exact: true })
+        .click();
+      await tilt.fill(value);
+      await tilt.press('Enter');
+    };
+    await changeTilt('35');
     const alert = dialog
       .locator('[data-ui="gallery.videoReview.stage"]')
       .getByRole('alert')
@@ -318,6 +309,10 @@ test('unavailable perspective preserves settings and can retry', async ({ page }
       .getByRole('alert');
     await expect(miniAlert).toBeVisible();
     await dialog
+      .locator('[data-ui="gallery.videoReview.spatialTools"]')
+      .getByRole('button', { name: label('gallery.videoReview.spatialToolPosition'), exact: true })
+      .click();
+    await dialog
       .getByRole('button', { name: label('gallery.videoReview.zoomPreviewArea'), exact: true })
       .click();
     await expect(miniAlert).toHaveCount(0);
@@ -326,20 +321,10 @@ test('unavailable perspective preserves settings and can retry', async ({ page }
       .getByRole('button', { name: label('gallery.videoReview.zoomPreviewResult'), exact: true })
       .click();
     await expect(miniAlert).toBeVisible();
-    await group
-      .getByRole('button', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.motionBlurOff'), exact: true })
-      .click();
+    await changeTilt('0');
     await expect(miniAlert).toHaveCount(0);
     await expect(alert).toHaveCount(0);
-    await group
-      .getByRole('button', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.motionBlurOn'), exact: true })
-      .click();
+    await changeTilt('35');
     await expect(miniAlert).toBeVisible();
     await page.evaluate(() => document.dispatchEvent(new Event('restore-test-gpu')));
     await alert

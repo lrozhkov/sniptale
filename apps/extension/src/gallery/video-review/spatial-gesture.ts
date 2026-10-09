@@ -13,6 +13,10 @@ import type {
 } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import {
+  DEFAULT_QUICK_EDIT_DEPTH,
+  DEFAULT_QUICK_EDIT_PERSPECTIVE,
+} from '../../features/video/review/advanced/spatial';
+import {
   resolveReviewSpatialFocusGeometry,
   reviewSpatialFocusPatch,
   type ReviewSpatialControlGeometryInput,
@@ -37,6 +41,8 @@ type Props = {
   onInteract(): void;
 };
 type Transaction = {
+  authoredPerspectiveEnabled: boolean | undefined;
+  authoredDepthEnabled: boolean | undefined;
   handle: SpatialHandle;
   side: -1 | 1 | undefined;
   regionId: string;
@@ -65,9 +71,8 @@ const directions: Record<string, Point> = {
 
 function admitted(props: Props, handle: SpatialHandle) {
   if (!props.enabled) return false;
-  if (handle === 'tilt' || handle === 'rotation')
-    return props.tool === handle && props.region.perspective?.enabled === true;
-  return props.tool === 'focus' && props.region.depthOfField?.enabled === true && !!props.geometry;
+  if (handle === 'tilt' || handle === 'rotation') return props.tool === handle;
+  return props.tool === 'focus' && !!props.geometry;
 }
 
 function current(props: Props, transaction: Transaction) {
@@ -76,7 +81,9 @@ function current(props: Props, transaction: Transaction) {
     props.region.id === transaction.regionId &&
     props.revision === transaction.revision &&
     props.tool === transaction.tool &&
-    props.axis === transaction.axis
+    props.axis === transaction.axis &&
+    props.region.perspective?.enabled === transaction.authoredPerspectiveEnabled &&
+    props.region.depthOfField?.enabled === transaction.authoredDepthEnabled
   );
 }
 
@@ -109,20 +116,17 @@ function updatePatch(transaction: Transaction, patch: Patch) {
 function tiltBy(transaction: Transaction, degrees: Point) {
   const perspective = transaction.patch.perspective;
   if (!perspective) return;
-  updatePatch(transaction, {
-    perspective: {
-      ...perspective,
-      rotateX: clamp(perspective.rotateX + (transaction.axis === 'y' ? 0 : degrees.x), -60, 60),
-      rotateY: clamp(perspective.rotateY + (transaction.axis === 'x' ? 0 : degrees.y), -60, 60),
-    },
-  });
+  const rotateX = clamp(perspective.rotateX + (transaction.axis === 'y' ? 0 : degrees.x), -60, 60);
+  const rotateY = clamp(perspective.rotateY + (transaction.axis === 'x' ? 0 : degrees.y), -60, 60);
+  if (rotateX === perspective.rotateX && rotateY === perspective.rotateY) return;
+  updatePatch(transaction, { perspective: { ...perspective, enabled: true, rotateX, rotateY } });
 }
 
 function rotateBy(transaction: Transaction, degrees: number) {
   const perspective = transaction.patch.perspective;
   if (!perspective || degrees === 0) return;
   updatePatch(transaction, {
-    perspective: { ...perspective, rotateZ: wrap(perspective.rotateZ + degrees) },
+    perspective: { ...perspective, enabled: true, rotateZ: wrap(perspective.rotateZ + degrees) },
   });
 }
 
@@ -135,7 +139,8 @@ function focusBy(transaction: Transaction, delta: Partial<QuickEditDepthOfField>
     if (change !== undefined)
       next[key] = clamp(next[key] + change, key === 'softness' ? 0.01 : 0, 1);
   }
-  updatePatch(transaction, { depthOfField: next });
+  if (JSON.stringify(next) === JSON.stringify(depth)) return;
+  updatePatch(transaction, { depthOfField: { ...next, enabled: true } });
 }
 
 function sampleRotation(transaction: Transaction, point: Point, scale: number) {
@@ -197,8 +202,16 @@ function keyboardSample(transaction: Transaction, direction: Point, fine: boolea
 }
 
 function changedPose(transaction: Transaction) {
-  if (transaction.handle !== 'rotation')
-    return JSON.stringify(transaction.initial) !== JSON.stringify(transaction.patch);
+  if (transaction.handle === 'tilt') {
+    const before = transaction.initial.perspective!;
+    const after = transaction.patch.perspective!;
+    return before.rotateX !== after.rotateX || before.rotateY !== after.rotateY;
+  }
+  if (transaction.handle !== 'rotation') {
+    const before = transaction.initial.depthOfField!;
+    const after = transaction.patch.depthOfField!;
+    return (['x', 'y', 'width', 'softness'] as const).some((key) => before[key] !== after[key]);
+  }
   const before = transaction.initial.perspective;
   const after = transaction.patch.perspective;
   if (!before || !after) return false;
@@ -227,8 +240,8 @@ function captureTransaction(
   if (!rect) return null;
   const initial: Patch =
     handle === 'tilt' || handle === 'rotation'
-      ? { perspective: { ...value.region.perspective! } }
-      : { depthOfField: { ...value.region.depthOfField! } };
+      ? { perspective: { ...(value.region.perspective ?? DEFAULT_QUICK_EDIT_PERSPECTIVE) } }
+      : { depthOfField: { ...(value.region.depthOfField ?? DEFAULT_QUICK_EDIT_DEPTH) } };
   const pending: Transaction = {
     handle,
     side,
@@ -236,6 +249,8 @@ function captureTransaction(
     revision: value.revision,
     tool: value.tool,
     axis: value.axis,
+    authoredPerspectiveEnabled: value.region.perspective?.enabled,
+    authoredDepthEnabled: value.region.depthOfField?.enabled,
     initial,
     patch: initial,
     rect,
@@ -245,7 +260,7 @@ function captureTransaction(
           plane: { ...value.geometry.plane },
           projection: [...value.geometry.projection],
           rotation: [...value.geometry.rotation],
-          focus: { ...value.region.depthOfField! },
+          focus: { ...(value.region.depthOfField ?? DEFAULT_QUICK_EDIT_DEPTH) },
         }
       : null,
     previous: point,

@@ -223,7 +223,7 @@ it('uses precise layout sliders without limiting typed high-resolution values', 
   expect(change).toHaveBeenLastCalledWith({ layout: { padding: 512, cornerRadius: 12 } });
 });
 
-it('offers the fixed legacy default and commits following motion from the background inspector', async () => {
+it('shows the legacy policy honestly and allows an explicit new zoom target', async () => {
   const change = vi.fn();
   act(() =>
     root.render(
@@ -236,17 +236,17 @@ it('offers the fixed legacy default and commits following motion from the backgr
   const select = host.querySelector<HTMLButtonElement>(
     '[aria-label="gallery.videoReview.backgroundZoom"]'
   )!;
-  expect(select.textContent).toContain('gallery.videoReview.backgroundZoomFixed');
+  expect(select.textContent).toContain('gallery.videoReview.backgroundZoomLegacyFixed');
   await act(async () => select.click());
   const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-    (item) => item.textContent === 'gallery.videoReview.backgroundZoomFollow'
+    (item) => item.textContent === 'gallery.videoReview.backgroundZoomContent'
   )!;
   await act(async () => option.click());
-  expect(change).toHaveBeenLastCalledWith({ zoomBehavior: 'follow-video' });
+  expect(change).toHaveBeenLastCalledWith({ zoomBehavior: 'content' });
   act(() =>
     root.render(<ReviewBackgroundInspector background={{ enabled: false }} onChange={change} />)
   );
-  expect(host.querySelector('[aria-label="gallery.videoReview.backgroundZoom"]')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.backgroundZoom"]')).not.toBeNull();
 });
 
 it('restores a saved image when choosing Image without asking for another import', async () => {
@@ -312,4 +312,23 @@ it('offers blur for images and commits the complete layout using the standard nu
     )
   );
   expect(host.querySelector('input[aria-label="editor.scene.backgroundBlurAmount"]')).toBeNull();
+});
+
+it('changes zoom target without requiring a background or a non-perspective frame', async () => {
+  const change = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{ enabled: false, zoomBehavior: 'window' }}
+        onChange={change}
+      />
+    )
+  );
+  const group = host.querySelector('[aria-label="gallery.videoReview.backgroundZoom"]')!;
+  const target = group.querySelector<HTMLButtonElement>(
+    '[title="gallery.videoReview.backgroundZoomContent"]'
+  )!;
+  expect(target.disabled).toBe(false);
+  await act(async () => target.click());
+  expect(change).toHaveBeenCalledExactlyOnceWith({ zoomBehavior: 'content' });
 });

@@ -311,10 +311,11 @@ export function computeQuickEditSceneCamera(
   },
   background: QuickEditBackgroundSettings
 ) {
-  const follows =
+  const legacyFollows =
     !layout.spatial?.lockBackground &&
     background.enabled &&
     background.zoomBehavior === 'follow-video';
+  const follows = legacyFollows || background.zoomBehavior === 'window';
   const scale = follows ? layout.videoTransform.width / layout.videoRect.width : 1;
   const base = layout.windowRect ?? layout.videoRect;
   const windowClip = layout.spatial
@@ -324,8 +325,9 @@ export function computeQuickEditSceneCamera(
       : base;
   return {
     scale,
-    x: follows ? layout.videoTransform.x - scale * layout.videoRect.x : 0,
-    y: follows ? layout.videoTransform.y - scale * layout.videoRect.y : 0,
+    backgroundScale: legacyFollows ? scale : 1,
+    x: legacyFollows ? layout.videoTransform.x - scale * layout.videoRect.x : 0,
+    y: legacyFollows ? layout.videoTransform.y - scale * layout.videoRect.y : 0,
     videoClip: follows ? layout.videoTransform : layout.videoRect,
     windowClip,
   };
@@ -365,6 +367,8 @@ export function computeQuickEditSpatialWindow(
 ): QuickEditRect {
   const base = layout.windowRect ?? layout.videoRect;
   const target = computeQuickEditWindowTransform(layout);
+  if (background.zoomBehavior === 'window') return target;
+  if (background.zoomBehavior === 'content') return base;
   const follows =
     !layout.spatial?.lockBackground &&
     background.enabled &&

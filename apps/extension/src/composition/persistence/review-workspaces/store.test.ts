@@ -60,6 +60,7 @@ beforeEach(() => {
 it('reopens exactly one durable history and rejects missing, malformed or changed media', async () => {
   const opened = await openVideoWorkspace(id, source);
   expect(opened.workspace.revision).toBe(1);
+  expect(opened.workspace.advanced.background.zoomBehavior).toBe('window');
   expect(await openVideoWorkspace(id, source)).toEqual(opened);
   await expect(openVideoWorkspace(id, { ...source, duration: 14 })).rejects.toMatchObject({
     code: 'changed-source',

@@ -354,16 +354,16 @@ function drawReviewSceneBackground(
   context.fillStyle = '#000000';
   context.fillRect(0, 0, canvas.width, canvas.height);
   const motion = computeQuickEditSceneCamera(layout, background);
-  if (motion.scale !== 1) {
+  if (motion.backgroundScale !== 1) {
     context.save();
     context.translate(motion.x, motion.y);
-    context.scale(motion.scale, motion.scale);
+    context.scale(motion.backgroundScale, motion.backgroundScale);
   }
   try {
     const paint = { background, image, width: canvas.width, height: canvas.height };
     if (backgroundPainter) backgroundPainter.draw(context, paint);
     else drawReviewBackgroundPaint(context, paint, backgroundCacheContext);
   } finally {
-    if (motion.scale !== 1) context.restore();
+    if (motion.backgroundScale !== 1) context.restore();
   }
 }

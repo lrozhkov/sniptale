@@ -185,6 +185,7 @@ export async function openVideoWorkspace(
       cursor: 0,
       advanced: {
         ...createQuickEditAdvancedState(),
+        background: { enabled: false, zoomBehavior: 'window' },
         presentation: createNewWorkspacePresentationSettings(),
       },
       createdAt: now,

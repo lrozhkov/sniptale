@@ -1,15 +1,16 @@
 import { ReviewSpatialInspector } from './spatial-inspector';
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
+import { ReviewSpatialToolContext } from './spatial-controls';
+import type { SpatialTool } from './spatial-gesture';
 import { ReviewIntervalMap } from './interval-timing';
 import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
 import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
-import { reviewSelectFieldClassName } from './controls';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-editor';
 import { ReviewBorderInspector, ReviewBorderAnimation } from './border-inspector';
 import { ReviewSpotlightInspector, ReviewSpotlightAnimation } from './spotlight-inspector';
 import type { ReactNode } from 'react';
-import { ReviewNumberRow } from './number-row';
+import { ReviewNumberRow, ReviewPreviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditZoomLinkEasing,
@@ -21,7 +22,8 @@ import {
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
 import { Trash2, Copy, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
   ReviewButton,
@@ -38,7 +40,7 @@ const transitionLabels: Record<QuickEditZoomTransition['type'], Parameters<typeo
   'ease-in-out': 'gallery.videoReview.transitionSmooth',
 };
 
-/** One transition phase: shared select for the curve plus a duration row in seconds. */
+/** One transition phase: direct segments for the curve plus a duration row in seconds. */
 function ZoomTransitionSection(props: {
   label: string;
   value: QuickEditZoomTransition;
@@ -48,10 +50,12 @@ function ZoomTransitionSection(props: {
 }) {
   return (
     <fieldset aria-label={props.label} className="review-inspector-phase min-w-0 space-y-2">
-      <legend className="float-left mb-2 w-full">{props.label}</legend>
+      <legend className="mb-2">{props.label}</legend>
       {props.children}
-      <SelectField<QuickEditZoomTransition['type']>
-        className={reviewSelectFieldClassName}
+      <SegmentedRow<QuickEditZoomTransition['type']>
+        columns={3}
+        layout="stacked"
+        ariaLabel={translate('gallery.videoReview.zoomTransitionType')}
         label={translate('gallery.videoReview.zoomTransitionType')}
         value={props.value.type}
         options={(['none', 'linear', 'ease-in-out'] as const).map((type) => ({
@@ -91,124 +95,173 @@ export function ReviewZoomInspector(props: {
   preview?: ReactNode;
 }) {
   const { region, onChange } = props;
+  const [tool, onTool] = useState<SpatialTool>('position');
   const map = useContext(ReviewIntervalMap);
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
   return (
-    <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
-      <ReviewInterval
-        start={sourceRange?.start ?? region.start}
-        end={sourceRange?.end ?? region.end}
-        timeBasis={sourceRange ? 'source' : 'result'}
-      />
-      {props.cutSuppressed ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.cutOverlapHint')}{' '}
-          {region.sourceAnchor
-            ? `${reviewTimeLabel(region.sourceAnchor.start)} – ${reviewTimeLabel(region.sourceAnchor.end)}`
-            : ''}
-        </p>
-      ) : null}
-      <ReviewInspectorSections
-        sections={[
-          {
-            id: 'framing',
-            label: translate('gallery.videoReview.zoomPreview'),
-            icon: Scan,
-            content: (
-              <ReviewInspectorColumns>
-                <div className="min-w-0 space-y-2">
-                  <ReviewFocusType
-                    region={region}
-                    onChange={onChange}
-                    blocked={props.zoomConversionBlocked ?? false}
-                  />
-                  {props.preview}
-                </div>
-                <div className="min-w-0 space-y-2">
-                  {region.border ? (
-                    <ReviewBorderInspector
-                      value={region.border}
-                      onChange={(border) => onChange({ border })}
+    <ReviewSpatialToolContext.Provider value={{ tool, onTool }}>
+      <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
+        <ReviewInterval
+          start={sourceRange?.start ?? region.start}
+          end={sourceRange?.end ?? region.end}
+          timeBasis={sourceRange ? 'source' : 'result'}
+        />
+        {props.cutSuppressed ? (
+          <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate('gallery.videoReview.cutOverlapHint')}{' '}
+            {region.sourceAnchor
+              ? `${reviewTimeLabel(region.sourceAnchor.start)} – ${reviewTimeLabel(region.sourceAnchor.end)}`
+              : ''}
+          </p>
+        ) : null}
+        <ReviewInspectorSections
+          sections={[
+            {
+              id: 'framing',
+              label: translate('gallery.videoReview.zoomPreview'),
+              icon: Scan,
+              content: (
+                <ReviewInspectorColumns>
+                  <div className="min-w-0 space-y-2">
+                    <ReviewFocusType
+                      region={region}
+                      onChange={onChange}
+                      blocked={props.zoomConversionBlocked ?? false}
+                    />
+                    {props.preview}
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <ReviewFocusParameters
+                      region={region}
+                      previewRegion={props.spatialPreview}
+                      tool={tool}
+                      onChange={onChange}
                       onPreview={props.onPreview}
                     />
-                  ) : region.spotlight ? (
-                    <ReviewSpotlightInspector
-                      value={region.spotlight}
-                      onChange={(spotlight) => onChange({ spotlight })}
-                    />
-                  ) : (
-                    <>
-                      <ReviewNumberRow
-                        label={translate('gallery.videoReview.zoomScale')}
-                        unit="x"
-                        min={1}
-                        max={4}
-                        step={0.1}
-                        precision={2}
-                        scrubStep={0.05}
-                        value={region.transform.scale}
-                        onChange={(scale) => onChange({ scale })}
-                      />
-                      <ReviewDetails
-                        preferenceId="gallery.videoReview.precisePosition"
-                        label={translate('gallery.videoReview.precisePosition')}
-                      >
-                        <ReviewNumberRow
-                          label={translate('gallery.videoReview.zoomFocusX')}
-                          unit="%"
-                          min={0}
-                          max={100}
-                          step={1}
-                          precision={1}
-                          value={region.transform.centerX * 100}
-                          onChange={(value) => onChange({ centerX: value / 100 })}
-                        />
-                        <ReviewNumberRow
-                          label={translate('gallery.videoReview.zoomFocusY')}
-                          unit="%"
-                          min={0}
-                          max={100}
-                          step={1}
-                          precision={1}
-                          value={region.transform.centerY * 100}
-                          onChange={(value) => onChange({ centerY: value / 100 })}
-                        />
-                      </ReviewDetails>
-                      <ReviewSpatialInspector
-                        region={region}
-                        previewRegion={props.spatialPreview}
-                        onChange={onChange}
-                        onPreview={props.onPreview}
-                      />
-                    </>
-                  )}
-                </div>
-              </ReviewInspectorColumns>
-            ),
-          },
-          {
-            id: 'animation',
-            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
-            icon: Waves,
-            content: region.border ? (
-              <ReviewBorderAnimation
-                onPreview={props.onPreview}
-                region={fitQuickEditZoomTransitions(region)}
-                onChange={onChange}
-              />
-            ) : (
-              <ReviewZoomAnimation region={region} onChange={onChange} />
-            ),
-          },
-        ]}
+                  </div>
+                </ReviewInspectorColumns>
+              ),
+            },
+            {
+              id: 'animation',
+              label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+              icon: Waves,
+              content: region.border ? (
+                <ReviewBorderAnimation
+                  onPreview={props.onPreview}
+                  region={fitQuickEditZoomTransitions(region)}
+                  onChange={onChange}
+                />
+              ) : (
+                <ReviewZoomAnimation region={region} onChange={onChange} />
+              ),
+            },
+          ]}
+        />
+        <ReviewFocusActions
+          region={region}
+          onReset={props.onReset}
+          onDelete={props.onDelete}
+          onDuplicate={props.onDuplicate}
+        />
+      </div>
+    </ReviewSpatialToolContext.Provider>
+  );
+}
+
+type FocusParameterProps = {
+  region: QuickEditZoomRegion;
+  previewRegion?: QuickEditZoomRegion | undefined;
+  tool: SpatialTool;
+  onChange(patch: QuickEditZoomRegionPatch): void;
+  onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
+};
+
+/** Selected focus kind and disposable tool choose their precise parameter surface. */
+function ReviewFocusParameters(props: FocusParameterProps) {
+  const { region, onChange } = props;
+  if (region.border)
+    return (
+      <ReviewBorderInspector
+        value={region.border}
+        onChange={(border) => onChange({ border })}
+        onPreview={props.onPreview}
       />
-      <ReviewFocusActions
-        region={region}
-        onReset={props.onReset}
-        onDelete={props.onDelete}
-        onDuplicate={props.onDuplicate}
+    );
+  if (region.spotlight)
+    return (
+      <ReviewSpotlightInspector
+        value={region.spotlight}
+        onChange={(spotlight) => onChange({ spotlight })}
       />
-    </div>
+    );
+  if (props.tool === 'position') return <ReviewZoomPositionFields {...props} />;
+  return (
+    <ReviewSpatialInspector
+      tool={props.tool}
+      region={region}
+      previewRegion={props.previewRegion}
+      onChange={onChange}
+      onPreview={props.onPreview}
+    />
+  );
+}
+
+/** Position edits share the existing transient transaction with the preview. */
+function ReviewZoomPositionFields(props: FocusParameterProps) {
+  const { region, onChange } = props;
+  return (
+    <>
+      <ReviewPreviewNumberRow
+        enterBehavior="blur"
+        label={translate('gallery.videoReview.zoomScale')}
+        unit="x"
+        min={1}
+        max={4}
+        step={0.1}
+        precision={2}
+        scrubStep={0.05}
+        value={region.transform.scale}
+        previewValue={props.previewRegion?.transform.scale}
+        onPreview={(scale) => props.onPreview?.(scale === null ? null : { scale })}
+        onChange={(scale) => onChange({ scale })}
+      />
+      <ReviewDetails
+        preferenceId="gallery.videoReview.precisePosition"
+        label={translate('gallery.videoReview.precisePosition')}
+      >
+        <ReviewPreviewNumberRow
+          enterBehavior="blur"
+          label={translate('gallery.videoReview.zoomFocusX')}
+          unit="%"
+          min={0}
+          max={100}
+          step={1}
+          precision={1}
+          value={region.transform.centerX * 100}
+          previewValue={
+            props.previewRegion ? props.previewRegion.transform.centerX * 100 : undefined
+          }
+          onPreview={(value) => props.onPreview?.(value === null ? null : { centerX: value / 100 })}
+          onChange={(value) => onChange({ centerX: value / 100 })}
+        />
+        <ReviewPreviewNumberRow
+          enterBehavior="blur"
+          label={translate('gallery.videoReview.zoomFocusY')}
+          unit="%"
+          min={0}
+          max={100}
+          step={1}
+          precision={1}
+          value={region.transform.centerY * 100}
+          previewValue={
+            props.previewRegion ? props.previewRegion.transform.centerY * 100 : undefined
+          }
+          onPreview={(value) => props.onPreview?.(value === null ? null : { centerY: value / 100 })}
+          onChange={(value) => onChange({ centerY: value / 100 })}
+        />
+      </ReviewDetails>
+    </>
   );
 }
 
@@ -331,8 +384,10 @@ export function ReviewZoomLinkInspector(props: {
         end={source && target ? target.start : props.link.target.start}
         timeBasis={source && target ? 'source' : 'result'}
       />
-      <SelectField<QuickEditZoomLinkEasing>
-        className={reviewSelectFieldClassName}
+      <SegmentedRow<QuickEditZoomLinkEasing>
+        columns={2}
+        layout="stacked"
+        ariaLabel={translate('gallery.videoReview.zoomLinkEasing')}
         label={translate('gallery.videoReview.zoomLinkEasing')}
         value={props.link.source.linkEasing ?? 'ease-in-out'}
         options={(['ease-in-out', 'linear'] as const).map((easing) => ({
@@ -434,23 +489,26 @@ function ReviewMotionBlurSettings(props: {
       data-ui="gallery.videoReview.motionBlurSettings"
       data-phase={props.phase}
     >
-      <SelectField<'off' | 'on'>
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.motionBlur')}
-        value={value.enabled ? 'on' : 'off'}
-        options={[
-          { value: 'off', label: translate('gallery.videoReview.motionBlurOff') },
-          { value: 'on', label: translate('gallery.videoReview.motionBlurOn') },
-        ]}
-        onChange={(enabled) =>
-          props.onChange({
-            motionBlur: {
-              ...props.region.motionBlur,
-              [props.phase]: { ...value, enabled: enabled === 'on' },
-            },
-          })
-        }
-      />
+      <div
+        className="flex min-h-8 items-center justify-between gap-2 text-xs
+          text-[var(--sniptale-color-text-secondary)]"
+      >
+        <span>{translate('gallery.videoReview.motionBlur')}</span>
+        <ProductGlassSwitch
+          role="switch"
+          aria-label={translate('gallery.videoReview.motionBlur')}
+          aria-checked={value.enabled}
+          on={value.enabled}
+          onClick={() =>
+            props.onChange({
+              motionBlur: {
+                ...props.region.motionBlur,
+                [props.phase]: { ...value, enabled: !value.enabled },
+              },
+            })
+          }
+        />
+      </div>
       {value.enabled ? (
         <ReviewNumberRow
           label={translate('gallery.videoReview.motionBlurStrength')}

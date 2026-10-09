@@ -135,6 +135,28 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+it.each(['tilt', 'rotation', 'focus'] as const)(
+  'enables an inactive %s only with the first real edit, in the same commit',
+  async (tool) => {
+    props.tool = tool;
+    handle = tool === 'focus' ? 'center' : tool;
+    props.region.perspective = { ...DEFAULT_QUICK_EDIT_PERSPECTIVE };
+    props.region.depthOfField = { ...DEFAULT_QUICK_EDIT_DEPTH, mode: 'area' };
+    await render();
+    expect(button.disabled).toBe(false);
+    expect(props.onPreview).not.toHaveBeenCalled();
+    expect(props.onCommit).not.toHaveBeenCalled();
+    key('ArrowRight');
+    tick();
+    expect(props.onCommit).not.toHaveBeenCalled();
+    key('Enter');
+    expect(props.onCommit).toHaveBeenCalledTimes(1);
+    expect(
+      tool === 'focus' ? commit()?.depthOfField?.enabled : commit()?.perspective?.enabled
+    ).toBe(true);
+  }
+);
+
 it('coalesces transient movement and commits the final unflushed pointerup sample once', async () => {
   await render();
   pointer('pointerdown', 110, 70);
@@ -157,6 +179,24 @@ it('coalesces transient movement and commits the final unflushed pointerup sampl
   tick();
   expect(props.onCommit).toHaveBeenCalledTimes(1);
 });
+
+it.each(['tilt', 'rotation', 'focus'] as const)(
+  'does not enable %s on a cancelled or net-zero gesture',
+  async (tool) => {
+    props.tool = tool;
+    handle = tool === 'focus' ? 'center' : tool;
+    props.region = createQuickEditZoomRegion({ id: 'untouched', at: 0 });
+    await render();
+    key('ArrowRight');
+    key('Escape');
+    expect(props.onCommit).not.toHaveBeenCalled();
+    expect(props.onPreview).toHaveBeenLastCalledWith(null);
+    key('ArrowRight');
+    key('ArrowLeft');
+    key('Enter');
+    expect(props.onCommit).not.toHaveBeenCalled();
+  }
+);
 
 it('keeps CSS bounds fixed, supports touch and changes Shift sensitivity incrementally', async () => {
   await render();
@@ -247,12 +287,12 @@ it.each([
   expect(captures.size).toBe(0);
 });
 
-it('does not admit disabled effects, Position or right-button input and does not seek', async () => {
-  props.region.perspective = { ...props.region.perspective!, enabled: false };
+it('does not admit read-only editing, Position or right-button input and does not seek', async () => {
+  props.enabled = false;
   await render();
   pointer('pointerdown', 110, 70);
   key('ArrowRight');
-  props.region.perspective.enabled = true;
+  props.enabled = true;
   props.tool = 'position';
   await render();
   pointer('pointerdown', 110, 70);

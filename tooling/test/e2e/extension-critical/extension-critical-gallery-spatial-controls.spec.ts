@@ -161,20 +161,6 @@ for (const variant of [
     const tools = dialog.locator('[data-ui="gallery.videoReview.spatialTools"]');
     const controls = dialog.locator('[data-ui="gallery.videoReview.spatialControls"]');
     const tool = (key: Message) => tools.getByRole('button', { name: label(key), exact: true });
-    const group = (key: Message) =>
-      dialog.locator('details[data-level="group"]').filter({
-        has: page.locator('summary h4', { hasText: label(key) }),
-      });
-    const enable = async (key: Message) => {
-      const section = group(key);
-      if ((await section.getAttribute('open')) === null) await section.locator('summary').click();
-      await section
-        .getByRole('button', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
-        .click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.motionBlurOn'), exact: true })
-        .click();
-    };
     const exact = async (key: Message, value: string) => {
       const input = dialog.getByRole('textbox', { name: label(key), exact: true });
       await input.fill(value);
@@ -198,11 +184,12 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.zoomAdd').click();
-      await expect(tool('gallery.videoReview.spatialToolTilt')).toBeDisabled();
-      await enable('gallery.videoReview.perspective');
+      await expect(tool('gallery.videoReview.spatialToolTilt')).toBeEnabled();
+      await tool('gallery.videoReview.spatialToolTilt').click();
       await exact('gallery.videoReview.perspectiveX', '25');
       await exact('gallery.videoReview.perspectiveY', '-30');
-      await enable('gallery.videoReview.depthOfField');
+      await tool('gallery.videoReview.spatialToolFocus').click();
+      await tool('gallery.videoReview.depthModeDepth').click();
       await expect.poll(async () => (await persistedFocus(page))?.perspective?.rotateY).toBe(-30);
       await expect.poll(async () => (await persistedFocus(page))?.depthOfField?.enabled).toBe(true);
       await expect(preview).toHaveAttribute('data-status', 'ready');
@@ -210,13 +197,38 @@ for (const variant of [
         cursor = await historyCursor(page);
       const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video');
       const time = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
+      await preview.scrollIntoViewIfNeeded();
+      const canvasHeight = (await preview.locator('canvas').boundingBox())!.height;
+      const offset = () =>
+        preview.evaluate((node) => {
+          const canvas = node.querySelector('canvas')!;
+          return canvas.getBoundingClientRect().top - node.getBoundingClientRect().top;
+        });
+      const canvasOffset = await offset();
       for (const key of [
         'spatialToolTilt',
         'spatialToolRotation',
         'spatialToolFocus',
         'spatialToolPosition',
-      ] as const)
+      ] as const) {
         await tool(`gallery.videoReview.${key}`).click();
+        expect((await preview.locator('canvas').boundingBox())!.height).toBeCloseTo(
+          canvasHeight,
+          1
+        );
+        expect(await offset()).toBeCloseTo(canvasOffset, 1);
+        const contextBottom = await tools
+          .locator('.review-spatial-context')
+          .evaluate((node) =>
+            Math.max(
+              ...[...node.querySelectorAll('button')].map(
+                (button) => button.getBoundingClientRect().bottom
+              ),
+              0
+            )
+          );
+        expect(contextBottom).toBeLessThan((await preview.locator('canvas').boundingBox())!.y);
+      }
       expect(await historyCursor(page)).toBe(cursor);
       expect(await persistedFocus(page)).toEqual(initial);
       expect(await video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBe(time);
@@ -293,13 +305,7 @@ for (const variant of [
         })
       ).toBeVisible();
       await page.screenshot({ path: info.outputPath('spatial-focus-depth.png'), fullPage: false });
-      const depth = group('gallery.videoReview.depthOfField');
-      await depth
-        .getByRole('button', { name: label('gallery.videoReview.depthMode'), exact: true })
-        .click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.depthModeArea'), exact: true })
-        .click();
+      await tool('gallery.videoReview.depthModeArea').click();
       // A mode change uses the debounced writer; capture the next gesture only after it is durable.
       await expect.poll(async () => (await persistedFocus(page))?.depthOfField?.mode).toBe('area');
       await controls.scrollIntoViewIfNeeded();
@@ -343,6 +349,24 @@ for (const variant of [
           fullPage: false,
         });
       }
+      const entrance = dialog.getByRole('group', {
+        name: label('gallery.videoReview.zoomTransitionIn'),
+        exact: true,
+      });
+      await entrance.scrollIntoViewIfNeeded();
+      await expect(
+        entrance.getByRole('button', {
+          name: label('gallery.videoReview.transitionLinear'),
+          exact: true,
+        })
+      ).toBeVisible();
+      await expect(
+        entrance.getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
+      ).toHaveAttribute('aria-checked', 'false');
+      await page.screenshot({
+        path: info.outputPath('animation-direct-controls.png'),
+        fullPage: false,
+      });
       const saved = await persistedFocus(page);
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -405,7 +429,11 @@ async function compareSpatialRasters(page: Page, first: Buffer, second: Buffer) 
 async function setupSpatialProof(page: Page, origin: string) {
   const label = (key: Message) => translate(key, 'en');
   const dialog = page.locator('dialog');
-  const button = (key: Message) => dialog.getByRole('button', { name: label(key), exact: true });
+  const button = (key: Message) =>
+    (key.startsWith('gallery.videoReview.spatialTool')
+      ? dialog.locator('[data-ui="gallery.videoReview.spatialTools"]')
+      : dialog
+    ).getByRole('button', { name: label(key), exact: true });
   await applyHarnessBootstrap(page, {
     preserveMediaLibrary: true,
     storage: { 'sniptale-locale-preference': 'en' },
@@ -418,22 +446,21 @@ async function setupSpatialProof(page: Page, origin: string) {
   await page.locator('[data-ui="gallery.videoReview.enter"]').click();
   await button('gallery.videoReview.advancedEditing').click();
   const number = async (key: Message, value: string) => {
+    if (key === 'gallery.videoReview.zoomScale')
+      await button('gallery.videoReview.spatialToolPosition').click();
     const input = dialog.getByRole('textbox', { name: label(key), exact: true });
     await input.fill(value);
     await input.press('Enter');
   };
   const enable = async (key: Message) => {
-    const group = dialog
-      .locator('details[data-level="group"]')
-      .filter({ has: page.locator('summary h4', { hasText: label(key) }) });
-    if ((await group.getAttribute('open')) === null) await group.locator('summary').click();
-    await group
-      .getByRole('button', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.motionBlurOn'), exact: true })
-      .click();
-    return group;
+    const tool =
+      key === 'gallery.videoReview.perspective'
+        ? 'gallery.videoReview.spatialToolTilt'
+        : 'gallery.videoReview.spatialToolFocus';
+    await button(tool).click();
+    if (key === 'gallery.videoReview.depthOfField')
+      await button('gallery.videoReview.depthModeArea').click();
+    return dialog;
   };
   const seek = async (time: number) => {
     const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
@@ -449,7 +476,7 @@ async function setupSpatialProof(page: Page, origin: string) {
 }
 
 for (const scenario of [
-  { fps: 30, header: false, follow: false, mode: 'area' },
+  { fps: 30, header: true, follow: false, mode: 'area' },
   { fps: 60, header: true, follow: true, mode: 'depth' },
 ] as const)
   test(`spatial handle committed target matches mini main and ${scenario.fps}fps export`, async ({
@@ -461,16 +488,12 @@ for (const scenario of [
       const ui = await setupSpatialProof(page, host.origin);
       await ui.button('gallery.videoReview.scene').click();
       await ui.button('gallery.videoReview.backgroundSolid').click();
-      await ui.button('gallery.videoReview.backgroundZoom').click();
-      await page
-        .getByRole('option', {
-          name: ui.label(
-            scenario.follow
-              ? 'gallery.videoReview.backgroundZoomFollow'
-              : 'gallery.videoReview.backgroundZoomFixed'
-          ),
-          exact: true,
-        })
+      await ui
+        .button(
+          scenario.follow
+            ? 'gallery.videoReview.backgroundZoomWindow'
+            : 'gallery.videoReview.backgroundZoomContent'
+        )
         .click();
       await ui.number('gallery.videoReview.backgroundPadding', '12');
       await ui.button(scenario.header ? 'windowHeader.browser' : 'windowHeader.none').click();
@@ -479,10 +502,7 @@ for (const scenario of [
       await ui.number('gallery.videoReview.perspectiveY', '35');
       const depth = await ui.enable('gallery.videoReview.depthOfField');
       await depth
-        .getByRole('button', { name: ui.label('gallery.videoReview.depthMode'), exact: true })
-        .click();
-      await page
-        .getByRole('option', {
+        .getByRole('button', {
           name: ui.label(
             scenario.mode === 'area'
               ? 'gallery.videoReview.depthModeArea'

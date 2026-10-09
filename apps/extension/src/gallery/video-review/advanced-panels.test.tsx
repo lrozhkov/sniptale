@@ -4,7 +4,8 @@ import { createQuickEditBorder } from '../../features/video/review/advanced/bord
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { ReviewDetails } from './controls';
 import { createInspectorDisclosureStore } from '../../composition/persistence/inspector-disclosures/store';
-import { act, useState } from 'react';
+import { act, useContext, useState } from 'react';
+import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
@@ -314,7 +315,17 @@ it('does not insert a loading paragraph above scene sections during background i
   expect(host.textContent).not.toContain('gallery.videoReview.backgroundImporting');
 });
 
-function mountSpatialDraftPanel() {
+function SpatialDraftNavigation() {
+  const controls = useContext(ReviewSpatialToolContext)!;
+  return (
+    <>
+      <button aria-label="draftTilt" onClick={() => controls.onTool('tilt')} />
+      <button aria-label="draftFocus" onClick={() => controls.onTool('focus')} />
+    </>
+  );
+}
+
+function mountSpatialDraftPanel(name = 'perspectiveX') {
   const initial = createQuickEditAdvancedState();
   initial.ui.mode = 'advanced';
   const region = {
@@ -347,9 +358,29 @@ function mountSpatialDraftPanel() {
     });
     authored = advanced;
     owner = zoom;
-    return <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />;
+    return (
+      <ReviewAdvancedPanels
+        advanced={advanced}
+        zoom={zoom}
+        zoomPreview={() => <SpatialDraftNavigation />}
+      />
+    );
   }
   act(() => root.render(<SpatialDraftPanel />));
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(
+        `button[aria-label="${name === 'depthWidth' ? 'draftFocus' : 'draftTilt'}"]`
+      )!
+      .click()
+  );
+  if (name === 'depthWidth') {
+    const details = host.querySelector<HTMLDetailsElement>('details')!;
+    act(() => {
+      details.open = true;
+      details.dispatchEvent(new Event('toggle'));
+    });
+  }
   const input = (name: string, range = false) => {
     const node = host.querySelector<HTMLInputElement>(
       `input[aria-label="gallery.videoReview.${name}${range ? ' range' : ''}"]`
@@ -366,29 +397,29 @@ function mountSpatialDraftPanel() {
   };
 }
 
-it('mirrors real zoom-owner spatial drafts in precise fields and restores authored values on cancellation', () => {
-  const panel = mountSpatialDraftPanel();
-  act(() =>
-    panel.owner().preview(panel.region.id, {
-      perspective: { ...panel.region.perspective, rotateX: 34.2 },
-      depthOfField: { ...panel.region.depthOfField, width: 0.508 },
-    })
-  );
-  expect(panel.input('perspectiveX').value).toBe('34.2');
-  expect(panel.input('depthWidth').value).toBe('50.8');
-  expect(panel.authored().perspective?.rotateX).toBe(10);
-  expect(panel.authored().depthOfField?.width).toBe(0.2);
-  expect(panel.mutations).not.toHaveBeenCalled();
-  act(() => panel.owner().preview(panel.region.id, null));
-  expect(panel.input('perspectiveX').value).toBe('10');
-  expect(panel.input('depthWidth').value).toBe('20');
-  expect(panel.mutations).not.toHaveBeenCalled();
-});
+it.each(['perspectiveX', 'depthWidth'])(
+  'mirrors the real zoom-owner %s draft and restores authored values on cancellation',
+  (name) => {
+    const panel = mountSpatialDraftPanel(name);
+    act(() =>
+      panel.owner().preview(panel.region.id, {
+        perspective: { ...panel.region.perspective, rotateX: 34.2 },
+        depthOfField: { ...panel.region.depthOfField, width: 0.508 },
+      })
+    );
+    expect(panel.input(name).value).toBe(name === 'perspectiveX' ? '34.2' : '50.8');
+    expect(panel.authored()).toEqual(panel.region);
+    expect(panel.mutations).not.toHaveBeenCalled();
+    act(() => panel.owner().preview(panel.region.id, null));
+    expect(panel.input(name).value).toBe(name === 'perspectiveX' ? '10' : '20');
+    expect(panel.mutations).not.toHaveBeenCalled();
+  }
+);
 
 it.each(['perspectiveX', 'depthWidth'])(
   'commits one %s range edit after its transient value has rerendered through the real panel',
   async (name) => {
-    const panel = mountSpatialDraftPanel();
+    const panel = mountSpatialDraftPanel(name);
     const range = panel.input(name, true);
     await act(async () => {
       range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
@@ -411,7 +442,7 @@ it.each(['perspectiveX', 'depthWidth'])(
 it.each(['perspectiveX', 'depthWidth'])(
   'cancels %s range preview and ignores its later pointerup after exact fields have synchronized',
   async (name) => {
-    const panel = mountSpatialDraftPanel();
+    const panel = mountSpatialDraftPanel(name);
     const range = panel.input(name, true);
     await act(async () => {
       range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
@@ -431,7 +462,7 @@ it.each(['perspectiveX', 'depthWidth'])(
 it.each(['perspectiveX', 'depthWidth'])(
   'commits %s text once on Enter without focusing the next exact field',
   async (name) => {
-    const panel = mountSpatialDraftPanel();
+    const panel = mountSpatialDraftPanel(name);
     const field = panel.input(name);
     act(() => field.focus());
     await act(async () => setInputValue(field, '45'));

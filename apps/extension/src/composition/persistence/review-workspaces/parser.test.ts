@@ -20,6 +20,31 @@ function workspace() {
     advanced: createQuickEditAdvancedState(),
   };
 }
+it.each(['fixed', 'follow-video', undefined] as const)(
+  'preserves schema 10 zoom policy %s when reopening the workspace',
+  (zoomBehavior) => {
+    const raw = workspace();
+    const advanced = {
+      ...raw.advanced,
+      schemaVersion: 10,
+      background: { enabled: false, ...(zoomBehavior ? { zoomBehavior } : {}) },
+    };
+    const result = inspectVideoWorkspace({ ...raw, advanced });
+    expect(result.failure).toBeNull();
+    expect(result.workspace?.advanced.background.zoomBehavior).toBe(zoomBehavior);
+    expect(inspectVideoWorkspace(result.workspace).workspace).toEqual(result.workspace);
+  }
+);
+
+it.each(['window', 'content'] as const)('reopens the new %s zoom policy', (zoomBehavior) => {
+  const raw = workspace();
+  const result = inspectVideoWorkspace({
+    ...raw,
+    advanced: { ...raw.advanced, background: { enabled: false, zoomBehavior } },
+  });
+  expect(result.failure).toBeNull();
+  expect(result.workspace?.advanced.background.zoomBehavior).toBe(zoomBehavior);
+});
 it('identifies no-change history position in the retained redo suffix without content', () => {
   const content = createQuickEditAdvancedContent();
   const raw = {

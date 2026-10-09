@@ -157,7 +157,7 @@ it.each([
 
 it('requires the exact presentation domain contract at the current physical version', () => {
   expect(parseStoredSchemaContracts(CURRENT_SCHEMA_CONTRACTS)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  for (const schemaVersion of [10, 12]) {
+  for (const schemaVersion of [10, 13]) {
     const incompatible = CURRENT_SCHEMA_CONTRACTS.map((contract) =>
       contract.domainId === 'mediaLibrary' ? { ...contract, schemaVersion } : contract
     );
@@ -197,6 +197,30 @@ it('admits scene appearance without rewriting rows and rolls back interrupted pu
   expect(fixture.durable).toEqual(before);
   fixture.retry();
   handleDatabaseUpgrade(fixture.db, 11, 12, fixture.tx);
+  fixture.commit();
+  expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(fixture.durable).toEqual(before);
+  expect(fixture.db.createObjectStore).not.toHaveBeenCalled();
+  expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
+});
+
+it('admits window zoom without row rewrites and rolls back interrupted publication', () => {
+  const plan = buildDatabaseMigrationPlan(12, 13)!;
+  expect(plan).toHaveLength(1);
+  expect(plan[0]).toMatchObject({
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 11, to: 12 }],
+    stores: ['video_workspaces', 'video_workspace_drafts'],
+  });
+  const fixture = upgradeFixture(3);
+  const before = structuredClone(fixture.durable);
+  const contracts = fixture.contracts();
+  expect(() => handleDatabaseUpgrade(fixture.db, 12, 13, fixture.tx)).toThrow('Interrupted');
+  expect(fixture.contracts()).toEqual(contracts);
+  expect(fixture.durable).toEqual(before);
+  fixture.retry();
+  handleDatabaseUpgrade(fixture.db, 12, 13, fixture.tx);
   fixture.commit();
   expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(fixture.durable).toEqual(before);

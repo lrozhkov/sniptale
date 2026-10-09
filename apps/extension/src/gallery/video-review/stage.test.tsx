@@ -519,7 +519,7 @@ it.each(['fixed', 'follow-video'] as const)(
   }
 );
 
-it.each(['fixed', 'follow-video'] as const)(
+it.each(['fixed', 'follow-video', 'window', 'content'] as const)(
   'keeps the DOM header attached through camera changes with %s background',
   (zoomBehavior) => {
     vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({

@@ -7,6 +7,8 @@ import {
   parseQuickEditPerspective,
   parseQuickEditDepth,
   quickEditSpatialSpan,
+  quickEditSpatialTargetCamera,
+  interpolateQuickEditSpatial,
 } from './spatial';
 import { loadQuickEditAdvancedState } from './validation';
 import { createQuickEditAdvancedState } from './defaults';
@@ -23,6 +25,26 @@ const b = {
 };
 
 describe('spatial zoom contract', () => {
+  it('keeps a neutral enabled perspective on the ordinary camera path', () => {
+    const neutral = { ...a, perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true } };
+    expect(quickEditSpatialTargetCamera(neutral)).toEqual(neutral.transform);
+    for (const time of [0, 0.15, 1, 2, 3, 4, 5.85]) {
+      expect(quickEditSpatialSpan([neutral, b], time)).toBe(false);
+      expect(evaluateQuickEditCameraAtTime([neutral, b], time).spatial).toBeUndefined();
+    }
+    const depth = { ...neutral, depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true } };
+    const frame = quickEditSpatialTargetCamera(depth).spatial!;
+    expect(frame.focus).toHaveLength(1);
+    expect(frame.windowMotion).toBe(0);
+    expect(frame.lockBackground).toBe(false);
+    expect(interpolateQuickEditSpatial(neutral, b, 0.5).perspective).toBe(0);
+    expect(
+      quickEditSpatialTargetCamera({
+        ...neutral,
+        perspective: { ...neutral.perspective, rotateZ: 12 },
+      }).spatial
+    ).toBeDefined();
+  });
   it('interpolates perspective to ordinary zoom without resetting scale or accumulating rotation', () => {
     const start = evaluateQuickEditCameraAtTime([a, b], 2);
     const middle = evaluateQuickEditCameraAtTime([a, b], 3);

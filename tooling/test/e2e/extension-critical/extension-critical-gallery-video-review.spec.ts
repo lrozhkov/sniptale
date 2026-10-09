@@ -4002,17 +4002,11 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
           .click();
       };
       const chooseMotion = async (follows: boolean) => {
-        await button('gallery.videoReview.backgroundZoom').click();
-        await page
-          .getByRole('option', {
-            name: label(
-              follows
-                ? 'gallery.videoReview.backgroundZoomFollow'
-                : 'gallery.videoReview.backgroundZoomFixed'
-            ),
-            exact: true,
-          })
-          .click();
+        await button(
+          follows
+            ? 'gallery.videoReview.backgroundZoomWindow'
+            : 'gallery.videoReview.backgroundZoomContent'
+        ).click();
       };
       await chooseHeader(true);
       await chooseMotion(zoomBehavior === 'follow-video');

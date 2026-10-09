@@ -46,12 +46,35 @@ async function enter(node: HTMLInputElement, value: string) {
   );
 }
 async function choose(label: string, option: string, scope: ParentNode = host) {
-  await act(async () => field(label, scope).click());
-  await act(async () =>
-    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-      .find((node) => node.textContent?.includes(`gallery.videoReview.${option}`))!
-      .click()
-  );
+  if (label !== 'focusReveal') {
+    await act(async () => field(label, scope).click());
+    await act(async () =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+        .find((node) => node.textContent?.includes(`gallery.videoReview.${option}`))!
+        .click()
+    );
+    return;
+  }
+  const direct = (key: string) =>
+    scope.querySelector<HTMLButtonElement>(`[title="gallery.videoReview.${key}"]`)!;
+  const reveal = option.startsWith('borderDraw')
+    ? 'borderDrawing'
+    : option.startsWith('borderErase')
+      ? 'borderErasing'
+      : option.startsWith('borderRotate')
+        ? 'borderRotation'
+        : option;
+  await act(async () => direct(reveal).click());
+  if (
+    option.startsWith('borderDraw') ||
+    option.startsWith('borderErase') ||
+    option.startsWith('borderRotate')
+  )
+    await act(async () =>
+      direct(
+        option.includes('Counterclockwise') ? 'borderCounterclockwise' : 'borderClockwise'
+      ).click()
+    );
 }
 async function scrub(name: string, value: string, cancel = false, scope: ParentNode = host) {
   const node = field(`${name} range`, scope);
@@ -225,8 +248,9 @@ it('offers no rotating hold for a solid stroke', async () => {
     border: createQuickEditBorder(),
   };
   act(() => root.render(<ReviewBorderAnimation region={region} onChange={vi.fn()} />));
-  act(() => field('focusReveal', hold()).click());
-  const options = [...document.querySelectorAll('[role="option"]')].map((node) => node.textContent);
+  const options = [...field('focusReveal', hold()).querySelectorAll('button')].map(
+    (node) => node.textContent
+  );
   expect(options).toEqual([
     'gallery.videoReview.borderStill',
     'gallery.videoReview.borderPulse',
@@ -294,7 +318,10 @@ it('shows legacy Solid rotation as still without rewriting saved state', () => {
   };
   const onChange = vi.fn();
   act(() => root.render(<ReviewBorderAnimation region={region} onChange={onChange} />));
-  expect(field('focusReveal', hold()).textContent).toContain('gallery.videoReview.borderStill');
+  expect(hold().querySelector('[title="gallery.videoReview.borderStill"]')).toHaveProperty(
+    'ariaPressed',
+    'true'
+  );
   expect(field('borderSpeed')).toBeNull();
   expect(field('borderSegmentPercent')).toBeNull();
   expect(onChange).not.toHaveBeenCalled();

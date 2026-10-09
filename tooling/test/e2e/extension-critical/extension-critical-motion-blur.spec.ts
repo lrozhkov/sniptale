@@ -115,17 +115,18 @@ for (const variant of [
       const exit = inspector.locator(
         '[data-ui="gallery.videoReview.motionBlurSettings"][data-phase="exit"]'
       );
-      await expect(enter.getByRole('button')).toContainText(
-        label('gallery.videoReview.motionBlurOff')
-      );
-      await expect(exit.getByRole('button')).toContainText(
-        label('gallery.videoReview.motionBlurOff')
-      );
+      const assertPhaseBounds = async () => {
+        for (const phase of [enter, exit]) {
+          const frame = (await phase.locator('..').boundingBox())!;
+          const toggle = (await phase.getByRole('switch').boundingBox())!;
+          expect(toggle.x + toggle.width).toBeLessThanOrEqual(frame.x + frame.width + 1);
+        }
+      };
+      await assertPhaseBounds();
+      await expect(enter.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      await expect(exit.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
       await enter
-        .getByRole('button', { name: label('gallery.videoReview.motionBlur'), exact: true })
-        .click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.motionBlurOn'), exact: true })
+        .getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
         .click();
       const strength = enter.getByRole('textbox', {
         name: label('gallery.videoReview.motionBlurStrength'),
@@ -134,9 +135,7 @@ for (const variant of [
       await strength.fill('20');
       await strength.press('Tab');
       await expect(strength).toHaveValue('20');
-      await expect(exit.getByRole('button')).toContainText(
-        label('gallery.videoReview.motionBlurOff')
-      );
+      await expect(exit.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
       await expect
         .poll(async () => (await persistedFocus(page))?.motionBlur?.enter?.strength)
         .toBe(0.2);
@@ -167,6 +166,7 @@ for (const variant of [
           await expect.poll(contentWidth).toBe(width);
           await enter.scrollIntoViewIfNeeded();
           await expect(strength).toBeVisible();
+          await assertPhaseBounds();
           await page.screenshot({
             path: info.outputPath(`blur-inspector-${width}.png`),
             fullPage: false,

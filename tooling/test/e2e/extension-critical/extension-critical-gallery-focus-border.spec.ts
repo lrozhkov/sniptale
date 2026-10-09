@@ -143,38 +143,32 @@ for (const variant of [
       await expect(width).toHaveValue('3');
       await button('gallery.videoReview.redo').click();
       await expect(width).toHaveValue('6');
-      const entrance = inspector
-        .getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
-        .first();
-      await entrance.click();
-      await page
-        .getByRole('option', {
-          name: label('gallery.videoReview.borderDrawCounterclockwise'),
+      const entrance = inspector.getByRole('group', {
+        name: label('gallery.videoReview.zoomTransitionIn'),
+        exact: true,
+      });
+      await entrance
+        .getByRole('button', { name: label('gallery.videoReview.borderDrawing'), exact: true })
+        .click();
+      await entrance
+        .getByRole('button', {
+          name: label('gallery.videoReview.borderCounterclockwise'),
           exact: true,
         })
         .click();
-      await expect
-        .poll(async () => (await entrance.boundingBox())?.height ?? 100)
-        .toBeLessThanOrEqual(40);
       await page.screenshot({
         path: info.outputPath('border-counterclockwise-label.png'),
         fullPage: false,
       });
-      const hold = inspector
-        .getByRole('group', { name: label('gallery.videoReview.borderHold'), exact: true })
-        .getByRole('button', {
-          name: label('gallery.videoReview.focusReveal'),
-          exact: true,
-        });
-      await hold.click();
+      const hold = inspector.getByRole('group', {
+        name: label('gallery.videoReview.borderHold'),
+        exact: true,
+      });
       await expect(
-        page.getByRole('option', {
-          name: label('gallery.videoReview.borderRotateClockwise'),
-          exact: true,
-        })
+        hold.getByRole('button', { name: label('gallery.videoReview.borderRotation'), exact: true })
       ).toHaveCount(0);
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.borderPulse'), exact: true })
+      await hold
+        .getByRole('button', { name: label('gallery.videoReview.borderPulse'), exact: true })
         .click();
       const speed = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.borderSpeed'),
@@ -198,10 +192,12 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.borderStyle_dashed'), exact: true })
         .click();
-      await hold.click();
-      await page
-        .getByRole('option', {
-          name: label('gallery.videoReview.borderRotateCounterclockwise'),
+      await hold
+        .getByRole('button', { name: label('gallery.videoReview.borderRotation'), exact: true })
+        .click();
+      await hold
+        .getByRole('button', {
+          name: label('gallery.videoReview.borderCounterclockwise'),
           exact: true,
         })
         .click();
@@ -209,16 +205,20 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.borderStyle_solid'), exact: true })
         .click();
-      await expect(hold).toContainText(label('gallery.videoReview.borderStill'));
+      await expect(
+        hold.getByRole('button', { name: label('gallery.videoReview.borderStill'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
       await expect(speed).toHaveCount(0);
       await style.click();
       await page
         .getByRole('option', { name: label('gallery.videoReview.borderStyle_dashed'), exact: true })
         .click();
-      await hold.click();
-      await page
-        .getByRole('option', {
-          name: label('gallery.videoReview.borderRotateCounterclockwise'),
+      await hold
+        .getByRole('button', { name: label('gallery.videoReview.borderRotation'), exact: true })
+        .click();
+      await hold
+        .getByRole('button', {
+          name: label('gallery.videoReview.borderCounterclockwise'),
           exact: true,
         })
         .click();
@@ -263,13 +263,7 @@ for (const variant of [
         )
         .toBeGreaterThan(1.4);
       await button('gallery.videoReview.scene').click();
-      await button('gallery.videoReview.windowHeader').click();
-      await page
-        .getByRole('option', {
-          name: label('gallery.videoReview.windowHeaderBrowser'),
-          exact: true,
-        })
-        .click();
+      await button('windowHeader.browser').click();
       await button('gallery.videoReview.backgroundSolid').click();
       const padding = dialog.getByRole('textbox', {
         name: label('gallery.videoReview.backgroundPadding'),
@@ -277,17 +271,11 @@ for (const variant of [
       });
       await padding.fill('8');
       await padding.press('Enter');
-      await button('gallery.videoReview.backgroundZoom').click();
-      await page
-        .getByRole('option', {
-          name: label(
-            variant.locale === 'en'
-              ? 'gallery.videoReview.backgroundZoomFixed'
-              : 'gallery.videoReview.backgroundZoomFollow'
-          ),
-          exact: true,
-        })
-        .click();
+      await button(
+        variant.locale === 'en'
+          ? 'gallery.videoReview.backgroundZoomContent'
+          : 'gallery.videoReview.backgroundZoomWindow'
+      ).click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.stage"] img')).toHaveCount(1);
       await expect(
         dialog.locator(
@@ -347,17 +335,30 @@ for (const variant of [
       await expect(width).toHaveValue('6');
       await expect(segmentSize).toHaveValue('65');
       await expect(speed).toHaveValue('0.5');
-      await expect(hold).toContainText(label('gallery.videoReview.borderRotateCounterclockwise'));
-      await hold.click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.borderRipple'), exact: true })
+      await expect(
+        hold.getByRole('button', {
+          name: label('gallery.videoReview.borderCounterclockwise'),
+          exact: true,
+        })
+      ).toHaveAttribute('aria-pressed', 'true');
+      await hold
+        .getByRole('button', { name: label('gallery.videoReview.borderRipple'), exact: true })
         .click();
-      await expect(hold).toContainText(label('gallery.videoReview.borderRipple'));
+      await expect(
+        hold.getByRole('button', { name: label('gallery.videoReview.borderRipple'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
       await expect(segmentSize).toHaveCount(0);
       await button('gallery.videoReview.undo').click();
-      await expect(hold).toContainText(label('gallery.videoReview.borderRotateCounterclockwise'));
+      await expect(
+        hold.getByRole('button', {
+          name: label('gallery.videoReview.borderCounterclockwise'),
+          exact: true,
+        })
+      ).toHaveAttribute('aria-pressed', 'true');
       await button('gallery.videoReview.redo').click();
-      await expect(hold).toContainText(label('gallery.videoReview.borderRipple'));
+      await expect(
+        hold.getByRole('button', { name: label('gallery.videoReview.borderRipple'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
       await hold.scrollIntoViewIfNeeded();
       await page.screenshot({
         path: info.outputPath('border-ripple-controls.png'),
@@ -393,7 +394,9 @@ for (const variant of [
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
-      await expect(hold).toContainText(label('gallery.videoReview.borderRipple'));
+      await expect(
+        hold.getByRole('button', { name: label('gallery.videoReview.borderRipple'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
       const downloading = page.waitForEvent('download');
       await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
       const download = await downloading;

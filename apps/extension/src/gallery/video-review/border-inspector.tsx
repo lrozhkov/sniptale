@@ -1,4 +1,5 @@
-import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
+import { RotateCw, RotateCcw } from 'lucide-react';
+import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditBorder,
@@ -8,10 +9,6 @@ import type { QuickEditZoomRegionPatch } from '../../features/video/review/advan
 import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
 import { ReviewPreviewNumberRow } from './number-row';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
-
-// Override inspector wrapping for long motion labels while retaining the shared overflow tooltip.
-const borderAnimationSelectClassName =
-  '[&_.truncate]:whitespace-nowrap! [&_.truncate]:overflow-hidden! [&_.truncate]:text-ellipsis!';
 
 /** Source geometry and stroke appearance share the selected effect's draft owner. */
 export function ReviewBorderInspector(props: {
@@ -152,11 +149,12 @@ export function ReviewBorderAnimation(props: {
                   : 'gallery.videoReview.zoomTransitionOut'
               )}
             </legend>
-            <SelectField
-              className={reviewSelectFieldClassName}
-              selectClassName={borderAnimationSelectClassName}
+            <SegmentedRow<'none' | 'fade' | 'draw'>
+              columns={3}
+              layout="stacked"
+              ariaLabel={translate('gallery.videoReview.focusReveal')}
               label={translate('gallery.videoReview.focusReveal')}
-              value={clock.type === 'none' ? 'none' : reveal}
+              value={clock.type === 'none' ? 'none' : reveal === 'fade' ? 'fade' : 'draw'}
               options={[
                 {
                   value: 'none',
@@ -168,19 +166,11 @@ export function ReviewBorderAnimation(props: {
                 },
                 { value: 'fade', label: translate('gallery.videoReview.focusFade') },
                 {
-                  value: phase === 'enter' ? 'draw' : 'erase',
+                  value: 'draw',
                   label: translate(
                     phase === 'enter'
-                      ? 'gallery.videoReview.borderDraw'
-                      : 'gallery.videoReview.borderErase'
-                  ),
-                },
-                {
-                  value: phase === 'enter' ? 'draw-ccw' : 'erase-ccw',
-                  label: translate(
-                    phase === 'enter'
-                      ? 'gallery.videoReview.borderDrawCounterclockwise'
-                      : 'gallery.videoReview.borderEraseCounterclockwise'
+                      ? 'gallery.videoReview.borderDrawing'
+                      : 'gallery.videoReview.borderErasing'
                   ),
                 },
               ]}
@@ -190,11 +180,41 @@ export function ReviewBorderAnimation(props: {
                   border: {
                     ...border,
                     [phase === 'enter' ? 'reveal' : 'exitReveal']:
-                      value === 'none' ? reveal : value,
+                      value === 'none'
+                        ? reveal
+                        : value === 'fade'
+                          ? 'fade'
+                          : phase === 'enter'
+                            ? reveal.endsWith('-ccw')
+                              ? 'draw-ccw'
+                              : 'draw'
+                            : reveal.endsWith('-ccw')
+                              ? 'erase-ccw'
+                              : 'erase',
                   },
                 })
               }
             />
+            {clock.type !== 'none' && reveal !== 'fade' ? (
+              <BorderDirection
+                counterclockwise={reveal.endsWith('-ccw')}
+                onChange={(counterclockwise) =>
+                  onChange({
+                    border: {
+                      ...border,
+                      [phase === 'enter' ? 'reveal' : 'exitReveal']:
+                        phase === 'enter'
+                          ? counterclockwise
+                            ? 'draw-ccw'
+                            : 'draw'
+                          : counterclockwise
+                            ? 'erase-ccw'
+                            : 'erase',
+                    },
+                  })
+                }
+              />
+            ) : null}
             <ReviewPreviewNumberRow
               label={translate('gallery.videoReview.zoomTransitionDuration')}
               min={0}
@@ -236,23 +256,28 @@ function BorderHold(props: {
   const moving = border.loop && (!rotating || border.style !== 'solid');
   return (
     <>
-      <SelectField<QuickEditBorder['motion'] | 'still'>
-        className={reviewSelectFieldClassName}
-        selectClassName={borderAnimationSelectClassName}
+      <SegmentedRow<'still' | 'rotate' | 'pulse' | 'ripple'>
+        columns={border.style === 'solid' ? 3 : 4}
+        layout="stacked"
+        ariaLabel={translate('gallery.videoReview.focusReveal')}
         label={translate('gallery.videoReview.focusReveal')}
-        value={moving ? border.motion : 'still'}
+        value={
+          moving
+            ? border.motion === 'pulse'
+              ? 'pulse'
+              : border.motion === 'ripple'
+                ? 'ripple'
+                : 'rotate'
+            : 'still'
+        }
         options={[
           { value: 'still', label: translate('gallery.videoReview.borderStill') },
           ...(border.style === 'solid'
             ? []
             : [
                 {
-                  value: 'clockwise' as const,
-                  label: translate('gallery.videoReview.borderRotateClockwise'),
-                },
-                {
-                  value: 'counterclockwise' as const,
-                  label: translate('gallery.videoReview.borderRotateCounterclockwise'),
+                  value: 'rotate' as const,
+                  label: translate('gallery.videoReview.borderRotation'),
                 },
               ]),
           { value: 'pulse', label: translate('gallery.videoReview.borderPulse') },
@@ -263,11 +288,28 @@ function BorderHold(props: {
             border: {
               ...border,
               loop: value !== 'still',
-              motion: value === 'still' ? border.motion : value,
+              motion:
+                value === 'still'
+                  ? border.motion
+                  : value === 'rotate'
+                    ? border.motion === 'counterclockwise'
+                      ? 'counterclockwise'
+                      : 'clockwise'
+                    : value,
             },
           })
         }
       />
+      {moving && rotating ? (
+        <BorderDirection
+          counterclockwise={border.motion === 'counterclockwise'}
+          onChange={(counterclockwise) =>
+            onChange({
+              border: { ...border, motion: counterclockwise ? 'counterclockwise' : 'clockwise' },
+            })
+          }
+        />
+      ) : null}
       {moving ? (
         <>
           {rotating ? (
@@ -316,3 +358,28 @@ function BorderHold(props: {
 }
 
 /** A numeric gesture previews locally and commits once; cancellation clears the effect draft. */
+
+function BorderDirection(props: { counterclockwise: boolean; onChange(value: boolean): void }) {
+  return (
+    <SegmentedRow
+      columns={2}
+      layout="inline"
+      ariaLabel={translate('gallery.videoReview.borderDirection')}
+      label={translate('gallery.videoReview.borderDirection')}
+      value={props.counterclockwise ? 'counterclockwise' : 'clockwise'}
+      options={[
+        {
+          value: 'clockwise',
+          label: translate('gallery.videoReview.borderClockwise'),
+          icon: <RotateCw size={16} aria-hidden="true" />,
+        },
+        {
+          value: 'counterclockwise',
+          label: translate('gallery.videoReview.borderCounterclockwise'),
+          icon: <RotateCcw size={16} aria-hidden="true" />,
+        },
+      ]}
+      onChange={(value) => props.onChange(value === 'counterclockwise')}
+    />
+  );
+}

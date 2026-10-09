@@ -1,3 +1,4 @@
+import { updateQuickEditBackground } from './background';
 import { describe, expect, it } from 'vitest';
 import {
   computeQuickEditContentRect,
@@ -9,6 +10,166 @@ import {
   quickEditContentPointToCanvas,
 } from './scene';
 import type { QuickEditZoomRegion } from './types';
+import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
+import { DEFAULT_QUICK_EDIT_PERSPECTIVE, DEFAULT_QUICK_EDIT_DEPTH } from './spatial';
+import {
+  quickEditPlaneProjection,
+  projectQuickEditPoint,
+  invertQuickEditProjection,
+} from './spatial-geometry';
+import {
+  computeQuickEditSpatialWindow,
+  computeQuickEditSpatialRasterLayout,
+  computeQuickEditWindowTransform,
+} from './scene';
+
+it.each(['window', 'content'] as const)(
+  'keeps %s geometry continuous and invertible through ordinary/perspective chains at 30/60 FPS',
+  (zoomBehavior) => {
+    const poses: QuickEditZoomRegion[] = [
+      {
+        id: 'ordinary',
+        start: 0,
+        end: 2,
+        transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'linear', duration: 0.5 },
+        exit: { type: 'linear', duration: 0.5 },
+        linkTo: 'tilt',
+      },
+      {
+        id: 'tilt',
+        start: 3,
+        end: 5,
+        transform: { scale: 2, centerX: 0.35, centerY: 0.4 },
+        enter: { type: 'linear', duration: 0.5 },
+        exit: { type: 'linear', duration: 0.5 },
+        linkTo: 'rotation',
+        perspective: {
+          ...DEFAULT_QUICK_EDIT_PERSPECTIVE,
+          enabled: true,
+          rotateX: 20,
+          rotateY: -30,
+        },
+        depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true, mode: 'area' },
+      },
+      {
+        id: 'rotation',
+        start: 6,
+        end: 8,
+        transform: { scale: 1.15, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'linear', duration: 0.5 },
+        exit: { type: 'linear', duration: 0.5 },
+        perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateZ: 25 },
+        depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true, mode: 'depth' },
+      },
+    ];
+    const layouts = [
+      {
+        source: { width: 640, height: 360 },
+        background: updateQuickEditBackground(
+          { enabled: false, zoomBehavior },
+          { type: 'gradient' }
+        ),
+      },
+      {
+        source: { width: 640, height: 360 },
+        background: { enabled: false as const, zoomBehavior },
+      },
+      {
+        source: { width: 360, height: 640 },
+        background: {
+          enabled: true as const,
+          type: 'solid' as const,
+          color: '#123456ff',
+          zoomBehavior,
+          layout: { padding: 30, cornerRadius: 12 },
+        },
+      },
+      {
+        source: { width: 640, height: 360 },
+        background: {
+          enabled: true as const,
+          type: 'image' as const,
+          assetId: 'project-background',
+          imageFit: 'cover' as const,
+          zoomBehavior,
+          layout: { padding: 20, cornerRadius: 12 },
+        },
+      },
+    ];
+    for (const settings of layouts) {
+      const output = { width: 640, height: 450 };
+      const at = (time: number) =>
+        computeQuickEditSceneLayout({
+          ...settings,
+          output,
+          camera: evaluateQuickEditCameraAtTime(poses, time),
+          windowHeader: DEFAULT_WINDOW_HEADER,
+        });
+      for (const fps of [30, 60])
+        for (let frame = 0; frame <= fps * 8; frame++) {
+          const layout = at(frame / fps);
+          const motion = computeQuickEditSceneCamera(layout, settings.background);
+          expect([motion.backgroundScale, motion.x, motion.y]).toEqual([1, 0, 0]);
+          const target = computeQuickEditSpatialWindow(layout, settings.background);
+          expect(target).toEqual(
+            zoomBehavior === 'window' ? computeQuickEditWindowTransform(layout) : layout.windowRect
+          );
+          const raster = computeQuickEditSpatialRasterLayout(layout, settings.background);
+          expect(raster.videoTransform.width / raster.videoRect.width).toBeCloseTo(
+            zoomBehavior === 'window' ? 1 : layout.videoTransform.width / layout.videoRect.width,
+            8
+          );
+          if (layout.spatial) {
+            const matrix = quickEditPlaneProjection(layout.windowRect, target, layout.spatial);
+            const point = { x: layout.windowRect.x, y: layout.windowRect.y };
+            const projected = projectQuickEditPoint(matrix, point)!;
+            const restored = projectQuickEditPoint(invertQuickEditProjection(matrix)!, projected)!;
+            expect(restored.x).toBeCloseTo(point.x, 6);
+            expect(restored.y).toBeCloseTo(point.y, 6);
+          }
+        }
+      for (const time of [0.5, 2, 3, 5, 6, 7.5, 8]) {
+        const left = computeQuickEditSpatialWindow(at(time - 1e-7), settings.background);
+        const right = computeQuickEditSpatialWindow(at(time + 1e-7), settings.background);
+        for (const key of ['x', 'y', 'width', 'height'] as const)
+          expect(left[key]).toBeCloseTo(right[key], 3);
+      }
+    }
+  }
+);
+
+it.each(['window', 'content'] as const)(
+  'keeps the background stationary in %s mode with or without perspective',
+  (zoomBehavior) => {
+    for (const spatial of [
+      undefined,
+      {
+        rotation: [0, 0, 0, 1] as const,
+        perspective: 0.5,
+        windowMotion: 0.2,
+        lockBackground: true,
+        focus: [],
+      },
+    ]) {
+      const layout = {
+        videoRect: { x: 40, y: 60, width: 200, height: 100 },
+        windowRect: { x: 40, y: 40, width: 200, height: 120 },
+        videoTransform: { x: -60, y: 20, width: 400, height: 200 },
+        ...(spatial ? { spatial } : {}),
+      };
+      const background = { enabled: false as const, zoomBehavior };
+      const motion = computeQuickEditSceneCamera(layout, background);
+      expect(motion.backgroundScale).toBe(1);
+      expect(motion.x).toBe(0);
+      expect(motion.y).toBe(0);
+      expect(motion.windowClip).toEqual(
+        zoomBehavior === 'window' ? { x: -60, y: -20, width: 400, height: 240 } : layout.windowRect
+      );
+      expect(motion.scale).toBe(zoomBehavior === 'window' ? 2 : 1);
+    }
+  }
+);
 
 const region = (
   overrides: Partial<QuickEditZoomRegion> & Pick<QuickEditZoomRegion, 'start' | 'end'>
@@ -407,6 +568,7 @@ it.each(['none', 'linear', 'ease-in-out'] as const)(
             x: 0,
             y: 0,
             scale: 1,
+            backgroundScale: 1,
             videoClip: layout.videoRect,
             windowClip: layout.windowRect,
           });
