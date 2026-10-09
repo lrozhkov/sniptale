@@ -10,6 +10,7 @@ import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/a
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSpatialWindow,
+  computeQuickEditSpatialRasterLayout,
   computeQuickEditSceneSize,
   computeQuickEditWindowTransform,
   computeQuickEditSceneCamera,
@@ -172,17 +173,35 @@ function resolveStageDecorations(
       }
     : null;
   const clip = computeQuickEditSceneCamera(sceneLayout, scene.background).windowClip;
+  const overlayClip = {
+    rect: clip,
+    radius: scene.background.enabled
+      ? ((scene.background.layout.cornerRadius * size.width) /
+          Math.max(1, scene.canvas?.width ?? props.source.width)) *
+        (clip.width / sceneLayout.windowRect.width)
+      : 0,
+  };
   return {
     spotlight: focus ? evaluateQuickEditSpotlightsAtTime(focus) : [],
     borders: focus ? evaluateQuickEditBordersAtTime(focus) : [],
-    overlayClip: {
-      rect: clip,
-      radius: scene.background.enabled
-        ? ((scene.background.layout.cornerRadius * size.width) /
-            Math.max(1, scene.canvas?.width ?? props.source.width)) *
-          (clip.width / sceneLayout.windowRect.width)
-        : 0,
-    },
+    overlayClip,
+  };
+}
+
+/** Rasterize before outer zoom: tilt can bring off-viewport click pixels back into view. */
+export function resolveReviewClickRaster(
+  layout: ReturnType<typeof previewSceneLayout>,
+  background: QuickEditBackgroundSettings,
+  clip: { rect: ReviewRegion; radius: number }
+) {
+  if (!layout.spatial) return { video: layout.videoTransform, clip, transform: undefined };
+  const raster = computeQuickEditSpatialRasterLayout(layout, background);
+  const base = layout.windowRect;
+  const scale = clip.rect.width / base.width;
+  return {
+    video: raster.videoTransform,
+    clip: { rect: base, radius: clip.radius / scale },
+    transform: { scale, x: clip.rect.x - scale * base.x, y: clip.rect.y - scale * base.y },
   };
 }
 

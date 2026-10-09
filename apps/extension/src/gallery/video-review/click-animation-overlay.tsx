@@ -12,10 +12,11 @@ export function ReviewClickOverlay(props: {
   output: { width: number; height: number };
   video: Parameters<typeof drawReviewClicks>[2] | undefined;
   sourceWidth: number;
+  transform?: { scale: number; x: number; y: number } | undefined;
   getFrame?(): CanvasImageSource | null;
   clip: Parameters<typeof drawReviewClicks>[4] | undefined;
 }) {
-  const { getFrame } = props;
+  const { getFrame, transform: mapping } = props;
   const canvas = useRef<HTMLCanvasElement>(null);
   const frames = evaluateReviewClicks(props.cues ?? [], props.time);
   useEffect(() => {
@@ -57,6 +58,14 @@ export function ReviewClickOverlay(props: {
       data-ui="gallery.videoReview.clickAnimation"
       width={props.output.width}
       height={props.output.height}
+      style={
+        mapping
+          ? {
+              transformOrigin: '0 0',
+              transform: `matrix(${mapping.scale}, 0, 0, ${mapping.scale}, ${mapping.x}, ${mapping.y})`,
+            }
+          : undefined
+      }
       className="pointer-events-none absolute inset-0 h-full w-full"
     />
   ) : null;

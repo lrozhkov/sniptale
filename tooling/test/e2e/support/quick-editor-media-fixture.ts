@@ -26,14 +26,15 @@ export async function seedReviewVideo(
   dimensions: { width: number; height: number; duration: number },
   gaps = false,
   history = false,
-  source?: { bytes: Uint8Array; mimeType: 'video/webm' | 'video/mp4' }
+  source?: { bytes: Uint8Array; mimeType: 'video/webm' | 'video/mp4' },
+  recordingPoint?: { x: number; y: number }
 ) {
   let bytes = source
     ? Buffer.from(source.bytes)
     : await readFile(new URL(`../fixtures/${filename}`, import.meta.url));
   if (gaps) bytes = await withAudioGaps(bytes);
   await page.evaluate(
-    async ({ fixture, encoded, dimensions, mimeType, history }) => {
+    async ({ fixture, encoded, dimensions, mimeType, history, recordingPoint }) => {
       const body = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
       const directory = await (
         await navigator.storage.getDirectory()
@@ -84,8 +85,13 @@ export async function seedReviewVideo(
               kind: 'CLICK',
               time: 1,
               duration: 0.2,
-              point: { x: 40, y: 30 },
-              recordingPoint: { x: 0.25, y: 0.33 },
+              point: recordingPoint
+                ? {
+                    x: recordingPoint.x * dimensions.width,
+                    y: recordingPoint.y * dimensions.height,
+                  }
+                : { x: 40, y: 30 },
+              recordingPoint: recordingPoint ?? { x: 0.25, y: 0.33 },
               label: '',
               data: {},
               preset: 'NONE',
@@ -100,6 +106,7 @@ export async function seedReviewVideo(
       encoded: bytes.toString('base64'),
       dimensions,
       history,
+      recordingPoint,
       mimeType: source?.mimeType ?? (filename.endsWith('.mp4') ? 'video/mp4' : 'video/webm'),
     }
   );

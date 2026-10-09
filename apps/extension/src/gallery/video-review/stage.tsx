@@ -7,6 +7,7 @@ import { useStagePresentation, ReviewStagePresentationFeedback } from './stage-p
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import {
   useReviewStageGeometry,
+  resolveReviewClickRaster,
   type ReviewStageScene,
   type ReviewStageCommentGeometry,
 } from './stage-geometry';
@@ -408,6 +409,10 @@ function ReviewStageContent({
   projected: ReturnType<typeof projectVideoRegion> | null;
 }) {
   const { size, sceneLayout, zoomLayout, borders, overlayClip } = geometry;
+  const clickRaster =
+    sceneLayout && props.scene && overlayClip
+      ? resolveReviewClickRaster(sceneLayout, props.scene.background, overlayClip)
+      : undefined;
   return (
     <div
       className="pointer-events-none absolute inset-0"
@@ -431,9 +436,10 @@ function ReviewStageContent({
           cues={props.clickCues}
           time={props.scene?.focus?.time ?? 0}
           output={size}
-          video={sceneLayout?.videoTransform}
+          video={clickRaster?.video}
           sourceWidth={props.source.width}
-          clip={overlayClip}
+          clip={clickRaster?.clip}
+          transform={clickRaster?.transform}
         />
       ) : null}
       <ReviewStageComments

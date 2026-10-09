@@ -340,3 +340,131 @@ test('unavailable perspective preserves settings and can retry', async ({ page }
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+test('projected click near the window edge retains its raster before tilt', async ({
+  page,
+}, info) => {
+  const host = await startHostServer();
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+  const dialog = page.locator('dialog');
+  const button = (key: Parameters<typeof translate>[0]) =>
+    dialog.getByRole('button', { name: label(key), exact: true });
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(
+      page,
+      'review-vp8-opus.webm',
+      { width: 160, height: 90, duration: 12 },
+      false,
+      true,
+      undefined,
+      { x: 0.1, y: 0.5 }
+    );
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await button('gallery.videoReview.advancedEditing').click();
+    await button('gallery.videoReview.historyOpen').click();
+    const history = dialog.locator('[data-ui="gallery.videoReview.actionHistory"]');
+    await history
+      .getByRole('checkbox', { name: label('gallery.videoReview.historySelectAll'), exact: true })
+      .click();
+    await history
+      .getByRole('button', { name: label('gallery.videoReview.historyConfigure'), exact: true })
+      .click();
+    await history
+      .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
+      .click();
+    await page
+      .getByRole('option', { name: label('gallery.videoReview.click_ripple'), exact: true })
+      .click();
+    const radius = dialog.getByRole('textbox', {
+      name: label('gallery.videoReview.clickRadius'),
+      exact: true,
+    });
+    await radius.fill('8');
+    await radius.press('Enter');
+    await button('gallery.videoReview.scene').click();
+    await button('gallery.videoReview.backgroundSolid').click();
+    await button('gallery.videoReview.backgroundZoomWindow').click();
+    const padding = dialog.getByRole('textbox', {
+      name: label('gallery.videoReview.backgroundPadding'),
+      exact: true,
+    });
+    await padding.fill('12');
+    await padding.press('Enter');
+    await addReviewFocus(page);
+    const scale = dialog.getByRole('textbox', {
+      name: label('gallery.videoReview.zoomScale'),
+      exact: true,
+    });
+    await scale.fill('2.3');
+    await scale.press('Enter');
+    await button('gallery.videoReview.spatialToolTilt').click();
+    const tilt = dialog.getByRole('textbox', {
+      name: label('gallery.videoReview.perspectiveY'),
+      exact: true,
+    });
+    await tilt.fill('-60');
+    await tilt.press('Enter');
+    await expect.poll(async () => (await persistedFocus(page))?.perspective?.rotateY).toBe(-60);
+    await expect.poll(async () => (await persistedFocus(page))?.transform.scale).toBe(2.3);
+    const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+    const rulerBox = (await ruler.boundingBox())!;
+    const duration = Number(
+      await dialog
+        .locator('[data-ui="gallery.videoReview.timePlane"]')
+        .getAttribute('aria-valuemax')
+    );
+    await page.mouse.click(rulerBox.x + (1.2 * rulerBox.width) / duration, rulerBox.y + 10);
+    const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+    const click = stage.locator('[data-ui="gallery.videoReview.clickAnimation"]');
+    await expect(click).toBeVisible();
+    await expect
+      .poll(() =>
+        click.evaluate((canvas: HTMLCanvasElement) => {
+          const pixels = canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          let painted = 0;
+          for (let i = 3; i < pixels.length; i += 4) if (pixels[i]! > 0) painted++;
+          return painted;
+        })
+      )
+      .toBeGreaterThan(100);
+    await page.screenshot({ path: info.outputPath('edge-click-projected.png'), fullPage: false });
+    // The header belongs to the same plane; the opposite tilt must preserve the same ring.
+    await button('gallery.videoReview.scene').click();
+    await button('windowHeader.browser').click();
+    await dialog.locator('[data-zoom-edge="start"]').first().locator('..').click();
+    await button('gallery.videoReview.spatialToolTilt').click();
+    await tilt.fill('60');
+    await tilt.press('Enter');
+    await expect.poll(async () => (await persistedFocus(page))?.perspective?.rotateY).toBe(60);
+    await page.mouse.click(rulerBox.x + (1.2 * rulerBox.width) / duration, rulerBox.y + 10);
+    await expect(click).toBeVisible();
+    await expect
+      .poll(() =>
+        click.evaluate((canvas: HTMLCanvasElement) => {
+          const pixels = canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          let painted = 0;
+          for (let i = 3; i < pixels.length; i += 4) if (pixels[i]! > 0) painted++;
+          return painted;
+        })
+      )
+      .toBeGreaterThan(100);
+    await page.screenshot({
+      path: info.outputPath('edge-click-header-opposite-tilt.png'),
+      fullPage: false,
+    });
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});
