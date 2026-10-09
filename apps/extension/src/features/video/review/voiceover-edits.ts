@@ -195,6 +195,45 @@ export function projectReviewVoiceover(
   });
 }
 
+/** Retained result slices for an interval measured in the intact audio asset's native seconds. */
+export function reviewVoiceoverNativeIntervals(
+  clip: QuickEditAudioClip,
+  interval: { start: number; end: number },
+  map?: readonly ReviewTimeSegment[]
+): Array<{ start: number; end: number }> {
+  if (clip.dormant || interval.end <= interval.start) return [];
+  return projectReviewVoiceover([clip], map).flatMap((slice) => {
+    const rate = slice.playbackRate ?? 1;
+    const start = Math.max(interval.start, slice.sourceOffset);
+    const end = Math.min(interval.end, slice.sourceOffset + slice.duration * rate);
+    return end > start
+      ? [
+          {
+            start: slice.timelineStart + (start - slice.sourceOffset) / rate,
+            end: slice.timelineStart + (end - slice.sourceOffset) / rate,
+          },
+        ]
+      : [];
+  });
+}
+
+/** Inverse native clock for the audible slice under a result playhead; authored gaps stay unmapped. */
+export function reviewVoiceoverNativeTime(
+  clip: QuickEditAudioClip,
+  time: number,
+  map?: readonly ReviewTimeSegment[]
+): number | null {
+  if (clip.dormant) return null;
+  const slices = projectReviewVoiceover([clip], map);
+  const slice =
+    slices.find(
+      (entry) => time >= entry.timelineStart && time < entry.timelineStart + entry.duration
+    ) ?? slices.find((entry) => time === entry.timelineStart + entry.duration);
+  return slice
+    ? slice.sourceOffset + (time - slice.timelineStart) * (slice.playbackRate ?? 1)
+    : null;
+}
+
 /** Actual audible duration; raw sample seconds are independent of applied Speed. */
 export function reviewVoiceoverPlaybackDuration(
   clip: QuickEditAudioClip,

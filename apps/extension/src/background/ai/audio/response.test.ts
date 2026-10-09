@@ -45,7 +45,14 @@ describe('audio response boundary', () => {
         },
         2
       )
-    ).toEqual({ text: 'one two', segments });
+    ).toEqual({
+      text: 'one two',
+      segments,
+      words: [
+        { text: 'one', start: 0, end: 0.5 },
+        { text: 'two', start: 0.5, end: 0.5 },
+      ],
+    });
     expect(
       parseAudioTranscriptResponse(
         {
@@ -54,7 +61,7 @@ describe('audio response boundary', () => {
         },
         2
       )
-    ).toEqual({ text: 'two' });
+    ).toEqual({ text: 'two', words: [{ text: 'two', start: 2, end: 2 }] });
   });
   it.each([
     [{ word: 'a', start: 1, end: 0.5 }],

@@ -69,12 +69,21 @@ function Harness({
   onError,
   assetId = 'original',
   geometry = 'geometry',
+  authorities,
 }: {
   onError(): void;
   assetId?: string;
   geometry?: string;
+  authorities?: Parameters<typeof useSpeechPreviews>[0]['authorities'];
 }) {
-  current = useSpeechPreviews({ assetId, transcript, geometry, onError });
+  current = useSpeechPreviews({
+    assetId,
+    onError,
+    target: { kind: 'voiceover', clipId: 'clip' },
+    authorities: authorities ?? [
+      { target: { kind: 'voiceover', clipId: 'clip' }, transcript, geometry },
+    ],
+  });
   return null;
 }
 beforeEach(() => {
@@ -98,6 +107,32 @@ afterEach(() => {
   host.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+it('keeps identical phrase ids from separate targets and invalidates only the edited target', async () => {
+  const onError = vi.fn();
+  const authorities = ['clip', 'other'].map((clipId) => ({
+    target: { kind: 'voiceover' as const, clipId },
+    transcript,
+    geometry: 'geometry',
+  }));
+  await act(async () => root?.render(<Harness onError={onError} authorities={authorities} />));
+  const first = preview('first');
+  const other = preview('other');
+  other.scope.target = { kind: 'voiceover', clipId: 'other' };
+  await act(async () => {
+    current.add(first);
+    current.add(other);
+  });
+  expect(current.previews).toEqual([first, other]);
+  await act(async () => current.invalidate(['phrase']));
+  expect(current.previews).toEqual([other]);
+  expect(mocks.cleanup).toHaveBeenCalledWith(first);
+  expect(mocks.cleanup).not.toHaveBeenCalledWith(other);
+  await act(async () =>
+    root?.render(<Harness onError={onError} authorities={[authorities[0]!]} />)
+  );
+  expect(current.previews).toEqual([]);
+  expect(mocks.cleanup).toHaveBeenCalledWith(other);
 });
 it('owns original audio URLs and releases generated previews on expiry and replacement', async () => {
   vi.useFakeTimers();

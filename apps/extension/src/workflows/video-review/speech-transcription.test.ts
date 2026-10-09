@@ -1,6 +1,8 @@
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
 import type { ReviewSpeechSession } from './speech-publication';
+import { parseAudioJobServerMessage } from '../../contracts/ai/audio';
+import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
 import { describe, expect, it, vi } from 'vitest';
 import {
   reviewSpeechChunks,
@@ -9,6 +11,52 @@ import {
 } from './speech-transcription';
 
 describe('native speech transcription', () => {
+  it.each([1, 2])(
+    'retains text and reliable anchors through transport and persistence with zero word %i',
+    (zero) => {
+      const raw = {
+        text: 'yes, yes. Last',
+        words: [
+          { text: 'yes,', start: 0, end: 0.4 },
+          { text: 'yes.', start: 0.4, end: 0.8 },
+          { text: 'Last', start: 0.8, end: 1.2 },
+        ].map((word, index) => (index === zero ? { ...word, end: word.start } : word)),
+      };
+      const message = parseAudioJobServerMessage({
+        type: 'transcript',
+        requestId: 'partial',
+        result: raw,
+      });
+      expect(message?.type).toBe('transcript');
+      if (message?.type !== 'transcript') throw new Error('Missing transcript');
+      const phrases = reviewSpeechPhrases(message.result, 10, 12);
+      expect(phrases).toHaveLength(1);
+      expect(phrases[0]).toMatchObject({
+        text: raw.text,
+        originalText: raw.text,
+        start: 10,
+        end: 12,
+        alignment: 'range',
+      });
+      expect(phrases[0]?.words).toEqual(
+        raw.words
+          .filter((word) => word.end > word.start)
+          .map((word) => ({ text: word.text, start: word.start + 10, end: word.end + 10 }))
+      );
+      expect(
+        parseReviewSpeechTranscript({ version: 1, phrases, replacements: [] })?.phrases
+      ).toEqual(phrases);
+    }
+  );
+  it('retains wholly unaligned text without inventing an interval for its word', () => {
+    const phrases = reviewSpeechPhrases(
+      { text: 'Done.', words: [{ text: 'Done.', start: 2, end: 2 }] },
+      10,
+      12
+    );
+    expect(phrases[0]).toMatchObject({ text: 'Done.', start: 10, end: 12, alignment: 'range' });
+    expect(phrases[0]?.words).toBeUndefined();
+  });
   it('does not bridge a cut or overlap text-only chunks', () => {
     expect(
       reviewSpeechChunks([
@@ -71,7 +119,8 @@ const workflow = vi.hoisted(() => ({
   ),
 }));
 vi.mock('./speech-client', () => ({ runReviewSpeechJob: workflow.job }));
-vi.mock('./speech-audio', () => ({
+vi.mock('./speech-audio', async (original) => ({
+  ...(await original<typeof import('./speech-audio')>()),
   extractReviewSpeechWav: workflow.extract,
   planReviewSpeechChunks: workflow.plan,
 }));

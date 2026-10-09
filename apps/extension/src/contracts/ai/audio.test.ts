@@ -134,3 +134,11 @@ it('binds both strict target variants across scope parsing and equality', () => 
     })
   ).toMatchObject({ scope: original });
 });
+it('admits bounded request keepalive without admitting new work or malformed identity', () => {
+  expect(parseAudioJobClientMessage({ type: 'keepalive', requestId: 'r' })).toEqual({
+    type: 'keepalive',
+    requestId: 'r',
+  });
+  expect(parseAudioJobClientMessage({ type: 'keepalive', requestId: '' })).toBeNull();
+  expect(parseAudioJobClientMessage({ type: 'keepalive', requestId: 'r\nsecret' })).toBeNull();
+});

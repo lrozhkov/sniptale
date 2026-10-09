@@ -79,9 +79,9 @@ export function syntheticSpeechWav(duration: number, frequency = 220): Buffer {
 }
 
 /** Mock only the remote boundary; real extraction, staging, decoding and publication run. */
-export async function installSpeechPortFixture(page: Page): Promise<void> {
+export async function installSpeechPortFixture(page: Page, phraseCount?: number): Promise<void> {
   await page.evaluate(
-    ({ portName, shortAudio, longAudio }) => {
+    ({ portName, shortAudio, longAudio, phraseCount }) => {
       const requests: { operation: string; text?: string; inputBytes?: number; wav?: boolean }[] =
         [];
       Object.assign(window, { speechFixtureRequests: requests });
@@ -145,16 +145,24 @@ export async function installSpeechPortFixture(page: Page): Promise<void> {
             });
             await root.removeEntry(message.staged.id);
             await root.removeEntry(`${message.staged.id}.json`);
+            const words =
+              phraseCount === undefined
+                ? [
+                    { text: 'First phrase.', start: 0.5, end: 1.5 },
+                    { text: 'Middle phrase.', start: 2, end: 4 },
+                    { text: 'Last phrase.', start: 4.5, end: 5.5 },
+                  ]
+                : Array.from({ length: phraseCount }, (_, index) => ({
+                    text: `Длинный пример текста для проверки озвучки и размещения фразы ${index + 1}.`,
+                    start: (index * 11) / Math.max(1, phraseCount),
+                    end: ((index + 0.9) * 11) / Math.max(1, phraseCount),
+                  }));
             emit({
               type: 'transcript',
               requestId: message.requestId,
               result: {
-                text: 'First phrase. Middle phrase. Last phrase.',
-                words: [
-                  { text: 'First phrase.', start: 0.5, end: 1.5 },
-                  { text: 'Middle phrase.', start: 2, end: 4 },
-                  { text: 'Last phrase.', start: 4.5, end: 5.5 },
-                ],
+                text: words.map((word) => word.text).join(' '),
+                words,
               },
             });
           };
@@ -213,6 +221,7 @@ export async function installSpeechPortFixture(page: Page): Promise<void> {
       portName: AUDIO_JOB_PORT_NAME,
       shortAudio: syntheticSpeechWav(1, 440).toString('base64'),
       longAudio: syntheticSpeechWav(3, 440).toString('base64'),
+      phraseCount,
     }
   );
 }
@@ -256,6 +265,7 @@ export async function persistedSpeech(page: Page) {
   const map = buildReviewTimeMap(workspace.source.duration, document.edits);
   return {
     clip,
+    clips: document.advancedContent.audio.voiceover,
     plan: buildQuickEditAudioPlan({ voiceover: projectReviewVoiceover([clip], map), music: [] }),
   };
 }

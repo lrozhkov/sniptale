@@ -1,5 +1,6 @@
 import {
   parseAudioJobFailureCode,
+  sameReviewSpeechTarget,
   type ReviewSpeechTarget,
   type AudioJobFailureCode,
 } from '../../contracts/ai/audio';
@@ -11,15 +12,25 @@ import {
   applyReviewSpeech,
   getReviewSpeechTarget,
   reviewSpeechGeometry,
-  generateReviewSpeech,
   type ReviewSpeechPreview,
   type ReviewSpeechSession,
 } from '../../workflows/video-review/speech-publication';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import {
+  planReviewSpeechQueue,
+  runReviewSpeechQueue,
+  type ReviewSpeechQueueSelection,
+  type ReviewSpeechQueueProgress,
+} from '../../workflows/video-review/speech-queue';
+import { buildReviewTimeMap, createReviewTimeMap } from '../../features/video/review/timeline';
+import {
+  reviewVoiceoverNativeIntervals,
+  reviewVoiceoverNativeTime,
+} from '../../features/video/review/voiceover-edits';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import { useSpeechEdits } from './use-speech-edits';
 import { useSpeechPreviews } from './use-speech-previews';
+import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
 type Failure =
   | AudioJobFailureCode
   | 'interrupted'
@@ -67,30 +78,27 @@ export function useReviewSpeech(args: {
       ? getReviewSpeechTarget(args.session, args.target)
       : undefined;
   const [originalVolume, setOriginalVolume] = useState(0);
-  const timing = originalSpeechTiming(
-    args.target.kind === 'original' ? clip?.nativeEnd : undefined,
-    snapshot.document.edits,
-    args.selection
-  );
-  const [catalogs, setCatalogs] = useState<{
-    transcription: AIModelSelectionBootstrapPayload;
-    speech: AIModelSelectionBootstrapPayload;
-  } | null>(null);
-  const [catalogAttempt, setCatalogAttempt] = useState(0);
+  const timing = reviewSpeechTiming(snapshot, args.target, clip, args.selection);
   const [modelId, setModelId] = useState(clip?.transcript?.transcriptionModelId ?? '');
   const [error, setError] = useState<Failure | null>(null);
   const [running, setRunning] = useState(false);
+  const [queueProgress, setQueueProgress] = useState<ReviewSpeechQueueProgress | null>(null);
   const mounted = useRef(true);
   const controller = useRef<AbortController | null>(null);
   const latestArgs = useRef(args);
   latestArgs.current = args;
+  const groups = reviewSpeechGroups(snapshot);
   const audio = useSpeechPreviews({
     assetId: clip?.assetId,
     original: args.original?.file,
-    transcript: clip?.transcript,
-    geometry: clip ? reviewSpeechGeometry(args.session, args.target) : null,
+    target: args.target,
+    authorities: groups.map((group) => ({
+      ...group,
+      geometry: reviewSpeechGeometry(args.session, group.target),
+    })),
     onError: () => setError('failed'),
   });
+  const { catalogs, reloadModels } = useReviewSpeechCatalog(setModelId, () => setError('failed'));
   const editor = useSpeechEdits({
     ...args,
     durable: clip?.transcript,
@@ -108,25 +116,6 @@ export function useReviewSpeech(args: {
       controller.current?.abort();
     };
   }, []);
-  useEffect(() => {
-    let active = true;
-    setCatalogs(null);
-    void Promise.all([
-      requestAIModelSelectionBootstrap('transcription'),
-      requestAIModelSelectionBootstrap('speech'),
-    ])
-      .then(([transcription, speech]) => {
-        if (!active) return;
-        setCatalogs({ transcription, speech });
-        setModelId((current) => current || transcription.defaultModelId || '');
-      })
-      .catch(() => {
-        if (active) setError('failed');
-      });
-    return () => {
-      active = false;
-    };
-  }, [catalogAttempt]);
   const { hasPending, ...editing } = editor;
   const command = (action: (signal: AbortSignal) => Promise<void>) => {
     if (controller.current) return;
@@ -135,6 +124,7 @@ export function useReviewSpeech(args: {
       const active = new AbortController();
       controller.current = active;
       setRunning(true);
+      setQueueProgress(null);
       setError(null);
       void (async () => {
         try {
@@ -150,28 +140,36 @@ export function useReviewSpeech(args: {
       })();
     });
   };
+  const generateQueue = (selected: readonly ReviewSpeechQueueSelection[]) => {
+    if (!editor.profile) {
+      setError('invalid');
+      return;
+    }
+    let plan: ReturnType<typeof planReviewSpeechQueue>;
+    try {
+      plan = planReviewSpeechQueue(args.session, selected, editor.profile);
+    } catch (cause) {
+      setError(failure(cause));
+      return;
+    }
+    command((signal) =>
+      runReviewSpeechQueue(args.session, plan, signal, {
+        ready: (preview) => {
+          if (!mounted.current) throw new DOMException('Unmounted', 'AbortError');
+          audio.add(preview);
+        },
+        progress: (progress) => {
+          if (mounted.current) setQueueProgress(progress);
+        },
+      })
+    );
+  };
   const generate = (ids: readonly string[]) =>
-    command(async (signal) => {
-      if (!editor.profile) throw new Error('invalid');
-      for (const id of ids) {
-        signal.throwIfAborted();
-        const preview = await generateReviewSpeech(
-          args.session,
-          args.target,
-          id,
-          editor.profile,
-          signal
-        );
-        if (signal.aborted || !mounted.current) {
-          audio.discard(preview);
-          return;
-        }
-        audio.add(preview);
-      }
-    });
+    generateQueue(ids.map((phraseId) => ({ target: args.target, phraseId })));
   return {
     ...editing,
     target: args.target,
+    groups,
     ...timing,
     originalVolume,
     setOriginalVolume,
@@ -181,11 +179,15 @@ export function useReviewSpeech(args: {
     catalogs,
     error,
     running,
+    queueProgress,
     originalUrl: audio.originalUrl,
-    previews: audio.previews,
+    previews: audio.previews.filter((preview) =>
+      sameReviewSpeechTarget(preview.scope.target, args.target)
+    ),
+    allPreviews: audio.previews,
     reloadModels: () => {
       setError(null);
-      setCatalogAttempt((value) => value + 1);
+      reloadModels();
     },
     setModelId,
     recognize: (selected = false) =>
@@ -203,14 +205,155 @@ export function useReviewSpeech(args: {
         });
       }),
     generate,
+    generateQueue,
     apply: (items: readonly ReviewSpeechPreview[]) =>
       command(async (signal) => {
-        await applyReviewSpeech(args.session, args.target, items, signal, { originalVolume });
-        audio.remove(items);
+        await applySpeechGroups(args.session, items, signal, originalVolume, audio.remove);
       }),
     cancel: () => {
       controller.current?.abort();
       setError('canceled');
+    },
+  };
+}
+
+/** Each successful target publication releases only its own staged previews. */
+async function applySpeechGroups(
+  session: ReviewSpeechSession,
+  items: readonly ReviewSpeechPreview[],
+  signal: AbortSignal,
+  originalVolume: number,
+  remove: (items: readonly ReviewSpeechPreview[]) => void
+) {
+  const pending = new Map<
+    string,
+    { target: ReviewSpeechTarget; previews: ReviewSpeechPreview[] }
+  >();
+  for (const item of items) {
+    const key = JSON.stringify(item.scope.target);
+    const group = pending.get(key) ?? { target: item.scope.target, previews: [] };
+    group.previews.push(item);
+    pending.set(key, group);
+  }
+  for (const group of pending.values()) {
+    signal.throwIfAborted();
+    await applyReviewSpeech(session, group.target, group.previews, signal, {
+      originalVolume,
+    });
+    remove(group.previews);
+  }
+}
+
+/** Snapshot enumeration is shared by batch presentation and preview admission. */
+function reviewSpeechGroups(snapshot: ReturnType<ReviewSpeechSession['getSnapshot']>) {
+  const originalTranscript = snapshot.document.advancedContent.audio.originalSpeech?.transcript;
+  const groups: {
+    target: ReviewSpeechTarget;
+    assetId: string;
+    transcript: ReviewSpeechTranscript;
+  }[] = [
+    ...(originalTranscript
+      ? [
+          {
+            target: { kind: 'original' as const },
+            assetId: snapshot.snapshot.workspace.sourceAssetId,
+            transcript: originalTranscript,
+          },
+        ]
+      : []),
+    ...snapshot.document.advancedContent.audio.voiceover.flatMap((entry) =>
+      entry.transcript
+        ? [
+            {
+              target: { kind: 'voiceover' as const, clipId: entry.id },
+              assetId: entry.assetId,
+              transcript: entry.transcript,
+            },
+          ]
+        : []
+    ),
+  ];
+  return groups;
+}
+
+/** Model discovery owns its retry lifecycle; remote audio commands keep a separate controller. */
+function useReviewSpeechCatalog(
+  setModelId: (update: (current: string) => string) => void,
+  onError: () => void
+) {
+  const [catalogs, setCatalogs] = useState<{
+    transcription: AIModelSelectionBootstrapPayload;
+    speech: AIModelSelectionBootstrapPayload;
+  } | null>(null);
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
+  const latestError = useRef(onError);
+  latestError.current = onError;
+  useEffect(() => {
+    let active = true;
+    setCatalogs(null);
+    void Promise.all([
+      requestAIModelSelectionBootstrap('transcription'),
+      requestAIModelSelectionBootstrap('speech'),
+    ])
+      .then(([transcription, speech]) => {
+        if (!active) return;
+        setCatalogs({ transcription, speech });
+        setModelId((current) => current || transcription.defaultModelId || '');
+      })
+      .catch(() => {
+        if (active) latestError.current();
+      });
+    return () => {
+      active = false;
+    };
+  }, [catalogAttempt, setModelId]);
+  return { catalogs, reloadModels: () => setCatalogAttempt((value) => value + 1) };
+}
+
+/** Pure phrase clocks resolve all rows against one snapshot and one lazy edit map. */
+function reviewSpeechTiming(
+  snapshot: ReturnType<ReviewSpeechSession['getSnapshot']>,
+  target: ReviewSpeechTarget,
+  clip: ReturnType<typeof getReviewSpeechTarget> | undefined,
+  selection: { start: number; end: number } | undefined
+) {
+  const timing = originalSpeechTiming(
+    target.kind === 'original' ? clip?.nativeEnd : undefined,
+    snapshot.document.edits,
+    selection
+  );
+  // All phrase rows in this render resolve against one snapshot and one edit map.
+  let resultMap: ReturnType<typeof createReviewTimeMap> | undefined;
+  const timeMap = () =>
+    (resultMap ??= createReviewTimeMap(
+      snapshot.snapshot.workspace.source.duration,
+      snapshot.document.edits
+    ));
+  return {
+    ...timing,
+    nativeBounds: clip ? { start: clip.nativeStart, end: clip.nativeEnd } : null,
+    nativeTimeAtResult: (time: number) => {
+      const map = timeMap();
+      if (target.kind === 'original') return map.timelineToSource(time);
+      const recording = snapshot.document.advancedContent.audio.voiceover.find(
+        (entry) => entry.id === target.clipId
+      );
+      return recording ? reviewVoiceoverNativeTime(recording, time, map.getSegments()) : null;
+    },
+    resultInterval: (start: number, end: number) => {
+      if (target.kind === 'original') return timing.resultInterval(start, end);
+      const recording = snapshot.document.advancedContent.audio.voiceover.find(
+        (entry) => entry.id === target.clipId
+      );
+      if (!recording) return null;
+      const slices = reviewVoiceoverNativeIntervals(
+        recording,
+        { start, end },
+        timeMap().getSegments()
+      );
+      const first = slices[0];
+      const last = slices.at(-1);
+      return first && last ? { start: first.start, end: last.end } : null;
     },
   };
 }

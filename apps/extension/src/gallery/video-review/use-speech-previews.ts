@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { sameReviewSpeechTarget, type ReviewSpeechTarget } from '../../contracts/ai/audio';
 import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
 import { reviewSpeechTextSignature } from '../../features/video/review/speech-transcript';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
@@ -14,8 +15,12 @@ function disposePreviews(items: readonly ReviewSpeechPreview[]): void {
 export function useSpeechPreviews(args: {
   assetId: string | undefined;
   original?: Blob | undefined;
-  transcript: ReviewSpeechTranscript | undefined;
-  geometry: string | null;
+  target: ReviewSpeechTarget;
+  authorities: readonly {
+    target: ReviewSpeechTarget;
+    transcript: ReviewSpeechTranscript | undefined;
+    geometry: string | null;
+  }[];
   onError(): void;
 }) {
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
@@ -53,14 +58,17 @@ export function useSpeechPreviews(args: {
     };
   }, [originalAssetId, original]);
 
-  const { geometry, transcript } = args;
+  const { authorities } = args;
   useEffect(() => {
-    const current = transcript;
     const removed = currentPreviews.current.filter((preview) => {
+      const authority = authorities.find((entry) =>
+        sameReviewSpeechTarget(entry.target, preview.scope.target)
+      );
+      const current = authority?.transcript;
       const phrase = current?.phrases.find((entry) => entry.id === preview.replacement.phraseId);
       return (
         !current ||
-        preview.geometry !== geometry ||
+        preview.geometry !== authority?.geometry ||
         !phrase ||
         !current?.profile ||
         preview.expiresAt <= Date.now() ||
@@ -83,7 +91,7 @@ export function useSpeechPreviews(args: {
       Math.max(1, expires - Date.now())
     );
     return () => window.clearTimeout(timer);
-  }, [transcript, geometry, previews, version]);
+  }, [authorities, previews, version]);
 
   const remove = (items: readonly ReviewSpeechPreview[]) => {
     currentPreviews.current = currentPreviews.current.filter((item) => !items.includes(item));
@@ -97,18 +105,19 @@ export function useSpeechPreviews(args: {
     discard: (preview: ReviewSpeechPreview) => disposePreviews([preview]),
     invalidate: (ids?: readonly string[]) =>
       remove(
-        currentPreviews.current.filter((item) => !ids || ids.includes(item.replacement.phraseId))
+        currentPreviews.current.filter(
+          (item) =>
+            sameReviewSpeechTarget(item.scope.target, args.target) &&
+            (!ids || ids.includes(item.replacement.phraseId))
+        )
       ),
     add: (preview: ReviewSpeechPreview) => {
-      disposePreviews(
-        currentPreviews.current.filter(
-          (item) => item.replacement.phraseId === preview.replacement.phraseId
-        )
-      );
+      const samePhrase = (item: ReviewSpeechPreview) =>
+        item.replacement.phraseId === preview.replacement.phraseId &&
+        sameReviewSpeechTarget(item.scope.target, preview.scope.target);
+      disposePreviews(currentPreviews.current.filter(samePhrase));
       currentPreviews.current = [
-        ...currentPreviews.current.filter(
-          (item) => item.replacement.phraseId !== preview.replacement.phraseId
-        ),
+        ...currentPreviews.current.filter((item) => !samePhrase(item)),
         preview,
       ];
       setPreviews(currentPreviews.current);

@@ -67,6 +67,7 @@ type SelectedPropertiesProps = {
   onFocus(region: QuickEditZoomRegion): void;
   onPreviewFrame?(time: number): void;
   focusTime?: number | undefined;
+  mainVideo?: HTMLVideoElement | undefined;
   playback?: ComponentProps<typeof ReviewZoomPreview>['playback'];
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
@@ -133,7 +134,6 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
           <SelectedOriginalAudio audio={audio} resource={resource} advanced={advanced} />
         ) : selection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
           <>
-            <ReviewAudioInspectorSection audio={audio} busy={busy} />
             {selection.lane === 'voiceover' &&
             audio.selected?.lane === 'voiceover' &&
             props.beforeSpeechAction &&
@@ -147,8 +147,15 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 flushAdvanced={props.flushAdvanced}
                 registerSpeechFlush={props.registerSpeechFlush}
                 tempo={audio.selected.clip.tempo ?? 1}
+                mainVideo={props.mainVideo}
+                resultTime={props.focusTime}
+                assetNames={audio.assets}
+                {...(props.onPreviewFrame ? { onJump: props.onPreviewFrame } : {})}
+                sound={<ReviewAudioInspectorSection audio={audio} busy={busy} embedded />}
               />
-            ) : null}
+            ) : (
+              <ReviewAudioInspectorSection audio={audio} busy={busy} />
+            )}
           </>
         ) : selection.kind === 'edit' && editing.selected ? (
           <SelectedEdit editing={editing} advanced={advanced} resource={resource} busy={busy} />

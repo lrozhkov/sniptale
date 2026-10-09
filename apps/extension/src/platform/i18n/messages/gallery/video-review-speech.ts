@@ -1,6 +1,30 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  speechAuditionSeek: { ru: 'Позиция прослушивания', en: 'Audition position' },
+  speechAuditionSource: { ru: 'Источник прослушивания', en: 'Audition source' },
+  speechAuditionFailed: {
+    ru: 'Не удалось воспроизвести. Попробуйте ещё раз.',
+    en: 'Could not play audio. Try again.',
+  },
+  speechJump: { ru: 'Перейти к фразе', en: 'Go to phrase' },
+  speechStartAtPlayhead: { ru: 'Начало по курсору', en: 'Start at playhead' },
+  speechEndAtPlayhead: { ru: 'Конец по курсору', en: 'End at playhead' },
+  speechPhraseTiming: { ru: 'Границы и деление', en: 'Timing and segmentation' },
+  speechPartialAlignment: { ru: 'Частичная привязка', en: 'Partial alignment' },
+  speechBatch: { ru: 'Выбрать фразы', en: 'Select phrases' },
+  speechBatchDone: { ru: 'Готово', en: 'Done' },
+  speechBatchClip: { ru: 'Аудиодорожка {index}', en: 'Audio clip {index}' },
+  speechBatchSelectClip: { ru: 'Выбрать фразы: {name}', en: 'Select phrases: {name}' },
+  speechBatchSelected: { ru: 'Выбрано: {count}', en: 'Selected: {count}' },
+  speechBatchReady: { ru: 'Готово: {count}', en: 'Ready: {count}' },
+  speechQueueProgress: {
+    ru: 'Озвучено {completed} из {total}',
+    en: 'Generated {completed} of {total}',
+  },
+  speechRecognition: { ru: 'Распознавание', en: 'Transcription' },
+  speechTranscript: { ru: 'Текст', en: 'Transcript' },
+  speechSynthesis: { ru: 'Озвучка', en: 'Speech' },
   speechSelectAll: { ru: 'Выбрать все фразы', en: 'Select all phrases' },
   speechDeselectAll: { ru: 'Снять выделение', en: 'Clear selection' },
   speechResultInterval: { ru: 'В готовом видео', en: 'In edited video' },
@@ -136,6 +160,16 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
   speechMissingModel: {
     ru: 'Модель недоступна. Выберите замену для новых запросов.',
     en: 'Model unavailable. Select a replacement for new requests.',
+  },
+  speechConsentContinue: { ru: 'Продолжить', en: 'Continue' },
+  speechConsentTitle: { ru: 'Отправить провайдеру?', en: 'Send to provider?' },
+  speechConsentAudio: {
+    ru: 'Выбранный звук будет отправлен провайдеру «{provider}» для распознавания. Запрос может быть платным.',
+    en: 'Selected audio will be sent to {provider} for transcription. The request may incur a charge.',
+  },
+  speechConsentText: {
+    ru: 'Текст выбранных фраз и параметры голоса будут отправлены провайдеру «{provider}» для озвучки. Запрос может быть платным.',
+    en: 'Selected phrase text and voice settings will be sent to {provider} for speech generation. The request may incur a charge.',
   },
   speechDisclosure: {
     ru: 'Распознавание отправляет запись выбранному провайдеру. Озвучка отправляет текст и параметры голоса.',

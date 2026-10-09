@@ -5,7 +5,27 @@ import {
   planReviewSpeechChunks,
   decodeReviewSpeechDuration,
   reviewSpeechQuietBoundary,
+  reviewSpeechWavIsSilent,
 } from './speech-audio';
+it('skips only entirely zero PCM and retains quiet speech, music, noise and a nonempty tail', async () => {
+  const signal = new AbortController().signal;
+  expect(
+    await reviewSpeechWavIsSilent(encodeReviewSpeechWav(new Float32Array(16000)), signal)
+  ).toBe(true);
+  for (const amplitude of [1 / 32767, 0.0001, 0.05, 0.5]) {
+    const samples = new Float32Array(16000);
+    samples[100] = amplitude;
+    expect(await reviewSpeechWavIsSilent(encodeReviewSpeechWav(samples), signal)).toBe(false);
+  }
+  expect(
+    await reviewSpeechWavIsSilent(new Blob([new Uint8Array(48)], { type: 'audio/wav' }), signal)
+  ).toBe(false);
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    reviewSpeechWavIsSilent(encodeReviewSpeechWav(new Float32Array(16)), controller.signal)
+  ).rejects.toMatchObject({ name: 'AbortError' });
+});
 it('encodes mono PCM16 at 16 kHz with clipped signed samples and matching sizes', async () => {
   const blob = encodeReviewSpeechWav(new Float32Array([-2, -0.5, 0, 0.5, 2]));
   const view = new DataView(await blob.arrayBuffer());

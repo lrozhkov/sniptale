@@ -15,8 +15,13 @@ import {
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 
+/** The immutable fixture writer needs page evaluation, never a browser or worker attachment. */
+export interface ReviewMediaFixtureWriter {
+  evaluate<Arg>(writer: (argument: Arg) => Promise<void>, argument: Arg): Promise<void>;
+}
+
 export async function seedReviewVideo(
-  page: Page,
+  page: ReviewMediaFixtureWriter,
   filename: string,
   dimensions: { width: number; height: number; duration: number },
   gaps = false,

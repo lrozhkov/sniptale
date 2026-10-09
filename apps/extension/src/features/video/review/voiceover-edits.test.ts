@@ -8,6 +8,8 @@ import {
   moveReviewVoiceover,
   trimReviewVoiceover,
   reviewVoiceoverRange,
+  reviewVoiceoverNativeIntervals,
+  reviewVoiceoverNativeTime,
 } from './voiceover-edits';
 import { parseVoiceoverAnchors, parseVoiceoverSegments } from './voiceover-validation';
 import { buildReviewTimeMap } from './timeline';
@@ -34,6 +36,64 @@ const clip: QuickEditAudioClip = {
   fadeIn: 0,
   fadeOut: 0,
 };
+
+it('projects native phrase bounds through trim and tempo exactly once', () => {
+  expect(
+    reviewVoiceoverNativeIntervals({ ...clip, tempo: 2 }, { start: 3, end: 5 }, original)
+  ).toEqual([{ start: 3.5, end: 4.5 }]);
+  expect(reviewVoiceoverNativeIntervals(clip, { start: 0, end: 3 }, original)).toEqual([
+    { start: 3, end: 4 },
+  ]);
+  expect(reviewVoiceoverNativeIntervals(clip, { start: 6, end: 8 }, original)).toEqual([]);
+});
+
+it('retains only audible phrase slices across cuts and source gaps', () => {
+  const recording = anchorReviewVoiceover(clip, original);
+  const map = buildReviewTimeMap(12, [cut(4, 5)]);
+  expect(reviewVoiceoverNativeIntervals(recording, { start: 2, end: 6 }, map)).toEqual([
+    { start: 3, end: 4 },
+    { start: 4, end: 6 },
+  ]);
+  expect(reviewVoiceoverNativeIntervals(recording, { start: 3, end: 4 }, map)).toEqual([]);
+  const gapped = {
+    ...clip,
+    sourceAnchor: [
+      { start: 3, end: 5, offset: 0, duration: 2 },
+      { start: 8, end: 10, offset: 2, duration: 2 },
+    ],
+  };
+  expect(reviewVoiceoverNativeIntervals(gapped, { start: 2, end: 6 }, original)).toEqual([
+    { start: 3, end: 5 },
+    { start: 8, end: 10 },
+  ]);
+});
+
+it('projects source-anchored phrases through Speed and excludes dormant recordings', () => {
+  const recording = anchorReviewVoiceover(clip, original);
+  const map = buildReviewTimeMap(12, [{ ...cut(3, 7), kind: 'speed', rate: 2, audio: 'speed' }]);
+  expect(reviewVoiceoverNativeIntervals(recording, { start: 3, end: 5 }, map)).toEqual([
+    { start: 4, end: 6 },
+  ]);
+  expect(
+    reviewVoiceoverNativeIntervals({ ...recording, dormant: true }, { start: 2, end: 6 }, original)
+  ).toEqual([]);
+});
+
+it('resolves a result playhead to native audio seconds without bridging an authored gap', () => {
+  expect(reviewVoiceoverNativeTime({ ...clip, tempo: 2 }, 3.75, original)).toBe(3.5);
+  expect(reviewVoiceoverNativeTime(clip, 2, original)).toBeNull();
+  const gapped = {
+    ...clip,
+    sourceAnchor: [
+      { start: 3, end: 5, offset: 0, duration: 2 },
+      { start: 8, end: 10, offset: 2, duration: 2 },
+    ],
+  };
+  expect(reviewVoiceoverNativeTime(gapped, 6, original)).toBeNull();
+  expect(reviewVoiceoverNativeTime(gapped, 8.5, original)).toBe(4.5);
+  expect(reviewVoiceoverNativeTime(gapped, 10, original)).toBe(6);
+  expect(reviewVoiceoverNativeTime({ ...clip, dormant: true }, 3, original)).toBeNull();
+});
 
 it.each([0.5, 0.75, 1.5, 2, 4] as const)(
   'creates parseable native audio across decimal Speed %sx boundaries',

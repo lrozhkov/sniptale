@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react';
+import { Check, ChevronDown, Clock3 } from 'lucide-react';
 import { ProductField, ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
-import { ReviewButton, reviewTextButtonClassName } from './controls';
-import { formatNumber, translate } from '../../platform/i18n';
+import { ReviewButton, ReviewDetails, reviewTextButtonClassName } from './controls';
+import { ReviewInspectorColumns } from './inspector-sections';
+import { SpeechAudition, formatSpeechTime } from './speech-audition';
+import { translate } from '../../platform/i18n';
 import type { useReviewSpeech } from './use-speech';
 type Controller = ReturnType<typeof useReviewSpeech>;
 const buttonClass = `${reviewTextButtonClassName} !h-auto min-h-8! whitespace-normal text-left`;
@@ -15,6 +18,14 @@ export function PhraseRow({
   tempo,
   selected,
   onSelect,
+  expanded = true,
+  batch = false,
+  index = 0,
+  onToggle,
+  onJump,
+  mainVideo,
+  nativePlayhead = null,
+  bounds,
 }: {
   phrase: ReviewSpeechPhrase;
   resultInterval?: { start: number; end: number } | null | undefined;
@@ -38,6 +49,14 @@ export function PhraseRow({
   tempo: number;
   selected: boolean;
   onSelect(): void;
+  expanded?: boolean;
+  batch?: boolean;
+  index?: number;
+  onToggle?: (() => void) | undefined;
+  onJump?: (() => void) | undefined;
+  mainVideo?: HTMLVideoElement | undefined;
+  nativePlayhead?: number | null;
+  bounds?: { start: number; end: number };
 }) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const [splitTime, setSplitTime] = useState('');
@@ -45,45 +64,205 @@ export function PhraseRow({
   const synthesisAvailable =
     speech.catalogs?.speech.models.some((entry) => entry.id === speech.profile?.modelId) ?? false;
   const busy = speech.running || speech.saving || speech.dirty;
+  const playing =
+    nativePlayhead !== null && nativePlayhead >= phrase.start && nativePlayhead < phrase.end;
   return (
     <article
       className="min-w-0 space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
       data-ui="gallery.videoReview.speechPhrase"
       data-speech-phrase-id={phrase.id}
+      data-speech-active={playing ? 'true' : undefined}
     >
-      <label className="flex items-center gap-2 text-xs">
-        <input type="checkbox" checked={selected} onChange={onSelect} />
-        <span>{translate('gallery.videoReview.speechSelectPhrase')}</span>
-        {speech.isChanged(phrase.id) ? (
-          <span className="text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.videoReview.speechStale')}
-          </span>
-        ) : null}
-      </label>
-      {resultInterval !== undefined ? (
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.speechResultInterval')}:{' '}
-          {resultInterval
-            ? formatSpeechInterval(resultInterval)
-            : translate('gallery.videoReview.speechRemovedInterval')}
-        </p>
-      ) : null}
-      {phrase.alignment === 'range' ? (
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.speechUnaligned')}
-        </p>
-      ) : null}
-      <ProductField label={translate('gallery.videoReview.speechText')}>
-        <ProductTextarea
-          aria-label={translate('gallery.videoReview.speechText')}
-          ref={textarea}
-          rows={3}
-          maxLength={16000}
-          value={phrase.text}
-          onChange={(event) => speech.editPhrase(phrase.id, { text: event.target.value })}
-        />
-      </ProductField>
-      <div className="grid min-w-0 grid-cols-2 gap-2">
+      <PhraseSummary
+        phrase={phrase}
+        resultInterval={resultInterval}
+        selected={selected}
+        onSelect={onSelect}
+        expanded={expanded}
+        batch={batch}
+        index={index}
+        onToggle={onToggle}
+        onJump={onJump}
+        playing={playing}
+        disabled={speech.saving || speech.dirty}
+      />
+      {expanded && (
+        <>
+          {speech.isChanged(phrase.id) ? (
+            <span className="text-[var(--sniptale-color-text-muted)]">
+              {translate('gallery.videoReview.speechStale')}
+            </span>
+          ) : null}
+          {resultInterval !== undefined ? (
+            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+              {translate('gallery.videoReview.speechResultInterval')}:{' '}
+              {resultInterval
+                ? formatSpeechInterval(resultInterval)
+                : translate('gallery.videoReview.speechRemovedInterval')}
+            </p>
+          ) : null}
+          {phrase.alignment === 'range' ? (
+            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+              {translate(
+                phrase.words?.length
+                  ? 'gallery.videoReview.speechPartialAlignment'
+                  : 'gallery.videoReview.speechUnaligned'
+              )}
+            </p>
+          ) : null}
+          <ProductField label={translate('gallery.videoReview.speechText')}>
+            <ProductTextarea
+              aria-label={translate('gallery.videoReview.speechText')}
+              ref={textarea}
+              rows={3}
+              maxLength={16000}
+              disabled={speech.running}
+              value={phrase.text}
+              onChange={(event) => speech.editPhrase(phrase.id, { text: event.target.value })}
+            />
+          </ProductField>
+          <PhraseTiming
+            phrase={phrase}
+            next={next}
+            speech={speech}
+            busy={busy}
+            nativePlayhead={nativePlayhead}
+            bounds={bounds}
+            splitTime={splitTime}
+            setSplitTime={setSplitTime}
+            selectionStart={() => textarea.current?.selectionStart ?? 0}
+          />
+          <div className="flex flex-wrap gap-1">
+            <ReviewButton
+              label={translate('gallery.videoReview.speechGenerate')}
+              className={buttonClass}
+              disabled={busy || !validProfile || !synthesisAvailable || !phrase.text.trim()}
+              onClick={() => speech.generate([phrase.id])}
+            >
+              {translate('gallery.videoReview.speechGenerate')}
+            </ReviewButton>
+          </div>
+          <PhraseAudition
+            phrase={phrase}
+            speech={speech}
+            tempo={tempo}
+            busy={busy}
+            mainVideo={mainVideo}
+          />
+        </>
+      )}
+    </article>
+  );
+}
+
+/** List navigation remains independent of the expanded phrase editor. */
+function PhraseSummary({
+  phrase,
+  resultInterval,
+  selected,
+  onSelect,
+  expanded,
+  batch,
+  index,
+  onToggle,
+  onJump,
+  playing,
+  disabled,
+}: Pick<
+  Parameters<typeof PhraseRow>[0],
+  | 'phrase'
+  | 'resultInterval'
+  | 'selected'
+  | 'onSelect'
+  | 'expanded'
+  | 'batch'
+  | 'index'
+  | 'onToggle'
+  | 'onJump'
+> & { playing: boolean; disabled: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-xs">
+      {batch && (
+        <label
+          className="review-history-checkbox"
+          title={translate('gallery.videoReview.speechSelectPhrase')}
+        >
+          <input
+            type="checkbox"
+            aria-label={translate('gallery.videoReview.speechSelectPhrase')}
+            checked={selected}
+            onChange={onSelect}
+          />
+          <span aria-hidden="true">{selected && <Check size={12} />}</span>
+        </label>
+      )}
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+        disabled={disabled}
+        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        title={phrase.text}
+      >
+        <ChevronDown size={14} className={`shrink-0 ${expanded ? '' : '-rotate-90'}`} />
+        <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {(index ?? 0) + 1}
+        </span>
+        {playing && (
+          <span
+            aria-hidden="true"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--sniptale-color-accent)]"
+          />
+        )}
+        <span className="min-w-0 flex-1 truncate">
+          {phrase.text || translate('gallery.videoReview.speechText')}
+        </span>
+        <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {formatSpeechTime(phrase.start)}–{formatSpeechTime(phrase.end)}
+        </span>
+      </button>
+      {onJump && (
+        <ReviewButton
+          label={translate('gallery.videoReview.speechJump')}
+          className={`${reviewTextButtonClassName} !w-8 !px-0`}
+          onClick={onJump}
+          disabled={resultInterval === null}
+        >
+          <Clock3 size={14} />
+        </ReviewButton>
+      )}
+    </div>
+  );
+}
+
+/** Native timing and segmentation have their own validation, separate from audition and synthesis. */
+function PhraseTiming({
+  phrase,
+  next,
+  speech,
+  busy,
+  nativePlayhead,
+  bounds,
+  splitTime,
+  setSplitTime,
+  selectionStart,
+}: {
+  phrase: ReviewSpeechPhrase;
+  next: ReviewSpeechPhrase | undefined;
+  speech: Pick<Controller, 'editPhrase' | 'split' | 'merge'>;
+  busy: boolean;
+  nativePlayhead: number | null;
+  bounds: { start: number; end: number } | undefined;
+  splitTime: string;
+  setSplitTime(value: string): void;
+  selectionStart(): number;
+}) {
+  return (
+    <ReviewDetails
+      label={translate('gallery.videoReview.speechPhraseTiming')}
+      preferenceId="speech.phrase.timing"
+    >
+      <ReviewInspectorColumns>
         <PhraseTimeField
           key={`${phrase.id}:start:${phrase.start}`}
           label={translate('gallery.videoReview.speechStart')}
@@ -96,7 +275,7 @@ export function PhraseRow({
           value={phrase.end}
           onCommit={(end) => speech.editPhrase(phrase.id, { end })}
         />
-      </div>
+      </ReviewInspectorColumns>
       <ProductField label={translate('gallery.videoReview.speechSplitTime')}>
         <ProductInput
           aria-label={translate('gallery.videoReview.speechSplitTime')}
@@ -110,6 +289,32 @@ export function PhraseRow({
       </ProductField>
       <div className="flex flex-wrap gap-1">
         <ReviewButton
+          label={translate('gallery.videoReview.speechStartAtPlayhead')}
+          className={buttonClass}
+          disabled={
+            busy ||
+            nativePlayhead === null ||
+            nativePlayhead < (bounds?.start ?? phrase.start) ||
+            nativePlayhead >= phrase.end
+          }
+          onClick={() => {
+            if (nativePlayhead !== null) speech.editPhrase(phrase.id, { start: nativePlayhead });
+          }}
+        />
+        <ReviewButton
+          label={translate('gallery.videoReview.speechEndAtPlayhead')}
+          className={buttonClass}
+          disabled={
+            busy ||
+            nativePlayhead === null ||
+            nativePlayhead <= phrase.start ||
+            nativePlayhead > (bounds?.end ?? phrase.end)
+          }
+          onClick={() => {
+            if (nativePlayhead !== null) speech.editPhrase(phrase.id, { end: nativePlayhead });
+          }}
+        />
+        <ReviewButton
           label={translate('gallery.videoReview.speechSplit')}
           className={buttonClass}
           disabled={
@@ -119,9 +324,7 @@ export function PhraseRow({
             Number(splitTime) <= phrase.start ||
             Number(splitTime) >= phrase.end
           }
-          onClick={() =>
-            speech.split(phrase.id, textarea.current?.selectionStart ?? 0, Number(splitTime))
-          }
+          onClick={() => speech.split(phrase.id, selectionStart(), Number(splitTime))}
         >
           {translate('gallery.videoReview.speechSplit')}
         </ReviewButton>
@@ -135,22 +338,21 @@ export function PhraseRow({
         >
           {translate('gallery.videoReview.speechMerge')}
         </ReviewButton>
-        <ReviewButton
-          label={translate('gallery.videoReview.speechGenerate')}
-          className={buttonClass}
-          disabled={busy || !validProfile || !synthesisAvailable || !phrase.text.trim()}
-          onClick={() => speech.generate([phrase.id])}
-        >
-          {translate('gallery.videoReview.speechGenerate')}
-        </ReviewButton>
       </div>
-      <PhraseAudition phrase={phrase} speech={speech} tempo={tempo} busy={busy} />
-    </article>
+    </ReviewDetails>
   );
 }
 
 function PhraseTimeField(props: { label: string; value: number; onCommit(value: number): void }) {
-  const [value, setValue] = useState(String(props.value));
+  const display = () => String(Number(props.value.toFixed(2)));
+  const [value, setValue] = useState(display);
+  const dirty = useRef(false);
+  const commit = () => {
+    if (!dirty.current) return;
+    const next = Number(value);
+    if (value && Number.isFinite(next) && next !== props.value) props.onCommit(next);
+    dirty.current = false;
+  };
   return (
     <ProductField label={props.label}>
       <ProductInput
@@ -159,10 +361,23 @@ function PhraseTimeField(props: { label: string; value: number; onCommit(value: 
         min={0}
         step={0.01}
         value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onBlur={() => {
-          const next = Number(value);
-          if (value && Number.isFinite(next) && next !== props.value) props.onCommit(next);
+        onChange={(event) => {
+          dirty.current = true;
+          setValue(event.target.value);
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+            event.currentTarget.blur();
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            dirty.current = false;
+            setValue(display());
+            event.currentTarget.blur();
+          }
         }}
       />
     </ProductField>
@@ -174,56 +389,32 @@ function PhraseAudition({
   speech,
   tempo,
   busy,
+  mainVideo,
 }: {
   phrase: ReviewSpeechPhrase;
   speech: Pick<Controller, 'previews' | 'originalUrl' | 'apply'>;
   tempo: number;
   busy: boolean;
+  mainVideo: HTMLVideoElement | undefined;
 }) {
   const preview = speech.previews.find((entry) => entry.replacement.phraseId === phrase.id);
   const overflow = !!preview && preview.replacement.duration > phrase.end - phrase.start + 1e-7;
   return (
     <>
-      {speech.originalUrl ? (
-        <ProductField label={translate('gallery.videoReview.speechOriginal')}>
-          <audio
-            aria-label={translate('gallery.videoReview.speechOriginal')}
-            className="max-w-full w-full"
-            controls
-            preload="none"
-            src={`${speech.originalUrl}#t=${phrase.start},${phrase.end}`}
-            onPlay={(event) => {
-              event.currentTarget.playbackRate = tempo;
-              if (
-                event.currentTarget.currentTime < phrase.start ||
-                event.currentTarget.currentTime >= phrase.end
-              )
-                event.currentTarget.currentTime = phrase.start;
-            }}
-            onTimeUpdate={(event) => {
-              if (event.currentTarget.currentTime >= phrase.end) event.currentTarget.pause();
-            }}
-          />
-        </ProductField>
-      ) : null}
-      {preview ? (
+      <SpeechAudition
+        originalUrl={speech.originalUrl}
+        interval={phrase}
+        tempo={tempo}
+        mainVideo={mainVideo}
+        result={preview ? { url: preview.url, duration: preview.replacement.duration } : undefined}
+      />
+      {preview && (
         <div className="space-y-2" data-ui="gallery.videoReview.speechPreview">
-          <ProductField label={translate('gallery.videoReview.speechPreview')}>
-            <audio
-              aria-label={translate('gallery.videoReview.speechPreview')}
-              controls
-              className="max-w-full w-full"
-              src={preview.url}
-              onPlay={(event) => {
-                event.currentTarget.playbackRate = tempo;
-              }}
-            />
-          </ProductField>
-          {overflow ? (
+          {overflow && (
             <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.videoReview.speechOverflow')}
             </p>
-          ) : null}
+          )}
           <ReviewButton
             label={translate('gallery.videoReview.speechApply')}
             className={buttonClass}
@@ -233,18 +424,11 @@ function PhraseAudition({
             {translate('gallery.videoReview.speechApply')}
           </ReviewButton>
         </div>
-      ) : null}
+      )}
     </>
   );
 }
 
 function formatSpeechInterval(interval: { start: number; end: number }): string {
-  const start = formatNumber(interval.start, { maximumFractionDigits: 2 });
-  const end = formatNumber(interval.end, {
-    style: 'unit',
-    unit: 'second',
-    unitDisplay: 'short',
-    maximumFractionDigits: 2,
-  });
-  return `${start}–${end}`;
+  return `${formatSpeechTime(interval.start)}–${formatSpeechTime(interval.end)}`;
 }

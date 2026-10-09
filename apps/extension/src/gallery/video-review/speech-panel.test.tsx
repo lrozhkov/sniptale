@@ -9,8 +9,17 @@ const mocks = vi.hoisted(() => ({ hook: vi.fn() }));
 vi.mock('./use-speech', () => ({ useReviewSpeech: mocks.hook }));
 vi.mock('./controls', () => ({
   ReviewDetails: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  ReviewButton: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,
+  ReviewButton: ({
+    label,
+    children,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) => (
+    <button aria-label={label} {...props}>
+      {children ?? label}
+    </button>
+  ),
   reviewTextButtonClassName: '',
+  reviewCompactTrackButtonClassName: '',
 }));
 vi.mock('../../features/ai/model-selector', () => ({
   AIModelSelector: (props: {
@@ -75,7 +84,16 @@ function fixture(): ReturnType<typeof useReviewSpeech> {
   };
   return {
     target: { kind: 'voiceover', clipId: 'clip' },
+    get groups() {
+      return [{ target: this.target, assetId: 'original', transcript: this.transcript }];
+    },
+    get allPreviews() {
+      return this.previews;
+    },
+    queueProgress: null,
     resultInterval: (start, end) => ({ start, end }),
+    nativeBounds: { start: 0, end: 4 },
+    nativeTimeAtResult: (time) => time,
     recognitionDuration: 4,
     selectionDuration: 2,
     originalVolume: 0,
@@ -126,6 +144,7 @@ function fixture(): ReturnType<typeof useReviewSpeech> {
     changeProfile: vi.fn(),
     recognize: vi.fn(),
     generate: vi.fn(),
+    generateQueue: vi.fn(),
     apply: vi.fn(),
     cancel: vi.fn(),
     editPhrase: vi.fn(),
@@ -144,7 +163,11 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
 });
-function render(state: ReturnType<typeof useReviewSpeech>) {
+function render(
+  state: ReturnType<typeof useReviewSpeech>,
+  onJump?: (time: number) => void,
+  resultTime?: number
+) {
   mocks.hook.mockReturnValue(state);
   act(() =>
     root.render(
@@ -157,15 +180,78 @@ function render(state: ReturnType<typeof useReviewSpeech>) {
         flushAdvanced={async () => undefined}
         registerSpeechFlush={() => () => undefined}
         tempo={1.5}
+        {...(onJump ? { onJump } : {})}
+        resultTime={resultTime}
       />
     )
   );
 }
+it('sets exact native boundaries at the playhead and disables commands in an audio gap', () => {
+  const state = fixture();
+  state.nativeTimeAtResult = () => 1.234567;
+  render(state, undefined, 9);
+  expect(host.querySelector('[data-speech-active="true"]')).not.toBeNull();
+  const button = (
+    key: 'gallery.videoReview.speechStartAtPlayhead' | 'gallery.videoReview.speechEndAtPlayhead'
+  ) =>
+    Array.from(host.querySelectorAll('button')).find(
+      (node) => node.getAttribute('aria-label') === translate(key)
+    )!;
+  act(() => button('gallery.videoReview.speechStartAtPlayhead').click());
+  expect(state.editPhrase).toHaveBeenCalledWith('phrase', { start: 1.234567 });
+  act(() => button('gallery.videoReview.speechEndAtPlayhead').click());
+  expect(state.editPhrase).toHaveBeenCalledWith('phrase', { end: 1.234567 });
+  state.nativeTimeAtResult = () => null;
+  render(state, undefined, 9);
+  expect(host.querySelector('[data-speech-active="true"]')).toBeNull();
+  expect(button('gallery.videoReview.speechStartAtPlayhead').disabled).toBe(true);
+  expect(button('gallery.videoReview.speechEndAtPlayhead').disabled).toBe(true);
+});
+it('shows voiceover result timing and jumps to retained result seconds', () => {
+  const state = fixture();
+  const jump = vi.fn();
+  state.resultInterval = () => ({ start: 7.25, end: 8.5 });
+  render(state, jump);
+  expect(host.textContent).toContain('00:07.25');
+  const action = Array.from(host.querySelectorAll('button')).find(
+    (node) => node.getAttribute('aria-label') === translate('gallery.videoReview.speechJump')
+  )!;
+  act(() => action.click());
+  expect(jump).toHaveBeenCalledExactlyOnceWith(7.25);
+  state.resultInterval = () => null;
+  render(state, jump);
+  expect(host.textContent).toContain(translate('gallery.videoReview.speechRemovedInterval'));
+  expect(
+    host.querySelector(`button[aria-label="${translate('gallery.videoReview.speechJump')}"]`)
+  ).toBeNull();
+});
+it('uses the inspector sections and a single phrase without bulk controls or native audio chrome', () => {
+  render(fixture());
+  expect(host.querySelector('[data-ui="gallery.videoReview.inspectorSections"]')).not.toBeNull();
+  expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+  expect(host.querySelectorAll('audio[controls]')).toHaveLength(0);
+  expect(host.querySelector('[data-speech-phrase-id] textarea')).not.toBeNull();
+});
+it('expands one phrase and exposes selection only in explicit bulk mode', () => {
+  const state = fixture();
+  state.transcript.phrases = Array.from({ length: 12 }, (_, index) => ({
+    ...state.transcript.phrases[0]!,
+    id: `p-${index}`,
+    start: index * 2,
+    end: index * 2 + 2,
+  }));
+  render(state);
+  expect(host.querySelectorAll('[data-speech-phrase-id] textarea')).toHaveLength(1);
+  expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+  const choose = Array.from(host.querySelectorAll('button')).find(
+    (button) => button.getAttribute('data-speech-batch') === 'toggle'
+  );
+  expect(choose).toBeDefined();
+  act(() => choose!.click());
+  expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(14);
+});
 it('keeps overflow preview listenable and disables Apply', () => {
   render(fixture());
-  expect(host.querySelector('textarea')?.getAttribute('aria-label')).toBe(
-    translate('gallery.videoReview.speechInstructions')
-  );
   expect(host.querySelector('[data-speech-phrase-id] textarea')?.getAttribute('aria-label')).toBe(
     translate('gallery.videoReview.speechText')
   );
@@ -179,9 +265,7 @@ it('keeps overflow preview listenable and disables Apply', () => {
     (button) => button.textContent === translate('gallery.videoReview.speechApply')
   );
   expect(apply?.disabled).toBe(true);
-  expect(
-    host.querySelector('[data-ui="gallery.videoReview.speechPreview"] audio')?.getAttribute('src')
-  ).toBe('blob:preview');
+  expect(host.querySelector('audio')?.getAttribute('src')).toBe('blob:preview');
 });
 it('exposes cancellation during a running request and retry for failed retained edits', () => {
   const state = fixture();
@@ -278,25 +362,77 @@ it('edits range-aligned phrase text and native times, splits at explicit time an
   act(() => button('gallery.videoReview.speechMerge')?.click());
   expect(state.merge).toHaveBeenCalledWith('phrase', 'second');
 });
+it('preserves native precision on untouched blur and commits Enter once without moving focus', () => {
+  const state = withCatalog(fixture());
+  state.transcript.phrases[0]!.start = 0.123456;
+  render(state);
+  const untouched = host.querySelector<HTMLInputElement>(
+    `input[aria-label="${translate('gallery.videoReview.speechStart')}"]`
+  )!;
+  expect(untouched.value).toBe('0.12');
+  act(() => {
+    untouched.focus();
+    untouched.blur();
+  });
+  expect(state.editPhrase).not.toHaveBeenCalled();
+  const edited = input('gallery.videoReview.speechStart', '0.25');
+  act(() => {
+    edited.focus();
+    edited.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(state.editPhrase).toHaveBeenCalledExactlyOnceWith('phrase', { start: 0.25 });
+  expect(document.activeElement).not.toBe(edited);
+  input('gallery.videoReview.speechStart', '0.5');
+  act(() => {
+    edited.focus();
+    edited.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  });
+  expect(state.editPhrase).toHaveBeenCalledTimes(1);
+  expect(edited.value).toBe('0.12');
+});
+it('does not start a paid request when the provider disclosure is cancelled', () => {
+  const state = withCatalog(fixture());
+  render(state);
+  act(() => button('gallery.videoReview.speechGenerate')!.click());
+  expect(state.generate).not.toHaveBeenCalled();
+  expect(host.querySelector('[role=dialog]')).not.toBeNull();
+  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button:last-child')!.click());
+  expect(state.generate).not.toHaveBeenCalled();
+  expect(host.querySelector('[role=dialog]')).toBeNull();
+});
 it('generates selected and changed phrases, applies fit previews and restores the original', () => {
   const state = withCatalog(fixture());
   state.previews[0]!.replacement.duration = 1;
   state.transcript.replacements = [state.previews[0]!.replacement];
-  state.isChanged = () => true;
+  state.isChanged = (id) => id === 'phrase';
+  state.transcript.phrases.push({
+    ...state.transcript.phrases[0]!,
+    id: 'second',
+    start: 2,
+    end: 4,
+  });
   render(state);
+  act(() => host.querySelector<HTMLButtonElement>('[data-speech-batch=toggle]')?.click());
   act(() => host.querySelector<HTMLInputElement>('input[type=checkbox]')?.click());
   act(() => button('gallery.videoReview.speechGenerateSelected')?.click());
-  expect(state.generate).toHaveBeenCalledWith(['phrase']);
+  expect(state.generateQueue).not.toHaveBeenCalled();
+  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button')?.click());
+  expect(state.generateQueue).toHaveBeenCalledWith([
+    { target: state.target, phraseId: 'phrase' },
+    { target: state.target, phraseId: 'second' },
+  ]);
   act(() => button('gallery.videoReview.speechGenerateChanged')?.click());
-  expect(state.generate).toHaveBeenCalledTimes(2);
+  expect(state.generateQueue).toHaveBeenCalledTimes(2);
   act(() => button('gallery.videoReview.speechApplySelected')?.click());
   expect(state.apply).toHaveBeenCalledWith(state.previews);
+  act(() => host.querySelector<HTMLButtonElement>('[data-speech-batch=toggle]')?.click());
   act(() => button('gallery.videoReview.speechApply')?.click());
   expect(state.apply).toHaveBeenCalledTimes(2);
   act(() => button('gallery.videoReview.speechGenerate')?.click());
-  expect(state.generate).toHaveBeenCalledTimes(3);
+  expect(state.generate).toHaveBeenCalledTimes(1);
   act(() => button('gallery.videoReview.speechRestore')?.click());
   expect(state.restore).toHaveBeenCalledWith(['replacement']);
+  act(() => host.querySelector<HTMLButtonElement>('[data-speech-batch=toggle]')?.click());
   act(() => host.querySelector<HTMLInputElement>('input[type=checkbox]')?.click());
   expect(button('gallery.videoReview.speechGenerateSelected')?.disabled).toBe(true);
 });
@@ -304,7 +440,9 @@ it('changes voice, speed, format and delivery defaults without starting a paid r
   const state = withCatalog(fixture());
   render(state);
   input('gallery.videoReview.speechVoice', 'new voice');
-  input('gallery.videoReview.speechSpeed', '1.25');
+  const speed = input('gallery.videoReview.speechSpeed', '1.25');
+  expect(state.changeProfile).not.toHaveBeenCalledWith({ ...state.profile, speed: 1.25 });
+  act(() => speed.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   input('gallery.videoReview.speechInstructions', 'Quietly');
   expect(state.changeProfile).toHaveBeenCalledWith({ ...state.profile, voiceId: 'new voice' });
   expect(state.changeProfile).toHaveBeenCalledWith({ ...state.profile, speed: 1.25 });
@@ -330,24 +468,36 @@ it('changes voice, speed, format and delivery defaults without starting a paid r
   });
   expect(state.generate).not.toHaveBeenCalled();
 });
-it('plays native source bounds at clip tempo and keeps generated audition separate', () => {
+it('plays native source bounds at clip tempo and switches generated audition in the same player', async () => {
   const state = fixture();
   state.originalUrl = 'blob:original';
   render(state);
-  const original = host.querySelector<HTMLAudioElement>('audio')!;
-  const pause = vi.spyOn(original, 'pause').mockImplementation(() => undefined);
-  original.currentTime = 3;
-  act(() => original.dispatchEvent(new Event('play', { bubbles: true })));
-  expect(original.currentTime).toBe(0);
-  expect(original.playbackRate).toBe(1.5);
-  original.currentTime = 2;
-  act(() => original.dispatchEvent(new Event('timeupdate', { bubbles: true })));
-  expect(pause).toHaveBeenCalledOnce();
-  const generated = host.querySelector<HTMLAudioElement>(
-    '[data-ui="gallery.videoReview.speechPreview"] audio'
-  )!;
-  act(() => generated.dispatchEvent(new Event('play', { bubbles: true })));
-  expect(generated.playbackRate).toBe(1.5);
+  const media = host.querySelector<HTMLAudioElement>('audio')!;
+  const pause = vi.spyOn(media, 'pause').mockImplementation(() => undefined);
+  vi.spyOn(media, 'play').mockResolvedValue();
+  media.currentTime = 3;
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.speechAudition"] button')!
+      .click()
+  );
+  expect(media.currentTime).toBe(0);
+  expect(media.playbackRate).toBe(1.5);
+  media.currentTime = 2;
+  act(() => media.dispatchEvent(new Event('timeupdate', { bubbles: true })));
+  expect(pause).toHaveBeenCalled();
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(
+        '[data-ui="gallery.videoReview.speechAudition"] [role=group] button:last-child'
+      )!
+      .click()
+  );
+  expect(host.querySelectorAll('audio')).toHaveLength(1);
+  expect(media.getAttribute('src')).toBe('blob:preview');
+  act(() => media.dispatchEvent(new Event('loadedmetadata')));
+  expect(media.currentTime).toBe(0);
+  expect(media.playbackRate).toBe(1.5);
 });
 it.each([
   'invalid',
@@ -382,6 +532,8 @@ it('offers recognition and model refresh for an empty transcript and names an un
   expect(host.textContent).toContain(translate('gallery.videoReview.speechMissingModel'));
   expect(host.textContent).toContain(translate('gallery.videoReview.speechEmpty'));
   act(() => button('gallery.videoReview.speechRecognize')?.click());
+  expect(state.recognize).not.toHaveBeenCalled();
+  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button')?.click());
   expect(state.recognize).toHaveBeenCalledOnce();
   act(() => button('gallery.videoReview.speechReloadModels')?.click());
   expect(state.reloadModels).toHaveBeenCalledOnce();
@@ -439,6 +591,8 @@ it('shows original selection recognition and addresses accepted controls by repl
   )!;
   expect(selected.disabled).toBe(false);
   act(() => selected.click());
+  expect(state.recognize).not.toHaveBeenCalled();
+  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button')?.click());
   expect(state.recognize).toHaveBeenCalledWith(true);
   const accepted = host.querySelector('[data-speech-replacement-id="accepted-independent"]')!;
   const restore = Array.from(accepted.querySelectorAll('button')).find(

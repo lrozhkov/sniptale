@@ -347,3 +347,25 @@ it('original tickets reauthorize after staged input and cannot execute again or 
   exclusion.release();
   await erased.connection.disconnect();
 });
+it('binds keepalive to the active request and never extends authorization or the job deadline', async () => {
+  vi.useFakeTimers();
+  const idle = setup();
+  idle.connection.receive({ type: 'keepalive', requestId: 'r' });
+  expect(idle.messages).toEqual([{ type: 'failure', requestId: 'r', code: 'unauthorized' }]);
+  expect(idle.deps.authorize).not.toHaveBeenCalled();
+  const job = setup();
+  job.connection.receive(transcription);
+  await vi.advanceTimersByTimeAsync(1);
+  for (let index = 0; index < 5; index++) {
+    await vi.advanceTimersByTimeAsync(20_000);
+    job.connection.receive({ type: 'keepalive', requestId: 'r' });
+  }
+  expect(job.messages.filter((message) => message.type === 'failure')).toEqual([]);
+  expect(job.deps.request).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(job.messages).toContainEqual({ type: 'failure', requestId: 'r', code: 'timeout' });
+  job.connection.receive({ type: 'keepalive', requestId: 'r' });
+  expect(job.messages.at(-1)).toEqual({ type: 'failure', requestId: 'r', code: 'unauthorized' });
+  expect(job.deps.authorize).toHaveBeenCalledOnce();
+  await Promise.all([idle.connection.disconnect(), job.connection.disconnect()]);
+});

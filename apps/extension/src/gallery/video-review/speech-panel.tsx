@@ -1,25 +1,97 @@
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
-import { useEffect, useRef, useState } from 'react';
-import { ReviewNumberRow } from './number-row';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { AudioLines, FileText, Mic, Sparkles } from 'lucide-react';
+import { ReviewInspectorSections } from './inspector-sections';
+import { ReviewNumberRow, ReviewPreviewNumberRow } from './number-row';
 import { SpeechProfileFields } from './speech-profile';
 import { PhraseRow } from './speech-phrase';
-import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
-import { formatNumber, translate } from '../../platform/i18n';
-import { ReviewDetails, ReviewButton, reviewTextButtonClassName } from './controls';
+import { SpeechBatchWorkspace } from './speech-batch';
+import { translate } from '../../platform/i18n';
+import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { useReviewSpeech } from './use-speech';
+import { sameReviewSpeechTarget } from '../../contracts/ai/audio';
 
 type Controller = ReturnType<typeof useReviewSpeech>;
 type Props = Parameters<typeof useReviewSpeech>[0] & {
   tempo?: number;
+  sound?: ReactNode;
+  mainVideo?: HTMLVideoElement | undefined;
+  resultTime?: number | undefined;
+  assetNames?: ReadonlyMap<string, { filename: string }> | undefined;
+  onJump?(time: number): void;
   selectedReplacementId?: string | undefined;
   originalSpeechEnabled?: boolean;
   onToggleOriginalSpeech?(enabled: boolean): void;
 };
 const buttonClass = `${reviewTextButtonClassName} !h-auto min-h-8! whitespace-normal text-left`;
 
+/** Source gain composes with speech without changing the replacement's ducking control. */
+export function ReviewOriginalSpeechPanel(
+  props: Omit<Props, 'target' | 'sound'> & {
+    masterAudio: { volume: number; muted: boolean };
+    onMasterVolumeChange(volume: number): void;
+    masterDisabled: boolean;
+  }
+) {
+  const { masterAudio, onMasterVolumeChange, masterDisabled, ...speech } = props;
+  return (
+    <ReviewSpeechPanel
+      {...speech}
+      target={{ kind: 'original' }}
+      sound={
+        <ReviewPreviewNumberRow
+          label={translate('gallery.videoReview.volume')}
+          unit="%"
+          min={0}
+          max={200}
+          step={1}
+          precision={0}
+          enterBehavior="blur"
+          disabled={masterDisabled}
+          value={masterAudio.muted ? 0 : masterAudio.volume * 100}
+          onChange={(value) => onMasterVolumeChange(value / 100)}
+        />
+      }
+    />
+  );
+}
+
 /** One speech editor serves explicit original and recorded voiceover targets. */
 export function ReviewSpeechPanel(props: Props) {
-  const speech = useReviewSpeech(props);
+  const controller = useReviewSpeech(props);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batch, setBatch] = useState(false);
+  const [active, setActive] = useState<string>();
+  const approved = useRef(new Set<string>());
+  const [request, setRequest] = useState<{ key: string; message: string; run(): void } | null>(
+    null
+  );
+  const authorize = (operation: 'transcription' | 'speech', run: () => void) => {
+    const catalog = controller.catalogs?.[operation];
+    const modelId =
+      operation === 'transcription' ? controller.modelId : controller.profile?.modelId;
+    const model = catalog?.models.find((entry) => entry.id === modelId);
+    if (!model) return;
+    const provider = catalog?.providers.find((entry) => entry.id === model.providerId);
+    const key = `${operation}:${model.providerId}`;
+    if (approved.current.has(key)) {
+      run();
+      return;
+    }
+    const message = translate(
+      operation === 'transcription'
+        ? 'gallery.videoReview.speechConsentAudio'
+        : 'gallery.videoReview.speechConsentText'
+    ).replace('{provider}', provider?.name ?? model.displayName);
+    setRequest({ key, message, run });
+  };
+  const speech: Controller = {
+    ...controller,
+    recognize: (selection) => authorize('transcription', () => controller.recognize(selection)),
+    generate: (ids) => authorize('speech', () => controller.generate([...ids])),
+    generateQueue: (selected) =>
+      authorize('speech', () => controller.generateQueue(structuredClone([...selected]))),
+  };
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
     const node = Array.from(
@@ -27,138 +99,235 @@ export function ReviewSpeechPanel(props: Props) {
     ).find((entry) => entry.dataset['speechReplacementId'] === props.selectedReplacementId);
     node?.scrollIntoView({ block: 'nearest' });
   }, [props.selectedReplacementId]);
-  const [selected, setSelected] = useState<string[]>([]);
   const busy = speech.running || speech.saving || speech.dirty;
-  const selectedIds = selected.filter((id) =>
-    speech.transcript.phrases.some((phrase) => phrase.id === id)
-  );
   return (
-    <ReviewDetails
-      level="section"
-      label={translate('gallery.videoReview.speechTitle')}
-      preferenceId="gallery.videoReview.speech"
-      initiallyOpen={props.target.kind === 'original'}
+    <section
+      ref={section}
+      className="min-w-0 space-y-3"
+      data-ui="gallery.videoReview.speechPanel"
+      onKeyDown={(event) => event.stopPropagation()}
     >
-      <section
-        ref={section}
-        className="min-w-0 space-y-3"
-        data-ui="gallery.videoReview.speechPanel"
-        onKeyDown={(event) => event.stopPropagation()}
-      >
-        {props.target.kind === 'original' ? (
-          <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.videoReview.audioOriginal')} ·{' '}
-            {formatNumber(speech.recognitionDuration, {
-              style: 'unit',
-              unit: 'second',
-              unitDisplay: 'short',
-              maximumFractionDigits: 2,
-            })}
-            {props.selection ? (
-              <>
-                {' '}
-                · {translate('gallery.videoReview.speechSelectionDuration')}:{' '}
-                {formatNumber(speech.selectionDuration, {
-                  style: 'unit',
-                  unit: 'second',
-                  unitDisplay: 'short',
-                  maximumFractionDigits: 2,
-                })}
-              </>
-            ) : null}
-          </p>
-        ) : null}
-        <SpeechProfileFields speech={speech} />
-        {speech.profile &&
-        speech.catalogs &&
-        !speech.catalogs.speech.models.some((entry) => entry.id === speech.profile?.modelId) ? (
-          <p role="status">{translate('gallery.videoReview.speechMissingModel')}</p>
-        ) : null}
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.speechDisclosure')}
-        </p>
-        <SpeechRecognitionActions speech={speech} busy={busy} />
-        {props.sourceAudioAvailable === false ? (
-          <p role="status" className="text-xs">
-            {translate('gallery.videoReview.speechNoSourceAudio')}
-          </p>
-        ) : null}
-        <SpeechFeedback speech={speech} />
-        {props.target.kind === 'original' ? (
-          <OriginalSpeechControls
-            speech={speech}
-            enabled={props.originalSpeechEnabled}
-            onToggle={props.onToggleOriginalSpeech}
-          />
-        ) : null}
-        {speech.transcript.phrases.length ? (
-          <>
-            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-              {translate('gallery.videoReview.speechOriginalWaveform')}
-            </p>
-            <ReviewButton
-              label={translate('gallery.videoReview.speechSelectAll')}
-              className={buttonClass}
-              onClick={() =>
-                setSelected(
-                  selectedIds.length === speech.transcript.phrases.length
-                    ? []
-                    : speech.transcript.phrases.map((phrase) => phrase.id)
-                )
-              }
-            >
-              {translate(
-                selectedIds.length === speech.transcript.phrases.length
-                  ? 'gallery.videoReview.speechDeselectAll'
-                  : 'gallery.videoReview.speechSelectAll'
-              )}
-            </ReviewButton>
-            <SpeechBatchActions speech={speech} selectedIds={selectedIds} busy={busy} />
-          </>
-        ) : (
-          <p className="text-xs">{translate('gallery.videoReview.speechEmpty')}</p>
-        )}
-        {speech.transcript.phrases.map((phrase, index) => (
-          <PhraseRow
-            key={phrase.id}
-            phrase={phrase}
-            resultInterval={
-              props.target.kind === 'original'
-                ? speech.resultInterval(phrase.start, phrase.end)
-                : undefined
-            }
-            next={speech.transcript.phrases[index + 1]}
-            speech={speech}
-            tempo={props.tempo ?? 1}
-            selected={selectedIds.includes(phrase.id)}
-            onSelect={() =>
-              setSelected((current) =>
-                current.includes(phrase.id)
-                  ? current.filter((id) => id !== phrase.id)
-                  : [...current, phrase.id]
-              )
-            }
-          />
-        ))}
-        {speech.transcript.replacements.length ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.speechRestore')}
-            className={buttonClass}
-            disabled={busy}
-            onClick={() =>
-              speech.restore(speech.transcript.replacements.map((replacement) => replacement.id))
-            }
-          >
-            {translate('gallery.videoReview.speechRestore')}
-          </ReviewButton>
-        ) : null}
-      </section>
-    </ReviewDetails>
+      <SpeechFeedback speech={speech} assetNames={props.assetNames} />
+      <fieldset disabled={!!request} className="min-w-0">
+        <ReviewInspectorSections
+          sections={[
+            ...(props.sound || props.target.kind === 'original'
+              ? [
+                  {
+                    id: 'audio',
+                    label: translate('gallery.videoReview.volume'),
+                    icon: AudioLines,
+                    content: (
+                      <>
+                        {props.sound}
+                        {props.target.kind === 'original' && (
+                          <OriginalSpeechControls
+                            speech={speech}
+                            enabled={props.originalSpeechEnabled}
+                            onToggle={props.onToggleOriginalSpeech}
+                          />
+                        )}
+                      </>
+                    ),
+                  },
+                ]
+              : []),
+            {
+              id: 'recognition',
+              label: translate('gallery.videoReview.speechRecognition'),
+              icon: Mic,
+              content: (
+                <>
+                  <fieldset disabled={busy}>
+                    <SpeechProfileFields speech={speech} operation="transcription" />
+                  </fieldset>
+                  <SpeechRecognitionActions speech={speech} busy={busy} />
+                  {props.sourceAudioAvailable === false && (
+                    <p role="status" className="text-xs">
+                      {translate('gallery.videoReview.speechNoSourceAudio')}
+                    </p>
+                  )}
+                </>
+              ),
+            },
+            {
+              id: 'text',
+              label: translate('gallery.videoReview.speechTranscript'),
+              icon: FileText,
+              content: (
+                <SpeechTranscript
+                  speech={speech}
+                  props={props}
+                  selected={selected}
+                  setSelected={setSelected}
+                  batch={batch}
+                  setBatch={setBatch}
+                  active={active}
+                  setActive={setActive}
+                />
+              ),
+            },
+            {
+              id: 'synthesis',
+              label: translate('gallery.videoReview.speechSynthesis'),
+              icon: Sparkles,
+              content: (
+                <>
+                  <fieldset disabled={busy}>
+                    <SpeechProfileFields speech={speech} operation="speech" />
+                  </fieldset>
+                  {speech.profile &&
+                    speech.catalogs &&
+                    !speech.catalogs.speech.models.some(
+                      (entry) => entry.id === speech.profile?.modelId
+                    ) && <p role="status">{translate('gallery.videoReview.speechMissingModel')}</p>}
+                </>
+              ),
+            },
+          ]}
+        />
+      </fieldset>
+      {request && (
+        <ProductConfirmDialog
+          title={translate('gallery.videoReview.speechConsentTitle')}
+          message={request.message}
+          confirmText={translate('gallery.videoReview.speechConsentContinue')}
+          cancelText={translate('common.actions.cancel')}
+          onConfirm={() => {
+            approved.current.add(request.key);
+            setRequest(null);
+            request.run();
+          }}
+          onCancel={() => setRequest(null)}
+        />
+      )}
+    </section>
   );
 }
 
-function SpeechFeedback({ speech }: { speech: Controller }) {
+function SpeechTranscript({
+  speech,
+  props,
+  selected,
+  setSelected,
+  batch,
+  setBatch,
+  active,
+  setActive,
+}: {
+  speech: Controller;
+  props: Props;
+  selected: string[];
+  setSelected: React.Dispatch<React.SetStateAction<string[]>>;
+  batch: boolean;
+  setBatch: React.Dispatch<React.SetStateAction<boolean>>;
+  active: string | undefined;
+  setActive: React.Dispatch<React.SetStateAction<string | undefined>>;
+}) {
+  const phrases = speech.transcript.phrases;
+  const opened = phrases.find((phrase) => phrase.id === active)?.id ?? phrases[0]?.id;
+  const busy = speech.running || speech.saving || speech.dirty;
+  const total = speech.groups.reduce((count, group) => count + group.transcript.phrases.length, 0);
+  const choosing = batch && total > 1;
+  const nativePlayhead =
+    props.resultTime === undefined ? null : speech.nativeTimeAtResult(props.resultTime);
+  return (
+    <div className="min-w-0 space-y-3">
+      {total > 1 && (
+        <ReviewButton
+          label={translate(
+            choosing ? 'gallery.videoReview.speechBatchDone' : 'gallery.videoReview.speechBatch'
+          )}
+          className={buttonClass}
+          data-speech-batch="toggle"
+          onClick={() => setBatch(!batch)}
+        >
+          {translate(
+            choosing ? 'gallery.videoReview.speechBatchDone' : 'gallery.videoReview.speechBatch'
+          )}
+        </ReviewButton>
+      )}
+      {choosing && (
+        <SpeechBatchWorkspace
+          speech={speech}
+          selected={selected}
+          onSelect={setSelected}
+          mainVideo={props.mainVideo}
+          assetNames={props.assetNames}
+        />
+      )}
+      {!phrases.length && <p className="text-xs">{translate('gallery.videoReview.speechEmpty')}</p>}
+      {!choosing &&
+        phrases.map((phrase, index) => {
+          const resultInterval = speech.resultInterval(phrase.start, phrase.end);
+          return (
+            <PhraseRow
+              key={phrase.id}
+              phrase={phrase}
+              index={index}
+              expanded={opened === phrase.id}
+              resultInterval={resultInterval}
+              nativePlayhead={nativePlayhead}
+              bounds={{
+                start: phrases[index - 1]?.end ?? speech.nativeBounds?.start ?? phrase.start,
+                end: phrases[index + 1]?.start ?? speech.nativeBounds?.end ?? phrase.end,
+              }}
+              next={phrases[index + 1]}
+              speech={speech}
+              tempo={props.tempo ?? 1}
+              mainVideo={props.mainVideo}
+              selected={false}
+              onToggle={() => setActive(phrase.id)}
+              {...(props.onJump && resultInterval
+                ? { onJump: () => props.onJump?.(resultInterval.start) }
+                : {})}
+              onSelect={() =>
+                setSelected((current) =>
+                  current.includes(phrase.id)
+                    ? current.filter((id) => id !== phrase.id)
+                    : [...current, phrase.id]
+                )
+              }
+            />
+          );
+        })}
+      {!choosing && !!speech.transcript.replacements.length && (
+        <ReviewButton
+          label={translate('gallery.videoReview.speechRestore')}
+          className={buttonClass}
+          disabled={busy}
+          onClick={() =>
+            speech.restore(speech.transcript.replacements.map((replacement) => replacement.id))
+          }
+        >
+          {translate('gallery.videoReview.speechRestore')}
+        </ReviewButton>
+      )}
+    </div>
+  );
+}
+
+function SpeechFeedback({
+  speech,
+  assetNames,
+}: {
+  speech: Controller;
+  assetNames?: Props['assetNames'];
+}) {
   const [discarding, setDiscarding] = useState(false);
+  const currentGroup = speech.queueProgress
+    ? speech.groups.find((group) =>
+        sameReviewSpeechTarget(group.target, speech.queueProgress!.current.target)
+      )
+    : undefined;
+  const currentName = currentGroup
+    ? (assetNames?.get(currentGroup.assetId)?.filename ??
+      translate(
+        currentGroup.target.kind === 'original'
+          ? 'gallery.videoReview.audioOriginal'
+          : 'gallery.videoReview.audioVoiceover'
+      ))
+    : '';
   const errorKey = {
     interrupted: 'gallery.videoReview.speechInterrupted',
     invalid: 'gallery.videoReview.speechInvalid',
@@ -187,15 +356,34 @@ function SpeechFeedback({ speech }: { speech: Controller }) {
   } as const;
   return (
     <>
-      <p role="status" className="text-xs">
-        {translate(
-          speech.running
-            ? 'gallery.videoReview.speechWorking'
-            : speech.saving || speech.dirty
-              ? 'gallery.videoReview.speechSaving'
-              : 'gallery.videoReview.speechSaved'
-        )}
-      </p>
+      {(speech.running ||
+        speech.saving ||
+        speech.dirty ||
+        (speech.queueProgress?.total ?? 0) > 1) && (
+        <div className="flex min-w-0 items-center gap-2 text-xs">
+          <p role="status" className="min-w-0 flex-1">
+            {speech.queueProgress && speech.queueProgress.total > 1
+              ? translate('gallery.videoReview.speechQueueProgress')
+                  .replace('{completed}', String(speech.queueProgress.completed))
+                  .replace('{total}', String(speech.queueProgress.total)) +
+                (speech.running && currentName ? ` · ${currentName}` : '')
+              : translate(
+                  speech.running
+                    ? 'gallery.videoReview.speechWorking'
+                    : speech.saving || speech.dirty
+                      ? 'gallery.videoReview.speechSaving'
+                      : 'gallery.videoReview.speechSaved'
+                )}
+          </p>
+          {speech.running && (
+            <ReviewButton
+              label={translate('common.actions.cancel')}
+              className={reviewTextButtonClassName}
+              onClick={speech.cancel}
+            />
+          )}
+        </div>
+      )}
       {speech.error ? (
         <div role="alert" className="text-xs text-[var(--sniptale-color-danger-text)]">
           {translate(errorKey[speech.error])}
@@ -236,67 +424,6 @@ function SpeechFeedback({ speech }: { speech: Controller }) {
   );
 }
 
-function SpeechBatchActions({
-  speech,
-  selectedIds,
-  busy,
-}: {
-  speech: Controller;
-  selectedIds: string[];
-  busy: boolean;
-}) {
-  const available =
-    !!speech.profile &&
-    !!parseReviewSpeechProfile(speech.profile) &&
-    !!speech.catalogs?.speech.models.some((model) => model.id === speech.profile?.modelId);
-  const selectedPreviews = speech.previews.filter((preview) =>
-    selectedIds.includes(preview.replacement.phraseId)
-  );
-  const overflow = selectedPreviews.some(
-    (preview) =>
-      preview.replacement.duration > preview.replacement.end - preview.replacement.start + 1e-7
-  );
-  return (
-    <div className="flex flex-wrap gap-1">
-      <ReviewButton
-        label={translate('gallery.videoReview.speechGenerateSelected')}
-        className={buttonClass}
-        disabled={busy || !available || !selectedIds.length}
-        onClick={() => speech.generate(selectedIds)}
-      >
-        {translate('gallery.videoReview.speechGenerateSelected')}
-      </ReviewButton>
-      <ReviewButton
-        label={translate('gallery.videoReview.speechGenerateChanged')}
-        className={buttonClass}
-        disabled={busy || !available}
-        onClick={() =>
-          speech.generate(
-            speech.transcript.phrases
-              .filter((phrase) => speech.isChanged(phrase.id))
-              .map((phrase) => phrase.id)
-          )
-        }
-      >
-        {translate('gallery.videoReview.speechGenerateChanged')}
-      </ReviewButton>
-      <ReviewButton
-        label={translate('gallery.videoReview.speechApplySelected')}
-        className={buttonClass}
-        disabled={
-          busy ||
-          overflow ||
-          !selectedPreviews.length ||
-          selectedPreviews.length !== selectedIds.length
-        }
-        onClick={() => speech.apply(selectedPreviews)}
-      >
-        {translate('gallery.videoReview.speechApplySelected')}
-      </ReviewButton>
-    </div>
-  );
-}
-
 function OriginalSpeechControls({
   speech,
   enabled,
@@ -320,9 +447,6 @@ function OriginalSpeechControls({
         value={speech.originalVolume * 100}
         onChange={(value) => speech.setOriginalVolume(value / 100)}
       />
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate('gallery.videoReview.speechOriginalMixHint')}
-      </p>
       {speech.transcript.replacements.length ? (
         <>
           {onToggle ? (
@@ -446,15 +570,6 @@ function SpeechRecognitionActions({ speech, busy }: { speech: Controller; busy: 
       >
         {translate('gallery.videoReview.speechReloadModels')}
       </ReviewButton>
-      {speech.running ? (
-        <ReviewButton
-          label={translate('common.actions.cancel')}
-          className={buttonClass}
-          onClick={speech.cancel}
-        >
-          {translate('common.actions.cancel')}
-        </ReviewButton>
-      ) : null}
     </div>
   );
 }

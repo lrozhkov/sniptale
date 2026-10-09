@@ -381,6 +381,7 @@ function ReviewInspectorHeader(
         {props.filename}
       </h2>
       {props.section === 'scene' ||
+      props.section === 'speech' ||
       (props.section === 'selected' && props.selectionHasSections === true) ? (
         <ContentToolbarButton
           type="button"

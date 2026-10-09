@@ -220,6 +220,12 @@ class AudioJobCoordinator {
     return {
       receive: (message: AudioJobClientMessage): void => {
         if (closed) return;
+        if (message.type === 'keepalive') {
+          // Receipt keeps MV3 alive; it never creates work or renews the job deadline.
+          if (!job || job.phase === 'done' || job.request.requestId !== message.requestId)
+            emit({ type: 'failure', requestId: message.requestId, code: 'unauthorized' });
+          return;
+        }
         if (message.type === 'cancel') {
           if (job?.request.requestId === message.requestId) this.abort(job);
           return;

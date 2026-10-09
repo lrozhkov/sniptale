@@ -30,6 +30,32 @@ export function encodeReviewSpeechWav(samples: Float32Array): Blob {
   return new Blob([bytes], { type: 'audio/wav' });
 }
 
+/** Only an entirely zero, locally encoded PCM16 interval is confirmed empty, never quiet speech. */
+export async function reviewSpeechWavIsSilent(wav: Blob, signal: AbortSignal): Promise<boolean> {
+  signal.throwIfAborted();
+  if (wav.type !== 'audio/wav' || wav.size <= 44 || wav.size > 24 * 1024 * 1024) return false;
+  const bytes = await wav.arrayBuffer();
+  signal.throwIfAborted();
+  const header = new DataView(bytes);
+  if (
+    header.getUint32(0, false) !== 0x52494646 ||
+    header.getUint32(8, false) !== 0x57415645 ||
+    header.getUint32(12, false) !== 0x666d7420 ||
+    header.getUint32(16, true) !== 16 ||
+    header.getUint16(20, true) !== 1 ||
+    header.getUint16(22, true) !== 1 ||
+    header.getUint32(24, true) !== RATE ||
+    header.getUint16(32, true) !== 2 ||
+    header.getUint16(34, true) !== 16 ||
+    header.getUint32(36, false) !== 0x64617461 ||
+    header.getUint32(40, true) + 44 !== bytes.byteLength ||
+    (bytes.byteLength - 44) % 2 !== 0
+  )
+    return false;
+  const samples = new Int16Array(bytes, 44);
+  return samples.every((sample) => sample === 0);
+}
+
 /** Decode only the authorized native interval, bounded to five minutes. */
 export async function extractReviewSpeechWav(
   source: string | Blob,

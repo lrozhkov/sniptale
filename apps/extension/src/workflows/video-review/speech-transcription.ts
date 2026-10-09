@@ -6,7 +6,11 @@ import type {
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 import { projectReviewVoiceover } from '../../features/video/review/voiceover-edits';
-import { extractReviewSpeechWav, planReviewSpeechChunks } from './speech-audio';
+import {
+  extractReviewSpeechWav,
+  planReviewSpeechChunks,
+  reviewSpeechWavIsSilent,
+} from './speech-audio';
 import { runReviewSpeechJob } from './speech-client';
 import {
   getReviewSpeechClip,
@@ -35,14 +39,14 @@ export function reviewSpeechPhrases(
   end: number
 ): ReviewSpeechPhrase[] {
   if (!result.text.trim()) return [];
-  const valid = (entries: AudioTranscriptTiming[] | undefined) =>
+  const valid = (entries: AudioTranscriptTiming[] | undefined, allowZero = false) =>
     entries?.length &&
     entries.every(
       (entry, index) =>
         Number.isFinite(entry.start) &&
         Number.isFinite(entry.end) &&
         entry.start >= 0 &&
-        entry.end > entry.start &&
+        (allowZero ? entry.end >= entry.start : entry.end > entry.start) &&
         entry.end <= end - start + 0.05 &&
         (index === 0 || entry.start >= entries[index - 1]!.end)
     );
@@ -71,10 +75,16 @@ export function reviewSpeechPhrases(
       : {}),
   });
   if (
-    (result.words?.length && !valid(result.words)) ||
+    (result.words?.length && !valid(result.words, true)) ||
     (result.segments?.length && !valid(result.segments))
   )
     throw new Error('invalid-response');
+  if (result.words?.some((word) => word.start === word.end)) {
+    const anchors = result.words.filter((word) => word.end > word.start);
+    // The chunk is the only proven bound for missing alignment. Preserve the complete
+    // provider text and valid anchors without assigning invented times to missing words.
+    return [phrase(result.text.trim(), start, end, 'range', anchors.length ? anchors : undefined)];
+  }
   if (valid(result.words)) {
     const groups: AudioTranscriptTiming[][] = [];
     for (const word of result.words!) {
@@ -199,8 +209,10 @@ export async function transcribeReviewSpeech(
       { type: 'start', operation: 'transcription', requestId: crypto.randomUUID(), modelId, scope },
       {
         signal,
-        prepareInput: (jobSignal) =>
-          extractReviewSpeechWav(source, chunk.start, chunk.end, jobSignal),
+        prepareInput: async (jobSignal) => {
+          const wav = await extractReviewSpeechWav(source, chunk.start, chunk.end, jobSignal);
+          return (await reviewSpeechWavIsSilent(wav, jobSignal)) ? null : wav;
+        },
       }
     );
     signal.throwIfAborted();

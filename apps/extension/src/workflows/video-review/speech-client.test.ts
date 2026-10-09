@@ -117,6 +117,32 @@ function connectedJob() {
     start,
   };
 }
+it('finishes confirmed silence after authorization without staging or executing a paid request', async () => {
+  staging.write.mockClear();
+  const job = connectedJob();
+  const pending = runReviewSpeechJob(job.start, {
+    signal: new AbortController().signal,
+    prepareInput: async () => null,
+  });
+  void pending.catch(() => undefined);
+  try {
+    expect(staging.write).not.toHaveBeenCalled();
+    job.receive({
+      type: 'authorized',
+      requestId: 'r',
+      ticket: '11111111-1111-4111-8111-111111111111',
+      scope: job.start.scope,
+    });
+    await vi.waitFor(() =>
+      expect(job.postMessage).toHaveBeenLastCalledWith({ type: 'cancel', requestId: 'r' })
+    );
+    await expect(pending).resolves.toEqual({ type: 'transcript', result: { text: '' } });
+    expect(staging.write).not.toHaveBeenCalled();
+    expect(job.postMessage).toHaveBeenCalledTimes(2);
+  } finally {
+    job.disconnect();
+  }
+});
 it('uploads once, ignores other request identities and publishes a typed transcript', async () => {
   const job = connectedJob();
   const id = '11111111-1111-4111-8111-111111111111';
@@ -212,3 +238,51 @@ it.each(['decode-failed', 'storage-failed'] as const)(
     expect(job.postMessage).toHaveBeenCalledTimes(1);
   }
 );
+it('keeps only the active one-shot job alive and stops messages on cancellation', async () => {
+  vi.useFakeTimers();
+  const job = connectedJob();
+  const controller = new AbortController();
+  const promise = runReviewSpeechJob(job.start, { signal: controller.signal });
+  const rejected = expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+  try {
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(job.postMessage.mock.calls.filter(([message]) => message.type === 'keepalive')).toEqual([
+      [{ type: 'keepalive', requestId: 'r' }],
+      [{ type: 'keepalive', requestId: 'r' }],
+    ]);
+    expect(job.postMessage.mock.calls.filter(([message]) => message.type === 'start')).toHaveLength(
+      1
+    );
+  } finally {
+    controller.abort();
+    await rejected;
+    const count = job.postMessage.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(100_000);
+    expect(job.postMessage).toHaveBeenCalledTimes(count);
+    vi.useRealTimers();
+  }
+});
+it('releases keepalive on a terminal response and failed initial delivery', async () => {
+  vi.useFakeTimers();
+  try {
+    const success = connectedJob();
+    const completed = runReviewSpeechJob(success.start, { signal: new AbortController().signal });
+    success.receive({ type: 'transcript', requestId: 'r', result: { text: 'done' } });
+    await expect(completed).resolves.toEqual({
+      type: 'transcript',
+      requestId: 'r',
+      result: { text: 'done' },
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    const failure = connectedJob();
+    failure.postMessage.mockImplementationOnce(() => {
+      throw new Error('closed');
+    });
+    await expect(
+      runReviewSpeechJob(failure.start, { signal: new AbortController().signal })
+    ).rejects.toThrow('interrupted');
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});

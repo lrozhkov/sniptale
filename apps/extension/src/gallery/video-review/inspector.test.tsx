@@ -434,21 +434,50 @@ it('opens original speech without a synthetic selected clip and leaves it on mod
       settingsAvailable,
       exportAvailable: true,
     });
-    return <output>{navigation.shown}</output>;
+    return (
+      <>
+        <output>{navigation.shown}</output>
+        <Inspector
+          filename="clip.webm"
+          annotations={[]}
+          selectedId={null}
+          busy={false}
+          message={null}
+          navigation={navigation}
+          settingsAvailable={settingsAvailable}
+          speech={<p>Speech controls</p>}
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={vi.fn()}
+          onHover={vi.fn()}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+          onReport={vi.fn()}
+        >
+          {null}
+        </Inspector>
+      </>
+    );
   }
   try {
     act(() => root.render(<Harness />));
     act(() => navigation.setSection('speech'));
-    expect(host.textContent).toBe('speech');
+    expect(host.querySelector('output')?.textContent).toBe('speech');
+    const presentation = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorPresentation"]'
+    );
+    expect(presentation).not.toBeNull();
+    act(() => presentation!.click());
+    expect(navigation.presentation).toBe('sections');
     expect(beforeAction).toHaveBeenCalledTimes(1);
     act(() => root.render(<Harness />));
-    expect(host.textContent).toBe('speech');
+    expect(host.querySelector('output')?.textContent).toBe('speech');
     act(() => navigation.setSection('scene'));
-    expect(host.textContent).toBe('scene');
+    expect(host.querySelector('output')?.textContent).toBe('scene');
     act(() => navigation.setSection('speech'));
     settingsAvailable = false;
     act(() => root.render(<Harness />));
-    expect(host.textContent).toBe('comments');
+    expect(host.querySelector('output')?.textContent).toBe('comments');
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

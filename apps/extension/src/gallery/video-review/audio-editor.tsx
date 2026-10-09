@@ -23,10 +23,85 @@ export function ReviewAudioClipEditor(props: {
   busy: boolean;
   lane?: 'voiceover' | 'music';
   cutSuppressed?: boolean;
+  embedded?: boolean;
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
   onDelete(): void;
 }) {
   const map = useContext(ReviewIntervalMap);
+  const sections = [
+    {
+      id: 'audio',
+      label: translate('gallery.videoReview.volume'),
+      icon: AudioLines,
+      content: (
+        <>
+          <ReviewInspectorColumns>
+            {props.lane === 'voiceover' ? (
+              <ReviewNumberRow
+                label={translate('gallery.videoReview.voiceoverTempo')}
+                unit="x"
+                min={0.25}
+                max={4}
+                step={0.05}
+                precision={2}
+                value={props.clip.tempo ?? 1}
+                disabled={props.busy}
+                onChange={(tempo) => props.onPatch({ tempo })}
+              />
+            ) : null}
+            <ReviewNumberRow
+              label={translate('gallery.videoReview.audioClipVolume')}
+              unit="%"
+              min={0}
+              max={200}
+              step={1}
+              value={props.clip.volume * 100}
+              disabled={props.busy}
+              onChange={(value) => props.onPatch({ volume: value / 100 })}
+            />
+          </ReviewInspectorColumns>
+          <ReviewButton
+            label={translate('gallery.videoReview.audioClipMute')}
+            aria-pressed={props.clip.muted}
+            disabled={props.busy}
+            className={`${reviewTextButtonClassName} !w-full justify-start`}
+            onClick={() => props.onPatch({ muted: !props.clip.muted })}
+          >
+            <VolumeX size={15} aria-hidden="true" />
+            <span>{translate('gallery.videoReview.audioClipMute')}</span>
+          </ReviewButton>
+        </>
+      ),
+    },
+    {
+      id: 'animation',
+      label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+      icon: Waves,
+      content: (
+        <ReviewInspectorColumns>
+          {(['fadeIn', 'fadeOut'] as const).map((key) => (
+            <ReviewNumberRow
+              key={key}
+              label={translate(
+                key === 'fadeIn'
+                  ? 'gallery.videoReview.audioFadeIn'
+                  : 'gallery.videoReview.audioFadeOut'
+              )}
+              unit="s"
+              min={0}
+              max={Math.min(60, props.clip.duration)}
+              scrubMax={Math.min(5, props.clip.duration)}
+              step={0.1}
+              precision={2}
+              value={props.clip[key]}
+              disabled={props.busy}
+              onChange={(value) => props.onPatch({ [key]: value })}
+            />
+          ))}
+        </ReviewInspectorColumns>
+      ),
+    },
+  ];
   return (
     <div data-ui="gallery.videoReview.audioInspector" className="min-w-0 space-y-3">
       <ReviewInterval
@@ -44,80 +119,15 @@ export function ReviewAudioClipEditor(props: {
           {translate('gallery.videoReview.voiceoverCut')}
         </p>
       ) : null}
-      <ReviewInspectorSections
-        sections={[
-          {
-            id: 'audio',
-            label: translate('gallery.videoReview.volume'),
-            icon: AudioLines,
-            content: (
-              <>
-                {props.lane === 'voiceover' ? (
-                  <ReviewNumberRow
-                    label={translate('gallery.videoReview.voiceoverTempo')}
-                    unit="x"
-                    min={0.25}
-                    max={4}
-                    step={0.05}
-                    precision={2}
-                    value={props.clip.tempo ?? 1}
-                    disabled={props.busy}
-                    onChange={(tempo) => props.onPatch({ tempo })}
-                  />
-                ) : null}
-                <ReviewNumberRow
-                  label={translate('gallery.videoReview.audioClipVolume')}
-                  unit="%"
-                  min={0}
-                  max={200}
-                  step={1}
-                  value={props.clip.volume * 100}
-                  disabled={props.busy}
-                  onChange={(value) => props.onPatch({ volume: value / 100 })}
-                />
-                <ReviewButton
-                  label={translate('gallery.videoReview.audioClipMute')}
-                  aria-pressed={props.clip.muted}
-                  disabled={props.busy}
-                  className={`${reviewTextButtonClassName} !w-full justify-start`}
-                  onClick={() => props.onPatch({ muted: !props.clip.muted })}
-                >
-                  <VolumeX size={15} aria-hidden="true" />
-                  <span>{translate('gallery.videoReview.audioClipMute')}</span>
-                </ReviewButton>
-              </>
-            ),
-          },
-          {
-            id: 'animation',
-            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
-            icon: Waves,
-            content: (
-              <ReviewInspectorColumns>
-                {(['fadeIn', 'fadeOut'] as const).map((key) => (
-                  <ReviewNumberRow
-                    key={key}
-                    label={translate(
-                      key === 'fadeIn'
-                        ? 'gallery.videoReview.audioFadeIn'
-                        : 'gallery.videoReview.audioFadeOut'
-                    )}
-                    unit="s"
-                    min={0}
-                    max={Math.min(60, props.clip.duration)}
-                    scrubMax={Math.min(5, props.clip.duration)}
-                    step={0.1}
-                    precision={2}
-                    value={props.clip[key]}
-                    disabled={props.busy}
-                    onChange={(value) => props.onPatch({ [key]: value })}
-                  />
-                ))}
-              </ReviewInspectorColumns>
-            ),
-          },
-        ]}
-      />
+      {props.embedded ? (
+        <div className="min-w-0 space-y-3">
+          {sections.map((section) => (
+            <div key={section.id}>{section.content}</div>
+          ))}
+        </div>
+      ) : (
+        <ReviewInspectorSections sections={sections} />
+      )}
       <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.audioClipDelete')}
@@ -137,11 +147,13 @@ export function ReviewAudioClipEditor(props: {
 export function ReviewAudioInspectorSection(props: {
   audio: ReturnType<typeof useReviewAudio>;
   busy: boolean;
+  embedded?: boolean;
 }) {
   const selected = props.audio.selected;
   if (!selected) return null;
   return (
     <ReviewAudioClipEditor
+      embedded={props.embedded ?? false}
       clip={selected.clip}
       lane={selected.lane}
       cutSuppressed={selected.cutSuppressed}

@@ -8,6 +8,8 @@ export const AUDIO_INPUT_MAX_BYTES = 24 * 1024 * 1024;
 export const AUDIO_OUTPUT_MAX_BYTES = 32 * 1024 * 1024;
 export const AUDIO_STAGING_TTL_MS = 10 * 60 * 1000;
 export const AUDIO_JOB_TIMEOUT_MS = 120_000;
+/** Active Port traffic stays below Chromium's 30-second MV3 idle window. */
+export const AUDIO_JOB_KEEPALIVE_MS = 20_000;
 
 export type ReviewSpeechTarget = { kind: 'original' } | { kind: 'voiceover'; clipId: string };
 
@@ -46,7 +48,8 @@ export type AudioJobStart = {
 export type AudioJobClientMessage =
   | AudioJobStart
   | { type: 'execute'; requestId: string; ticket: string; staged: AudioStagedHandle }
-  | { type: 'cancel'; requestId: string };
+  | { type: 'cancel'; requestId: string }
+  | { type: 'keepalive'; requestId: string };
 
 export const AUDIO_JOB_FAILURE_CODES = [
   'invalid-request',
@@ -79,6 +82,7 @@ export function parseAudioJobFailureCode(value: unknown): AudioJobFailureCode | 
 export interface AudioTranscriptTiming {
   text: string;
   start: number;
+  /** Equality is admitted for word text only; it is never a durable aligned word interval. */
   end: number;
 }
 
@@ -163,6 +167,7 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   if (!record(value) || !identifier(value['requestId'])) return null;
   const requestId = value['requestId'];
   if (value['type'] === 'cancel') return { type: 'cancel', requestId };
+  if (value['type'] === 'keepalive') return { type: 'keepalive', requestId };
   if (value['type'] === 'execute') {
     const staged = parseAudioStagedHandle(value['staged']);
     return isAudioStagingId(value['ticket']) &&
@@ -241,8 +246,10 @@ function parseTranscript(value: unknown): AudioTranscriptResult | null {
         item['start'] < 0 ||
         typeof item['end'] !== 'number' ||
         !Number.isFinite(item['end']) ||
-        item['end'] <= item['start'] ||
-        item['end'] > 300
+        (key === 'words' ? item['end'] < item['start'] : item['end'] <= item['start']) ||
+        item['end'] > 300 ||
+        (parsed.length > 0 &&
+          item['start'] < (key === 'words' ? parsed.at(-1)!.end : parsed.at(-1)!.start))
       )
         return null;
       parsed.push({ text: item['text'], start: item['start'], end: item['end'] });

@@ -26,7 +26,7 @@ function timing(value: unknown, duration: number, word: boolean): AudioTranscrip
     ? { text, start: boundedStart, end: boundedEnd }
     : null;
 }
-/** Invalid timings fail closed; zero-duration words retain text without word alignment. */
+/** Invalid timings fail closed; zero-duration words retain their position as unaligned text. */
 export function parseAudioTranscriptResponse(
   value: unknown,
   duration: number
@@ -50,7 +50,7 @@ export function parseAudioTranscriptResponse(
         return null;
       parsed.push(entry);
     }
-    if (key !== 'words' || parsed.every((entry) => entry.end > entry.start)) result[key] = parsed;
+    result[key] = parsed;
   }
   return result;
 }

@@ -2,6 +2,7 @@ import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import {
   AUDIO_JOB_PORT_NAME,
   AUDIO_JOB_TIMEOUT_MS,
+  AUDIO_JOB_KEEPALIVE_MS,
   parseAudioJobServerMessage,
   sameAudioJobScope,
   type AudioJobStart,
@@ -22,7 +23,8 @@ export function runReviewSpeechJob(
   start: AudioJobStart,
   options: {
     signal: AbortSignal;
-    prepareInput?: (signal: AbortSignal) => Promise<Blob>;
+    /** Null means the authorized interval was decoded as confirmed digital silence. */
+    prepareInput?: (signal: AbortSignal) => Promise<Blob | null>;
   }
 ): Promise<ReviewSpeechJobResult> {
   options.signal.throwIfAborted();
@@ -36,6 +38,7 @@ export function runReviewSpeechJob(
       finished = true;
       controller.abort();
       clearTimeout(timer);
+      clearInterval(keepalive);
       options.signal.removeEventListener('abort', cancel);
       port.disconnect();
       if (result) resolve(result);
@@ -50,6 +53,14 @@ export function runReviewSpeechJob(
       finish(undefined, new DOMException('Cancelled', 'AbortError'));
     };
     const timer = setTimeout(() => finish(undefined, new Error('timeout')), AUDIO_JOB_TIMEOUT_MS);
+    const keepalive = setInterval(() => {
+      if (finished) return;
+      try {
+        port.postMessage({ type: 'keepalive', requestId: start.requestId });
+      } catch {
+        finish(undefined, new Error('interrupted'));
+      }
+    }, AUDIO_JOB_KEEPALIVE_MS);
     options.signal.addEventListener('abort', cancel, { once: true });
     port.onDisconnect.addListener(() => {
       void browserRuntime.getLastError();
@@ -84,6 +95,12 @@ export function runReviewSpeechJob(
             throw new Error('decode-failed');
           })
           .then(async (blob) => {
+            controller.signal.throwIfAborted();
+            if (blob === null) {
+              port.postMessage({ type: 'cancel', requestId: start.requestId });
+              finish({ type: 'transcript', result: { text: '' } });
+              return;
+            }
             const staged = await writeAudioStaging({
               id: message.ticket,
               scope: start.scope,
@@ -117,6 +134,10 @@ export function runReviewSpeechJob(
           );
       }
     });
-    port.postMessage(start);
+    try {
+      port.postMessage(start);
+    } catch {
+      finish(undefined, new Error('interrupted'));
+    }
   });
 }
