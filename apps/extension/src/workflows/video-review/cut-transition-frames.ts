@@ -122,6 +122,53 @@ export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSigna
   };
 }
 
+/** Each side holds its own retained source frame and result-clock camera at the seam. */
+export function reviewCutTransitionSides(
+  blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>,
+  frames: ReviewTransitionFrames,
+  moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>,
+  resultTime: number,
+  resultOffset = 0
+) {
+  const seam = blend.plan.seam + resultOffset;
+  const range = blend.beforeSeam ? blend.plan.left : blend.plan.right;
+  const current = isReviewTransitionFrame(moving.timestamp, range)
+    ? moving
+    : blend.beforeSeam
+      ? frames.left
+      : frames.right;
+  return [
+    {
+      sample: blend.beforeSeam ? current : frames.left,
+      resultTime: blend.beforeSeam ? resultTime : beforeEndpoint(seam),
+    },
+    {
+      sample: blend.beforeSeam ? frames.right : current,
+      resultTime: blend.beforeSeam ? seam : resultTime,
+    },
+  ] as const;
+}
+
+/** Dissolve decorated scenes after each side has applied its own camera and focus effects. */
+export function paintReviewCutDissolve(
+  target: CanvasRenderingContext2D,
+  scratch: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D },
+  incoming: number,
+  draw: (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement, side: 0 | 1) => void,
+  canvas: HTMLCanvasElement
+) {
+  draw(target, canvas, 0);
+  draw(scratch.context, scratch.canvas, 1);
+  target.save();
+  try {
+    target.globalCompositeOperation = 'source-over';
+    target.globalAlpha = incoming;
+    target.drawImage(scratch.canvas, 0, 0);
+  } finally {
+    target.restore();
+  }
+}
+
 /** Blends only admitted source rasters; camera, background, overlays and audio stay with callers. */
 export function paintReviewCutTransition(
   context: CanvasRenderingContext2D,

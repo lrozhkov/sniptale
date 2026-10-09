@@ -42,7 +42,10 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     ready: false,
   });
   const interacting = input.interacting || placement !== null || Object.keys(comments).length > 0;
-  const manual = isReviewPreviewManual(input.preferences, input.playing);
+  // A raw-source dissolve cannot represent two independently decorated camera poses.
+  const manual =
+    isReviewPreviewManual(input.preferences, input.playing) ||
+    !!input.cut?.edits.some((edit) => edit.kind === 'cut' && edit.transition?.type === 'dissolve');
   const active = manual && input.visible !== false && pageVisible;
   const lifetimeKey = JSON.stringify([
     active,

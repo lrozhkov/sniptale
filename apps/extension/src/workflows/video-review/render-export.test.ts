@@ -724,3 +724,70 @@ it('routes only effective advanced presentation through the sequence writer', as
   expect(presentationExport).not.toHaveBeenCalled();
   expect(basic.resultDuration).toBe(2);
 });
+
+it('applies each dissolve side camera on the global clock during a fragment render', async () => {
+  const left = { timestamp: 1.9, draw: vi.fn(), close: vi.fn() };
+  const right = { timestamp: 4, draw: vi.fn(), close: vi.fn() };
+  const context = contextFixture();
+  const canvas = { width: 320, height: 180 } as HTMLCanvasElement;
+  const { VideoSample } = await import('mediabunny');
+  const moving = new VideoSample(canvas, { timestamp: 4.1 });
+  const movingDraw = vi.spyOn(moving, 'draw');
+  const movingClose = vi.spyOn(moving, 'close');
+  const regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'left', at: 10, duration: 2 }),
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+    },
+    {
+      ...createQuickEditZoomRegion({ id: 'right', at: 12, duration: 2 }),
+      transform: { scale: 3, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+    },
+  ];
+  await renderRenderWindowFrames({
+    window: {
+      segment: { ...segmentStub(4, 6), resultStart: 2, resultEnd: 4 },
+      timestamps: [2.1],
+      sourceTimes: [4.1],
+    },
+    fps: 30,
+    fragmentOffset: 10,
+    zoomRegions: regions,
+    background: { enabled: false },
+    comments: [],
+    canvas,
+    context,
+    sourceSize: canvas,
+    image: null,
+    frameSink: {
+      async *samplesAtTimestamps() {
+        yield moving;
+      },
+    },
+    transitions: [
+      {
+        id: 'cut',
+        type: 'dissolve',
+        seam: 2,
+        before: 0.5,
+        after: 0.5,
+        left: { start: 0, end: 2 },
+        right: { start: 4, end: 6 },
+      },
+    ],
+    transitionFrames: { load: async () => ({ left, right }), dispose: vi.fn() },
+    videoOut: { add: vi.fn(), close: vi.fn() },
+    resultDuration: 4,
+    onProgress: undefined,
+    signal: new AbortController().signal,
+  });
+  expect(left.draw.mock.calls[0]!.slice(3)).toEqual([640, 360]);
+  expect(movingDraw.mock.calls[0]!.slice(3)).toEqual([960, 540]);
+  expect(movingClose).toHaveBeenCalledOnce();
+  expect(left.close).not.toHaveBeenCalled();
+  expect(right.close).not.toHaveBeenCalled();
+});

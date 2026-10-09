@@ -732,3 +732,31 @@ it('keeps a healthy camera lifetime when retrying an unrelated renderer failure'
   expect(camera.dispose).not.toHaveBeenCalled();
   expect(io.camera).toHaveBeenCalledOnce();
 });
+
+it('keeps the composed owner for dissolve projects even at Current quality outside the seam', async () => {
+  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
+  props.cut = {
+    file: new File(['source'], 'source.webm'),
+    duration: 10,
+    time: 0,
+    edits: [
+      {
+        id: 'cut',
+        kind: 'cut',
+        start: 2,
+        end: 4,
+        requestedStart: 2,
+        requestedEnd: 4,
+        transition: { type: 'dissolve', before: 0.5, after: 0.5 },
+      },
+    ],
+  };
+  await render();
+  expect(result.active).toBe(true);
+  expect(io.factory).toHaveBeenCalledOnce();
+  props = { ...props, playing: true, cut: { ...props.cut, time: 5 } };
+  await render();
+  expect(result.active).toBe(true);
+  expect(io.factory).toHaveBeenCalledOnce();
+  expect(io.dispose).not.toHaveBeenCalled();
+});

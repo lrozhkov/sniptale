@@ -4,6 +4,8 @@ import {
   createReviewTransitionFrames,
   isReviewTransitionFrame,
   paintReviewCutTransition,
+  reviewCutTransitionSides,
+  paintReviewCutDissolve,
   paintReviewCutBlackout,
   type ReviewTransitionSample,
 } from './cut-transition-frames';
@@ -300,4 +302,34 @@ it('retains decoded allocation metadata on the same bounded endpoint samples', a
   owner.dispose();
   expect(left.close).toHaveBeenCalledOnce();
   expect(right.close).toHaveBeenCalledOnce();
+});
+
+it('holds independent seam clocks in fragment exports and rejects a moving frame from the cut', () => {
+  const endpoints = { left: frame(1.9), right: frame(4) };
+  const blend = reviewCutTransitionAt(2.1, [plan])!;
+  const sides = reviewCutTransitionSides(blend, endpoints, frame(3), 12.1, 10);
+  expect(sides[0].sample).toBe(endpoints.left);
+  expect(sides[0].resultTime).toBeLessThan(12);
+  expect(sides[0].resultTime).toBeCloseTo(12, 12);
+  expect(sides[1]).toEqual({ sample: endpoints.right, resultTime: 12.1 });
+});
+
+it('restores the dissolve compositor context and leaves source lifetime with the caller', () => {
+  const target = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const canvas = { width: 640, height: 360 } as HTMLCanvasElement;
+  const scratch = { canvas, context: target };
+  const draw = vi.fn();
+  paintReviewCutDissolve(target, scratch, 0.5, draw, canvas);
+  expect(draw.mock.calls.map((call) => call[2])).toEqual([0, 1]);
+  expect(target.drawImage).toHaveBeenCalledWith(canvas, 0, 0);
+  expect(target.restore).toHaveBeenCalledOnce();
+  vi.mocked(target.drawImage).mockImplementationOnce(() => {
+    throw new Error('paint failed');
+  });
+  expect(() => paintReviewCutDissolve(target, scratch, 0.5, draw, canvas)).toThrow('paint failed');
+  expect(target.restore).toHaveBeenCalledTimes(2);
 });

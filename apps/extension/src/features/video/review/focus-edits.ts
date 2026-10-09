@@ -184,24 +184,13 @@ export function projectReviewFocus(
       };
     });
   });
-  return visible.flatMap((slices, index) =>
+  return visible.flatMap((slices) =>
     slices.map((slice, sliceIndex) => {
       if (!slice.linkTo) return slice;
       const targetIndex = active.findIndex((region) => region.id === slice.linkTo);
       const target = active[targetIndex];
       const targetSlice = visible[targetIndex]?.[0];
-      const gapCut = !!map.some(
-        (part) =>
-          part.kind === 'cut' &&
-          part.sourceStart < (target?.sourceAnchor?.start ?? Infinity) &&
-          part.sourceEnd > (active[index]?.sourceAnchor?.end ?? -Infinity)
-      );
-      if (
-        sliceIndex !== slices.length - 1 ||
-        !targetSlice ||
-        slice.linkTo !== target?.id ||
-        gapCut
-      ) {
+      if (sliceIndex !== slices.length - 1 || !targetSlice || slice.linkTo !== target?.id) {
         const { linkTo: _linkTo, linkEasing: _linkEasing, ...unlinked } = slice;
         return unlinked;
       }

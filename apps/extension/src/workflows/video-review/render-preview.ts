@@ -24,6 +24,7 @@ import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
 import { measureReviewWatermark } from './render-watermark';
 import type { createReviewWatermarkRenderer } from './render-watermark';
 import {
+  resolvePreviewRenderAllocation,
   calculatePreviewPreparationAllocation,
   calculatePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
@@ -35,6 +36,8 @@ import { drawReviewWebcam } from './render-webcam';
 import { drawReviewKeys } from './render-key-animation';
 import {
   paintReviewCutTransition,
+  paintReviewCutDissolve,
+  reviewCutTransitionSides,
   paintReviewCutBlackout,
   type ReviewTransitionFrames,
 } from './cut-transition-frames';
@@ -68,6 +71,7 @@ type Frame = {
   transition?: {
     blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>;
     frames: ReviewTransitionFrames;
+    resultOffset?: number;
   };
 };
 type PreparedScene = { generation: number; scene: Scene; dimensions: Dimensions };
@@ -241,7 +245,7 @@ function drawPreparedFrame(
   let transition: RenderCanvasLease | undefined;
   try {
     let sample: Drawable = frame.source;
-    if (frame.transition) {
+    if (frame.transition && frame.transition.blend.plan.type !== 'dissolve') {
       validSize(frame.source.backing);
       transition = resources.canvas('preview-transition-source', frame.source.backing);
       paintReviewCutTransition(
@@ -256,54 +260,89 @@ function drawPreparedFrame(
         draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
       };
     }
-    if (request.layout.spatial && !assets.spatial)
-      throw new Error('Preview spatial preparation is unavailable.');
-    const drawScene = {
-      canvas,
-      layout: request.layout,
-      background: request.background,
-      image: assets.background,
-      headerImage: assets.header,
-      sample,
-      deferComments: true,
-      comments: scene.comments.filter((comment) =>
-        isCanvasCommentVisibleAt(comment, frame.sourceTime)
-      ),
-      sourceTime: frame.sourceTime,
-      cameraScale: request.camera.scale,
-      sceneScale: request.sceneScale,
-      resources,
-      backgroundPainter: assets.painter,
-      commentSpace: {
-        canvas: dimensions.canonical,
-        layout: request.canonicalLayout,
-        background: request.canonicalBackground,
+    const draw = (
+      context: CanvasRenderingContext2D,
+      canvas: HTMLCanvasElement,
+      frame: Frame,
+      sample: Drawable
+    ) => {
+      const request = sceneRequest(prepared, frame);
+      if (request.layout.spatial && !assets.spatial)
+        throw new Error('Preview spatial preparation is unavailable.');
+      const drawScene = {
+        canvas,
+        backgroundCacheContext: output.context,
+        layout: request.layout,
+        background: request.background,
+        image: assets.background,
+        headerImage: assets.header,
+        sample,
+        deferComments: true,
+        comments: scene.comments.filter((comment) =>
+          isCanvasCommentVisibleAt(comment, frame.sourceTime)
+        ),
+        sourceTime: frame.sourceTime,
         cameraScale: request.camera.scale,
-      },
+        sceneScale: request.sceneScale,
+        resources,
+        backgroundPainter: assets.painter,
+        commentSpace: {
+          canvas: dimensions.canonical,
+          layout: request.canonicalLayout,
+          background: request.canonicalBackground,
+          cameraScale: request.camera.scale,
+        },
+      };
+      drawReviewSceneFrame(context, {
+        ...drawScene,
+        spatialRenderer: assets.spatial,
+        windowRasterBacking: {
+          width: Math.max(1, Math.ceil(request.layout.windowRect.width)),
+          height: Math.max(1, Math.ceil(request.layout.windowRect.height)),
+        },
+        motionBlur: frame.cameraTransform
+          ? undefined
+          : quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime),
+      });
+      drawReviewSceneOverlays({
+        scene: drawScene,
+        renderer: assets.spatial,
+        context,
+        canvas,
+        spotlightScratch: null,
+        regions: scene.zoomRegions,
+        globalResultTime: frame.resultTime,
+        cameraScale: request.camera.scale,
+        sourceWidth: scene.source.width,
+        clicks: scene.clicks,
+      });
     };
-    drawReviewSceneFrame(context, {
-      ...drawScene,
-      spatialRenderer: assets.spatial,
-      windowRasterBacking: {
-        width: Math.max(1, Math.ceil(request.layout.windowRect.width)),
-        height: Math.max(1, Math.ceil(request.layout.windowRect.height)),
-      },
-      motionBlur: frame.cameraTransform
-        ? undefined
-        : quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime),
-    });
-    drawReviewSceneOverlays({
-      scene: drawScene,
-      renderer: assets.spatial,
-      context,
-      canvas,
-      spotlightScratch: null,
-      regions: scene.zoomRegions,
-      globalResultTime: frame.resultTime,
-      cameraScale: request.camera.scale,
-      sourceWidth: scene.source.width,
-      clicks: scene.clicks,
-    });
+    if (frame.transition?.blend.plan.type === 'dissolve') {
+      const { blend, frames, resultOffset } = frame.transition;
+      const sides = reviewCutTransitionSides(
+        blend,
+        frames,
+        frame.source,
+        frame.resultTime,
+        resultOffset
+      );
+      transition = resources.canvas('preview-transition-source', dimensions.backing);
+      paintReviewCutDissolve(
+        context,
+        transition,
+        blend.incoming,
+        (target, surface, side) => {
+          const endpoint = sides[side];
+          draw(
+            target,
+            surface,
+            { ...frame, resultTime: endpoint.resultTime, sourceTime: endpoint.sample.timestamp },
+            { draw: endpoint.sample.draw.bind(endpoint.sample) }
+          );
+        },
+        canvas
+      );
+    } else draw(context, canvas, frame, sample);
     if (frame.camera && scene.webcam)
       drawReviewWebcam(
         context,
@@ -348,16 +387,56 @@ function paintPreviewOuterFade(
   }
 }
 
-function admitRender(allocation: Allocation | undefined, prepared: PreparedScene, assets: Assets) {
+function admitRender(
+  allocation: Allocation | undefined,
+  prepared: PreparedScene,
+  assets: Assets,
+  frame?: Frame
+) {
   if (!allocation) return;
   const input = allocation.describe();
-  allocation.replaceLimits(
-    calculatePreviewRenderAllocation({
-      ...input,
-      publication: { ...input.publication, backing: prepared.dimensions.backing },
-      assets: assets.allocation,
-    })
-  );
+  const base = {
+    ...input,
+    publication: { ...input.publication, backing: prepared.dimensions.backing },
+    assets: assets.allocation,
+  };
+  const candidates = [calculatePreviewRenderAllocation(base)];
+  if (frame?.transition?.blend.plan.type === 'dissolve') {
+    const sides = reviewCutTransitionSides(
+      frame.transition.blend,
+      frame.transition.frames,
+      frame.source,
+      frame.resultTime,
+      frame.transition.resultOffset
+    );
+    for (const side of sides) {
+      const graph = resolvePreviewRenderAllocation({
+        scene: prepared.scene,
+        dimensions: prepared.dimensions,
+        resultTime: side.resultTime,
+        sourceTime: side.sample.timestamp,
+        ...(frame.cameraTransform ? { cameraTransform: frame.cameraTransform } : {}),
+        sourceAllocationBytes: null,
+        sourceBacking: frame.source.backing,
+        camera: { retainedBytes: null, activeBytes: null },
+        transitionBytes: null,
+        previousFront: input.publication.previousFront,
+        assets: assets.allocation,
+        ...(input.background ? { previousBackgroundCache: input.background.previousCache } : {}),
+      });
+      candidates.push(
+        calculatePreviewRenderAllocation({
+          ...base,
+          background: graph.background,
+          scene: { ...graph.scene, transitionRaster: prepared.dimensions.backing },
+        })
+      );
+    }
+  }
+  allocation.replaceLimits({
+    maximumManagedBytes: Math.max(...candidates.map((value) => value.maximumManagedBytes)),
+    maximumCanvases: Math.max(...candidates.map((value) => value.maximumCanvases)),
+  });
 }
 
 /** One prepared scene owner; transport, immutable capture and publication remain with the caller. */
@@ -476,6 +555,7 @@ export function createReviewPreviewRenderer(args: {
         throw new Error('Preview scene is stale.');
       if (![frame.source.timestamp, frame.sourceTime, frame.resultTime].every(Number.isFinite))
         throw new Error('Invalid preview frame time.');
+      admitRender(args.allocation, current.prepared, current.assets, frame);
       const output = args.resources.canvas(
         'preview-publication',
         current.prepared.dimensions.backing,

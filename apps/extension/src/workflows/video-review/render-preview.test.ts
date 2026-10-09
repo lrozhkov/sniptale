@@ -6,6 +6,7 @@ import { createReviewPreviewRenderer } from './render-preview';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { reviewCutTransitionAt } from '../../features/video/review/cuts';
+import { DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/review/advanced/spatial';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 
 const io = vi.hoisted(() => ({
@@ -25,7 +26,8 @@ vi.mock('./scene-frame', () => ({ drawReviewSceneFrame: io.frame }));
 vi.mock('./render-scene-overlays', () => ({ drawReviewSceneOverlays: io.overlays }));
 vi.mock('./render-webcam', () => ({ drawReviewWebcam: io.webcam }));
 vi.mock('./render-key-animation', () => ({ drawReviewKeys: io.keys }));
-vi.mock('./cut-transition-frames', () => ({
+vi.mock('./cut-transition-frames', async (original) => ({
+  ...(await original<typeof import('./cut-transition-frames')>()),
   paintReviewCutTransition: io.transition,
   paintReviewCutBlackout: io.blackout,
 }));
@@ -548,5 +550,120 @@ it('evaluates the immutable outer plan at each represented frame after watermark
   expect(io.watermark).toHaveBeenCalledOnce();
   renderer.render(prepared, { ...frame(), resultTime: 4 }).release();
   expect(leases[2]!.context.globalAlpha).toBe(1);
+  renderer.dispose();
+});
+
+it('dissolves independently composed zoom poses instead of blending their source rasters', async () => {
+  const { resources, leases } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const input = scene();
+  input.zoomRegions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'left', at: 0, duration: 2 }),
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true, strength: 0.25 },
+      perspective: { enabled: true, rotateX: 15, rotateY: 0, rotateZ: 0, strength: 0.5 },
+    },
+    {
+      ...createQuickEditZoomRegion({ id: 'right', at: 2, duration: 2 }),
+      transform: { scale: 3, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true, strength: 0.75 },
+      perspective: { enabled: true, rotateX: -10, rotateY: 0, rotateZ: 0, strength: 0.5 },
+    },
+  ];
+  const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
+  const left = { timestamp: 1.9, draw: vi.fn(), close: vi.fn() };
+  const right = { timestamp: 4, draw: vi.fn(), close: vi.fn() };
+  for (const time of [1.8, 2, 2.2]) {
+    io.frame.mockClear();
+    io.frame.mockImplementation((context, request) => request.sample.draw(context, 0, 0, 10, 10));
+    io.overlays.mockClear();
+    const admitted = { ...frame(), resultTime: time, sourceTime: time < 2 ? time : time + 2 };
+    admitted.source.timestamp = admitted.sourceTime;
+    const blend = reviewCutTransitionAt(time, [
+      {
+        id: 'cut',
+        type: 'dissolve',
+        seam: 2,
+        before: 0.5,
+        after: 0.5,
+        left: { start: 0, end: 2 },
+        right: { start: 4, end: 6 },
+      },
+    ])!;
+    const output = renderer.render(prepared, {
+      ...admitted,
+      transition: { blend, frames: { left, right } },
+    });
+    expect(io.frame).toHaveBeenCalledTimes(2);
+    expect(io.frame.mock.calls.map((call) => call[1].cameraScale)).toEqual([2, 3]);
+    const poses = io.frame.mock.calls.map((call) => call[1].layout.spatial);
+    expect(poses[0].rotation).not.toEqual(poses[1].rotation);
+    expect(poses.map((pose) => pose.focus[0].settings.strength)).toEqual([0.25, 0.75]);
+    expect(io.overlays.mock.calls.map((call) => call[0].globalResultTime)[0]).toBeLessThan(2);
+    expect(
+      io.overlays.mock.calls.map((call) => call[0].globalResultTime)[1]
+    ).toBeGreaterThanOrEqual(2);
+    expect(leases.at(-1)?.release).toHaveBeenCalledOnce();
+    output.release();
+  }
+  expect(left.draw.mock.contexts.every((context) => context === left || context === right)).toBe(
+    true
+  );
+  expect(right.draw.mock.contexts.every((context) => context === right)).toBe(true);
+  expect(left.close).not.toHaveBeenCalled();
+  expect(right.close).not.toHaveBeenCalled();
+  prepared.release();
+  renderer.dispose();
+});
+
+it('admits the full output dissolve scratch and endpoint overlays before acquiring publication', async () => {
+  const { resources } = setup();
+  const input = allocationInput();
+  input.admission.transition = [
+    { kind: 'video-frame', allocationBytes: 100 },
+    { kind: 'video-frame', allocationBytes: 200 },
+  ];
+  input.scene.transitionRaster = { width: 10, height: 10 };
+  const replaceLimits = vi.fn();
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    allocation: { describe: () => input, replaceLimits },
+  });
+  const snapshot = scene();
+  snapshot.zoomRegions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'border', at: 2, duration: 2 }),
+      border: (await import('../../features/video/review/advanced/border')).createQuickEditBorder(),
+    },
+  ];
+  const prepared = await renderer.prepare(snapshot, dimensions, new AbortController().signal);
+  const blend = reviewCutTransitionAt(1.8, [
+    {
+      id: 'cut',
+      type: 'dissolve',
+      seam: 2,
+      before: 0.5,
+      after: 0.5,
+      left: { start: 0, end: 2 },
+      right: { start: 4, end: 6 },
+    },
+  ])!;
+  const endpoint = { timestamp: 1.9, draw: vi.fn(), close: vi.fn() };
+  const output = renderer.render(prepared, {
+    ...frame(),
+    resultTime: 1.8,
+    transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 4 } } },
+  });
+  const limits = replaceLimits.mock.calls.at(-1)![0];
+  expect(limits.maximumManagedBytes).toBeGreaterThanOrEqual(3 * 640 * 360 * 4 + 1300);
+  expect(limits.maximumCanvases).toBeGreaterThanOrEqual(4);
+  expect(resources.canvas).toHaveBeenCalledWith('preview-transition-source', dimensions.backing);
+  output.release();
+  prepared.release();
   renderer.dispose();
 });

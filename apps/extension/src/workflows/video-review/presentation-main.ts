@@ -269,7 +269,9 @@ class PresentationMain {
               },
             }
           : {}),
-        ...(blend && endpoints ? { transition: { blend, frames: endpoints } } : {}),
+        ...(blend && endpoints
+          ? { transition: { blend, frames: endpoints, resultOffset: this.args.fragmentOffset } }
+          : {}),
       };
       const output = this.renderer.render(prepared, frame);
       this.front = output;

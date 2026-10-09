@@ -29,8 +29,11 @@ import {
   type ReviewCutTransitionPlan,
 } from '../../features/video/review/cuts';
 import {
+  type ReviewTransitionSample,
   createReviewTransitionFrames,
   paintReviewCutTransition,
+  paintReviewCutDissolve,
+  reviewCutTransitionSides,
   paintReviewCutBlackout,
 } from './cut-transition-frames';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
@@ -576,6 +579,7 @@ export async function renderRenderWindowFrames(args: {
   )
     ? createReviewSpatialRenderer()
     : undefined;
+  let dissolve: HTMLCanvasElement | undefined;
   let frame = 0;
   const writer = createReviewFrameWriter({
     canvas,
@@ -595,75 +599,114 @@ export async function renderRenderWindowFrames(args: {
       const timestamp = window.timestamps[frame]!;
       try {
         signal.throwIfAborted();
-        const camera = evaluateQuickEditCameraAtTime(
-          args.zoomRegions,
-          timestamp + args.fragmentOffset
-        );
-        const layout = computeQuickEditSceneLayout({
-          output: canvas,
-          source: args.sourceSize,
-          canvas: args.baseCanvas ?? canvas,
-          windowHeader: args.windowHeader,
-          background: args.background,
-          camera,
-        });
-        const burned = args.comments.filter(
-          (comment) =>
-            comment.renderToVideo &&
-            isCanvasCommentVisibleAt(
-              comment,
-              window.sourceTimes[frame] ?? window.segment.sourceStart
-            )
-        );
         const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
-        if (blend) {
-          const frames = await args.transitionFrames?.load(blend.plan);
-          signal.throwIfAborted();
-          if (!frames) throw new QuickEditExportUnavailable(['transition-frames']);
-          paintReviewCutTransition(rasterContext, raster, blend, frames, sample);
-        } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
-        drawReviewSceneFrame(context, {
-          spatialRenderer,
-          canvas,
-          layout,
-          background: args.background,
-          image: args.image,
-          headerImage: args.headerImage,
-          sample: {
-            draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
-          },
-          deferComments: true,
-          comments: burned,
-          sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
-          cameraScale: camera.scale,
-          motionBlur: blurEnabled
-            ? quickEditMotionBlurCameras(args.zoomRegions, timestamp + args.fragmentOffset)
-            : undefined,
-          sceneScale: args.sceneScale ?? 1,
-        });
-        drawReviewSceneOverlays({
-          scene: {
+        const draw = (
+          context: CanvasRenderingContext2D,
+          canvas: HTMLCanvasElement,
+          drawable: Pick<ReviewTransitionSample, 'draw'>,
+          resultTime: number,
+          sourceTime: number
+        ) => {
+          const camera = evaluateQuickEditCameraAtTime(args.zoomRegions, resultTime);
+          const layout = computeQuickEditSceneLayout({
+            output: canvas,
+            source: args.sourceSize,
+            canvas: args.baseCanvas ?? canvas,
+            windowHeader: args.windowHeader,
+            background: args.background,
+            camera,
+          });
+          const burned = args.comments.filter(
+            (comment) => comment.renderToVideo && isCanvasCommentVisibleAt(comment, sourceTime)
+          );
+          drawReviewSceneFrame(context, {
+            spatialRenderer,
             canvas,
             layout,
             background: args.background,
             image: args.image,
-            sample: {
+            headerImage: args.headerImage,
+            sample: drawable,
+            deferComments: true,
+            comments: burned,
+            sourceTime: sourceTime,
+            cameraScale: camera.scale,
+            motionBlur: blurEnabled
+              ? quickEditMotionBlurCameras(args.zoomRegions, resultTime)
+              : undefined,
+            sceneScale: args.sceneScale ?? 1,
+          });
+          drawReviewSceneOverlays({
+            scene: {
+              canvas,
+              layout,
+              background: args.background,
+              image: args.image,
+              sample: drawable,
+              comments: burned,
+              sourceTime: sourceTime,
+              sceneScale: args.sceneScale ?? 1,
+            },
+            renderer: spatialRenderer,
+            context,
+            canvas,
+            spotlightScratch: scratch,
+            regions: args.zoomRegions,
+            globalResultTime: resultTime,
+            cameraScale: camera.scale,
+            sourceWidth: args.sourceSize.width,
+            clicks: args.clickCues,
+          });
+        };
+        if (blend?.plan.type === 'dissolve') {
+          const endpoints = await args.transitionFrames?.load(blend.plan);
+          signal.throwIfAborted();
+          if (!endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
+          const sides = reviewCutTransitionSides(
+            blend,
+            endpoints,
+            sample,
+            timestamp + args.fragmentOffset,
+            args.fragmentOffset
+          );
+          dissolve ??= document.createElement('canvas');
+          dissolve.width = canvas.width;
+          dissolve.height = canvas.height;
+          const dissolveContext = dissolve.getContext('2d');
+          if (!dissolveContext) throw new Error('Canvas context is unavailable.');
+          paintReviewCutDissolve(
+            context,
+            { canvas: dissolve, context: dissolveContext },
+            blend.incoming,
+            (target, surface, side) => {
+              const endpoint = sides[side];
+              draw(
+                target,
+                surface,
+                { draw: endpoint.sample.draw.bind(endpoint.sample) },
+                endpoint.resultTime,
+                endpoint.sample.timestamp
+              );
+            },
+            canvas
+          );
+        } else {
+          if (blend) {
+            const endpoints = await args.transitionFrames?.load(blend.plan);
+            signal.throwIfAborted();
+            if (!endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
+            paintReviewCutTransition(rasterContext, raster, blend, endpoints, sample);
+          } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
+          draw(
+            context,
+            canvas,
+            {
               draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
             },
-            comments: burned,
-            sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
-            sceneScale: args.sceneScale ?? 1,
-          },
-          renderer: spatialRenderer,
-          context,
-          canvas,
-          spotlightScratch: scratch,
-          regions: args.zoomRegions,
-          globalResultTime: timestamp + args.fragmentOffset,
-          cameraScale: camera.scale,
-          sourceWidth: args.sourceSize.width,
-          clicks: args.clickCues,
-        });
+            timestamp + args.fragmentOffset,
+            window.sourceTimes[frame] ?? window.segment.sourceStart
+          );
+        }
         if (webcamFrames) {
           const cameraFrame = await webcamFrames.next();
           signal.throwIfAborted();
