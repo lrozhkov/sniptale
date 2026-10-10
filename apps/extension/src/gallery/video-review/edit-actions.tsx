@@ -45,7 +45,6 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   background: 'gallery.videoReview.exportBlockerBackground',
   comments: 'gallery.videoReview.exportBlockerComments',
   voiceover: 'gallery.videoReview.exportBlockerVoiceover',
-  revoice: 'gallery.videoReview.speechRevoice',
   music: 'gallery.videoReview.exportBlockerMusic',
   'original-audio': 'gallery.videoReview.exportBlockerOriginalAudio',
   'audio-encoder': 'gallery.videoReview.exportBlockerAudioEncoder',

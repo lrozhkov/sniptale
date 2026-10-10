@@ -497,12 +497,12 @@ it('requires an explicit binding for active bookend video, while muted bookends 
   await expect(collect(args)).rejects.toThrow('Missing presentation audio binding.');
 });
 
-it('keeps Revoice and source attenuation in main audio before the shared sequence envelope', async () => {
+it('keeps ordinary voiceover and authored source gain in main audio before the shared sequence envelope', async () => {
   const args = request({ bookends: true, duration: 0.2, fade: true });
   args.main.exportAudio = {
     entries: [
       {
-        lane: 'revoice',
+        lane: 'voiceover',
         clipId: 'accepted',
         assetId: 'accepted',
         timelineStart: 0,
@@ -516,7 +516,7 @@ it('keeps Revoice and source attenuation in main audio before the shared sequenc
     buffers: new Map([['accepted', clipBuffer()]]),
     originalVolume: 1,
     originalMuted: false,
-    automaticOriginalRanges: [{ start: 0, end: 0.2, volume: 0.25 }],
+    originalRanges: [{ id: 'manual', start: 0, end: 0.2, volume: 0.25 }],
   };
   const result = await collect(args);
   const calls = vi.mocked(renderReviewAudio).mock.calls;
@@ -525,7 +525,7 @@ it('keeps Revoice and source attenuation in main audio before the shared sequenc
   expect(main[0]![1]).toMatchObject({ resultStart: 0, sourceStart: 0 });
   for (const call of calls.filter((call) => call[4] !== args.main.exportAudio)) {
     expect(call[4]!.entries).toEqual([]);
-    expect(call[4]!.automaticOriginalRanges).toBeUndefined();
+    expect(call[4]!.originalRanges).toBeUndefined();
   }
   expect(result.left[0]).toBe(0);
   expect(result.left.at(-1)).toBeCloseTo(0, 6);

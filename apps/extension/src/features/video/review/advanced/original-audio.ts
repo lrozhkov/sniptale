@@ -36,14 +36,11 @@ export function parseOriginalAudioRanges(value: unknown): QuickEditOriginalAudio
   return ranges.some((range, i) => i > 0 && range.start < ranges[i - 1]!.end) ? null : ranges;
 }
 
-export type OriginalAudioAttenuation = Readonly<{ start: number; end: number; volume: number }>;
-
 /** Master gain multiplies the selected range; explicit speed/cut muting always wins. */
 export function originalAudioGainAt(
   original: QuickEditOriginalAudio,
   time: number,
-  edits: readonly ReviewEdit[] = [],
-  automaticRanges: readonly OriginalAudioAttenuation[] = []
+  edits: readonly ReviewEdit[] = []
 ): number {
   if (
     original.muted ||
@@ -54,8 +51,7 @@ export function originalAudioGainAt(
   )
     return 0;
   const range = original.ranges?.find((item) => time >= item.start && time < item.end);
-  const automatic = automaticRanges.find((item) => time >= item.start && time < item.end);
-  return original.volume * (range?.volume ?? 1) * (automatic?.volume ?? 1);
+  return original.volume * (range?.volume ?? 1);
 }
 
 /** A range must retain audible video and must not overlap another manually controlled range. */

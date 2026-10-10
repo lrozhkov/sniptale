@@ -711,9 +711,8 @@ it('defers unknown sequence audio capability but blocks a confirmed composed aud
   });
 });
 
-it('couples Revoice and native attenuation using the current map independently of microphone visibility', async () => {
-  const { resolveQuickEditEffectiveAudio } = await import('./effective');
-  const { buildReviewTimeMap } = await import('../timeline');
+it('admits alpha replacement metadata without another audio lane or implicit gain', async () => {
+  const { resolveQuickEditEffectiveState } = await import('./effective');
   const state = createQuickEditAdvancedState();
   state.ui.mode = 'advanced';
   state.ui.tracks.audio = false;
@@ -740,58 +739,18 @@ it('couples Revoice and native attenuation using the current map independently o
       ],
     },
   };
-  const edits: import('../types').ReviewEdit[] = [
-    { id: 'cut', kind: 'cut', start: 3, end: 4, requestedStart: 3, requestedEnd: 4 },
-    {
-      id: 'speed',
-      kind: 'speed',
-      start: 4,
-      end: 8,
-      requestedStart: 4,
-      requestedEnd: 8,
-      rate: 2,
-      audio: 'mute',
-    },
-  ];
-  const timeMap = buildReviewTimeMap(10, edits);
-  const document = { edits, canvasComments: [] };
-  const effective = resolveQuickEditEffectiveAudio(state, timeMap);
-  expect(effective.revoice).toMatchObject([
-    { timelineStart: 2, duration: 1, sourceOffset: 0, playbackRate: 1 },
-    { timelineStart: 3, duration: 1, sourceOffset: 2, playbackRate: 2 },
-  ]);
-  expect(effective.automaticOriginalRanges).toEqual([{ start: 2, end: 8, volume: 0.25 }]);
-  expect(resolveQuickEditExportPlan({ advanced: state, document, timeMap })).toMatchObject({
-    audio: 'process',
-    reasons: ['revoice'],
-  });
-  expect(() => resolveQuickEditExportPlan({ advanced: state, document })).toThrow('time map');
-  const before = structuredClone(state.audio.originalSpeech);
-  state.ui.mode = 'basic';
-  expect(resolveQuickEditEffectiveAudio(state, timeMap)).toMatchObject({
-    revoice: [],
-    automaticOriginalRanges: [],
-  });
-  expect(state.audio.originalSpeech).toEqual(before);
-  state.ui.mode = 'advanced';
-  state.audio.originalSpeech.enabled = false;
-  expect(resolveQuickEditEffectiveAudio(state, timeMap)).toMatchObject({
-    revoice: [],
-    automaticOriginalRanges: [],
-  });
-  state.audio.originalSpeech.enabled = true;
-  state.audio.originalSpeech.transcript.replacements[0]!.enabled = false;
-  expect(resolveQuickEditEffectiveAudio(state, timeMap)).toMatchObject({
-    revoice: [],
-    automaticOriginalRanges: [],
-  });
-  state.audio.originalSpeech.transcript.replacements[0]!.enabled = true;
-  const cutMap = buildReviewTimeMap(10, [
-    { id: 'all', kind: 'cut', start: 2, end: 8, requestedStart: 2, requestedEnd: 8 },
-  ]);
-  expect(resolveQuickEditEffectiveAudio(state, cutMap)).toMatchObject({
-    revoice: [],
-    automaticOriginalRanges: [],
-  });
-  expect(state.audio.originalSpeech).toEqual(before);
+  const before = structuredClone(state);
+  for (const mode of ['advanced', 'basic'] as const) {
+    state.ui.mode = mode;
+    const effective = resolveQuickEditEffectiveState(state);
+    expect(effective.voiceover).toEqual([]);
+    expect(effective.music).toEqual([]);
+    expect(effective.originalAudio).toEqual(before.audio.original);
+    expect(effective).not.toHaveProperty('revoice');
+    expect(effective).not.toHaveProperty('automaticOriginalRanges');
+    expect(
+      resolveQuickEditExportPlan({ advanced: state, document: { edits: [], canvasComments: [] } })
+    ).toEqual({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
+    expect(state.audio).toEqual(before.audio);
+  }
 });

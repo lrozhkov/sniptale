@@ -255,18 +255,15 @@ function verifySequenceTiming(
   base: ReviewProvenanceBase
 ): PresentationSequencePlan | null {
   const main = value.segments.find((segment) => segment.name === 'main');
-  if (
-    !main ||
-    main.contentDuration !== buildReviewTimeMap(base.source.duration, base.edits).at(-1)?.resultEnd
-  )
-    return null;
+  if (!main) return null;
   const settings = createNeutralPresentationSettings();
   settings.color = value.color;
   for (const segment of value.segments)
     if (segment.name !== 'main') settings[segment.name] = slotFor(segment);
   const result = planReviewPresentationSequence({
     settings,
-    mainDuration: main.contentDuration,
+    // The planner emits rationalized durations; compare its canonical projection below.
+    mainDuration: buildReviewTimeMap(base.source.duration, base.edits).at(-1)!.resultEnd,
     fragmentOffset: value.fragmentOffset,
     includeBookends: value.includeBookends,
     rate: value.rate,

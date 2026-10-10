@@ -66,6 +66,54 @@ it('ignores hostile, future, overlapping and oversized container metadata', () =
 
 import { createNeutralPresentationSettings } from './advanced/presentation';
 import { planReviewPresentationSequence } from './presentation-sequence';
+import { buildReviewTimeMap } from './timeline';
+
+it('roundtrips the canonical rational duration of a pointer-created Speed interval', () => {
+  const base = structuredClone(provenance);
+  base.source.duration = 12.008;
+  base.edits = [
+    {
+      id: 'speed',
+      start: 0,
+      end: 7.999999875682994,
+      requestedStart: 0,
+      requestedEnd: 7.999999875682994,
+      kind: 'speed',
+      rate: 4,
+      audio: 'speed',
+    },
+  ];
+  const mainDuration = buildReviewTimeMap(base.source.duration, base.edits).at(-1)!.resultEnd;
+  const result = planReviewPresentationSequence({
+    settings: createNeutralPresentationSettings(),
+    mainDuration,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 10, denominator: 1 },
+  });
+  if (!result.ok) throw new Error('Invalid fixture plan');
+  expect(result.plan.segments[0]!.contentDuration).not.toBe(mainDuration);
+  const value = createPresentationReviewProvenance({
+    base,
+    plan: result.plan,
+    output: {
+      format: 'webm',
+      videoCodec: 'vp9',
+      width: 160,
+      height: 90,
+      frameRateMode: 'constant',
+    },
+    includeBookends: true,
+    watermarkBaked: false,
+  });
+  expect(parseReviewProvenance(encodeReviewProvenance(value))).toEqual(value);
+  for (const duration of [mainDuration, mainDuration + 0.001]) {
+    const changed = structuredClone(value);
+    changed.presentation.segments[0]!.contentDuration = duration;
+    expect(parseReviewProvenance(JSON.stringify(changed))).toBeNull();
+  }
+});
+
 function presentation() {
   const settings = createNeutralPresentationSettings();
   settings.intro = {

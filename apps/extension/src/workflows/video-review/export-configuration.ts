@@ -1,8 +1,7 @@
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import {
   resolveQuickEditExportPlan,
-  resolveQuickEditEffectiveAudio,
+  resolveQuickEditEffectiveState,
   type QuickEditExportPlan,
 } from '../../features/video/review/advanced/effective';
 import type { ReviewMediaIndex, ReviewRenderSettings } from './media-index';
@@ -20,8 +19,6 @@ export function configuredReviewExportPlan(
   }
 ): QuickEditExportPlan {
   const { index } = args;
-  if (!index && args.advanced.ui.mode === 'advanced' && args.advanced.audio.originalSpeech?.enabled)
-    return { kind: 'unavailable', reasons: ['audio-encoder'] };
   const presentation = args.advanced.presentation;
   const advanced =
     args.includeBookends === false && presentation
@@ -51,7 +48,6 @@ export function configuredReviewExportPlan(
     args.presentationAudioPresent ?? composedAudioPresence({ ...args, advanced });
   const plan = resolveQuickEditExportPlan({
     ...args,
-    timeMap: index ? buildReviewTimeMap(index.duration, args.document.edits) : [],
     advanced,
     ...(index?.audioCodec || presentationAudioPresent === true
       ? { audioProcessingAvailable: !!audioCodec }
@@ -71,13 +67,9 @@ export function configuredReviewExportPlan(
 function composedAudioPresence(
   args: Parameters<typeof configuredReviewExportPlan>[0]
 ): boolean | undefined {
-  const effective = resolveQuickEditEffectiveAudio(
-    args.advanced,
-    args.index ? buildReviewTimeMap(args.index.duration, args.document.edits) : []
-  );
-  if (effective.revoice.some((clip) => !clip.muted && clip.volume > 0)) return true;
-  if (!effective.presentation) return undefined;
+  const effective = resolveQuickEditEffectiveState(args.advanced);
   if (args.index?.audioCodec || effective.voiceover.length || effective.music.length) return true;
+  if (!effective.presentation) return undefined;
   const settings = effective.presentation;
   const possibleBookendAudio =
     settings &&

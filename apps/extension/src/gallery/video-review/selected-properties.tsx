@@ -154,10 +154,8 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 beforeAction={props.beforeSpeechAction}
                 flushAdvanced={props.flushAdvanced}
                 registerSpeechFlush={props.registerSpeechFlush}
-                tempo={audio.selected.clip.tempo ?? 1}
                 mainVideo={props.mainVideo}
                 resultTime={props.focusTime}
-                assetNames={audio.assets}
                 {...(props.onPreviewFrame ? { onJump: props.onPreviewFrame } : {})}
                 sound={(applying) => (
                   <ReviewAudioInspectorSection audio={audio} busy={busy || applying} embedded />

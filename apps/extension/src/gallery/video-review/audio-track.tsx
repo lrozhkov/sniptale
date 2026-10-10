@@ -1,4 +1,3 @@
-import { ReviewOriginalSpeechTrack } from './original-speech-track';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
@@ -106,9 +105,7 @@ type ReviewAudioClipLaneProps = ReviewAudioTimelineProps & {
 };
 
 type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
-  onOpenSpeech?: ((replacementId?: string, time?: number) => void) | undefined;
-  selectedSpeechId?: string | undefined;
-  onToggleSpeech?: ((enabled: boolean) => void) | undefined;
+  onOpenSpeech?: (() => void) | undefined;
   originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
   selectedEditId?: string | undefined;
   edits?: readonly ReviewEdit[] | undefined;
@@ -116,8 +113,6 @@ type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
   onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
   audio: QuickEditAudioState;
   hasOriginalAudio?: boolean;
-  showOriginalSpeech?: boolean;
-  automaticOriginalRanges?: readonly { start: number; end: number; volume: number }[] | undefined;
   showAddedAudio?: boolean;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
@@ -508,28 +503,9 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           onSelectSpeed={props.onSelectSpeed}
           waveform={props.waveforms?.get('original')}
           original={props.audio.original}
-          automaticRanges={props.automaticOriginalRanges}
           projection={props.projection}
           busy={props.busy}
           onOriginal={props.onOriginal}
-        />
-      ) : null}
-      {props.showOriginalSpeech &&
-      props.audio.originalSpeech &&
-      props.onOpenSpeech &&
-      props.onToggleSpeech ? (
-        <ReviewOriginalSpeechTrack
-          speech={props.audio.originalSpeech}
-          duration={props.duration}
-          projection={props.projection}
-          selectedId={props.selectedSpeechId}
-          busy={props.busy}
-          onSelect={(id, time) =>
-            (props.beforeAction ?? ((action) => action()))(() => props.onOpenSpeech?.(id, time))
-          }
-          onToggle={(enabled) =>
-            (props.beforeAction ?? ((action) => action()))(() => props.onToggleSpeech?.(enabled))
-          }
         />
       ) : null}
       {props.showAddedAudio !== false ? (

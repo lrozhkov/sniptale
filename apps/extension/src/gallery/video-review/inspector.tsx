@@ -56,7 +56,7 @@ function inspectorNavigationOptions(args: {
   }
   if (args.context === 'text' && args.settingsAvailable)
     options.push({ id: 'text', label: translate('gallery.videoReview.textTrackDocument') });
-  if (args.context === 'speech' && args.settingsAvailable)
+  if (args.context === 'speech')
     options.push({ id: 'speech', label: translate('gallery.videoReview.speechTitle') });
   if (args.context === 'selected' && args.selectionLabel)
     options.push({ id: 'selected', label: args.selectionLabel });
@@ -138,7 +138,11 @@ export function ReviewInspector(props: {
         }
       />
       <ReviewInspectorStatus {...props} />
-      {props.settingsAvailable || props.selectionLabel || props.actions || shown === 'preview' ? (
+      {props.settingsAvailable ||
+      props.selectionLabel ||
+      props.actions ||
+      shown === 'preview' ||
+      shown === 'speech' ? (
         <div
           className="review-inspector-navigation shrink-0"
           data-ui="gallery.videoReview.inspectorNavigation"

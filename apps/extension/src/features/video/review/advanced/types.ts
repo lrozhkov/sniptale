@@ -232,7 +232,7 @@ export interface QuickEditCanvasSize {
 }
 
 export interface QuickEditAudioState {
-  /** Accepted native-source replacements; the revoice lane is derived, never stored twice. */
+  /** Admitted alpha metadata; playback uses ordinary voiceover clips only. */
   originalSpeech?: import('../speech-transcript').ReviewOriginalSpeech;
   /** Current video mapping used only to project anchored voiceover into playback slices. */
   voiceoverSegments?: ReviewTimeSegment[];

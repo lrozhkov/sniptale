@@ -28,9 +28,9 @@ async function resizeRecognitionInspector(page: Page, dialog: Locator, target: n
   await expect.poll(width).toBe(target);
 }
 for (const variant of [
-  { width: 1280, height: 560, locale: 'en', theme: 'light' },
-  { width: 1920, height: 900, locale: 'ru', theme: 'dark' },
-  { width: 1024, height: 560, locale: 'en', theme: 'light' },
+  { width: 1280, height: 560, locale: 'en', theme: 'light', basic: true },
+  { width: 1920, height: 900, locale: 'ru', theme: 'dark', basic: true },
+  { width: 1024, height: 560, locale: 'en', theme: 'light', basic: false },
 ] as const) {
   test('source recognition proposes canonical text ' + variant.width, async ({ page }, info) => {
     const host = await startHostServer();
@@ -55,9 +55,10 @@ for (const variant of [
       };
       await open();
       const dialog = page.locator('dialog');
-      await dialog
-        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
-        .click();
+      if (!variant.basic)
+        await dialog
+          .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+          .click();
       const header = dialog
         .locator('[data-ui="gallery.videoReview.trackHeader"]')
         .filter({ hasText: label('gallery.videoReview.audioOriginal') });
@@ -235,6 +236,20 @@ for (const variant of [
         expect((await persistedReviewContent(page))?.audio).toEqual(originalAudio);
         await expect(dialog.locator('[data-ui="gallery.videoReview.textDocument"]')).toHaveCount(0);
       }
+      if (variant.basic) {
+        await expect(dialog.locator('[data-ui="gallery.videoReview.textTrack"]')).toHaveCount(0);
+        const advanced = result.getByRole('button', {
+          name: label('gallery.videoReview.advancedEditing'),
+          exact: true,
+        });
+        await advanced.scrollIntoViewIfNeeded();
+        await expect(advanced).toBeInViewport();
+        await capture('recognition-basic-accepted.png');
+        await advanced.click();
+        await expect(dialog.locator('[data-ui="gallery.videoReview.textTrack"]')).toBeVisible();
+        await openSpeech();
+      }
+      await expect(dialog.locator('[data-ui="gallery.videoReview.revoiceTrack"]')).toHaveCount(0);
       if (variant.width !== 1024)
         for (const width of [523, 524, 525]) {
           await resizeRecognitionInspector(page, dialog, width);

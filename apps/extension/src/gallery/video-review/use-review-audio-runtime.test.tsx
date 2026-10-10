@@ -585,7 +585,7 @@ it('reschedules external clips on explicit short-loop discontinuities below the 
   expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 2 });
 });
 
-it('uses the same combined gain as the native element and updates paused amplification', async () => {
+it('uses authored native gain and updates paused amplification', async () => {
   const engine = new FakeEngine();
   const video = document.createElement('video');
   video.currentTime = 4;
@@ -598,18 +598,19 @@ it('uses the same combined gain as the native element and updates paused amplifi
       volume: 2,
       ranges: [{ id: 'manual', start: 0, end: 10, volume: 0.75 }],
     },
-    automaticOriginalRanges: [{ start: 2, end: 6, volume: 0.25 }],
   });
   await act(async () => root.render(<Harness />));
-  expect(engine.gains.at(-1)).toBe(1);
-  await act(async () => root.render(<Harness playing={false} automaticOriginalRanges={[]} />));
   expect(engine.gains.at(-1)).toBe(1.5);
+  await act(async () =>
+    root.render(<Harness playing={false} original={{ volume: 0.4, muted: false }} />)
+  );
+  expect(engine.gains.at(-1)).toBe(1);
   await act(async () => root.render(<Harness playing={false} silent />));
   expect(engine.gains.at(-1)).toBe(0);
 });
 
 it.each(['missing', 'decode'] as const)(
-  'stops and reports accepted Revoice %s instead of playing suppressed silence',
+  'keeps original transport running when an ordinary voiceover is %s',
   async (failure) => {
     const engine = new FakeEngine();
     if (failure === 'decode') vi.spyOn(engine, 'decode').mockRejectedValue(new Error('bad bytes'));
@@ -621,28 +622,27 @@ it.each(['missing', 'decode'] as const)(
       createEngine: () => engine,
       playing: true,
       outputTime: 3,
-      revoice: [clip()],
-      automaticOriginalRanges: [{ start: 2, end: 6, volume: 0 }],
+      voiceover: [clip()],
       onFailure,
       resolveAsset: async () => (failure === 'missing' ? null : new Blob()),
     });
     await act(async () => root.render(<Harness />));
-    expect(onFailure).toHaveBeenCalledOnce();
-    expect(pause).toHaveBeenCalledOnce();
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(pause).not.toHaveBeenCalled();
     expect(engine.scheduled).toHaveLength(0);
-    expect(engine.stops).toBeGreaterThanOrEqual(2);
+    expect(engine.stops).toBeGreaterThanOrEqual(1);
   }
 );
 
-it('prepares tempo once and preserves native offset across Revoice disable/undo', async () => {
+it('prepares ordinary voiceover tempo once and preserves native offset across pause and restore', async () => {
   const engine = new FakeEngine();
   const prepare = vi.spyOn(engine, 'prepareClip');
-  const revoice = [clip({ timelineStart: 2, duration: 2, sourceOffset: 1, playbackRate: 2 })];
+  const voiceover = [clip({ timelineStart: 2, duration: 2, sourceOffset: 1, playbackRate: 2 })];
   const { Harness } = renderRuntime({
     createEngine: () => engine,
     playing: true,
     outputTime: 2.5,
-    revoice,
+    voiceover,
     resolveAsset: async () => new Blob(),
   });
   await act(async () => root.render(<Harness />));
@@ -653,11 +653,11 @@ it('prepares tempo once and preserves native offset across Revoice disable/undo'
     duration: 1.5,
     playbackRate: 1,
   });
-  await act(async () => root.render(<Harness revoice={[]} />));
+  await act(async () => root.render(<Harness voiceover={[]} />));
   const count = engine.scheduled.length;
   await act(async () => root.render(<Harness />));
   expect(engine.scheduled).toHaveLength(count + 1);
-  expect(revoice[0]!.sourceOffset).toBe(1);
+  expect(voiceover[0]!.sourceOffset).toBe(1);
 });
 
 it('retries a missing accepted asset after explicit resume instead of caching absence', async () => {
@@ -672,12 +672,12 @@ it('retries a missing accepted asset after explicit resume instead of caching ab
     createEngine: () => engine,
     playing: true,
     outputTime: 3,
-    revoice: [clip()],
+    voiceover: [clip()],
     resolveAsset,
     onFailure,
   });
   await act(async () => root.render(<Harness />));
-  expect(onFailure).toHaveBeenCalledOnce();
+  expect(onFailure).not.toHaveBeenCalled();
   await act(async () => root.render(<Harness playing={false} />));
   available = true;
   await act(async () => root.render(<Harness />));

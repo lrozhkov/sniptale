@@ -4,10 +4,7 @@ import {
   resolveReviewPlaybackSample,
   type ReviewPlaybackRange,
 } from './playback-range';
-import {
-  originalAudioGainAt,
-  type OriginalAudioAttenuation,
-} from '../../features/video/review/advanced/original-audio';
+import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useReviewPlaybackRecovery } from './use-playback-recovery';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -23,7 +20,6 @@ interface ReviewPlaybackProps {
   onRecovered?: (() => void) | undefined;
   onInvalidRange?: (() => void) | undefined;
   original: QuickEditOriginalAudio;
-  automaticOriginalRanges?: readonly OriginalAudioAttenuation[];
   silent?: boolean;
   retainCutTime?: boolean;
 }
@@ -80,7 +76,6 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   };
   const audioSettingsKey = JSON.stringify([
     props.original,
-    props.automaticOriginalRanges,
     props.edits,
     props.silent,
     props.retainCutTime,
@@ -177,12 +172,7 @@ function applyReviewPlaybackSample(
   if (sample.time !== previousTime) node.currentTime = sample.time;
   if (node.playbackRate !== sample.rate) node.playbackRate = sample.rate;
   if (node.preservesPitch !== true) node.preservesPitch = true;
-  const gain = originalAudioGainAt(
-    props.original,
-    sample.time,
-    props.edits,
-    props.automaticOriginalRanges
-  );
+  const gain = originalAudioGainAt(props.original, sample.time, props.edits);
   const muted = props.silent || sample.muted || gain === 0;
   if (node.muted !== muted) node.muted = muted;
   // The element caps at one; the preview audio graph amplifies beyond it.

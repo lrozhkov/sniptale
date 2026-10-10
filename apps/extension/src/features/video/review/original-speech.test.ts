@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   parseReviewOriginalSpeech,
   parseReviewOriginalSpeechTranscript,
-  projectOriginalSpeech,
   type ReviewOriginalSpeech,
 } from './original-speech';
 import {
@@ -14,7 +13,6 @@ import {
   reviewSpeechTextSignature,
 } from './speech-transcript';
 import { parseReviewSpeechTranscript } from './speech-validation';
-import { buildReviewTimeMap } from './timeline';
 import { createQuickEditAdvancedState } from './advanced/defaults';
 import {
   loadQuickEditAdvancedContentState,
@@ -173,75 +171,5 @@ describe('original speech durable specialization', () => {
       })
     ).toEqual(reviewAdvancedContentBaseline(state));
     expect(state.audio).not.toHaveProperty('originalSpeech');
-  });
-});
-
-it('uses one native-to-result projection across cuts and speed, retaining short-generation tail attenuation', () => {
-  const value = speech();
-  const timeMap = buildReviewTimeMap(10, [
-    { id: 'cut', kind: 'cut', start: 3, end: 4, requestedStart: 3, requestedEnd: 4 },
-    {
-      id: 'speed',
-      kind: 'speed',
-      start: 4,
-      end: 7,
-      requestedStart: 4,
-      requestedEnd: 7,
-      rate: 2,
-      audio: 'mute',
-    },
-  ]);
-  const projected = projectOriginalSpeech({ speech: value, timeMap });
-  expect(projected.originalRanges).toEqual([{ start: 2, end: 8, volume: 0.25 }]);
-  expect(projected.clips).toEqual([
-    {
-      id: 'revoice:accepted:2',
-      assetId: 'project-asset:accepted',
-      sourceOffset: 0,
-      timelineStart: 2,
-      duration: 1,
-      playbackRate: 1,
-      volume: 1,
-      muted: false,
-      fadeIn: 0,
-      fadeOut: 0,
-    },
-    {
-      id: 'revoice:accepted:4',
-      assetId: 'project-asset:accepted',
-      sourceOffset: 2,
-      timelineStart: 3,
-      duration: 1.5,
-      playbackRate: 2,
-      volume: 1,
-      muted: false,
-      fadeIn: 0,
-      fadeOut: 0,
-    },
-  ]);
-  expect(projected.clips.every((clip) => !clip.transcript && !clip.sourceAnchor)).toBe(true);
-  expect(
-    projectOriginalSpeech({
-      speech: value,
-      timeMap: buildReviewTimeMap(10, [
-        { id: 'all', kind: 'cut', start: 2, end: 8, requestedStart: 2, requestedEnd: 8 },
-      ]),
-    }).clips
-  ).toEqual([]);
-  expect(value.transcript.replacements).toHaveLength(1);
-  value.transcript.replacements[0]!.enabled = false;
-  expect(projectOriginalSpeech({ speech: value, timeMap })).toEqual({
-    clips: [],
-    originalRanges: [],
-  });
-  value.transcript.replacements[0]!.enabled = true;
-  value.enabled = false;
-  expect(projectOriginalSpeech({ speech: value, timeMap })).toEqual({
-    clips: [],
-    originalRanges: [],
-  });
-  expect(projectOriginalSpeech({ speech: undefined, timeMap })).toEqual({
-    clips: [],
-    originalRanges: [],
   });
 });

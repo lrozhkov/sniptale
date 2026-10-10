@@ -121,9 +121,7 @@ export function ReviewInspectorBinding({
   resizeHandle,
   preview,
   onJoinPreview,
-  selectedSpeechId,
 }: {
-  selectedSpeechId?: string | undefined;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   preview?: ReactNode;
   resizeHandle?: ReactNode;
@@ -156,7 +154,6 @@ export function ReviewInspectorBinding({
             resource={resource}
             state={state}
             audio={audio}
-            selectedSpeechId={selectedSpeechId}
             canvasComments={canvasComments}
           />
         }
@@ -264,13 +261,11 @@ function ReviewSourceSpeechBinding({
   resource,
   state,
   audio,
-  selectedSpeechId,
   canvasComments,
 }: {
   resource: LoadedReview;
   state: InspectorState;
   audio: ReturnType<typeof useReviewAudio>;
-  selectedSpeechId: string | undefined;
   canvasComments: ReturnType<typeof useCanvasComments>;
 }) {
   return (
@@ -278,7 +273,6 @@ function ReviewSourceSpeechBinding({
       key="original"
       mainVideo={state.video.current ?? undefined}
       resultTime={state.timeline.sceneOutputTime}
-      assetNames={audio.assets}
       masterAudio={state.advanced.audio.original}
       masterDisabled={state.busy}
       onMasterVolumeChange={(volume) => audio.setOriginal({ volume })}
@@ -294,13 +288,13 @@ function ReviewSourceSpeechBinding({
       selection={
         state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)
       }
-      selectedReplacementId={selectedSpeechId}
       beforeAction={state.beforeAction}
       flushAdvanced={() => flushReviewTextVoiceBuffers(state, canvasComments)}
       registerSpeechFlush={state.registerSpeechFlush}
       sourceAudioAvailable={!!state.editing.exporter.index?.audioCodec}
-      originalSpeechEnabled={state.advanced.audio.originalSpeech?.enabled ?? true}
-      onToggleOriginalSpeech={audio.setOriginalSpeechEnabled}
+      {...(state.advanced.ui.mode === 'basic'
+        ? { onEnableAdvanced: () => state.setMode('advanced') }
+        : {})}
     />
   );
 }

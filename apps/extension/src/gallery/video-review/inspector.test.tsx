@@ -421,79 +421,82 @@ it.each(['scene', 'selected', 'history', 'export'] as const)(
   }
 );
 
-it('opens original speech without a synthetic selected clip and leaves it on mode change', () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const host = document.createElement('div');
-  const root = createRoot(host);
-  let navigation!: ReturnType<typeof useReviewInspectorNavigation>;
-  let settingsAvailable = true;
-  const beforeAction = vi.fn((action: () => void) => action());
-  function Harness() {
-    navigation = useReviewInspectorNavigation({
-      beforeAction,
-      contextKey: 'settings:none:',
-      contextSelection: { kind: 'none' },
-      settingsAvailable,
-      exportAvailable: true,
-    });
-    return (
-      <>
-        <output>{navigation.shown}</output>
-        <Inspector
-          filename="clip.webm"
-          annotations={[]}
-          selectedId={null}
-          busy={false}
-          message={null}
-          navigation={navigation}
-          settingsAvailable={settingsAvailable}
-          speech={<p>Speech controls</p>}
-          onBack={vi.fn()}
-          onAdd={vi.fn()}
-          onSelect={vi.fn()}
-          onHover={vi.fn()}
-          onEdit={vi.fn()}
-          onDelete={vi.fn()}
-          onReport={vi.fn()}
-        >
-          {null}
-        </Inspector>
-      </>
-    );
+it.each([true, false])(
+  'opens original speech with advanced settings=%s and leaves it on mode change',
+  (advanced) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    let navigation!: ReturnType<typeof useReviewInspectorNavigation>;
+    let settingsAvailable = advanced;
+    const beforeAction = vi.fn((action: () => void) => action());
+    function Harness() {
+      navigation = useReviewInspectorNavigation({
+        beforeAction,
+        contextKey: 'settings:none:',
+        contextSelection: { kind: 'none' },
+        settingsAvailable,
+        exportAvailable: true,
+      });
+      return (
+        <>
+          <output>{navigation.shown}</output>
+          <Inspector
+            filename="clip.webm"
+            annotations={[]}
+            selectedId={null}
+            busy={false}
+            message={null}
+            navigation={navigation}
+            settingsAvailable={settingsAvailable}
+            speech={<p>Speech controls</p>}
+            onBack={vi.fn()}
+            onAdd={vi.fn()}
+            onSelect={vi.fn()}
+            onHover={vi.fn()}
+            onEdit={vi.fn()}
+            onDelete={vi.fn()}
+            onReport={vi.fn()}
+          >
+            {null}
+          </Inspector>
+        </>
+      );
+    }
+    try {
+      act(() => root.render(<Harness />));
+      act(() => navigation.setSection('speech'));
+      expect(host.querySelector('output')?.textContent).toBe('speech');
+      expect(
+        Array.from(
+          host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
+        ).map((node) => node.textContent)
+      ).toEqual([
+        'gallery.videoReview.comments',
+        ...(advanced ? ['gallery.videoReview.scene'] : []),
+        'gallery.videoReview.speechTitle',
+      ]);
+      const presentation = host.querySelector<HTMLButtonElement>(
+        '[data-ui="gallery.videoReview.inspectorPresentation"]'
+      );
+      expect(presentation).not.toBeNull();
+      act(() => presentation!.click());
+      expect(navigation.presentation).toBe('sections');
+      expect(beforeAction).toHaveBeenCalledTimes(1);
+      act(() => root.render(<Harness />));
+      expect(host.querySelector('output')?.textContent).toBe('speech');
+      act(() => navigation.setSection(advanced ? 'scene' : 'comments'));
+      expect(host.querySelector('output')?.textContent).toBe(advanced ? 'scene' : 'comments');
+      act(() => navigation.setSection('speech'));
+      settingsAvailable = !advanced;
+      act(() => root.render(<Harness />));
+      expect(host.querySelector('output')?.textContent).toBe(advanced ? 'comments' : 'scene');
+    } finally {
+      act(() => root.unmount());
+      vi.unstubAllGlobals();
+    }
   }
-  try {
-    act(() => root.render(<Harness />));
-    act(() => navigation.setSection('speech'));
-    expect(host.querySelector('output')?.textContent).toBe('speech');
-    expect(
-      Array.from(
-        host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
-      ).map((node) => node.textContent)
-    ).toEqual([
-      'gallery.videoReview.comments',
-      'gallery.videoReview.scene',
-      'gallery.videoReview.speechTitle',
-    ]);
-    const presentation = host.querySelector<HTMLButtonElement>(
-      '[data-ui="gallery.videoReview.inspectorPresentation"]'
-    );
-    expect(presentation).not.toBeNull();
-    act(() => presentation!.click());
-    expect(navigation.presentation).toBe('sections');
-    expect(beforeAction).toHaveBeenCalledTimes(1);
-    act(() => root.render(<Harness />));
-    expect(host.querySelector('output')?.textContent).toBe('speech');
-    act(() => navigation.setSection('scene'));
-    expect(host.querySelector('output')?.textContent).toBe('scene');
-    act(() => navigation.setSection('speech'));
-    settingsAvailable = false;
-    act(() => root.render(<Harness />));
-    expect(host.querySelector('output')?.textContent).toBe('comments');
-  } finally {
-    act(() => root.unmount());
-    vi.unstubAllGlobals();
-  }
-});
+);
 
 it('opens the track document in the third context and closes it on selection or section change', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

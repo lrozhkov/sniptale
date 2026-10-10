@@ -1,4 +1,3 @@
-import type { OriginalAudioAttenuation } from '../../features/video/review/advanced/original-audio';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type {
   QuickEditAudioClip,
@@ -14,8 +13,6 @@ export function useReviewTransport(args: {
   resource: LoadedReview;
   edits: readonly ReviewEdit[];
   originalAudio: QuickEditOriginalAudio;
-  revoice: readonly QuickEditAudioClip[];
-  automaticOriginalRanges: readonly OriginalAudioAttenuation[];
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
   onSeek(value: number): void;
@@ -44,7 +41,6 @@ export function useReviewTransport(args: {
     duration: source.duration,
     edits: args.edits,
     original: args.originalAudio,
-    automaticOriginalRanges: args.automaticOriginalRanges,
     silent: args.silent ?? false,
     retainCutTime: args.silent ?? false,
     boundaries: args.boundaries,
@@ -61,15 +57,10 @@ export function useReviewTransport(args: {
     outputTime: timeline.sceneOutputTime,
     seekRevision,
     originalAudio: args.originalAudio,
-    revoice: args.revoice,
-    automaticOriginalRanges: args.automaticOriginalRanges,
     voiceover: args.voiceover,
     music: args.music,
     sessionKey: session.getSnapshot().snapshot.workspace.aggregateId,
-    onFailure: (stopPlayback) => {
-      if (stopPlayback) setPlaying(false);
-      args.onTransportFailure();
-    },
+    onFailure: args.onTransportFailure,
   });
   return {
     video,

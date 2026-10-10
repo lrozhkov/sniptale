@@ -88,7 +88,11 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function mount(withRelated = false, originalSelection?: { start: number; end: number }) {
+async function mount(
+  withRelated = false,
+  originalSelection?: { start: number; end: number },
+  onEnableAdvanced?: () => void
+) {
   const advanced = createQuickEditAdvancedState();
   const clip = {
     id: 'clip',
@@ -198,6 +202,7 @@ async function mount(withRelated = false, originalSelection?: { start: number; e
           flushAdvanced={async () => undefined}
           registerSpeechFlush={guard.register}
           onSelectText={onSelectText}
+          {...(onEnableAdvanced ? { onEnableAdvanced } : {})}
           sound={(applying) => (
             <button disabled={applying} data-ui="gallery.videoReview.audioInspector">
               Sound controls
@@ -243,6 +248,18 @@ async function recognize() {
   await click(translate('gallery.videoReview.recognitionStart'));
   await click(translate('gallery.videoReview.speechConsentContinue'));
 }
+it('offers advanced editing after accepted source recognition as an explicit action', async () => {
+  const enable = vi.fn();
+  await mount(false, { start: 0, end: 1 }, enable);
+  await recognize();
+  expect(
+    host.querySelector('[aria-label="' + translate('gallery.videoReview.advancedEditing') + '"]')
+  ).toBeNull();
+  await click(translate('gallery.videoReview.recognitionApply'));
+  expect(enable).not.toHaveBeenCalled();
+  await click(translate('gallery.videoReview.advancedEditing'));
+  expect(enable).toHaveBeenCalledOnce();
+});
 it('disables selected clip sound controls only while Apply is in flight', async () => {
   await mount();
   await recognize();

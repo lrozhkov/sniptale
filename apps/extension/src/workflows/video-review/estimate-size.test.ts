@@ -211,7 +211,7 @@ it('rejects an unrepresentable sequence before measuring', async () => {
 });
 
 it.each([false, true])(
-  'budgets accepted Revoice on a silent main only when advanced (basic=%s)',
+  'keeps retained alpha speech metadata processing-neutral on a silent main (basic=%s)',
   async (basic) => {
     const args = sourceFixture();
     args.advanced.ui.mode = basic ? 'basic' : 'advanced';
@@ -240,7 +240,7 @@ it.each([false, true])(
     };
     mocks.measure.mockImplementation(
       async (input: Parameters<typeof measureVideoExportSize>[0]) => {
-        expect(input.audioBitrate).toBe(basic ? 0 : 192000);
+        expect(input.audioBitrate).toBe(0);
         expect(input.duration).toBe(2);
       }
     );

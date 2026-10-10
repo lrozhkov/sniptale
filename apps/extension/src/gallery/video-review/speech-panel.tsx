@@ -13,16 +13,12 @@ import { translate } from '../../platform/i18n';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 
 type Props = ReviewRecognitionAccess & {
-  tempo?: number;
   sound?: (applying: boolean) => ReactNode;
   mainVideo?: HTMLVideoElement | undefined;
   resultTime?: number | undefined;
-  assetNames?: ReadonlyMap<string, { filename: string }> | undefined;
   onJump?(time: number): void;
   onSelectText?(id: string): void;
-  selectedReplacementId?: string | undefined;
-  originalSpeechEnabled?: boolean;
-  onToggleOriginalSpeech?(enabled: boolean): void;
+  onEnableAdvanced?(): void;
 };
 type Recognition = ReturnType<typeof useReviewRecognition>;
 const buttonClass = reviewTextButtonClassName + ' !h-auto min-h-8! whitespace-normal text-left';
@@ -436,9 +432,21 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
         <p className="text-xs">{translate('gallery.videoReview.recognitionReceiptHint')}</p>
       )}
       {recognition.accepted ? (
-        <p role="status" className="text-xs">
-          {translate('gallery.videoReview.recognitionAdded')}
-        </p>
+        <div className="space-y-1">
+          <p role="status" className="text-xs">
+            {translate('gallery.videoReview.recognitionAdded')}
+          </p>
+          {access.onEnableAdvanced && (
+            <ReviewButton
+              label={translate('gallery.videoReview.advancedEditing')}
+              className={buttonClass}
+              disabled={recognition.running}
+              onClick={() => access.beforeAction(() => access.onEnableAdvanced?.())}
+            >
+              {translate('gallery.videoReview.advancedEditing')}
+            </ReviewButton>
+          )}
+        </div>
       ) : (
         <div className="flex flex-wrap gap-1">
           <ReviewButton

@@ -238,7 +238,7 @@ it.each([undefined, { offset: 0, duration: 4 }, { offset: 2, duration: 4 }])(
   }
 );
 
-it('schedules already projected Revoice without applying microphone speech replacement again', () => {
+it('schedules ordinary projected voiceover with its native offset and rate', () => {
   const entry = {
     id: 'accepted:part',
     assetId: 'project-asset:accepted',
@@ -251,10 +251,10 @@ it('schedules already projected Revoice without applying microphone speech repla
     fadeIn: 0,
     fadeOut: 0,
   };
-  const plan = buildQuickEditAudioPlan({ revoice: [entry], voiceover: [], music: [] });
+  const plan = buildQuickEditAudioPlan({ voiceover: [entry], music: [] });
   expect(plan).toEqual([
     {
-      lane: 'revoice',
+      lane: 'voiceover',
       clipId: 'accepted:part',
       assetId: 'project-asset:accepted',
       timelineStart: 3,
@@ -269,4 +269,37 @@ it('schedules already projected Revoice without applying microphone speech repla
   expect(
     planQuickEditClipPlayback({ entry: plan[0]!, outputTime: 3.25, audioNow: 100 })
   ).toMatchObject({ offset: 2.5, duration: 1.5, playbackRate: 2 });
+});
+
+it('does not interpret retained clip transcript replacements as another playback source', () => {
+  const source = clip({
+    transcript: {
+      version: 1,
+      phrases: [],
+      replacements: [
+        {
+          id: 'old',
+          phraseId: 'p',
+          start: 0,
+          end: 2,
+          duration: 1,
+          assetId: 'project-asset:old',
+          revision: 0,
+          text: 'Old',
+          textSignature: 'sig',
+          profile: { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' },
+        },
+      ],
+    },
+  });
+  const before = structuredClone(source);
+  const plan = buildQuickEditAudioPlan({ voiceover: [source], music: [] });
+  expect(plan).toHaveLength(1);
+  expect(plan[0]).toMatchObject({
+    lane: 'voiceover',
+    clipId: source.id,
+    assetId: source.assetId,
+    duration: source.duration,
+  });
+  expect(source).toEqual(before);
 });

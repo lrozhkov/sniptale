@@ -588,7 +588,7 @@ it('initializes source timing when the first voiceover is imported without prece
   }
 });
 
-it('toggles accepted original speech without changing manual original gain or other lanes', () => {
+it('edits ordinary original gain without modifying admitted alpha speech metadata', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const root = createRoot(document.createElement('div'));
   let audio: QuickEditAudioState = {
@@ -616,15 +616,14 @@ it('toggles accepted original speech without changing manual original gain or ot
   }
   try {
     act(() => root.render(<Harness />));
-    act(() => hook.setOriginalSpeechEnabled(false));
-    expect(audio.originalSpeech?.enabled).toBe(false);
-    expect(audio.original).toBe(original);
-    expect(audio.originalSpeech?.transcript).toBe(transcript);
-    act(() => hook.setOriginalSpeechEnabled(true));
+    act(() => hook.setOriginal({ volume: 0.6 }));
+    expect(audio.original.volume).toBe(0.6);
+    expect(audio.original.muted).toBe(false);
+    expect(original.muted).toBe(true);
+    expect(audio.original.ranges).toEqual(original.ranges);
+    expect(original.volume).toBe(0.4);
     expect(audio.originalSpeech?.enabled).toBe(true);
-    delete audio.originalSpeech;
-    act(() => hook.setOriginalSpeechEnabled(true));
-    expect(audio.originalSpeech).toBeUndefined();
+    expect(audio.originalSpeech?.transcript).toBe(transcript);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

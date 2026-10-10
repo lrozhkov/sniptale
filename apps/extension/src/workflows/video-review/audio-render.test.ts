@@ -725,7 +725,7 @@ it('retains native resampler context around streamed normal-speed clip windows',
 });
 
 it.each([0.5, 1, 2, 4])(
-  'attenuates only original PCM through native slots at rate %s including the generated tail',
+  'applies only authored source gain to original PCM at rate %s without changing voiceover',
   async (rate) => {
     const fixture = await audioFixture();
     audioMock.packets = Array.from({ length: 250 }, (_, i) => ({
@@ -736,8 +736,8 @@ it.each([0.5, 1, 2, 4])(
     audioMock.samples.mockImplementation((start: number, end: number) => [
       decodedSample(start, end - start),
     ]);
-    const revoice = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
-    revoice.getChannelData(0).fill(0.75);
+    const voiceover = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
+    voiceover.getChannelData(0).fill(0.75);
     try {
       for await (const _sample of renderReviewAudio(
         fixture.track,
@@ -754,7 +754,7 @@ it.each([0.5, 1, 2, 4])(
         {
           entries: [
             {
-              lane: 'revoice',
+              lane: 'voiceover',
               clipId: 'accepted',
               assetId: 'accepted',
               timelineStart: 0,
@@ -766,11 +766,10 @@ it.each([0.5, 1, 2, 4])(
               playbackRate: rate,
             },
           ],
-          buffers: new Map([['accepted', revoice]]),
+          buffers: new Map([['accepted', voiceover]]),
           originalVolume: 2,
           originalMuted: false,
           originalRanges: [{ id: 'manual', start: 2, end: 3, volume: 0.5 }],
-          automaticOriginalRanges: [{ start: 2.2, end: 2.8, volume: 0.25 }],
         }
       )) {
         /* drain bounded output */
@@ -782,10 +781,10 @@ it.each([0.5, 1, 2, 4])(
         return pcm[Math.round((outputTime - window + 0.02) * 48000)]!;
       };
       expect(sampleAt(2.1)).toBeCloseTo(0.125, 3);
-      expect(sampleAt(2.3)).toBeCloseTo(0.03125, 3);
-      expect(sampleAt(2.7)).toBeCloseTo(0.03125, 3);
+      expect(sampleAt(2.3)).toBeCloseTo(0.125, 3);
+      expect(sampleAt(2.7)).toBeCloseTo(0.125, 3);
       if (rate >= 1) expect(sampleAt(2.9)).toBeCloseTo(0.125, 3);
-      expect(revoice.getChannelData(0)[0]).toBe(0.75);
+      expect(voiceover.getChannelData(0)[0]).toBe(0.75);
       expect(fixture.windows[0]!.gains![0]!.gain.value).toBe(2);
     } finally {
       fixture.cleanup();

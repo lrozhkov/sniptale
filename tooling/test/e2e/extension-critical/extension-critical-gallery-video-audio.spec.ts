@@ -40,7 +40,10 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      const dialog = page.locator('dialog');
+      const dialog = page.getByRole('dialog', {
+        name: translate('gallery.videoReview.title', variant.locale),
+        exact: true,
+      });
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
@@ -208,7 +211,12 @@ async function voiceTiming(page: Page) {
 
 async function voiceTimelineGesture(page: Page, start: number, end?: number) {
   const plane = page.locator('[data-ui="gallery.videoReview.timePlane"]');
-  const box = (await plane.locator('[data-ui="gallery.videoReview.ruler"]').boundingBox())!;
+  const lane = plane.locator(
+    end === undefined
+      ? '[data-ui="gallery.videoReview.ruler"]'
+      : '[data-ui="gallery.videoReview.sourceLane"]'
+  );
+  const box = (await lane.boundingBox())!;
   const duration = Number(await plane.getAttribute('aria-valuemax'));
   const x = (time: number) => box.x + (box.width * time) / duration;
   await page.mouse.move(x(start), box.y + 12);
@@ -259,7 +267,10 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      const dialog = page.locator('dialog');
+      const dialog = page.getByRole('dialog', {
+        name: translate('gallery.videoReview.title', variant.locale),
+        exact: true,
+      });
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', {
           name: translate(key, variant.locale),
@@ -278,18 +289,23 @@ for (const variant of [
       const header = dialog.locator('[data-ui="gallery.videoReview.trackHeader"]').filter({
         hasText: translate('gallery.videoReview.audioVoiceover', variant.locale),
       });
-      const chooser = page.waitForEvent('filechooser');
       await header
         .getByRole('button', {
           name: translate('gallery.videoReview.audioImport', variant.locale),
           exact: true,
         })
         .click();
-      await (await chooser).setFiles(resolve('tooling/test/e2e/fixtures/review-voice-speech.wav'));
-      const voice = dialog.getByRole('button', {
-        name: `${translate('gallery.videoReview.audioVoiceover', variant.locale)} · review-voice-speech.wav`,
+      const library = page.getByRole('dialog', {
+        name: translate('gallery.videoReview.musicLibrary', variant.locale),
         exact: true,
       });
+      await expect(library).toBeVisible();
+      await library
+        .locator('input[type="file"]')
+        .setInputFiles(resolve('tooling/test/e2e/fixtures/review-voice-speech.wav'));
+      await expect(library).toHaveCount(0);
+      const voice = dialog.locator('[data-audio-lane="voiceover"] [data-audio-id]');
+      await expect(voice).toHaveCount(1);
       await expect(voice).toBeVisible();
       await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [1] });
       const initial = (await voiceTiming(page))!;

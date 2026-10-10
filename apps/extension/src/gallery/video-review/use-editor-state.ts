@@ -12,11 +12,7 @@ import { useReviewBackgroundImport } from './use-review-background';
 import { useReviewComposer, useReviewSnapshot, type LoadedReview } from './use-session';
 import { useReviewExport } from './use-export';
 import { useReviewAdvanced } from './use-advanced';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import {
-  resolveQuickEditEffectiveAudio,
-  resolveQuickEditEffectiveState,
-} from '../../features/video/review/advanced/effective';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useReviewTransport } from './use-review-transport';
 import { reviewSelectionSourceTime, useReviewSelection } from './use-review-selection';
 import { useReviewEditorWiring } from './use-review-wiring';
@@ -172,14 +168,7 @@ function useReviewEditorBase(resource: LoadedReview) {
   const exporter = useReviewExport(resource);
   const advancedState = useReviewAdvanced(session);
   const advanced = advancedState.advanced;
-  const features = useMemo(
-    () =>
-      resolveQuickEditEffectiveAudio(
-        advanced,
-        buildReviewTimeMap(source.duration, snapshot.document.edits)
-      ),
-    [advanced, source.duration, snapshot.document.edits]
-  );
+  const features = useMemo(() => resolveQuickEditEffectiveState(advanced), [advanced]);
   const [selection, setSelection] = useState<ReviewAnchor>(
     composer.annotation?.anchor ?? { kind: 'point', time: 0 }
   );
@@ -303,8 +292,6 @@ function useReviewEditorTimeline(
     resource,
     edits: snapshot.document.edits,
     originalAudio: features.originalAudio,
-    revoice: features.revoice,
-    automaticOriginalRanges: features.automaticOriginalRanges,
     voiceover: features.voiceover,
     music: features.music,
     onSeek: (next) => {

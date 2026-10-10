@@ -653,12 +653,12 @@ it.each(['success', 'admission', 'render', 'cancel'] as const)(
   }
 );
 
-it('projects accepted native speech through the full map and subtracts fragment offset exactly once', async () => {
+it('ignores retained alpha replacement scheduling and offsets ordinary voiceover once', async () => {
   const { buildReviewExportClipPlan } = await import('./export-lifecycle');
-  const { buildReviewTimeMap } = await import('../../features/video/review/timeline');
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
   advanced.audio.originalSpeech = {
     enabled: true,
     transcript: {
@@ -682,22 +682,23 @@ it('projects accepted native speech through the full map and subtracts fragment 
       ],
     },
   };
-  const timeMap = buildReviewTimeMap(10, [
-    { id: 'cut', kind: 'cut', start: 3, end: 4, requestedStart: 3, requestedEnd: 4 },
+  advanced.audio.voiceover = [
     {
-      id: 'speed',
-      kind: 'speed',
-      start: 4,
-      end: 8,
-      requestedStart: 4,
-      requestedEnd: 8,
-      rate: 2,
-      audio: 'mute',
+      id: 'voice',
+      assetId: 'project-asset:voice',
+      timelineStart: 3,
+      duration: 1,
+      sourceOffset: 2,
+      playbackRate: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
     },
-  ]);
+  ];
+  const before = structuredClone(advanced.audio);
   const input = {
     advanced,
-    timeMap,
     fragmentOffset: 3,
     signal: args.signal,
     readProjectAsset: deps.readProjectAsset,
@@ -705,55 +706,43 @@ it('projects accepted native speech through the full map and subtracts fragment 
   };
   const plan = await buildReviewExportClipPlan(input, deps);
   expect(plan.entries).toMatchObject([
-    { lane: 'revoice', timelineStart: 0, duration: 1, sourceOffset: 2, playbackRate: 2 },
+    { lane: 'voiceover', timelineStart: 0, duration: 1, sourceOffset: 2, playbackRate: 2 },
   ]);
-  expect(plan.automaticOriginalRanges).toEqual([{ start: 2, end: 8, volume: 0.25 }]);
+  expect(plan).not.toHaveProperty('automaticOriginalRanges');
+  expect(deps.readProjectAsset).toHaveBeenCalledWith('project-asset:voice');
+  expect(deps.readProjectAsset).not.toHaveBeenCalledWith('project-asset:accepted');
+  expect(advanced.audio).toEqual(before);
   expect(deps.openAudioSource).toHaveBeenCalledOnce();
   plan.dispose?.();
   await expect(
     buildReviewExportClipPlan({ ...input, readProjectAsset: async () => null }, deps)
   ).rejects.toMatchObject({ reasons: ['asset-missing'] });
-  await expect(
-    buildReviewExportClipPlan(
-      { advanced, fragmentOffset: 3, signal: args.signal, readProjectAsset: deps.readProjectAsset },
-      deps
-    )
-  ).rejects.toThrow('time map');
   advanced.ui.mode = 'basic';
   expect((await buildReviewExportClipPlan(input, deps)).entries).toEqual([]);
 });
 
-it('exports accepted speech with packet video and preserves the original', async () => {
-  const { reviewSpeechTextSignature } =
-    await import('../../features/video/review/speech-transcript');
+it('exports ordinary voiceover and authored mute with packet video and preserves the original', async () => {
   const { args, deps, original } = fixture();
   const before = await original.arrayBuffer();
   args.index.processedAudioCodec = 'opus';
-  const profile = { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' as const };
   args.snapshot.workspace.advanced.ui.mode = 'advanced';
-  args.snapshot.workspace.advanced.audio.originalSpeech = {
-    enabled: true,
-    transcript: {
-      version: 1,
-      phrases: [],
-      replacements: [
-        {
-          id: 'accepted',
-          phraseId: 'p',
-          start: 4,
-          end: 6,
-          duration: 1,
-          enabled: true,
-          originalVolume: 0,
-          assetId: 'project-asset:accepted',
-          revision: 0,
-          text: 'accepted',
-          textSignature: reviewSpeechTextSignature('accepted', profile),
-          profile,
-        },
-      ],
+  args.snapshot.workspace.advanced.ui.tracks.audio = true;
+  args.snapshot.workspace.advanced.audio.voiceover = [
+    {
+      id: 'accepted',
+      assetId: 'project-asset:accepted',
+      timelineStart: 2,
+      duration: 1,
+      sourceOffset: 0,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
     },
-  };
+  ];
+  args.snapshot.workspace.advanced.audio.original.ranges = [
+    { id: 'mute', start: 4, end: 5, volume: 0 },
+  ];
   await exportReviewedVideo(args, deps);
   expect(deps.writeReviewPackets).toHaveBeenCalledOnce();
   expect(deps.writeReviewFrames).not.toHaveBeenCalled();
@@ -762,13 +751,13 @@ it('exports accepted speech with packet video and preserves the original', async
       exportAudio: expect.objectContaining({
         entries: [
           expect.objectContaining({
-            lane: 'revoice',
+            lane: 'voiceover',
             timelineStart: 2,
             duration: 1,
             sourceOffset: 0,
           }),
         ],
-        automaticOriginalRanges: [{ start: 4, end: 6, volume: 0 }],
+        originalRanges: [{ id: 'mute', start: 4, end: 5, volume: 0 }],
       }),
     })
   );

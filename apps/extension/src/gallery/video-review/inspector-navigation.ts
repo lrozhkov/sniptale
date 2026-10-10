@@ -141,8 +141,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       ? props.settingsAvailable
         ? 'scene'
         : 'comments'
-      : (section === 'scene' || section === 'speech' || section === 'text') &&
-          !props.settingsAvailable
+      : (section === 'scene' || section === 'text') && !props.settingsAvailable
         ? 'comments'
         : section;
   return {
@@ -163,11 +162,8 @@ export type ReviewInspectorNavigation = ReturnType<typeof useReviewInspectorNavi
 export function reviewTimelineInspectorCommands(args: {
   video: { current: Pick<HTMLVideoElement, 'pause'> | null };
   select(selection: ReviewSelection): void;
-  seek(time: number, snap?: boolean): void;
   navigation: Pick<ReviewInspectorNavigation, 'setSection' | 'shown'>;
   selectedTextId: string | undefined;
-  selectedSpeechId: string | undefined;
-  setSpeechId(id: string | undefined): void;
   requestExport(update: (current: number) => number): void;
 }) {
   const clearSelection = () => {
@@ -176,7 +172,6 @@ export function reviewTimelineInspectorCommands(args: {
   };
   return {
     selectedTextId: args.selectedTextId,
-    selectedSpeechId: args.navigation.shown === 'speech' ? args.selectedSpeechId : undefined,
     exportActive: args.navigation.shown === 'export',
     onSelectText: (id: string) => {
       args.video.current?.pause();
@@ -187,10 +182,8 @@ export function reviewTimelineInspectorCommands(args: {
       clearSelection();
       args.navigation.setSection('text');
     },
-    onOpenSpeech: (id?: string, time?: number) => {
+    onOpenSpeech: () => {
       clearSelection();
-      args.setSpeechId(id);
-      if (time !== undefined) args.seek(time, false);
       args.navigation.setSection('speech');
     },
     onOpenHistory: () => args.navigation.setSection('history'),

@@ -1,4 +1,4 @@
-import { resolveQuickEditEffectiveAudio } from '../../features/video/review/advanced/effective';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -15,10 +15,7 @@ export async function estimateReviewExportSize(
   const profile = resolveReviewOutputProfile(args.index, args.advanced, args.renderSettings);
   if (!profile.codec || !profile.dimensionsSupported) throw new Error('Size estimate unavailable');
   const mainDuration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;
-  const effective = resolveQuickEditEffectiveAudio(
-    args.advanced,
-    buildReviewTimeMap(args.index.duration, args.edits)
-  );
+  const effective = resolveQuickEditEffectiveState(args.advanced);
   let duration = mainDuration;
   if (effective.presentation) {
     const sequence = planReviewPresentationSequence({
@@ -44,9 +41,7 @@ export async function estimateReviewExportSize(
   const hasAudio =
     !!bookendAudio ||
     !!args.index.audioCodec ||
-    [...effective.revoice, ...effective.voiceover, ...effective.music].some(
-      (clip) => !clip.muted && clip.volume > 0
-    );
+    [...effective.voiceover, ...effective.music].some((clip) => !clip.muted && clip.volume > 0);
   return measureVideoExportSize({
     profile: { ...profile, codec: profile.codec, quality: args.renderSettings?.quality ?? 'HIGH' },
     duration,

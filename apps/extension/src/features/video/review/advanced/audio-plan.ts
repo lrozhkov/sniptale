@@ -1,9 +1,8 @@
-import { projectReviewSpeechReplacements } from '../speech-projection';
 import type { QuickEditAudioClip } from './types';
 
 /** One scheduled external-audio entry in output time; consumed by preview and export. */
 export interface QuickEditAudioPlanEntry {
-  lane: 'revoice' | 'voiceover' | 'music';
+  lane: 'voiceover' | 'music';
   clipId: string;
   assetId: string;
   timelineStart: number;
@@ -21,15 +20,11 @@ export interface QuickEditAudioPlanEntry {
  * are not applied and muted clips contribute silence.
  */
 export function buildQuickEditAudioPlan(args: {
-  revoice?: readonly QuickEditAudioClip[];
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
 }): readonly QuickEditAudioPlanEntry[] {
-  return (['revoice', 'voiceover', 'music'] as const).flatMap((lane) =>
-    (lane === 'voiceover'
-      ? args[lane].flatMap(projectReviewSpeechReplacements)
-      : (args[lane] ?? [])
-    ).map((clip) => ({
+  return (['voiceover', 'music'] as const).flatMap((lane) =>
+    args[lane].map((clip) => ({
       lane,
       clipId: clip.id,
       assetId: clip.assetId,

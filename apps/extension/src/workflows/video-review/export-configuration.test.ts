@@ -265,7 +265,7 @@ it('omits all fragment presentation capabilities without mutating retained setti
   ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
 });
 
-it('requires a real output audio encoder for Revoice on a silent main and avoids whole-file copy', () => {
+it('ignores alpha replacements and requires an encoder only for ordinary audio on a silent main', () => {
   const args = fixture();
   args.index.audioCodec = null;
   args.index.outputAudioCodecs!.webm = null;
@@ -292,6 +292,26 @@ it('requires a real output audio encoder for Revoice on a silent main and avoids
       ],
     },
   };
+  expect(configuredReviewExportPlan({ ...args, renderSettings: undefined })).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+  args.advanced.audio.voiceover = [
+    {
+      id: 'voice',
+      assetId: 'project-asset:voice',
+      timelineStart: 2,
+      duration: 4,
+      sourceOffset: 0,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  args.advanced.ui.tracks.audio = true;
   expect(configuredReviewExportPlan(args)).toMatchObject({
     kind: 'unavailable',
     reasons: ['audio-encoder'],
@@ -300,14 +320,14 @@ it('requires a real output audio encoder for Revoice on a silent main and avoids
   expect(configuredReviewExportPlan(args)).toMatchObject({
     kind: 'ready',
     audio: 'process',
-    reasons: ['revoice'],
+    reasons: ['voiceover'],
   });
   const { renderSettings: _settings, ...copyVideo } = args;
   expect(configuredReviewExportPlan(copyVideo)).toMatchObject({
     kind: 'ready',
     video: 'copy',
     audio: 'process',
-    reasons: ['revoice'],
+    reasons: ['voiceover'],
   });
   args.advanced.ui.mode = 'basic';
   expect(configuredReviewExportPlan(args)).toMatchObject({

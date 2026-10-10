@@ -102,6 +102,7 @@ export function createReviewExportFixture() {
       boundaries: [0, 2, 4, 6],
       videoCodec: 'vp8' as const,
       audioCodec: null,
+      processedAudioCodec: 'opus',
       container: 'webm' as const,
       rotation: 0 as const,
     } as ReviewMediaIndex,

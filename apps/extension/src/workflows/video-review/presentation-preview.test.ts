@@ -97,7 +97,7 @@ it('uses the original late sequence lattice and a bounded unpublished writer', a
   expect(blob.type).toBe('video/mp4');
 });
 
-it('uses the actual fragment map for Revoice and keeps attenuation source-native in a bounded preview', async () => {
+it('keeps ordinary voiceover offsets and authored mute source-native in a bounded preview', async () => {
   const { createQuickEditAdvancedState } =
     await import('../../features/video/review/advanced/defaults');
   const { createNewWorkspacePresentationSettings } =
@@ -107,6 +107,7 @@ it('uses the actual fragment map for Revoice and keeps attenuation source-native
   const { buildReviewExportClipPlan } = await import('./export-lifecycle');
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
   advanced.presentation = createNewWorkspacePresentationSettings();
   advanced.audio.originalSpeech = {
     enabled: true,
@@ -131,6 +132,21 @@ it('uses the actual fragment map for Revoice and keeps attenuation source-native
       ],
     },
   };
+  advanced.audio.voiceover = [
+    {
+      id: 'voice',
+      assetId: 'project-asset:voice',
+      timelineStart: 3,
+      duration: 1,
+      sourceOffset: 2,
+      playbackRate: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  advanced.audio.original.ranges = [{ id: 'mute', start: 4, end: 8, volume: 0 }];
   const input: import('./presentation-preview').PresentationPreviewInput = {
     file: new Blob(),
     advanced,
@@ -182,10 +198,10 @@ it('uses the actual fragment map for Revoice and keeps attenuation source-native
       }),
     write: async (args) => {
       expect(args.exportAudio!.entries).toMatchObject([
-        { lane: 'revoice', timelineStart: 0, duration: 1, sourceOffset: 2, playbackRate: 2 },
+        { lane: 'voiceover', timelineStart: 0, duration: 1, sourceOffset: 2, playbackRate: 2 },
       ]);
-      expect(args.exportAudio!.automaticOriginalRanges).toEqual([
-        { start: 2, end: 8, volume: 0.25 },
+      expect(args.exportAudio!.originalRanges).toEqual([
+        { id: 'mute', start: 4, end: 8, volume: 0 },
       ]);
       await args.writer.writeAt(0, new Blob(['clip']));
       return {

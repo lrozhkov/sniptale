@@ -106,12 +106,6 @@ export function useReviewAudio(args: ReviewAudioArgs) {
       setSelected(clip.id, 'voiceover');
     },
     ...clipActions,
-    setOriginalSpeechEnabled: (enabled: boolean) =>
-      args.setAudio((audio) =>
-        audio.originalSpeech
-          ? { ...audio, originalSpeech: { ...audio.originalSpeech, enabled } }
-          : audio
-      ),
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
       args.setAudio((audio) => updateOriginalAudio(audio, patch)),
   };

@@ -38,7 +38,6 @@ export function ReviewOriginalAudioTrack(props: {
   beforeAction?: ReviewBeforeAction | undefined;
   original: QuickEditOriginalAudio;
   waveform?: ReviewWaveform | undefined;
-  automaticRanges?: Parameters<typeof originalAudioGainAt>[3] | undefined;
   projection?: ReviewTrackProjection | undefined;
   duration: number;
   busy: boolean;
@@ -55,8 +54,8 @@ export function ReviewOriginalAudioTrack(props: {
   const gesture = useOriginalAudioGesture(props, duration);
   const preview = gesture.preview;
   const gainAt = useCallback(
-    (time: number) => originalAudioGainAt(props.original, time, props.edits, props.automaticRanges),
-    [props.original, props.edits, props.automaticRanges]
+    (time: number) => originalAudioGainAt(props.original, time, props.edits),
+    [props.original, props.edits]
   );
   const rectStyle = (start: number, end: number) => ({
     left: `${(start / duration) * 100}%`,
