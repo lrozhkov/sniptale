@@ -5,6 +5,7 @@ import { reconcileReviewFocus } from './focus-edits';
 import type { ReviewDocument, ReviewOperation, ReviewSource } from './types';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import type { QuickEditAdvancedContent } from './advanced/types';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
 const historyMessages = {
   'identity-invalid': 'Review operation identity is invalid.',
@@ -101,6 +102,56 @@ function replaceAdvancedContent(
   return after;
 }
 
+function equalAdvancedContentValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right))
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value: unknown, index) => equalAdvancedContentValue(value, right[index]))
+    );
+  if (!isRecord(left) || !isRecord(right)) return false;
+  const keys = Object.keys(left);
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every(
+      (key) => Object.hasOwn(right, key) && equalAdvancedContentValue(left[key], right[key])
+    )
+  );
+}
+
+/** Encodes admitted source gain edits without unchanged content; compound edits retain a full snapshot. */
+export function createReviewAdvancedContentOperation(args: {
+  id: string;
+  at: number;
+  before: QuickEditAdvancedContent;
+  after: QuickEditAdvancedContent;
+}): ReviewOperation | null {
+  if (equalAdvancedContentValue(args.before, args.after)) return null;
+  const { muted, volume } = args.after.audio.original;
+  const gainOnly = {
+    ...args.before,
+    audio: {
+      ...args.before.audio,
+      original: { ...args.before.audio.original, muted, volume },
+    },
+  };
+  if (equalAdvancedContentValue(gainOnly, args.after)) {
+    return {
+      id: args.id,
+      at: args.at,
+      target: 'sourceAudio',
+      before: {
+        muted: args.before.audio.original.muted,
+        volume: args.before.audio.original.volume,
+      },
+      after: { muted, volume },
+    };
+  }
+  return { ...args, target: 'advancedContent' };
+}
+
 /** Applies a validated operation without changing its inputs or the original media. */
 export function applyReviewOperation(
   document: ReviewDocument,
@@ -117,6 +168,27 @@ export function applyReviewOperation(
     return {
       ...document,
       canvasComments: replaceItem(document.canvasComments, operation.before, operation.after),
+    };
+  }
+  if (operation.target === 'sourceAudio') {
+    const original = document.advancedContent.audio.original;
+    const beforeJson = JSON.stringify(operation.before);
+    if (JSON.stringify({ muted: original.muted, volume: original.volume }) !== beforeJson)
+      throw new ReviewHistoryError('before-mismatch');
+    if (beforeJson === JSON.stringify(operation.after)) throw new ReviewHistoryError('no-change');
+    return {
+      ...document,
+      advancedContent: {
+        ...document.advancedContent,
+        audio: {
+          ...document.advancedContent.audio,
+          original: {
+            ...original,
+            muted: operation.after.muted,
+            volume: operation.after.volume,
+          },
+        },
+      },
     };
   }
   if (operation.target === 'advancedContent') {

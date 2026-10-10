@@ -3,7 +3,12 @@ import { reviewAdvancedContentBaseline } from './document';
 import { projectReviewVoiceover } from './voiceover-edits';
 import { buildReviewTimeMap } from './timeline';
 import { describe, expect, it, vi } from 'vitest';
-import { applyReviewOperation, replayReviewHistory } from './document';
+import {
+  applyReviewOperation,
+  createReviewAdvancedContentOperation,
+  replayReviewHistory,
+  ReviewHistoryError,
+} from './document';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import type { QuickEditAdvancedContent } from './advanced/types';
 import { createCanvasComment } from './comments';
@@ -410,4 +415,54 @@ it('replays presentation removal without resurrecting the baseline and retains i
   expect(replayReviewHistory(history, 0, source, baseline).advancedContent.presentation).toEqual(
     baseline.presentation
   );
+});
+
+it('encodes only admitted source master gain while retaining compound content edits', () => {
+  const before = createQuickEditAdvancedContent();
+  before.audio.original.ranges = [{ id: 'manual', start: 1, end: 3, volume: 0.25 }];
+  const after = {
+    ...before,
+    audio: { ...before.audio, original: { ...before.audio.original, muted: true, volume: 0.5 } },
+  };
+  const args = { id: 'gain', at: 1, before, after };
+  const operation = createReviewAdvancedContentOperation(args);
+  expect(operation).toEqual({
+    id: 'gain',
+    at: 1,
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 0.5 },
+  });
+  expect(
+    createReviewAdvancedContentOperation({ ...args, after: structuredClone(before) })
+  ).toBeNull();
+  for (const compound of [
+    { ...after, actionsEnabled: !before.actionsEnabled },
+    { ...after, audio: { ...after.audio, original: { ...after.audio.original, ranges: [] } } },
+    { ...after, audio: { ...after.audio, original: { ...after.audio.original, mutes: [] } } },
+  ]) {
+    expect(createReviewAdvancedContentOperation({ ...args, after: compound })).toEqual({
+      ...args,
+      after: compound,
+      target: 'advancedContent',
+    });
+  }
+  const original = structuredClone(before);
+  const document = replayReviewHistory([], 0, source, before);
+  if (!operation || operation.target !== 'sourceAudio')
+    throw new Error('Missing gain fixture operation');
+  const changed = applyReviewOperation(document, operation, source);
+  expect(changed.advancedContent).toEqual(after);
+  expect(changed.annotations).toBe(document.annotations);
+  expect(changed.edits).toBe(document.edits);
+  expect(changed.advancedContent.audio.original.ranges).toBe(before.audio.original.ranges);
+  expect(before).toEqual(original);
+  expect(replayReviewHistory([operation], 0, source, before).advancedContent).toEqual(before);
+  expect(replayReviewHistory([operation], 1, source, before).advancedContent).toEqual(after);
+  expect(() => applyReviewOperation(changed, operation, source)).toThrow(
+    new ReviewHistoryError('before-mismatch')
+  );
+  expect(() =>
+    applyReviewOperation(document, { ...operation, after: operation.before }, source)
+  ).toThrow(new ReviewHistoryError('no-change'));
 });

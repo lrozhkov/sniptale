@@ -246,3 +246,61 @@ it('retains current header operations and the baseline header when reopening', (
   });
   expect(baseline.workspace?.advanced.windowHeader).toEqual(after.windowHeader);
 });
+
+it.each([0, 1, 2, 3])(
+  'reopens mixed compact and full content history at cursor %s without writes',
+  (cursor) => {
+    const before = createQuickEditAdvancedContent();
+    const first = { ...before, actionsEnabled: false };
+    const muted = { ...first, audio: { ...first.audio, original: { muted: true, volume: 0.5 } } };
+    const final = { ...muted, actionsEnabled: true };
+    const raw = {
+      ...workspace(),
+      cursor,
+      history: [
+        { id: 'content', at: 1, target: 'advancedContent', before, after: first },
+        {
+          id: 'gain',
+          at: 2,
+          target: 'sourceAudio',
+          before: { muted: false, volume: 1 },
+          after: { muted: true, volume: 0.5 },
+        },
+        { id: 'compound', at: 3, target: 'advancedContent', before: muted, after: final },
+      ],
+    };
+    const original = structuredClone(raw);
+    const admitted = inspectVideoWorkspace(raw);
+    expect(admitted.failure).toBeNull();
+    expect(admitted.document?.advancedContent).toEqual([before, first, muted, final][cursor]);
+    expect(admitted.workspace?.history).toHaveLength(3);
+    expect(inspectVideoWorkspace(admitted.workspace).workspace).toEqual(admitted.workspace);
+    expect(raw).toEqual(original);
+  }
+);
+it('rejects stale compact gain in unapplied redo and leaves raw history intact', () => {
+  const raw = {
+    ...workspace(),
+    history: [
+      {
+        id: 'gain',
+        at: 1,
+        target: 'sourceAudio',
+        before: { muted: true, volume: 1 },
+        after: { muted: false, volume: 0.5 },
+      },
+    ],
+  };
+  const original = structuredClone(raw);
+  expect(inspectVideoWorkspace(raw)).toMatchObject({
+    workspace: null,
+    document: null,
+    failure: {
+      check: 'history-replay',
+      reason: 'before-mismatch',
+      operationIndex: 0,
+      target: 'sourceAudio',
+    },
+  });
+  expect(raw).toEqual(original);
+});

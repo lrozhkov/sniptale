@@ -15,6 +15,10 @@ import {
   createQuickEditAdvancedState,
   createQuickEditAdvancedContent,
 } from '../../../features/video/review/advanced/defaults';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
@@ -610,4 +614,72 @@ it('backs up and restores scene variants under none including history and recove
     'presentation.intro.video.assetId',
     'project-asset:new-clip'
   );
+});
+
+it('roundtrips compact source gain and retained resources through portable backup and restore', async () => {
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.original.ranges = [{ id: 'manual', start: 0, end: 1, volume: 0.25 }];
+  advanced.audio.music = [
+    {
+      id: 'music',
+      assetId: 'project-asset:music',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  const stored: VideoWorkspace = {
+    ...workspace,
+    advanced,
+    cursor: 1,
+    history: [
+      {
+        id: 'gain',
+        at: 2,
+        target: 'sourceAudio',
+        before: { muted: false, volume: 1 },
+        after: { muted: true, volume: 0.5 },
+      },
+    ],
+  };
+  const exported = await readVideoReviewForBackup({
+    db: snapshotDatabase(stored, undefined),
+    aggregateId: stored.aggregateId,
+    sourceAssetId: stored.sourceAssetId,
+  });
+  const portable = encodePortableReviewAssetRefs(exported!);
+  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
+  const restored = prepareVideoReviewRestore({
+    review: parsed,
+    sourceAggregateId: stored.aggregateId,
+    targetAggregateId: 'recording:copy',
+    sourceAssetId: 'new-source',
+    assetIdMap: new Map([['music', 'restored-music']]),
+  });
+  expect(restored.workspace.history).toEqual(stored.history);
+  expect(restored.workspace.cursor).toBe(1);
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(['project-asset:restored-music'])
+  );
+  const { history, cursor, source, advanced: baseline } = restored.workspace;
+  const document = replayReviewHistory(
+    history,
+    cursor,
+    source,
+    reviewAdvancedContentBaseline(baseline)
+  );
+  expect(document.advancedContent.audio.original).toEqual({
+    muted: true,
+    volume: 0.5,
+    ranges: advanced.audio.original.ranges,
+  });
+  expect(document.advancedContent.audio.music[0]?.assetId).toBe('project-asset:restored-music');
+  expect(
+    replayReviewHistory(history, 0, source, reviewAdvancedContentBaseline(baseline)).advancedContent
+      .audio.original.muted
+  ).toBe(false);
 });

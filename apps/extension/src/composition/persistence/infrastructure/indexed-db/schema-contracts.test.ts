@@ -4,6 +4,8 @@ import { DB_VERSION, EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from './core.stor
 import { handleDatabaseUpgrade } from './upgrade/core';
 import { betaV4Fixture } from './fixtures/beta-v4';
 import { betaV14Fixture } from './fixtures/beta-v14';
+import { betaV16Fixture } from './fixtures/beta-v16';
+import { betaV17Fixture } from './fixtures/beta-v17';
 import {
   CURRENT_SCHEMA_CONTRACTS,
   PERSISTENCE_DOMAIN_REGISTRY,
@@ -92,11 +94,12 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   };
   const plan = buildDatabaseMigrationPlan(14, DB_VERSION);
   expect(buildDatabaseMigrationPlan(13, DB_VERSION)?.map((step) => step.toDatabaseVersion)).toEqual(
-    [14, 15, 16]
+    [14, 15, 16, 17]
   );
-  expect(plan).toHaveLength(2);
+  expect(plan).toHaveLength(3);
   expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 13, to: 14 }]);
   expect(plan?.[1]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 14, to: 15 }]);
+  expect(plan?.[2]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
   handleDatabaseUpgrade(db, 14, DB_VERSION, transaction);
   expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
@@ -219,4 +222,38 @@ it('upgrades each retained source contract only after all required stores valida
     expect(() => migration.validate(db, transaction)).toThrow();
     expect(db.deleteObjectStore).not.toHaveBeenCalled();
   }
+});
+
+it('admits compact source gain without workspace migration and refuses incompatible contracts', () => {
+  expect(betaV17Fixture.records).toEqual(betaV16Fixture.records);
+  expect(betaV17Fixture.opfsObjects).toEqual(betaV16Fixture.opfsObjects);
+  const plan = buildDatabaseMigrationPlan(16, DB_VERSION);
+  expect(plan).toHaveLength(1);
+  expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
+  const put = vi.fn();
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+  };
+  const db = {
+    objectStoreNames: {
+      contains: (name: string) => betaV16Fixture.stores.some((store) => store === name),
+    },
+    createObjectStore: vi.fn(),
+    deleteObjectStore: vi.fn(),
+  };
+  handleDatabaseUpgrade(db, 16, DB_VERSION, tx);
+  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(
+    parseStoredSchemaContracts(
+      Object.entries(betaV16Fixture.domainVersions).map(([domainId, schemaVersion]) => ({
+        domainId,
+        schemaVersion,
+      }))
+    )
+  ).toBeNull();
+  expect(buildDatabaseMigrationPlan(DB_VERSION, 16)).toBeNull();
 });

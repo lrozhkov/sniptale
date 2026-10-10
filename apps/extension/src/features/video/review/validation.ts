@@ -298,6 +298,23 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       return null;
     return { ...metadata, target: 'canvasComment', before, after };
   }
+  if (value['target'] === 'sourceAudio') {
+    const parseGain = (gain: unknown) => {
+      if (
+        !isRecord(gain) ||
+        typeof gain['muted'] !== 'boolean' ||
+        !finite(gain['volume']) ||
+        gain['volume'] < 0 ||
+        gain['volume'] > 2
+      )
+        return null;
+      return { muted: gain['muted'], volume: gain['volume'] };
+    };
+    const before = parseGain(value['before']);
+    const after = parseGain(value['after']);
+    if (!before || !after) return null;
+    return { ...metadata, target: 'sourceAudio', before, after };
+  }
   if (value['target'] === 'advancedContent') {
     const before = loadQuickEditAdvancedContentState(value['before']);
     const after = loadQuickEditAdvancedContentState(value['after']);

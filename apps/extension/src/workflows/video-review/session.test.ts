@@ -4,6 +4,7 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { createVideoReviewSession } from './session';
 import type { ReviewOperation } from '../../features/video/review/types';
 import { saveReviewSpeechTranscript } from './speech-publication';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
 it('reads an exact retained operation across Undo without writes; unavailable storage is not absence', async () => {
@@ -521,4 +522,79 @@ it('explicit buffer Save drains earlier edits without a synthetic operation or e
   expect(session.getSnapshot()).toMatchObject({ dirty: false, autosaveEnabled: false, pending: 0 });
   await session.saveBuffered();
   expect(saveSnapshot).toHaveBeenCalledOnce();
+});
+
+it('keeps source mute autosave payload independent of unchanged text and preserves replay on reopen', async () => {
+  let stored = initial();
+  stored.workspace.advanced.text = {
+    version: 1,
+    fragments: Array.from({ length: 200 }, (_, index) => ({
+      id: `text-${index}`,
+      start: index / 100,
+      end: (index + 1) / 100,
+      text: 'Synthetic unchanged content '.repeat(20),
+      originalText: '',
+      revision: 0,
+      timingRevision: 0,
+      timeDomain: 'result' as const,
+      alignment: 'manual' as const,
+      showInVideo: false,
+    })),
+  };
+  const unchangedText = structuredClone(stored.workspace.advanced.text);
+  const read = vi.fn(async () => structuredClone(stored));
+  const commit = vi.fn(async (request: { operation: unknown; expectedRevision: number }) => {
+    expect(request.expectedRevision).toBe(stored.workspace.revision);
+    const workspace = parseVideoWorkspace({
+      ...stored.workspace,
+      history: [...stored.workspace.history.slice(0, stored.workspace.cursor), request.operation],
+      cursor: stored.workspace.cursor + 1,
+      revision: stored.workspace.revision + 1,
+      updatedAt: Date.now(),
+    });
+    if (!workspace) throw new Error('Invalid committed test workspace');
+    stored = { workspace, draft: stored.draft };
+    return structuredClone(stored);
+  });
+  const deps = {
+    readVideoWorkspace: read,
+    commitVideoWorkspace: commit,
+    moveVideoWorkspaceHistory: read,
+    saveVideoWorkspaceAdvanced: read,
+    saveVideoWorkspaceDraft: read,
+    saveVideoWorkspaceSnapshot: read,
+  };
+  const session = createVideoReviewSession(stored, deps);
+  const before = session.getSnapshot().document.advancedContent;
+  const acknowledge = vi.fn();
+  const fail = vi.fn();
+  session.stageAutosave(
+    'content',
+    () => ({
+      change: {
+        kind: 'content',
+        content: {
+          ...before,
+          audio: { ...before.audio, original: { ...before.audio.original, muted: true } },
+        },
+      },
+      acknowledge,
+      fail,
+    }),
+    { delay: 250 }
+  );
+  await session.flush();
+  const operation = stored.workspace.history[0];
+  expect(new TextEncoder().encode(JSON.stringify(operation)).byteLength).toBeLessThan(300);
+  expect(operation).toMatchObject({
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 1 },
+  });
+  expect(acknowledge).toHaveBeenCalledOnce();
+  expect(fail).not.toHaveBeenCalled();
+  const reopened = createVideoReviewSession(structuredClone(stored), deps);
+  expect(reopened.getSnapshot().document.advancedContent.audio.original.muted).toBe(true);
+  expect(reopened.getSnapshot().document.advancedContent.text).toEqual(unchangedText);
+  expect(stored.workspace.history).toHaveLength(1);
 });

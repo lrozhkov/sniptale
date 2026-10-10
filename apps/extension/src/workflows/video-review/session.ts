@@ -33,6 +33,7 @@ import type {
   ReviewOperation,
 } from '../../features/video/review/types';
 import {
+  createReviewAdvancedContentOperation,
   replayReviewHistory,
   reviewAdvancedContentBaseline,
 } from '../../features/video/review/document';
@@ -142,14 +143,13 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         if (change.kind === 'content') {
           const content = loadQuickEditAdvancedContentState(change.content);
           if (!content) throw new Error('Advanced content is invalid.');
-          if (JSON.stringify(content) !== JSON.stringify(state.document.advancedContent)) {
-            const operation: ReviewOperation = {
-              id: crypto.randomUUID(),
-              at: Date.now(),
-              target: 'advancedContent',
-              before: state.document.advancedContent,
-              after: content,
-            };
+          const operation = createReviewAdvancedContentOperation({
+            id: crypto.randomUUID(),
+            at: Date.now(),
+            before: state.document.advancedContent,
+            after: content,
+          });
+          if (operation) {
             await execute(() => deps.commitVideoWorkspace({ ...identity(), operation }), {
               kind: 'commit',
               operation,

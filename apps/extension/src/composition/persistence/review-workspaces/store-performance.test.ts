@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import {
+  createReviewAdvancedContentOperation,
   replayReviewHistory,
   reviewAdvancedContentBaseline,
 } from '../../../features/video/review/document';
@@ -158,10 +159,9 @@ function parameterEdit(value: VideoWorkspace): ReviewOperation {
     value.source,
     reviewAdvancedContentBaseline(value.advanced)
   ).advancedContent;
-  return {
+  const operation = createReviewAdvancedContentOperation({
     id: 'parameter-edit',
     at: 1000,
-    target: 'advancedContent',
     before,
     after: {
       ...before,
@@ -170,7 +170,9 @@ function parameterEdit(value: VideoWorkspace): ReviewOperation {
         original: { ...before.audio.original, muted: !before.audio.original.muted },
       },
     },
-  };
+  });
+  if (!operation) throw new Error('Missing parameter fixture change');
+  return operation;
 }
 
 it.each([
@@ -188,12 +190,19 @@ it.each([
   expect(observed.parse.mock.calls.length + observed.inspect.mock.calls.length).toBe(2);
   expect(observed.reads).toBe(1);
   expect(observed.writes).toBe(1);
+  expect(operation.target).toBe('sourceAudio');
   expect(observed.replay.mock.calls.filter(([history]) => history.length > 0)).toHaveLength(0);
   expect(observed.replay).toHaveBeenCalledTimes(2);
   expect(result.workspace.history.slice(0, previous.cursor)).toEqual(previous.history);
   expect(result.workspace.cursor).toBe(previous.cursor + 1);
   expect(result.workspace.revision).toBe(2);
   expect(Object.keys(result).sort()).toEqual(['draft', 'workspace']);
+  const persisted = await readVideoWorkspace(id);
+  if (!persisted) throw new Error('Missing persisted workspace');
+  expect(persisted.workspace.history.at(-1)).toEqual(operation);
+  expect(
+    new TextEncoder().encode(JSON.stringify(persisted.workspace.history.at(-1))).byteLength
+  ).toBeLessThan(300);
 });
 
 it('still rejects corrupt unapplied redo before any write', async () => {

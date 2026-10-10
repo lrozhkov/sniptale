@@ -299,3 +299,36 @@ it('preserves custom cut colors in history and rejects nonopaque or malformed co
     ).toBeNull();
   }
 });
+
+it('admits bounded source master gain operations without retaining extension fields', () => {
+  const value = {
+    id: 'gain',
+    at: 1,
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 0.5 },
+  };
+  expect(
+    parseReviewOperation(
+      { ...value, after: { ...value.after, assetId: 'untrusted', ranges: [] } },
+      10
+    )
+  ).toEqual(value);
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { volume: 1 },
+    { muted: true },
+    { muted: 'true', volume: 1 },
+    { muted: true, volume: '1' },
+    ...[-1, 2.1, NaN, Infinity].map((volume) => ({ muted: true, volume })),
+  ]) {
+    expect(parseReviewOperation({ ...value, before: invalid }, 10)).toBeNull();
+    expect(parseReviewOperation({ ...value, after: invalid }, 10)).toBeNull();
+  }
+  for (const volume of [0, 2])
+    expect(parseReviewOperation({ ...value, after: { muted: true, volume } }, 10)).toMatchObject({
+      after: { muted: true, volume },
+    });
+});

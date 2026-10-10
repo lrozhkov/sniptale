@@ -110,6 +110,12 @@ export type ReviewOperation = { id: string; at: number } & (
       after: CanvasComment | null;
     }
   | {
+      /** Master source gain only; ranges, mute bindings and other content stay in the document. */
+      target: 'sourceAudio';
+      before: Pick<import('./advanced/types').QuickEditOriginalAudio, 'muted' | 'volume'>;
+      after: Pick<import('./advanced/types').QuickEditOriginalAudio, 'muted' | 'volume'>;
+    }
+  | {
       /** Whole-content advanced snapshot; `ui` chrome never travels through history. */
       target: 'advancedContent';
       before: import('./advanced/types').QuickEditAdvancedContent;
