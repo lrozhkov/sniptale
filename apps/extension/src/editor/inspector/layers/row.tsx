@@ -1,6 +1,6 @@
 import React from 'react';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
-import { translate } from '../../../platform/i18n';
+import { translate, type AppLocale } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { cx } from '../../chrome/ui';
 import { LayerActionRail, LayerExpandedActions } from './actions';
@@ -221,8 +221,10 @@ function createLayerDragHandlers(props: {
   };
 }
 
-export function LayerRow(props: {
+export const LayerRow = React.memo(function LayerRow(props: {
   layer: EditorLayerItem;
+  // The list's single locale subscription invalidates every memoized row.
+  locale: AppLocale;
   dragOverLayerId: string | null;
   autoNavigateSelectedLayer?: boolean;
   setDraggedLayerId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -268,4 +270,4 @@ export function LayerRow(props: {
       <LayerActionRail layer={props.layer} />
     </div>
   );
-}
+});

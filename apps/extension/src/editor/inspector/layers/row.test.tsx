@@ -87,6 +87,7 @@ function renderRow(layerName = 'Layer 1') {
   act(() => {
     root?.render(
       <LayerRow
+        locale="en"
         layer={{ ...BASE_LAYER, name: layerName } as never}
         dragOverLayerId={null}
         setDraggedLayerId={vi.fn() as never}
@@ -165,6 +166,7 @@ it('passes enabled viewport navigation through layer selection actions', () => {
   act(() => {
     root?.render(
       <LayerRow
+        locale="en"
         layer={BASE_LAYER as never}
         autoNavigateSelectedLayer
         dragOverLayerId={null}
@@ -227,6 +229,7 @@ it('forwards drag events for mutable layers', () => {
   act(() => {
     root?.render(
       <LayerRow
+        locale="en"
         layer={BASE_LAYER as never}
         dragOverLayerId={null}
         setDraggedLayerId={setDraggedLayerId as never}
@@ -264,6 +267,7 @@ it('keeps immutable rows non-draggable and skips drag updates', () => {
   act(() => {
     root?.render(
       <LayerRow
+        locale="en"
         layer={
           { ...BASE_LAYER, id: 'source-image', immutable: true, name: 'Immutable Layer' } as never
         }

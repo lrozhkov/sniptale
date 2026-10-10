@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand';
 import type {
   BrowserFrameState,
   EditorFrameSettings,
+  EditorLayerItem,
   EditorViewportState,
   EditorWorkspaceSettings,
 } from '../../features/editor/document/types';
@@ -108,7 +109,7 @@ export function createRuntimePatch(
   patch: EditorRuntimePatch
 ): RuntimeStatePatch {
   return {
-    layers: patch.layers ?? state.layers,
+    layers: patch.layers ? retainLayerProjections(state.layers, patch.layers) : state.layers,
     selection: patch.selection ?? state.selection,
     cropReady: patch.cropReady,
     cropSelection: patch.cropSelection,
@@ -117,6 +118,46 @@ export function createRuntimePatch(
     frame: patch.frame ? normalizeEditorFrameSettings(patch.frame) : state.frame,
     browserFrame: patch.browserFrame ?? state.browserFrame,
   };
+}
+
+function sameProjectionFields<T extends object>(previous: T, next: T): boolean {
+  const keys = Object.keys(previous) as Array<keyof T>;
+  return (
+    keys.length === Object.keys(next).length &&
+    keys.every((key) => Object.hasOwn(next, key) && Object.is(previous[key], next[key]))
+  );
+}
+
+function sameProjectionItems<T extends object>(previous: T[] | undefined, next: T[] | undefined) {
+  if (previous === next) return true;
+  return (
+    previous !== undefined &&
+    next !== undefined &&
+    previous.length === next.length &&
+    previous.every((item, index) => sameProjectionFields(item, next[index]!))
+  );
+}
+
+function sameLayerProjection(previous: EditorLayerItem, next: EditorLayerItem): boolean {
+  const { effects: previousEffects, groupChildren: previousChildren, ...previousFields } = previous;
+  const { effects: nextEffects, groupChildren: nextChildren, ...nextFields } = next;
+  return (
+    sameProjectionFields(previousFields, nextFields) &&
+    sameProjectionItems(previousEffects, nextEffects) &&
+    sameProjectionItems(previousChildren, nextChildren)
+  );
+}
+
+function retainLayerProjections(previous: EditorLayerItem[], next: EditorLayerItem[]) {
+  const previousById = new Map(previous.map((layer) => [layer.id, layer]));
+  const retained = next.map((layer) => {
+    const existing = previousById.get(layer.id);
+    return existing && sameLayerProjection(existing, layer) ? existing : layer;
+  });
+  return previous.length === retained.length &&
+    retained.every((layer, index) => layer === previous[index])
+    ? previous
+    : retained;
 }
 
 export function createManualViewportPreviewPatch(

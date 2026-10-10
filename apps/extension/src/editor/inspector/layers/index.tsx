@@ -35,7 +35,7 @@ export function EditorInspectorLayersPanel(props: EditorInspectorLayersPanelProp
         setDraggedLayerId={panelView.state.setDraggedLayerId}
         setDragOverLayerId={panelView.state.setDragOverLayerId}
         onDrop={panelView.actions.handleLayerDrop}
-        onOpenLayerEffects={props.onOpenLayerEffects}
+        onOpenLayerEffects={panelView.actions.handleOpenLayerEffects}
       />
     </LayerPanelFrame>
   );
