@@ -10,11 +10,13 @@ type Session = ReturnType<
 >;
 
 const ADVANCED_SAVE_DEBOUNCE_MS = 250;
+const TEXT_TYPING_SAVE_DEBOUNCE_MS = 1000;
 type ContentMutation = (content: QuickEditAdvancedContent) => QuickEditAdvancedContent;
 type PendingContent = {
   revision: number;
   value: QuickEditAdvancedContent;
   mutations: ContentMutation[];
+  typing: boolean;
 };
 
 async function commitPendingContent(session: Session, sent: PendingContent): Promise<void> {
@@ -56,42 +58,56 @@ export function useReviewAdvancedContent(
   const nextRevision = useRef(0);
   const optimistic = useRef<PendingContent | null>(null);
   const mounted = useRef(true);
-  const drain = useCallback(async (): Promise<void> => {
-    while (pending.current) {
-      const sent = pending.current;
-      try {
-        await commitPendingContent(session, sent);
-      } catch (error) {
-        if (mounted.current) setSaveFailed(true);
-        throw error;
+  const drain = useCallback(
+    async (idle: boolean): Promise<void> => {
+      while (pending.current) {
+        // Acknowledging an older automatic save does not end the current typing pause.
+        if (idle && pending.current.typing && timer.current !== null) break;
+        const sent = pending.current;
+        try {
+          await commitPendingContent(session, sent);
+        } catch (error) {
+          if (mounted.current) setSaveFailed(true);
+          throw error;
+        }
+        const acknowledged = pendingAfterAcknowledgement(pending.current, sent);
+        pending.current = acknowledged;
+        optimistic.current = acknowledged;
+        if (mounted.current) {
+          if (!acknowledged) setSaveFailed(false);
+          setVersion((value) => value + 1);
+        }
       }
-      const acknowledged = pendingAfterAcknowledgement(pending.current, sent);
-      pending.current = acknowledged;
-      optimistic.current = acknowledged;
-      if (mounted.current) {
-        if (!acknowledged) setSaveFailed(false);
-        setVersion((value) => value + 1);
-      }
-    }
-  }, [session]);
+    },
+    [session]
+  );
+  const save = useCallback(
+    (idle: boolean): Promise<void> => {
+      const attempt = async () => {
+        do {
+          if (!running.current) {
+            const task = drain(idle).finally(() => {
+              running.current = null;
+            });
+            running.current = task;
+          }
+          await running.current;
+        } while (
+          pending.current !== null &&
+          !(idle && pending.current.typing && timer.current !== null)
+        );
+      };
+      return attempt();
+    },
+    [drain]
+  );
   const flush = useCallback((): Promise<void> => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    const attempt = async () => {
-      do {
-        if (!running.current) {
-          const task = drain().finally(() => {
-            running.current = null;
-          });
-          running.current = task;
-        }
-        await running.current;
-      } while (pending.current !== null);
-    };
-    return attempt();
-  }, [drain]);
+    return save(false);
+  }, [save]);
   const stage = useCallback(
-    (mutate: ContentMutation) => {
+    (mutate: ContentMutation, typing = false) => {
       const previous = pending.current;
       const base = previous?.value ?? session.getSnapshot().document.advancedContent;
       const value = mutate(base);
@@ -100,18 +116,22 @@ export function useReviewAdvancedContent(
         revision: ++nextRevision.current,
         value,
         mutations: [...(previous?.mutations ?? []), mutate],
+        typing,
       };
       optimistic.current = entry;
       pending.current = entry;
       setVersion((value) => value + 1);
       setSaveFailed(false);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        timer.current = null;
-        void flush().catch(() => undefined);
-      }, ADVANCED_SAVE_DEBOUNCE_MS);
+      timer.current = setTimeout(
+        () => {
+          timer.current = null;
+          void save(true).catch(() => undefined);
+        },
+        typing ? TEXT_TYPING_SAVE_DEBOUNCE_MS : ADVANCED_SAVE_DEBOUNCE_MS
+      );
     },
-    [flush, session]
+    [save, session]
   );
   useEffect(() => {
     mounted.current = true;
@@ -150,16 +170,17 @@ export function useReviewAdvancedContent(
 }
 
 /** Authored mutations share the debounced history writer, independent of its React lifecycle. */
-function reviewContentCommands(stage: (mutation: ContentMutation) => void) {
+function reviewContentCommands(stage: (mutation: ContentMutation, typing?: boolean) => void) {
   return {
     setText: (
-      update: (text: QuickEditAdvancedContent['text']) => QuickEditAdvancedContent['text']
+      update: (text: QuickEditAdvancedContent['text']) => QuickEditAdvancedContent['text'],
+      typing = false
     ) =>
       stage((content) => {
         const { text: previous, ...rest } = content;
         const text = update(previous);
         return text ? { ...rest, text } : rest;
-      }),
+      }, typing),
     setCaptions: (captions: QuickEditAdvancedContent['captions']) =>
       stage((content) => {
         const { captions: _previous, ...rest } = content;

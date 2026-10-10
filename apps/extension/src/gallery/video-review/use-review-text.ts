@@ -72,7 +72,8 @@ export function useReviewText(args: {
   snapshots?: readonly ReviewVoiceTextSnapshot[];
   selection?: ReviewSelection;
   setText(
-    update: (current: ReviewTextDocument | undefined) => ReviewTextDocument | undefined
+    update: (current: ReviewTextDocument | undefined) => ReviewTextDocument | undefined,
+    typing?: boolean
   ): void;
   sourceDuration: number;
   edits: readonly ReviewEdit[];
@@ -91,14 +92,17 @@ export function useReviewText(args: {
     [args.sourceDuration, args.edits]
   );
   const document = args.document ?? createReviewTextDocument();
-  const mutate = (operation: (current: ReviewTextDocument) => ReviewTextEditResult) => {
+  const mutate = (
+    operation: (current: ReviewTextDocument) => ReviewTextEditResult,
+    typing = false
+  ) => {
     let failure: typeof error = null;
     args.setText((current) => {
       const result = operation(current ?? createReviewTextDocument());
       if (result.ok) return result.document;
       failure = result.reason;
       return current;
-    });
+    }, typing);
     setError(failure);
     return failure === null;
   };
@@ -108,19 +112,22 @@ export function useReviewText(args: {
     patch: Parameters<typeof editReviewTextFragment>[2],
     timingRevision?: number
   ) =>
-    mutate((current) => {
-      const fragment = current.fragments.find((entry) => entry.id === id);
-      if (timingRevision !== undefined && fragment?.timingRevision !== timingRevision)
-        return { ok: false, reason: 'stale' };
-      const limit =
-        fragment?.timeDomain === 'source' ? args.sourceDuration : projection.resultDuration;
-      if (
-        (patch.start !== undefined && patch.start < 0) ||
-        (patch.end !== undefined && patch.end > limit)
-      )
-        return { ok: false, reason: 'invalid' };
-      return editReviewTextFragment(current, id, patch);
-    });
+    mutate(
+      (current) => {
+        const fragment = current.fragments.find((entry) => entry.id === id);
+        if (timingRevision !== undefined && fragment?.timingRevision !== timingRevision)
+          return { ok: false, reason: 'stale' };
+        const limit =
+          fragment?.timeDomain === 'source' ? args.sourceDuration : projection.resultDuration;
+        if (
+          (patch.start !== undefined && patch.start < 0) ||
+          (patch.end !== undefined && patch.end > limit)
+        )
+          return { ok: false, reason: 'invalid' };
+        return editReviewTextFragment(current, id, patch);
+      },
+      patch.text !== undefined && Object.keys(patch).length === 1
+    );
   const add = (select = true) =>
     guard(() => {
       args.pause();

@@ -331,6 +331,14 @@ async function checkLocalTakes(
   });
   await button('videoEditor.app.recordAudioStart').click();
   await expect(recording.getByRole('meter')).toBeVisible();
+  const dialog = voice.locator('xpath=ancestor::dialog[1]');
+  const inspectorWidth = await dialog
+    .locator('.review-inspector-scroll')
+    .evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
+  for (const width of [420, 640, inspectorWidth]) {
+    await resizeInspectorContent(page, dialog, width);
+    await expect(recording.getByRole('meter')).toBeVisible();
+  }
   await button('videoEditor.app.recordAudioPause').click();
   await button('videoEditor.app.recordAudioResume').click();
   // MediaRecorder needs elapsed media time to produce an actual decodable take.
@@ -389,6 +397,10 @@ async function checkLocalTakes(
     .getByRole('button', { name: label('gallery.videoReview.speechApply'), exact: true })
     .click();
   await expect(takes).toHaveCount(4);
+  for (const width of [420, 640, inspectorWidth]) {
+    await resizeInspectorContent(page, dialog, width);
+    await expect(takes).toHaveCount(4);
+  }
   const persisted = await persistedSpeech(page);
   expect(persisted?.clips.map((clip) => clip.textSnapshot?.kind)).toEqual([
     'ai',
@@ -481,7 +493,9 @@ async function resizeInspectorContent(page: Page, dialog: Locator, width: number
     .boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 20);
   await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 - (width - current), handle.y + 20);
+  await page.mouse.move(handle.x + handle.width / 2 - (width - current), handle.y + 20, {
+    steps: 12,
+  });
   await page.mouse.up();
   await expect.poll(readWidth).toBe(width);
 }
@@ -495,6 +509,15 @@ for (const variant of [
     page,
   }, info) => {
     await page.setViewportSize({ width: variant.width, height: variant.height });
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', (error) => runtimeErrors.push(error.message));
+    page.on('console', (message) => {
+      if (
+        message.type() === 'error' &&
+        /Minified React error|Maximum update depth/i.test(message.text())
+      )
+        runtimeErrors.push(message.text());
+    });
     const host = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
@@ -503,6 +526,16 @@ for (const variant of [
         storage: {
           'sniptale-locale-preference': variant.locale,
           'sniptale-theme-preference': variant.theme,
+          ...(variant.width === 1920
+            ? {
+                sniptale_quick_preview_preferences: {
+                  rasterPreset: '720p',
+                  frameRate: '30',
+                  pausedQuality: 'detailed',
+                  showFrameRate: false,
+                },
+              }
+            : {}),
         },
         runtimeResponses: {
           AI_SETTINGS_QUERY: textModelResponse,
@@ -533,7 +566,15 @@ for (const variant of [
         exact: true,
       });
       await expect(textbox).toBeFocused();
-      await textbox.fill('Первая фраза');
+      await expect
+        .poll(async () => (await persistedReviewContent(page))?.text?.fragments[0]?.text)
+        .toBe('');
+      await textbox.pressSequentially('Первая фраза', { delay: 400 });
+      await expect(textbox).toHaveValue('Первая фраза');
+      expect((await persistedReviewContent(page))?.text?.fragments[0]?.text).toBe('');
+      await expect
+        .poll(async () => (await persistedReviewContent(page))?.text?.fragments[0]?.text)
+        .toBe('Первая фраза');
       await document
         .getByRole('button', { name: label('gallery.videoReview.textFragmentAdd'), exact: true })
         .click();
@@ -574,6 +615,21 @@ for (const variant of [
       await expect(voice).toBeVisible();
       await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
       await expect(voice.locator('svg.animate-spin')).toHaveCount(0);
+      const format = voice.getByRole('button', {
+        name: label('gallery.videoReview.speechFormat'),
+        exact: true,
+      });
+      await format.click();
+      await page.getByRole('option', { name: 'MP3', exact: true }).click();
+      await expect(format).toBeFocused();
+      const initialInspectorWidth = await dialog
+        .locator('.review-inspector-scroll')
+        .evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
+      for (const width of [420, 523, 524, 525, 640, initialInspectorWidth]) {
+        await resizeInspectorContent(page, dialog, width);
+        await expect(voice).toBeVisible();
+        expect(runtimeErrors).toEqual([]);
+      }
       const muteSource = voice.getByRole('switch', {
         name: label('gallery.videoReview.textVoiceMuteSource'),
         exact: true,
@@ -616,6 +672,13 @@ for (const variant of [
         .click();
       await expect(voice.locator('audio')).toHaveCount(1);
       expect(await requestCount()).toBe(1);
+      await button('videoEditor.app.panelFullHeight').click();
+      for (const width of [420, 523, 524, 525, 640, initialInspectorWidth]) {
+        await resizeInspectorContent(page, dialog, width);
+        await expect(voice.locator('audio')).toHaveCount(1);
+        expect(runtimeErrors).toEqual([]);
+      }
+      await button('videoEditor.app.panelRestoreHeight').click();
       const apply = voice.getByRole('button', {
         name: label('gallery.videoReview.speechApply'),
         exact: true,
@@ -744,6 +807,7 @@ for (const variant of [
         button('gallery.videoReview.undo'),
         button('gallery.videoReview.redo')
       );
+      expect(runtimeErrors).toEqual([]);
       if (variant.width < 1280) {
         await dialog
           .getByRole('slider', { name: label('videoEditor.timeline.zoom'), exact: true })
