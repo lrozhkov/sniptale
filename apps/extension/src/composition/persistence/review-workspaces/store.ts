@@ -1,4 +1,5 @@
-import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
+import { usageReferenceKey, USAGE_INDEX_MARKER } from '../media-library/usage-index-keys';
+import { collectReviewAssetReferences } from './asset-refs';
 import { createNewWorkspacePresentationSettings } from '../../../features/video/review/advanced/presentation';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -53,6 +54,15 @@ function beginWriteTransaction(db: Database) {
   return db.transaction(stores, 'readwrite', { durability: 'strict' });
 }
 type WriteTransaction = ReturnType<typeof beginWriteTransaction>;
+
+function indexedWorkspace(workspace: VideoWorkspace) {
+  const keys = new Set([USAGE_INDEX_MARKER]);
+  for (const ref of collectReviewAssetReferences(workspace)) {
+    if (ref.startsWith('project-asset:'))
+      keys.add(usageReferenceKey('project-asset', ref.slice('project-asset:'.length)));
+  }
+  return { ...workspace, usageReferenceKeys: [...keys] };
+}
 
 /** Recoverable failure codes; never include user text in the error. */
 export class VideoWorkspaceError extends Error {
@@ -192,7 +202,7 @@ export async function openVideoWorkspace(
       updatedAt: now,
     });
     if (!workspace) throw new VideoWorkspaceError('invalid');
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).put(withReviewWorkspaceUsage(workspace));
+    await tx.objectStore(VIDEO_WORKSPACES_STORE).put(indexedWorkspace(workspace));
     return { workspace, draft: null };
   });
 }
@@ -215,6 +225,7 @@ async function requireSnapshot(
 
 async function putWorkspace(
   tx: WriteTransaction,
+  previous: VideoWorkspace,
   workspace: VideoWorkspace,
   prepared: ReviewReadySources = { assets: new Map(), libraryAudioClaims: [] }
 ): Promise<VideoWorkspace> {
@@ -224,10 +235,6 @@ async function putWorkspace(
     updatedAt: Math.max(Date.now(), workspace.updatedAt),
   });
   if (!next) throw new VideoWorkspaceError('invalid');
-  const previous = parseVideoWorkspace(
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).get(next.aggregateId)
-  );
-  if (!previous) throw new VideoWorkspaceError('invalid');
   if (
     !(await areNewReviewSourcesAvailable(
       next,
@@ -249,7 +256,7 @@ async function putWorkspace(
     },
     prepared
   );
-  await tx.objectStore(VIDEO_WORKSPACES_STORE).put(withReviewWorkspaceUsage(next));
+  await tx.objectStore(VIDEO_WORKSPACES_STORE).put(indexedWorkspace(next));
   return next;
 }
 
@@ -300,6 +307,7 @@ export async function commitVideoWorkspace(args: {
       applyReviewOperation(document, operation, workspace.source);
       const next = await putWorkspace(
         tx,
+        workspace,
         {
           ...workspace,
           history: [...workspace.history.slice(0, workspace.cursor), operation],
@@ -339,7 +347,10 @@ export async function moveVideoWorkspaceHistory(args: {
       cursor > snapshot.workspace.history.length
     )
       return snapshot;
-    return { ...snapshot, workspace: await putWorkspace(tx, { ...snapshot.workspace, cursor }) };
+    return {
+      ...snapshot,
+      workspace: await putWorkspace(tx, snapshot.workspace, { ...snapshot.workspace, cursor }),
+    };
   });
 }
 
@@ -363,7 +374,12 @@ export async function saveVideoWorkspaceAdvanced(args: {
       if (!advanced) throw new VideoWorkspaceError('invalid');
       return {
         ...snapshot,
-        workspace: await putWorkspace(tx, { ...snapshot.workspace, advanced }, prepared),
+        workspace: await putWorkspace(
+          tx,
+          snapshot.workspace,
+          { ...snapshot.workspace, advanced },
+          prepared
+        ),
       };
     },
     true
@@ -392,7 +408,9 @@ export async function saveVideoWorkspaceDraft(args: {
       await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
       // Advancing the workspace revision prevents an old writer matching a recreated draft.
       return {
-        workspace: snapshot.draft ? await putWorkspace(tx, snapshot.workspace) : snapshot.workspace,
+        workspace: snapshot.draft
+          ? await putWorkspace(tx, snapshot.workspace, snapshot.workspace)
+          : snapshot.workspace,
         draft: null,
       };
     }
@@ -448,6 +466,7 @@ export async function saveVideoWorkspaceSnapshot(args: {
         throw new VideoWorkspaceError('invalid');
       const next = await putWorkspace(
         tx,
+        current.workspace,
         {
           ...workspace,
           revision: current.workspace.revision,
