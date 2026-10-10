@@ -26,7 +26,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('serializes caption history snapshots while an earlier save is pending', async () => {
+it('coalesces uncaptured caption autosaves while retaining the latest published history document', async () => {
   const autosave = createEditorSessionAutosaveService();
   autosave.activate({
     aggregateId: 'image-1',
@@ -57,16 +57,13 @@ it('serializes caption history snapshots while an earlier save is pending', asyn
   expect(commitWorkspaceMock).toHaveBeenCalledOnce();
   finishFirst();
   await vi.advanceTimersByTimeAsync(0);
-  expect(commitWorkspaceMock.mock.calls.map(([input]) => input.expectedRevision)).toEqual([
-    0, 1, 2,
-  ]);
+  expect(commitWorkspaceMock.mock.calls.map(([input]) => input.expectedRevision)).toEqual([0, 1]);
   expect(commitWorkspaceMock.mock.calls.map(([input]) => input.sourceTitle)).toEqual([
     'First',
-    'Second',
     'Third',
   ]);
   expect(autosave.getLastWriteError()).toBeNull();
-  expect(autosave.getDurableRevision()).toBe(3);
+  expect(autosave.getDurableRevision()).toBe(2);
   autosave.dispose();
 });
 

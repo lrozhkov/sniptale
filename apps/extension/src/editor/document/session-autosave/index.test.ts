@@ -89,6 +89,43 @@ function createDocument(sourceImageData: string) {
   return { ...createEditorDocumentFixture(), sourceImageData };
 }
 
+it('coalesces expired uncaptured autosaves behind an acquired workspace write', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let release: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(
+    (input) =>
+      new Promise((resolve) => {
+        release = () =>
+          resolve({
+            aggregateId: input.aggregateId,
+            documentAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl ?? new Map(),
+            revision: input.expectedRevision + 1,
+          });
+      })
+  );
+  autosave.scheduleAutosave(createDocument('first acquired snapshot'));
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  autosave.scheduleAutosave(createDocument('obsolete expired snapshot'));
+  await vi.advanceTimersByTimeAsync(2_000);
+  autosave.scheduleAutosave(createDocument('latest expired snapshot'));
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  release();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      document: expect.objectContaining({ sourceImageData: 'latest expired snapshot' }),
+      expectedRevision: 1,
+    })
+  );
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});
+
 describe('presentation scheduling admission', () => {
   it('defers presentation while autosave is off and the canvas contains unsaved edits', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
@@ -498,7 +535,7 @@ describe('image aggregate autosave', () => {
     expect(autosave.getDurableRevision()).toBeNull();
   });
 
-  it('safely drains stale internal queue states without persisting empty work', async () => {
+  it('retries a failed write on a new edit without persisting detached or empty work', async () => {
     const { activateAutosaveContext } = await import('./lifecycle');
     const { queuePendingAutosave } = await import('./persistence');
     const { createAutosaveState } = await import('./state');
@@ -512,26 +549,27 @@ describe('image aggregate autosave', () => {
 
     const recoveredChainState = createAutosaveState();
     activateAutosaveContext(recoveredChainState, context);
-    const rejectedWrite = Promise.reject(new Error('previous queue failure'));
-    void rejectedWrite.catch(() => undefined);
-    recoveredChainState.writeChain = rejectedWrite;
+    commitWorkspaceMock.mockRejectedValueOnce(new Error('temporary workspace failure'));
+    queuePendingAutosave(recoveredChainState, createDocument('failed'));
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(commitWorkspaceMock).toHaveBeenCalledOnce();
     queuePendingAutosave(recoveredChainState, createDocument('after-failure'));
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
 
     const detachedState = createAutosaveState();
     activateAutosaveContext(detachedState, context);
     queuePendingAutosave(detachedState, createDocument('detached'));
     detachedState.activeContext = null;
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
 
     const emptyState = createAutosaveState();
     activateAutosaveContext(emptyState, context);
     queuePendingAutosave(emptyState, createDocument('cleared'));
     emptyState.pendingDocument = null;
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
   });
 });
 

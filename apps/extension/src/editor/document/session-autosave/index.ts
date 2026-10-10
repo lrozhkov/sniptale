@@ -18,7 +18,7 @@ import {
 } from './persistence';
 import { scheduleImagePresentation } from './presentation';
 import {
-  clearPendingAutosaveTimer,
+  cancelPendingAutosaveRequest,
   interruptImagePresentation,
   releaseAutosaveInteraction,
   createAutosaveState,
@@ -66,7 +66,7 @@ function createEditorSessionAutosaveActions(
       state.interactionRevision += 1;
       state.interactionActive = active;
       if (active) {
-        clearPendingAutosaveTimer(state);
+        cancelPendingAutosaveRequest(state);
         interruptImagePresentation(state);
         return;
       }
@@ -85,7 +85,7 @@ function createEditorSessionAutosaveActions(
     setEnabled: (enabled, getDocument) => {
       if (state.enabled === enabled) return;
       state.enabled = enabled;
-      clearPendingAutosaveTimer(state);
+      cancelPendingAutosaveRequest(state);
       state.pendingDocument = null;
       if (enabled && state.activeContext && getDocument) {
         queuePendingAutosave(state, getDocument());

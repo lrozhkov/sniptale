@@ -1,14 +1,19 @@
-import { commitImageWorkspace } from '../../../composition/persistence/image-aggregates';
+import {
+  commitImageWorkspace,
+  StaleImageWorkspaceError,
+} from '../../../composition/persistence/image-aggregates';
+import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { useEditorStore } from '../../state/useEditorStore';
 import { scheduleImagePresentation } from './presentation';
 import {
-  clearPendingAutosaveTimer,
+  cancelPendingAutosaveRequest,
   interruptImagePresentation,
   type ActiveEditorSessionContext,
   type EditorSessionAutosaveState,
+  type EditorAutosaveCapture,
 } from './state';
 
 const EDITOR_AUTOSAVE_DEBOUNCE_MS = 2_000;
@@ -41,7 +46,7 @@ async function persistEditorSessionDocument(args: {
       reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
     });
 
-    if (args.state.contextGeneration !== args.contextGeneration) return;
+    if (!isCurrentCapture(args.state, args)) return;
     if (args.state.activeContext?.aggregateId === args.context.aggregateId) {
       args.state.activeContext.durableRevision = result.revision;
       args.state.activeContext.requireExistingRoot = true;
@@ -60,62 +65,71 @@ async function persistEditorSessionDocument(args: {
     }
     scheduleImagePresentation(args.context, result.revision, args.revision, args.state);
   } catch (error) {
-    if (args.state.contextGeneration !== args.contextGeneration) return;
+    if (!isCurrentCapture(args.state, args)) return;
     args.state.lastWriteError = error;
     logger.error('Failed to persist draft', error);
 
-    if (
-      args.state.activeContext?.aggregateId === args.context.aggregateId &&
-      args.revision === args.state.autosaveRevision
-    ) {
-      setEditorSaveErrorMessage(
-        createUserFacingErrorMessage({
-          cause: error,
-          detail: 'storage',
-          summaryKey: 'common.errors.saveFailed',
-        })
-      );
-      setEditorSaveState('error');
-    }
+    setEditorSaveErrorMessage(
+      createUserFacingErrorMessage({
+        cause: error,
+        detail: 'storage',
+        summaryKey: 'common.errors.saveFailed',
+      })
+    );
+    setEditorSaveState('error');
+    throw error;
   }
 }
 
-function enqueueEditorSessionDocument(
+function isCurrentCapture(
   state: EditorSessionAutosaveState,
-  document: EditorDocument,
-  explicit = false
-): Promise<void> {
-  const context = state.activeContext;
-  if (!context) {
-    return Promise.resolve();
-  }
+  capture: EditorAutosaveCapture
+): boolean {
+  return (
+    state.contextGeneration === capture.contextGeneration &&
+    state.activeContext?.aggregateId === capture.context.aggregateId
+  );
+}
 
-  const contextGeneration = state.contextGeneration;
-  const revision = ++state.autosaveRevision;
-  interruptImagePresentation(state);
-  state.hasUnsavedChanges = true;
-  setEditorSaveErrorMessage(null);
-  setEditorSaveState('saving');
-
-  state.writeChain = state.writeChain
-    .catch(() => undefined)
-    .then(() => {
-      if (state.contextGeneration !== contextGeneration || (!explicit && !state.enabled)) return;
-      if (!explicit && state.interactionActive) {
-        if (revision === state.autosaveRevision) state.pendingDocument = document;
-        setEditorSaveState('idle');
-        return;
+function getAutosaveCoordinator(state: EditorSessionAutosaveState) {
+  if (state.coordinator) return state.coordinator;
+  state.coordinator = createAutosaveCoordinator<'document', EditorAutosaveCapture | null>({
+    now: () => Date.now(),
+    schedule: (callback, delay) => {
+      const timer = window.setTimeout(callback, delay);
+      return () => window.clearTimeout(timer);
+    },
+    capture: () => {
+      if (
+        !state.activeContext ||
+        !state.pendingDocument ||
+        !state.enabled ||
+        state.interactionActive
+      )
+        return null;
+      const captured = {
+        context: state.activeContext,
+        contextGeneration: state.contextGeneration,
+        document: state.pendingDocument,
+        revision: state.autosaveRevision,
+      };
+      state.pendingDocument = null;
+      return captured;
+    },
+    commit: async (capture) => {
+      if (!capture || !isCurrentCapture(state, capture)) return;
+      setEditorSaveState('saving');
+      try {
+        await persistEditorSessionDocument({ ...capture, state });
+      } catch (error) {
+        if (!isCurrentCapture(state, capture)) return;
+        if (capture.revision === state.autosaveRevision) state.pendingDocument = capture.document;
+        throw error;
       }
-      return persistEditorSessionDocument({
-        context,
-        contextGeneration,
-        document,
-        revision,
-        state,
-      });
-    });
-
-  return state.writeChain;
+    },
+    classifyFailure: (error) => (error instanceof StaleImageWorkspaceError ? 'stop' : 'retry'),
+  });
+  return state.coordinator;
 }
 
 export function queuePendingAutosave(
@@ -135,15 +149,50 @@ export function queuePendingAutosave(
 }
 
 export function schedulePendingAutosaveWrite(state: EditorSessionAutosaveState): void {
-  clearPendingAutosaveTimer(state);
   if (!state.pendingDocument || !state.enabled || state.interactionActive) return;
-  state.pendingTimer = window.setTimeout(() => {
-    state.pendingTimer = 0;
-    if (state.interactionActive || !state.enabled) return;
-    const snapshot = state.pendingDocument;
-    state.pendingDocument = null;
-    if (snapshot) void enqueueEditorSessionDocument(state, snapshot);
-  }, EDITOR_AUTOSAVE_DEBOUNCE_MS);
+  getAutosaveCoordinator(state).request('document', { delay: EDITOR_AUTOSAVE_DEBOUNCE_MS });
+}
+
+function requireAutosaveGeneration(
+  state: EditorSessionAutosaveState,
+  generation: number,
+  cause?: unknown
+): void {
+  if (state.contextGeneration !== generation) {
+    throw new Error('Editor document changed while waiting to save.', { cause });
+  }
+}
+
+async function flushAutosaveBarrier(
+  state: EditorSessionAutosaveState,
+  generation: number,
+  previousError: unknown
+): Promise<boolean> {
+  const interactionRevision = state.interactionRevision;
+  const documentRevision = state.autosaveRevision;
+  const coordinator = getAutosaveCoordinator(state);
+  try {
+    await coordinator.flushCaptured(['document']);
+  } catch (error) {
+    requireAutosaveGeneration(state, generation, error);
+    if (!state.enabled) return false;
+    if (
+      state.lastWriteError &&
+      (state.lastWriteError !== previousError || state.lastWriteError === error)
+    )
+      throw state.lastWriteError;
+    if (state.autosaveRevision !== documentRevision) {
+      await coordinator
+        .runOrdered(async () => undefined)
+        .catch((cause: unknown) => {
+          requireAutosaveGeneration(state, generation, cause);
+          throw cause;
+        });
+    } else if (state.interactionRevision !== interactionRevision) {
+      return false;
+    } else throw error;
+  }
+  return true;
 }
 
 export async function flushPendingAutosave(
@@ -155,20 +204,18 @@ export async function flushPendingAutosave(
   }
 
   const generation = state.contextGeneration;
+  const previousError = state.lastWriteError;
   do {
     if (state.interactionActive) {
       await new Promise<void>((resolve) => state.interactionWaiters.push(resolve));
     }
-    if (state.contextGeneration !== generation) {
-      throw new Error('Editor document changed while waiting to save.');
-    }
-    clearPendingAutosaveTimer(state);
-    const snapshot = state.pendingDocument ?? getDocument();
-    state.pendingDocument = null;
-    await enqueueEditorSessionDocument(state, snapshot);
-    if (state.contextGeneration !== generation) {
-      throw new Error('Editor document changed while waiting to save.');
-    }
+    requireAutosaveGeneration(state, generation);
+    if (!state.enabled) return;
+    if (state.lastWriteError instanceof StaleImageWorkspaceError) throw state.lastWriteError;
+    if (state.lastWriteError && state.lastWriteError !== previousError) throw state.lastWriteError;
+    if (!state.pendingDocument) queuePendingAutosave(state, getDocument());
+    if (!(await flushAutosaveBarrier(state, generation, previousError))) continue;
+    requireAutosaveGeneration(state, generation);
     if (state.lastWriteError) throw state.lastWriteError;
   } while (
     state.contextGeneration === generation &&
@@ -194,8 +241,27 @@ export async function saveEditorSessionSnapshot(
 ): Promise<void> {
   if (!state.activeContext) return;
 
-  clearPendingAutosaveTimer(state);
+  cancelPendingAutosaveRequest(state);
   state.pendingDocument = null;
-  await enqueueEditorSessionDocument(state, getDocument(), true);
-  if (state.lastWriteError) throw state.lastWriteError;
+  const captured: EditorAutosaveCapture = {
+    context: state.activeContext,
+    contextGeneration: state.contextGeneration,
+    document: getDocument(),
+    revision: ++state.autosaveRevision,
+  };
+  interruptImagePresentation(state);
+  state.hasUnsavedChanges = true;
+  setEditorSaveErrorMessage(null);
+  setEditorSaveState('saving');
+  const coordinator = getAutosaveCoordinator(state);
+  await coordinator.runOrdered(async () => {
+    if (!isCurrentCapture(state, captured) || !state.activeContext) return;
+    try {
+      await persistEditorSessionDocument({ ...captured, context: state.activeContext, state });
+    } catch (error) {
+      if (!isCurrentCapture(state, captured)) return;
+      if (error instanceof StaleImageWorkspaceError) coordinator.suspend(error);
+      throw error;
+    }
+  });
 }
