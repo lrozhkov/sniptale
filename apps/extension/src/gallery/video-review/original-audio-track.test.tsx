@@ -9,6 +9,9 @@ import { useReviewPlayback } from './use-playback';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { translate } from '../../platform/i18n';
+import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
 
 vi.mock('../../composition/persistence/media-library', () => ({
   listMediaLibrary: async () => [],
@@ -16,7 +19,8 @@ vi.mock('../../composition/persistence/media-library', () => ({
 
 function setup(
   originalVolume = 1,
-  beforeAction?: Parameters<typeof ReviewOriginalAudioTrack>[0]['beforeAction']
+  beforeAction?: Parameters<typeof ReviewOriginalAudioTrack>[0]['beforeAction'],
+  linked = false
 ) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
@@ -40,6 +44,26 @@ function setup(
   function Harness() {
     const [audio, setAudio] = useState(() => {
       const initial = createQuickEditAdvancedState().audio;
+      if (linked) {
+        initial.voiceoverSegments = buildReviewTimeMap(10, currentEdits);
+        initial.voiceover = [
+          anchorReviewVoiceover(
+            createQuickEditAudioClip({
+              id: 'take',
+              assetId: 'asset',
+              timelineStart: 2,
+              duration: 3,
+              endMax: 10,
+            }),
+            initial.voiceoverSegments
+          ),
+        ];
+        initial.original.ranges = [{ id: 'gain', start: 1, end: 8, volume: 0.5 }];
+        initial.original.mutes = [
+          { id: 'binding', kind: 'take', clipId: 'take' },
+          { id: 'detached', kind: 'range', start: 2.5, end: 4, volume: 0.25 },
+        ];
+      }
       return { ...initial, original: { ...initial.original, volume: originalVolume } };
     });
     const [selectedOriginalId, onOriginalSelection] = useState<string | null>(null);
@@ -114,6 +138,57 @@ function setup(
     },
   };
 }
+
+it('puts overlapping source gain on separate rows and detaches linked coverage only after a real edit', () => {
+  const f = setup(1, undefined, true);
+  try {
+    const items = f.lane.querySelectorAll<HTMLButtonElement>('button[data-audio-id]');
+    expect(items).toHaveLength(3);
+    expect(new Set([...items].map((item) => item.style.top)).size).toBe(3);
+    expect(f.lane.style.height).toBe('96px');
+    const take = f.lane.querySelector<HTMLButtonElement>('button[data-audio-id="mute:binding:0"]')!;
+    f.send('pointerdown', 250, take);
+    f.send('pointerup', 250);
+    expect(f.editor.selectedOriginal?.origin).toBe('take');
+    const captured = f.editor;
+    act(() => {
+      captured.addImported(
+        createQuickEditAudioClip({
+          id: 'music',
+          assetId: 'new-music',
+          timelineStart: 0,
+          duration: 2,
+          endMax: 10,
+        }),
+        'music'
+      );
+      captured.patchOriginal('mute:binding:0', { volume: 0.5 });
+    });
+    expect(f.editor.assets.get('new-music')).toBeDefined();
+    expect(f.editor.originalRanges.find((item) => item.id === 'mute:binding:0')?.volume).toBe(0.5);
+    // The current functional update retains the independently queued clip.
+    act(() => f.editor.setSelectedId('music', 'music'));
+    expect(f.editor.selected?.clip.assetId).toBe('new-music');
+    f.send('pointerdown', 250, take);
+    f.send('pointermove', 350);
+    f.send('pointerup', 350);
+    expect(f.editor.originalRanges.find((item) => item.id === 'mute:binding:0')).toMatchObject({
+      id: 'mute:binding:0',
+      origin: 'mute',
+      start: 3,
+      end: 6,
+    });
+    expect(f.editor.originalRanges.find((item) => item.id === 'gain')).toMatchObject({
+      start: 1,
+      end: 8,
+      volume: 0.5,
+    });
+    act(() => f.editor.removeClip('voiceover', 'take'));
+    expect(f.editor.originalRanges.some((item) => item.id === 'mute:binding:0')).toBe(true);
+  } finally {
+    f.close();
+  }
+});
 
 it('draws in source time, trims both edges, cancels gestures and follows a linked speed mute', () => {
   const f = setup();

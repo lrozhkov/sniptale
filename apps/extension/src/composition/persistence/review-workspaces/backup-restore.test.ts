@@ -15,6 +15,7 @@ import {
   createQuickEditAdvancedState,
   createQuickEditAdvancedContent,
 } from '../../../features/video/review/advanced/defaults';
+import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
 const workspace: VideoWorkspace = {
@@ -29,6 +30,51 @@ const workspace: VideoWorkspace = {
   createdAt: 1,
   updatedAt: 3,
 };
+
+it('restores source mute identities with their ordinary take while remapping only immutable assets', async () => {
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.voiceoverSegments = buildReviewTimeMap(workspace.source.duration, []);
+  advanced.audio.voiceover = [
+    {
+      id: 'take',
+      assetId: 'project-asset:voice',
+      timelineStart: 0,
+      duration: 1,
+      sourceOffset: 0,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  advanced.audio.original.mutes = [
+    { id: 'binding', kind: 'take', clipId: 'take' },
+    { id: 'detached', kind: 'range', start: 0.5, end: 1.5, volume: 0.25 },
+  ];
+  const stored = { ...workspace, advanced, history: [], cursor: 0 };
+  const exported = await readVideoReviewForBackup({
+    db: snapshotDatabase(stored, undefined),
+    aggregateId: stored.aggregateId,
+    sourceAssetId: stored.sourceAssetId,
+  });
+  const portable = encodePortableReviewAssetRefs(exported!);
+  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
+  const restored = prepareVideoReviewRestore({
+    review: parsed,
+    sourceAggregateId: stored.aggregateId,
+    targetAggregateId: 'recording:copy',
+    sourceAssetId: 'new-source',
+    assetIdMap: new Map([['voice', 'new-voice']]),
+  });
+  expect(restored.workspace.advanced.audio.original.mutes).toEqual(advanced.audio.original.mutes);
+  expect(restored.workspace.advanced.audio.voiceover[0]).toMatchObject({
+    id: 'take',
+    assetId: 'project-asset:new-voice',
+  });
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(['project-asset:new-voice'])
+  );
+});
 const draft = {
   aggregateId: workspace.aggregateId,
   revision: 3,

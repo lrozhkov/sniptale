@@ -208,32 +208,83 @@ async function persistedSourceAudio(page: Page) {
   return latest?.target === 'advancedContent' ? latest.after.audio.original : undefined;
 }
 
-test('Basic video without source audio has no audio lane and disables the Volume tool', async ({
-  page,
-}) => {
-  const host = await startHostServer();
-  try {
-    await applyHarnessBootstrap(page, {
-      preserveMediaLibrary: true,
-      storage: { 'sniptale-locale-preference': 'en' },
-    });
-    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
-    await page.locator('[data-ui="gallery.page.root"]').waitFor();
-    await seedReviewVideo(page, 'review-cut-vfr.webm', { width: 160, height: 90, duration: 6 });
-    await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-    const dialog = page.locator('dialog');
-    await expect(
-      dialog.getByRole('button', {
-        name: translate('gallery.videoReview.originalAudioRange', 'en'),
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`Basic video without source audio disables source gain and take mute (${viewport.width})`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize(viewport);
+    const host = await startHostServer();
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-cut-vfr.webm', { width: 160, height: 90, duration: 6 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await expect(
+        dialog.getByRole('button', {
+          name: translate('gallery.videoReview.originalAudioRange', 'en'),
+          exact: true,
+        })
+      ).toBeDisabled();
+      await expect(dialog.locator('[data-original-audio-lane]')).toHaveCount(0);
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.textTrackOpen').click();
+      const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
+      await document
+        .getByRole('button', {
+          name: translate('gallery.videoReview.textFragmentAdd', 'en'),
+          exact: true,
+        })
+        .click();
+      await document
+        .getByRole('textbox', {
+          name: translate('gallery.videoReview.speechText', 'en'),
+          exact: true,
+        })
+        .fill('A silent video can have its own script.');
+      await document
+        .getByRole('button', {
+          name: translate('gallery.videoReview.speechGenerate', 'en'),
+          exact: true,
+        })
+        .click();
+      const voice = dialog.locator('[data-ui="gallery.videoReview.textVoice"]');
+      const mute = voice.getByRole('switch', {
+        name: translate('gallery.videoReview.textVoiceMuteSource', 'en'),
         exact: true,
-      })
-    ).toBeDisabled();
-    await expect(dialog.locator('[data-original-audio-lane]')).toHaveCount(0);
-  } finally {
-    await new Promise<void>((resolve, reject) =>
-      host.server.close((error) => (error ? reject(error) : resolve()))
-    );
-  }
-});
+      });
+      await expect(mute).toBeDisabled();
+      await expect(mute).toHaveAttribute('aria-checked', 'false');
+      await expect(voice).toContainText(
+        translate('gallery.videoReview.textVoiceMuteUnavailable', 'en')
+      );
+      await mute.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('silent-text-voice-form.png'),
+        fullPage: false,
+      });
+      for (const key of [
+        'gallery.videoReview.textVoiceMicrophone',
+        'gallery.videoReview.textVoiceGallery',
+      ] as const) {
+        await button(key).click();
+        await expect(mute).toBeDisabled();
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}

@@ -19,6 +19,7 @@ import {
   readReviewTextTakeFragment as textFragment,
   reviewTextTakeGeometry as textVoiceGeometry,
   type ReviewTextTakePreview,
+  type ReviewTextTakeOptions,
 } from './text-take';
 import { runReviewSpeechJob } from './speech-client';
 import { decodeReviewSpeechDuration } from './speech-audio';
@@ -148,13 +149,15 @@ export async function generateReviewTextVoice(
 export async function applyReviewTextVoice(
   session: Session,
   preview: ReviewTextVoicePreview,
-  signal: AbortSignal
+  signal: AbortSignal,
+  options?: ReviewTextTakeOptions
 ): Promise<void> {
   await applyReviewTextTake({
     session,
     preview,
     signal,
     filename: `${preview.clipId}.${preview.staged.mimeType === 'audio/wav' ? 'wav' : 'mp3'}`,
+    options,
   });
 }
 

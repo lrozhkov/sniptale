@@ -138,9 +138,7 @@ export async function buildReviewExportClipPlan(
       entries,
       buffers,
       originalVolume: args.advanced.audio.original.volume,
-      ...(args.advanced.audio.original.ranges
-        ? { originalRanges: args.advanced.audio.original.ranges }
-        : {}),
+      ...(effective.originalAudio.ranges ? { originalRanges: effective.originalAudio.ranges } : {}),
       originalMuted: args.advanced.audio.original.muted,
     };
   } catch (error) {

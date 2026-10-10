@@ -188,7 +188,10 @@ it('previews without Save and applies a naturally timed microphone take after fu
   const prepared = asset();
   mocks.prepare.mockResolvedValue(prepared);
   const retained = vi.fn();
-  await applyReviewLocalTextVoice(session, preview, signal(), retained);
+  await applyReviewLocalTextVoice(session, preview, signal(), retained, {
+    muteSource: true,
+    sourceAudioAvailable: () => true,
+  });
   expect(save).toHaveBeenCalledOnce();
   expect(save.mock.calls[0]![0].draft).toMatchObject({ annotation: { text: 'Unrelated draft' } });
   expect(session.getSnapshot()).toMatchObject({ autosaveEnabled: false, dirty: false });
@@ -202,6 +205,9 @@ it('previews without Save and applies a naturally timed microphone take after fu
     end: 2,
   });
   expect(commit).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().document.advancedContent.audio.original.mutes).toEqual([
+    { id: expect.any(String), kind: 'take', clipId: preview.clipId },
+  ]);
   expect(retained).toHaveBeenCalledOnce();
 });
 
@@ -263,20 +269,28 @@ it('keeps shared Library bytes after failed attach but never treats another clip
   });
   commit.mockRejectedValueOnce(new Error('storage'));
   const retained = vi.fn();
-  await expect(applyReviewLocalTextVoice(session, preview, signal(), retained)).rejects.toThrow(
-    'storage'
-  );
+  const options = { muteSource: true, sourceAudioAvailable: () => true };
+  await expect(
+    applyReviewLocalTextVoice(session, preview, signal(), retained, options)
+  ).rejects.toThrow('storage');
   expect(binding.cancel).not.toHaveBeenCalled();
   expect(binding.publish).not.toHaveBeenCalled();
   expect(retained).not.toHaveBeenCalled();
+  expect(session.getSnapshot().document.advancedContent.audio.original.mutes).toBeUndefined();
   await session.reload();
-  await applyReviewLocalTextVoice(session, preview, signal(), retained);
+  await applyReviewLocalTextVoice(session, preview, signal(), retained, options);
   expect(mocks.admitLibrary).toHaveBeenCalledOnce();
   expect(mocks.bindLibrary).toHaveBeenCalledOnce();
   expect(commit).toHaveBeenCalledTimes(2);
   expect(retained).toHaveBeenCalledOnce();
   expect(session.getSnapshot().document.advancedContent.audio.voiceover).toHaveLength(1);
   expect(session.getSnapshot().document.advancedContent.audio.music).toHaveLength(1);
+  expect(session.getSnapshot().document.advancedContent.audio.original.mutes).toEqual([
+    { id: expect.any(String), kind: 'take', clipId: preview.clipId },
+  ]);
+  await applyReviewLocalTextVoice(session, preview, signal(), retained, { muteSource: false });
+  expect(commit).toHaveBeenCalledTimes(2);
+  expect(session.getSnapshot().document.advancedContent.audio.original.mutes).toHaveLength(1);
 });
 
 it('carries drawer audition bytes through choice and refuses their changed source at Apply', async () => {

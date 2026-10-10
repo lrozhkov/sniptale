@@ -135,7 +135,11 @@ function preview(id: string): ReviewTextVoicePreview {
     expiresAt: Date.now() + 600000,
   };
 }
-async function render(ids = ['first'], deps?: Parameters<typeof createVideoReviewSession>[1]) {
+async function render(
+  ids = ['first'],
+  deps?: Parameters<typeof createVideoReviewSession>[1],
+  sourceAudioAvailable?: () => boolean
+) {
   const advanced = createQuickEditAdvancedState();
   let text = createReviewTextDocument();
   for (const id of ids) {
@@ -170,7 +174,11 @@ async function render(ids = ['first'], deps?: Parameters<typeof createVideoRevie
   );
   session.setAutosaveEnabled(false);
   const beforeRequest = vi.fn(async () => undefined);
-  const props = { access: { session, beforeRequest }, ids, onClose: vi.fn() };
+  const props = {
+    access: { session, beforeRequest, ...(sourceAudioAvailable ? { sourceAudioAvailable } : {}) },
+    ids,
+    onClose: vi.fn(),
+  };
   await act(async () => root.render(<ReviewTextVoiceForm {...props} />));
   return { session, beforeRequest, props };
 }
@@ -232,7 +240,29 @@ it('generates after consent and preparation, keeps a preview, and only applies o
   expect(mocks.apply).not.toHaveBeenCalled();
   await click('gallery.videoReview.speechApply');
   expect(mocks.apply).toHaveBeenCalledOnce();
+  expect(mocks.apply.mock.calls[0]?.[3]).toMatchObject({ muteSource: false });
   expect(host.textContent).toContain('gallery.videoReview.textVoiceAccepted');
+});
+
+it('keeps source attenuation off and unavailable for silent/unknown media, and captures it only at Apply', async () => {
+  const mutedLabel = 'gallery.videoReview.textVoiceMuteSource';
+  await render();
+  expect(
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${mutedLabel}"]`)?.disabled
+  ).toBe(true);
+  expect(host.textContent).toContain('gallery.videoReview.textVoiceMuteUnavailable');
+  const { beforeRequest } = await render(['first'], undefined, () => true);
+  const toggle = host.querySelector<HTMLButtonElement>(`button[aria-label="${mutedLabel}"]`)!;
+  expect(toggle.getAttribute('aria-checked')).toBe('false');
+  await click(mutedLabel);
+  expect(toggle.getAttribute('aria-checked')).toBe('true');
+  expect(beforeRequest).not.toHaveBeenCalled();
+  expect(mocks.apply).not.toHaveBeenCalled();
+  await start();
+  await approve();
+  expect(mocks.apply).not.toHaveBeenCalled();
+  await click('gallery.videoReview.speechApply');
+  expect(mocks.apply.mock.calls[0]?.[3]).toMatchObject({ muteSource: true });
 });
 
 it('aborts a two-phrase command after a failed real buffer Save and requests only after explicit retry', async () => {

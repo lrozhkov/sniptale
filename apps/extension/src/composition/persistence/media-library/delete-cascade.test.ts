@@ -9,6 +9,7 @@ import { createQuickEditAdvancedState } from '../../../features/video/review/adv
 import { createQuickEditAdvancedContent } from '../../../features/video/review/advanced/defaults';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
+import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 
 it('atomically removes placements, library metadata and the last physical owner', async () => {
   const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
@@ -110,6 +111,13 @@ it.each(['music', 'voiceover'] as const)(
       fadeIn: 0,
       fadeOut: 0,
     });
+    advanced.audio.original.mutes = [
+      { id: 'detached', kind: 'range', start: 1, end: 2, volume: 0.5 },
+    ];
+    if (lane === 'voiceover') {
+      advanced.audio.voiceoverSegments = buildReviewTimeMap(2, []);
+      advanced.audio.original.mutes.push({ id: 'take-mute', kind: 'take', clipId: 'music' });
+    }
     rows.set(
       'video_workspaces',
       new Map([
@@ -137,12 +145,15 @@ it.each(['music', 'voiceover'] as const)(
       { id: project.id, kind: 'video', name: project.project.name, primary: false },
       { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
     ]);
-    const review = rows.get('video_workspaces')!.get('recording:other') as {
-      advanced: { audio: { music: unknown[]; voiceover: unknown[] } };
-      revision: number;
-    };
-    expect(review.advanced.audio[lane]).toEqual([]);
-    expect(review.revision).toBe(2);
+    const review = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+    expect(review).not.toBeNull();
+    expect(review!.advanced.audio[lane]).toEqual([]);
+    expect(review!.advanced.audio.original.mutes).toEqual([
+      { id: 'detached', kind: 'range', start: 1, end: 2, volume: 0.5 },
+    ]);
+    expect(review!.revision).toBe(2);
+    expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+    expect(harness.complete).toHaveBeenCalledTimes(1);
   }
 );
 

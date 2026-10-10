@@ -12,7 +12,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
-import type { ReviewTrackProjection } from './track-projection';
+import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
 import type { useReviewAudio } from './use-review-audio';
 import { ReviewAudioWaveform } from './audio-waveform';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
@@ -53,9 +53,13 @@ export function ReviewOriginalAudioTrack(props: {
   const muted = props.original.muted || props.original.volume === 0;
   const gesture = useOriginalAudioGesture(props, duration);
   const preview = gesture.preview;
+  const ranges = props.editor?.originalRanges ?? props.original.ranges ?? [];
+  const rows = reviewAudioClipRows(ranges);
+  const rowCount = Math.max(1, ...[...rows.values()].map((row) => row + 1));
+  const playback = props.editor?.originalPlayback ?? props.original;
   const gainAt = useCallback(
-    (time: number) => originalAudioGainAt(props.original, time, props.edits),
-    [props.original, props.edits]
+    (time: number) => originalAudioGainAt(playback, time, props.edits),
+    [playback, props.edits]
   );
   const rectStyle = (start: number, end: number) => ({
     left: `${(start / duration) * 100}%`,
@@ -86,11 +90,12 @@ export function ReviewOriginalAudioTrack(props: {
           className={`relative mt-1 h-8 rounded touch-none border-b border-dashed
             bg-[var(--sniptale-color-surface-hover)]
             ${muted ? 'border-[var(--sniptale-color-text-secondary)]' : 'border-transparent'}`}
-          style={
-            gesture.preview?.id
+          style={{
+            height: rowCount * 32,
+            ...(gesture.preview?.id
               ? { cursor: gesture.preview.edge === 'move' ? 'grabbing' : 'ew-resize' }
-              : undefined
-          }
+              : {}),
+          }}
           data-dragging={gesture.preview?.id ? 'true' : undefined}
           {...gesture.handlers}
         >
@@ -101,10 +106,11 @@ export function ReviewOriginalAudioTrack(props: {
             muted={muted}
             gainAt={gainAt}
           />
-          {props.original.ranges?.map((range) => (
+          {ranges.map((range) => (
             <ReviewOriginalGainBlock
               key={range.id}
               range={range}
+              row={rows.get(range.id) ?? 0}
               duration={duration}
               preview={preview}
               selected={props.editor?.selectedOriginal?.id === range.id}
@@ -221,6 +227,7 @@ function OriginalAudioControls(props: {
 /** One authored source-gain item keeps its selection and resize handles together. */
 function ReviewOriginalGainBlock(props: {
   range: QuickEditOriginalAudioRange;
+  row: number;
   duration: number;
   preview: Drag | null;
   selected: boolean;
@@ -239,9 +246,11 @@ function ReviewOriginalGainBlock(props: {
       title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
       data-ui="gallery.videoReview.originalAudioRange"
       data-audio-id={range.id}
-      className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
+      className={`absolute z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
         rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
       style={{
+        top: props.row * 32,
+        height: 32,
         left: `${(start / props.duration) * 100}%`,
         width: `${((end - start) / props.duration) * 100}%`,
       }}
@@ -303,8 +312,13 @@ function useOriginalAudioGesture(
         const at = position(event);
         const id = item?.dataset['audioId'];
         const edge = item?.dataset['audioEdge'];
-        const range = props.original.ranges?.find((item) => item.id === id);
-        const neighbors = props.original.ranges?.filter((other) => other.id !== id) ?? [];
+        const range =
+          props.editor.originalRanges?.find((item) => item.id === id) ??
+          props.original.ranges?.find((item) => item.id === id);
+        const overlay = range && 'origin' in range && range.origin !== 'manual';
+        const neighbors = overlay
+          ? []
+          : (props.original.ranges?.filter((other) => other.id !== id) ?? []);
         const admission = deferReviewGesture(props.beforeAction, () => {
           if (id && lifetime.canCommit('item')) props.editor?.selectOriginal(id);
         });

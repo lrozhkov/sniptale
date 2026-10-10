@@ -64,6 +64,18 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
     en: 'Checking acceptance of this result. Retrying does not send audio to the API again.',
   },
   textVoiceSource: { ru: 'Как озвучить', en: 'Voice source' },
+  textVoiceMuteSource: {
+    ru: 'Приглушить исходный звук под озвучкой',
+    en: 'Mute source audio under this take',
+  },
+  textVoiceMuteUnavailable: {
+    ru: 'Приглушение доступно, если у исходного видео есть звуковая дорожка.',
+    en: 'Source muting is available when the original video contains an audio track.',
+  },
+  textVoiceMuteLinked: {
+    ru: 'Следует за озвучкой. Ручное изменение отделит диапазон.',
+    en: 'Follows the take. Manual editing detaches this range.',
+  },
   textVoiceAI: { ru: 'AI', en: 'AI' },
   textVoiceMicrophone: { ru: 'Микрофон', en: 'Microphone' },
   textVoiceGallery: { ru: 'Галерея', en: 'Gallery' },

@@ -19,6 +19,12 @@ async function checkLocalTakes(
 ) {
   const button = (key: Parameters<typeof translate>[0]) =>
     voice.getByRole('button', { name: label(key), exact: true });
+  const muteSource = voice.getByRole('switch', {
+    name: label('gallery.videoReview.textVoiceMuteSource'),
+    exact: true,
+  });
+  await expect(muteSource).toBeEnabled();
+  if ((await muteSource.getAttribute('aria-checked')) === 'false') await muteSource.click();
   await button('gallery.videoReview.textVoiceMicrophone').click();
   const recording = voice.locator('[data-ui="gallery.videoReview.textVoiceRecording"]');
   await expect(recording).toBeVisible();
@@ -104,6 +110,34 @@ async function checkLocalTakes(
     'gallery',
   ]);
   expect(persisted?.clips[3]?.assetId).toBe(persisted?.clips[2]?.assetId);
+  const sourceRanges = page.locator('[data-original-audio-lane] button[data-audio-id]');
+  await expect(sourceRanges).toHaveCount(4);
+  const rectangles = await sourceRanges.evaluateAll((items) =>
+    items.map((item) => {
+      const { x, y, width, height } = item.getBoundingClientRect();
+      return { x, y, width, height };
+    })
+  );
+  for (const [index, rectangle] of rectangles.entries())
+    for (const other of rectangles.slice(index + 1)) {
+      if (rectangle.x < other.x + other.width && other.x < rectangle.x + rectangle.width)
+        expect(
+          rectangle.y + rectangle.height <= other.y || other.y + other.height <= rectangle.y
+        ).toBe(true);
+    }
+  const lowest = await sourceRanges.evaluateAll(
+    (items) =>
+      items.reduce(
+        (chosen, item, index) =>
+          Number.parseFloat((item as HTMLElement).style.top) > chosen.top
+            ? { index, top: Number.parseFloat((item as HTMLElement).style.top) }
+            : chosen,
+        { index: 0, top: -1 }
+      ).index
+  );
+  await sourceRanges.nth(lowest).scrollIntoViewIfNeeded();
+  await expect(sourceRanges.nth(lowest)).toBeInViewport();
+  await capture('text-voice-source-mute-rows.png');
   expect(
     persisted?.clips.slice(1).every((clip) => clip.textSnapshot?.text === 'Первая фраза')
   ).toBe(true);
@@ -111,7 +145,27 @@ async function checkLocalTakes(
 
 async function checkTextGesture(page: Page, block: Locator, undo: Locator, redo: Locator) {
   await block.scrollIntoViewIfNeeded();
+  await block.evaluate((element) => {
+    const viewport = element.closest<HTMLElement>(
+      '[data-ui="gallery.videoReview.timelineViewport"]'
+    )!;
+    const ruler = viewport.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerRow"]')!;
+    viewport.scrollLeft = 0;
+    viewport.scrollTop +=
+      element.getBoundingClientRect().top -
+      viewport.getBoundingClientRect().top -
+      ruler.getBoundingClientRect().height -
+      4;
+  });
   const initial = (await block.boundingBox())!;
+  await expect
+    .poll(() =>
+      block.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(rect.x + 20, rect.y + rect.height / 2));
+      })
+    )
+    .toBe(true);
   const drag = async () => {
     await page.mouse.move(initial.x + 20, initial.y + initial.height / 2);
     await page.mouse.down();
@@ -229,6 +283,14 @@ for (const variant of [
       await expect(voice).toBeVisible();
       await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
       await expect(voice.locator('svg.animate-spin')).toHaveCount(0);
+      const muteSource = voice.getByRole('switch', {
+        name: label('gallery.videoReview.textVoiceMuteSource'),
+        exact: true,
+      });
+      await expect(muteSource).toBeEnabled();
+      await expect(muteSource).toHaveAttribute('aria-checked', 'false');
+      await muteSource.click();
+      await expect(muteSource).toHaveAttribute('aria-checked', 'true');
       await expect(document).toHaveCount(0);
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.inspectorNavigation"] button')
@@ -275,6 +337,9 @@ for (const variant of [
       await expect(voice).toContainText(label('gallery.videoReview.textVoiceAccepted'));
       const takes = dialog.locator('[data-audio-lane="voiceover"] [data-audio-id]');
       await expect(takes).toHaveCount(1);
+      await expect(dialog.locator('[data-original-audio-lane] button[data-audio-id]')).toHaveCount(
+        1
+      );
       await button('gallery.videoReview.textVoiceBack').press('Enter');
       await expect(document).toBeVisible();
       await expect(

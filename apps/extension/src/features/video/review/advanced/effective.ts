@@ -1,4 +1,5 @@
 import { resolvePresentationSettings } from './presentation';
+import { resolveOriginalSourceAudio } from './original-audio-mutes';
 import { projectReviewVoiceover } from '../voiceover-edits';
 import { projectReviewFocus } from '../focus-edits';
 import { reviewVisibleEditBoundaries } from '../timeline';
@@ -101,7 +102,7 @@ export function resolveQuickEditEffectiveState(
       features.presentationApplied && state.presentation
         ? resolvePresentationSettings(state.presentation)
         : undefined,
-    originalAudio: state.audio.original,
+    originalAudio: resolveOriginalSourceAudio(state.audio, features.voiceoverApplied),
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
       state.audio.voiceoverSegments
@@ -194,7 +195,7 @@ export function resolveQuickEditExportPlan(args: {
   if (
     args.advanced.audio.original.muted ||
     args.advanced.audio.original.volume !== 1 ||
-    args.advanced.audio.original.ranges?.some(
+    effective.originalAudio.ranges?.some(
       (range) =>
         !args.advanced.audio.voiceoverSegments ||
         args.advanced.audio.voiceoverSegments.some(

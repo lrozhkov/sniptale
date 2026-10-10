@@ -11,6 +11,7 @@ import {
 } from '../../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { originalAudioRangeViews } from '../../../features/video/review/advanced/original-audio-mutes';
 const harness = vi.hoisted(() => ({ database: vi.fn(), failure: false }));
 vi.mock('../infrastructure/indexed-db/core', () => ({
   initDB: harness.database,
@@ -88,7 +89,17 @@ it('persists native voice normalization on a new Speed command and restores it a
     at: 2,
     target: 'advancedContent',
     before,
-    after: { ...before, audio: { ...before.audio, voiceover: [voice] } },
+    after: {
+      ...before,
+      audio: {
+        ...before.audio,
+        voiceover: [voice],
+        original: {
+          ...before.audio.original,
+          mutes: [{ id: 'binding', kind: 'take', clipId: voice.id }],
+        },
+      },
+    },
   });
   await commit({ id: 'speed-remove', at: 3, target: 'edit', before: speed, after: null });
   expect(state.workspace.history[2]).toMatchObject({ normalizeVoiceoverTempo: true });
@@ -96,6 +107,10 @@ it('persists native voice normalization on a new Speed command and restores it a
   expect(reopened).toEqual(state);
   state = reopened!;
   const audio = project().advancedContent.audio;
+  expect(audio.original.mutes).toEqual([{ id: 'binding', kind: 'take', clipId: 'voice' }]);
+  expect(originalAudioRangeViews(audio)).toEqual([
+    expect.objectContaining({ start: 2, end: 4, volume: 0 }),
+  ]);
   expect(projectReviewVoiceover(audio.voiceover, audio.voiceoverSegments)).toMatchObject([
     { playbackRate: 1, duration: 2, sourceOffset: 0.4, timelineStart: 2 },
   ]);

@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { expect, it, vi } from 'vitest';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { resolveOriginalSourceAudio } from '../../features/video/review/advanced/original-audio-mutes';
 
 it('keeps unsupported audio processing separate from packet-copy support and honors cancellation', async () => {
   const input = new Input({
@@ -632,49 +634,6 @@ it.each([48000, 44100])(
   }
 );
 
-it('applies source gain inside a fragment without scaling the added music buffer', async () => {
-  const fixture = await audioFixture();
-  audioMock.packets = Array.from({ length: 50 }, (_, i) => ({
-    timestamp: 2 + i * 0.02,
-    duration: 0.02,
-    data: new Uint8Array([0xf8, 0]),
-  }));
-  audioMock.samples.mockImplementation((start: number, end: number) => [
-    decodedSample(start, end - start),
-  ]);
-  const music = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
-  music.getChannelData(0).fill(0.75);
-  try {
-    for await (const _sample of renderReviewAudio(
-      fixture.track,
-      { sourceStart: 2, sourceEnd: 3, resultStart: 0, resultEnd: 1, rate: 1, kind: 'keep' },
-      false,
-      new AbortController().signal,
-      {
-        entries: [],
-        buffers: new Map([['music', music]]),
-        originalVolume: 1,
-        originalMuted: false,
-        originalRanges: [
-          { id: 'mute', start: 2.2, end: 2.4, volume: 0 },
-          { id: 'boost', start: 2.4, end: 2.6, volume: 2 },
-        ],
-      }
-    )) {
-      /* drain */
-    }
-    const pcm = fixture.windows[0]!.sources![0]!.buffer!.getChannelData(0);
-    const at = (time: number) => pcm[Math.round((time + 0.02) * 48_000)];
-    expect(at(0.1)).toBeCloseTo(0.25);
-    expect(at(0.3)).toBe(0);
-    expect(at(0.5)).toBeCloseTo(0.5);
-    expect(at(0.7)).toBeCloseTo(0.25);
-    expect(music.getChannelData(0)[0]).toBe(0.75);
-  } finally {
-    fixture.cleanup();
-  }
-});
-
 it('retains native resampler context around streamed normal-speed clip windows', async () => {
   const fixture = await audioFixture();
   const read = vi.fn(async (start: number, end: number) => ({
@@ -724,9 +683,9 @@ it('retains native resampler context around streamed normal-speed clip windows',
   }
 });
 
-it.each([0.5, 1, 2, 4])(
-  'applies only authored source gain to original PCM at rate %s without changing voiceover',
-  async (rate) => {
+it.each([...[0.5, 1, 2, 4].map((rate) => ({ rate, overlay: true })), { rate: 1, overlay: false }])(
+  'composes source gain and attenuation (rate=$rate, overlay=$overlay) without scaling external PCM',
+  async ({ rate, overlay }) => {
     const fixture = await audioFixture();
     audioMock.packets = Array.from({ length: 250 }, (_, i) => ({
       timestamp: i * 0.02,
@@ -738,6 +697,19 @@ it.each([0.5, 1, 2, 4])(
     ]);
     const voiceover = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
     voiceover.getChannelData(0).fill(0.75);
+    const audio = createQuickEditAdvancedState().audio;
+    audio.original.ranges = overlay
+      ? [{ id: 'manual', start: 2, end: 3, volume: 0.5 }]
+      : [
+          { id: 'mute', start: 2.2, end: 2.4, volume: 0 },
+          { id: 'boost', start: 2.4, end: 2.6, volume: 2 },
+        ];
+    audio.original.mutes = overlay
+      ? [
+          { id: 'one', kind: 'range', start: 2.2, end: 2.5, volume: 0 },
+          { id: 'two', kind: 'range', start: 2.4, end: 2.8, volume: 0.5 },
+        ]
+      : [];
     try {
       for await (const _sample of renderReviewAudio(
         fixture.track,
@@ -766,10 +738,13 @@ it.each([0.5, 1, 2, 4])(
               playbackRate: rate,
             },
           ],
-          buffers: new Map([['accepted', voiceover]]),
-          originalVolume: 2,
+          buffers: new Map([
+            ['accepted', voiceover],
+            ['music', voiceover],
+          ]),
+          originalVolume: overlay ? 2 : 1,
           originalMuted: false,
-          originalRanges: [{ id: 'manual', start: 2, end: 3, volume: 0.5 }],
+          originalRanges: resolveOriginalSourceAudio(audio).ranges!,
         }
       )) {
         /* drain bounded output */
@@ -780,12 +755,13 @@ it.each([0.5, 1, 2, 4])(
         const pcm = fixture.windows[window]!.sources![0]!.buffer!.getChannelData(0);
         return pcm[Math.round((outputTime - window + 0.02) * 48000)]!;
       };
-      expect(sampleAt(2.1)).toBeCloseTo(0.125, 3);
-      expect(sampleAt(2.3)).toBeCloseTo(0.125, 3);
-      expect(sampleAt(2.7)).toBeCloseTo(0.125, 3);
-      if (rate >= 1) expect(sampleAt(2.9)).toBeCloseTo(0.125, 3);
+      expect(sampleAt(2.1)).toBeCloseTo(overlay ? 0.125 : 0.25, 3);
+      expect(sampleAt(2.3)).toBeCloseTo(0, 3);
+      expect(sampleAt(2.5)).toBeCloseTo(overlay ? 0.0625 : 0.5, 3);
+      expect(sampleAt(2.7)).toBeCloseTo(overlay ? 0.0625 : 0.25, 3);
+      if (rate >= 1) expect(sampleAt(2.9)).toBeCloseTo(overlay ? 0.125 : 0.25, 3);
       expect(voiceover.getChannelData(0)[0]).toBe(0.75);
-      expect(fixture.windows[0]!.gains![0]!.gain.value).toBe(2);
+      expect(fixture.windows[0]!.gains![0]!.gain.value).toBe(overlay ? 2 : 1);
     } finally {
       fixture.cleanup();
     }

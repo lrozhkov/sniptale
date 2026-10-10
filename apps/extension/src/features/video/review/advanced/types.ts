@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 12;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 13;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -215,9 +215,16 @@ export interface QuickEditOriginalAudioRange {
   volume: number;
 }
 
+/** Source attenuation follows an ordinary take until its first manual range edit. */
+export type QuickEditOriginalAudioMute =
+  | { id: string; kind: 'take'; clipId: string }
+  | (QuickEditOriginalAudioRange & { kind: 'range' });
+
 export interface QuickEditOriginalAudio {
   /** Source seconds, independent of result-time edits. */
   ranges?: QuickEditOriginalAudioRange[];
+  /** Independent overlays preserve the authored manual gain envelope underneath. */
+  mutes?: QuickEditOriginalAudioMute[];
   muted: boolean;
   volume: number;
 }

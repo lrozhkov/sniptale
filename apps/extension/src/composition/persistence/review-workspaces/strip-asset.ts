@@ -65,6 +65,30 @@ function stripAudioClips(clips: QuickEditAudioClip[], assetId: string): QuickEdi
     );
 }
 
+/** Associations follow removed clip identities; manually detached attenuation remains authored. */
+function stripOriginalMuteBindings<T>(original: T, clips: unknown, assetId: string): T {
+  if (!isRecord(original) || !Array.isArray(original['mutes']) || !Array.isArray(clips))
+    return original;
+  const removedIds = new Set(
+    clips.flatMap((clip: unknown) =>
+      isRecord(clip) && clip['assetId'] === assetId && typeof clip['id'] === 'string'
+        ? [clip['id']]
+        : []
+    )
+  );
+  if (!removedIds.size) return original;
+  return {
+    ...original,
+    mutes: original['mutes'].filter(
+      (mute: unknown) =>
+        !isRecord(mute) ||
+        mute['kind'] !== 'take' ||
+        typeof mute['clipId'] !== 'string' ||
+        !removedIds.has(mute['clipId'])
+    ),
+  } as T;
+}
+
 function stripRecoverySpeech(clip: unknown, assetId: string): unknown {
   if (
     !isRecord(clip) ||
@@ -96,6 +120,7 @@ function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedStat
     ...(content.watermark ? { watermark: stripWatermark(content.watermark, assetId) } : {}),
     audio: {
       ...content.audio,
+      original: stripOriginalMuteBindings(content.audio.original, content.audio.voiceover, assetId),
       ...(content.audio.originalSpeech
         ? {
             originalSpeech: {
@@ -132,27 +157,28 @@ function stripRecovery(value: string | undefined, assetId: string): string | und
     )
       delete content['webcam'];
     const audio = content['audio'];
-    const nextAudio =
-      typeof audio === 'object' && audio !== null && !Array.isArray(audio)
-        ? Object.fromEntries(
-            Object.entries(audio).map(([key, clips]) => [
-              key,
-              (key === 'voiceover' || key === 'music') && Array.isArray(clips)
-                ? clips
-                    .filter(
-                      (clip: unknown) =>
-                        typeof clip !== 'object' ||
-                        clip === null ||
-                        !('assetId' in clip) ||
-                        clip.assetId !== assetId
-                    )
-                    .map((clip: unknown) => stripRecoverySpeech(clip, assetId))
+    const nextAudio = isRecord(audio)
+      ? Object.fromEntries(
+          Object.entries(audio).map(([key, clips]) => [
+            key,
+            (key === 'voiceover' || key === 'music') && Array.isArray(clips)
+              ? clips
+                  .filter(
+                    (clip: unknown) =>
+                      typeof clip !== 'object' ||
+                      clip === null ||
+                      !('assetId' in clip) ||
+                      clip.assetId !== assetId
+                  )
+                  .map((clip: unknown) => stripRecoverySpeech(clip, assetId))
+              : key === 'original'
+                ? stripOriginalMuteBindings(clips, audio['voiceover'], assetId)
                 : key === 'originalSpeech'
                   ? stripRecoverySpeech(clips, assetId)
                   : clips,
-            ])
-          )
-        : audio;
+          ])
+        )
+      : audio;
     const background = content['background'];
     return JSON.stringify({
       ...content,

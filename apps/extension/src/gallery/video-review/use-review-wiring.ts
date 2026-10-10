@@ -92,6 +92,7 @@ export function useReviewEditorWiring(args: {
     setAudio: args.advancedState.setAudio,
     timelineDuration: args.timelineDuration,
     sourceDuration: args.sourceDuration,
+    voiceoverEnabled: args.advanced.ui.mode === 'advanced' && args.advanced.ui.tracks.audio,
     edits: args.document.edits,
     selectedOriginalId:
       args.activeSelection.kind === 'original-audio' ? args.activeSelection.id : null,

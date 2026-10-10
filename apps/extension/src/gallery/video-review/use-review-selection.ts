@@ -1,4 +1,5 @@
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import { originalAudioRangeViews } from '../../features/video/review/advanced/original-audio-mutes';
 import { createTrackProjection } from './track-projection';
 import { reviewVoiceoverRange } from '../../features/video/review/voiceover-edits';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
@@ -69,7 +70,10 @@ export function reviewSelectionExists(
   if (selection.kind === 'zoom-link')
     return resolveQuickEditZoomLink(advanced.zoom.regions, selection.id) !== null;
   if (selection.kind === 'original-audio')
-    return !!advanced.audio.original.ranges?.some((range) => range.id === selection.id);
+    return originalAudioRangeViews(
+      advanced.audio,
+      resolveQuickEditEffectiveFeatures(advanced).voiceoverApplied
+    ).some((range) => range.id === selection.id);
   if (selection.kind === 'audio')
     return advanced.audio[selection.lane].some((item) => item.id === selection.id);
   return false;
@@ -195,7 +199,12 @@ export function reviewSelectionSourceTime(
       return link ? focusLinkSourceTime(link, duration, document.edits) : null;
     }
     case 'original-audio':
-      return midpoint(advanced.audio.original.ranges?.find((item) => item.id === selection.id));
+      return midpoint(
+        originalAudioRangeViews(
+          advanced.audio,
+          resolveQuickEditEffectiveFeatures(advanced).voiceoverApplied
+        ).find((item) => item.id === selection.id)
+      );
     case 'audio': {
       const clip = advanced.audio[selection.lane].find(
         (item) => item.id === selection.id && !item.dormant

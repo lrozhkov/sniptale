@@ -7,6 +7,70 @@ import type { VideoWorkspace } from './contracts';
 import { collectReviewAssetReferences } from './asset-refs';
 import { stripReviewAssetReference } from './strip-asset';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import { buildReviewTimeMap } from '../../../features/video/review/timeline';
+import { parseVideoWorkspace } from './parser';
+
+it.each([
+  [true, 0],
+  [true, 1],
+  [false, 0],
+  [false, 1],
+] as const)(
+  'strips linked take mutes from baseline=%s and history cursor=%i',
+  (baseline, cursor) => {
+    const workspace = makeWorkspace();
+    const operation = workspace.history[0]!;
+    if (operation.target !== 'advancedContent') throw new Error('Invalid fixture target');
+    const audio = structuredClone(operation.after.audio);
+    audio.voiceoverSegments = buildReviewTimeMap(10, []);
+    audio.voiceover.push({ ...audio.voiceover[0]!, id: 'kept', assetId: retained });
+    audio.original.ranges = [{ id: 'gain', start: 2, end: 3, volume: 1.5 }];
+    audio.original.mutes = [
+      { id: 'removed-mute', kind: 'take', clipId: 'voice' },
+      { id: 'retained-mute', kind: 'take', clipId: 'kept' },
+      { id: 'detached', kind: 'range', start: 4, end: 5, volume: 0.5 },
+    ];
+    const before = { ...createQuickEditAdvancedContent(), audio: structuredClone(audio) };
+    if (!baseline) {
+      before.audio.voiceover = before.audio.voiceover.filter((clip) => clip.id !== 'voice');
+      before.audio.original.mutes = before.audio.original.mutes!.filter(
+        (mute) => mute.id !== 'removed-mute'
+      );
+    }
+    const after = { ...before, audio: structuredClone(audio) };
+    after.audio.voiceover.find((clip) => clip.id === 'kept')!.volume = 1.25;
+    workspace.advanced = {
+      ...createQuickEditAdvancedState(),
+      ...before,
+      recoveryV1: JSON.stringify({ audio, unrelated: 'preserve' }),
+    };
+    workspace.history = [{ id: 'mute', at: 1, target: 'advancedContent', before, after }];
+    workspace.cursor = cursor;
+    expect(parseVideoWorkspace(workspace)).not.toBeNull();
+    const untouched = structuredClone(workspace);
+    const stripped = stripReviewAssetReference(workspace, removed, 2);
+    const expected = audio.original.mutes.filter((mute) => mute.id !== 'removed-mute');
+    const contents = [
+      stripped.advanced,
+      ...stripped.history.flatMap((op) =>
+        op.target === 'advancedContent' ? [op.before, op.after] : []
+      ),
+    ];
+    for (const content of contents) {
+      expect(content.audio.original.mutes).toEqual(expected);
+      expect(content.audio.original.ranges).toEqual(audio.original.ranges);
+      expect(content.audio.voiceover.map((clip) => clip.id)).toEqual(['kept']);
+    }
+    expect(stripped.cursor).toBe(cursor);
+    expect(stripped.history).toHaveLength(1);
+    expect(collectReviewAssetReferences(stripped)).toEqual(new Set([retained]));
+    const recovery = JSON.parse(stripped.advanced.recoveryV1!);
+    expect(recovery.audio.original.mutes).toEqual(expected);
+    expect(recovery.audio.voiceover.map((clip: { id: string }) => clip.id)).toEqual(['kept']);
+    expect(recovery.unrelated).toBe('preserve');
+    expect(workspace).toEqual(untouched);
+  }
+);
 
 const removed = 'project-asset:voice-old';
 const retained = 'project-asset:music-new';

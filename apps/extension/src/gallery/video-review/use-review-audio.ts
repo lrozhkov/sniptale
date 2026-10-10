@@ -1,6 +1,11 @@
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { canPlaceOriginalAudioRange } from '../../features/video/review/advanced/original-audio';
+import {
+  changeOriginalAudioMute,
+  originalAudioRangeViews,
+  resolveOriginalSourceAudio,
+} from '../../features/video/review/advanced/original-audio-mutes';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
   anchorReviewVoiceover,
@@ -30,6 +35,7 @@ type ReviewAudioArgs = {
   setAudio(update: (audio: QuickEditAudioState) => QuickEditAudioState): void;
   timelineDuration: number;
   sourceDuration?: number;
+  voiceoverEnabled?: boolean;
   edits?: readonly ReviewEdit[];
   selectedOriginalId?: string | null;
   onOriginalSelection?(id: string | null): void;
@@ -198,7 +204,20 @@ function createReviewAudioClipActions(
       );
     },
     removeClip: (lane: ReviewAudioLane, id: string) => {
-      patchLane(lane, (clips) => clips.filter((clip) => clip.id !== id));
+      args.setAudio((audio) => ({
+        ...audio,
+        [lane]: audio[lane].filter((clip) => clip.id !== id),
+        ...(lane === 'voiceover' && audio.original.mutes
+          ? {
+              original: {
+                ...audio.original,
+                mutes: audio.original.mutes.filter(
+                  (item) => item.kind !== 'take' || item.clipId !== id
+                ),
+              },
+            }
+          : {}),
+      }));
       args.onRemoved(id);
     },
     toggleLaneMute: (lane: ReviewAudioLane) =>
@@ -274,6 +293,32 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
     'too-short' | 'overlap' | 'cut' | 'limit' | null
   >(null);
   const originalRanges = args.audio.original.ranges ?? [];
+  const originalViews = originalAudioRangeViews(args.audio, args.voiceoverEnabled !== false);
+  const changeMute = (
+    id: string,
+    patch: Parameters<typeof changeOriginalAudioMute>[0]['patch']
+  ) => {
+    const next = changeOriginalAudioMute({
+      audio: args.audio,
+      id,
+      patch,
+      duration: args.sourceDuration ?? args.timelineDuration,
+    });
+    if (!next) {
+      setOriginalFeedback('limit');
+      return false;
+    }
+    args.setAudio(
+      (audio) =>
+        changeOriginalAudioMute({
+          audio,
+          id,
+          patch,
+          duration: args.sourceDuration ?? args.timelineDuration,
+        }) ?? audio
+    );
+    return true;
+  };
   const canAddOriginal = (range: ReviewAnchor, exceptId?: string) =>
     range.kind === 'range' &&
     (exceptId !== undefined || originalRanges.length < 512) &&
@@ -287,6 +332,8 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
   const updateOriginalRanges = (ranges: typeof originalRanges) =>
     args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ranges } }));
   return {
+    originalRanges: originalViews,
+    originalPlayback: resolveOriginalSourceAudio(args.audio, args.voiceoverEnabled !== false),
     defaultOriginalVolume,
     setDefaultOriginalVolume: (volume: number) => {
       if (Number.isFinite(volume) && volume >= 0 && volume <= 2) setDefaultOriginalVolume(volume);
@@ -298,7 +345,7 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
     originalTool,
     setOriginalTool,
     canAddOriginal,
-    selectedOriginal: originalRanges.find((range) => range.id === args.selectedOriginalId) ?? null,
+    selectedOriginal: originalViews.find((range) => range.id === args.selectedOriginalId) ?? null,
     selectOriginal: (id: string) => {
       setOriginalRangeSelected(true);
       setOriginalTool(false);
@@ -333,6 +380,10 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
       return true;
     },
     patchOriginal: (id: string, patch: Partial<{ start: number; end: number; volume: number }>) => {
+      if (originalViews.some((item) => item.id === id && item.origin !== 'manual')) {
+        changeMute(id, patch);
+        return;
+      }
       const old = originalRanges.find((range) => range.id === id);
       if (!old) return;
       const next = { ...old, ...patch };
@@ -356,6 +407,10 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
       );
     },
     removeOriginal: (id: string) => {
+      if (originalViews.some((item) => item.id === id && item.origin !== 'manual')) {
+        if (changeMute(id, null)) args.onOriginalSelection?.(null);
+        return;
+      }
       updateOriginalRanges(originalRanges.filter((range) => range.id !== id));
       args.onOriginalSelection?.(null);
     },

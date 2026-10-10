@@ -22,6 +22,7 @@ import {
 export interface ReviewTextVoiceAccess {
   session: ReturnType<typeof createVideoReviewSession>;
   beforeRequest(): Promise<void>;
+  sourceAudioAvailable?: () => boolean;
   context?: {
     video: RefObject<HTMLVideoElement | null>;
     registerPending(owner: ReviewSpeechFlushRegistration): () => void;
@@ -167,6 +168,11 @@ function useTextVoiceAttempt(props: Options) {
 
 /** Coordinates authored voice commands through the form's single attempt/resource owner. */
 export function useReviewTextVoiceOperation(props: Options) {
+  const [muteSource, setMuteSource] = useState(false);
+  const takeOptions = () => ({
+    muteSource,
+    sourceAudioAvailable: props.access.sourceAudioAvailable,
+  });
   const attempt = useTextVoiceAttempt(props);
   const { state, command, remember, accept, report } = attempt;
   const readyIds = new Set(
@@ -177,6 +183,8 @@ export function useReviewTextVoiceOperation(props: Options) {
   const remainingIds = props.ids.filter((id) => !readyIds.has(id));
   return {
     ...state,
+    muteSource,
+    setMuteSource,
     remaining: remainingIds.length,
     modelError: attempt.modelError,
     clearError: attempt.clearError,
@@ -213,12 +221,19 @@ export function useReviewTextVoiceOperation(props: Options) {
         throw new Error('stale');
       }
       remember(preview);
+      const options = takeOptions();
       const pending = command(
         async (attemptSignal) => {
           const signal = AbortSignal.any([attemptSignal, captureSignal]);
           signal.throwIfAborted();
           await attempt.beforeRequest();
-          await applyReviewLocalTextVoice(props.access.session, preview, signal, onRetained);
+          await applyReviewLocalTextVoice(
+            props.access.session,
+            preview,
+            signal,
+            onRetained,
+            options
+          );
           signal.throwIfAborted();
           accept(preview);
         },
@@ -258,15 +273,23 @@ export function useReviewTextVoiceOperation(props: Options) {
         }
       }, selected.length);
     },
-    apply: (selected: readonly Preview[]) =>
-      command(async (signal) => {
+    apply: (selected: readonly Preview[]) => {
+      const options = takeOptions();
+      return command(async (signal) => {
         await attempt.beforeRequest();
         for (const [index, preview] of selected.entries()) {
           signal.throwIfAborted();
           try {
             if ('staged' in preview)
-              await applyReviewTextVoice(props.access.session, preview, signal);
-            else await applyReviewLocalTextVoice(props.access.session, preview, signal);
+              await applyReviewTextVoice(props.access.session, preview, signal, options);
+            else
+              await applyReviewLocalTextVoice(
+                props.access.session,
+                preview,
+                signal,
+                undefined,
+                options
+              );
             if (!signal.aborted) accept(preview);
           } catch (cause) {
             if (signal.aborted) break;
@@ -274,6 +297,7 @@ export function useReviewTextVoiceOperation(props: Options) {
           }
           attempt.complete(index + 1);
         }
-      }, selected.length),
+      }, selected.length);
+    },
   };
 }

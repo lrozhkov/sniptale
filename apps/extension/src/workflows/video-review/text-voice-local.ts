@@ -10,6 +10,7 @@ import {
   assertReviewTextTakeBasis,
   captureReviewTextTakeBasis,
   type ReviewTextTakePreview,
+  type ReviewTextTakeOptions,
 } from './text-take';
 
 type Session = ReturnType<typeof createVideoReviewSession>;
@@ -88,7 +89,8 @@ export async function applyReviewLocalTextVoice(
   session: Session,
   preview: ReviewLocalTextVoicePreview,
   signal: AbortSignal,
-  onRetained?: () => void
+  onRetained?: () => void,
+  options?: ReviewTextTakeOptions
 ) {
   signal.throwIfAborted();
   // A previously accepted take owns its bytes independently of later text or Library edits.
@@ -108,6 +110,7 @@ export async function applyReviewLocalTextVoice(
     signal,
     filename: preview.filename,
     onRetained,
+    options,
     ...(library
       ? {
           preparation: {

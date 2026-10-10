@@ -11,6 +11,11 @@ import type { createVideoReviewSession } from './session';
 
 type Session = ReturnType<typeof createVideoReviewSession>;
 
+export interface ReviewTextTakeOptions {
+  muteSource?: boolean;
+  sourceAudioAvailable?: (() => boolean) | undefined;
+}
+
 export interface ReviewTextTakePreview {
   clipId: string;
   textSnapshot: ReviewVoiceTextSnapshot;
@@ -89,6 +94,7 @@ export async function applyReviewTextTake(args: {
   filename: string;
   preparation?: NonNullable<Parameters<typeof importReviewAudio>[0]['preparation']>;
   onRetained?: (() => void) | undefined;
+  options?: ReviewTextTakeOptions | undefined;
 }) {
   const { session, preview, signal } = args;
   signal.throwIfAborted();
@@ -110,6 +116,8 @@ export async function applyReviewTextTake(args: {
   }
   await session.flush();
   assertReviewTextTakeBasis(session, preview);
+  if (args.options?.muteSource && !args.options.sourceAudioAvailable?.())
+    throw new Error('invalid-request');
   const workspaceId = session.getSnapshot().snapshot.workspace.aggregateId;
   const preparation =
     args.preparation ??
@@ -144,6 +152,11 @@ async function commitReviewTextTake(
   assertReviewTextTakeBasis(session, preview);
   const state = session.getSnapshot();
   const before = state.document.advancedContent;
+  if (
+    args.options?.muteSource &&
+    (!args.options.sourceAudioAvailable?.() || (before.audio.original.mutes?.length ?? 0) >= 512)
+  )
+    throw new Error('invalid-request');
   const map = buildReviewTimeMap(state.snapshot.workspace.source.duration, state.document.edits);
   const end = map.at(-1)?.resultEnd ?? 0;
   if (Math.abs(duration - preview.duration) > 0.001 || preview.resultStart + duration > end)
@@ -167,6 +180,17 @@ async function commitReviewTextTake(
         ...before,
         audio: {
           ...before.audio,
+          ...(args.options?.muteSource
+            ? {
+                original: {
+                  ...before.audio.original,
+                  mutes: [
+                    ...(before.audio.original.mutes ?? []),
+                    { id: crypto.randomUUID(), kind: 'take' as const, clipId: preview.clipId },
+                  ],
+                },
+              }
+            : {}),
           voiceoverSegments: [...map],
           voiceover: [
             ...before.audio.voiceover.map((item) => anchorReviewVoiceover(item, map)),

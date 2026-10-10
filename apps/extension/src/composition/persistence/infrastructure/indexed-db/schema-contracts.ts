@@ -74,7 +74,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 13,
+    schemaVersion: 14,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -480,6 +480,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         )
       )
         throw new Error('Text document workspace stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 13, to: 14 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 14,
+    toDatabaseVersion: 15,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      )
+        throw new Error('Source mute workspace stores are unavailable.');
       return undefined;
     },
   },

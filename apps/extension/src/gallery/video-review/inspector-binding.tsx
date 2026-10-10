@@ -593,11 +593,13 @@ function reviewTextVoiceAccess(
     | 'registerSpeechFlush'
     | 'beforeAction'
     | 'setVoiceoverSilent'
+    | 'editing'
   >,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
   return {
     session: state.session,
+    sourceAudioAvailable: () => !!state.editing.exporter.index?.audioCodec,
     beforeRequest: () => flushReviewTextVoiceBuffers(state, canvasComments),
     context: {
       video: state.video,

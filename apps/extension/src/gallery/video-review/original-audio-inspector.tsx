@@ -34,12 +34,17 @@ export function ReviewOriginalAudioInspector(props: {
                   label={translate('gallery.videoReview.volume')}
                   unit="%"
                   min={0}
-                  max={200}
+                  max={range.origin && range.origin !== 'manual' ? 100 : 200}
                   step={1}
                   precision={0}
                   value={range.volume * 100}
                   onChange={(value) => props.audio.patchOriginal(range.id, { volume: value / 100 })}
                 />
+                {range.origin === 'take' && (
+                  <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+                    {translate('gallery.videoReview.textVoiceMuteLinked')}
+                  </p>
+                )}
 
                 {props.speedMuted ? (
                   <p className="text-xs text-[var(--sniptale-color-text-muted)]">

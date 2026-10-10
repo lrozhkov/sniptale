@@ -763,3 +763,37 @@ it('exports ordinary voiceover and authored mute with packet video and preserves
   );
   expect(await original.arrayBuffer()).toEqual(before);
 });
+
+it('exports linked source attenuation even when no manual source ranges exist', async () => {
+  const { args, deps } = fixture();
+  args.index.processedAudioCodec = 'opus';
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
+  advanced.audio.voiceoverSegments = buildReviewTimeMap(
+    args.snapshot.workspace.source.duration,
+    []
+  );
+  advanced.audio.voiceover = [
+    {
+      id: 'take',
+      assetId: 'project-asset:take',
+      timelineStart: 2,
+      duration: 1,
+      sourceOffset: 0,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  advanced.audio.original.mutes = [{ id: 'binding', kind: 'take', clipId: 'take' }];
+  await exportReviewedVideo(args, deps);
+  expect(deps.writeReviewPackets).toHaveBeenCalledWith(
+    expect.objectContaining({
+      exportAudio: expect.objectContaining({
+        originalRanges: [{ id: 'source-envelope:0', start: 2, end: 3, volume: 0 }],
+      }),
+    })
+  );
+});
