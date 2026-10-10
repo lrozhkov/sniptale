@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { saveScenarioProjectRecord } from '../../../composition/persistence/scenario/store/public';
 
@@ -19,97 +20,28 @@ type AutosaveInput = {
   onStatus: (status: SaveStatus) => void;
   onPublish: (project: GuideProject, source: GuideProject) => void;
 };
+type Session = {
+  generation: number;
+  projectId: string | undefined;
+  acknowledgement?: { source: GuideProject; committed: GuideProject };
+  conflict: boolean;
+};
+type Capture = { session: Session; args: AutosaveInput };
 
 /** Schedules writes through the page's shared admission gate and committed revision. */
 export function useGuideAutosave(input: AutosaveInput) {
   const latest = useRef(input);
   latest.current = input;
-  const pending = useRef<Promise<boolean> | null>(null);
-  const dirtySince = useRef<number | null>(null);
-  const acknowledged = useRef<{ source: GuideProject; committed: GuideProject } | null>(null);
-  const save = () => {
-    if (pending.current) return pending.current;
-    const args = latest.current;
-    const source = args.project;
-    const base = args.saved.current;
-    if (!source || !base || args.conflict || args.busy.current) return Promise.resolve(false);
-    if (source === base) {
-      args.onStatus('saved');
-      return Promise.resolve(true);
-    }
-    args.busy.current = true;
-    args.autosaving.current = true;
-    args.onStatus('saving');
-    const turn = args.generation.current;
-    const operation = saveScenarioProjectRecord(source, { baseUpdatedAt: base.updatedAt })
-      .then((committed) => {
-        if (args.generation.current !== turn) return false;
-        acknowledged.current = { source, committed };
-        args.saved.current = committed;
-        args.onPublish(committed, source);
-        args.onStatus(latest.current.project === source ? 'saved' : 'dirty');
-        return true;
-      })
-      .catch((error: unknown) => {
-        if (args.generation.current === turn)
-          args.onStatus(
-            error instanceof Error && error.name === 'StaleScenarioAggregateRevisionError'
-              ? 'conflict'
-              : 'failed'
-          );
-        return false;
-      })
-      .finally(() => {
-        args.busy.current = false;
-        args.autosaving.current = false;
-        pending.current = null;
-      });
-    pending.current = operation;
-    return operation;
-  };
-  const flushLatest = async (): Promise<GuideProject | null> => {
-    const generation = latest.current.generation.current;
-    const projectId = latest.current.project?.id;
-    while (latest.current.generation.current === generation) {
-      if (pending.current) {
-        if (!(await pending.current)) return null;
-        continue;
-      }
-      const args = latest.current;
-      const source = args.project;
-      const base = args.saved.current;
-      if (!source || !base || source.id !== projectId || args.conflict) return null;
-      if (
-        (source === acknowledged.current?.source && base === acknowledged.current.committed) ||
-        guideDraftContent(source) === guideDraftContent(base)
-      ) {
-        args.onStatus('saved');
-        return base;
-      }
-      if (!(await save())) return null;
-    }
-    return null;
-  };
-  const request = useRef(save);
-  request.current = save;
-  const flush = useRef(flushLatest);
-  flush.current = flushLatest;
+  const owner = useRef<ReturnType<typeof createGuideAutosave> | null>(null);
   useEffect(() => {
-    if (!input.dirty || !input.project || input.enabled === false) {
-      dirtySince.current = null;
-      return;
-    }
-    dirtySince.current ??= Date.now();
-    const remaining = Math.max(0, GUIDE_AUTOSAVE_MAX_WAIT_MS - (Date.now() - dirtySince.current));
-    const timer = window.setTimeout(
-      () => {
-        dirtySince.current = null;
-        void request.current();
-      },
-      Math.min(GUIDE_AUTOSAVE_IDLE_MS, remaining)
-    );
-    return () => window.clearTimeout(timer);
-  }, [input.project, input.dirty, input.enabled]);
+    const session = createGuideAutosave(() => latest.current);
+    owner.current = session;
+    return () => {
+      session.dispose();
+      if (owner.current === session) owner.current = null;
+    };
+  }, []);
+  useEffect(() => owner.current?.update());
   useEffect(() => {
     const protect = (event: BeforeUnloadEvent) => {
       const state = latest.current;
@@ -118,18 +50,201 @@ export function useGuideAutosave(input: AutosaveInput) {
       if (!state.protectUnsaved && !state.autosaving.current) return;
       event.preventDefault();
       event.returnValue = '';
-      if (state.dirty && state.enabled !== false) void flush.current();
+      if (state.dirty && state.enabled !== false) void owner.current?.flushLatest();
     };
     window.addEventListener('beforeunload', protect);
     return () => window.removeEventListener('beforeunload', protect);
   }, []);
   return {
-    save,
-    flushLatest,
+    save: () => owner.current?.save() ?? Promise.resolve(false),
+    flushLatest: () => owner.current?.flushLatest() ?? Promise.resolve(null),
     flushEdits: () => {
-      if (latest.current.enabled !== false && latest.current.dirty) void flushLatest();
+      if (latest.current.enabled !== false && latest.current.dirty)
+        void owner.current?.flushLatest();
     },
   };
+}
+
+function createGuideAutosave(latest: () => AutosaveInput) {
+  let disposed = false;
+  let session: Session | undefined;
+  let observed: AutosaveInput | undefined;
+  let pending: Promise<boolean> | null = null;
+  const current = (turn: Session) =>
+    !disposed &&
+    session === turn &&
+    latest().generation.current === turn.generation &&
+    latest().project?.id === turn.projectId;
+  const coordinator = createAutosaveCoordinator<'document', Capture>({
+    now: Date.now,
+    schedule(callback, delay) {
+      const timer = window.setTimeout(callback, delay);
+      return () => window.clearTimeout(timer);
+    },
+    capture: () => ({ session: getSession(), args: latest() }),
+    commit: async (capture) => {
+      if (capture.args.enabled === false || !current(capture.session)) return;
+      await execute(capture);
+    },
+    classifyFailure: (error) => (isConflict(error) ? 'stop' : 'retry'),
+  });
+  function getSession() {
+    const args = latest();
+    if (
+      !session ||
+      session.generation !== args.generation.current ||
+      session.projectId !== args.project?.id
+    ) {
+      coordinator.cancel('document');
+      coordinator.resume();
+      session = {
+        generation: args.generation.current,
+        projectId: args.project?.id,
+        conflict: false,
+      };
+      observed = undefined;
+    }
+    return session;
+  }
+  function execute(capture: Capture): Promise<boolean> {
+    const operation = persistGuideDraft(
+      capture,
+      () => current(capture.session),
+      () => latest().project
+    ).finally(() => {
+      if (pending === operation) pending = null;
+    });
+    pending = operation;
+    return operation;
+  }
+  function save(): Promise<boolean> {
+    if (pending) return pending.catch(() => false);
+    const capture = { session: getSession(), args: latest() };
+    coordinator.cancel('document');
+    return coordinator
+      .runOrdered(() => execute(capture))
+      .catch((error: unknown) => {
+        if (current(capture.session) && isConflict(error)) coordinator.suspend(error);
+        return false;
+      });
+  }
+  return {
+    update() {
+      const turn = getSession();
+      const args = latest();
+      const previous = observed;
+      observed = args;
+      if (args.conflict || turn.conflict) {
+        coordinator.suspend(new Error('Scenario save has a revision conflict.'));
+        return;
+      }
+      if (!args.project || args.enabled === false || (!args.dirty && !args.autosaving.current)) {
+        coordinator.cancel('document');
+        return;
+      }
+      if (!args.dirty) return;
+      const changed =
+        previous?.project !== args.project && !isTimestampRebase(previous?.project, args.project);
+      if (!previous || changed || previous.enabled === false || !previous.dirty)
+        coordinator.request('document', {
+          delay: GUIDE_AUTOSAVE_IDLE_MS,
+          maxWait: GUIDE_AUTOSAVE_MAX_WAIT_MS,
+        });
+    },
+    save,
+    async flushLatest(): Promise<GuideProject | null> {
+      const turn = getSession();
+      try {
+        while (current(turn)) {
+          if (pending) {
+            if (!(await pending)) return null;
+            continue;
+          }
+          const args = latest();
+          const source = args.project;
+          const base = args.saved.current;
+          if (!source || !base || source.id !== base.id || args.conflict || turn.conflict)
+            return null;
+          if (
+            (source === turn.acknowledgement?.source && base === turn.acknowledgement.committed) ||
+            guideDraftContent(source) === guideDraftContent(base)
+          ) {
+            args.onStatus('saved');
+            return base;
+          }
+          if (!(await save())) return null;
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    },
+    dispose() {
+      disposed = true;
+      coordinator.dispose();
+    },
+  };
+}
+
+/** Owns one admitted scenario write, its committed revision and admission cleanup. */
+function persistGuideDraft(
+  { session: turn, args }: Capture,
+  isCurrent: () => boolean,
+  currentProject: () => GuideProject | null
+): Promise<boolean> {
+  const source = args.project;
+  const base = args.saved.current;
+  if (!isCurrent()) return Promise.resolve(false);
+  if (
+    !source ||
+    !base ||
+    source.id !== base.id ||
+    args.conflict ||
+    turn.conflict ||
+    args.busy.current
+  )
+    return Promise.reject(new Error('Scenario save admission is unavailable.'));
+  if (source === base) {
+    args.onStatus('saved');
+    return Promise.resolve(true);
+  }
+  args.busy.current = true;
+  args.autosaving.current = true;
+  args.onStatus('saving');
+  return saveScenarioProjectRecord(source, { baseUpdatedAt: base.updatedAt })
+    .then((committed) => {
+      if (!isCurrent()) return false;
+      turn.acknowledgement = { source, committed };
+      args.saved.current = committed;
+      args.onPublish(committed, source);
+      args.onStatus(currentProject() === source ? 'saved' : 'dirty');
+      return true;
+    })
+    .catch((error: unknown) => {
+      if (!isCurrent()) return false;
+      turn.conflict = isConflict(error);
+      args.onStatus(turn.conflict ? 'conflict' : 'failed');
+      throw error;
+    })
+    .finally(() => {
+      args.busy.current = false;
+      args.autosaving.current = false;
+    });
+}
+
+function isConflict(error: unknown): boolean {
+  return error instanceof Error && error.name === 'StaleScenarioAggregateRevisionError';
+}
+
+/** History publication changes only the timestamp of a newer draft. */
+function isTimestampRebase(previous: GuideProject | null | undefined, next: GuideProject): boolean {
+  return (
+    !!previous &&
+    Object.keys(previous).length === Object.keys(next).length &&
+    Object.entries(previous).every(
+      ([key, value]) => key === 'updatedAt' || Reflect.get(next, key) === value
+    )
+  );
 }
 
 /** Persistence reorders object keys; only the aggregate timestamp is outside draft content. */

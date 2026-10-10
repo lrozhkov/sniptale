@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { reduceGuideHistory } from './history';
 import { createRoot, type Root } from 'react-dom/client';
@@ -99,6 +99,83 @@ it('does not retry a duplicate-tab conflict by toggling autosave', async () => {
   expect(save).not.toHaveBeenCalled();
 });
 
+it('keeps manual save and latest flush available while automatic saving is disabled', async () => {
+  input = { ...input, enabled: false };
+  save.mockImplementation(async (source) => ({ ...source, updatedAt: 2 }));
+  act(() => root.render(<Harness />));
+  await expect(autosave.save()).resolves.toBe(true);
+  input = { ...input, project: { ...input.project!, name: 'Explicit paused edit' } };
+  act(() => root.render(<Harness />));
+  await expect(autosave.flushLatest()).resolves.toMatchObject({ name: 'Explicit paused edit' });
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_MAX_WAIT_MS));
+  expect(save).toHaveBeenCalledTimes(2);
+});
+
+it('retains external admission ownership and retries explicitly after the gate becomes free', async () => {
+  input.busy.current = true;
+  save.mockImplementation(async (source) => ({ ...source, updatedAt: 2 }));
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_MAX_WAIT_MS * 2));
+  expect(save).not.toHaveBeenCalled();
+  expect(input.busy.current).toBe(true);
+  expect(input.autosaving.current).toBe(false);
+  await expect(autosave.flushLatest()).resolves.toBeNull();
+  input.busy.current = false;
+  await expect(autosave.flushLatest()).resolves.toMatchObject({ name: 'Edited' });
+  expect(save).toHaveBeenCalledOnce();
+});
+
+it('creates a fresh coordinator after StrictMode effect cleanup', async () => {
+  save.mockImplementation(async (source) => ({ ...source, updatedAt: 2 }));
+  act(() =>
+    root.render(
+      <StrictMode>
+        <Harness />
+      </StrictMode>
+    )
+  );
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  expect(save).toHaveBeenCalledOnce();
+  expect(input.onPublish).toHaveBeenCalledOnce();
+});
+
+it('does not acknowledge an acquired write after unmount even without a generation change', async () => {
+  let release: () => void = () => undefined;
+  save.mockImplementationOnce(
+    (source) =>
+      new Promise((resolve) => {
+        release = () => resolve({ ...source, updatedAt: 2 });
+      })
+  );
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  act(() => root.render(null));
+  await act(async () => release());
+  expect(input.onPublish).not.toHaveBeenCalled();
+  expect(input.saved.current?.name).toBe('Guide');
+  expect(input.busy.current).toBe(false);
+  expect(input.autosaving.current).toBe(false);
+});
+
+it('rejects a foreign acknowledgement when project changes without a generation change', async () => {
+  let release: () => void = () => undefined;
+  save.mockImplementationOnce(
+    (source) =>
+      new Promise((resolve) => {
+        release = () => resolve({ ...source, updatedAt: 2 });
+      })
+  );
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  const other = createGuideProject('Other', 'other', 3);
+  input = { ...input, project: other, dirty: false };
+  input.saved.current = other;
+  act(() => root.render(<Harness />));
+  await act(async () => release());
+  expect(input.saved.current).toBe(other);
+  expect(input.onPublish).not.toHaveBeenCalled();
+});
+
 it('coalesces phrase typing instead of writing after each short pause', async () => {
   save.mockImplementation(async (project) => ({ ...project, updatedAt: Date.now() }));
   for (const name of ['A', 'AB', 'ABC', 'ABCD']) {
@@ -148,6 +225,95 @@ it('flushes the latest draft after an older pending write using its acknowledged
   expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Latest draft' }), {
     baseUpdatedAt: 2,
   });
+});
+
+it('retains the newer autosave deadline when an older acknowledgement rebases its timestamp', async () => {
+  let release: () => void = () => undefined;
+  save
+    .mockImplementationOnce(
+      (source) =>
+        new Promise((resolve) => {
+          release = () => resolve({ ...source, updatedAt: 2 });
+        })
+    )
+    .mockImplementation(async (source) => ({ ...source, updatedAt: 3 }));
+  input.onPublish = (committed, source) => {
+    const history = reduceGuideHistory(
+      { present: input.project, past: [], future: [], group: null },
+      { kind: 'publish', project: committed, source }
+    );
+    input = { ...input, project: history.present };
+    act(() => root.render(<Harness />));
+  };
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  input = { ...input, project: { ...input.project!, name: 'Newer ready draft' } };
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  expect(save).toHaveBeenCalledTimes(1);
+  await act(async () => release());
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Newer ready draft' }), {
+    baseUpdatedAt: 2,
+  });
+});
+
+it('coalesces uncaptured intermediate edits behind one acquired write', async () => {
+  let release: () => void = () => undefined;
+  save
+    .mockImplementationOnce(
+      (source) =>
+        new Promise((resolve) => {
+          release = () => resolve({ ...source, updatedAt: 2 });
+        })
+    )
+    .mockImplementation(async (source) => ({ ...source, updatedAt: 3 }));
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  input = { ...input, project: { ...input.project!, name: 'Obsolete queued edit' } };
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  input = { ...input, project: { ...input.project!, name: 'Latest queued edit' } };
+  act(() => root.render(<Harness />));
+  await act(async () => release());
+  expect(save).toHaveBeenCalledOnce();
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Latest queued edit' }), {
+    baseUpdatedAt: 2,
+  });
+});
+
+it('does not let a late conflict stop a new A/B/A session', async () => {
+  let reject: (error: Error) => void = () => undefined;
+  save
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        })
+    )
+    .mockImplementation(async (source) => ({ ...source, updatedAt: 5 }));
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  const other = createGuideProject('Other', 'other', 3);
+  input = { ...input, project: other, dirty: false };
+  input.saved.current = other;
+  act(() => root.render(<Harness />));
+  const base = createGuideProject('Reopened A', 'guide', 4);
+  input = { ...input, project: { ...base, name: 'New A edit' }, dirty: true };
+  input.saved.current = base;
+  act(() => root.render(<Harness />));
+  const conflict = new Error('Old A conflict');
+  conflict.name = 'StaleScenarioAggregateRevisionError';
+  await act(async () => reject(conflict));
+  expect(input.onStatus).not.toHaveBeenCalledWith('conflict');
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'New A edit' }), {
+    baseUpdatedAt: 4,
+  });
+  expect(input.saved.current?.name).toBe('New A edit');
 });
 
 it('keeps a failed draft for explicit retry and does not flush a conflict', async () => {
