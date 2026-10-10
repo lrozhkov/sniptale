@@ -72,5 +72,82 @@ for (const viewport of [
     await page.reload();
     await expect(models).toContainText(modelName);
     await expect(models).toContainText(label('settings.aiProviders.modelOperationSpeech'));
+    const recognitionName = `Multimodal fixture ${viewport.width}`;
+    await models.getByRole('button', { name: /^(Add|Добавить)$/u }).click();
+    await dialog
+      .getByRole('button', {
+        name: label('settings.aiProviders.modelProviderPlaceholder'),
+        exact: true,
+      })
+      .click();
+    await page.getByRole('option', { name: providerName, exact: true }).click();
+    await dialog
+      .getByPlaceholder(label('settings.aiProviders.modelNamePlaceholder'), { exact: true })
+      .fill(recognitionName);
+    await dialog
+      .getByPlaceholder(label('settings.aiProviders.modelCodePlaceholder'), { exact: true })
+      .fill('fixture-audio-chat');
+    await dialog
+      .getByLabel(label('settings.aiProviders.modelOperationLabel'), { exact: true })
+      .click();
+    await page
+      .getByRole('option', {
+        name: label('settings.aiProviders.modelOperationTranscription'),
+        exact: true,
+      })
+      .click();
+    await dialog
+      .getByLabel(label('settings.aiProviders.modelAudioTransport'), { exact: true })
+      .click();
+    await page
+      .getByRole('option', {
+        name: label('settings.aiProviders.modelAudioMultimodal'),
+        exact: true,
+      })
+      .click();
+    await dialog
+      .getByLabel(label('settings.aiProviders.modelAudioChatProtocol'), { exact: true })
+      .click();
+    await page.getByRole('option', { name: 'Bothub data URL', exact: true }).click();
+    await expect(
+      dialog.getByLabel(label('settings.aiProviders.modelAudioTimestamps'), { exact: true })
+    ).toHaveCount(0);
+    await dialog
+      .getByLabel(label('settings.aiProviders.modelAudioPrompt'), { exact: true })
+      .fill('Preserve source language');
+    await submit.scrollIntoViewIfNeeded();
+    await expect(submit).toBeInViewport();
+    await page.screenshot({
+      path: info.outputPath('multimodal-model-footer.png'),
+      fullPage: false,
+    });
+    await submit.click();
+    await expect(models).toContainText(recognitionName);
+    await page.reload();
+    await expect(models).toContainText(recognitionName);
+    await page.goto(
+      `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=ai-prompts&view=prompts`
+    );
+    const instructions = page.getByRole('textbox', {
+      name: label('settings.aiProviders.audioTranscriptionPromptTitle'),
+      exact: true,
+    });
+    await instructions.scrollIntoViewIfNeeded();
+    const instructionValue = `Keep meaningful pauses and source language. Fixture ${viewport.width}.`;
+    await instructions.fill(instructionValue);
+    const save = instructions
+      .locator('xpath=..')
+      .locator('xpath=..')
+      .getByRole('button', { name: label('common.actions.save'), exact: true });
+    await save.scrollIntoViewIfNeeded();
+    await expect(save).toBeInViewport();
+    await page.screenshot({
+      path: info.outputPath('recognition-prompt-save.png'),
+      fullPage: false,
+    });
+    await save.click();
+    await expect(save).toBeDisabled();
+    await page.reload();
+    await expect(instructions).toHaveValue(instructionValue);
   });
 }

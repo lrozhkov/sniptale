@@ -99,3 +99,17 @@ it('round trips audio model parameters while rejecting an audio text default', (
     })
   ).toThrow();
 });
+
+it('admits bounded optional recognition instructions without changing legacy prompt payloads', () => {
+  const legacy = {
+    'ai.prompts': { schemaVersion: 1, data: { global: 'Global', scenario: 'Scenario' } },
+  };
+  expect(parseSettingsTransferDomains(legacy)).toEqual(legacy);
+  const payload = { 'ai.prompts': { schemaVersion: 1, data: { recognition: 'Native language' } } };
+  expect(parseSettingsTransferDomains(payload)).toEqual(payload);
+  expect(() =>
+    parseSettingsTransferDomains({
+      'ai.prompts': { schemaVersion: 1, data: { recognition: 'x'.repeat(10001) } },
+    })
+  ).toThrow();
+});

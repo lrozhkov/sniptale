@@ -8,6 +8,8 @@ import {
   parseStoredSystemPrompt,
 } from './guards';
 import {
+  AI_AUDIO_TRANSCRIPTION_PROMPT_KEY,
+  DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT,
   AI_CHROME_ENABLED_KEY,
   AI_DEFAULT_MODEL_KEY,
   AI_GLOBAL_PROMPT_KEY,
@@ -236,4 +238,27 @@ export async function resetScenarioEditorSystemPrompt(): Promise<void> {
   await initializeAiStorageAccess();
   await browserStorage.local.remove(AI_SCENARIO_EDITOR_PROMPT_KEY);
   logger.info('Scenario editor system prompt reset');
+}
+
+/** Reads bounded local user instructions without activating provider credentials. */
+export async function loadAudioTranscriptionSystemPrompt(): Promise<string> {
+  const result = await browserStorage.local.get([AI_AUDIO_TRANSCRIPTION_PROMPT_KEY]);
+  const value = result[AI_AUDIO_TRANSCRIPTION_PROMPT_KEY];
+  return typeof value === 'string' && value.length <= 10000
+    ? value
+    : DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT;
+}
+export async function saveAudioTranscriptionSystemPrompt(prompt: string): Promise<void> {
+  if (prompt.length > 10000) throw new Error('Invalid transcription instructions');
+  await initializeAiStorageAccess();
+  return saveLocalValue(
+    AI_AUDIO_TRANSCRIPTION_PROMPT_KEY,
+    prompt,
+    'Audio transcription instructions saved'
+  );
+}
+export async function resetAudioTranscriptionSystemPrompt(): Promise<void> {
+  await initializeAiStorageAccess();
+  await browserStorage.local.remove(AI_AUDIO_TRANSCRIPTION_PROMPT_KEY);
+  logger.info('Audio transcription instructions reset');
 }

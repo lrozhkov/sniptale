@@ -6,6 +6,8 @@ const coreMocks = vi.hoisted(() => ({
   enableAISecretPassphraseProtection: vi.fn(),
   loadAISecretProtectionStatus: vi.fn(),
   lockAISecretProtection: vi.fn(),
+  resetAudioTranscriptionSystemPrompt: vi.fn(),
+  saveAudioTranscriptionSystemPrompt: vi.fn(),
   resetGlobalSystemPrompt: vi.fn(),
   resetAISecretPassphraseProtection: vi.fn(),
   resetScenarioEditorSystemPrompt: vi.fn(),
@@ -97,4 +99,19 @@ it('dispatches remaining secret-protection commands and returns serialized statu
   expect(coreMocks.resetAISecretPassphraseProtection).toHaveBeenCalledOnce();
   expect(coreMocks.loadAISecretProtectionStatus).toHaveBeenCalledOnce();
   expect(invariantMock).toHaveBeenCalledTimes(9);
+});
+
+it('keeps recognition prompt save/reset ordered with other AI settings mutations after failure', async () => {
+  coreMocks.saveAudioTranscriptionSystemPrompt.mockRejectedValueOnce(new Error('write failed'));
+  const failed = mutateStoredAISettings({
+    operation: 'save-audio-transcription-prompt',
+    prompt: 'new',
+  });
+  const reset = mutateStoredAISettings({ operation: 'reset-audio-transcription-prompt' });
+  await expect(failed).rejects.toThrow('write failed');
+  await reset;
+  expect(coreMocks.resetAudioTranscriptionSystemPrompt).toHaveBeenCalledOnce();
+  expect(coreMocks.saveAudioTranscriptionSystemPrompt.mock.invocationCallOrder[0]).toBeLessThan(
+    coreMocks.resetAudioTranscriptionSystemPrompt.mock.invocationCallOrder[0]!
+  );
 });

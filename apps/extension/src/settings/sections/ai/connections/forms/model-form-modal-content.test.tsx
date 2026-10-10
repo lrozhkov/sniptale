@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../../../platform/i18n';
 import type { AIProvider } from '../../../../../contracts/settings';
+import type { AIModelAudioParameters } from '../../../../../contracts/settings/model-operation';
 
 const { layoutPropsSpy } = vi.hoisted(() => ({
   layoutPropsSpy: vi.fn(),
@@ -145,6 +146,102 @@ function renderContent(overrides: Partial<Parameters<typeof ModelFormModalConten
 
   return props;
 }
+
+it('changes audio protocol explicitly and removes hidden chat fields when returning to the speech API', () => {
+  const change = vi.fn();
+  function Harness() {
+    const [audio, setAudio] = useState<AIModelAudioParameters>();
+    const props = createProps();
+    return (
+      <ModelFormModalContent
+        {...props}
+        formData={{ ...props.formData, operation: 'transcription', ...(audio ? { audio } : {}) }}
+        onAudioChange={(next) => {
+          change(next);
+          setAudio(next);
+        }}
+      />
+    );
+  }
+  renderContent();
+  act(() => root?.render(<Harness />));
+  const select = (key: Parameters<typeof translate>[0], value: string) => {
+    const node = container?.querySelector<HTMLSelectElement>(
+      'select[aria-label="' + translate(key) + '"]'
+    );
+    if (!node) throw new Error('Missing selector: ' + key);
+    act(() => {
+      node.value = value;
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+  const latest = () => change.mock.lastCall?.[0]?.transcription;
+  const language = container?.querySelector<HTMLInputElement>(
+    'input[aria-label="' + translate('settings.aiProviders.modelAudioLanguage') + '"]'
+  );
+  const setLanguage = (value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        language,
+        value
+      );
+      language?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  setLanguage('ru');
+  expect(latest()?.language).toBe('ru');
+  select('settings.aiProviders.modelAudioTransport', 'audio-chat');
+  expect(latest()).toMatchObject({
+    transport: 'audio-chat',
+    chatProtocol: 'openai',
+    structuredOutput: 'json_schema',
+    responseFormat: 'json',
+    timestampGranularity: 'none',
+  });
+  expect(
+    container?.querySelector(
+      'select[aria-label="' + translate('settings.aiProviders.modelAudioFormat') + '"]'
+    )
+  ).toBeNull();
+  select('settings.aiProviders.modelAudioChatProtocol', 'bothub');
+  expect(latest()?.language).toBe('ru');
+  expect(latest()?.chatProtocol).toBe('bothub');
+  select('settings.aiProviders.modelAudioChatProtocol', 'openai');
+  select('settings.aiProviders.modelAudioStructuredOutput', 'json_object');
+  expect(latest()?.structuredOutput).toBe('json_object');
+  select('settings.aiProviders.modelAudioStructuredOutput', 'json_schema');
+  setLanguage('');
+  expect(latest()).not.toHaveProperty('language');
+  const prompt = container?.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="' + translate('settings.aiProviders.modelAudioPrompt') + '"]'
+  );
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+      prompt,
+      'Preserve names'
+    );
+    prompt?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(latest()?.prompt).toBe('Preserve names');
+  select('settings.aiProviders.modelAudioTransport', 'audio-api');
+  expect(latest()).toMatchObject({
+    transport: 'audio-api',
+    responseFormat: 'verbose_json',
+    timestampGranularity: 'word',
+  });
+  expect(latest()).not.toHaveProperty('chatProtocol');
+  expect(latest()).not.toHaveProperty('structuredOutput');
+  expect(latest()?.prompt).toBe('Preserve names');
+  expect(
+    container?.querySelector(
+      'select[aria-label="' + translate('settings.aiProviders.modelAudioChatProtocol') + '"]'
+    )
+  ).toBeNull();
+  select('settings.aiProviders.modelAudioFormat', 'json');
+  expect(latest()?.timestampGranularity).toBe('none');
+  select('settings.aiProviders.modelAudioFormat', 'verbose_json');
+  select('settings.aiProviders.modelAudioTimestamps', 'segment');
+  expect(latest()?.timestampGranularity).toBe('segment');
+});
 
 beforeEach(() => {
   layoutPropsSpy.mockReset();

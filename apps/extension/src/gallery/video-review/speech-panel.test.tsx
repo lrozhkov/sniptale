@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   run: vi.fn(),
   apply: vi.fn(),
   wasApplied: vi.fn(),
+  multimodal: false,
 }));
 vi.mock('../../workflows/video-review/recognition', () => ({
   prepareReviewRecognition: mocks.prepare,
@@ -28,7 +29,27 @@ vi.mock('../../workflows/video-review/recognition', () => ({
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
   requestAIModelSelectionBootstrap: async () => ({
-    models: [{ id: 'model', displayName: 'Model', providerId: 'provider' }],
+    models: [
+      {
+        id: 'model',
+        displayName: 'Model',
+        providerId: 'provider',
+        ...(mocks.multimodal
+          ? {
+              operation: 'transcription',
+              audio: {
+                transcription: {
+                  transport: 'audio-chat',
+                  chatProtocol: 'bothub',
+                  structuredOutput: 'json_schema',
+                  responseFormat: 'json',
+                  timestampGranularity: 'none',
+                },
+              },
+            }
+          : {}),
+      },
+    ],
     providers: [{ id: 'provider', name: 'Provider' }],
     defaultModelId: 'model',
     chromeAiEnabled: false,
@@ -77,6 +98,7 @@ let root: Root | undefined;
 let host: HTMLDivElement;
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.multimodal = false;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.append(host);
@@ -285,7 +307,7 @@ it('keeps ordinary audio controls and one compact model form without requesting 
   expect(host.querySelector('input[type="range"]')).toBeNull();
   expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(0);
   expect(mocks.prepare).not.toHaveBeenCalled();
-  expect(host.textContent).toContain(translate('gallery.videoReview.recognitionPauseHint'));
+  expect(host.querySelector('fieldset p')).toBeNull();
   expect(host.textContent).not.toContain(translate('gallery.videoReview.speechSynthesisModel'));
 });
 it('requires provider consent in the inspector and lets the user cancel before egress', async () => {
@@ -389,14 +411,93 @@ it('links both authored snapshots and recognized origins to individual canonical
 
 it('discloses original audio including cuts for complete and selected requests', async () => {
   await mount(false, { start: 2, end: 4 });
+  expect(host.textContent).not.toContain('включая вырезанные участки');
+  await click(translate('gallery.videoReview.recognitionStart'));
   expect(host.textContent).toContain('включая вырезанные участки');
   expect(host.textContent).not.toContain('без вырезанных участков');
+  await click(translate('common.actions.cancel'));
   await act(async () => button(translate('gallery.videoReview.recognitionSelection')).click());
+  await click(translate('gallery.videoReview.recognitionStart'));
   expect(host.textContent).toContain('включая вырезанные участки');
   expect(host.textContent).not.toContain('без вырезанных участков');
 });
 it('preserves the retained-audio disclosure for voice clips', async () => {
   await mount();
+  expect(host.textContent).not.toContain('без вырезанных участков');
+  await click(translate('gallery.videoReview.recognitionStart'));
   expect(host.textContent).toContain('без вырезанных участков');
   expect(host.textContent).not.toContain('включая вырезанные участки');
+});
+
+it('uses compact multimodal controls and captures only the chosen rewrite instructions', async () => {
+  mocks.multimodal = true;
+  await mount(false, { start: 0, end: 1 });
+  const select = async (key: Parameters<typeof translate>[0], value: string) => {
+    const node = host.querySelector<HTMLSelectElement>(
+      'select[aria-label="' + translate(key) + '"]'
+    );
+    if (!node) throw new Error('Missing selector: ' + key);
+    await act(async () => {
+      node.value = value;
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+  expect(host.querySelector('fieldset p')).toBeNull();
+  expect(host.querySelector('textarea')).toBeNull();
+  await select('gallery.videoReview.recognitionProcessingMode', 'rewrite');
+  await select('gallery.videoReview.recognitionGrouping', 'paragraph');
+  const textarea = host.querySelector<HTMLTextAreaElement>('textarea');
+  expect(textarea).not.toBeNull();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+      textarea,
+      'Make the wording concise'
+    );
+    textarea?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await recognize();
+  expect(mocks.prepare.mock.calls[0]?.[5]).toMatchObject({
+    recognition: { mode: 'rewrite', granularity: 'paragraph', prompt: 'Make the wording concise' },
+  });
+  await click(translate('gallery.videoReview.recognitionDiscard'));
+  await select('gallery.videoReview.recognitionProcessingMode', 'transcribe');
+  await select('gallery.videoReview.recognitionGrouping', 'phrase');
+  expect(host.querySelector('textarea')).toBeNull();
+  await click(translate('gallery.videoReview.recognitionStart'));
+  expect(mocks.prepare.mock.calls[1]?.[5]).toMatchObject({
+    recognition: { mode: 'transcribe', granularity: 'phrase', prompt: '' },
+  });
+});
+
+it('requests distinct approval for saved instructions after an audio-only approval at the same provider', async () => {
+  await mount(false, { start: 0, end: 1 });
+  await recognize();
+  await click(translate('gallery.videoReview.recognitionDiscard'));
+  mocks.multimodal = true;
+  await click(translate('gallery.videoReview.speechReloadModels'));
+  await click(translate('gallery.videoReview.recognitionStart'));
+  expect(mocks.prepare).toHaveBeenCalledTimes(1);
+  expect(button(translate('gallery.videoReview.speechConsentContinue'))).toBeDefined();
+  expect(host.textContent).toContain(
+    translate('gallery.videoReview.speechConsentAudioInstructions').replace(
+      '{provider}',
+      'Provider'
+    )
+  );
+  await click(translate('common.actions.cancel'));
+  expect(mocks.prepare).toHaveBeenCalledTimes(1);
+  await recognize();
+  expect(mocks.prepare).toHaveBeenCalledTimes(2);
+  expect(mocks.prepare.mock.calls[1]?.[5]).toMatchObject({
+    recognition: { mode: 'transcribe', granularity: 'sentence', prompt: '' },
+  });
+  expect(host.textContent).not.toContain(
+    translate('gallery.videoReview.speechConsentAudioInstructions').replace(
+      '{provider}',
+      'Provider'
+    )
+  );
+  await click(translate('gallery.videoReview.recognitionDiscard'));
+  await click(translate('gallery.videoReview.recognitionStart'));
+  expect(mocks.prepare).toHaveBeenCalledTimes(3);
 });

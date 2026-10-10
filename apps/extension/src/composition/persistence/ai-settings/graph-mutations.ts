@@ -15,6 +15,8 @@ import {
   loadAIProviders,
   loadDefaultModelId,
   lockAISecretProtection,
+  resetAudioTranscriptionSystemPrompt,
+  saveAudioTranscriptionSystemPrompt,
   resetGlobalSystemPrompt,
   resetAISecretPassphraseProtection,
   resetScenarioEditorSystemPrompt,
@@ -179,6 +181,10 @@ async function applyAISettingsMutation(command: AISettingsMutationCommand): Prom
       return moveModel(command.modelId, command.beforeModelId);
     case 'save-default-model':
       return saveDefaultModel(command.defaultModelId);
+    case 'save-audio-transcription-prompt':
+      return saveAudioTranscriptionSystemPrompt(command.prompt);
+    case 'reset-audio-transcription-prompt':
+      return resetAudioTranscriptionSystemPrompt();
     case 'save-global-prompt':
       return saveGlobalSystemPrompt(command.prompt);
     case 'save-scenario-editor-prompt':

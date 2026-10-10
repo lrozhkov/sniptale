@@ -49,15 +49,38 @@ export interface AudioStagedHandle {
   size: number;
 }
 
+/** Disposable multimodal request options, parsed before provider activation. */
+export interface AudioRecognitionOptions {
+  mode: 'transcribe' | 'rewrite';
+  granularity: 'phrase' | 'sentence' | 'paragraph';
+  prompt: string;
+}
+
+export function parseAudioRecognitionOptions(value: unknown): AudioRecognitionOptions | null {
+  if (
+    !record(value) ||
+    Object.keys(value).some((key) => !['mode', 'granularity', 'prompt'].includes(key)) ||
+    (value['mode'] !== 'transcribe' && value['mode'] !== 'rewrite') ||
+    (value['granularity'] !== 'phrase' &&
+      value['granularity'] !== 'sentence' &&
+      value['granularity'] !== 'paragraph') ||
+    typeof value['prompt'] !== 'string' ||
+    value['prompt'].length > 10000 ||
+    (value['mode'] === 'transcribe' && value['prompt'] !== '')
+  )
+    return null;
+  return { mode: value['mode'], granularity: value['granularity'], prompt: value['prompt'] };
+}
+
 export type AudioJobStart = {
   type: 'start';
   requestId: string;
   modelId: string;
-  /** The provider disclosed by the requesting view; mandatory for authored text synthesis. */
+  /** The disclosed provider; mandatory for authored synthesis and multimodal recognition. */
   approvedProviderId?: string;
   scope: AudioJobScope;
 } & (
-  | { operation: 'transcription' }
+  | { operation: 'transcription'; recognition?: AudioRecognitionOptions }
   | {
       operation: 'speech';
       phraseId: string;
@@ -103,6 +126,7 @@ export function parseAudioJobFailureCode(value: unknown): AudioJobFailureCode | 
 
 export interface AudioTranscriptTiming {
   text: string;
+  originalText?: string;
   start: number;
   /** Equality is admitted for word text only; it is never a durable aligned word interval. */
   end: number;
@@ -246,8 +270,20 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
     scope,
     ...(typeof approvedProviderId === 'string' ? { approvedProviderId } : {}),
   };
-  if (value['operation'] === 'transcription')
-    return isAudioSourceJobScope(scope) ? { ...base, operation: 'transcription', scope } : null;
+  if (value['operation'] === 'transcription') {
+    const recognition =
+      value['recognition'] === undefined
+        ? undefined
+        : parseAudioRecognitionOptions(value['recognition']);
+    if (
+      !isAudioSourceJobScope(scope) ||
+      recognition === null ||
+      (recognition && !identifier(approvedProviderId))
+    )
+      return null;
+    return { ...base, operation: 'transcription', scope, ...(recognition ? { recognition } : {}) };
+  }
+  if ('recognition' in value) return null;
   if (
     value['operation'] !== 'speech' ||
     !identifier(value['phraseId']) ||
@@ -323,6 +359,10 @@ function parseTranscript(value: unknown): AudioTranscriptResult | null {
         !record(item) ||
         typeof item['text'] !== 'string' ||
         item['text'].length > 100000 ||
+        (item['originalText'] !== undefined &&
+          (key === 'words' ||
+            typeof item['originalText'] !== 'string' ||
+            item['originalText'].length > 16000)) ||
         typeof item['start'] !== 'number' ||
         !Number.isFinite(item['start']) ||
         item['start'] < 0 ||
@@ -334,7 +374,12 @@ function parseTranscript(value: unknown): AudioTranscriptResult | null {
           item['start'] < (key === 'words' ? parsed.at(-1)!.end : parsed.at(-1)!.start))
       )
         return null;
-      parsed.push({ text: item['text'], start: item['start'], end: item['end'] });
+      parsed.push({
+        text: item['text'],
+        start: item['start'],
+        end: item['end'],
+        ...(typeof item['originalText'] === 'string' ? { originalText: item['originalText'] } : {}),
+      });
     }
     result[key] = parsed;
   }

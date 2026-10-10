@@ -6,6 +6,7 @@ import {
   parseReviewSpeechTarget,
   sameReviewSpeechTarget,
   sameAudioJobScope,
+  parseAudioRecognitionOptions,
 } from './audio';
 const scope = {
   workspaceId: 'w',
@@ -15,6 +16,67 @@ const scope = {
   nativeStart: 0,
   nativeEnd: 1,
 };
+
+it('freezes bounded multimodal options at the Port boundary and rejects forged operation fields', () => {
+  const recognition = { mode: 'rewrite', granularity: 'phrase', prompt: 'Make concise.' };
+  const start = {
+    type: 'start',
+    requestId: 'r',
+    modelId: 'm',
+    approvedProviderId: 'provider',
+    scope,
+    operation: 'transcription',
+    recognition,
+  };
+  const parsed = parseAudioJobClientMessage(start);
+  expect(parseAudioJobClientMessage({ ...start, approvedProviderId: undefined })).toBeNull();
+  expect(parsed).toMatchObject({ recognition });
+  recognition.prompt = 'Changed later';
+  expect(parsed).toMatchObject({ recognition: { prompt: 'Make concise.' } });
+  for (const patch of [
+    { mode: 'translate' },
+    { granularity: 'word' },
+    { prompt: 'x'.repeat(10001) },
+    { prompt: 1 },
+    { extra: true },
+    { mode: 'transcribe', prompt: 'Rewrite' },
+  ])
+    expect(
+      parseAudioJobClientMessage({ ...start, recognition: { ...recognition, ...patch } })
+    ).toBeNull();
+  expect(
+    parseAudioRecognitionOptions({ mode: 'transcribe', granularity: 'paragraph', prompt: '' })
+  ).not.toBeNull();
+  expect(
+    parseAudioJobClientMessage({
+      ...start,
+      operation: 'speech',
+      phraseId: 'p',
+      textRevision: 1,
+      text: 'a',
+      profile: { voiceId: 'v', responseFormat: 'mp3' },
+    })
+  ).toBeNull();
+});
+
+it('preserves bounded source wording only on transcript segment frames', () => {
+  const segment = { text: 'Short.', originalText: 'Longer source.', start: 0, end: 1 };
+  const frame = {
+    type: 'transcript',
+    requestId: 'r',
+    result: { text: 'Short.', segments: [segment] },
+  };
+  expect(parseAudioJobServerMessage(frame)).toEqual(frame);
+  expect(
+    parseAudioJobServerMessage({ ...frame, result: { text: 'Short.', words: [segment] } })
+  ).toBeNull();
+  expect(
+    parseAudioJobServerMessage({
+      ...frame,
+      result: { text: 'Short.', segments: [{ ...segment, originalText: 'x'.repeat(16001) }] },
+    })
+  ).toBeNull();
+});
 
 it('admits asset-free text synthesis and refuses text transcription, mixed clocks or forged identity', () => {
   const textScope = {

@@ -124,6 +124,15 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
         prompt: z.string().max(50000),
       })
       .strict(),
+    baseMutationSchema
+      .extend({
+        operation: z.literal('save-audio-transcription-prompt'),
+        prompt: z.string().max(10000),
+      })
+      .strict(),
+    baseMutationSchema
+      .extend({ operation: z.literal('reset-audio-transcription-prompt') })
+      .strict(),
     baseMutationSchema.extend({ operation: z.literal('reset-global-prompt') }).strict(),
     baseMutationSchema.extend({ operation: z.literal('reset-scenario-editor-prompt') }).strict(),
     baseMutationSchema
@@ -184,6 +193,7 @@ export const aiSettingsQueryResponseSchema = defineAiSettingsQueryResponseSchema
       settingsRuntimeData: z
         .object({
           scenarioEditorSystemPrompt: z.string(),
+          audioTranscriptionSystemPrompt: z.string().max(10000).optional(),
           secretProtectionStatus: secretProtectionStatusSchema,
           selectionBootstrap: aiSettingsPageModelSelectionBootstrapSchema,
         })

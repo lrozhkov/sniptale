@@ -20,9 +20,15 @@ export type AiProvidersPromptResetResult = { error: string | null };
 export type AiProvidersPromptsState = {
   global: AiProvidersPromptViewState;
   scenarioEditor: AiProvidersPromptViewState;
+  audioTranscription: AiProvidersPromptViewState;
 };
 
 export type AiProvidersPromptSource = {
+  audioTranscriptionPrompt: string;
+  audioTranscriptionPromptRef: MutableRefObject<HTMLTextAreaElement | null>;
+  persistedAudioTranscriptionPrompt: string;
+  setAudioTranscriptionPromptState: (value: string) => void;
+  setPersistedAudioTranscriptionPrompt: (value: string) => void;
   globalPrompt: string;
   globalPromptRef: MutableRefObject<HTMLTextAreaElement | null>;
   persistedGlobalPrompt: string;

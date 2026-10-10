@@ -6,6 +6,7 @@ import {
 } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
 import { parseAudioTranscriptResponse } from './response';
+import { encodeChatTranscription, parseChatTranscription } from './chat-transcription';
 
 interface AudioRequest {
   request: AudioJobStart;
@@ -64,6 +65,30 @@ async function encodeTranscription(
   if (!args.input || !params) throw new Error('invalid-request');
   if (args.input.size > AUDIO_INPUT_MAX_BYTES) throw new Error('too-large');
   args.signal.throwIfAborted();
+  if (params.transport === 'audio-chat') {
+    if (
+      args.request.operation !== 'transcription' ||
+      !args.request.recognition ||
+      !isAudioSourceJobScope(args.request.scope)
+    )
+      throw new Error('invalid-request');
+    const bytes = new Uint8Array(await args.input.arrayBuffer());
+    args.signal.throwIfAborted();
+    // Bounded blocks avoid spreading the complete audio into the JavaScript argument stack.
+    const parts: string[] = [];
+    // All nonfinal blocks contain a multiple of three bytes, so their base64 has no internal padding.
+    for (let offset = 0; offset < bytes.length; offset += 32766)
+      parts.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + 32766))));
+    const payload = encodeChatTranscription(
+      args.config,
+      args.request.recognition,
+      args.request.scope.nativeEnd - args.request.scope.nativeStart,
+      parts.join('')
+    );
+    args.signal.throwIfAborted();
+    headers['Content-Type'] = 'application/json';
+    return new TextEncoder().encode(payload).buffer;
+  }
   const form = new FormData();
   form.set('file', args.input);
   form.set('model', args.config.modelCode);
@@ -122,7 +147,12 @@ async function decodeTranscription(response: Response, args: AudioRequest) {
   } catch {
     throw new Error('invalid-response');
   }
-  const result = parseAudioTranscriptResponse(raw, scope.nativeEnd - scope.nativeStart);
+  const result =
+    args.config.transcription?.transport === 'audio-chat'
+      ? args.request.operation === 'transcription' && args.request.recognition
+        ? parseChatTranscription(raw, scope.nativeEnd - scope.nativeStart, args.request.recognition)
+        : null
+      : parseAudioTranscriptResponse(raw, scope.nativeEnd - scope.nativeStart);
   if (!result) throw new Error('invalid-response');
   return { kind: 'transcript' as const, result };
 }

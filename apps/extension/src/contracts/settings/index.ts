@@ -180,6 +180,7 @@ export interface AISettings {
   defaultModelId: string | null;
   globalSystemPrompt: string;
   scenarioEditorSystemPrompt: string;
+  audioTranscriptionSystemPrompt?: string;
 }
 
 export interface PromptTemplate {

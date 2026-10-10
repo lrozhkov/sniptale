@@ -2,6 +2,10 @@
 export type AIModelOperation = 'text' | 'transcription' | 'speech';
 
 export interface AITranscriptionModelParameters {
+  /** Missing transport preserves the existing Speech API configuration. */
+  transport?: 'audio-api' | 'audio-chat';
+  chatProtocol?: 'openai' | 'bothub';
+  structuredOutput?: 'json_schema' | 'json_object';
   language?: string;
   prompt?: string;
   responseFormat: 'json' | 'verbose_json';
@@ -48,7 +52,25 @@ function optionalText(value: unknown, maximum: number): boolean {
 function isTranscription(value: unknown): value is AITranscriptionModelParameters {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ['language', 'prompt', 'responseFormat', 'timestampGranularity']) &&
+    hasOnlyKeys(value, [
+      'language',
+      'prompt',
+      'responseFormat',
+      'timestampGranularity',
+      'transport',
+      'chatProtocol',
+      'structuredOutput',
+    ]) &&
+    (value['transport'] === undefined ||
+      value['transport'] === 'audio-api' ||
+      value['transport'] === 'audio-chat') &&
+    (value['transport'] === 'audio-chat'
+      ? (value['chatProtocol'] === 'openai' || value['chatProtocol'] === 'bothub') &&
+        (value['structuredOutput'] === 'json_schema' ||
+          value['structuredOutput'] === 'json_object') &&
+        value['responseFormat'] === 'json' &&
+        value['timestampGranularity'] === 'none'
+      : value['chatProtocol'] === undefined && value['structuredOutput'] === undefined) &&
     (value['language'] === undefined ||
       (typeof value['language'] === 'string' && /^[a-z]{2,3}$/.test(value['language']))) &&
     optionalText(value['prompt'], 10000) &&

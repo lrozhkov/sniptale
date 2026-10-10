@@ -120,6 +120,23 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
   textRewriteVariant: { ru: 'Создать скрытый вариант', en: 'Create a hidden variant' },
   textRewriteApplied: { ru: 'Правка применена', en: 'Text changes applied' },
   textRewriteWaiting: { ru: 'Ожидание: {seconds} с', en: 'Waiting: {seconds} s' },
+  recognitionTooLarge: {
+    ru: 'Аудио превышает лимит загрузки 24 МБ. Выберите меньший интервал или используйте Speech API с разбиением по размеру.',
+    en: 'Audio exceeds the 24 MB upload limit. Select a smaller interval or use Speech API with splitting by upload size.',
+  },
+  recognitionInvalidResponse: {
+    ru: 'Модель вернула неверную разметку. Текст не добавлен. Проверьте совместимость модели и повторите запрос вручную.',
+    en: 'The model returned invalid transcript data. No text was added. Check model compatibility and retry explicitly.',
+  },
+  recognitionProcessingMode: { ru: 'Обработка текста', en: 'Text processing' },
+  recognitionVerbatim: { ru: 'Чистая транскрипция', en: 'Verbatim transcription' },
+  recognitionRewrite: {
+    ru: 'Транскрипция с изменением текста',
+    en: 'Transcription with text changes',
+  },
+  recognitionPhrases: { ru: 'Фразы', en: 'Phrases' },
+  recognitionParagraphs: { ru: 'Абзацы', en: 'Paragraphs' },
+  recognitionInstructions: { ru: 'Что изменить в тексте', en: 'What to change in the text' },
   recognitionTitle: { ru: 'Распознавание речи', en: 'Transcription' },
   recognitionHistoryDisclosure: {
     ru: 'Звук и распознанный текст не сохраняются в истории AI-запросов.',
@@ -128,10 +145,6 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
   recognitionGrouping: { ru: 'Деление текста', en: 'Text grouping' },
   recognitionSentences: { ru: 'По предложениям', en: 'By sentence' },
   recognitionPauses: { ru: 'По предложениям и паузам', en: 'By sentence and pause' },
-  recognitionPauseHint: {
-    ru: 'Паузы от 0,45 с разделяют фразы. Тайминги сохраняют тишину между ними.',
-    en: 'Pauses of 0.45 s split phrases. Timing preserves the silence between them.',
-  },
   recognitionSelection: { ru: 'Только выделенный интервал', en: 'Selected interval only' },
   recognitionStart: { ru: 'Распознать речь', en: 'Transcribe speech' },
   recognitionSaveStart: {
@@ -144,12 +157,8 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
     en: 'No speech found in the selected audio.',
   },
   recognitionApproximate: {
-    ru: 'Часть текста привязана к диапазону без точных меток по словам. Уточните границы и деление вручную.',
-    en: 'Some text has range timing without precise word anchors. Adjust boundaries and segmentation manually.',
-  },
-  recognitionPreviewHint: {
-    ru: 'Исправьте текст и границы фраз. В проекте он появится после применения.',
-    en: 'Edit text and phrase timing. It enters the project when applied.',
+    ru: 'Разметка без точных меток по словам.',
+    en: 'Timing has no precise word anchors.',
   },
   recognitionApply: { ru: 'Применить текст', en: 'Apply text' },
   recognitionSaveApply: {
@@ -425,6 +434,10 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
   speechConsentAudio: {
     ru: 'Выбранный звук будет отправлен провайдеру «{provider}» для распознавания. Запрос может быть платным.',
     en: 'Selected audio will be sent to {provider} for transcription. The request may incur a charge.',
+  },
+  speechConsentAudioInstructions: {
+    ru: 'Звук и инструкции распознавания из настроек и этого запроса будут отправлены провайдеру «{provider}». Запрос может быть платным.',
+    en: 'Audio and recognition instructions from settings and this request will be sent to {provider}. The request may incur a charge.',
   },
   speechConsentText: {
     ru: 'Текст выбранных фраз и параметры голоса будут отправлены провайдеру «{provider}» для озвучки. Запрос может быть платным.',

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   initializeAiStorageAccess,
+  loadAudioTranscriptionSystemPrompt,
   loadAIModels,
   loadAIProviders,
 } from '../../../composition/persistence/ai-settings';
@@ -12,6 +13,7 @@ import { createAudioJobService } from './service';
 
 vi.mock('../../../composition/persistence/ai-settings', () => ({
   initializeAiStorageAccess: vi.fn(),
+  loadAudioTranscriptionSystemPrompt: vi.fn(),
   loadAIModels: vi.fn(),
   loadAIProviders: vi.fn(),
 }));
@@ -80,6 +82,7 @@ beforeEach(() => {
   vi.stubGlobal('chrome', { permissions: { contains: permission } });
   permission.mockResolvedValue(true);
   vi.mocked(initializeAiStorageAccess).mockResolvedValue(undefined);
+  vi.mocked(loadAudioTranscriptionSystemPrompt).mockResolvedValue('Audio instructions');
   vi.mocked(loadAIModels).mockResolvedValue([model]);
   vi.mocked(loadAIProviders).mockResolvedValue([provider]);
   vi.mocked(activateStoredAIProviderSecretForUse).mockResolvedValue('fixture-secret');
@@ -258,4 +261,41 @@ it('authorizes before credentials and rechecks model deletion before POST', asyn
   expect(activateStoredAIProviderSecretForUse).toHaveBeenCalledTimes(1);
   expect(post).not.toHaveBeenCalled();
   await job.disconnect();
+});
+
+it('resolves a declared chat endpoint and rejects mismatched request transport before credentials', async () => {
+  const transcriber: AIModel = {
+    ...model,
+    operation: 'transcription',
+    audio: {
+      transcription: {
+        transport: 'audio-chat',
+        chatProtocol: 'bothub',
+        structuredOutput: 'json_schema',
+        responseFormat: 'json',
+        timestampGranularity: 'none',
+      },
+    },
+  };
+  vi.mocked(loadAIModels).mockResolvedValue([transcriber]);
+  const start: AudioJobStart = {
+    type: 'start',
+    requestId: 'chat',
+    operation: 'transcription',
+    modelId: model.id,
+    approvedProviderId: provider.id,
+    scope: request.scope,
+    recognition: { mode: 'transcribe', granularity: 'sentence', prompt: '' },
+  };
+  await expect(resolveAudioModelConfig(start)).resolves.toMatchObject({
+    url: 'https://audio.example.test/custom/v1/chat/completions',
+    transcriptionInstructions: 'Audio instructions',
+  });
+  vi.mocked(activateStoredAIProviderSecretForUse).mockClear();
+  const { approvedProviderId: _approved, ...unapproved } = start;
+  await expect(resolveAudioModelConfig(unapproved)).rejects.toThrow('model-unavailable');
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  const { recognition: _recognition, ...missing } = start;
+  await expect(resolveAudioModelConfig(missing)).rejects.toThrow('invalid-request');
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
 });

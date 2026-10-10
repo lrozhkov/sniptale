@@ -1,4 +1,8 @@
-import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
+import {
+  AUDIO_INPUT_MAX_SECONDS,
+  type AudioRecognitionOptions,
+  type ReviewSpeechTarget,
+} from '../../contracts/ai/audio';
 import {
   createReviewTextDocument,
   reviewTextOrigins,
@@ -43,6 +47,7 @@ export interface ReviewRecognitionJob {
   modelId: string;
   approvedProviderId: string;
   grouping: ReviewRecognitionGrouping;
+  recognition?: AudioRecognitionOptions;
   source: string | Blob;
   ranges: Array<{ start: number; end: number }>;
   chunks: RecognitionChunk[];
@@ -138,6 +143,7 @@ export async function prepareReviewRecognition(
     original?: { file: Blob; sourceAssetId: string };
     selection?: { start: number; end: number };
     grouping?: ReviewRecognitionGrouping;
+    recognition?: AudioRecognitionOptions;
     previous?: ReviewRecognitionJob;
   } = {}
 ): Promise<ReviewRecognitionJob> {
@@ -151,6 +157,9 @@ export async function prepareReviewRecognition(
     throw new Error('stale');
   const ranges = recognitionRanges(session, target, options.selection);
   if (!ranges.length) throw new Error('invalid-request');
+  if (options.recognition && ranges.length !== 1) throw new Error('invalid-request');
+  if (options.recognition && ranges[0]!.end - ranges[0]!.start > AUDIO_INPUT_MAX_SECONDS)
+    throw new Error('too-large');
   const geometry = recognitionGeometry(session, target);
   const documentBasis = textBasis(session);
   const grouping = options.grouping ?? 'sentences-pauses';
@@ -162,6 +171,7 @@ export async function prepareReviewRecognition(
     approvedProviderId,
     grouping,
     options.selection,
+    options.recognition,
   ]);
   const saved = await session.saveBuffered();
   signal.throwIfAborted();
@@ -177,6 +187,7 @@ export async function prepareReviewRecognition(
     modelId,
     approvedProviderId,
     grouping,
+    ...(options.recognition ? { recognition: structuredClone(options.recognition) } : {}),
     source:
       previous?.source ?? (target.kind === 'original' ? options.original!.file : source.assetId),
     ranges,
@@ -198,7 +209,9 @@ export async function prepareReviewRecognition(
     .map((fragment) => fragment.id);
   if (!previous)
     for (const [range, interval] of ranges.entries()) {
-      const chunks = await planReviewSpeechChunks(job.source, [interval], signal);
+      const chunks = options.recognition
+        ? [interval]
+        : await planReviewSpeechChunks(job.source, [interval], signal);
       job.chunks.push(...chunks.map((chunk) => ({ ...chunk, range })));
     }
   signal.throwIfAborted();
@@ -227,6 +240,7 @@ export async function runReviewRecognition(
           requestId: crypto.randomUUID(),
           modelId: job.modelId,
           approvedProviderId: job.approvedProviderId,
+          ...(job.recognition ? { recognition: job.recognition } : {}),
           scope: reviewSpeechScope(session, job.target, chunk.start, chunk.end),
         },
         {

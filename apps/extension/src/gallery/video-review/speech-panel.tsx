@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
-import { ProductField, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductField, ProductSelect, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { ReviewInspectorSections } from './inspector-sections';
 import { ReviewPreviewNumberRow } from './number-row';
@@ -190,6 +190,7 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
   const provider = recognition.catalogs?.transcription.providers.find(
     (entry) => entry.id === model?.providerId
   );
+  const approvalKey = `${provider?.id ?? ''}:${recognition.multimodal ? 'audio-instructions' : 'audio'}`;
   const disabled = recognition.running || !!consenting;
   const scope = recognitionSourceDisclosure(recognition, access);
   const label = translate(
@@ -201,26 +202,29 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
     <div className="space-y-2">
       <fieldset disabled={disabled} className="min-w-0 space-y-2">
         <SpeechTranscriptionModelField speech={recognition} />
-        <ProductField label={translate('gallery.videoReview.recognitionGrouping')}>
-          <ProductSelect
-            aria-label={translate('gallery.videoReview.recognitionGrouping')}
-            value={recognition.grouping}
-            options={[
-              { value: 'sentences', label: translate('gallery.videoReview.recognitionSentences') },
-              {
-                value: 'sentences-pauses',
-                label: translate('gallery.videoReview.recognitionPauses'),
-              },
-            ]}
-            onChange={(value) => {
-              if (value === 'sentences' || value === 'sentences-pauses')
-                recognition.setGrouping(value);
-            }}
-          />
-        </ProductField>
-        {recognition.grouping === 'sentences-pauses' && (
-          <p className="text-xs">{translate('gallery.videoReview.recognitionPauseHint')}</p>
+        {!recognition.multimodal && (
+          <ProductField label={translate('gallery.videoReview.recognitionGrouping')}>
+            <ProductSelect
+              aria-label={translate('gallery.videoReview.recognitionGrouping')}
+              value={recognition.grouping}
+              options={[
+                {
+                  value: 'sentences',
+                  label: translate('gallery.videoReview.recognitionSentences'),
+                },
+                {
+                  value: 'sentences-pauses',
+                  label: translate('gallery.videoReview.recognitionPauses'),
+                },
+              ]}
+              onChange={(value) => {
+                if (value === 'sentences' || value === 'sentences-pauses')
+                  recognition.setGrouping(value);
+              }}
+            />
+          </ProductField>
         )}
+        {recognition.multimodal && <MultimodalRecognitionSettings recognition={recognition} />}
         {scope.selectable && (
           <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
             <span>{translate('gallery.videoReview.recognitionSelection')}</span>
@@ -232,10 +236,6 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
               aria-label={translate('gallery.videoReview.recognitionSelection')}
             />
           </div>
-        )}
-        <p className="text-xs">{translate(scope.label)}</p>
-        {!recognition.snapshot.autosaveEnabled && (
-          <p className="text-xs">{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
         )}
         <div className="flex flex-wrap gap-1">
           <ReviewButton
@@ -249,7 +249,7 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
             }
             onClick={() => {
               if (!provider) return;
-              if (approved.current.has(provider.id)) recognition.recognize(provider.id);
+              if (approved.current.has(approvalKey)) recognition.recognize(provider.id);
               else setConsenting(provider.id);
             }}
           >
@@ -270,12 +270,17 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
       {consenting && provider && (
         <div className="space-y-2 rounded border border-[var(--sniptale-color-border-soft)] p-2 text-xs">
           <p>
-            {translate('gallery.videoReview.speechConsentAudio').replace(
-              '{provider}',
-              provider.name
-            )}{' '}
+            {translate(
+              recognition.multimodal
+                ? 'gallery.videoReview.speechConsentAudioInstructions'
+                : 'gallery.videoReview.speechConsentAudio'
+            ).replace('{provider}', provider.name)}{' '}
             · {model?.displayName}
           </p>
+          <p>{translate(scope.label)}</p>
+          {!recognition.snapshot.autosaveEnabled && (
+            <p>{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
+          )}
           <p>{translate('gallery.videoReview.recognitionHistoryDisclosure')}</p>
           <div className="flex flex-wrap gap-1">
             <ReviewButton
@@ -288,7 +293,7 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
               }
               onClick={() => {
                 if (consenting !== provider.id) return;
-                approved.current.add(provider.id);
+                approved.current.add(approvalKey);
                 setConsenting(null);
                 recognition.recognize(provider.id);
               }}
@@ -336,13 +341,17 @@ function RecognitionFeedback({ recognition }: { recognition: Recognition }) {
       {recognition.error && (
         <p role="alert" className="text-xs">
           {translate(
-            recognition.error === 'selection'
-              ? 'gallery.videoReview.recognitionSelectionMissing'
-              : recognition.error === 'stale'
-                ? 'gallery.videoReview.speechChanged'
-                : recognition.error === 'model'
-                  ? 'gallery.videoReview.speechMissingModel'
-                  : 'gallery.videoReview.speechFailed'
+            recognition.error === 'too-large'
+              ? 'gallery.videoReview.recognitionTooLarge'
+              : recognition.error === 'invalid-response'
+                ? 'gallery.videoReview.recognitionInvalidResponse'
+                : recognition.error === 'selection'
+                  ? 'gallery.videoReview.recognitionSelectionMissing'
+                  : recognition.error === 'stale'
+                    ? 'gallery.videoReview.speechChanged'
+                    : recognition.error === 'model'
+                      ? 'gallery.videoReview.speechMissingModel'
+                      : 'gallery.videoReview.speechFailed'
           )}
         </p>
       )}
@@ -374,7 +383,6 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
   );
   return (
     <section className="min-w-0 space-y-2" data-ui="gallery.videoReview.recognitionResult">
-      <p className="text-xs">{translate('gallery.videoReview.recognitionPreviewHint')}</p>
       {editor.document.fragments.some((fragment) => fragment.alignment !== 'word') && (
         <p className="text-xs">{translate('gallery.videoReview.recognitionApproximate')}</p>
       )}
@@ -477,5 +485,52 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
         </div>
       )}
     </section>
+  );
+}
+
+function MultimodalRecognitionSettings({ recognition }: { recognition: Recognition }) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <ProductField label={translate('gallery.videoReview.recognitionProcessingMode')}>
+        <ProductSelect
+          aria-label={translate('gallery.videoReview.recognitionProcessingMode')}
+          value={recognition.recognitionMode}
+          options={[
+            { value: 'transcribe', label: translate('gallery.videoReview.recognitionVerbatim') },
+            { value: 'rewrite', label: translate('gallery.videoReview.recognitionRewrite') },
+          ]}
+          onChange={(value) => {
+            if (value === 'transcribe' || value === 'rewrite')
+              recognition.setRecognitionMode(value);
+          }}
+        />
+      </ProductField>
+      <ProductField label={translate('gallery.videoReview.recognitionGrouping')}>
+        <ProductSelect
+          aria-label={translate('gallery.videoReview.recognitionGrouping')}
+          value={recognition.granularity}
+          options={[
+            { value: 'phrase', label: translate('gallery.videoReview.recognitionPhrases') },
+            { value: 'sentence', label: translate('gallery.videoReview.recognitionSentences') },
+            { value: 'paragraph', label: translate('gallery.videoReview.recognitionParagraphs') },
+          ]}
+          onChange={(value) => {
+            if (value === 'phrase' || value === 'sentence' || value === 'paragraph')
+              recognition.setGranularity(value);
+          }}
+        />
+      </ProductField>
+      {recognition.recognitionMode === 'rewrite' && (
+        <ProductField label={translate('gallery.videoReview.recognitionInstructions')}>
+          <ProductTextarea
+            aria-label={translate('gallery.videoReview.recognitionInstructions')}
+            rows={3}
+            maxLength={10000}
+            value={recognition.prompt}
+            onChange={(event) => recognition.setPrompt(event.target.value)}
+          />
+        </ProductField>
+      )}
+    </div>
   );
 }

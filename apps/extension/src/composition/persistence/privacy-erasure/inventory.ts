@@ -105,6 +105,7 @@ const localSensitiveKeys = [
   'sniptale_runtime_diagnostic_log',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
+  'sniptale_ai_audio_transcription_prompt',
   'sniptale_last_save_as_dir',
   'sniptale_prompt_templates',
   'sniptale_template_order',

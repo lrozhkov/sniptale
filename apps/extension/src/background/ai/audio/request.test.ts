@@ -285,3 +285,82 @@ it('rejects an oversized input before reading it or making a request', async () 
   expect(read).not.toHaveBeenCalled();
   expect(fetchMock).not.toHaveBeenCalled();
 });
+
+it('posts a complete declared multimodal file once and admits only schema-valid timed text', async () => {
+  const body = JSON.stringify({
+    choices: [
+      {
+        finish_reason: 'stop',
+        message: {
+          content: JSON.stringify({
+            segments: [{ text: 'Hello.', start: 0, end: 1 }],
+          }),
+        },
+      },
+    ],
+  });
+  const post = vi.fn<typeof fetch>(
+    async () => new Response(body, { headers: { 'Content-Type': 'application/json' } })
+  );
+  vi.stubGlobal('fetch', post);
+  const result = await run(
+    { ...transcription, recognition: { mode: 'transcribe', granularity: 'sentence', prompt: '' } },
+    {
+      ...transcriptionConfig,
+      url: 'https://provider.test/v1/chat/completions',
+      transcription: {
+        transport: 'audio-chat',
+        chatProtocol: 'bothub',
+        structuredOutput: 'json_schema',
+        responseFormat: 'json',
+        timestampGranularity: 'none',
+      },
+    }
+  );
+  expect(post).toHaveBeenCalledTimes(1);
+  const request = post.mock.calls[0]![1]!;
+  expect(new Headers(request.headers).get('Content-Type')).toBe('application/json');
+  const payload = JSON.parse(new TextDecoder().decode(request.body as ArrayBuffer));
+  expect(payload.messages[1].content[1]).toEqual({
+    type: 'image_url',
+    image_url: { url: 'data:audio/wav;base64,Ynl0ZXM=' },
+  });
+  expect(result).toMatchObject({ kind: 'transcript', result: { text: 'Hello.' } });
+});
+
+it('preserves every audio byte across base64 block boundaries without extra POSTs', async () => {
+  const bytes = Uint8Array.from({ length: 32766 * 2 + 5 }, (_, index) => index % 256);
+  const post = vi.fn<typeof fetch>(
+    async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ finish_reason: 'stop', message: { content: '{"segments":[]}' } }],
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+  );
+  vi.stubGlobal('fetch', post);
+  await requestAudio({
+    request: {
+      ...transcription,
+      recognition: { mode: 'transcribe', granularity: 'sentence', prompt: '' },
+    },
+    config: {
+      ...transcriptionConfig,
+      transcription: {
+        transport: 'audio-chat',
+        chatProtocol: 'openai',
+        structuredOutput: 'json_schema',
+        responseFormat: 'json',
+        timestampGranularity: 'none',
+      },
+    },
+    input: new File([bytes], 'audio.wav', { type: 'audio/wav' }),
+    signal: new AbortController().signal,
+    onReceiving() {},
+  });
+  expect(post).toHaveBeenCalledOnce();
+  const payload = JSON.parse(new TextDecoder().decode(post.mock.calls[0]![1]!.body as ArrayBuffer));
+  const encoded = payload.messages[1].content[1].input_audio.data;
+  expect(Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))).toEqual(bytes);
+});

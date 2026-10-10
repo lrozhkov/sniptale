@@ -52,6 +52,7 @@ const LOCAL_KEYS = [
   'sniptale_ai_chrome_enabled',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
+  'sniptale_ai_audio_transcription_prompt',
 ] as const;
 
 export class SettingsTransferQuotaError extends Error {}
@@ -394,6 +395,7 @@ function applyAiWrites(context: WriteBuildContext): void {
   if (prompts) {
     assign(localWrites, 'sniptale_ai_global_prompt', prompts['global']);
     assign(localWrites, 'sniptale_ai_scenario_editor_prompt', prompts['scenario']);
+    assign(localWrites, 'sniptale_ai_audio_transcription_prompt', prompts['recognition']);
   }
 }
 

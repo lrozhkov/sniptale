@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 
 import { requestAISettingsPageRuntimeData } from '../../../../workflows/ai-settings/query';
 import { useAiProvidersPromptState } from './state';
+import { DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT } from '../../../../composition/persistence/ai-settings/constants';
 
 export function useAiPromptsController() {
   const [globalPrompt, setGlobalPromptState] = useState('');
   const [persistedGlobalPrompt, setPersistedGlobalPrompt] = useState('');
   const [scenarioEditorPrompt, setScenarioEditorPromptState] = useState('');
   const [persistedScenarioEditorPrompt, setPersistedScenarioEditorPrompt] = useState('');
+  const [audioTranscriptionPrompt, setAudioTranscriptionPromptState] = useState('');
+  const [persistedAudioTranscriptionPrompt, setPersistedAudioTranscriptionPrompt] = useState('');
+  const audioTranscriptionPromptRef = useRef<HTMLTextAreaElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const globalPromptRef = useRef<HTMLTextAreaElement | null>(null);
@@ -22,6 +26,12 @@ export function useAiPromptsController() {
         setPersistedGlobalPrompt(data.selectionBootstrap.globalSystemPrompt);
         setScenarioEditorPromptState(data.scenarioEditorSystemPrompt);
         setPersistedScenarioEditorPrompt(data.scenarioEditorSystemPrompt);
+        setAudioTranscriptionPromptState(
+          data.audioTranscriptionSystemPrompt ?? DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT
+        );
+        setPersistedAudioTranscriptionPrompt(
+          data.audioTranscriptionSystemPrompt ?? DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT
+        );
         setError(false);
       })
       .catch(() => {
@@ -39,6 +49,11 @@ export function useAiPromptsController() {
     error,
     isLoading,
     prompts: useAiProvidersPromptState({
+      audioTranscriptionPrompt,
+      audioTranscriptionPromptRef,
+      persistedAudioTranscriptionPrompt,
+      setAudioTranscriptionPromptState,
+      setPersistedAudioTranscriptionPrompt,
       globalPrompt,
       globalPromptRef,
       persistedGlobalPrompt,

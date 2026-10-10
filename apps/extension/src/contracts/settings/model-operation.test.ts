@@ -15,6 +15,18 @@ describe('AI model operation configuration', () => {
   });
 
   it.each([
+    {
+      operation: 'transcription',
+      audio: {
+        transcription: {
+          transport: 'audio-chat',
+          chatProtocol: 'bothub',
+          structuredOutput: 'json_schema',
+          responseFormat: 'json',
+          timestampGranularity: 'none',
+        },
+      },
+    },
     {},
     { operation: 'text' },
     {
@@ -43,6 +55,29 @@ describe('AI model operation configuration', () => {
 
   it.each([
     { operation: 'other' },
+    {
+      operation: 'transcription',
+      audio: {
+        transcription: {
+          transport: 'audio-chat',
+          chatProtocol: 'unknown',
+          structuredOutput: 'json_schema',
+          responseFormat: 'json',
+          timestampGranularity: 'none',
+        },
+      },
+    },
+    {
+      operation: 'transcription',
+      audio: {
+        transcription: {
+          transport: 'audio-api',
+          chatProtocol: 'bothub',
+          responseFormat: 'json',
+          timestampGranularity: 'none',
+        },
+      },
+    },
     { operation: 'speech' },
     { audio: {} },
     { operation: 'text', audio: { speech: { voiceId: 'x', responseFormat: 'mp3' } } },

@@ -273,3 +273,143 @@ for (const variant of [
     }
   });
 }
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+  { width: 1024, height: 560 },
+]) {
+  test(
+    'multimodal recognition keeps instructions and consent inside the inspector ' + viewport.width,
+    async ({ page }, info) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+      try {
+        await page.setViewportSize(viewport);
+        const selection = speechModelResponse.modelSelection;
+        const model = selection?.models.find((entry) => entry.operation === 'transcription');
+        if (!selection || !model) throw new Error('Missing recognition catalog fixture');
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'dark' },
+          runtimeResponses: {
+            AI_SETTINGS_QUERY: {
+              ...speechModelResponse,
+              modelSelection: {
+                ...selection,
+                models: [
+                  {
+                    ...model,
+                    audio: {
+                      transcription: {
+                        transport: 'audio-chat',
+                        chatProtocol: 'bothub',
+                        structuredOutput: 'json_schema',
+                        responseFormat: 'json',
+                        timestampGranularity: 'none',
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        });
+        await page.goto(host.origin + GALLERY_HARNESS_PATH + '?theme=dark');
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedReviewVideo(page, 'review-vp8-opus.webm', {
+          width: 160,
+          height: 90,
+          duration: 12,
+        });
+        await page.reload();
+        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        const dialog = page.locator('dialog');
+        await dialog
+          .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+          .click();
+        const header = dialog
+          .locator('[data-ui="gallery.videoReview.trackHeader"]')
+          .filter({ hasText: label('gallery.videoReview.audioOriginal') });
+        await header
+          .getByRole('button', { name: label('gallery.videoReview.speechTitle'), exact: true })
+          .click();
+        const panel = dialog.locator('[data-ui="gallery.videoReview.speechPanel"]');
+        await expect(
+          panel.getByLabel(label('gallery.videoReview.recognitionInstructions'), { exact: true })
+        ).toHaveCount(0);
+        await panel
+          .getByLabel(label('gallery.videoReview.recognitionProcessingMode'), { exact: true })
+          .click();
+        await page
+          .getByRole('option', {
+            name: label('gallery.videoReview.recognitionRewrite'),
+            exact: true,
+          })
+          .click();
+        const prompt = panel.getByLabel(label('gallery.videoReview.recognitionInstructions'), {
+          exact: true,
+        });
+        await prompt.fill('Keep the original meaning; make the wording concise.');
+        await expect(prompt).toBeVisible();
+        await expect(panel.locator('fieldset p')).toHaveCount(0);
+        await page.screenshot({
+          path: info.outputPath('multimodal-instructions.png'),
+          fullPage: false,
+        });
+        if (viewport.width === 1920)
+          for (const width of [523, 524, 525]) {
+            await resizeRecognitionInspector(page, dialog, width);
+            await prompt.scrollIntoViewIfNeeded();
+            await expect(prompt).toBeVisible();
+            await page.screenshot({
+              path: info.outputPath('multimodal-inspector-' + width + '.png'),
+              fullPage: false,
+            });
+          }
+        if (viewport.width < 1280)
+          await expect
+            .poll(() =>
+              dialog
+                .locator('[data-ui="gallery.videoReview.workspaceScroll"]')
+                .evaluate((node) => node.scrollWidth - node.clientWidth)
+            )
+            .toBeGreaterThan(0);
+        await installSpeechPortFixture(page, 1);
+        await panel
+          .getByRole('button', { name: label('gallery.videoReview.recognitionStart'), exact: true })
+          .click();
+        const consent = panel.getByRole('button', {
+          name: label('gallery.videoReview.speechConsentContinue'),
+          exact: true,
+        });
+        await consent.scrollIntoViewIfNeeded();
+        await expect(consent).toBeInViewport();
+        await page.screenshot({ path: info.outputPath('multimodal-consent.png'), fullPage: false });
+        await consent.click();
+        await expect(
+          panel.locator('[data-ui="gallery.videoReview.recognitionResult"]')
+        ).toBeVisible();
+        await expect
+          .poll(async () => (await persistedReviewContent(page))?.text?.fragments.length ?? 0)
+          .toBe(0);
+        const apply = panel.getByRole('button', {
+          name: label('gallery.videoReview.recognitionApply'),
+          exact: true,
+        });
+        await apply.scrollIntoViewIfNeeded();
+        await expect(apply).toBeInViewport();
+        await page.screenshot({
+          path: info.outputPath('multimodal-proposal-footer.png'),
+          fullPage: false,
+        });
+        expect(await page.evaluate(() => Reflect.get(window, 'speechFixtureRequests'))).toEqual(
+          expect.arrayContaining([expect.objectContaining({ operation: 'input', wav: true })])
+        );
+      } finally {
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    }
+  );
+}

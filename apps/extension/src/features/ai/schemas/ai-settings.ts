@@ -74,6 +74,7 @@ export const AIModelSchema = z
   });
 
 export const AISettingsSchema = z.object({
+  audioTranscriptionSystemPrompt: z.string().max(10000).optional(),
   chromeAiEnabled: z.boolean(),
   providers: z.array(AIProviderSchema),
   models: z.array(AIModelSchema),

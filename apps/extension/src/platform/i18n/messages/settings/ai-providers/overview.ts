@@ -73,6 +73,22 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
     ru: ' загрузки настроек AI',
     en: ' loading AI settings',
   },
+  audioTranscriptionPromptTitle: {
+    ru: 'Дополнительные инструкции распознаванию речи',
+    en: 'Additional speech recognition instructions',
+  },
+  audioTranscriptionPromptDescription: {
+    ru: 'Для мультимодального распознавания аудио. Применяются вместе с инструкциями модели и операции. Формат ответа, сохранение исходных таймкодов и структура задаются приложением.',
+    en: 'Used for multimodal audio recognition together with model and operation instructions. Response format, original timestamps and structure are defined by the application.',
+  },
+  audioTranscriptionPromptSaveErrorSuffix: {
+    ru: 'Не удалось сохранить инструкции распознаванию речи',
+    en: 'Failed to save speech recognition instructions',
+  },
+  audioTranscriptionPromptResetErrorSuffix: {
+    ru: 'Не удалось сбросить инструкции распознаванию речи',
+    en: 'Failed to reset speech recognition instructions',
+  },
   globalPromptTitle: {
     ru: 'Системный промпт для редактора контента',
     en: 'System prompt for the content editor',

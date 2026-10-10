@@ -1,4 +1,5 @@
 import {
+  loadAudioTranscriptionSystemPrompt,
   loadAIModels,
   loadAIProviders,
   loadAISecretProtectionStatus,
@@ -80,15 +81,21 @@ async function loadSanitizedModelSelection(): Promise<AIModelSelectionBootstrapP
 }
 
 async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataPayload> {
-  const [selectionBootstrap, scenarioEditorSystemPrompt, secretProtectionStatus] =
-    await Promise.all([
-      loadStoredModelSelection(),
-      loadScenarioEditorSystemPrompt(),
-      loadAISecretProtectionStatus(),
-    ]);
+  const [
+    selectionBootstrap,
+    scenarioEditorSystemPrompt,
+    secretProtectionStatus,
+    audioTranscriptionSystemPrompt,
+  ] = await Promise.all([
+    loadStoredModelSelection(),
+    loadScenarioEditorSystemPrompt(),
+    loadAISecretProtectionStatus(),
+    loadAudioTranscriptionSystemPrompt(),
+  ]);
 
   return {
     scenarioEditorSystemPrompt,
+    audioTranscriptionSystemPrompt,
     secretProtectionStatus,
     selectionBootstrap,
   };

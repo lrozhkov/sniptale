@@ -164,7 +164,11 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('ai.models', 'default'),
   ]),
   ...domain('ai.chrome', [field('ai.chrome', 'enabled')]),
-  ...domain('ai.prompts', [field('ai.prompts', 'global'), field('ai.prompts', 'scenario')]),
+  ...domain('ai.prompts', [
+    field('ai.prompts', 'global'),
+    field('ai.prompts', 'scenario'),
+    field('ai.prompts', 'recognition'),
+  ]),
   ...domain('ai.prompt-templates', [
     field('ai.prompt-templates', 'items', { kind: 'collection', dynamicItems: true }),
   ]),

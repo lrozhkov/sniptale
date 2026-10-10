@@ -2,9 +2,13 @@ import {
   initializeAiStorageAccess,
   loadAIModels,
   loadAIProviders,
+  loadAudioTranscriptionSystemPrompt,
 } from '../../../composition/persistence/ai-settings';
 import { activateStoredAIProviderSecretForUse } from '../../../composition/persistence/ai-settings/provider-secrets.store';
-import { resolveAIProviderAudioUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
+import {
+  resolveAIProviderChatCompletionsUrl,
+  resolveAIProviderAudioUrl,
+} from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
 import {
   isValidAIModelOperationConfiguration,
   type AISpeechModelParameters,
@@ -16,6 +20,7 @@ export interface AudioModelConfig {
   url: string;
   apiKey: string;
   modelCode: string;
+  transcriptionInstructions?: string;
   transcription?: AITranscriptionModelParameters;
   speech?: AISpeechModelParameters;
 }
@@ -36,7 +41,16 @@ export async function resolveAudioModelConfig(request: AudioJobStart): Promise<A
   )
     throw new Error('model-unavailable');
   const provider = providers.find((entry) => entry.id === model.providerId);
-  const url = provider && resolveAIProviderAudioUrl(provider.baseUrl, request.operation);
+  const chat =
+    request.operation === 'transcription' && model.audio?.transcription?.transport === 'audio-chat';
+  if (chat && !request.approvedProviderId) throw new Error('model-unavailable');
+  if (request.operation === 'transcription' && Boolean(request.recognition) !== chat)
+    throw new Error('invalid-request');
+  const url =
+    provider &&
+    (chat
+      ? resolveAIProviderChatCompletionsUrl(provider.baseUrl)
+      : resolveAIProviderAudioUrl(provider.baseUrl, request.operation));
   if (!provider || !url || !provider.hasStoredApiKey) throw new Error('model-unavailable');
   if (!(await chrome.permissions.contains({ origins: [`${new URL(url).origin}/*`] })))
     throw new Error('permission-denied');
@@ -46,6 +60,7 @@ export async function resolveAudioModelConfig(request: AudioJobStart): Promise<A
     url,
     apiKey,
     modelCode: model.modelCode,
+    ...(chat ? { transcriptionInstructions: await loadAudioTranscriptionSystemPrompt() } : {}),
     ...(request.operation === 'transcription' && model.audio?.transcription
       ? { transcription: model.audio.transcription }
       : {}),

@@ -24,6 +24,15 @@ export function reviewRecognitionPhrases(
     const incoming = reviewSpeechPhrases(chunk.result, chunk.start, chunk.end, {
       splitAtPauses: grouping === 'sentences-pauses',
     });
+    for (const phrase of incoming) {
+      const source = chunk.result.segments?.find(
+        (entry) =>
+          entry.originalText !== undefined &&
+          Math.abs(entry.start + chunk.start - phrase.start) < 1e-7 &&
+          Math.abs(entry.end + chunk.start - phrase.end) < 1e-7
+      );
+      if (source?.originalText !== undefined) phrase.originalText = source.originalText;
+    }
     const last = phrases.at(-1);
     const first = incoming[0];
     if (
@@ -109,7 +118,7 @@ export function recognitionFragments(
           start: output(start),
           end: output(end),
           text,
-          originalText: text,
+          originalText: aligned ? text : phrase.originalText,
           timeDomain: 'result' as const,
           alignment: aligned
             ? ('word' as const)

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   run: vi.fn(),
   apply: vi.fn(),
   wasApplied: vi.fn(),
+  multimodal: false,
 }));
 vi.mock('../../workflows/video-review/recognition', () => ({
   prepareReviewRecognition: mocks.prepare,
@@ -27,7 +28,27 @@ vi.mock('../../workflows/video-review/recognition', () => ({
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
   requestAIModelSelectionBootstrap: async () => ({
-    models: [{ id: 'model', displayName: 'Transcription', providerId: 'provider' }],
+    models: [
+      {
+        id: 'model',
+        displayName: 'Transcription',
+        providerId: 'provider',
+        ...(mocks.multimodal
+          ? {
+              purpose: 'transcription',
+              audio: {
+                transcription: {
+                  transport: 'audio-chat',
+                  chatProtocol: 'bothub',
+                  structuredOutput: 'json_schema',
+                  responseFormat: 'json',
+                  timestampGranularity: 'none',
+                },
+              },
+            }
+          : {}),
+      },
+    ],
     providers: [{ id: 'provider', name: 'Provider' }],
     defaultModelId: 'model',
     chromeAiEnabled: false,
@@ -104,9 +125,52 @@ async function mount(access: ReviewRecognitionAccess) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.multimodal = false;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+});
+
+it('freezes multimodal correction settings and cancels a pending provider attempt without applying it', async () => {
+  mocks.multimodal = true;
+  const { access } = fixture();
+  await mount(access);
+  expect(current.multimodal).toBe(true);
+  let activeSignal: AbortSignal | undefined;
+  mocks.run.mockImplementationOnce((_session, _job, signal: AbortSignal) => {
+    activeSignal = signal;
+    return new Promise((_resolve, reject) =>
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    );
+  });
+  await act(async () => {
+    current.setRecognitionMode('rewrite');
+    current.setGranularity('phrase');
+    current.setPrompt('Make concise.');
+  });
+  await act(async () => current.recognize('provider'));
+  expect(mocks.prepare.mock.calls[0]?.[5]).toMatchObject({
+    recognition: { mode: 'rewrite', granularity: 'phrase', prompt: 'Make concise.' },
+  });
+  await act(async () => current.setPrompt('Changed later.'));
+  expect(mocks.prepare.mock.calls[0]?.[5].recognition.prompt).toBe('Make concise.');
+  expect(current.running).toBe(true);
+  await act(async () => current.cancel());
+  expect(activeSignal?.aborted).toBe(true);
+  expect(current.running).toBe(false);
+  expect(current.error).toBeNull();
+  expect(mocks.apply).not.toHaveBeenCalled();
+});
+
+it('does not pass hidden correction instructions into pure transcription', async () => {
+  mocks.multimodal = true;
+  const { access } = fixture();
+  await mount(access);
+  await act(async () => current.setPrompt('Previously entered rewrite prompt.'));
+  await act(async () => current.recognize('provider'));
+  expect(mocks.prepare.mock.calls[0]?.[5]).toMatchObject({
+    recognition: { mode: 'transcribe', granularity: 'sentence', prompt: '' },
+  });
 });
 afterEach(async () => {
   await act(async () => root?.unmount());

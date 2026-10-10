@@ -68,7 +68,7 @@ type PersistenceMutationCoverage = {
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
   excluded(
     'system/events-logs/index.tsx',
-    ['createMaintenanceLog', 'createRuntimeLog'],
+    ['createEventHistory', 'createMaintenanceLog', 'createRuntimeLog'],
     'action/status'
   ),
   transferable(
@@ -120,8 +120,10 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
   transferable(
     'ai/prompts/save.ts',
     [
+      'resetAudioTranscriptionSystemPrompt',
       'resetGlobalSystemPrompt',
       'resetScenarioEditorSystemPrompt',
+      'saveAudioTranscriptionSystemPrompt',
       'saveGlobalSystemPrompt',
       'saveScenarioEditorSystemPrompt',
     ],

@@ -20,6 +20,59 @@ type Props = {
   error: string | undefined;
 };
 
+function ChatCompatibilityFields({
+  parameters,
+  change,
+}: {
+  parameters: AITranscriptionModelParameters;
+  change(next: AITranscriptionModelParameters): void;
+}) {
+  return (
+    <>
+      <ProductField label={translate('settings.aiProviders.modelAudioChatProtocol')}>
+        <ProductSelect
+          aria-label={translate('settings.aiProviders.modelAudioChatProtocol')}
+          value={parameters.chatProtocol ?? 'openai'}
+          options={[
+            {
+              value: 'openai',
+              label: translate('settings.aiProviders.modelAudioProtocolOpenai'),
+            },
+            {
+              value: 'bothub',
+              label: translate('settings.aiProviders.modelAudioProtocolBothub'),
+            },
+          ]}
+          onChange={(value) => {
+            if (value === 'openai' || value === 'bothub')
+              change({ ...parameters, chatProtocol: value });
+          }}
+        />
+      </ProductField>
+      <ProductField label={translate('settings.aiProviders.modelAudioStructuredOutput')}>
+        <ProductSelect
+          aria-label={translate('settings.aiProviders.modelAudioStructuredOutput')}
+          value={parameters.structuredOutput ?? 'json_schema'}
+          options={[
+            {
+              value: 'json_schema',
+              label: translate('settings.aiProviders.modelAudioJsonSchema'),
+            },
+            {
+              value: 'json_object',
+              label: translate('settings.aiProviders.modelAudioJsonObject'),
+            },
+          ]}
+          onChange={(value) => {
+            if (value === 'json_schema' || value === 'json_object')
+              change({ ...parameters, structuredOutput: value });
+          }}
+        />
+      </ProductField>
+    </>
+  );
+}
+
 function TranscriptionFields(props: Props) {
   const parameters: AITranscriptionModelParameters = props.audio?.transcription ?? {
     responseFormat: 'verbose_json',
@@ -29,6 +82,39 @@ function TranscriptionFields(props: Props) {
     props.onAudioChange?.({ transcription: next });
   return (
     <>
+      <ProductField label={translate('settings.aiProviders.modelAudioTransport')}>
+        <ProductSelect
+          aria-label={translate('settings.aiProviders.modelAudioTransport')}
+          value={parameters.transport ?? 'audio-api'}
+          options={[
+            { value: 'audio-api', label: translate('settings.aiProviders.modelAudioSpeechApi') },
+            { value: 'audio-chat', label: translate('settings.aiProviders.modelAudioMultimodal') },
+          ]}
+          onChange={(value) => {
+            if (value === 'audio-chat')
+              change({
+                ...parameters,
+                transport: value,
+                chatProtocol: 'openai',
+                structuredOutput: 'json_schema',
+                responseFormat: 'json',
+                timestampGranularity: 'none',
+              });
+            if (value === 'audio-api') {
+              const { chatProtocol: _protocol, structuredOutput: _output, ...rest } = parameters;
+              change({
+                ...rest,
+                transport: value,
+                responseFormat: 'verbose_json',
+                timestampGranularity: 'word',
+              });
+            }
+          }}
+        />
+      </ProductField>
+      {parameters.transport === 'audio-chat' && (
+        <ChatCompatibilityFields parameters={parameters} change={change} />
+      )}
       <ProductField label={translate('settings.aiProviders.modelAudioLanguage')}>
         <ProductInput
           aria-label={translate('settings.aiProviders.modelAudioLanguage')}
@@ -40,52 +126,60 @@ function TranscriptionFields(props: Props) {
           }}
         />
       </ProductField>
-      <ProductField label={translate('settings.aiProviders.modelAudioFormat')}>
-        <ProductSelect
-          aria-label={translate('settings.aiProviders.modelAudioFormat')}
-          value={parameters.responseFormat}
-          options={[
-            { value: 'json', label: 'JSON' },
-            {
-              value: 'verbose_json',
-              label: translate('settings.aiProviders.modelAudioVerboseJson'),
-            },
-          ]}
-          onChange={(value) => {
-            if (value === 'json' || value === 'verbose_json')
-              change({
-                ...parameters,
-                responseFormat: value,
-                timestampGranularity: value === 'json' ? 'none' : parameters.timestampGranularity,
-              });
-          }}
-        />
-      </ProductField>
-      <ProductField label={translate('settings.aiProviders.modelAudioTimestamps')}>
-        <ProductSelect
-          aria-label={translate('settings.aiProviders.modelAudioTimestamps')}
-          value={parameters.timestampGranularity}
-          options={[
-            { value: 'none', label: translate('settings.aiProviders.modelAudioTimestampsNone') },
-            ...(parameters.responseFormat === 'verbose_json'
-              ? [
-                  {
-                    value: 'segment',
-                    label: translate('settings.aiProviders.modelAudioTimestampsSegment'),
-                  },
-                  {
-                    value: 'word',
-                    label: translate('settings.aiProviders.modelAudioTimestampsWord'),
-                  },
-                ]
-              : []),
-          ]}
-          onChange={(value) => {
-            if (value === 'none' || value === 'segment' || value === 'word')
-              change({ ...parameters, timestampGranularity: value });
-          }}
-        />
-      </ProductField>
+      {parameters.transport !== 'audio-chat' && (
+        <>
+          <ProductField label={translate('settings.aiProviders.modelAudioFormat')}>
+            <ProductSelect
+              aria-label={translate('settings.aiProviders.modelAudioFormat')}
+              value={parameters.responseFormat}
+              options={[
+                { value: 'json', label: 'JSON' },
+                {
+                  value: 'verbose_json',
+                  label: translate('settings.aiProviders.modelAudioVerboseJson'),
+                },
+              ]}
+              onChange={(value) => {
+                if (value === 'json' || value === 'verbose_json')
+                  change({
+                    ...parameters,
+                    responseFormat: value,
+                    timestampGranularity:
+                      value === 'json' ? 'none' : parameters.timestampGranularity,
+                  });
+              }}
+            />
+          </ProductField>
+          <ProductField label={translate('settings.aiProviders.modelAudioTimestamps')}>
+            <ProductSelect
+              aria-label={translate('settings.aiProviders.modelAudioTimestamps')}
+              value={parameters.timestampGranularity}
+              options={[
+                {
+                  value: 'none',
+                  label: translate('settings.aiProviders.modelAudioTimestampsNone'),
+                },
+                ...(parameters.responseFormat === 'verbose_json'
+                  ? [
+                      {
+                        value: 'segment',
+                        label: translate('settings.aiProviders.modelAudioTimestampsSegment'),
+                      },
+                      {
+                        value: 'word',
+                        label: translate('settings.aiProviders.modelAudioTimestampsWord'),
+                      },
+                    ]
+                  : []),
+              ]}
+              onChange={(value) => {
+                if (value === 'none' || value === 'segment' || value === 'word')
+                  change({ ...parameters, timestampGranularity: value });
+              }}
+            />
+          </ProductField>
+        </>
+      )}
       <ProductField label={translate('settings.aiProviders.modelAudioPrompt')}>
         <ProductTextarea
           aria-label={translate('settings.aiProviders.modelAudioPrompt')}

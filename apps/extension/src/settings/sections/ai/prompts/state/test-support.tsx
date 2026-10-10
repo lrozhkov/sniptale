@@ -14,6 +14,11 @@ export function createPromptSource(
   overrides: Partial<AiProvidersPromptSource> = {}
 ): AiProvidersPromptSource {
   return {
+    audioTranscriptionPrompt: 'Recognition instructions',
+    audioTranscriptionPromptRef: { current: null },
+    persistedAudioTranscriptionPrompt: 'Recognition instructions',
+    setAudioTranscriptionPromptState: () => undefined,
+    setPersistedAudioTranscriptionPrompt: () => undefined,
     globalPrompt: 'Global prompt',
     globalPromptRef: { current: null },
     persistedGlobalPrompt: 'Global prompt',

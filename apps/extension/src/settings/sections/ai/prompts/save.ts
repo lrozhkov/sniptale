@@ -1,4 +1,6 @@
 import {
+  resetAudioTranscriptionSystemPrompt,
+  saveAudioTranscriptionSystemPrompt,
   resetGlobalSystemPrompt,
   resetScenarioEditorSystemPrompt,
   saveGlobalSystemPrompt,
@@ -47,6 +49,7 @@ type PromptResetResult = { error: string | null };
 
 async function resetPrompt(args: {
   errorSuffixKey:
+    | 'settings.aiProviders.audioTranscriptionPromptResetErrorSuffix'
     | 'settings.aiProviders.globalPromptResetErrorSuffix'
     | 'settings.aiProviders.scenarioEditorPromptResetErrorSuffix';
   reset: () => Promise<void>;
@@ -77,5 +80,25 @@ export function resetAiProvidersScenarioEditorPrompt(): Promise<PromptResetResul
   return resetPrompt({
     errorSuffixKey: 'settings.aiProviders.scenarioEditorPromptResetErrorSuffix',
     reset: resetScenarioEditorSystemPrompt,
+  });
+}
+
+export async function saveAiProvidersAudioTranscriptionPrompt(
+  prompt: string
+): Promise<string | null> {
+  try {
+    await saveAudioTranscriptionSystemPrompt(prompt);
+    return null;
+  } catch (error) {
+    const message = translate('settings.aiProviders.audioTranscriptionPromptSaveErrorSuffix');
+    logger.error('Failed to save audio transcription instructions', error);
+    toast.error(message);
+    return message;
+  }
+}
+export function resetAiProvidersAudioTranscriptionPrompt(): Promise<PromptResetResult> {
+  return resetPrompt({
+    errorSuffixKey: 'settings.aiProviders.audioTranscriptionPromptResetErrorSuffix',
+    reset: resetAudioTranscriptionSystemPrompt,
   });
 }
