@@ -14,9 +14,15 @@ const observed = vi.hoisted(() => ({
   database: vi.fn(),
   parse: vi.fn(),
   inspect: vi.fn(),
+  replay: vi.fn(),
   reads: 0,
   writes: 0,
 }));
+vi.mock('../../../features/video/review/document', async (load) => {
+  const actual = await load<typeof import('../../../features/video/review/document')>();
+  observed.replay.mockImplementation(actual.replayReviewHistory);
+  return { ...actual, replayReviewHistory: observed.replay };
+});
 vi.mock('./parser', async (load) => {
   const actual = await load<typeof import('./parser')>();
   observed.parse.mockImplementation(actual.parseVideoWorkspace);
@@ -46,6 +52,7 @@ import {
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
   openVideoWorkspace,
+  readVideoWorkspace,
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
   saveVideoWorkspaceSnapshot,
@@ -59,6 +66,7 @@ let rows: Map<string, Map<string, unknown>>;
 beforeEach(() => {
   observed.parse.mockClear();
   observed.inspect.mockClear();
+  observed.replay.mockClear();
   observed.reads = observed.writes = 0;
   const fixture = createReviewWorkspaceStoreFixture(() => false);
   rows = fixture.rows;
@@ -171,16 +179,21 @@ it.each([
 ])('admits previous and candidate once for $historyLength retained operations', async (size) => {
   const previous = workspace(size.historyLength, size.fragments);
   rows.get('video_workspaces')!.set(id, previous);
+  const operation = parameterEdit(previous);
+  observed.replay.mockClear();
   const result = await commitVideoWorkspace({
     ...identity(previous),
-    operation: parameterEdit(previous),
+    operation,
   });
   expect(observed.parse.mock.calls.length + observed.inspect.mock.calls.length).toBe(2);
   expect(observed.reads).toBe(1);
   expect(observed.writes).toBe(1);
+  expect(observed.replay.mock.calls.filter(([history]) => history.length > 0)).toHaveLength(0);
+  expect(observed.replay).toHaveBeenCalledTimes(2);
   expect(result.workspace.history.slice(0, previous.cursor)).toEqual(previous.history);
   expect(result.workspace.cursor).toBe(previous.cursor + 1);
   expect(result.workspace.revision).toBe(2);
+  expect(Object.keys(result).sort()).toEqual(['draft', 'workspace']);
 });
 
 it('still rejects corrupt unapplied redo before any write', async () => {
@@ -264,4 +277,24 @@ it('derives retained usage keys for every workspace writer without accepting imp
   rows.get('video_workspaces')!.delete(id);
   const opened = await openVideoWorkspace(id, source);
   expect(rows.get('video_workspaces')!.get(id)).toEqual(withReviewWorkspaceUsage(opened.workspace));
+  const reopened = await openVideoWorkspace(id, source);
+  const unchanged = await moveVideoWorkspaceHistory({
+    ...identity(opened.workspace),
+    direction: 'undo',
+  });
+  const writesBeforeRead = observed.writes;
+  const read = await readVideoWorkspace(id);
+  expect(observed.writes).toBe(writesBeforeRead);
+  for (const result of [
+    moved,
+    advanced,
+    saved,
+    draft,
+    discarded,
+    opened,
+    reopened,
+    unchanged,
+    read,
+  ])
+    expect(Object.keys(result ?? {}).sort()).toEqual(['draft', 'workspace']);
 });

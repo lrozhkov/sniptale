@@ -24,14 +24,14 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import {
-  applyReviewOperation,
-  replayReviewHistory,
-  reviewAdvancedContentBaseline,
-} from '../../../features/video/review/document';
+import { applyReviewOperation } from '../../../features/video/review/document';
 import { parseReviewOperation, parseReviewSource } from '../../../features/video/review/validation';
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
-import type { ReviewHistoryDirection, ReviewSource } from '../../../features/video/review/types';
+import type {
+  ReviewDocument,
+  ReviewHistoryDirection,
+  ReviewSource,
+} from '../../../features/video/review/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import {
   inspectVideoWorkspace,
@@ -96,15 +96,20 @@ async function readSourceAssetId(tx: Transaction, aggregateId: string): Promise<
   return entry.assetId;
 }
 
+type AdmittedWorkspaceSnapshot = {
+  snapshot: VideoWorkspaceSnapshot;
+  document: ReviewDocument;
+};
+
 async function readSnapshot(
   tx: Transaction,
   aggregateId: string
-): Promise<VideoWorkspaceSnapshot | null> {
+): Promise<AdmittedWorkspaceSnapshot | null> {
   const raw: unknown = await tx.objectStore(VIDEO_WORKSPACES_STORE).get(aggregateId);
   const rawDraft: unknown = await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(aggregateId);
   if (raw === undefined && rawDraft === undefined) return null;
-  const { workspace, failure } = inspectVideoWorkspace(raw);
-  if (!workspace) throw new VideoWorkspaceError('invalid', failure ?? undefined);
+  const { workspace, document, failure } = inspectVideoWorkspace(raw);
+  if (!workspace || !document) throw new VideoWorkspaceError('invalid', failure ?? undefined);
   if (workspace.aggregateId !== aggregateId)
     throw new VideoWorkspaceError('invalid', { check: 'workspace-identity', reason: 'invalid' });
   const draft =
@@ -114,7 +119,7 @@ async function readSnapshot(
   }
   if (workspace.sourceAssetId !== (await readSourceAssetId(tx, aggregateId)))
     throw new VideoWorkspaceError('changed-source');
-  return { workspace, draft };
+  return { snapshot: { workspace, draft }, document };
 }
 
 /** Read-only recovery: missing is distinct from invalid and never repairs durable content. */
@@ -123,9 +128,9 @@ export async function readVideoWorkspace(
 ): Promise<VideoWorkspaceSnapshot | null> {
   const db = await initDB();
   const tx = db.transaction(stores, 'readonly');
-  const snapshot = await readSnapshot(tx, aggregateId);
+  const admitted = await readSnapshot(tx, aggregateId);
   await tx.done;
-  return snapshot;
+  return admitted?.snapshot ?? null;
 }
 
 async function mutate<T>(
@@ -180,9 +185,9 @@ export async function openVideoWorkspace(
       throw new VideoWorkspaceError('changed-source');
     const existing = await readSnapshot(tx, aggregateId);
     if (existing) {
-      if (JSON.stringify(existing.workspace.source) !== JSON.stringify(source))
+      if (JSON.stringify(existing.snapshot.workspace.source) !== JSON.stringify(source))
         throw new VideoWorkspaceError('changed-source');
-      return existing;
+      return existing.snapshot;
     }
     const now = Date.now();
     const workspace = parseVideoWorkspace({
@@ -212,15 +217,15 @@ async function requireSnapshot(
   aggregateId: string,
   expectedRevision: number,
   expectedSourceAssetId: string
-): Promise<VideoWorkspaceSnapshot> {
-  const snapshot = await readSnapshot(tx, aggregateId);
+): Promise<AdmittedWorkspaceSnapshot> {
+  const admitted = await readSnapshot(tx, aggregateId);
   if (
-    !snapshot ||
-    snapshot.workspace.revision !== expectedRevision ||
-    snapshot.workspace.sourceAssetId !== expectedSourceAssetId
+    !admitted ||
+    admitted.snapshot.workspace.revision !== expectedRevision ||
+    admitted.snapshot.workspace.sourceAssetId !== expectedSourceAssetId
   )
     throw new VideoWorkspaceError('conflict');
-  return snapshot;
+  return admitted;
 }
 
 async function putWorkspace(
@@ -271,7 +276,10 @@ export async function commitVideoWorkspace(args: {
   return mutate(
     args.aggregateId,
     async (tx, prepared) => {
-      const { workspace, draft } = await requireSnapshot(
+      const {
+        snapshot: { workspace, draft },
+        document,
+      } = await requireSnapshot(
         tx,
         args.aggregateId,
         args.expectedRevision,
@@ -298,12 +306,6 @@ export async function commitVideoWorkspace(args: {
           JSON.stringify(operation.before) !== JSON.stringify(draft.before))
       )
         throw new VideoWorkspaceError('conflict');
-      const document = replayReviewHistory(
-        workspace.history,
-        workspace.cursor,
-        workspace.source,
-        reviewAdvancedContentBaseline(workspace.advanced)
-      );
       applyReviewOperation(document, operation, workspace.source);
       const next = await putWorkspace(
         tx,
@@ -331,7 +333,7 @@ export async function moveVideoWorkspaceHistory(args: {
   direction: ReviewHistoryDirection;
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(args.aggregateId, async (tx) => {
-    const snapshot = await requireSnapshot(
+    const { snapshot } = await requireSnapshot(
       tx,
       args.aggregateId,
       args.expectedRevision,
@@ -364,7 +366,7 @@ export async function saveVideoWorkspaceAdvanced(args: {
   return mutate(
     args.aggregateId,
     async (tx, prepared) => {
-      const snapshot = await requireSnapshot(
+      const { snapshot } = await requireSnapshot(
         tx,
         args.aggregateId,
         args.expectedRevision,
@@ -396,7 +398,7 @@ export async function saveVideoWorkspaceDraft(args: {
   before: unknown;
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(args.aggregateId, async (tx) => {
-    const snapshot = await requireSnapshot(
+    const { snapshot } = await requireSnapshot(
       tx,
       args.aggregateId,
       args.expectedRevision,
@@ -442,7 +444,7 @@ export async function saveVideoWorkspaceSnapshot(args: {
   return mutate(
     args.aggregateId,
     async (tx, prepared) => {
-      const current = await requireSnapshot(
+      const { snapshot: current } = await requireSnapshot(
         tx,
         args.aggregateId,
         args.expectedRevision,

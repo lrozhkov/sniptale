@@ -130,7 +130,10 @@ function parseWorkspaceDocument(args: {
 }
 
 /** Rejects corrupt history, including invalid operations in the unapplied redo suffix. */
-function parseWorkspace(value: unknown, report: Report): VideoWorkspace | null {
+function parseWorkspace(
+  value: unknown,
+  report: Report
+): { workspace: VideoWorkspace; document: ReviewDocument } | null {
   if (
     !isRecord(value) ||
     value['formatVersion'] !== 1 ||
@@ -164,32 +167,36 @@ function parseWorkspace(value: unknown, report: Report): VideoWorkspace | null {
   if (!parsed) return null;
   const { advanced, history, cursor } = parsed;
   return {
-    aggregateId: value['aggregateId'],
-    formatVersion: 1,
-    source,
-    sourceAssetId: value['sourceAssetId'],
-    revision: value['revision'],
-    history,
-    cursor,
-    advanced,
-    createdAt: value['createdAt'],
-    updatedAt: value['updatedAt'],
+    workspace: {
+      aggregateId: value['aggregateId'],
+      formatVersion: 1,
+      source,
+      sourceAssetId: value['sourceAssetId'],
+      revision: value['revision'],
+      history,
+      cursor,
+      advanced,
+      createdAt: value['createdAt'],
+      updatedAt: value['updatedAt'],
+    },
+    document: parsed.document,
   };
 }
 
-/** Normalizes supported legacy history without writing storage, retaining a bounded diagnostic for rejected workspaces. */
+/** Admits complete history and its selected document without storage writes; rejected values retain only a bounded diagnostic. */
 export function inspectVideoWorkspace(value: unknown) {
   let failure: VideoWorkspaceDiagnostic = { check: 'workspace-envelope', reason: 'invalid' };
-  const workspace = parseWorkspace(value, (detail) => {
+  const admitted = parseWorkspace(value, (detail) => {
     failure = detail;
   });
-  if (workspace) return { workspace, failure: null };
+  if (admitted) return { ...admitted, failure: null };
   const count = (value: unknown) =>
     typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
       ? Math.min(value, 1_000_000)
       : undefined;
   return {
     workspace: null,
+    document: null,
     failure: {
       ...failure,
       cursor: isRecord(value) ? count(value['cursor']) : undefined,

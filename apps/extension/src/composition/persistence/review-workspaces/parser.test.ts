@@ -5,6 +5,10 @@ import {
   createQuickEditAdvancedState,
 } from '../../../features/video/review/advanced/defaults';
 import { inspectVideoWorkspace } from './parser';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
 
 function workspace() {
   return {
@@ -20,6 +24,35 @@ function workspace() {
     advanced: createQuickEditAdvancedState(),
   };
 }
+
+it.each([0, 1, 2])(
+  'returns the admitted document at cursor %s with complete redo validation',
+  (cursor) => {
+    const before = createQuickEditAdvancedContent();
+    const muted = {
+      ...before,
+      audio: { ...before.audio, original: { ...before.audio.original, muted: true } },
+    };
+    const quieter = {
+      ...muted,
+      audio: { ...muted.audio, original: { ...muted.audio.original, volume: 0.5 } },
+    };
+    const raw = {
+      ...workspace(),
+      cursor,
+      history: [
+        { id: 'mute', at: 1, target: 'advancedContent', before, after: muted },
+        { id: 'volume', at: 2, target: 'advancedContent', before: muted, after: quieter },
+      ],
+    };
+    const original = structuredClone(raw);
+    const result = inspectVideoWorkspace(raw);
+    expect(result.failure).toBeNull();
+    expect(result.workspace?.history).toHaveLength(2);
+    expect(result.document?.advancedContent).toEqual([before, muted, quieter][cursor]);
+    expect(raw).toEqual(original);
+  }
+);
 it.each(['fixed', 'follow-video', undefined] as const)(
   'preserves schema 10 zoom policy %s when reopening the workspace',
   (zoomBehavior) => {
@@ -61,6 +94,7 @@ it('identifies no-change history position in the retained redo suffix without co
   };
   const result = inspectVideoWorkspace(raw);
   expect(result.workspace).toBeNull();
+  expect(result.document).toBeNull();
   expect(result.failure).toEqual({
     check: 'history-replay',
     reason: 'no-change',
@@ -137,6 +171,15 @@ it('opens legacy header history at every undo position without losing unrelated 
     expect(result.failure).toBeNull();
     expect(result.workspace?.history.map((op) => op.id)).toEqual(['volume']);
     expect(result.workspace?.cursor).toBe(cursor >= 3 ? 1 : 0);
+    if (!result.workspace) throw new Error('Legacy workspace admission failed');
+    expect(result.document).toEqual(
+      replayReviewHistory(
+        result.workspace.history,
+        result.workspace.cursor,
+        result.workspace.source,
+        reviewAdvancedContentBaseline(result.workspace.advanced)
+      )
+    );
     expect(inspectVideoWorkspace(result.workspace).workspace).toEqual(result.workspace);
     expect(raw).toEqual(original);
   }
