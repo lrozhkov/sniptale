@@ -41,7 +41,11 @@ vi.mock('../assets/opfs-store', async (original) => ({
   },
 }));
 
-import { prepareLibraryAudioBinding, readLibraryAudioBindingSource } from './library-asset-binding';
+import {
+  assertLibraryAudioBindingSource,
+  prepareLibraryAudioBinding,
+  readLibraryAudioBindingSource,
+} from './library-asset-binding';
 import { recoverProjectMediaPublications } from './asset-publication';
 import { withVoiceoverAttachmentLock } from './voiceover-publication-lock';
 import {
@@ -202,6 +206,19 @@ async function attach(assetId: string, clipId = 'music', preserve = false) {
     },
   });
 }
+
+it('read-only receipt re-admission preserves bytes and creates no journal, then refuses a deleted source', async () => {
+  const { mediaId } = seed('stored-asset');
+  const source = await readLibraryAudioBindingSource(mediaId);
+  await withVoiceoverAttachmentLock('project-asset:pending', () =>
+    assertLibraryAudioBindingSource(source, 'pending')
+  );
+  expect(harness.journals.size).toBe(0);
+  expect(harness.objects.has(ref.assetId)).toBe(true);
+  table('media_library').delete(mediaId);
+  await expect(assertLibraryAudioBindingSource(source, 'pending')).rejects.toThrow('unavailable');
+  expect(harness.journals.size).toBe(0);
+});
 
 it.each(['project-asset', 'recording', 'stored-asset'] as const)(
   'attaches %s without byte writes or a second Library identity and reopens it',

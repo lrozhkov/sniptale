@@ -3,7 +3,111 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { installSpeechPortFixture, speechModelResponse } from '../support/voiceover-speech-fixture';
+import {
+  installSpeechPortFixture,
+  persistedSpeech,
+  speechModelResponse,
+  syntheticSpeechWav,
+} from '../support/voiceover-speech-fixture';
+
+async function checkLocalTakes(
+  page: Page,
+  voice: Locator,
+  takes: Locator,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => Promise<unknown>
+) {
+  const button = (key: Parameters<typeof translate>[0]) =>
+    voice.getByRole('button', { name: label(key), exact: true });
+  await button('gallery.videoReview.textVoiceMicrophone').click();
+  const recording = voice.locator('[data-ui="gallery.videoReview.textVoiceRecording"]');
+  await expect(recording).toBeVisible();
+  await expect(recording.locator('dialog')).toHaveCount(0);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      configurable: true,
+      value: async () => {
+        const context = new AudioContext();
+        const oscillator = context.createOscillator();
+        const destination = context.createMediaStreamDestination();
+        oscillator.connect(destination);
+        oscillator.start();
+        return destination.stream;
+      },
+    });
+  });
+  await button('videoEditor.app.recordAudioStart').click();
+  await expect(recording.getByRole('meter')).toBeVisible();
+  await button('videoEditor.app.recordAudioPause').click();
+  await button('videoEditor.app.recordAudioResume').click();
+  // MediaRecorder needs elapsed media time to produce an actual decodable take.
+  await page.waitForTimeout(1200);
+  await button('videoEditor.app.recordAudioStop').click();
+  const apply = button('gallery.videoReview.textVoiceLocalSave');
+  await expect(apply).toBeEnabled();
+  await apply.scrollIntoViewIfNeeded();
+  await capture('text-voice-microphone.png');
+  await expect(takes).toHaveCount(1);
+  await apply.click();
+  await expect(takes).toHaveCount(2);
+  await button('gallery.videoReview.textVoiceGallery').click();
+  await button('gallery.videoReview.textVoiceChooseAudio').click();
+  const drawer = page.getByRole('dialog', {
+    name: label('gallery.videoReview.textVoiceAudioGallery'),
+    exact: true,
+  });
+  await expect(drawer).toBeVisible();
+  await drawer.locator('input[type="file"]').setInputFiles({
+    name: 'text-gallery.wav',
+    mimeType: 'audio/wav',
+    buffer: syntheticSpeechWav(1),
+  });
+  await expect(drawer).toHaveCount(0);
+  await expect(takes).toHaveCount(2);
+  await voice
+    .getByRole('button', { name: label('gallery.videoReview.speechApply'), exact: true })
+    .click();
+  await expect(takes).toHaveCount(3);
+  await button('gallery.videoReview.textVoiceChooseAudio').click();
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('searchbox').fill('text-gallery');
+  await expect(drawer.locator('li')).toHaveCount(1);
+  const play = drawer.getByRole('button', {
+    name: `${label('gallery.videoReview.musicPlay')}: text-gallery.wav`,
+    exact: true,
+  });
+  await play.click();
+  await expect(
+    drawer.getByRole('button', {
+      name: `${label('gallery.videoReview.musicStop')}: text-gallery.wav`,
+      exact: true,
+    })
+  ).toBeVisible();
+  await capture('text-voice-gallery.png');
+  await drawer
+    .getByRole('button', {
+      name: `${label('gallery.videoReview.musicAdd')}: text-gallery.wav`,
+      exact: true,
+    })
+    .click();
+  await expect(drawer).toHaveCount(0);
+  await expect(takes).toHaveCount(3);
+  await voice
+    .getByRole('button', { name: label('gallery.videoReview.speechApply'), exact: true })
+    .click();
+  await expect(takes).toHaveCount(4);
+  const persisted = await persistedSpeech(page);
+  expect(persisted?.clips.map((clip) => clip.textSnapshot?.kind)).toEqual([
+    'ai',
+    'microphone',
+    'gallery',
+    'gallery',
+  ]);
+  expect(persisted?.clips[3]?.assetId).toBe(persisted?.clips[2]?.assetId);
+  expect(
+    persisted?.clips.slice(1).every((clip) => clip.textSnapshot?.text === 'Первая фраза')
+  ).toBe(true);
+}
 
 async function checkTextGesture(page: Page, block: Locator, undo: Locator, redo: Locator) {
   await block.scrollIntoViewIfNeeded();
@@ -217,6 +321,9 @@ for (const variant of [
       await button('gallery.videoReview.speechGenerate').press('Enter');
       await expect(voice).toBeVisible();
       await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
+      await checkLocalTakes(page, voice, takes, label, (name) =>
+        page.screenshot({ path: info.outputPath(name), fullPage: false })
+      );
       await button('gallery.videoReview.textVoiceBack').press('Enter');
       await expect(voice).toHaveCount(0);
       await expect(button('gallery.videoReview.speechGenerate')).toBeFocused();
@@ -297,7 +404,7 @@ for (const variant of [
       await expect(cards).toHaveCount(2);
       await expect(cards.nth(0)).toContainText('Первая фраза');
       await expect(cards.nth(1)).toContainText('Вторая фраза');
-      await expect(takes).toHaveCount(1);
+      await expect(takes).toHaveCount(4);
       await page.screenshot({ path: info.outputPath('text-restored.png'), fullPage: false });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));

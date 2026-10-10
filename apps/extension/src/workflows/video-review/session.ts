@@ -2,6 +2,7 @@ import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
 import {
   collectReviewAssetReferences,
+  reviewWorkspaceHasAudioClip,
   reviewWorkspaceHasSpeechReplacement,
 } from '../../composition/persistence/review-workspaces/asset-refs';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
@@ -159,31 +160,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   }
   return {
     getSnapshot: () => state,
-    async hasRetainedAssetReference(assetId: string) {
-      const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
-      if (!saved) throw new Error('Review session is unavailable.');
-      return collectReviewAssetReferences(saved.workspace).has(assetId);
-    },
-    async hasDurableVoiceoverClip(clipId: string, assetId: string) {
-      const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
-      return (
-        !!saved &&
-        project(saved).advancedContent.audio.voiceover.some(
-          (clip) => clip.id === clipId && clip.assetId === assetId
-        )
-      );
-    },
-    async hasDurableSpeechAsset(
-      target: ReviewSpeechTarget,
-      replacementId: string,
-      assetId: string
-    ) {
-      const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
-      return (
-        !!saved &&
-        reviewWorkspaceHasSpeechReplacement(saved.workspace, target, replacementId, assetId)
-      );
-    },
+    ...reviewDurableAudioAccess(initial.workspace.aggregateId, deps.readVideoWorkspace, project),
     setAutosaveEnabled(enabled: boolean) {
       state = { ...state, autosaveEnabled: enabled };
       emit();
@@ -314,6 +291,46 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
       // Only a completed history failure may be retried; pending/content failures stay strict.
       if (state.error && !(options?.retryHistory && failedHistory && !hadPending))
         throw new Error(`Review ${state.error}.`);
+    },
+  };
+}
+
+/** Read-only persisted byte/clip admission; it owns no session state, queue or writes. */
+function reviewDurableAudioAccess(
+  aggregateId: string,
+  read: typeof persistence.readVideoWorkspace,
+  project: (snapshot: VideoWorkspaceSnapshot) => ReturnType<typeof replayReviewHistory>
+) {
+  return {
+    async hasRetainedVoiceoverClip(clipId: string, assetId: string) {
+      const saved = await read(aggregateId);
+      if (!saved) throw new Error('Review session is unavailable.');
+      return reviewWorkspaceHasAudioClip(saved.workspace, clipId, assetId);
+    },
+    async hasRetainedAssetReference(assetId: string) {
+      const saved = await read(aggregateId);
+      if (!saved) throw new Error('Review session is unavailable.');
+      return collectReviewAssetReferences(saved.workspace).has(assetId);
+    },
+    async hasDurableVoiceoverClip(clipId: string, assetId: string) {
+      const saved = await read(aggregateId);
+      return (
+        !!saved &&
+        project(saved).advancedContent.audio.voiceover.some(
+          (clip) => clip.id === clipId && clip.assetId === assetId
+        )
+      );
+    },
+    async hasDurableSpeechAsset(
+      target: ReviewSpeechTarget,
+      replacementId: string,
+      assetId: string
+    ) {
+      const saved = await read(aggregateId);
+      return (
+        !!saved &&
+        reviewWorkspaceHasSpeechReplacement(saved.workspace, target, replacementId, assetId)
+      );
     },
   };
 }

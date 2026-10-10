@@ -78,6 +78,7 @@ type InspectorState = Pick<
   | 'resetAdvanced'
   | 'flushAdvanced'
   | 'registerSpeechFlush'
+  | 'setVoiceoverSilent'
 >;
 
 /** Adapts the retained playback range to the existing guarded fragment download. */
@@ -569,7 +570,7 @@ function leaveReviewInspector(
 ) {
   state.video.current?.pause();
   void state.run(async () => {
-    await reviewTextVoiceAccess(state, canvasComments).beforeRequest();
+    await flushReviewTextVoiceBuffers(state, canvasComments);
     await state.session.flush();
     done();
   });
@@ -577,15 +578,36 @@ function leaveReviewInspector(
 
 /** Notes, advanced content and canvas text join the same ordered buffer before explicit API Save. */
 function reviewTextVoiceAccess(
-  state: Pick<InspectorState, 'composer' | 'flushAdvanced' | 'session'>,
+  state: Pick<
+    InspectorState,
+    | 'composer'
+    | 'flushAdvanced'
+    | 'session'
+    | 'video'
+    | 'registerSpeechFlush'
+    | 'beforeAction'
+    | 'setVoiceoverSilent'
+  >,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
   return {
     session: state.session,
-    beforeRequest: async () => {
-      await state.composer.flush();
-      await state.flushAdvanced();
-      await canvasComments.flushTexts();
+    beforeRequest: () => flushReviewTextVoiceBuffers(state, canvasComments),
+    context: {
+      video: state.video,
+      registerPending: state.registerSpeechFlush,
+      beforeAction: state.beforeAction,
+      setSilent: state.setVoiceoverSilent,
     },
   };
+}
+
+/** All-buffer joins are shared by explicit voice actions and leaving the inspector. */
+async function flushReviewTextVoiceBuffers(
+  state: Pick<InspectorState, 'composer' | 'flushAdvanced'>,
+  canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
+) {
+  await state.composer.flush();
+  await state.flushAdvanced();
+  await canvasComments.flushTexts();
 }

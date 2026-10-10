@@ -118,7 +118,7 @@ export async function prepareReviewAudio(
  * attaches its durable reference, and only then the asset is published. Any
  * failure or cancellation before publication discards the staged asset.
  */
-export async function importReviewAudio(args: {
+type ReviewAudioImport = {
   file: File;
   signal: AbortSignal;
   attach(assetId: string, duration: number): Promise<void>;
@@ -126,35 +126,55 @@ export async function importReviewAudio(args: {
   hasDurableReference?(assetId: string): boolean | Promise<boolean>;
   onPrepared?(prepared: PreparedReviewAudio): void;
   requiredReview?: { aggregateId: string; clipId: string };
-}): Promise<void> {
+  /** Existing-byte admission and receipt reuse must prepare under their known attachment lock. */
+  preparation?: { assetId: string; prepare(): Promise<PreparedReviewAudio> };
+};
+
+export async function importReviewAudio(args: ReviewAudioImport): Promise<void> {
+  if (args.preparation) {
+    const preparation = args.preparation;
+    return withVoiceoverAttachmentLock(preparation.assetId, async () => {
+      args.signal.throwIfAborted();
+      args.assertCurrentTarget();
+      const prepared = await preparation.prepare();
+      if (prepared.assetId !== preparation.assetId)
+        throw new Error('Audio preparation changed identity');
+      await attachPreparedReviewAudio(args, prepared);
+    });
+  }
   const prepared = await prepareReviewAudio(args.file, args.signal, args.requiredReview);
-  return withVoiceoverAttachmentLock(prepared.assetId, async () => {
-    let attached = false;
-    try {
-      args.onPrepared?.(prepared);
-      args.signal.throwIfAborted();
-      args.assertCurrentTarget();
-      await prepared.protect();
-      args.signal.throwIfAborted();
-      args.assertCurrentTarget();
-      await args.attach(prepared.assetId, prepared.duration);
-      // Ownership transfers to the durable reference; a publish failure keeps the
-      // staged bytes for recovery instead of deleting referenced material.
-      attached = true;
-      await prepared.publish();
-    } finally {
-      if (!attached) {
-        let durable = false;
-        try {
-          durable = (await args.hasDurableReference?.(prepared.assetId)) ?? false;
-        } catch {
-          // An unavailable durability check must keep the journal and staged bytes.
-          durable = true;
-        }
-        if (!durable) await prepared.cancel();
+  return withVoiceoverAttachmentLock(prepared.assetId, () =>
+    attachPreparedReviewAudio(args, prepared)
+  );
+}
+
+/** File and existing-byte preparation join the same compensation and publication authority. */
+async function attachPreparedReviewAudio(args: ReviewAudioImport, prepared: PreparedReviewAudio) {
+  let attached = false;
+  try {
+    args.onPrepared?.(prepared);
+    args.signal.throwIfAborted();
+    args.assertCurrentTarget();
+    await prepared.protect();
+    args.signal.throwIfAborted();
+    args.assertCurrentTarget();
+    await args.attach(prepared.assetId, prepared.duration);
+    // Ownership transfers to the durable reference; a publish failure keeps the
+    // staged bytes for recovery instead of deleting referenced material.
+    attached = true;
+    await prepared.publish();
+  } finally {
+    if (!attached) {
+      let durable = false;
+      try {
+        durable = (await args.hasDurableReference?.(prepared.assetId)) ?? false;
+      } catch {
+        // An unavailable durability check must keep the journal and staged bytes.
+        durable = true;
       }
+      if (!durable) await prepared.cancel();
     }
-  });
+  }
 }
 
 /** Places an imported clip at the target time, bounded by the timeline end. */

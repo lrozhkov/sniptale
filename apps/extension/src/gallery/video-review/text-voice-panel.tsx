@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { ReviewTextVoiceRecording } from './text-voice-recording';
+import { ReviewTextVoiceGallery } from './text-voice-gallery';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
 import { useReviewTextVoiceOperation, type ReviewTextVoiceAccess } from './use-text-voice';
 import { SpeechProfileFields } from './speech-profile';
@@ -20,10 +23,19 @@ const textVoiceErrors = {
   failed: 'gallery.videoReview.speechFailed',
 } as const;
 const buttonClass = `${reviewTextButtonClassName} !h-auto min-h-8! whitespace-normal text-left`;
+type VoiceSource = 'ai' | 'microphone' | 'gallery';
+const sourceLabel = {
+  ai: 'gallery.videoReview.textVoiceAI',
+  microphone: 'gallery.videoReview.textVoiceMicrophone',
+  gallery: 'gallery.videoReview.textVoiceGallery',
+} as const;
 
 /** Authored AI operation occupies the current inspector context and reuses the existing voice fields. */
 export function ReviewTextVoiceForm(props: Props) {
   const operation = useReviewTextVoiceOperation(props);
+  const [source, setSource] = useState<VoiceSource>('ai');
+  const navigate = (action: () => void) =>
+    props.access.context ? props.access.context.beforeAction(action) : action();
   return (
     <section
       data-ui="gallery.videoReview.textVoice"
@@ -35,7 +47,7 @@ export function ReviewTextVoiceForm(props: Props) {
           autoFocus
           label={translate('gallery.videoReview.textVoiceBack')}
           className={buttonClass}
-          onClick={props.onClose}
+          onClick={() => navigate(props.onClose)}
         >
           <ArrowLeft size={14} />
         </ReviewButton>
@@ -52,11 +64,48 @@ export function ReviewTextVoiceForm(props: Props) {
       {!props.access.session.getSnapshot().autosaveEnabled && (
         <p className="text-xs">{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
       )}
-      <TextVoiceSettings
-        operation={operation}
-        disabled={props.disabled}
-        autosaveEnabled={props.access.session.getSnapshot().autosaveEnabled}
+      <SegmentedSwitch
+        activeId={source}
+        ariaLabel={translate('gallery.videoReview.textVoiceSource')}
+        density="compact"
+        wrap
+        options={(['ai', 'microphone', 'gallery'] as const).map((id) => ({
+          id,
+          label: translate(sourceLabel[id]),
+          disabled:
+            !!props.disabled ||
+            operation.running ||
+            (id !== 'ai' && props.ids.length !== 1) ||
+            (id === 'microphone' && !props.access.context),
+        }))}
+        onChange={(next) =>
+          navigate(() => {
+            operation.clearError();
+            setSource(next);
+          })
+        }
       />
+      {props.ids.length !== 1 && (
+        <p className="text-xs">{translate('gallery.videoReview.textVoiceLocalSingle')}</p>
+      )}
+      <div hidden={source !== 'ai'}>
+        <TextVoiceSettings
+          operation={operation}
+          disabled={props.disabled || source !== 'ai'}
+          autosaveEnabled={props.access.session.getSnapshot().autosaveEnabled}
+        />
+      </div>
+      {source === 'microphone' && (
+        <ReviewTextVoiceRecording
+          access={props.access}
+          fragmentId={props.ids[0]!}
+          operation={operation}
+          disabled={props.disabled}
+        />
+      )}
+      {source === 'gallery' && (
+        <ReviewTextVoiceGallery operation={operation} disabled={props.disabled} />
+      )}
       {operation.running && (
         <div role="status" className="flex flex-wrap items-center gap-2 text-xs">
           <LoaderCircle size={14} className="animate-spin" />
@@ -76,12 +125,12 @@ export function ReviewTextVoiceForm(props: Props) {
           </ReviewButton>
         </div>
       )}
-      {operation.error && (
+      {operation.error && (operation.error !== 'model' || source === 'ai') && (
         <p role="alert" className="text-xs">
           {translate(textVoiceErrors[operation.error])}
         </p>
       )}
-      <TextVoiceResults operation={operation} disabled={props.disabled} />
+      <TextVoiceResults operation={operation} disabled={props.disabled} source={source} />
     </section>
   );
 }
@@ -254,26 +303,35 @@ function TextVoiceConsent(props: {
 function TextVoiceResults({
   operation,
   disabled,
+  source,
 }: {
   operation: Pick<
     ReturnType<typeof useReviewTextVoiceOperation>,
     'previews' | 'accepted' | 'running' | 'apply'
   >;
   disabled?: boolean | undefined;
+  source: VoiceSource;
 }) {
   const locale = useAppLocale();
   const [limit, setLimit] = useState(50);
   const accepted = new Set(operation.accepted);
-  const pending = operation.previews.filter((preview) => !accepted.has(preview.clipId));
+  const visible = operation.previews.filter(
+    (preview) =>
+      source !== 'microphone' ||
+      preview.textSnapshot.kind !== 'microphone' ||
+      accepted.has(preview.clipId)
+  );
+  const pending = visible.filter((preview) => !accepted.has(preview.clipId));
   return (
     <>
-      {operation.previews.slice(0, limit).map((preview) => (
+      {visible.slice(0, limit).map((preview) => (
         <div
           key={preview.clipId}
           className="min-w-0 space-y-1 rounded border border-[var(--sniptale-color-border-soft)] p-2 text-xs"
         >
           <p className="truncate">{preview.textSnapshot.text}</p>
           <p>
+            {translate(sourceLabel[preview.textSnapshot.kind])} ·{' '}
             {translate('gallery.videoReview.textVoiceDuration').replace(
               '{duration}',
               formatNumber(preview.duration, { maximumFractionDigits: 2 }, locale)
@@ -299,7 +357,7 @@ function TextVoiceResults({
           )}
         </div>
       ))}
-      {operation.previews.length > limit && (
+      {visible.length > limit && (
         <ReviewButton
           label={translate('gallery.videoReview.textFragmentMore')}
           className={buttonClass}

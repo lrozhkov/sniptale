@@ -1,6 +1,17 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  textVoiceSource: { ru: 'Как озвучить', en: 'Voice source' },
+  textVoiceAI: { ru: 'AI', en: 'AI' },
+  textVoiceMicrophone: { ru: 'Микрофон', en: 'Microphone' },
+  textVoiceGallery: { ru: 'Галерея', en: 'Gallery' },
+  textVoiceLocalSingle: {
+    ru: 'Запись и аудиофайл доступны для одной фразы. Выберите отдельный фрагмент.',
+    en: 'Recording and audio files apply to one phrase. Select an individual fragment.',
+  },
+  textVoiceChooseAudio: { ru: 'Выбрать аудиофайл', en: 'Choose audio file' },
+  textVoiceAudioGallery: { ru: 'Аудиофайлы', en: 'Audio files' },
+  textVoiceLocalSave: { ru: 'Применить запись', en: 'Apply recording' },
   textTrack: { ru: 'Текст', en: 'Text' },
   textTrackDocument: { ru: 'Текст дорожки', en: 'Track text' },
   textTrackOpen: { ru: 'Открыть текст дорожки', en: 'Open track text' },

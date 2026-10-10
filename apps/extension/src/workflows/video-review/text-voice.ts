@@ -7,23 +7,19 @@ import {
   discardAudioStaging,
   readAudioStaging,
 } from '../../composition/persistence/assets/audio-staging';
-import { withVoiceoverAttachmentLock } from '../../composition/persistence/projects/voiceover-publication-lock';
-import {
-  matchesReviewTextScope,
-  type ReviewTextFragment,
-  type ReviewVoiceTextSnapshot,
-} from '../../features/video/review/text-document';
-import { projectReviewTextFragment } from '../../features/video/review/text-projection';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
+import { matchesReviewTextScope } from '../../features/video/review/text-document';
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
+import { reviewAudioRestriction } from './audio-import';
 import {
-  importReviewAudio,
-  importedAudioClip,
-  reviewAudioRestriction,
-  type PreparedReviewAudio,
-} from './audio-import';
+  applyReviewTextTake,
+  assertReviewTextTakeBasis as assertTextVoiceBasis,
+  captureReviewTextTakeBasis,
+  cleanupReviewTextTakePreview,
+  readReviewTextTakeFragment as textFragment,
+  reviewTextTakeGeometry as textVoiceGeometry,
+  type ReviewTextTakePreview,
+} from './text-take';
 import { runReviewSpeechJob } from './speech-client';
 import { decodeReviewSpeechDuration } from './speech-audio';
 import type { createVideoReviewSession } from './session';
@@ -31,50 +27,9 @@ import type { createVideoReviewSession } from './session';
 type Session = ReturnType<typeof createVideoReviewSession>;
 
 /** Disposable generated take; only its accepted ordinary clip acquires durable byte ownership. */
-export interface ReviewTextVoicePreview {
-  clipId: string;
+export interface ReviewTextVoicePreview extends ReviewTextTakePreview {
   scope: AudioTextJobScope;
-  textSnapshot: ReviewVoiceTextSnapshot;
-  geometry: string;
-  duration: number;
-  resultStart: number;
-  blob: Blob;
-  url: string;
   staged: AudioStagedHandle;
-  expiresAt: number;
-  /** Retained only for local publication retry; never serialized into the workspace. */
-  publication?: PreparedReviewAudio;
-}
-
-function textVoiceGeometry(session: Session): string {
-  const state = session.getSnapshot();
-  return JSON.stringify([
-    state.snapshot.workspace.aggregateId,
-    state.snapshot.workspace.sourceAssetId,
-    state.snapshot.workspace.source,
-    state.document.edits,
-  ]);
-}
-
-function textFragment(session: Session, id: string): ReviewTextFragment {
-  const fragment = session
-    .getSnapshot()
-    .document.advancedContent.text?.fragments.find((entry) => entry.id === id);
-  if (!fragment) throw new Error('stale');
-  return fragment;
-}
-
-function assertTextVoiceBasis(session: Session, preview: ReviewTextVoicePreview) {
-  if (
-    Date.now() >= preview.expiresAt ||
-    preview.geometry !== textVoiceGeometry(session) ||
-    !matchesReviewTextScope(
-      textFragment(session, preview.scope.target.fragmentId),
-      preview.scope
-    ) ||
-    textFragment(session, preview.scope.target.fragmentId).text !== preview.textSnapshot.text
-  )
-    throw new Error('stale');
 }
 
 /** Freezes the whole selection before one Save; preparation failure aborts the command. */
@@ -84,17 +39,12 @@ export async function prepareReviewTextVoiceBatch(
   signal: AbortSignal
 ) {
   signal.throwIfAborted();
-  const fragments = ids.map((id) => structuredClone(textFragment(session, id)));
-  if (!fragments.length || fragments.some((fragment) => !fragment.text.trim()))
-    throw new Error('invalid-request');
-  const geometry = textVoiceGeometry(session);
+  if (!ids.length) throw new Error('invalid-request');
+  const captured = ids.map((id) => captureReviewTextTakeBasis(session, id));
   const saved = await session.saveBuffered();
   signal.throwIfAborted();
-  const map = buildReviewTimeMap(
-    saved.workspace.source.duration,
-    session.getSnapshot().document.edits
-  );
-  return fragments.map((fragment) => {
+  return captured.map((basis) => {
+    const { fragment, geometry } = basis;
     const scope: AudioTextJobScope = {
       workspaceId: saved.workspace.aggregateId,
       workspaceRevision: saved.workspace.revision,
@@ -111,21 +61,7 @@ export async function prepareReviewTextVoiceBatch(
       textFragment(session, fragment.id).text !== fragment.text
     )
       throw new Error('stale');
-    const projection = projectReviewTextFragment(fragment, map);
-    const clockLimit =
-      fragment.timeDomain === 'source'
-        ? saved.workspace.source.duration
-        : (map.at(-1)?.resultEnd ?? 0);
-    if (projection.excludedFromResult || fragment.end > clockLimit) throw new Error('duration');
-    const resultStart = projection.ranges[0]!.start;
-    return {
-      fragment,
-      scope,
-      geometry,
-      resultStart,
-      resultDuration: map.at(-1)?.resultEnd ?? 0,
-      expiresAt: Date.now() + AUDIO_STAGING_TTL_MS,
-    };
+    return { ...basis, scope, expiresAt: Date.now() + AUDIO_STAGING_TTL_MS };
   });
 }
 
@@ -208,97 +144,28 @@ export async function generateReviewTextVoice(
   }
 }
 
-/** Accepts the natural take duration as one ordinary clip, preserving neighboring text and audio. */
+/** Accepts AI output through the same ordinary take transaction as local recordings/files. */
 export async function applyReviewTextVoice(
   session: Session,
   preview: ReviewTextVoicePreview,
   signal: AbortSignal
 ): Promise<void> {
-  signal.throwIfAborted();
-  const previous = preview.publication;
-  if (previous) {
-    const published = await withVoiceoverAttachmentLock(previous.assetId, async () => {
-      if (await session.hasRetainedAssetReference(previous.assetId)) {
-        await previous.publish();
-        return true;
-      }
-      await previous.cancel();
-      return false;
-    });
-    if (published) return;
-    delete preview.publication;
-  }
-  await session.flush();
-  assertTextVoiceBasis(session, preview);
-  const workspaceId = session.getSnapshot().snapshot.workspace.aggregateId;
-  await importReviewAudio({
-    file: new File(
-      [preview.blob],
-      `${preview.clipId}.${preview.staged.mimeType === 'audio/wav' ? 'wav' : 'mp3'}`,
-      {
-        type: preview.blob.type,
-      }
-    ),
+  await applyReviewTextTake({
+    session,
+    preview,
     signal,
-    requiredReview: { aggregateId: workspaceId, clipId: preview.clipId },
-    assertCurrentTarget: () => assertTextVoiceBasis(session, preview),
-    onPrepared: (prepared) => {
-      preview.publication = prepared;
-    },
-    hasDurableReference: (assetId) => session.hasRetainedAssetReference(assetId),
-    attach: async (assetId, duration) => {
-      signal.throwIfAborted();
-      assertTextVoiceBasis(session, preview);
-      const state = session.getSnapshot();
-      const before = state.document.advancedContent;
-      const map = buildReviewTimeMap(
-        state.snapshot.workspace.source.duration,
-        state.document.edits
-      );
-      const end = map.at(-1)?.resultEnd ?? 0;
-      if (Math.abs(duration - preview.duration) > 0.001 || preview.resultStart + duration > end)
-        throw new Error('duration');
-      if (before.audio.voiceover.some((clip) => clip.id === preview.clipId))
-        throw new Error('stale');
-      const clip = anchorReviewVoiceover(
-        {
-          ...importedAudioClip(assetId, duration, preview.resultStart, end),
-          id: preview.clipId,
-          textSnapshot: structuredClone(preview.textSnapshot),
-        },
-        map
-      );
-      await session.commitDurable({
-        id: crypto.randomUUID(),
-        at: Date.now(),
-        target: 'advancedContent',
-        before,
-        after: {
-          ...before,
-          audio: {
-            ...before.audio,
-            voiceoverSegments: [...map],
-            voiceover: [
-              ...before.audio.voiceover.map((item) => anchorReviewVoiceover(item, map)),
-              clip,
-            ],
-          },
-        },
-      });
-    },
+    filename: `${preview.clipId}.${preview.staged.mimeType === 'audio/wav' ? 'wav' : 'mp3'}`,
   });
 }
 
-/** Releases disposable output; accepted or ambiguous byte references remain with their existing recovery owner. */
+/** Remote staging stays with the AI adapter; accepted byte ownership stays with the common take owner. */
 export async function cleanupReviewTextVoicePreview(
   session: Session,
   preview: ReviewTextVoicePreview
 ) {
-  URL.revokeObjectURL(preview.url);
-  await discardAudioStaging(preview.staged, preview.scope);
-  const prepared = preview.publication;
-  if (prepared)
-    await withVoiceoverAttachmentLock(prepared.assetId, async () => {
-      if (!(await session.hasRetainedAssetReference(prepared.assetId))) await prepared.cancel();
-    });
+  try {
+    await cleanupReviewTextTakePreview(session, preview);
+  } finally {
+    await discardAudioStaging(preview.staged, preview.scope);
+  }
 }

@@ -447,3 +447,58 @@ it('stops the loader on failed model discovery and resumes it only for an explic
   expect(host.querySelectorAll('svg.animate-spin')).toHaveLength(1);
   expect(mocks.generate).not.toHaveBeenCalled();
 });
+
+it('preserves the AI profile across Gallery selection and requires no model for the local mode', async () => {
+  const { beforeRequest } = await render();
+  await click('Provider Two');
+  await click('gallery.videoReview.textVoiceGallery');
+  expect(host.querySelector('[data-ui="gallery.videoReview.textVoiceGallery"]')).not.toBeNull();
+  expect(beforeRequest).not.toHaveBeenCalled();
+  await click('gallery.videoReview.textVoiceAI');
+  await start();
+  await approve();
+  expect(mocks.generate.mock.calls[0]?.[2]).toMatchObject({ modelId: 'model2' });
+  mocks.failCatalog = true;
+  await click('gallery.videoReview.textVoiceGallery');
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(
+    host
+      .querySelector('[data-ui="gallery.videoReview.textVoiceGallery"] button')
+      ?.hasAttribute('disabled')
+  ).toBe(false);
+});
+
+it('keeps batch local modes unavailable and routes Back and mode changes through the existing admission', async () => {
+  const batch = await render(['first', 'second']);
+  for (const key of [
+    'gallery.videoReview.textVoiceMicrophone',
+    'gallery.videoReview.textVoiceGallery',
+  ]) {
+    const button = [...host.querySelectorAll('button')].find((node) => node.textContent === key);
+    expect(button?.disabled).toBe(true);
+  }
+  expect(host.textContent).toContain('gallery.videoReview.textVoiceLocalSingle');
+  const beforeAction = vi.fn();
+  const props = {
+    ...batch.props,
+    access: {
+      ...batch.props.access,
+      context: {
+        beforeAction,
+        registerPending: vi.fn(() => vi.fn()),
+        video: { current: null },
+        setSilent: vi.fn(),
+      },
+    },
+  };
+  await act(async () => root.render(<ReviewTextVoiceForm {...props} ids={['first']} />));
+  await click('gallery.videoReview.textVoiceGallery');
+  expect(beforeAction).toHaveBeenCalledOnce();
+  expect(host.querySelector('[data-ui="gallery.videoReview.textVoiceGallery"]')).toBeNull();
+  await act(async () => beforeAction.mock.calls[0]![0]());
+  expect(host.querySelector('[data-ui="gallery.videoReview.textVoiceGallery"]')).not.toBeNull();
+  await click('gallery.videoReview.textVoiceBack');
+  expect(props.onClose).not.toHaveBeenCalled();
+  await act(async () => beforeAction.mock.calls[1]![0]());
+  expect(props.onClose).toHaveBeenCalledOnce();
+});

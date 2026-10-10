@@ -17,6 +17,7 @@ type PreviewState = Pick<
   EditorState,
   | 'busy'
   | 'playing'
+  | 'voiceoverSilent'
   | 'time'
   | 'message'
   | 'setMessage'
@@ -283,7 +284,7 @@ function ReviewPreviewStage({
         );
       }}
       onPlaying={(playing) => {
-        if (playing)
+        if (playing && !state.voiceoverSilent)
           state.setActiveSelection((current) =>
             current.kind === 'none' ? current : { kind: 'none' }
           );

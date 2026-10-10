@@ -8,6 +8,7 @@ import {
   prepareReviewAudio,
   type PreparedReviewAudio,
 } from './audio-import';
+import { withVoiceoverAttachmentLock } from '../../composition/persistence/projects/voiceover-publication-lock';
 
 const storeMocks = vi.hoisted(() => ({
   writeBlobToAsset: vi.fn(),
@@ -80,6 +81,79 @@ beforeEach(() => {
     journalId: 'journal-1',
     assetRefs: [preparedRef],
   });
+});
+
+it('holds the known asset lock through preparation, attachment and publication without re-importing', async () => {
+  const events: string[] = [];
+  let entered!: () => void;
+  let release!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const pause = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const prepared: PreparedReviewAudio = {
+    assetId: 'project-asset:existing',
+    duration: 2,
+    protect: async () => {
+      events.push('protect');
+    },
+    publish: async () => {
+      events.push('publish');
+    },
+    cancel: vi.fn(),
+    discard: vi.fn(),
+  };
+  const importing = importReviewAudio({
+    file: file(8),
+    signal: new AbortController().signal,
+    preparation: {
+      assetId: prepared.assetId,
+      prepare: async () => {
+        events.push('prepare');
+        entered();
+        await pause;
+        return prepared;
+      },
+    },
+    assertCurrentTarget: () => undefined,
+    attach: async () => {
+      events.push('attach');
+    },
+  });
+  await started;
+  const other = withVoiceoverAttachmentLock(prepared.assetId, async () => {
+    events.push('other');
+  });
+  expect(events).toEqual(['prepare']);
+  release();
+  await Promise.all([importing, other]);
+  expect(events).toEqual(['prepare', 'protect', 'attach', 'publish', 'other']);
+  expect(storeMocks.writeBlobToAsset).not.toHaveBeenCalled();
+});
+
+it('refuses mismatched prepared identity without attaching or deleting an unproven claim', async () => {
+  const prepared: PreparedReviewAudio = {
+    assetId: 'project-asset:other',
+    duration: 2,
+    protect: vi.fn(),
+    publish: vi.fn(),
+    cancel: vi.fn(),
+    discard: vi.fn(),
+  };
+  const attach = vi.fn();
+  await expect(
+    importReviewAudio({
+      file: file(8),
+      signal: new AbortController().signal,
+      preparation: { assetId: 'project-asset:expected', prepare: async () => prepared },
+      assertCurrentTarget: () => undefined,
+      attach,
+    })
+  ).rejects.toThrow('changed identity');
+  expect(attach).not.toHaveBeenCalled();
+  expect(prepared.cancel).not.toHaveBeenCalled();
 });
 
 describe('prepareReviewAudio', () => {

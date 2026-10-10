@@ -15,6 +15,7 @@ import { useMusicLibraryState } from './music-library-state';
 
 /** Callbacks retain ownership of playback, durable insertion, cancellation and successful closure. */
 export interface MusicLibraryDrawerProps {
+  label?: string;
   anchor: HTMLElement | null;
   onClose(): void;
   onSelect(id: string): Promise<void>;
@@ -42,7 +43,7 @@ export function MusicLibraryDrawer(props: MusicLibraryDrawerProps) {
     <dialog
       ref={dialog}
       data-theme={theme ?? undefined}
-      aria-label={translate('gallery.videoReview.musicLibrary')}
+      aria-label={props.label ?? translate('gallery.videoReview.musicLibrary')}
       onCancel={(event) => {
         event.preventDefault();
         props.onClose();
@@ -95,6 +96,7 @@ function MusicLibraryContent(props: MusicLibraryDrawerProps) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-ui="music.library.drawer">
       <MusicLibraryHeader
+        label={props.label ?? translate('gallery.videoReview.musicLibrary')}
         state={state}
         busy={busy}
         onClose={props.onClose}
@@ -164,6 +166,7 @@ function MusicLibraryContent(props: MusicLibraryDrawerProps) {
 }
 
 function MusicLibraryHeader(props: {
+  label: string;
   state: Pick<
     ReturnType<typeof useMusicLibraryState>,
     'views' | 'viewId' | 'setViewId' | 'query' | 'setQuery' | 'setComposing' | 'applyQuery'
@@ -177,7 +180,7 @@ function MusicLibraryHeader(props: {
   return (
     <>
       <MediaLibraryHeader
-        title={translate('gallery.videoReview.musicLibrary')}
+        title={props.label}
         dataUi="music.library"
         query={state.query}
         onQueryChange={state.setQuery}

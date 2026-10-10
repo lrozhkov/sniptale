@@ -73,6 +73,7 @@ beforeEach(() => {
   state = {
     busy: false,
     playing: false,
+    voiceoverSilent: false,
     time: 0,
     message: 'notice',
     clickCues: [],
@@ -213,6 +214,21 @@ it('maps transport seeks and playback events while preserving non-point selectio
   vi.mocked(state.seek).mockClear();
   frame().onSeek(3);
   expect(state.seek).not.toHaveBeenCalled();
+});
+
+it('keeps the authored text inspector mounted during recording playback', async () => {
+  active = { kind: 'text', id: 'script' };
+  state.voiceoverSilent = true;
+  await render();
+  stage().onPlaying(true);
+  expect(active).toEqual({ kind: 'text', id: 'script' });
+  expect(state.setPlaying).toHaveBeenCalledWith(true);
+  stage().onPlaying(false);
+  expect(active).toEqual({ kind: 'text', id: 'script' });
+  state.voiceoverSilent = false;
+  await render();
+  stage().onPlaying(true);
+  expect(active.kind).toBe('none');
 });
 
 it('admits scene gestures only while idle and reconnects resource recovery to export readiness', async () => {

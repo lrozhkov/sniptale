@@ -40,3 +40,19 @@ it('admits one continuation and refuses stale selection after an asynchronous fl
   await flight;
   expect(action).not.toHaveBeenCalled();
 });
+
+it('keeps a declined recording discard in its current context without a storage failure', async () => {
+  const failure = vi.fn();
+  const guard = createReviewSpeechEditGuard(failure);
+  const action = vi.fn();
+  const flush = vi
+    .fn<() => Promise<void | false>>()
+    .mockResolvedValueOnce(false)
+    .mockResolvedValueOnce(undefined);
+  guard.register({ hasPending: () => true, flush });
+  await guard.perform(action);
+  expect(action).not.toHaveBeenCalled();
+  expect(failure).not.toHaveBeenCalled();
+  await guard.perform(action);
+  expect(action).toHaveBeenCalledOnce();
+});

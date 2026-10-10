@@ -161,12 +161,13 @@ export function ReviewVoiceoverRecording(props: {
   );
 }
 
-function VoiceoverCaptureOptions(props: {
+export function VoiceoverCaptureOptions(props: {
   session: RecordingSession;
   capturing: boolean;
   playVideo: boolean;
   onPlayVideo(value: boolean): void;
   durationLimit: ReturnType<typeof useRecordingDurationLimit>;
+  maximum?: number;
 }) {
   const disabled = props.session.starting || props.capturing;
   return (
@@ -188,6 +189,7 @@ function VoiceoverCaptureOptions(props: {
       duration={
         <RecordingDurationLimit
           value={props.durationLimit}
+          {...(props.maximum !== undefined ? { maximum: props.maximum } : {})}
           disabled={disabled || props.session.isSaving}
         />
       }
@@ -195,7 +197,7 @@ function VoiceoverCaptureOptions(props: {
   );
 }
 
-function VoiceoverTransport(props: {
+export function VoiceoverTransport(props: {
   session: RecordingSession;
   limit: number | undefined;
   invalid: boolean;
@@ -251,12 +253,14 @@ function VoiceoverTransport(props: {
   );
 }
 
-function VoiceoverTakeReview({
+export function VoiceoverTakeReview({
   session,
   durationLimit,
+  saveLabel,
 }: {
   session: RecordingSession;
   durationLimit: ReturnType<typeof useRecordingDurationLimit>;
+  saveLabel?: string;
 }) {
   return (
     <>
@@ -290,7 +294,7 @@ function VoiceoverTakeReview({
           onClick={() => void session.saveRecording()}
         >
           <Save size={16} aria-hidden="true" />
-          {translate('videoEditor.app.recordAudioSave')}
+          {saveLabel ?? translate('videoEditor.app.recordAudioSave')}
         </ProductActionButton>
       </footer>
     </>

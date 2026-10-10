@@ -84,7 +84,10 @@ export function useReviewVoiceoverRecording(args: {
 }
 
 /** Owns delayed playback completion and cancellation across recording generations. */
-function useVoiceoverPlayback(video: RefObject<HTMLVideoElement | null>, startTime: () => number) {
+export function useVoiceoverPlayback(
+  video: RefObject<HTMLVideoElement | null>,
+  startTime: () => number
+) {
   const generation = useRef(0);
   const openRef = useRef(false);
   const shouldPlay = useRef(false);

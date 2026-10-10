@@ -45,6 +45,44 @@ interface PreparedLibraryAudioBinding {
   cancel(): Promise<void>;
 }
 
+/** Read-only re-admission for an unaccepted prepared receipt; caller holds its attachment lock. */
+export async function assertLibraryAudioBindingSource(
+  source: LibraryAudioSource,
+  projectAssetId: string
+): Promise<void> {
+  const db = await initDB();
+  await runWithDurableAssetLifecycleLock(async () => {
+    await admitLibraryAudioBindingSource(source, projectAssetId, db);
+  });
+}
+
+/** Preparation and receipt reuse share one canonical source/ref/bytes admission. */
+async function admitLibraryAudioBindingSource(
+  source: LibraryAudioSource,
+  projectAssetId: string,
+  db: Awaited<ReturnType<typeof initDB>>
+) {
+  const current = await readLibraryAudioSource(source.mediaId);
+  if (
+    !sameLibraryAudioRef(source.ref, current.ref) ||
+    JSON.stringify(source.source) !== JSON.stringify(current.source) ||
+    (current.entry && current.entry.id !== projectAssetId)
+  )
+    throw new LibraryAudioBindingError('changed-source');
+  if (
+    !current.entry &&
+    ((await db.get(PROJECT_ASSETS_STORE, projectAssetId)) !== undefined ||
+      (await db.get(MEDIA_LIBRARY_STORE, `project-asset:${projectAssetId}`)) !== undefined)
+  )
+    throw new LibraryAudioBindingError('changed-source');
+  try {
+    await readAssetFile(current.ref, current.filename);
+  } catch {
+    throw new LibraryAudioBindingError('unavailable');
+  }
+  return current;
+}
+
 /**
  * Caller holds the project-asset attachment lock across preparation, durable attach and
  * publication. The ready claim shares existing bytes and never publishes another card.
@@ -56,24 +94,7 @@ export async function prepareLibraryAudioBinding(
 ): Promise<PreparedLibraryAudioBinding> {
   const db = await initDB();
   const journal = await runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
-    const current = await readLibraryAudioSource(source.mediaId);
-    if (
-      !sameLibraryAudioRef(source.ref, current.ref) ||
-      JSON.stringify(source.source) !== JSON.stringify(current.source) ||
-      (current.entry && current.entry.id !== projectAssetId)
-    )
-      throw new LibraryAudioBindingError('changed-source');
-    if (
-      !current.entry &&
-      ((await db.get(PROJECT_ASSETS_STORE, projectAssetId)) !== undefined ||
-        (await db.get(MEDIA_LIBRARY_STORE, `project-asset:${projectAssetId}`)) !== undefined)
-    )
-      throw new LibraryAudioBindingError('changed-source');
-    try {
-      await readAssetFile(current.ref, current.filename);
-    } catch {
-      throw new LibraryAudioBindingError('unavailable');
-    }
+    const current = await admitLibraryAudioBindingSource(source, projectAssetId, db);
     const entry = current.entry ?? {
       id: projectAssetId,
       assetId: current.ref.assetId,
