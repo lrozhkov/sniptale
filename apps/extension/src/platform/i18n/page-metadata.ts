@@ -9,8 +9,9 @@ interface PageLocaleMetadata {
 }
 
 function applyPageLocaleMetadata(metadata: PageLocaleMetadata): void {
-  document.documentElement.lang = metadata.locale;
-  document.title = metadata.title;
+  if (document.documentElement.lang !== metadata.locale)
+    document.documentElement.lang = metadata.locale;
+  if (document.title !== metadata.title) document.title = metadata.title;
 }
 
 /** Keeps browser metadata synchronized with the active document and locale. */
