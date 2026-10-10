@@ -183,7 +183,8 @@ it('publishes a complete manual frame at exact paused clocks and retains only it
   const pause = vi.spyOn(props.video.current!, 'pause').mockImplementation(() => {});
   await render();
   await step(0);
-  expect(io.prepare.mock.calls[0]![0].comments[0].renderToVideo).toBe(true);
+  expect(io.prepare.mock.calls[0]![0].comments[0].renderToVideo).toBe(false);
+  expect(io.prepare.mock.calls[0]![0].showEditorComments).toBe(true);
   expect(props.scene.comments[0]!.renderToVideo).toBe(false);
   const frame = io.render.mock.calls[0]![1];
   expect(frame.sourceTime).toBe(1.234567);

@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { getActionKeyStyle } from '../../../project/action-style';
-import { drawKeystroke } from './keystrokes';
+import { drawKeystroke, measureKeystroke } from './keystrokes';
 import type { VideoCompositionActionState } from '../../types';
 
 it('keeps all six placements within the visible frame at both preview scales', () => {
@@ -47,4 +47,52 @@ it('keeps all six placements within the visible frame at both preview scales', (
       expect(context.font).toBe(`500 ${24 * scale}px monospace`);
       expect(context.fillText).toHaveBeenCalled();
     }
+});
+
+it('omits empty labels and frames too small for a legible key', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    fillText: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  drawKeystroke(context, { event: { label: '' }, progress: 0.5 }, 1);
+  drawKeystroke(context, { event: { label: 'Key' }, progress: 0.5 }, 1, {
+    x: 0,
+    y: 0,
+    width: 10,
+    height: 0,
+  });
+  expect(context.save).not.toHaveBeenCalled();
+  expect(context.fillText).not.toHaveBeenCalled();
+});
+
+it('uses native canvas bounds or their fallback and preserves an unanimated key opacity', () => {
+  for (const canvas of [undefined, { width: 800, height: 450 }]) {
+    const context = {
+      canvas,
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      fill: vi.fn(),
+      fillText: vi.fn(),
+      globalAlpha: 0.5,
+      measureText: () => ({ width: 90 }),
+    } as unknown as CanvasRenderingContext2D;
+    const state = {
+      event: { label: 'Key' },
+      progress: 0.01,
+      keyStyle: { ...getActionKeyStyle(), entrance: 'none' as const },
+    };
+    const bounds = measureKeystroke(context, state, 0.1)!;
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(canvas?.width ?? 1920);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(canvas?.height ?? 1080);
+    expect(bounds.travel).toBe(0);
+    drawKeystroke(context, state, 0.1);
+    expect(context.fillText).toHaveBeenCalledOnce();
+    expect(context.globalAlpha).toBe(0.5 * getActionKeyStyle().opacity);
+    expect(vi.mocked(context.save).mock.calls.length).toBe(
+      vi.mocked(context.restore).mock.calls.length
+    );
+  }
 });

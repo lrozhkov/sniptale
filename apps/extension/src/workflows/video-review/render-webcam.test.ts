@@ -205,6 +205,7 @@ it.each([1 / 30, 30])(
   async (declared) => {
     state.declaredDuration = declared;
     const renderer = await createReviewWebcamRenderer(webcam(), read, new AbortController().signal);
+    expect(renderer.duration).toBe(3);
     const visible: boolean[] = [];
     for await (const frame of renderer.frames([0, 0.5, 2.5, 3])) visible.push(!!frame);
     expect(visible).toEqual([true, true, true, false]);

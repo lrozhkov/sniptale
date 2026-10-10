@@ -251,6 +251,7 @@ function createRenderer(args: Args, prepared: Preparation) {
       file: args.file,
       index: args.index,
       edits: args.edits,
+      ...(args.captionTimeMap ? { captionTimeMap: args.captionTimeMap } : {}),
       effective: prepared.effective,
       ...(args.comments ? { comments: args.comments } : {}),
       ...(args.clickCues ? { clickCues: args.clickCues } : {}),

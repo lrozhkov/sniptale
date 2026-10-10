@@ -2,7 +2,8 @@ import { ReviewButton } from './controls';
 import { ReviewPresentationBinding } from './presentation-binding';
 import { ReviewWatermarkInspector } from './watermark-inspector';
 import type { ComponentProps } from 'react';
-import { Scan, Wallpaper, Stamp, AudioLines, PanelTop, Clapperboard } from 'lucide-react';
+import { Scan, Wallpaper, Stamp, AudioLines, PanelTop, Clapperboard, Captions } from 'lucide-react';
+import { ReviewCaptionSceneControls } from './caption-controls';
 import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
@@ -96,6 +97,8 @@ export function ReviewSceneProperties(props: {
   background: QuickEditAdvancedState['background'];
   onPreviewBackground?(background: QuickEditAdvancedState['background'] | null): void;
   canvas: QuickEditAdvancedState['canvas'];
+  captions?: QuickEditAdvancedState['captions'];
+  onCaptions?(settings: NonNullable<QuickEditAdvancedState['captions']>): void;
   presentation?: ComponentProps<typeof ReviewPresentationBinding>;
   watermark?: ComponentProps<typeof ReviewWatermarkInspector>;
   windowHeader?: QuickEditAdvancedState['windowHeader'];
@@ -129,6 +132,22 @@ export function ReviewSceneProperties(props: {
         ) : null}
         <ReviewInspectorSections
           sections={[
+            ...(props.onCaptions
+              ? [
+                  {
+                    id: 'captions',
+                    label: translate('gallery.videoReview.captions'),
+                    icon: Captions,
+                    content: (
+                      <ReviewCaptionSceneControls
+                        settings={props.captions}
+                        onChange={props.onCaptions}
+                        disabled={props.busy}
+                      />
+                    ),
+                  },
+                ]
+              : []),
             {
               id: 'canvas',
               label: translate('gallery.videoReview.canvas'),

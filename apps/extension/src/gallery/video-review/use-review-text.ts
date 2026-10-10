@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import {
   addReviewTextFragment,
   createReviewTextDocument,
+  createReviewCaptionSettings,
+  type ReviewCaptionSettings,
   deleteReviewTextFragments,
   editReviewTextFragment,
   mergeReviewTextFragments,
@@ -68,6 +70,7 @@ export function queryReviewText(
 
 /** Text mutations reuse the advanced-content history writer and the shared source-axis projection. */
 export function useReviewText(args: {
+  captions?: ReviewCaptionSettings | undefined;
   document: ReviewTextDocument | undefined;
   snapshots?: readonly ReviewVoiceTextSnapshot[];
   selection?: ReviewSelection;
@@ -155,6 +158,7 @@ export function useReviewText(args: {
       : { start: projection.source(fragment.start), end: projection.source(fragment.end, 'end') };
   return {
     document,
+    captions: args.captions ?? createReviewCaptionSettings(),
     snapshots: args.snapshots ?? [],
     selectedId: args.selection?.kind === 'text' ? args.selection.id : undefined,
     error,
@@ -188,10 +192,11 @@ export function useReviewText(args: {
         args.setText((current) => (current ? deleteReviewTextFragments(current, ids) : current));
         setError(null);
       }),
-    jump: (fragment: ReviewTextFragment) =>
+    jump: (fragment: ReviewTextFragment, select = false) =>
       guard(() => {
         args.pause();
         args.seek(sourceInterval(fragment).start, false);
+        if (select) args.select({ kind: 'text', id: fragment.id });
       }),
   };
 }

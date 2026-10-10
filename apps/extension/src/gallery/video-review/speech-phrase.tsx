@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Clock3, Merge, Scissors, Trash2 } from 'lucide-react';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { ProductTextarea } from '@sniptale/ui/product-form-controls';
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import {
@@ -17,6 +16,7 @@ import {
 import type { useReviewText } from './use-review-text';
 import { formatSpeechTime } from './speech-audition';
 import { translate } from '../../platform/i18n';
+import { ReviewFragmentCaptionControls } from './caption-controls';
 /** List navigation remains independent of the expanded phrase editor. */
 function PhraseSummary({
   phrase,
@@ -106,7 +106,7 @@ export function ReviewTextPhrase(props: {
   next?: ReviewTextFragment | undefined;
   editor: Pick<
     ReturnType<typeof useReviewText>,
-    'change' | 'split' | 'merge' | 'remove' | 'playhead'
+    'change' | 'split' | 'merge' | 'remove' | 'playhead' | 'captions'
   >;
   expanded: boolean;
   selected?: boolean;
@@ -203,24 +203,12 @@ export function ReviewTextPhrase(props: {
               <Trash2 size={14} />
             </ReviewButton>
           </div>
-          <div
-            className={[
-              'flex min-h-8 items-center justify-between gap-2 text-xs',
-              'text-[var(--sniptale-color-text-secondary)]',
-            ].join(' ')}
-          >
-            <span>{translate('gallery.videoReview.textFragmentShown')}</span>
-            <ProductGlassSwitch
-              role="switch"
-              aria-label={translate('gallery.videoReview.textFragmentShown')}
-              aria-checked={fragment.showInVideo}
-              on={fragment.showInVideo}
-              disabled={props.busy}
-              onClick={() =>
-                props.editor.change(fragment.id, { showInVideo: !fragment.showInVideo })
-              }
-            />
-          </div>
+          <ReviewFragmentCaptionControls
+            fragment={fragment}
+            settings={props.editor.captions}
+            disabled={props.busy}
+            onChange={(patch) => props.editor.change(fragment.id, patch)}
+          />
           <ReviewDetails
             preferenceId="group:text-timing"
             label={translate('gallery.videoReview.speechPhraseTiming')}

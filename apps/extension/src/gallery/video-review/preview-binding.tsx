@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
@@ -37,6 +38,7 @@ type PreviewState = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  text: Pick<EditorState['text'], 'jump'>;
   features: Pick<
     EditorState['features'],
     | 'webcam'
@@ -155,6 +157,31 @@ export function ReviewPreviewBinding({
   );
 }
 
+/** Caption clock/selection adaptation is independent of scene drag/edit controls. */
+function useReviewCaptionPreview(
+  state: Pick<PreviewState, 'advanced' | 'source' | 'snapshot' | 'text'>
+) {
+  const captionSegments = useMemo(
+    () => buildReviewTimeMap(state.source.duration, state.snapshot.document.edits),
+    [state.source.duration, state.snapshot.document.edits]
+  );
+  const captions =
+    state.advanced.ui.mode === 'advanced' && state.advanced.captions?.enabled
+      ? {
+          document: state.advanced.text,
+          settings: state.advanced.captions,
+          segments: captionSegments,
+        }
+      : undefined;
+  return {
+    captions,
+    onCaptionSelect(id: string) {
+      const fragment = state.advanced.text?.fragments.find((entry) => entry.id === id);
+      if (fragment) state.text.jump(fragment, true);
+    },
+  };
+}
+
 /** Stage interactions share playback admission and disposable scene gestures. */
 function ReviewPreviewStage({
   resource,
@@ -172,6 +199,7 @@ function ReviewPreviewStage({
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
 }) {
   const { busy, features, composer, snapshot, canvasComments } = state;
+  const captionPreview = useReviewCaptionPreview(state);
   const outerFadePlan = useMemo(() => {
     if (state.advanced.ui.mode !== 'advanced' || !state.exporter.index) return undefined;
     try {
@@ -203,6 +231,7 @@ function ReviewPreviewStage({
     !state.playing && !busy && state.editing.exporter.phase === 'idle' && !composer.annotation;
   return (
     <ReviewStageBinding
+      {...captionPreview}
       outerFadePlan={outerFadePlan}
       preview={
         previewPreferences

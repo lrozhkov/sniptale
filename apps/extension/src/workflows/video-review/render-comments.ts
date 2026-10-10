@@ -46,14 +46,7 @@ function drawReviewComment(
     rasterScale?: { x: number; y: number } | undefined;
   }
 ): void {
-  const point = args.videoTransform
-    ? quickEditContentPointToCanvas(comment.position, args.videoTransform)
-    : { x: comment.position.x * args.canvas.width, y: comment.position.y * args.canvas.height };
-  const bubble = canvasCommentBubble(comment.style, {
-    width: args.canvas.width / args.scale,
-    height: args.canvas.height / args.scale,
-  });
-  const pointRadius = bubble.pointRadius * args.scale;
+  const { point, pointRadius, box } = measureReviewComment(context, comment, args);
   const phase = overlayPulsePhase(args.sourceTime ?? 0, comment.start);
   context.save();
   try {
@@ -73,7 +66,70 @@ function drawReviewComment(
     context.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
     context.fill();
     context.stroke();
-    drawCommentBubble(context, comment, args, point, pointRadius, bubble);
+    if (box) drawCommentBubble(context, comment, args, box);
+  } finally {
+    context.restore();
+  }
+}
+
+/** The painter and caption reservations share the exact bounded bubble layout. */
+export function measureReviewComment(
+  context: CanvasRenderingContext2D,
+  comment: CanvasCommentExport,
+  args: Pick<Parameters<typeof drawReviewComments>[2], 'canvas' | 'videoTransform' | 'scale'>
+) {
+  const point = args.videoTransform
+    ? quickEditContentPointToCanvas(comment.position, args.videoTransform)
+    : { x: comment.position.x * args.canvas.width, y: comment.position.y * args.canvas.height };
+  const bubble = canvasCommentBubble(comment.style, {
+    width: args.canvas.width / args.scale,
+    height: args.canvas.height / args.scale,
+  });
+  const pointRadius = bubble.pointRadius * args.scale;
+  if (!comment.resolvedText.trim()) return { point, pointRadius, box: null };
+  context.save();
+  try {
+    const fontSize = bubble.fontSize * args.scale;
+    const lineHeight = bubble.lineHeight * args.scale;
+    const maxWidth = bubble.maxWidth * args.scale;
+    const paddingX = bubble.paddingX * args.scale;
+    const paddingY = bubble.paddingY * args.scale;
+    const font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+    context.font = font;
+    const maxHeight = bubble.maxHeight * args.scale;
+    const maxLines = Math.max(1, Math.floor((maxHeight - paddingY * 2) / lineHeight));
+    const lines = wrapCanvasText(
+      context,
+      comment.resolvedText,
+      Math.max(1, maxWidth - paddingX * 2),
+      maxLines
+    );
+    const width = Math.min(
+      maxWidth,
+      Math.max(...lines.map((line) => context.measureText(line).width)) + paddingX * 2
+    );
+    const height = Math.min(maxHeight, lines.length * lineHeight + paddingY * 2);
+    const x = point.x - width / 2;
+    const y =
+      comment.placement === 'below'
+        ? point.y + pointRadius + bubble.gap * args.scale
+        : point.y - pointRadius - bubble.gap * args.scale - height;
+    return {
+      point,
+      pointRadius,
+      box: {
+        x,
+        y,
+        width,
+        height,
+        lines,
+        font,
+        lineHeight,
+        paddingX,
+        paddingY,
+        radius: comment.style.radius * args.scale,
+      },
+    };
   } finally {
     context.restore();
   }
@@ -87,30 +143,20 @@ function drawCommentBubble(
     resources?: RenderResources | undefined;
     rasterScale?: { x: number; y: number } | undefined;
   },
-  point: { x: number; y: number },
-  pointRadius: number,
-  bubble: ReturnType<typeof canvasCommentBubble>
+  box: NonNullable<ReturnType<typeof measureReviewComment>['box']>
 ): void {
-  const text = comment.resolvedText;
-  if (!text.trim()) return;
-  const fontSize = bubble.fontSize * args.scale;
-  const lineHeight = bubble.lineHeight * args.scale;
-  const maxWidth = bubble.maxWidth * args.scale;
-  const paddingX = bubble.paddingX * args.scale;
-  const paddingY = bubble.paddingY * args.scale;
-  const radius = comment.style.radius * args.scale;
-  context.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-  const maxHeight = bubble.maxHeight * args.scale;
-  const maxLines = Math.max(1, Math.floor((maxHeight - paddingY * 2) / lineHeight));
-  const lines = wrapCanvasText(context, text, Math.max(1, maxWidth - paddingX * 2), maxLines);
-  const textWidth = Math.max(...lines.map((line) => context.measureText(line).width));
-  const boxWidth = Math.min(maxWidth, textWidth + paddingX * 2);
-  const boxHeight = Math.min(maxHeight, lines.length * lineHeight + paddingY * 2);
-  const boxX = point.x - boxWidth / 2;
-  const boxY =
-    comment.placement === 'below'
-      ? point.y + pointRadius + bubble.gap * args.scale
-      : point.y - pointRadius - bubble.gap * args.scale - boxHeight;
+  const {
+    x: boxX,
+    y: boxY,
+    width: boxWidth,
+    height: boxHeight,
+    radius,
+    lines,
+    lineHeight,
+    paddingX,
+    paddingY,
+  } = box;
+  context.font = box.font;
   context.save();
   try {
     context.beginPath();

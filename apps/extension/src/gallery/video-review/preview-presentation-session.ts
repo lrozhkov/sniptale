@@ -55,6 +55,7 @@ class ManualPresentationSession {
   private readonly video: HTMLVideoElement | null;
   private readonly admission: ReturnType<typeof createPresentationAdmission>;
   private contextLost = false;
+  private sourceFrameCallback: number | null = null;
   private renderer: Renderer;
   private readonly scheduler: ReturnType<
     typeof createReviewPreviewPresentation<Description, Prepared, RenderFrame, Publication>
@@ -100,6 +101,7 @@ class ManualPresentationSession {
       first = this.publications[0];
     this.report({
       phase,
+      captionConflicts: this.front?.captionConflicts ?? [],
       nativeVideoFPS: null,
       actualRaster: this.front
         ? { width: this.front.canvas.width, height: this.front.canvas.height }
@@ -147,7 +149,13 @@ class ManualPresentationSession {
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
     const prepared = await this.renderer.prepare(
-      this.current.scene,
+      this.current.scene.captions && this.current.scene.webcam
+        ? {
+            ...this.current.scene,
+            webcamDuration:
+              this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
+          }
+        : this.current.scene,
       this.current.dimensions,
       signal
     );
@@ -164,7 +172,7 @@ class ManualPresentationSession {
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
-    return captureReviewPreviewFrame({
+    const captured = captureReviewPreviewFrame({
       video,
       description: this.current,
       sequence: this.sequence,
@@ -182,7 +190,26 @@ class ManualPresentationSession {
           this.admission.cameraResources
         ),
     });
+    if (!captured) {
+      if (
+        this.sourceFrameCallback === null &&
+        typeof video.requestVideoFrameCallback === 'function'
+      )
+        this.sourceFrameCallback = video.requestVideoFrameCallback(() => {
+          this.sourceFrameCallback = null;
+          this.ready();
+        });
+      throw new PendingPresentation();
+    }
+    this.cancelSourceFrameCallback();
+    return captured;
   };
+
+  private cancelSourceFrameCallback() {
+    if (this.sourceFrameCallback === null) return;
+    this.video?.cancelVideoFrameCallback(this.sourceFrameCallback);
+    this.sourceFrameCallback = null;
+  }
 
   private render = (prepared: Prepared, frame: RenderFrame) => {
     const completed = this.renderer.render(prepared, frame);
@@ -297,6 +324,7 @@ class ManualPresentationSession {
   }
 
   retry() {
+    this.cancelSourceFrameCallback();
     this.waiting = false;
     this.scheduler.invalidate();
     this.renderer.dispose();
@@ -309,6 +337,7 @@ class ManualPresentationSession {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.cancelSourceFrameCallback();
     this.scheduler.dispose();
     for (const event of ['loadeddata', 'seeked', 'timeupdate'])
       this.video?.removeEventListener(event, this.ready);

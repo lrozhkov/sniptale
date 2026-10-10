@@ -36,6 +36,7 @@ export interface PresentationInput {
 
 /** FPS counts completed manual publications; native transport statistics are a separate contract. */
 export interface ReviewPreviewPresentationStatus {
+  captionConflicts?: Prepared['captionConflicts'];
   phase: 'inactive' | 'pending' | 'ready' | 'failed';
   actualRaster: Size | null;
   presentedFPS: number | null;
@@ -67,10 +68,10 @@ export function resolvePresentationDescription(
 ): StableDescription {
   const scene: Scene = {
     ...input.scene,
-    // Live editor comments include non-exported comments; this is a disposable snapshot only.
+    // Live overlays retain burn-in authority so caption admission ignores editor-only comments.
+    showEditorComments: true,
     comments: input.scene.comments.map((comment) => ({
       ...comment,
-      renderToVideo: true,
       position: comments[comment.id] ?? comment.position,
     })),
   };

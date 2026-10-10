@@ -6,6 +6,7 @@ import { createNewWorkspacePresentationSettings } from '../../features/video/rev
 import { planPresentationPreview } from '../../features/video/review/presentation-preview';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { parseReviewProvenance } from '../../features/video/review/provenance';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 const io = vi.hoisted(() => ({
   open: vi.fn(),
@@ -209,6 +210,7 @@ afterEach(() => vi.restoreAllMocks());
 
 it('renders the complete rational sequence with explicit geometry and a partial final video sample', async () => {
   const args = fixture();
+  args.captionTimeMap = buildReviewTimeMap(args.index.duration, []);
   args.index.frameRate = 30000 / 1001;
   const result = await writeReviewPresentationFrames(args);
   expect(result.resultDuration).toBe(3.105);
@@ -218,6 +220,7 @@ it('renders the complete rational sequence with explicit geometry and a partial 
     expect.objectContaining({
       plan: expect.objectContaining({ rate: { numerator: 30000, denominator: 1001 } }),
       main: expect.objectContaining({
+        captionTimeMap: args.captionTimeMap,
         dimensions: {
           canonical: { width: 320, height: 180 },
           backing: { width: 320, height: 180 },

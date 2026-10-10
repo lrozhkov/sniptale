@@ -19,6 +19,7 @@ import {
 import type { PreviewRenderAllocationInput } from './preview-render-allocation';
 import type { ReviewMediaIndex } from './media-index';
 import { QuickEditExportUnavailable } from './export-unavailable';
+import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
 
 type Renderer = ReturnType<typeof createReviewPreviewRenderer>;
 type Scene = Parameters<Renderer['prepare']>[0];
@@ -30,6 +31,7 @@ export interface ReviewPresentationMainInput {
   file: Blob;
   index: ReviewMediaIndex;
   edits: readonly ReviewEdit[];
+  captionTimeMap?: readonly ReviewTimeSegment[];
   effective: ReturnType<typeof resolveQuickEditEffectiveState>;
   comments?: readonly CanvasCommentExport[];
   clickCues?: readonly ReviewClickCue[];
@@ -154,6 +156,17 @@ class PresentationMain {
       comments: (this.args.comments ?? []).filter((comment) => comment.renderToVideo),
       keys: this.args.keyCues ?? [],
       clicks: this.args.clickCues ?? [],
+      ...(effective.captions
+        ? {
+            captions: {
+              document: effective.text,
+              settings: effective.captions,
+              segments:
+                this.args.captionTimeMap ??
+                buildReviewTimeMap(this.args.index.duration, this.args.edits),
+            },
+          }
+        : {}),
     };
     this.sink = createReviewDecodedSampleSink(new VideoSampleSink(video), signal);
     this.transitionSink = createReviewDecodedSampleSink(new VideoSampleSink(video), signal);
@@ -170,6 +183,22 @@ class PresentationMain {
       this.camera = camera;
     }
     signal.throwIfAborted();
+    if (effective.captions) {
+      this.scene = { ...this.scene, webcamDuration: this.camera?.duration };
+      if (this.args.fragmentOffset > 0 && !this.args.captionTimeMap)
+        throw new Error('Fragment captions require the full document time map.');
+      const prepared = await this.renderer.prepare(this.scene, this.args.dimensions, signal);
+      try {
+        this.assets = prepared.allocationAssets;
+        const end = this.args.fragmentOffset + this.segments.at(-1)!.resultEnd;
+        const conflicts = prepared.captionConflicts.filter(
+          (entry) => entry.start < end && this.args.fragmentOffset < entry.end
+        );
+        if (conflicts.length) throw new QuickEditExportUnavailable(['caption-layout'], conflicts);
+      } finally {
+        prepared.release();
+      }
+    }
   }
 
   private map(candidate: PresentationCandidate, heldMainLocalTime: number | undefined) {

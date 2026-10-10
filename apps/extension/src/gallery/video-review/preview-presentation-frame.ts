@@ -14,7 +14,15 @@ export function captureReviewPreviewFrame(args: {
   reserveSource(bytes: number): { release(): void };
   captureCamera(): ReviewWebcamFrameLease | undefined;
 }) {
-  const source = new VideoFrame(args.video);
+  let source: VideoFrame;
+  try {
+    source = new VideoFrame(args.video);
+  } catch (error) {
+    // Metadata readiness can precede the first capturable native frame in Chrome.
+    // Only that constructor state is transient; decoding/admission errors remain failures.
+    if (error instanceof DOMException && error.name === 'InvalidStateError') return null;
+    throw error;
+  }
   let reservation: { release(): void } | undefined;
   let camera: ReviewWebcamFrameLease | undefined;
   const release = () => {

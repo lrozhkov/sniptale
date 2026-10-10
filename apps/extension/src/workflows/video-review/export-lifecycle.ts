@@ -452,6 +452,7 @@ async function renderPreparedReviewExport(
         index,
         edits,
         advanced,
+        captionTimeMap: buildReviewTimeMap(index.duration, document.edits),
         ...reviewExportPresentations(original.telemetry, advanced, index.duration, document.edits),
         comments: resolveQuickEditEffectiveFeatures(advanced).overlaysVisible
           ? resolveOverlayComments(document)

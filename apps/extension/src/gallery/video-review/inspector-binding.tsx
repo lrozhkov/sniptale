@@ -73,6 +73,7 @@ type InspectorState = Pick<
   | 'setBackground'
   | 'previewBackground'
   | 'setCanvas'
+  | 'setCaptions'
   | 'setWindowHeader'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
@@ -442,6 +443,8 @@ function ReviewScenePropertiesBinding({
       focus={{ advanced: state.advanced, time: state.timeline.sceneOutputTime }}
       background={state.advanced.background}
       canvas={state.advanced.canvas}
+      captions={state.advanced.captions}
+      onCaptions={state.setCaptions}
       source={source}
       onCanvas={state.setCanvas}
       presentation={{

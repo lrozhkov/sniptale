@@ -7,6 +7,9 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
+import type { ReviewCaptionConflict } from '../../features/video/review/caption-plan';
+import { createReviewCaptionSettings } from '../../features/video/review/text-document';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 const io = vi.hoisted(() => ({
   samples: [] as {
@@ -27,6 +30,7 @@ const io = vi.hoisted(() => ({
   decode: true,
   missingSample: false,
   allocation: 4096,
+  captionConflicts: [] as ReviewCaptionConflict[],
 }));
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
@@ -78,6 +82,7 @@ vi.mock('./render-preview', async (importOriginal) => {
             prepare: async (...input: unknown[]) => {
               await io.prepare(...input);
               return {
+                captionConflicts: io.captionConflicts,
                 allocationAssets: {
                   headerBitmap: null,
                   backgroundBitmap: null,
@@ -147,6 +152,7 @@ beforeEach(() => {
   io.decode = true;
   io.missingSample = false;
   io.allocation = 4096;
+  io.captionConflicts = [];
   io.prepare.mockResolvedValue(undefined);
   io.audio.mockResolvedValue(null);
   io.render.mockImplementation(() => undefined);
@@ -448,4 +454,39 @@ it('starts a retained interval at its first representable source tick after a fr
   const frame = await owner.render(candidate(0));
   expect(io.times).toEqual([0.501]);
   frame.release();
+});
+
+it('prepares caption layout before publishing main frames and forwards the authoritative global time map', async () => {
+  const args = fixture();
+  args.effective.captions = { ...createReviewCaptionSettings(), enabled: true };
+  args.effective.text = { version: 1, fragments: [] };
+  args.captionTimeMap = buildReviewTimeMap(10, []);
+  const owner = await open(args);
+  expect(io.prepare).toHaveBeenCalledOnce();
+  expect(io.prepare.mock.calls[0]![0]).toMatchObject({
+    captions: {
+      document: args.effective.text,
+      settings: args.effective.captions,
+      segments: args.captionTimeMap,
+    },
+  });
+  const frame = await owner.render(candidate(1));
+  expect(io.render.mock.calls[0]![0]).toMatchObject({ resultTime: 8 });
+  frame.release();
+});
+
+it('refuses main caption conflicts and admits conflicts outside the export', async () => {
+  const args = fixture();
+  args.effective.captions = { ...createReviewCaptionSettings(), enabled: true };
+  args.effective.text = { version: 1, fragments: [] };
+  args.captionTimeMap = buildReviewTimeMap(10, []);
+  io.captionConflicts = [{ fragmentId: 'caption', reason: 'space', start: 8, end: 9 }];
+  await expect(open(args)).rejects.toMatchObject({
+    reasons: ['caption-layout'],
+    captionConflicts: io.captionConflicts,
+  });
+  expect(io.render).not.toHaveBeenCalled();
+  expect(io.inputs.every((input) => input.dispose.mock.calls.length > 0)).toBe(true);
+  io.captionConflicts = [{ fragmentId: 'outside', reason: 'space', start: 0, end: 2 }];
+  await expect(open(args)).resolves.toBeDefined();
 });

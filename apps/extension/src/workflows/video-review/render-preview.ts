@@ -42,6 +42,8 @@ import {
   type ReviewTransitionFrames,
 } from './cut-transition-frames';
 import { QuickEditExportUnavailable } from './export-unavailable';
+import { prepareReviewCaptions } from './render-captions';
+import { reviewCaptionReservations } from './caption-reservations';
 
 type Size = { width: number; height: number };
 type Drawable = {
@@ -79,6 +81,7 @@ type Prepared = {
   generation: number;
   watermarkBounds: NonNullable<Assets['watermark']>['bounds'];
   allocationAssets: PreviewRenderAllocationInput['assets'];
+  captionConflicts: Awaited<ReturnType<typeof prepareReviewCaptions>>['plan']['conflicts'];
   release(): void;
 };
 type Allocation = {
@@ -86,6 +89,7 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  captions: Awaited<ReturnType<typeof prepareReviewCaptions>> | null;
   allocation: PreviewRenderAllocationInput['assets'];
   background: ImageBitmap | null;
   header: ImageBitmap | null;
@@ -101,6 +105,7 @@ function validSize(size: Size) {
 }
 
 function disposeAssets(assets: Assets) {
+  assets.captions = null;
   assets.watermark?.dispose();
   assets.watermark = null;
   assets.background?.close();
@@ -230,6 +235,23 @@ async function prepareAssets(
   signal.throwIfAborted();
   if (document.fonts) await document.fonts.ready;
   signal.throwIfAborted();
+  if (scene.captions) {
+    admit(Boolean(scene.captions.settings?.enabled));
+    assets.captions = await prepareReviewCaptions({
+      ...scene.captions,
+      output: dimensions.canonical,
+      signal,
+      resources,
+      reservations: (context) =>
+        reviewCaptionReservations({
+          scene,
+          context,
+          output: dimensions.canonical,
+          watermarkBounds: assets.watermark?.bounds ?? { x: 0, y: 0, width: 0, height: 0 },
+        }),
+    });
+    admit(false);
+  }
 }
 
 function drawPreparedFrame(
@@ -278,9 +300,11 @@ function drawPreparedFrame(
         headerImage: assets.header,
         sample,
         deferComments: true,
-        comments: scene.comments.filter((comment) =>
-          isCanvasCommentVisibleAt(comment, frame.sourceTime)
-        ),
+        comments: scene.comments
+          .filter((comment) => isCanvasCommentVisibleAt(comment, frame.sourceTime))
+          .map((comment) =>
+            scene.showEditorComments ? { ...comment, renderToVideo: true } : comment
+          ),
         sourceTime: frame.sourceTime,
         cameraScale: request.camera.scale,
         sceneScale: request.sceneScale,
@@ -358,6 +382,7 @@ function drawPreparedFrame(
       context.scale(request.scaleX, request.scaleY);
       drawReviewKeys(context, scene.keys, frame.resultTime, dimensions.canonical);
       assets.watermark?.draw(context);
+      assets.captions?.draw(context, frame.resultTime);
     } finally {
       context.restore();
     }
@@ -462,6 +487,7 @@ export function createReviewPreviewRenderer(args: {
         assets.watermark?.bounds ?? { x: 0, y: 0, width: 0, height: 0 }
       ),
       allocationAssets: structuredClone(assets.allocation),
+      captionConflicts: structuredClone(assets.captions?.plan.conflicts ?? []),
       release() {
         leases.delete(handle);
         signal.removeEventListener('abort', handle.release);
@@ -491,6 +517,7 @@ export function createReviewPreviewRenderer(args: {
       signal.addEventListener('abort', abort, { once: true });
       const prepared = structuredClone({ generation: ++generation, scene, dimensions });
       const assets: Assets = {
+        captions: null,
         allocation: {
           backgroundBitmap: null,
           headerBitmap: null,
@@ -572,6 +599,7 @@ export function createReviewPreviewRenderer(args: {
           representedMediaTime: frame.source.timestamp,
           cameraMediaTime: frame.camera?.representedMediaTime ?? null,
           cameraGeneration: frame.camera?.generation ?? null,
+          captionConflicts: prepared.captionConflicts,
         };
       } catch (failure) {
         output.release();

@@ -3,7 +3,11 @@ import {
   presentationMainColor,
   type PresentationSequencePlan,
 } from '../../features/video/review/presentation-sequence';
-import { useStagePresentation, ReviewStagePresentationFeedback } from './stage-presentation';
+import {
+  useStagePresentation,
+  ReviewStagePresentationFeedback,
+  ReviewHeaderFailure,
+} from './stage-presentation';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import {
   useReviewStageGeometry,
@@ -25,7 +29,6 @@ import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { ReviewBorderOverlay } from './border-overlay';
 import { ReviewWebcamOverlay, type ReviewWebcamStageBinding } from './webcam-overlay';
 import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
-import { ReviewButton } from './controls';
 import { useReviewWindowHeader } from './use-window-header';
 import {
   ReviewCutTransitionPreview,
@@ -78,6 +81,8 @@ type ReviewStageCommentBinding = {
 };
 
 type ReviewStageProps = {
+  captions?: Parameters<typeof useStagePresentation>[0]['captions'];
+  onCaptionSelect?: ((id: string) => void) | undefined;
   preview?:
     | {
         preferences: QuickPreviewPreferences;
@@ -198,9 +203,7 @@ export function ReviewStage(props: ReviewStageProps) {
   return (
     <div
       ref={host}
-      onPointerDownCapture={(event) => {
-        if (event.button === 0) beginInteraction();
-      }}
+      onPointerDownCapture={beginInteraction}
       className="relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]
           bg-[var(--sniptale-color-surface-canvas)]"
     >
@@ -314,6 +317,8 @@ export function ReviewStage(props: ReviewStageProps) {
         <ReviewStagePresentationFeedback
           presentation={presentation}
           showFrameRate={props.preview?.preferences.showFrameRate ?? false}
+          captions={props.captions}
+          onCaptionSelect={props.onCaptionSelect}
         />
       </div>
     </div>
@@ -724,21 +729,6 @@ function ReviewRegionOverlay(props: {
             />
           ))
         : null}
-    </div>
-  );
-}
-
-/** Header loading has its own recoverable notice above the rendered scene. */
-function ReviewHeaderFailure(props: { failed: boolean; retry(): void }) {
-  if (!props.failed) return null;
-  return (
-    <div
-      role="alert"
-      className="absolute inset-x-0 top-0 z-20 flex items-center gap-2
-        bg-[var(--sniptale-color-surface-panel)] p-2 text-xs"
-    >
-      <span>{translate('gallery.videoReview.windowHeaderFailed')}</span>
-      <ReviewButton label={translate('gallery.videoReview.retry')} onClick={props.retry} />
     </div>
   );
 }

@@ -106,6 +106,7 @@ export function useReviewEditorWiring(args: {
   });
   useOriginalAudioToolLifecycle(args.activeSelection.kind, audio);
   const text = useReviewText({
+    captions: args.advanced.captions,
     document: args.advanced.text,
     snapshots: args.advanced.audio.voiceover.flatMap((clip) =>
       clip.textSnapshot ? [clip.textSnapshot] : []

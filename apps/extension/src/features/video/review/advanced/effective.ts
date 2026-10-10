@@ -26,6 +26,7 @@ interface QuickEditEffectiveFeatures {
   actionsApplied: boolean;
   webcamApplied: boolean;
   watermarkApplied: boolean;
+  captionsApplied: boolean;
   presentationApplied: boolean;
   zoomApplied: boolean;
   backgroundApplied: boolean;
@@ -53,6 +54,10 @@ export function resolveQuickEditEffectiveFeatures(
       advanced &&
       (state.watermark?.mode === 'text' ||
         (state.watermark?.mode === 'image' && !!state.watermark.image)),
+    captionsApplied:
+      advanced &&
+      !!state.captions?.enabled &&
+      !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim()),
     presentationApplied: advanced && hasPresentationEffects(state),
     actionsApplied: advanced && state.ui.tracks.actions && state.actionsEnabled !== false,
     overlaysVisible: advanced && state.ui.overlaysVisible,
@@ -75,6 +80,8 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   windowHeader: QuickEditAdvancedState['windowHeader'];
   webcam: QuickEditAdvancedState['webcam'];
   watermark: QuickEditAdvancedState['watermark'];
+  captions: QuickEditAdvancedState['captions'];
+  text: QuickEditAdvancedState['text'];
   presentation: QuickEditAdvancedState['presentation'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
@@ -98,6 +105,8 @@ export function resolveQuickEditEffectiveState(
     windowHeader: advanced ? state.windowHeader : undefined,
     webcam: features.webcamApplied ? state.webcam : undefined,
     watermark: features.watermarkApplied ? state.watermark : undefined,
+    captions: features.captionsApplied ? state.captions : undefined,
+    text: features.captionsApplied ? state.text : undefined,
     presentation:
       features.presentationApplied && state.presentation
         ? resolvePresentationSettings(state.presentation)
@@ -127,6 +136,8 @@ export type QuickEditExportReason =
   | 'window-header'
   | 'webcam'
   | 'watermark'
+  | 'captions'
+  | 'caption-layout'
   | 'presentation'
   | 'canvas-size'
   | 'precise-edits'
@@ -216,6 +227,7 @@ export function resolveQuickEditExportPlan(args: {
   if (effective.windowHeader) visual.push('window-header');
   if (effective.webcam) visual.push('webcam');
   if (features.watermarkApplied) visual.push('watermark');
+  if (features.captionsApplied) visual.push('captions');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
   if (
@@ -258,6 +270,8 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     !!state.canvas ||
     !!state.windowHeader ||
     !!state.webcam?.enabled ||
+    (!!state.captions?.enabled &&
+      !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim())) ||
     state.watermark?.mode === 'text' ||
     (state.watermark?.mode === 'image' && !!state.watermark.image) ||
     state.zoom.regions.length > 0 ||

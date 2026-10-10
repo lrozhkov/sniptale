@@ -11,6 +11,7 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewAnnotation, ReviewSource } from '../../features/video/review/types';
 import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 
 const io = vi.hoisted(() => ({
   stage: vi.fn(),
@@ -63,6 +64,36 @@ async function render(sceneActive = true) {
     )
   );
 }
+
+it('forwards caption clocks and guards conflict navigation', async () => {
+  const fragment = {
+    id: 'caption',
+    text: 'Caption',
+    originalText: 'Caption',
+    start: 1,
+    end: 3,
+    timeDomain: 'source' as const,
+    alignment: 'manual' as const,
+    revision: 0,
+    timingRevision: 0,
+    showInVideo: true,
+  };
+  state.advanced.text = { version: 1, fragments: [fragment] };
+  state.advanced.captions = { ...createReviewCaptionSettings(), enabled: true };
+  await render();
+  expect(stage().captions).toMatchObject({
+    document: state.advanced.text,
+    settings: state.advanced.captions,
+  });
+  expect(stage().captions!.segments.at(-1)!.sourceEnd).toBe(14);
+  act(() => stage().onCaptionSelect!('caption'));
+  expect(state.text.jump).toHaveBeenCalledExactlyOnceWith(fragment, true);
+  act(() => stage().onCaptionSelect!('deleted'));
+  expect(state.text.jump).toHaveBeenCalledOnce();
+  state.advanced.ui.mode = 'basic';
+  await render();
+  expect(stage().captions).toBeUndefined();
+});
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
@@ -71,6 +102,7 @@ beforeEach(() => {
   active = { kind: 'annotation', id: 'note' };
   selection = { kind: 'point', time: 0 };
   state = {
+    text: { jump: vi.fn() },
     busy: false,
     playing: false,
     voiceoverSilent: false,

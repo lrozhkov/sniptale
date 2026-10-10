@@ -19,6 +19,7 @@ const presentation = vi.hoisted(() => ({
   input: vi.fn(),
   retry: vi.fn(),
   draft: vi.fn(),
+  conflicts: [] as import('../../features/video/review/caption-plan').ReviewCaptionConflict[],
 }));
 vi.mock('./use-preview-presentation', () => ({
   useReviewPreviewPresentation: (input: unknown) => {
@@ -30,6 +31,7 @@ vi.mock('./use-preview-presentation', () => ({
         actualRaster: null,
         presentedFPS: null,
         nativeVideoFPS: null,
+        captionConflicts: presentation.conflicts,
       },
       retry: presentation.retry,
       onCommentPreview: presentation.draft,
@@ -73,6 +75,7 @@ let host: HTMLDivElement;
 
 beforeEach(() => {
   presentation.active = false;
+  presentation.conflicts = [];
   presentation.input.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
@@ -112,6 +115,8 @@ const renderStage = (
       | 'comments'
       | 'watermark'
       | 'outerFadePlan'
+      | 'captions'
+      | 'onCaptionSelect'
     >
   >
 ) => {
@@ -120,6 +125,8 @@ const renderStage = (
       <ReviewStage
         watermark={props.watermark}
         outerFadePlan={props.outerFadePlan}
+        captions={props.captions}
+        onCaptionSelect={props.onCaptionSelect}
         url="blob:review"
         source={source}
         video={{ current: null }}
@@ -147,6 +154,42 @@ const renderStage = (
       }),
   };
 };
+
+it('keeps caption conflict pointer navigation out of scene gesture preparation', async () => {
+  presentation.active = true;
+  presentation.conflicts = [{ fragmentId: 'phrase', start: 0, end: 2, reason: 'space' }];
+  const onCaptionSelect = vi.fn();
+  const stage = renderStage({
+    onCaptionSelect,
+    captions: {
+      settings: undefined,
+      segments: [],
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'phrase',
+            text: 'Long caption',
+            originalText: 'Long caption',
+            start: 0,
+            end: 2,
+            timeDomain: 'source',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  });
+  const button = host.querySelector<HTMLButtonElement>('[role="alert"] button')!;
+  await stage.event(button, 'pointerdown', 5, 5);
+  expect(presentation.input.mock.lastCall![0].interacting).toBe(false);
+  await stage.event(button, 'pointerup', 5, 5);
+  act(() => button.click());
+  expect(onCaptionSelect).toHaveBeenCalledExactlyOnceWith('phrase');
+});
 
 it('applies the scene camera transform to the video element (R05)', async () => {
   const stage = renderStage({

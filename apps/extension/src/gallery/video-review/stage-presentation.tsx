@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useState, type RefObject, type PointerEvent } from 'react';
 import { sameQuickEditCamera } from '../../features/video/review/advanced/motion-blur';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import { resolveOverlayComments } from '../../features/video/review/comments';
@@ -16,6 +16,8 @@ import type {
 type PreviewInput = Parameters<typeof useReviewPreviewPresentation>[0];
 /** Presentation input is independent of the stage component that consumes this adapter. */
 type PresentationProps = {
+  captions?: PreviewInput['scene']['captions'];
+  onCaptionSelect?: ((id: string) => void) | undefined;
   video: PreviewInput['video'];
   url: string;
   source: ReviewSource;
@@ -46,6 +48,7 @@ function stagePresentationScene(
   props: Pick<
     PresentationProps,
     | 'source'
+    | 'captions'
     | 'scene'
     | 'outerFadePlan'
     | 'watermark'
@@ -56,6 +59,7 @@ function stagePresentationScene(
   >
 ): Parameters<typeof useReviewPreviewPresentation>[0]['scene'] {
   return {
+    ...(props.captions ? { captions: props.captions } : {}),
     outerFadePlan: props.outerFadePlan,
     source: { width: props.source.width, height: props.source.height },
     ...(props.scene?.canvas ? { canvas: props.scene.canvas } : {}),
@@ -67,7 +71,7 @@ function stagePresentationScene(
     comments: resolveOverlayComments({
       canvasComments: [...(props.comments?.items ?? [])],
       annotations: [...(props.comments?.annotations ?? [])],
-    }).map((comment) => ({ ...comment, renderToVideo: true })),
+    }),
     keys: props.keyCues ?? [],
     clicks: props.clickCues ?? [],
   };
@@ -129,20 +133,75 @@ export function useStagePresentation(
   useEffect(() => {
     onRaster?.(presentation.status.actualRaster);
   }, [onRaster, presentation.status.actualRaster]);
-  return { presentation, beginInteraction: () => setInteracting(true) };
+  return {
+    presentation,
+    beginInteraction(event: PointerEvent<HTMLDivElement>) {
+      // Feedback navigation must not reprepare and unmount its own click target.
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[data-ui="gallery.videoReview.captionConflicts"]')
+      )
+        return;
+      if (event.button === 0) setInteracting(true);
+    },
+  };
 }
 
 /** Presentation feedback is independent of authored scene layers and handles. */
 export function ReviewStagePresentationFeedback({
   presentation,
   showFrameRate,
+  captions,
+  onCaptionSelect,
 }: {
   presentation: ReturnType<typeof useReviewPreviewPresentation>;
   showFrameRate: boolean;
+  captions?: PresentationProps['captions'];
+  onCaptionSelect?: PresentationProps['onCaptionSelect'];
 }) {
   const manual = presentation.active;
   return (
     <>
+      {manual &&
+        presentation.status.phase === 'ready' &&
+        !!presentation.status.captionConflicts?.length && (
+          <div
+            role="alert"
+            data-ui="gallery.videoReview.captionConflicts"
+            onPointerDown={(event) => event.stopPropagation()}
+            className={[
+              'absolute inset-x-0 top-0 z-40 max-h-32 overflow-y-auto',
+              'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
+            ].join(' ')}
+          >
+            <p>{translate('gallery.videoReview.captionConflict')}</p>
+            <p>{translate('gallery.videoReview.captionConflictHint')}</p>
+            {presentation.status.captionConflicts.some((entry) => entry.conservative) && (
+              <p>{translate('gallery.videoReview.captionConflictPossible')}</p>
+            )}
+            {[...new Set(presentation.status.captionConflicts.map((entry) => entry.fragmentId))]
+              .slice(0, 5)
+              .map((id) => {
+                const fragment = captions?.document?.fragments.find((entry) => entry.id === id);
+                return fragment && onCaptionSelect ? (
+                  <ReviewButton
+                    key={id}
+                    className="max-w-full justify-start"
+                    label={translate('gallery.videoReview.captionConflictJump').replace(
+                      '{text}',
+                      fragment.text.slice(0, 80)
+                    )}
+                    onClick={() => onCaptionSelect(id)}
+                  >
+                    <span className="min-w-0 truncate">
+                      {fragment.text.slice(0, 80)}
+                      {fragment.text.length > 80 ? '…' : ''}
+                    </span>
+                  </ReviewButton>
+                ) : null;
+              })}
+          </div>
+        )}
       {manual && presentation.status.phase !== 'ready' ? (
         <div
           role={presentation.status.phase === 'failed' ? 'alert' : 'status'}
@@ -183,5 +242,20 @@ export function ReviewStagePresentationFeedback({
         </output>
       ) : null}
     </>
+  );
+}
+
+/** Header loading has its own recoverable notice above the rendered scene. */
+export function ReviewHeaderFailure(props: { failed: boolean; retry(): void }) {
+  if (!props.failed) return null;
+  return (
+    <div
+      role="alert"
+      className="absolute inset-x-0 top-0 z-20 flex items-center gap-2
+        bg-[var(--sniptale-color-surface-panel)] p-2 text-xs"
+    >
+      <span>{translate('gallery.videoReview.windowHeaderFailed')}</span>
+      <ReviewButton label={translate('gallery.videoReview.retry')} onClick={props.retry} />
+    </div>
   );
 }

@@ -77,6 +77,7 @@ import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import type { ReviewExportClipPlan } from './audio-render';
 import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
+import { prepareReviewFinalCaptions } from './render-captions';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
@@ -110,12 +111,22 @@ export async function writeReviewFrames(
       args.signal,
       args.readProjectAsset
     );
+    if (preparation.effective.captions && args.fragmentOffset > 0 && !args.captionTimeMap)
+      throw new Error('Fragment captions require the full document time map.');
     if (preparation.effective.webcam)
       webcam = await createReviewWebcamRenderer(
         preparation.effective.webcam,
         args.readProjectAsset,
         args.signal
       );
+    const captions = await prepareReviewFinalCaptions({
+      input: args,
+      effective: preparation.effective,
+      source: { size: source.sourceSize, output: source.canvas },
+      webcamDuration: webcam?.duration,
+      watermarkBounds: watermark.bounds,
+      resultDuration: preparation.windows.at(-1)!.segment.resultEnd,
+    });
     const receipt: ReviewPacketReceipt = {
       videoPackets: 0,
       audioPackets: 0,
@@ -237,6 +248,7 @@ export async function writeReviewFrames(
         transitionFrames,
         webcam,
         watermark,
+        captions,
         videoOut,
         resultDuration: receipt.resultDuration,
         onProgress: timeTracking?.renderProgress ?? args.onProgress,
@@ -542,6 +554,7 @@ export async function renderRenderWindowFrames(args: {
   transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
   webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
   watermark?: ReviewWatermarkRenderer | null;
+  captions?: Awaited<ReturnType<typeof prepareReviewFinalCaptions>>;
   videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
   resultDuration: number;
   onProgress: ((fraction: number) => void) | undefined;
@@ -715,6 +728,7 @@ export async function renderRenderWindowFrames(args: {
         }
         drawReviewKeys(context, args.keyCues ?? [], timestamp + args.fragmentOffset, canvas);
         args.watermark?.draw(context);
+        args.captions?.draw(context, timestamp + args.fragmentOffset);
         paintReviewCutBlackout(context, canvas, blend);
         await writer.add(
           timestamp,

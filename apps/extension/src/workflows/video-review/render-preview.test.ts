@@ -8,6 +8,9 @@ import { createQuickEditWebcam } from '../../features/video/review/advanced/webc
 import { reviewCutTransitionAt } from '../../features/video/review/cuts';
 import { DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/review/advanced/spatial';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { createReviewCaptionSettings } from '../../features/video/review/text-document';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { createCanvasComment } from '../../features/video/review/comments';
 
 const io = vi.hoisted(() => ({
   order: [] as string[],
@@ -77,6 +80,11 @@ function setup() {
         scale: vi.fn(),
         drawImage: vi.fn(),
         fillRect: vi.fn(() => io.order.push('outer-fade')),
+        measureText: vi.fn((text: string) => ({ width: text.length * 8 })),
+        beginPath: vi.fn(),
+        roundRect: vi.fn(),
+        fill: vi.fn(),
+        fillText: vi.fn(() => io.order.push('captions')),
       } as unknown as CanvasRenderingContext2D;
       const release = vi.fn();
       leases.push({ release, context });
@@ -106,7 +114,64 @@ beforeEach(() => {
   io.background.mockImplementation(() => ({ draw: vi.fn(), dispose: vi.fn() }));
   io.spatial.mockImplementation(() => ({ dispose: vi.fn() }));
   io.header.mockResolvedValue({ width: 640, height: 30, close: vi.fn() });
-  vi.stubGlobal('document', { fonts: { ready: Promise.resolve() } });
+  vi.stubGlobal('document', {
+    fonts: { ready: Promise.resolve(), load: vi.fn(async () => [{ status: 'loaded' }]) },
+  });
+});
+
+it('paints cached captions before blackout and retains editor comment visibility', async () => {
+  const { resources, leases } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, readAsset: async () => null });
+  const input = scene();
+  input.showEditorComments = true;
+  input.comments = [
+    {
+      ...createCanvasComment({ id: 'editor', position: { x: 0.5, y: 0.9 } }),
+      renderToVideo: false,
+      resolvedText: 'Editor only',
+    },
+  ];
+  input.captions = {
+    settings: { ...createReviewCaptionSettings(), enabled: true },
+    segments: buildReviewTimeMap(5, []),
+    document: {
+      version: 1,
+      fragments: [
+        {
+          id: 'caption',
+          text: 'Caption',
+          originalText: 'Caption',
+          start: 0,
+          end: 5,
+          timeDomain: 'result',
+          alignment: 'manual',
+          revision: 0,
+          timingRevision: 0,
+          showInVideo: true,
+        },
+      ],
+    },
+  };
+  const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
+  expect(prepared.captionConflicts).toEqual([]);
+  const measured = leases.reduce(
+    (total, lease) => total + vi.mocked(lease.context.measureText).mock.calls.length,
+    0
+  );
+  const output = renderer.render(prepared, frame());
+  expect(io.order).toEqual(['scene', 'overlays', 'keys', 'watermark', 'captions', 'blackout']);
+  expect(io.overlays.mock.calls[0]![0].scene.comments[0].renderToVideo).toBe(true);
+  expect(input.comments[0]!.renderToVideo).toBe(false);
+  expect(
+    leases.reduce(
+      (total, lease) => total + vi.mocked(lease.context.measureText).mock.calls.length,
+      0
+    )
+  ).toBe(measured);
+  output.release();
+  prepared.release();
+  renderer.dispose();
+  expect(leases.every((lease) => lease.release.mock.calls.length === 1)).toBe(true);
 });
 afterEach(() => {
   vi.resetAllMocks();

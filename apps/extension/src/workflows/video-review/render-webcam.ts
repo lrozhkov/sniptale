@@ -195,6 +195,7 @@ export async function createReviewWebcamRenderer(
       }
     }
     return {
+      duration,
       dispose: release,
       sourceFrames,
       async *frames(

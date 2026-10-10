@@ -51,6 +51,7 @@ it.each([false, true])(
     const released = vi.fn();
     const cameraTimes: number[] = [];
     const webcam = {
+      duration: 1,
       dispose: vi.fn(),
       async *sourceFrames() {
         yield null;
