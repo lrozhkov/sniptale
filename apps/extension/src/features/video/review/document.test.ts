@@ -2,7 +2,7 @@ import { createQuickEditWatermark } from './advanced/watermark';
 import { reviewAdvancedContentBaseline } from './document';
 import { projectReviewVoiceover } from './voiceover-edits';
 import { buildReviewTimeMap } from './timeline';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { applyReviewOperation, replayReviewHistory } from './document';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import type { QuickEditAdvancedContent } from './advanced/types';
@@ -29,6 +29,55 @@ const added: ReviewOperation = {
   before: null,
   after: annotation,
 };
+
+it.each(['advancedContent', 'annotation', 'canvasComment', 'edit'] as const)(
+  'traverses the before-value once while applying a %s operation',
+  (target) => {
+    const document = replayReviewHistory([], 0, source);
+    let operation: ReviewOperation;
+    if (target === 'advancedContent') {
+      const before = createQuickEditAdvancedContent();
+      const after = {
+        ...before,
+        audio: { ...before.audio, original: { ...before.audio.original, muted: true } },
+      };
+      document.advancedContent = structuredClone(before);
+      operation = { id: 'change', at: 1, target, before, after };
+    } else if (target === 'annotation') {
+      document.annotations = [structuredClone(annotation)];
+      operation = { ...added, before: annotation, after: { ...annotation, text: 'Changed' } };
+    } else if (target === 'canvasComment') {
+      const before = createCanvasComment({ id: 'comment', at: 2 });
+      document.canvasComments = [structuredClone(before)];
+      operation = { id: 'change', at: 1, target, before, after: { ...before, text: 'Changed' } };
+    } else {
+      const before = {
+        id: 'cut',
+        kind: 'cut' as const,
+        start: 2,
+        end: 3,
+        requestedStart: 2,
+        requestedEnd: 3,
+      };
+      document.edits = [structuredClone(before)];
+      operation = {
+        id: 'change',
+        at: 1,
+        target,
+        before,
+        after: { ...before, end: 4, requestedEnd: 4 },
+      };
+    }
+    const stringify = vi.spyOn(JSON, 'stringify');
+    try {
+      applyReviewOperation(document, operation, source);
+      expect(stringify.mock.calls.filter(([value]) => value === operation.before)).toHaveLength(1);
+      expect(stringify).toHaveBeenCalledTimes(3);
+    } finally {
+      stringify.mockRestore();
+    }
+  }
+);
 
 describe('video review history', () => {
   it('replays canvas comment operations like other targets at every cursor', () => {

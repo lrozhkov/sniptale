@@ -72,10 +72,12 @@ function replaceItem<T extends { id: string }>(items: T[], before: T | null, aft
     throw new ReviewHistoryError('identity-invalid');
   }
   const existing = items.find((item) => item.id === id) ?? null;
-  if (JSON.stringify(existing) !== JSON.stringify(before)) {
+  const existingJson = JSON.stringify(existing);
+  const beforeJson = JSON.stringify(before);
+  if (existingJson !== beforeJson) {
     throw new ReviewHistoryError('before-mismatch');
   }
-  if (JSON.stringify(before) === JSON.stringify(after)) {
+  if (beforeJson === JSON.stringify(after)) {
     throw new ReviewHistoryError('no-change');
   }
   return [...items.filter((item) => item.id !== id), ...(after ? [after] : [])].sort((a, b) =>
@@ -88,10 +90,12 @@ function replaceAdvancedContent(
   before: QuickEditAdvancedContent,
   after: QuickEditAdvancedContent
 ): QuickEditAdvancedContent {
-  if (JSON.stringify(current) !== JSON.stringify(before)) {
+  const currentJson = JSON.stringify(current);
+  const beforeJson = JSON.stringify(before);
+  if (currentJson !== beforeJson) {
     throw new ReviewHistoryError('before-mismatch');
   }
-  if (JSON.stringify(before) === JSON.stringify(after)) {
+  if (beforeJson === JSON.stringify(after)) {
     throw new ReviewHistoryError('no-change');
   }
   return after;
