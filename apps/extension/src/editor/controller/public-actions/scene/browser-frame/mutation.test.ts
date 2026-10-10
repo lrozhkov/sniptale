@@ -187,3 +187,48 @@ it('does not reinstall a header after its owner mutation token becomes stale', a
   expect(options.relayoutScene).not.toHaveBeenCalled();
   expect(effects.commitHistory).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  'does not select a hidden header when replacement is %s',
+  async (replace) => {
+    const previous = { sniptaleType: 'browser-frame', getScaledWidth: () => 400 };
+    const next = { setCoords: vi.fn() };
+    const selected = { sniptaleType: 'shape' };
+    const canvas = createCanvas(replace ? [selected, previous] : [selected]);
+    const { options, effects } = createOptions(canvas);
+    let active: unknown = selected;
+    const cleared = vi.fn();
+    canvas.remove.mockImplementation((object: unknown) => {
+      if (active === object) {
+        active = null;
+        cleared();
+      }
+      const index = canvas.getObjects().indexOf(object);
+      if (index >= 0) canvas.getObjects().splice(index, 1);
+    });
+    canvas.setActiveObject.mockImplementation((object: unknown) => {
+      active = object;
+    });
+    effects.ensureBrowserFrameOnTop.mockImplementation(() => {
+      if (active === next) {
+        active = null;
+        cleared();
+      }
+    });
+    mocks.readCurrentBrowserFrameSourceState.mockReturnValueOnce({
+      displayHeight: 300,
+      displayWidth: 400,
+      left: 10,
+      top: 40,
+    });
+    mocks.createBrowserFrameLayerObject.mockResolvedValueOnce(next);
+
+    await applyEditorBrowserFrameSettings(options);
+
+    expect(cleared).not.toHaveBeenCalled();
+    expect(canvas.setActiveObject).not.toHaveBeenCalled();
+    expect(active).toBe(selected);
+    expect(canvas.getObjects()).toEqual([selected, next]);
+    expect(effects.commitHistory).toHaveBeenCalledOnce();
+  }
+);

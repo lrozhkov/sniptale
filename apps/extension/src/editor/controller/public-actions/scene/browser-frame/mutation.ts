@@ -124,6 +124,5 @@ function replaceBrowserFrameLayer(
   } else {
     canvas.bringObjectToFront(next);
   }
-  canvas.setActiveObject(next);
   next.setCoords();
 }

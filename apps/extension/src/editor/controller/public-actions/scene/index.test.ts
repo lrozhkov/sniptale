@@ -146,7 +146,7 @@ function expectInsertedBrowserHeaderMutation(args: {
   );
   expect(args.canvas.add).toHaveBeenCalledWith(args.nextLayer);
   expect(args.canvas.bringObjectToFront).toHaveBeenCalledWith(args.nextLayer);
-  expect(args.canvas.setActiveObject).toHaveBeenCalledWith(args.nextLayer);
+  expect(args.canvas.setActiveObject).not.toHaveBeenCalled();
   expect(args.nextLayer.setCoords).toHaveBeenCalledOnce();
   expect(args.effects.ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
   expect(args.effects.commitHistory).toHaveBeenCalledOnce();
