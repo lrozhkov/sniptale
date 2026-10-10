@@ -1,55 +1,67 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { useReviewSpeech } from './use-speech';
-import type { ReviewSpeechSession } from '../../workflows/video-review/speech-publication';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import {
+  addReviewTextFragment,
+  createReviewTextDocument,
+} from '../../features/video/review/text-document';
+import { createVideoReviewSession } from '../../workflows/video-review/session';
+import type {
+  ReviewRecognitionJob,
+  ReviewRecognitionProposal,
+} from '../../workflows/video-review/recognition';
 import { translate } from '../../platform/i18n';
-const mocks = vi.hoisted(() => ({ hook: vi.fn() }));
-vi.mock('./use-speech', () => ({ useReviewSpeech: mocks.hook }));
-vi.mock('./controls', () => ({
-  ReviewDetails: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  ReviewButton: ({
-    label,
-    children,
-    ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) => (
-    <button aria-label={label} {...props}>
-      {children ?? label}
-    </button>
-  ),
-  reviewTextButtonClassName: '',
-  reviewCompactTrackButtonClassName: '',
+import { createReviewSpeechEditGuard } from './speech-edit-guard';
+const mocks = vi.hoisted(() => ({
+  prepare: vi.fn(),
+  run: vi.fn(),
+  apply: vi.fn(),
+  wasApplied: vi.fn(),
+}));
+vi.mock('../../workflows/video-review/recognition', () => ({
+  prepareReviewRecognition: mocks.prepare,
+  runReviewRecognition: mocks.run,
+  applyReviewRecognition: mocks.apply,
+  reviewRecognitionWasApplied: mocks.wasApplied,
+}));
+vi.mock('../../workflows/ai-settings/query', () => ({
+  requestAIModelSelectionBootstrap: async () => ({
+    models: [{ id: 'model', displayName: 'Model', providerId: 'provider' }],
+    providers: [{ id: 'provider', name: 'Provider' }],
+    defaultModelId: 'model',
+    chromeAiEnabled: false,
+    globalSystemPrompt: '',
+  }),
 }));
 vi.mock('../../features/ai/model-selector', () => ({
   AIModelSelector: (props: {
-    models: Array<{ id: string; displayName: string }>;
     selectedModelId: string | null;
     onSelect(id: string | null): void;
   }) => (
     <select
+      aria-label="configured model"
       value={props.selectedModelId ?? ''}
-      onChange={(event) => props.onSelect(event.target.value || null)}
+      onChange={(event) => props.onSelect(event.target.value)}
     >
-      {props.models.map((model) => (
-        <option key={model.id} value={model.id}>
-          {model.displayName}
-        </option>
-      ))}
+      <option value="model">Model</option>
     </select>
   ),
 }));
-vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/ui/product-form-controls')>()),
+vi.mock('@sniptale/ui/product-form-controls', async (original) => ({
+  ...(await original<typeof import('@sniptale/ui/product-form-controls')>()),
   ProductSelect: (props: {
     'aria-label'?: string;
-    options: Array<{ value: string; label: string }>;
     value: string;
+    disabled?: boolean;
+    options: Array<{ value: string; label: string }>;
     onChange(value: string): void;
   }) => (
     <select
       aria-label={props['aria-label']}
       value={props.value}
+      disabled={props.disabled}
       onChange={(event) => props.onChange(event.target.value)}
     >
       {props.options.map((option) => (
@@ -60,558 +72,300 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
     </select>
   ),
 }));
-vi.mock('@sniptale/ui/product-feedback/confirm-dialog', () => ({
-  ProductConfirmDialog: (props: { onConfirm(): void; onCancel(): void }) => (
-    <div role="dialog">
-      <button onClick={props.onConfirm}>confirm</button>
-      <button onClick={props.onCancel}>cancel discard</button>
-    </div>
-  ),
-}));
 import { ReviewSpeechPanel } from './speech-panel';
-let root: Root;
+let root: Root | undefined;
 let host: HTMLDivElement;
-function fixture(): ReturnType<typeof useReviewSpeech> {
-  const profile = { modelId: 'model', voiceId: 'voice', responseFormat: 'wav' as const };
-  const phrase = {
-    id: 'phrase',
-    start: 0,
-    end: 2,
-    text: 'Text',
-    originalText: 'Text',
-    revision: 0,
-    alignment: 'range' as const,
-  };
-  return {
-    target: { kind: 'voiceover', clipId: 'clip' },
-    get groups() {
-      return [{ target: this.target, assetId: 'original', transcript: this.transcript }];
-    },
-    get allPreviews() {
-      return this.previews;
-    },
-    queueProgress: null,
-    resultInterval: (start, end) => ({ start, end }),
-    nativeBounds: { start: 0, end: 4 },
-    nativeTimeAtResult: (time) => time,
-    recognitionDuration: 4,
-    selectionDuration: 2,
-    originalVolume: 0,
-    setOriginalVolume: vi.fn(),
-    selection: undefined,
-    sourceAudioAvailable: undefined,
-    patchReplacement: vi.fn(),
-    transcript: { version: 1, phrases: [phrase], replacements: [] },
-    profile,
-    modelId: 'stt',
-    catalogs: null,
-    error: null,
-    running: false,
-    saving: false,
-    originalUrl: null,
-    previews: [
-      {
-        replacement: {
-          ...phrase,
-          id: 'replacement',
-          phraseId: 'phrase',
-          assetId: '',
-          duration: 3,
-          profile,
-          textSignature: '',
-        },
-        blob: new Blob(),
-        url: 'blob:preview',
-        scope: {
-          workspaceId: 'workspace',
-          workspaceRevision: 1,
-          target: { kind: 'voiceover' as const, clipId: 'clip' },
-          assetId: 'original',
-          nativeStart: 0,
-          nativeEnd: 2,
-        },
-        staged: { id: 'preview', mimeType: 'audio/wav', size: 1 },
-        geometry: 'geometry',
-        createdAt: 0,
-        expiresAt: Date.now() + 60000,
-      },
-    ],
-    dirty: false,
-    retrySave: vi.fn(),
-    discardDraft: vi.fn(),
-    reloadModels: vi.fn(),
-    setModelId: vi.fn(),
-    changeProfile: vi.fn(),
-    recognize: vi.fn(),
-    generate: vi.fn(),
-    generateQueue: vi.fn(),
-    apply: vi.fn(),
-    cancel: vi.fn(),
-    editPhrase: vi.fn(),
-    split: vi.fn(),
-    merge: vi.fn(),
-    restore: vi.fn(),
-    isChanged: () => false,
-  };
-}
 beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 });
-afterEach(() => {
-  act(() => root.unmount());
+afterEach(async () => {
+  await act(async () => root?.unmount());
+  root = undefined;
   host.remove();
+  vi.unstubAllGlobals();
 });
-function render(
-  state: ReturnType<typeof useReviewSpeech>,
-  onJump?: (time: number) => void,
-  resultTime?: number
-) {
-  mocks.hook.mockReturnValue(state);
-  act(() =>
-    root.render(
-      <ReviewSpeechPanel
-        session={{} as ReviewSpeechSession}
-        target={state.target}
-        selection={state.selection}
-        sourceAudioAvailable={state.sourceAudioAvailable}
-        beforeAction={(action) => action()}
-        flushAdvanced={async () => undefined}
-        registerSpeechFlush={() => () => undefined}
-        tempo={1.5}
-        {...(onJump ? { onJump } : {})}
-        resultTime={resultTime}
-      />
-    )
-  );
-}
-it('sets exact native boundaries at the playhead and disables commands in an audio gap', () => {
-  const state = fixture();
-  state.nativeTimeAtResult = () => 1.234567;
-  render(state, undefined, 9);
-  expect(host.querySelector('[data-speech-active="true"]')).not.toBeNull();
-  const button = (
-    key: 'gallery.videoReview.speechStartAtPlayhead' | 'gallery.videoReview.speechEndAtPlayhead'
-  ) =>
-    Array.from(host.querySelectorAll('button')).find(
-      (node) => node.getAttribute('aria-label') === translate(key)
-    )!;
-  act(() => button('gallery.videoReview.speechStartAtPlayhead').click());
-  expect(state.editPhrase).toHaveBeenCalledWith('phrase', { start: 1.234567 });
-  act(() => button('gallery.videoReview.speechEndAtPlayhead').click());
-  expect(state.editPhrase).toHaveBeenCalledWith('phrase', { end: 1.234567 });
-  state.nativeTimeAtResult = () => null;
-  render(state, undefined, 9);
-  expect(host.querySelector('[data-speech-active="true"]')).toBeNull();
-  expect(button('gallery.videoReview.speechStartAtPlayhead').disabled).toBe(true);
-  expect(button('gallery.videoReview.speechEndAtPlayhead').disabled).toBe(true);
-});
-it('shows voiceover result timing and jumps to retained result seconds', () => {
-  const state = fixture();
-  const jump = vi.fn();
-  state.resultInterval = () => ({ start: 7.25, end: 8.5 });
-  render(state, jump);
-  expect(host.textContent).toContain('00:07.25');
-  const action = Array.from(host.querySelectorAll('button')).find(
-    (node) => node.getAttribute('aria-label') === translate('gallery.videoReview.speechJump')
-  )!;
-  act(() => action.click());
-  expect(jump).toHaveBeenCalledExactlyOnceWith(7.25);
-  state.resultInterval = () => null;
-  render(state, jump);
-  expect(host.textContent).toContain(translate('gallery.videoReview.speechRemovedInterval'));
-  expect(
-    host.querySelector(`button[aria-label="${translate('gallery.videoReview.speechJump')}"]`)
-  ).toBeNull();
-});
-it('uses the inspector sections and a single phrase without bulk controls or native audio chrome', () => {
-  render(fixture());
-  expect(host.querySelector('[data-ui="gallery.videoReview.inspectorSections"]')).not.toBeNull();
-  expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-  expect(host.querySelectorAll('audio[controls]')).toHaveLength(0);
-  expect(host.querySelector('[data-speech-phrase-id] textarea')).not.toBeNull();
-});
-it('expands one phrase and exposes selection only in explicit bulk mode', () => {
-  const state = fixture();
-  state.transcript.phrases = Array.from({ length: 12 }, (_, index) => ({
-    ...state.transcript.phrases[0]!,
-    id: `p-${index}`,
-    start: index * 2,
-    end: index * 2 + 2,
-  }));
-  render(state);
-  expect(host.querySelectorAll('[data-speech-phrase-id] textarea')).toHaveLength(1);
-  expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-  const choose = Array.from(host.querySelectorAll('button')).find(
-    (button) => button.getAttribute('data-speech-batch') === 'toggle'
-  );
-  expect(choose).toBeDefined();
-  act(() => choose!.click());
-  expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(14);
-});
-it('keeps overflow preview listenable and disables Apply', () => {
-  render(fixture());
-  expect(host.querySelector('[data-speech-phrase-id] textarea')?.getAttribute('aria-label')).toBe(
-    translate('gallery.videoReview.speechText')
-  );
-  expect(
-    Array.from(host.querySelectorAll('input'))
-      .filter((input) => input.type !== 'checkbox')
-      .every((input) => Boolean(input.getAttribute('aria-label')))
-  ).toBe(true);
-  expect(host.textContent).toContain(translate('gallery.videoReview.speechOverflow'));
-  const apply = Array.from(host.querySelectorAll('button')).find(
-    (button) => button.textContent === translate('gallery.videoReview.speechApply')
-  );
-  expect(apply?.disabled).toBe(true);
-  expect(host.querySelector('audio')?.getAttribute('src')).toBe('blob:preview');
-});
-it('exposes cancellation during a running request and retry for failed retained edits', () => {
-  const state = fixture();
-  state.running = true;
-  state.error = 'failed';
-  state.dirty = true;
-  render(state);
-  const cancel = Array.from(host.querySelectorAll('button')).find(
-    (button) => button.textContent === translate('common.actions.cancel')
-  );
-  act(() => cancel?.click());
-  expect(state.cancel).toHaveBeenCalledOnce();
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-    translate('gallery.videoReview.speechFailed')
-  );
-  expect(host.textContent).toContain(translate('gallery.videoReview.speechRetrySave'));
-});
-
-function withCatalog(state: ReturnType<typeof useReviewSpeech>) {
-  const base = {
-    chromeAiEnabled: false,
-    globalSystemPrompt: '',
-    providers: [],
-    defaultModelId: 'model',
+async function mount(withRelated = false, originalSelection?: { start: number; end: number }) {
+  const advanced = createQuickEditAdvancedState();
+  const clip = {
+    id: 'clip',
+    assetId: 'project-asset:audio',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 5,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
   };
-  state.catalogs = {
-    speech: {
-      ...base,
-      models: [
-        {
-          id: 'model',
-          providerId: 'p',
-          displayName: 'Speech',
-          modelCode: 'tts',
-          operation: 'speech',
-          audio: { speech: { voiceId: 'catalog', responseFormat: 'mp3' } },
+  advanced.audio.voiceover = [clip];
+  if (withRelated) {
+    let related = createReviewTextDocument();
+    for (const id of ['authored', 'recognized', 'unrelated']) {
+      const added = addReviewTextFragment(related, { id, text: id + ' text', start: 0, end: 2 });
+      if (!added.ok) throw new Error('fixture');
+      related = added.document;
+    }
+    advanced.text = {
+      ...related,
+      fragments: related.fragments.map((fragment) =>
+        fragment.id === 'recognized'
+          ? { ...fragment, origin: { kind: 'voiceover', clipId: 'clip', start: 0, end: 2 } }
+          : fragment
+      ),
+    };
+    advanced.audio.voiceover = [
+      {
+        ...clip,
+        textSnapshot: {
+          kind: 'ai',
+          textId: 'authored',
+          text: 'authored text',
+          revision: 0,
+          timingRevision: 0,
+          start: 0,
+          end: 2,
+          timeDomain: 'result',
         },
-      ],
+      },
+    ];
+  }
+  const session = createVideoReviewSession({
+    workspace: {
+      aggregateId: 'video',
+      sourceAssetId: 'source',
+      formatVersion: 1,
+      revision: 1,
+      source: { duration: 10, width: 640, height: 360, mimeType: 'video/webm', size: 5 },
+      advanced,
+      history: [],
+      cursor: 0,
+      createdAt: 1,
+      updatedAt: 1,
     },
-    transcription: {
-      ...base,
-      defaultModelId: 'stt',
-      models: [
-        {
-          id: 'stt',
-          providerId: 'p',
-          displayName: 'Transcribe',
-          modelCode: 'stt',
-          operation: 'transcription',
-          audio: { transcription: { responseFormat: 'json', timestampGranularity: 'none' } },
-        },
-      ],
-    },
-  };
-  return state;
-}
-function button(key: Parameters<typeof translate>[0]) {
-  return Array.from(host.querySelectorAll('button')).find(
-    (item) => item.textContent === translate(key)
-  );
-}
-function input(key: Parameters<typeof translate>[0], value: string) {
-  const element = Array.from(
-    host.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')
-  ).find((item) => item.getAttribute('aria-label') === translate(key));
-  if (!element) throw new Error(`Missing field ${key}`);
-  act(() => {
-    Object.getOwnPropertyDescriptor(
-      element instanceof HTMLTextAreaElement
-        ? HTMLTextAreaElement.prototype
-        : HTMLInputElement.prototype,
-      'value'
-    )?.set?.call(element, value);
-    element.dispatchEvent(new Event('input', { bubbles: true }));
+    draft: null,
   });
-  return element;
-}
-it('edits range-aligned phrase text and native times, splits at explicit time and merges adjacent phrases', () => {
-  const state = withCatalog(fixture());
-  const phrase = state.transcript.phrases[0]!;
-  phrase.text = 'Hello world';
-  state.transcript.phrases.push({ ...phrase, id: 'second', start: 2, end: 4 });
-  state.previews = [];
-  render(state);
-  const textarea = input('gallery.videoReview.speechText', 'Updated text');
-  expect(state.editPhrase).toHaveBeenCalledWith('phrase', { text: 'Updated text' });
-  const start = input('gallery.videoReview.speechStart', '0.25');
-  act(() => start.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
-  expect(state.editPhrase).toHaveBeenCalledWith('phrase', { start: 0.25 });
-  input('gallery.videoReview.speechSplitTime', '1.25');
-  (textarea as HTMLTextAreaElement).selectionStart = 5;
-  act(() => button('gallery.videoReview.speechSplit')?.click());
-  expect(state.split).toHaveBeenCalledWith('phrase', 5, 1.25);
-  act(() => button('gallery.videoReview.speechMerge')?.click());
-  expect(state.merge).toHaveBeenCalledWith('phrase', 'second');
-});
-it('preserves native precision on untouched blur and commits Enter once without moving focus', () => {
-  const state = withCatalog(fixture());
-  state.transcript.phrases[0]!.start = 0.123456;
-  render(state);
-  const untouched = host.querySelector<HTMLInputElement>(
-    `input[aria-label="${translate('gallery.videoReview.speechStart')}"]`
-  )!;
-  expect(untouched.value).toBe('0.12');
-  act(() => {
-    untouched.focus();
-    untouched.blur();
-  });
-  expect(state.editPhrase).not.toHaveBeenCalled();
-  const edited = input('gallery.videoReview.speechStart', '0.25');
-  act(() => {
-    edited.focus();
-    edited.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  });
-  expect(state.editPhrase).toHaveBeenCalledExactlyOnceWith('phrase', { start: 0.25 });
-  expect(document.activeElement).not.toBe(edited);
-  input('gallery.videoReview.speechStart', '0.5');
-  act(() => {
-    edited.focus();
-    edited.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-  });
-  expect(state.editPhrase).toHaveBeenCalledTimes(1);
-  expect(edited.value).toBe('0.12');
-});
-it('does not start a paid request when the provider disclosure is cancelled', () => {
-  const state = withCatalog(fixture());
-  render(state);
-  act(() => button('gallery.videoReview.speechGenerate')!.click());
-  expect(state.generate).not.toHaveBeenCalled();
-  expect(host.querySelector('[role=dialog]')).not.toBeNull();
-  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button:last-child')!.click());
-  expect(state.generate).not.toHaveBeenCalled();
-  expect(host.querySelector('[role=dialog]')).toBeNull();
-});
-it('generates selected and changed phrases, applies fit previews and restores the original', () => {
-  const state = withCatalog(fixture());
-  state.previews[0]!.replacement.duration = 1;
-  state.transcript.replacements = [state.previews[0]!.replacement];
-  state.isChanged = (id) => id === 'phrase';
-  state.transcript.phrases.push({
-    ...state.transcript.phrases[0]!,
-    id: 'second',
-    start: 2,
-    end: 4,
-  });
-  render(state);
-  act(() => host.querySelector<HTMLButtonElement>('[data-speech-batch=toggle]')?.click());
-  act(() => host.querySelector<HTMLInputElement>('input[type=checkbox]')?.click());
-  act(() => button('gallery.videoReview.speechGenerateSelected')?.click());
-  expect(state.generateQueue).not.toHaveBeenCalled();
-  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button')?.click());
-  expect(state.generateQueue).toHaveBeenCalledWith([
-    { target: state.target, phraseId: 'phrase' },
-    { target: state.target, phraseId: 'second' },
-  ]);
-  act(() => button('gallery.videoReview.speechGenerateChanged')?.click());
-  expect(state.generateQueue).toHaveBeenCalledTimes(2);
-  act(() => button('gallery.videoReview.speechApplySelected')?.click());
-  expect(state.apply).toHaveBeenCalledWith(state.previews);
-  act(() => host.querySelector<HTMLButtonElement>('[data-speech-batch=toggle]')?.click());
-  act(() => button('gallery.videoReview.speechApply')?.click());
-  expect(state.apply).toHaveBeenCalledTimes(2);
-  act(() => button('gallery.videoReview.speechGenerate')?.click());
-  expect(state.generate).toHaveBeenCalledTimes(1);
-  act(() => button('gallery.videoReview.speechRestore')?.click());
-  expect(state.restore).toHaveBeenCalledWith(['replacement']);
-  act(() => host.querySelector<HTMLButtonElement>('[data-speech-batch=toggle]')?.click());
-  act(() => host.querySelector<HTMLInputElement>('input[type=checkbox]')?.click());
-  expect(button('gallery.videoReview.speechGenerateSelected')?.disabled).toBe(true);
-});
-it('changes voice, speed, format and delivery defaults without starting a paid request', () => {
-  const state = withCatalog(fixture());
-  render(state);
-  input('gallery.videoReview.speechVoice', 'new voice');
-  const speed = input('gallery.videoReview.speechSpeed', '1.25');
-  expect(state.changeProfile).not.toHaveBeenCalledWith({ ...state.profile, speed: 1.25 });
-  act(() => speed.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
-  input('gallery.videoReview.speechInstructions', 'Quietly');
-  expect(state.changeProfile).toHaveBeenCalledWith({ ...state.profile, voiceId: 'new voice' });
-  expect(state.changeProfile).toHaveBeenCalledWith({ ...state.profile, speed: 1.25 });
-  expect(state.changeProfile).toHaveBeenCalledWith({ ...state.profile, instructions: 'Quietly' });
-  input('gallery.videoReview.speechSpeed', '');
-  input('gallery.videoReview.speechInstructions', '');
-  const format = Array.from(host.querySelectorAll('select')).find(
-    (item) => item.getAttribute('aria-label') === translate('gallery.videoReview.speechFormat')
-  )!;
-  act(() => {
-    format.value = 'mp3';
-    format.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  expect(state.changeProfile).toHaveBeenCalledWith({ ...state.profile, responseFormat: 'mp3' });
-  const selectors = host.querySelectorAll('select');
-  act(() => selectors[0]?.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(state.setModelId).toHaveBeenCalledWith('stt');
-  act(() => selectors[1]?.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(state.changeProfile).toHaveBeenCalledWith({
+  const guard = createReviewSpeechEditGuard(vi.fn());
+  const job: ReviewRecognitionJob = {
+    id: 'job',
+    identity: 'basis',
+    workspaceId: 'video',
+    workspaceRevision: 1,
+    geometry: 'geometry',
+    documentBasis: 'document',
+    target: originalSelection ? { kind: 'original' } : { kind: 'voiceover', clipId: 'clip' },
     modelId: 'model',
-    voiceId: 'catalog',
-    responseFormat: 'mp3',
-  });
-  expect(state.generate).not.toHaveBeenCalled();
-});
-it('plays native source bounds at clip tempo and switches generated audition in the same player', async () => {
-  const state = fixture();
-  state.originalUrl = 'blob:original';
-  render(state);
-  const media = host.querySelector<HTMLAudioElement>('audio')!;
-  const pause = vi.spyOn(media, 'pause').mockImplementation(() => undefined);
-  vi.spyOn(media, 'play').mockResolvedValue();
-  media.currentTime = 3;
-  await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.speechAudition"] button')!
-      .click()
-  );
-  expect(media.currentTime).toBe(0);
-  expect(media.playbackRate).toBe(1.5);
-  media.currentTime = 2;
-  act(() => media.dispatchEvent(new Event('timeupdate', { bubbles: true })));
-  expect(pause).toHaveBeenCalled();
-  act(() =>
-    host
-      .querySelector<HTMLButtonElement>(
-        '[data-ui="gallery.videoReview.speechAudition"] [role=group] button:last-child'
-      )!
-      .click()
-  );
-  expect(host.querySelectorAll('audio')).toHaveLength(1);
-  expect(media.getAttribute('src')).toBe('blob:preview');
-  act(() => media.dispatchEvent(new Event('loadedmetadata')));
-  expect(media.currentTime).toBe(0);
-  expect(media.playbackRate).toBe(1.5);
-});
-it.each([
-  'invalid',
-  'interrupted',
-  'canceled',
-  'duration',
-  'partial-replacement',
-  'stale',
-  'failed',
-] as const)('shows fixed %s feedback and preserves explicit retry/discard', (error) => {
-  const state = fixture();
-  state.error = error;
-  state.dirty = true;
-  render(state);
-  expect(host.querySelector('[role=alert]')).not.toBeNull();
-  act(() => button('gallery.videoReview.speechRetrySave')?.click());
-  expect(state.retrySave).toHaveBeenCalledOnce();
-  act(() => button('gallery.videoReview.speechDiscardDraft')?.click());
-  act(() =>
-    Array.from(host.querySelectorAll('[role=dialog] button'))
-      .find((item) => item.textContent === 'confirm')
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  );
-  expect(state.discardDraft).toHaveBeenCalledOnce();
-});
-it('offers recognition and model refresh for an empty transcript and names an unavailable saved model', () => {
-  const state = withCatalog(fixture());
-  state.transcript.phrases = [];
-  state.previews = [];
-  state.profile = { ...state.profile!, modelId: 'missing' };
-  render(state);
-  expect(host.textContent).toContain(translate('gallery.videoReview.speechMissingModel'));
-  expect(host.textContent).toContain(translate('gallery.videoReview.speechEmpty'));
-  act(() => button('gallery.videoReview.speechRecognize')?.click());
-  expect(state.recognize).not.toHaveBeenCalled();
-  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button')?.click());
-  expect(state.recognize).toHaveBeenCalledOnce();
-  act(() => button('gallery.videoReview.speechReloadModels')?.click());
-  expect(state.reloadModels).toHaveBeenCalledOnce();
-});
-
-it.each([
-  ['provider-auth', 'gallery.videoReview.speechProviderAuth'],
-  ['provider-rate-limit', 'gallery.videoReview.speechProviderRateLimit'],
-  ['provider-request', 'gallery.videoReview.speechProviderRequest'],
-  ['provider-not-found', 'gallery.videoReview.speechProviderNotFound'],
-  ['provider-failed', 'gallery.videoReview.speechProviderFailed'],
-  ['network-failed', 'gallery.videoReview.speechNetworkFailed'],
-  ['permission-denied', 'gallery.videoReview.speechPermissionDenied'],
-  ['model-unavailable', 'gallery.videoReview.speechModelUnavailable'],
-  ['secret-unavailable', 'gallery.videoReview.speechSecretUnavailable'],
-  ['invalid-response', 'gallery.videoReview.speechInvalidResponse'],
-  ['storage-failed', 'gallery.videoReview.speechStorageFailed'],
-  ['decode-failed', 'gallery.videoReview.speechDecodeFailed'],
-  ['unauthorized', 'gallery.videoReview.speechUnauthorized'],
-  ['invalid-request', 'gallery.videoReview.speechInvalidRequest'],
-  ['too-large', 'gallery.videoReview.speechTooLarge'],
-] as const)('renders an actionable safe message for %s', (code, key) => {
-  const state = fixture();
-  state.error = code;
-  render(state);
-  expect(host.querySelector('[role="alert"]')?.textContent).toBe(translate(key));
-});
-
-it('shows original selection recognition and addresses accepted controls by replacement identity', () => {
-  const state = fixture();
-  state.target = { kind: 'original' };
-  state.selection = { start: 1, end: 2 };
-  state.catalogs = {
-    transcription: {
-      models: [{ id: 'stt', displayName: 'STT', providerId: 'provider', modelCode: 'stt' }],
-      providers: [],
-      defaultModelId: 'stt',
-      chromeAiEnabled: false,
-      globalSystemPrompt: '',
-    },
-    speech: {
-      models: [],
-      providers: [],
-      defaultModelId: null,
-      chromeAiEnabled: false,
-      globalSystemPrompt: '',
-    },
+    approvedProviderId: 'provider',
+    grouping: 'sentences-pauses',
+    source: clip.assetId,
+    relatedIds: ['related'],
+    ranges: [{ start: 0, end: 5 }],
+    chunks: [{ range: 0, start: 0, end: 5 }],
   };
-  state.transcript.replacements = [
-    { ...state.previews[0]!.replacement, id: 'accepted-independent', phraseId: 'removed-draft' },
-  ];
-  render(state);
-  const selected = Array.from(host.querySelectorAll('button')).find(
-    (button) => button.textContent === translate('gallery.videoReview.speechRecognizeSelection')
-  )!;
-  expect(selected.disabled).toBe(false);
-  act(() => selected.click());
-  expect(state.recognize).not.toHaveBeenCalled();
-  act(() => host.querySelector<HTMLButtonElement>('[role=dialog] button')?.click());
-  expect(state.recognize).toHaveBeenCalledWith(true);
-  const accepted = host.querySelector('[data-speech-replacement-id="accepted-independent"]')!;
-  const restore = Array.from(accepted.querySelectorAll('button')).find(
-    (button) => button.textContent === translate('gallery.videoReview.speechRestorePhrase')
-  )!;
-  act(() => restore.click());
-  expect(state.restore).toHaveBeenCalledWith(['accepted-independent']);
-  const toggle = accepted.querySelector('button')!;
-  act(() => toggle.click());
-  expect(state.patchReplacement).toHaveBeenCalledWith('accepted-independent', { enabled: true });
+  let document = createReviewTextDocument();
+  for (const id of ['first', 'second']) {
+    const added = addReviewTextFragment(document, {
+      id,
+      text: id + ' phrase',
+      start: id === 'first' ? 0 : 2,
+      end: id === 'first' ? 2 : 4,
+    });
+    if (!added.ok) throw new Error('fixture');
+    document = added.document;
+  }
+  const proposal: ReviewRecognitionProposal = { job, document };
+  mocks.prepare.mockResolvedValue(job);
+  mocks.run.mockResolvedValue(proposal);
+  mocks.apply.mockResolvedValue(undefined);
+  mocks.wasApplied.mockResolvedValue(false);
+  const onSelectText = vi.fn();
+  const render = async (selection?: { start: number; end: number }) =>
+    act(async () =>
+      root!.render(
+        <ReviewSpeechPanel
+          session={session}
+          target={job.target}
+          original={
+            job.target.kind === 'original'
+              ? { file: new Blob(['source']), sourceAssetId: 'source' }
+              : undefined
+          }
+          selection={selection}
+          beforeAction={(action) => action()}
+          flushAdvanced={async () => undefined}
+          registerSpeechFlush={guard.register}
+          onSelectText={onSelectText}
+          sound={(applying) => (
+            <button disabled={applying} data-ui="gallery.videoReview.audioInspector">
+              Sound controls
+            </button>
+          )}
+        />
+      )
+    );
+  await render(originalSelection);
+  return { session, proposal, onSelectText, render };
+}
+function button(label: string) {
+  const found = Array.from(host.querySelectorAll('button')).find(
+    (node) => node.getAttribute('aria-label') === label
+  );
+  if (!found) throw new Error('Missing button: ' + label);
+  return found;
+}
+async function click(label: string) {
+  await act(async () => button(label).click());
+}
+it('keeps selected-only intent and blocks consent when the ruler interval disappears', async () => {
+  const { render } = await mount(false, { start: 1, end: 4 });
+  await click(translate('gallery.videoReview.recognitionSelection'));
+  await click(translate('gallery.videoReview.recognitionStart'));
+  expect(button(translate('gallery.videoReview.speechConsentContinue')).disabled).toBe(false);
+  await render();
+  expect(
+    button(translate('gallery.videoReview.recognitionSelection')).getAttribute('aria-checked')
+  ).toBe('true');
+  expect(button(translate('gallery.videoReview.speechConsentContinue')).disabled).toBe(true);
+  expect(host.textContent).toContain(translate('gallery.videoReview.recognitionSelectionMissing'));
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  expect(mocks.run).not.toHaveBeenCalled();
+  await click(translate('common.actions.cancel'));
+  await click(translate('gallery.videoReview.recognitionSelection'));
+  await click(translate('gallery.videoReview.recognitionStart'));
+  await click(translate('gallery.videoReview.speechConsentContinue'));
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  expect(mocks.prepare.mock.calls[0]?.[5]).not.toHaveProperty('selection');
 });
-it('keeps recognition unavailable when original has no audio', () => {
-  const state = fixture();
-  state.target = { kind: 'original' };
-  state.sourceAudioAvailable = false;
-  render(state);
-  expect(host.textContent).toContain(translate('gallery.videoReview.speechNoSourceAudio'));
-  const recognize = Array.from(host.querySelectorAll('button')).find(
-    (button) => button.textContent === translate('gallery.videoReview.speechRecognizeAll')
-  )!;
-  expect(recognize.disabled).toBe(true);
+async function recognize() {
+  await click(translate('gallery.videoReview.recognitionStart'));
+  await click(translate('gallery.videoReview.speechConsentContinue'));
+}
+it('disables selected clip sound controls only while Apply is in flight', async () => {
+  await mount();
+  await recognize();
+  const sound = () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.audioInspector"]')!;
+  expect(sound().disabled).toBe(false);
+  let release!: () => void;
+  mocks.apply.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      })
+  );
+  await click(translate('gallery.videoReview.recognitionApply'));
+  expect(sound().disabled).toBe(true);
+  await act(async () => release());
+  expect(sound().disabled).toBe(false);
+});
+it('keeps ordinary audio controls and one compact model form without requesting speech on mount', async () => {
+  await mount();
+  expect(host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')).not.toBeNull();
+  expect(button(translate('gallery.videoReview.recognitionStart'))).toBeDefined();
+  expect(host.querySelector('input[type="range"]')).toBeNull();
+  expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(0);
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  expect(host.textContent).toContain(translate('gallery.videoReview.recognitionPauseHint'));
+  expect(host.textContent).not.toContain(translate('gallery.videoReview.speechSynthesisModel'));
+});
+it('requires provider consent in the inspector and lets the user cancel before egress', async () => {
+  await mount();
+  await click(translate('gallery.videoReview.recognitionStart'));
+  expect(host.textContent).toContain('Provider');
+  expect(host.textContent).toContain('Model');
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  await click(translate('common.actions.cancel'));
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  await recognize();
+  expect(mocks.prepare.mock.calls[0]?.[3]).toBe('provider');
+  expect(host.querySelector('[data-ui="gallery.videoReview.recognitionResult"]')).not.toBeNull();
+  expect(mocks.apply).not.toHaveBeenCalled();
+  expect(host.textContent).toContain(translate('gallery.videoReview.recognitionApproximate'));
+});
+it('uses one expandable phrase and allows all phrases to be collapsed', async () => {
+  await mount();
+  await recognize();
+  const rows = () =>
+    Array.from(host.querySelectorAll('[data-ui="gallery.videoReview.textPhrase"]'));
+  const toggle = (index: number) => {
+    const node = rows()[index]?.querySelector('button[aria-expanded]');
+    if (!(node instanceof HTMLButtonElement)) throw new Error('Missing phrase toggle');
+    node.click();
+  };
+  await act(async () => toggle(0));
+  expect(host.querySelectorAll('textarea')).toHaveLength(1);
+  await act(async () => toggle(1));
+  expect(host.querySelectorAll('textarea')).toHaveLength(1);
+  expect(host.querySelector('textarea')?.value).toBe('second phrase');
+  await act(async () => toggle(1));
+  expect(host.querySelectorAll('textarea')).toHaveLength(0);
+});
+it('applies only on explicit acceptance and enables another recognition after acceptance', async () => {
+  const { proposal } = await mount();
+  await recognize();
+  expect(mocks.apply).not.toHaveBeenCalled();
+  mocks.apply.mockImplementationOnce(async () => {
+    const before = createQuickEditAdvancedState();
+    proposal.receipt = {
+      id: 'op',
+      at: 1,
+      target: 'advancedContent',
+      before,
+      after: { ...before, text: proposal.document },
+    };
+  });
+  await click(translate('gallery.videoReview.recognitionApply'));
+  expect(mocks.apply.mock.calls[0]?.[3]).toBe('add');
+  expect(host.textContent).toContain(translate('gallery.videoReview.recognitionAdded'));
+  expect(button(translate('gallery.videoReview.recognitionStart')).disabled).toBe(false);
+});
+it('requires an explicit replacement choice and preserves a failed Apply result for retry', async () => {
+  const { proposal } = await mount();
+  await recognize();
+  const mode = host.querySelector(
+    'select[aria-label="' + translate('gallery.videoReview.recognitionMode') + '"]'
+  );
+  if (!(mode instanceof HTMLSelectElement)) throw new Error('Missing application mode');
+  await act(async () => {
+    mode.value = 'replace';
+    mode.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(host.textContent).toContain(translate('gallery.videoReview.recognitionReplaceHint'));
+  mocks.apply.mockImplementationOnce(async () => {
+    const before = createQuickEditAdvancedState();
+    proposal.receipt = {
+      id: 'op',
+      at: 1,
+      target: 'advancedContent',
+      before,
+      after: { ...before, text: proposal.document },
+    };
+    throw new Error('lost acknowledgement');
+  });
+  await click(translate('gallery.videoReview.recognitionApply'));
+  expect(mocks.apply.mock.calls[0]?.[3]).toBe('replace');
+  expect(host.querySelectorAll('[data-ui="gallery.videoReview.textPhrase"]')).toHaveLength(2);
+  expect(button(translate('gallery.videoReview.recognitionApply')).disabled).toBe(false);
+  expect(button(translate('gallery.videoReview.recognitionDiscard')).disabled).toBe(true);
+  expect(host.textContent).toContain(translate('gallery.videoReview.recognitionReceiptHint'));
+});
+it('discards the disposable result without modifying canonical text', async () => {
+  const { session } = await mount();
+  await recognize();
+  await click(translate('gallery.videoReview.recognitionDiscard'));
+  expect(host.querySelector('[data-ui="gallery.videoReview.recognitionResult"]')).toBeNull();
+  expect(session.getSnapshot().document.advancedContent.text).toBeUndefined();
+  expect(mocks.apply).not.toHaveBeenCalled();
+});
+it('links both authored snapshots and recognized origins to individual canonical text', async () => {
+  const { onSelectText } = await mount(true);
+  expect(button('authored text')).toBeDefined();
+  expect(button('recognized text')).toBeDefined();
+  expect(host.querySelector('button[aria-label="unrelated text"]')).toBeNull();
+  await click('recognized text');
+  expect(onSelectText).toHaveBeenCalledWith('recognized');
+  expect(host.querySelector('[data-ui="gallery.videoReview.textDocument"]')).toBeNull();
 });

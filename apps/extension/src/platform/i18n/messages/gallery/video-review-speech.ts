@@ -1,6 +1,68 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  recognitionTitle: { ru: 'Распознавание речи', en: 'Transcription' },
+  recognitionHistoryDisclosure: {
+    ru: 'Звук и распознанный текст не сохраняются в истории AI-запросов.',
+    en: 'Audio and recognized text are not stored in AI request history.',
+  },
+  recognitionGrouping: { ru: 'Деление текста', en: 'Text grouping' },
+  recognitionSentences: { ru: 'По предложениям', en: 'By sentence' },
+  recognitionPauses: { ru: 'По предложениям и паузам', en: 'By sentence and pause' },
+  recognitionPauseHint: {
+    ru: 'Паузы от 0,45 с разделяют фразы. Тайминги сохраняют тишину между ними.',
+    en: 'Pauses of 0.45 s split phrases. Timing preserves the silence between them.',
+  },
+  recognitionSelection: { ru: 'Только выделенный интервал', en: 'Selected interval only' },
+  recognitionStart: { ru: 'Распознать речь', en: 'Transcribe speech' },
+  recognitionSaveStart: {
+    ru: 'Сохранить изменения и распознать',
+    en: 'Save changes and transcribe',
+  },
+  recognitionPreview: { ru: 'Проверка текста', en: 'Review text' },
+  recognitionEmpty: {
+    ru: 'Речь в выбранном звуке не найдена.',
+    en: 'No speech found in the selected audio.',
+  },
+  recognitionApproximate: {
+    ru: 'Часть текста привязана к диапазону без точных меток по словам. Уточните границы и деление вручную.',
+    en: 'Some text has range timing without precise word anchors. Adjust boundaries and segmentation manually.',
+  },
+  recognitionPreviewHint: {
+    ru: 'Исправьте текст и границы фраз. В проекте он появится после применения.',
+    en: 'Edit text and phrase timing. It enters the project when applied.',
+  },
+  recognitionApply: { ru: 'Применить текст', en: 'Apply text' },
+  recognitionSaveApply: {
+    ru: 'Сохранить изменения и применить текст',
+    en: 'Save changes and apply text',
+  },
+  recognitionAdded: { ru: 'Текст добавлен на дорожку', en: 'Text added to the track' },
+  recognitionDiscard: { ru: 'Отменить результат', en: 'Discard result' },
+  recognitionMode: { ru: 'Как применить', en: 'How to apply' },
+  recognitionAdd: { ru: 'Добавить новые фразы', en: 'Add new phrases' },
+  recognitionReplace: { ru: 'Заменить связанные фразы', en: 'Replace related phrases' },
+  recognitionReplaceHint: {
+    ru: 'Будут заменены только связанные фразы в распознанном интервале, включая ваши правки. Остальной текст и звук сохранятся.',
+    en: 'Only related phrases in the transcribed interval will be replaced, including your edits. Other text and audio are preserved.',
+  },
+  recognitionScopeAll: {
+    ru: 'Отправляется сохранённый звук этой дорожки, без вырезанных участков.',
+    en: 'The retained audio of this track is sent, excluding cuts.',
+  },
+  recognitionScopeSelection: {
+    ru: 'Отправляется звук выделенного интервала, без вырезанных участков.',
+    en: 'The selected audio interval is sent, excluding cuts.',
+  },
+  recognitionSelectionMissing: {
+    ru: 'Выделите интервал на шкале времени или отключите «Только выделенный интервал».',
+    en: 'Select a timeline interval or turn off “Selected interval only”.',
+  },
+  recognitionRelatedText: { ru: 'Связанный текст', en: 'Related text' },
+  recognitionReceiptHint: {
+    ru: 'Проверяем применение этого результата. Повтор не отправляет звук в API заново.',
+    en: 'Checking acceptance of this result. Retrying does not send audio to the API again.',
+  },
   textVoiceSource: { ru: 'Как озвучить', en: 'Voice source' },
   textVoiceAI: { ru: 'AI', en: 'AI' },
   textVoiceMicrophone: { ru: 'Микрофон', en: 'Microphone' },
@@ -173,7 +235,7 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
     ru: 'Несохранённый текст и параметры будут отброшены. Сохранённая версия останется.',
     en: 'Discard unsaved text and settings? The saved version will remain.',
   },
-  speechTitle: { ru: 'Текст и озвучка', en: 'Transcript and speech' },
+  speechTitle: { ru: 'Распознать речь', en: 'Transcription' },
   speechTranscriptionModel: { ru: 'Модель распознавания', en: 'Transcription model' },
   speechSynthesisModel: { ru: 'Модель озвучки', en: 'Speech model' },
   speechVoice: { ru: 'Голос', en: 'Voice' },

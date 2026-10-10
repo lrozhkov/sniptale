@@ -36,7 +36,8 @@ export function reviewSpeechChunks(
 export function reviewSpeechPhrases(
   result: AudioTranscriptResult,
   start: number,
-  end: number
+  end: number,
+  options: { splitAtPauses?: boolean } = {}
 ): ReviewSpeechPhrase[] {
   if (!result.text.trim()) return [];
   const valid = (entries: AudioTranscriptTiming[] | undefined, allowZero = false) =>
@@ -93,7 +94,7 @@ export function reviewSpeechPhrases(
       if (
         !group ||
         !previous ||
-        word.start - previous.end >= 0.45 ||
+        (options.splitAtPauses !== false && word.start - previous.end >= 0.45) ||
         /[.!?。！？]$/u.test(previous.text)
       )
         groups.push([word]);

@@ -1,31 +1,33 @@
-import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AudioLines, FileText, Mic, Sparkles } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
+import { ProductField, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { ReviewInspectorSections } from './inspector-sections';
-import { ReviewNumberRow, ReviewPreviewNumberRow } from './number-row';
-import { SpeechProfileFields } from './speech-profile';
-import { PhraseRow } from './speech-phrase';
-import { SpeechBatchWorkspace } from './speech-batch';
+import { ReviewPreviewNumberRow } from './number-row';
+import { SpeechTranscriptionModelField } from './speech-profile';
+import { ReviewTextPhrase } from './speech-phrase';
+import { useReviewText } from './use-review-text';
+import { useReviewRecognition, type ReviewRecognitionAccess } from './use-recognition';
+import type { ReviewTextFragment } from '../../features/video/review/text-document';
 import { translate } from '../../platform/i18n';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
-import { useReviewSpeech } from './use-speech';
-import { sameReviewSpeechTarget } from '../../contracts/ai/audio';
 
-type Controller = ReturnType<typeof useReviewSpeech>;
-type Props = Parameters<typeof useReviewSpeech>[0] & {
+type Props = ReviewRecognitionAccess & {
   tempo?: number;
-  sound?: ReactNode;
+  sound?: (applying: boolean) => ReactNode;
   mainVideo?: HTMLVideoElement | undefined;
   resultTime?: number | undefined;
   assetNames?: ReadonlyMap<string, { filename: string }> | undefined;
   onJump?(time: number): void;
+  onSelectText?(id: string): void;
   selectedReplacementId?: string | undefined;
   originalSpeechEnabled?: boolean;
   onToggleOriginalSpeech?(enabled: boolean): void;
 };
-const buttonClass = `${reviewTextButtonClassName} !h-auto min-h-8! whitespace-normal text-left`;
+type Recognition = ReturnType<typeof useReviewRecognition>;
+const buttonClass = reviewTextButtonClassName + ' !h-auto min-h-8! whitespace-normal text-left';
 
-/** Source gain composes with speech without changing the replacement's ducking control. */
+/** Original gain stays under the ordinary audio owner while recognition only proposes text. */
 export function ReviewOriginalSpeechPanel(
   props: Omit<Props, 'target' | 'sound'> & {
     masterAudio: { volume: number; muted: boolean };
@@ -38,7 +40,7 @@ export function ReviewOriginalSpeechPanel(
     <ReviewSpeechPanel
       {...speech}
       target={{ kind: 'original' }}
-      sound={
+      sound={(applying) => (
         <ReviewPreviewNumberRow
           label={translate('gallery.videoReview.volume')}
           unit="%"
@@ -47,529 +49,416 @@ export function ReviewOriginalSpeechPanel(
           step={1}
           precision={0}
           enterBehavior="blur"
-          disabled={masterDisabled}
+          disabled={masterDisabled || applying}
           value={masterAudio.muted ? 0 : masterAudio.volume * 100}
-          onChange={(value) => onMasterVolumeChange(value / 100)}
+          onChange={(value) => {
+            if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
+          }}
         />
-      }
+      )}
     />
   );
 }
 
-/** One speech editor serves explicit original and recorded voiceover targets. */
+/** Explicit source and selected voiceover commands share one canonical recognition workflow. */
 export function ReviewSpeechPanel(props: Props) {
-  const controller = useReviewSpeech(props);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [batch, setBatch] = useState(false);
-  const [active, setActive] = useState<string>();
-  const approved = useRef(new Set<string>());
-  const [request, setRequest] = useState<{ key: string; message: string; run(): void } | null>(
-    null
-  );
-  const authorize = (operation: 'transcription' | 'speech', run: () => void) => {
-    const catalog = controller.catalogs?.[operation];
-    const modelId =
-      operation === 'transcription' ? controller.modelId : controller.profile?.modelId;
-    const model = catalog?.models.find((entry) => entry.id === modelId);
-    if (!model) return;
-    const provider = catalog?.providers.find((entry) => entry.id === model.providerId);
-    const key = `${operation}:${model.providerId}`;
-    if (approved.current.has(key)) {
-      run();
-      return;
-    }
-    const message = translate(
-      operation === 'transcription'
-        ? 'gallery.videoReview.speechConsentAudio'
-        : 'gallery.videoReview.speechConsentText'
-    ).replace('{provider}', provider?.name ?? model.displayName);
-    setRequest({ key, message, run });
-  };
-  const speech: Controller = {
-    ...controller,
-    recognize: (selection) => authorize('transcription', () => controller.recognize(selection)),
-    generate: (ids) => authorize('speech', () => controller.generate([...ids])),
-    generateQueue: (selected) =>
-      authorize('speech', () => controller.generateQueue(structuredClone([...selected]))),
-  };
-  const section = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const node = Array.from(
-      section.current?.querySelectorAll<HTMLElement>('[data-speech-replacement-id]') ?? []
-    ).find((entry) => entry.dataset['speechReplacementId'] === props.selectedReplacementId);
-    node?.scrollIntoView({ block: 'nearest' });
-  }, [props.selectedReplacementId]);
-  const busy = speech.running || speech.saving || speech.dirty;
+  const recognition = useReviewRecognition(props);
+  const linkedTextId =
+    props.target.kind === 'voiceover'
+      ? recognition.snapshot.document.advancedContent.audio.voiceover.find(
+          (clip) => props.target.kind === 'voiceover' && clip.id === props.target.clipId
+        )?.textSnapshot?.textId
+      : undefined;
+  const related =
+    recognition.snapshot.document.advancedContent.text?.fragments.filter(
+      (fragment) =>
+        fragment.id === linkedTextId ||
+        (fragment.origin?.kind === props.target.kind &&
+          (props.target.kind === 'original' || fragment.origin.clipId === props.target.clipId))
+    ) ?? [];
   return (
     <section
-      ref={section}
       className="min-w-0 space-y-3"
       data-ui="gallery.videoReview.speechPanel"
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <SpeechFeedback speech={speech} assetNames={props.assetNames} />
-      <fieldset disabled={!!request} className="min-w-0">
-        <ReviewInspectorSections
-          sections={[
-            ...(props.sound || props.target.kind === 'original'
-              ? [
-                  {
-                    id: 'audio',
-                    label: translate('gallery.videoReview.volume'),
-                    icon: AudioLines,
-                    content: (
-                      <>
-                        {props.sound}
-                        {props.target.kind === 'original' && (
-                          <OriginalSpeechControls
-                            speech={speech}
-                            enabled={props.originalSpeechEnabled}
-                            onToggle={props.onToggleOriginalSpeech}
-                          />
-                        )}
-                      </>
-                    ),
-                  },
-                ]
-              : []),
-            {
-              id: 'recognition',
-              label: translate('gallery.videoReview.speechRecognition'),
-              icon: Mic,
-              content: (
-                <>
-                  <fieldset disabled={busy}>
-                    <SpeechProfileFields speech={speech} operation="transcription" />
-                  </fieldset>
-                  <SpeechRecognitionActions speech={speech} busy={busy} />
-                  {props.sourceAudioAvailable === false && (
-                    <p role="status" className="text-xs">
-                      {translate('gallery.videoReview.speechNoSourceAudio')}
-                    </p>
-                  )}
-                </>
-              ),
-            },
-            {
-              id: 'text',
-              label: translate('gallery.videoReview.speechTranscript'),
-              icon: FileText,
-              content: (
-                <SpeechTranscript
-                  speech={speech}
-                  props={props}
-                  selected={selected}
-                  setSelected={setSelected}
-                  batch={batch}
-                  setBatch={setBatch}
-                  active={active}
-                  setActive={setActive}
-                />
-              ),
-            },
-            {
-              id: 'synthesis',
-              label: translate('gallery.videoReview.speechSynthesis'),
-              icon: Sparkles,
-              content: (
-                <>
-                  <fieldset disabled={busy}>
-                    <SpeechProfileFields speech={speech} operation="speech" />
-                  </fieldset>
-                  {speech.profile &&
-                    speech.catalogs &&
-                    !speech.catalogs.speech.models.some(
-                      (entry) => entry.id === speech.profile?.modelId
-                    ) && <p role="status">{translate('gallery.videoReview.speechMissingModel')}</p>}
-                </>
-              ),
-            },
-          ]}
-        />
-      </fieldset>
-      {request && (
-        <ProductConfirmDialog
-          title={translate('gallery.videoReview.speechConsentTitle')}
-          message={request.message}
-          confirmText={translate('gallery.videoReview.speechConsentContinue')}
-          cancelText={translate('common.actions.cancel')}
-          onConfirm={() => {
-            approved.current.add(request.key);
-            setRequest(null);
-            request.run();
-          }}
-          onCancel={() => setRequest(null)}
-        />
-      )}
+      <ReviewInspectorSections
+        sections={[
+          ...(props.sound
+            ? [
+                {
+                  id: 'audio',
+                  label: translate('gallery.videoReview.volume'),
+                  icon: AudioLines,
+                  content: props.sound(recognition.applying),
+                },
+              ]
+            : []),
+          {
+            id: 'recognition',
+            label: translate('gallery.videoReview.recognitionTitle'),
+            icon: FileText,
+            content: (
+              <div className="min-w-0 space-y-2">
+                <RecognitionSettings recognition={recognition} access={props} />
+                <RecognitionFeedback recognition={recognition} />
+                {recognition.proposal && (
+                  <RecognitionResult
+                    key={recognition.proposal.job.id}
+                    recognition={recognition}
+                    access={props}
+                  />
+                )}
+                {related.length > 0 && props.onSelectText && (
+                  <RecognitionRelatedText
+                    fragments={related}
+                    onSelect={props.onSelectText}
+                    disabled={recognition.running}
+                  />
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
     </section>
   );
 }
 
-function SpeechTranscript({
-  speech,
-  props,
-  selected,
-  setSelected,
-  batch,
-  setBatch,
-  active,
-  setActive,
-}: {
-  speech: Controller;
-  props: Props;
-  selected: string[];
-  setSelected: React.Dispatch<React.SetStateAction<string[]>>;
-  batch: boolean;
-  setBatch: React.Dispatch<React.SetStateAction<boolean>>;
-  active: string | undefined;
-  setActive: React.Dispatch<React.SetStateAction<string | undefined>>;
+/** Related authored and recognized text share the existing compact navigation controls. */
+function RecognitionRelatedText(props: {
+  fragments: readonly ReviewTextFragment[];
+  onSelect(id: string): void;
+  disabled: boolean;
 }) {
-  const phrases = speech.transcript.phrases;
-  const opened = phrases.find((phrase) => phrase.id === active)?.id ?? phrases[0]?.id;
-  const busy = speech.running || speech.saving || speech.dirty;
-  const total = speech.groups.reduce((count, group) => count + group.transcript.phrases.length, 0);
-  const choosing = batch && total > 1;
-  const nativePlayhead =
-    props.resultTime === undefined ? null : speech.nativeTimeAtResult(props.resultTime);
+  const [limit, setLimit] = useState(50);
   return (
-    <div className="min-w-0 space-y-3">
-      {total > 1 && (
+    <div className="space-y-1">
+      <p className="text-xs">{translate('gallery.videoReview.recognitionRelatedText')}</p>
+      {props.fragments.slice(0, limit).map((fragment) => (
         <ReviewButton
-          label={translate(
-            choosing ? 'gallery.videoReview.speechBatchDone' : 'gallery.videoReview.speechBatch'
-          )}
+          key={fragment.id}
+          label={fragment.text}
           className={buttonClass}
-          data-speech-batch="toggle"
-          onClick={() => setBatch(!batch)}
+          disabled={props.disabled}
+          onClick={() => props.onSelect(fragment.id)}
         >
-          {translate(
-            choosing ? 'gallery.videoReview.speechBatchDone' : 'gallery.videoReview.speechBatch'
-          )}
+          <span className="block truncate">{fragment.text}</span>
         </ReviewButton>
-      )}
-      {choosing && (
-        <SpeechBatchWorkspace
-          speech={speech}
-          selected={selected}
-          onSelect={setSelected}
-          mainVideo={props.mainVideo}
-          assetNames={props.assetNames}
-        />
-      )}
-      {!phrases.length && <p className="text-xs">{translate('gallery.videoReview.speechEmpty')}</p>}
-      {!choosing &&
-        phrases.map((phrase, index) => {
-          const resultInterval = speech.resultInterval(phrase.start, phrase.end);
-          return (
-            <PhraseRow
-              key={phrase.id}
-              phrase={phrase}
-              index={index}
-              expanded={opened === phrase.id}
-              resultInterval={resultInterval}
-              nativePlayhead={nativePlayhead}
-              bounds={{
-                start: phrases[index - 1]?.end ?? speech.nativeBounds?.start ?? phrase.start,
-                end: phrases[index + 1]?.start ?? speech.nativeBounds?.end ?? phrase.end,
-              }}
-              next={phrases[index + 1]}
-              speech={speech}
-              tempo={props.tempo ?? 1}
-              mainVideo={props.mainVideo}
-              selected={false}
-              onToggle={() => setActive(phrase.id)}
-              {...(props.onJump && resultInterval
-                ? { onJump: () => props.onJump?.(resultInterval.start) }
-                : {})}
-              onSelect={() =>
-                setSelected((current) =>
-                  current.includes(phrase.id)
-                    ? current.filter((id) => id !== phrase.id)
-                    : [...current, phrase.id]
-                )
-              }
-            />
-          );
-        })}
-      {!choosing && !!speech.transcript.replacements.length && (
+      ))}
+      {props.fragments.length > limit && (
         <ReviewButton
-          label={translate('gallery.videoReview.speechRestore')}
+          label={translate('gallery.videoReview.textFragmentMore')}
           className={buttonClass}
-          disabled={busy}
-          onClick={() =>
-            speech.restore(speech.transcript.replacements.map((replacement) => replacement.id))
-          }
+          onClick={() => setLimit((value) => value + 50)}
         >
-          {translate('gallery.videoReview.speechRestore')}
+          {translate('gallery.videoReview.textFragmentMore')}
         </ReviewButton>
       )}
     </div>
   );
 }
 
-function SpeechFeedback({
-  speech,
-  assetNames,
-}: {
-  speech: Controller;
-  assetNames?: Props['assetNames'];
-}) {
-  const [discarding, setDiscarding] = useState(false);
-  const currentGroup = speech.queueProgress
-    ? speech.groups.find((group) =>
-        sameReviewSpeechTarget(group.target, speech.queueProgress!.current.target)
-      )
-    : undefined;
-  const currentName = currentGroup
-    ? (assetNames?.get(currentGroup.assetId)?.filename ??
-      translate(
-        currentGroup.target.kind === 'original'
-          ? 'gallery.videoReview.audioOriginal'
-          : 'gallery.videoReview.audioVoiceover'
-      ))
-    : '';
-  const errorKey = {
-    interrupted: 'gallery.videoReview.speechInterrupted',
-    invalid: 'gallery.videoReview.speechInvalid',
-    canceled: 'gallery.videoReview.speechCanceled',
-    duration: 'gallery.videoReview.speechOverflow',
-    'partial-replacement': 'gallery.videoReview.speechPartialReplacement',
-    stale: 'gallery.videoReview.speechChanged',
-    failed: 'gallery.videoReview.speechFailed',
-    timeout: 'gallery.videoReview.speechInterrupted',
-    cancelled: 'gallery.videoReview.speechCanceled',
-    'provider-auth': 'gallery.videoReview.speechProviderAuth',
-    'provider-rate-limit': 'gallery.videoReview.speechProviderRateLimit',
-    'provider-request': 'gallery.videoReview.speechProviderRequest',
-    'provider-not-found': 'gallery.videoReview.speechProviderNotFound',
-    'provider-failed': 'gallery.videoReview.speechProviderFailed',
-    'network-failed': 'gallery.videoReview.speechNetworkFailed',
-    'permission-denied': 'gallery.videoReview.speechPermissionDenied',
-    'model-unavailable': 'gallery.videoReview.speechModelUnavailable',
-    'secret-unavailable': 'gallery.videoReview.speechSecretUnavailable',
-    'invalid-response': 'gallery.videoReview.speechInvalidResponse',
-    'storage-failed': 'gallery.videoReview.speechStorageFailed',
-    'decode-failed': 'gallery.videoReview.speechDecodeFailed',
-    unauthorized: 'gallery.videoReview.speechUnauthorized',
-    'invalid-request': 'gallery.videoReview.speechInvalidRequest',
-    'too-large': 'gallery.videoReview.speechTooLarge',
+/** Source disclosure stays independent of model/provider consent and never widens a lost selection. */
+function recognitionSourceDisclosure(
+  recognition: Pick<Recognition, 'selectionOnly' | 'selectionUnavailable'>,
+  access: Pick<Props, 'target' | 'selection'>
+) {
+  return {
+    selectable:
+      access.target.kind === 'original' && !!(access.selection || recognition.selectionOnly),
+    label: recognition.selectionUnavailable
+      ? 'gallery.videoReview.recognitionSelectionMissing'
+      : recognition.selectionOnly
+        ? 'gallery.videoReview.recognitionScopeSelection'
+        : 'gallery.videoReview.recognitionScopeAll',
   } as const;
+}
+
+/** Approval is bound to the displayed provider and captured model, never inferred from a changed selector. */
+function RecognitionSettings({ recognition, access }: { recognition: Recognition; access: Props }) {
+  const [consenting, setConsenting] = useState<string | null>(null);
+  const approved = useRef(new Set<string>());
+  const model = recognition.catalogs?.transcription.models.find(
+    (entry) => entry.id === recognition.modelId
+  );
+  const provider = recognition.catalogs?.transcription.providers.find(
+    (entry) => entry.id === model?.providerId
+  );
+  const disabled = recognition.running || !!consenting;
+  const scope = recognitionSourceDisclosure(recognition, access);
+  const label = translate(
+    recognition.snapshot.autosaveEnabled
+      ? 'gallery.videoReview.recognitionStart'
+      : 'gallery.videoReview.recognitionSaveStart'
+  );
   return (
-    <>
-      {(speech.running ||
-        speech.saving ||
-        speech.dirty ||
-        (speech.queueProgress?.total ?? 0) > 1) && (
-        <div className="flex min-w-0 items-center gap-2 text-xs">
-          <p role="status" className="min-w-0 flex-1">
-            {speech.queueProgress && speech.queueProgress.total > 1
-              ? translate('gallery.videoReview.speechQueueProgress')
-                  .replace('{completed}', String(speech.queueProgress.completed))
-                  .replace('{total}', String(speech.queueProgress.total)) +
-                (speech.running && currentName ? ` · ${currentName}` : '')
-              : translate(
-                  speech.running
-                    ? 'gallery.videoReview.speechWorking'
-                    : speech.saving || speech.dirty
-                      ? 'gallery.videoReview.speechSaving'
-                      : 'gallery.videoReview.speechSaved'
-                )}
+    <div className="space-y-2">
+      <fieldset disabled={disabled} className="min-w-0 space-y-2">
+        <SpeechTranscriptionModelField speech={recognition} />
+        <ProductField label={translate('gallery.videoReview.recognitionGrouping')}>
+          <ProductSelect
+            aria-label={translate('gallery.videoReview.recognitionGrouping')}
+            value={recognition.grouping}
+            options={[
+              { value: 'sentences', label: translate('gallery.videoReview.recognitionSentences') },
+              {
+                value: 'sentences-pauses',
+                label: translate('gallery.videoReview.recognitionPauses'),
+              },
+            ]}
+            onChange={(value) => {
+              if (value === 'sentences' || value === 'sentences-pauses')
+                recognition.setGrouping(value);
+            }}
+          />
+        </ProductField>
+        {recognition.grouping === 'sentences-pauses' && (
+          <p className="text-xs">{translate('gallery.videoReview.recognitionPauseHint')}</p>
+        )}
+        {scope.selectable && (
+          <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
+            <span>{translate('gallery.videoReview.recognitionSelection')}</span>
+            <ProductGlassSwitch
+              role="switch"
+              aria-checked={recognition.selectionOnly}
+              on={recognition.selectionOnly}
+              onClick={() => recognition.setSelectionOnly(!recognition.selectionOnly)}
+              aria-label={translate('gallery.videoReview.recognitionSelection')}
+            />
+          </div>
+        )}
+        <p className="text-xs">{translate(scope.label)}</p>
+        {!recognition.snapshot.autosaveEnabled && (
+          <p className="text-xs">{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
+        )}
+        <div className="flex flex-wrap gap-1">
+          <ReviewButton
+            label={label}
+            className={buttonClass}
+            disabled={
+              !model ||
+              !provider ||
+              access.sourceAudioAvailable === false ||
+              recognition.selectionUnavailable
+            }
+            onClick={() => {
+              if (!provider) return;
+              if (approved.current.has(provider.id)) recognition.recognize(provider.id);
+              else setConsenting(provider.id);
+            }}
+          >
+            {label}
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.speechReloadModels')}
+            className={buttonClass}
+            onClick={() => {
+              recognition.clearError();
+              recognition.reloadModels();
+            }}
+          >
+            {translate('gallery.videoReview.speechReloadModels')}
+          </ReviewButton>
+        </div>
+      </fieldset>
+      {consenting && provider && (
+        <div className="space-y-2 rounded border border-[var(--sniptale-color-border-soft)] p-2 text-xs">
+          <p>
+            {translate('gallery.videoReview.speechConsentAudio').replace(
+              '{provider}',
+              provider.name
+            )}{' '}
+            · {model?.displayName}
           </p>
-          {speech.running && (
+          <p>{translate('gallery.videoReview.recognitionHistoryDisclosure')}</p>
+          <div className="flex flex-wrap gap-1">
+            <ReviewButton
+              label={translate('gallery.videoReview.speechConsentContinue')}
+              className={buttonClass}
+              disabled={
+                consenting !== provider.id ||
+                recognition.running ||
+                recognition.selectionUnavailable
+              }
+              onClick={() => {
+                if (consenting !== provider.id) return;
+                approved.current.add(provider.id);
+                setConsenting(null);
+                recognition.recognize(provider.id);
+              }}
+            >
+              {translate('gallery.videoReview.speechConsentContinue')}
+            </ReviewButton>
             <ReviewButton
               label={translate('common.actions.cancel')}
-              className={reviewTextButtonClassName}
-              onClick={speech.cancel}
-            />
+              className={buttonClass}
+              onClick={() => setConsenting(null)}
+            >
+              {translate('common.actions.cancel')}
+            </ReviewButton>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecognitionFeedback({ recognition }: { recognition: Recognition }) {
+  return (
+    <>
+      {recognition.running && (
+        <div role="status" className="flex flex-wrap items-center gap-2 text-xs">
+          <LoaderCircle size={14} className="animate-spin" />
+          {translate('gallery.videoReview.textVoiceWaiting').replace(
+            '{seconds}',
+            String(recognition.elapsed)
+          )}
+          <span>
+            {recognition.completed} / {recognition.total}
+          </span>
+          {!recognition.applying && (
+            <ReviewButton
+              label={translate('common.actions.cancel')}
+              className={buttonClass}
+              onClick={recognition.cancel}
+            >
+              {translate('common.actions.cancel')}
+            </ReviewButton>
           )}
         </div>
       )}
-      {speech.error ? (
-        <div role="alert" className="text-xs text-[var(--sniptale-color-danger-text)]">
-          {translate(errorKey[speech.error])}
-          {speech.dirty ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.speechRetrySave')}
-              className={buttonClass}
-              onClick={speech.retrySave}
-            >
-              {translate('gallery.videoReview.speechRetrySave')}
-            </ReviewButton>
-          ) : null}
-        </div>
-      ) : null}
-      {speech.dirty && !speech.saving ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.speechDiscardDraft')}
-          className={buttonClass}
-          onClick={() => setDiscarding(true)}
-        >
-          {translate('gallery.videoReview.speechDiscardDraft')}
-        </ReviewButton>
-      ) : null}
-      {discarding ? (
-        <ProductConfirmDialog
-          title={translate('gallery.videoReview.speechDiscardDraft')}
-          message={translate('gallery.videoReview.speechDiscardConfirm')}
-          confirmText={translate('gallery.videoReview.speechDiscardDraft')}
-          cancelText={translate('common.actions.cancel')}
-          onConfirm={() => {
-            speech.discardDraft();
-            setDiscarding(false);
-          }}
-          onCancel={() => setDiscarding(false)}
-        />
-      ) : null}
+      {recognition.error && (
+        <p role="alert" className="text-xs">
+          {translate(
+            recognition.error === 'selection'
+              ? 'gallery.videoReview.recognitionSelectionMissing'
+              : recognition.error === 'stale'
+                ? 'gallery.videoReview.speechChanged'
+                : recognition.error === 'model'
+                  ? 'gallery.videoReview.speechMissingModel'
+                  : 'gallery.videoReview.speechFailed'
+          )}
+        </p>
+      )}
     </>
   );
 }
 
-function OriginalSpeechControls({
-  speech,
-  enabled,
-  onToggle,
-}: {
-  speech: Controller;
-  enabled: boolean | undefined;
-  onToggle: ((enabled: boolean) => void) | undefined;
-}) {
-  const busy = speech.running || speech.saving || speech.dirty;
-  return (
-    <div className="space-y-3 border-t border-[var(--sniptale-color-border-soft)] pt-3">
-      <ReviewNumberRow
-        disabled={busy}
-        label={translate('gallery.videoReview.speechOriginalUnderNew')}
-        unit="%"
-        min={0}
-        max={100}
-        step={1}
-        precision={0}
-        value={speech.originalVolume * 100}
-        onChange={(value) => speech.setOriginalVolume(value / 100)}
-      />
-      {speech.transcript.replacements.length ? (
-        <>
-          {onToggle ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.speechRevoice')}
-              className={buttonClass}
-              aria-pressed={enabled !== false}
-              disabled={busy}
-              onClick={() => onToggle(enabled === false)}
-            >
-              {translate(
-                enabled === false
-                  ? 'gallery.videoReview.speechEnableRevoice'
-                  : 'gallery.videoReview.speechDisableRevoice'
-              )}
-            </ReviewButton>
-          ) : null}
-          {speech.transcript.replacements.map((replacement) => (
-            <article
-              key={replacement.id}
-              className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-2"
-              data-speech-replacement-id={replacement.id}
-            >
-              <p className="text-xs">{replacement.text}</p>
-              <div className="flex flex-wrap gap-1">
-                <ReviewButton
-                  className={buttonClass}
-                  label={translate('gallery.videoReview.speechToggleReplacement')}
-                  aria-pressed={'enabled' in replacement && replacement.enabled === true}
-                  disabled={busy}
-                  onClick={() =>
-                    speech.patchReplacement(replacement.id, {
-                      enabled: !('enabled' in replacement && replacement.enabled === true),
-                    })
-                  }
-                >
-                  {translate(
-                    'enabled' in replacement && replacement.enabled === true
-                      ? 'gallery.videoReview.speechDisableRevoice'
-                      : 'gallery.videoReview.speechEnableRevoice'
-                  )}
-                </ReviewButton>
-                <ReviewButton
-                  className={buttonClass}
-                  label={translate('gallery.videoReview.speechRestorePhrase')}
-                  disabled={busy}
-                  onClick={() => speech.restore([replacement.id])}
-                >
-                  {translate('gallery.videoReview.speechRestorePhrase')}
-                </ReviewButton>
-              </div>
-              <ReviewNumberRow
-                disabled={busy}
-                label={translate('gallery.videoReview.speechOriginalUnderNew')}
-                unit="%"
-                min={0}
-                max={100}
-                step={1}
-                precision={0}
-                value={
-                  'originalVolume' in replacement && typeof replacement.originalVolume === 'number'
-                    ? replacement.originalVolume * 100
-                    : 0
-                }
-                onChange={(value) =>
-                  speech.patchReplacement(replacement.id, { originalVolume: value / 100 })
-                }
-              />
-            </article>
-          ))}
-        </>
-      ) : null}
-    </div>
+/** Existing phrase editing mutates only the disposable proposal; one accordion keeps large results compact. */
+function RecognitionResult({ recognition, access }: { recognition: Recognition; access: Props }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [limit, setLimit] = useState(50);
+  const editor = useReviewText({
+    document: recognition.proposal?.document,
+    setText: recognition.setText,
+    sourceDuration: recognition.snapshot.snapshot.workspace.source.duration,
+    edits: recognition.snapshot.document.edits,
+    sourceTime: access.mainVideo?.currentTime ?? 0,
+    select: () => undefined,
+    seek: (time) => access.onJump?.(time),
+    pause: () => access.mainVideo?.pause(),
+  });
+  const proposal = recognition.proposal;
+  if (!proposal) return null;
+  const busy = recognition.running || recognition.accepted || !!proposal.receipt;
+  const applyLabel = translate(
+    recognition.snapshot.autosaveEnabled
+      ? 'gallery.videoReview.recognitionApply'
+      : 'gallery.videoReview.recognitionSaveApply'
   );
-}
-
-function SpeechRecognitionActions({ speech, busy }: { speech: Controller; busy: boolean }) {
   return (
-    <div className="flex flex-wrap gap-1">
-      <ReviewButton
-        label={translate(
-          speech.target.kind === 'original'
-            ? 'gallery.videoReview.speechRecognizeAll'
-            : 'gallery.videoReview.speechRecognize'
-        )}
-        className={buttonClass}
-        disabled={
-          busy ||
-          speech.sourceAudioAvailable === false ||
-          (speech.target.kind === 'original' && speech.recognitionDuration <= 0) ||
-          !speech.catalogs?.transcription.models.some((model) => model.id === speech.modelId)
-        }
-        onClick={() => speech.recognize()}
-      >
-        {translate(
-          speech.target.kind === 'original'
-            ? 'gallery.videoReview.speechRecognizeAll'
-            : 'gallery.videoReview.speechRecognize'
-        )}
-      </ReviewButton>
-      {speech.target.kind === 'original' && speech.selection ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.speechRecognizeSelection')}
-          className={buttonClass}
-          disabled={
-            busy ||
-            speech.sourceAudioAvailable === false ||
-            speech.selectionDuration <= 0 ||
-            !speech.catalogs?.transcription.models.some((model) => model.id === speech.modelId)
+    <section className="min-w-0 space-y-2" data-ui="gallery.videoReview.recognitionResult">
+      <p className="text-xs">{translate('gallery.videoReview.recognitionPreviewHint')}</p>
+      {editor.document.fragments.some((fragment) => fragment.alignment !== 'word') && (
+        <p className="text-xs">{translate('gallery.videoReview.recognitionApproximate')}</p>
+      )}
+      {!editor.document.fragments.length && (
+        <p role="status" className="text-xs">
+          {translate('gallery.videoReview.recognitionEmpty')}
+        </p>
+      )}
+      {editor.error && (
+        <p role="alert" className="text-xs">
+          {translate('gallery.videoReview.textFragmentInvalid')}
+        </p>
+      )}
+      {editor.document.fragments.slice(0, limit).map((fragment, index) => (
+        <ReviewTextPhrase
+          key={fragment.id}
+          fragment={fragment}
+          next={editor.document.fragments[index + 1]}
+          editor={editor}
+          expanded={expanded === fragment.id}
+          index={index}
+          busy={busy}
+          limit={
+            fragment.timeDomain === 'source'
+              ? recognition.snapshot.snapshot.workspace.source.duration
+              : editor.projection.resultDuration
           }
-          onClick={() => speech.recognize(true)}
+          onToggle={() => setExpanded((current) => (current === fragment.id ? null : fragment.id))}
+          onJump={() => {
+            access.mainVideo?.pause();
+            access.onJump?.(editor.sourceInterval(fragment).start);
+          }}
+        />
+      ))}
+      {editor.document.fragments.length > limit && (
+        <ReviewButton
+          label={translate('gallery.videoReview.textFragmentMore')}
+          className={buttonClass}
+          onClick={() => setLimit((current) => current + 50)}
         >
-          {translate('gallery.videoReview.speechRecognizeSelection')}
+          {translate('gallery.videoReview.textFragmentMore')}
         </ReviewButton>
-      ) : null}
-      <ReviewButton
-        label={translate('gallery.videoReview.speechReloadModels')}
-        className={buttonClass}
-        disabled={speech.running}
-        onClick={speech.reloadModels}
-      >
-        {translate('gallery.videoReview.speechReloadModels')}
-      </ReviewButton>
-    </div>
+      )}
+      {proposal.job.relatedIds.length > 0 && (
+        <ProductField label={translate('gallery.videoReview.recognitionMode')}>
+          <ProductSelect
+            aria-label={translate('gallery.videoReview.recognitionMode')}
+            value={recognition.mode}
+            disabled={busy}
+            options={[
+              { value: 'add', label: translate('gallery.videoReview.recognitionAdd') },
+              { value: 'replace', label: translate('gallery.videoReview.recognitionReplace') },
+            ]}
+            onChange={(value) => {
+              if (value === 'add' || value === 'replace') recognition.setMode(value);
+            }}
+          />
+        </ProductField>
+      )}
+      {recognition.mode === 'replace' && (
+        <p className="text-xs">{translate('gallery.videoReview.recognitionReplaceHint')}</p>
+      )}
+      {proposal.receipt && !recognition.accepted && (
+        <p className="text-xs">{translate('gallery.videoReview.recognitionReceiptHint')}</p>
+      )}
+      {recognition.accepted ? (
+        <p role="status" className="text-xs">
+          {translate('gallery.videoReview.recognitionAdded')}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          <ReviewButton
+            label={applyLabel}
+            className={buttonClass}
+            disabled={recognition.running || !editor.document.fragments.length}
+            onClick={recognition.apply}
+          >
+            {applyLabel}
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.recognitionDiscard')}
+            className={buttonClass}
+            disabled={busy}
+            onClick={recognition.discard}
+          >
+            {translate('gallery.videoReview.recognitionDiscard')}
+          </ReviewButton>
+        </div>
+      )}
+    </section>
   );
 }

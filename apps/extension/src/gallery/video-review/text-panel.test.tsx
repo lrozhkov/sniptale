@@ -83,6 +83,36 @@ afterEach(() => {
 const button = (label: string) =>
   host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!;
 
+it('edits, hides and removes canonical text without changing timing or mounting an audio controller', () => {
+  act(() => root.render(<Fixture count={1} />));
+  act(() => host.querySelector<HTMLButtonElement>('[data-text-id] button[aria-expanded]')!.click());
+  const textarea = host.querySelector('textarea')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+      textarea,
+      'Updated narration'
+    );
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(current.fragments[0]).toMatchObject({
+    text: 'Updated narration',
+    start: 0,
+    end: 3,
+    timeDomain: 'result',
+    showInVideo: true,
+  });
+  act(() => button('textFragmentShown').click());
+  expect(current.fragments[0]).toMatchObject({
+    text: 'Updated narration',
+    start: 0,
+    end: 3,
+    showInVideo: false,
+  });
+  expect(button('textFragmentShown').getAttribute('aria-checked')).toBe('false');
+  act(() => button('textFragmentDelete').click());
+  expect(current.fragments).toHaveLength(0);
+});
+
 it('opens exactly one card under rapid clicks, allows all closed and keeps seek separate', () => {
   act(() => root.render(<Fixture count={3} />));
   const summaries = () =>

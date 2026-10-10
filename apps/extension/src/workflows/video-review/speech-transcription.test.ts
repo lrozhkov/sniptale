@@ -97,6 +97,26 @@ describe('native speech transcription', () => {
     });
     expect(reviewSpeechPhrases({ text: ' ' }, 8, 12)).toEqual([]);
   });
+  it('supports sentence-only grouping without moving words through a pause', () => {
+    const phrases = reviewSpeechPhrases(
+      {
+        text: 'Hello again. Next',
+        words: [
+          { text: 'Hello', start: 0, end: 0.5 },
+          { text: 'again.', start: 5, end: 5.5 },
+          { text: 'Next', start: 6, end: 6.5 },
+        ],
+      },
+      10,
+      20,
+      { splitAtPauses: false }
+    );
+    expect(phrases.map((phrase) => [phrase.text, phrase.start, phrase.end])).toEqual([
+      ['Hello again.', 10, 15.5],
+      ['Next', 16, 16.5],
+    ]);
+    expect(phrases[0]?.words?.map((word) => word.start)).toEqual([10, 15]);
+  });
   it('rejects supplied unsafe timing instead of silently downgrading alignment', () => {
     expect(() =>
       reviewSpeechPhrases({ text: 'text', words: [{ text: 'text', start: -1, end: 20 }] }, 2, 4)

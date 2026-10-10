@@ -52,6 +52,7 @@ type SelectedPropertiesProps = {
   registerSpeechFlush?: (owner: ReviewSpeechFlushRegistration) => () => void;
   beforeSpeechAction?: ReviewBeforeAction;
   flushAdvanced?: () => Promise<void>;
+  onSelectText?(id: string): void;
   webcam?: ReturnType<typeof useReviewWebcamEditor>;
   webcamRange?: { start: number; end: number } | undefined;
   selection: ReviewSelection;
@@ -158,7 +159,10 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 resultTime={props.focusTime}
                 assetNames={audio.assets}
                 {...(props.onPreviewFrame ? { onJump: props.onPreviewFrame } : {})}
-                sound={<ReviewAudioInspectorSection audio={audio} busy={busy} embedded />}
+                sound={(applying) => (
+                  <ReviewAudioInspectorSection audio={audio} busy={busy || applying} embedded />
+                )}
+                {...(props.onSelectText ? { onSelectText: props.onSelectText } : {})}
               />
             ) : (
               <ReviewAudioInspectorSection audio={audio} busy={busy} />

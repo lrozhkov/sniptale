@@ -145,6 +145,10 @@ export async function installSpeechPortFixture(page: Page, phraseCount?: number)
             });
             await root.removeEntry(message.staged.id);
             await root.removeEntry(`${message.staged.id}.json`);
+            if (!start || start.operation !== 'transcription' || !('nativeStart' in start.scope))
+              throw new Error('Missing transcription source scope');
+            const duration = start.scope.nativeEnd - start.scope.nativeStart;
+            const scale = Math.min(1, duration / (phraseCount === undefined ? 6 : 11));
             const words =
               phraseCount === undefined
                 ? [
@@ -157,12 +161,17 @@ export async function installSpeechPortFixture(page: Page, phraseCount?: number)
                     start: (index * 11) / Math.max(1, phraseCount),
                     end: ((index + 0.9) * 11) / Math.max(1, phraseCount),
                   }));
+            const bounded = words.map((word) => ({
+              ...word,
+              start: word.start * scale,
+              end: word.end * scale,
+            }));
             emit({
               type: 'transcript',
               requestId: message.requestId,
               result: {
-                text: words.map((word) => word.text).join(' '),
-                words,
+                text: bounded.map((word) => word.text).join(' '),
+                words: bounded,
               },
             });
           };
@@ -226,7 +235,7 @@ export async function installSpeechPortFixture(page: Page, phraseCount?: number)
   );
 }
 
-export async function persistedSpeech(page: Page) {
+async function persistedReviewState(page: Page) {
   const raw = await page.evaluate(
     async ({ databaseName, aggregateId }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -260,6 +269,18 @@ export async function persistedSpeech(page: Page) {
     workspace.source,
     reviewAdvancedContentBaseline(workspace.advanced)
   );
+  return { workspace, document };
+}
+
+/** Reads the canonical accepted content; proposals must never appear here before Apply. */
+export async function persistedReviewContent(page: Page) {
+  return (await persistedReviewState(page))?.document.advancedContent ?? null;
+}
+
+export async function persistedSpeech(page: Page) {
+  const state = await persistedReviewState(page);
+  if (!state) return null;
+  const { workspace, document } = state;
   const clip = document.advancedContent.audio.voiceover[0];
   if (!clip) return null;
   const map = buildReviewTimeMap(workspace.source.duration, document.edits);

@@ -157,6 +157,7 @@ export function ReviewInspectorBinding({
             state={state}
             audio={audio}
             selectedSpeechId={selectedSpeechId}
+            canvasComments={canvasComments}
           />
         }
         preview={preview}
@@ -264,11 +265,13 @@ function ReviewSourceSpeechBinding({
   state,
   audio,
   selectedSpeechId,
+  canvasComments,
 }: {
   resource: LoadedReview;
   state: InspectorState;
   audio: ReturnType<typeof useReviewAudio>;
   selectedSpeechId: string | undefined;
+  canvasComments: ReturnType<typeof useCanvasComments>;
 }) {
   return (
     <ReviewOriginalSpeechPanel
@@ -293,7 +296,7 @@ function ReviewSourceSpeechBinding({
       }
       selectedReplacementId={selectedSpeechId}
       beforeAction={state.beforeAction}
-      flushAdvanced={state.flushAdvanced}
+      flushAdvanced={() => flushReviewTextVoiceBuffers(state, canvasComments)}
       registerSpeechFlush={state.registerSpeechFlush}
       sourceAudioAvailable={!!state.editing.exporter.index?.audioCodec}
       originalSpeechEnabled={state.advanced.audio.originalSpeech?.enabled ?? true}
@@ -522,7 +525,16 @@ function ReviewSelectionBinding({
     <ReviewSelectedProperties
       registerSpeechFlush={state.registerSpeechFlush}
       beforeSpeechAction={state.beforeAction}
-      flushAdvanced={state.flushAdvanced}
+      flushAdvanced={() => flushReviewTextVoiceBuffers(state, canvasComments)}
+      onSelectText={(id) =>
+        state.beforeAction(() => {
+          const fragment = state.text.document.fragments.find((entry) => entry.id === id);
+          if (!fragment) return;
+          state.video.current?.pause();
+          state.seek(state.text.sourceInterval(fragment).start, false);
+          state.setActiveSelection({ kind: 'text', id });
+        })
+      }
       webcam={state.webcam}
       webcamRange={
         state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)

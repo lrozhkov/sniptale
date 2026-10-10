@@ -12,6 +12,27 @@ import { ReviewInspectorColumns } from './inspector-sections';
 import { ReviewDetails } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 type Controller = ReturnType<typeof useReviewSpeech>;
+/** The same configured transcription selector serves original and recorded audio. */
+export function SpeechTranscriptionModelField({
+  speech,
+}: {
+  speech: Pick<Controller, 'catalogs' | 'modelId' | 'setModelId'>;
+}) {
+  return (
+    <ProductField label={translate('gallery.videoReview.speechTranscriptionModel')}>
+      {speech.catalogs ? (
+        <AIModelSelector
+          models={speech.catalogs.transcription.models}
+          providers={speech.catalogs.transcription.providers}
+          selectedModelId={speech.modelId || null}
+          onSelect={(id) => speech.setModelId(id ?? '')}
+        />
+      ) : (
+        <p role="status">{translate('common.states.loading')}</p>
+      )}
+    </ProductField>
+  );
+}
 export function SpeechProfileFields({
   speech,
   operation = 'all',
@@ -25,20 +46,7 @@ export function SpeechProfileFields({
   };
   return (
     <>
-      {operation !== 'speech' && (
-        <ProductField label={translate('gallery.videoReview.speechTranscriptionModel')}>
-          {speech.catalogs ? (
-            <AIModelSelector
-              models={speech.catalogs.transcription.models}
-              providers={speech.catalogs.transcription.providers}
-              selectedModelId={speech.modelId || null}
-              onSelect={(id) => speech.setModelId(id ?? '')}
-            />
-          ) : (
-            <p role="status">{translate('common.states.loading')}</p>
-          )}
-        </ProductField>
-      )}
+      {operation !== 'speech' && <SpeechTranscriptionModelField speech={speech} />}
       {operation !== 'transcription' && (
         <>
           <ProductField label={translate('gallery.videoReview.speechSynthesisModel')}>

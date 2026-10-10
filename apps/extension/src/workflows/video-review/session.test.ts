@@ -6,6 +6,33 @@ import type { ReviewOperation } from '../../features/video/review/types';
 import { saveReviewSpeechTranscript } from './speech-publication';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
+it('reads an exact retained operation across Undo without writes; unavailable storage is not absence', async () => {
+  const snapshot = initial();
+  snapshot.workspace.history = [
+    { id: 'retained', at: 1, target: 'annotation', before: null, after: annotation },
+  ];
+  const read = vi.fn(async (): Promise<VideoWorkspaceSnapshot | null> => snapshot);
+  const write = vi.fn(async () => snapshot);
+  const session = createVideoReviewSession(snapshot, {
+    readVideoWorkspace: read,
+    commitVideoWorkspace: write,
+    moveVideoWorkspaceHistory: write,
+    saveVideoWorkspaceAdvanced: write,
+    saveVideoWorkspaceDraft: write,
+    saveVideoWorkspaceSnapshot: write,
+  });
+  const operation = await session.readRetainedReviewOperation('retained');
+  expect(operation?.id).toBe('retained');
+  if (operation) operation.at = 999;
+  expect(snapshot.workspace.history[0]?.at).toBe(1);
+  expect(await session.readRetainedReviewOperation('absent')).toBeNull();
+  read.mockResolvedValueOnce(null);
+  await expect(session.readRetainedReviewOperation('retained')).rejects.toThrow('unavailable');
+  read.mockRejectedValueOnce(new Error('storage inaccessible'));
+  await expect(session.readRetainedReviewOperation('retained')).rejects.toThrow('inaccessible');
+  expect(write).not.toHaveBeenCalled();
+  expect(session.getSnapshot()).toMatchObject({ dirty: false, pending: 0 });
+});
 function initial(): VideoWorkspaceSnapshot {
   return {
     workspace: {

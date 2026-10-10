@@ -160,7 +160,11 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   }
   return {
     getSnapshot: () => state,
-    ...reviewDurableAudioAccess(initial.workspace.aggregateId, deps.readVideoWorkspace, project),
+    ...reviewDurableWorkspaceAccess(
+      initial.workspace.aggregateId,
+      deps.readVideoWorkspace,
+      project
+    ),
     setAutosaveEnabled(enabled: boolean) {
       state = { ...state, autosaveEnabled: enabled };
       emit();
@@ -295,13 +299,21 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   };
 }
 
-/** Read-only persisted byte/clip admission; it owns no session state, queue or writes. */
-function reviewDurableAudioAccess(
+/** Read-only persisted history/byte/clip admission; it owns no session state, queue or writes. */
+function reviewDurableWorkspaceAccess(
   aggregateId: string,
   read: typeof persistence.readVideoWorkspace,
   project: (snapshot: VideoWorkspaceSnapshot) => ReturnType<typeof replayReviewHistory>
 ) {
   return {
+    /** Exact history receipt, including Undo entries; missing authority never implies failure to commit. */
+    async readRetainedReviewOperation(id: string) {
+      const saved = await read(aggregateId);
+      if (!saved) throw new Error('Review session is unavailable.');
+      return structuredClone(
+        saved.workspace.history.find((operation) => operation.id === id) ?? null
+      );
+    },
     async hasRetainedVoiceoverClip(clipId: string, assetId: string) {
       const saved = await read(aggregateId);
       if (!saved) throw new Error('Review session is unavailable.');
