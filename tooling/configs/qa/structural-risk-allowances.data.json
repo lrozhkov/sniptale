@@ -94,11 +94,22 @@
       "file": "apps/extension/src/workflows/video-review/session.ts",
       "symbol": "createVideoReviewSession",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: The factory retains one serialized queue, history projection and durable session receiver. Original and voiceover transcript saves share that queue and exact retained-reference checks delegate to persistence. Score1 delta0; a separate per-target session would duplicate authority rather than isolate an independent lifecycle. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "reason": "tool-noise: This existing review factory retains one history/local/durable session receiver. Gallery producers and accepted explicit commands now share one injected package scheduling lane; persistence still issues revisions, source admission and resource authority. It owns no React buffers or second queue. The sole blocking metric is299 outer lines, including cohesive nested command methods; score1 delta0, outer cyclomatic1. Per-command extraction would distribute the same session state and recovery rather than isolate an independent lifecycle. Main inspected the implementation; fresh independent architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "d9ce89da4423af2d3a04dae67e54d2c5ddb118f624b4944fdde8778b1a53439a",
+      "reviewDate": "2026-10-10",
+      "astHash": "0f353fd08dd5457bbf0baa6ebf8f145dd6dd2dadd041bfb6ebee81827f03836b",
       "signatureHash": "aed89eba9c2e167caeeaf39979c18b16f68ed33f8a375440b08514c8a3e1a7cb"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "packages/platform/src/data/autosave.ts",
+      "symbol": "createAutosaveCoordinator",
+      "owner": "package:platform:data",
+      "reason": "tool-noise: The dependency-pure factory owns one admission lane, clock, coalesced producer tokens and their barriers/lifecycle. No document, React, storage, resource, permission or runtime singleton authority enters this package. The sole blocking metric is219 outer lines containing cohesive nested admission and cancellation methods; outer cyclomatic1, score1, cohesion1.00. Splitting its pending/active/ordered state among services would duplicate or distribute the same queue authority. Controlled-clock and transitive adapter tests cover the algorithm; this allowance does not exempt its semantic or advisory findings. Main inspected the implementation; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes, or when an independent document, durable writer, resource, UI or runtime authority enters the factory. Remove when the analyzer models cohesive closure-based scheduling factories. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-10",
+      "astHash": "020e471b9851b9e9a5b457ecbb5ab78d3b27b1c4edc2d9400e31db3d58f225ca",
+      "signatureHash": "1e108aca146e78573024dac35fb8541e02ea45c51727e49e24aa511c1c4f2ad4"
     },
     {
       "rule": "structural-file-risk",

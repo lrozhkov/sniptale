@@ -1,4 +1,3 @@
-import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   QuickEditAdvancedContent,
@@ -19,21 +18,6 @@ type PendingContent = {
   typing: boolean;
 };
 
-async function commitPendingContent(session: Session, sent: PendingContent): Promise<void> {
-  const document = session.getSnapshot().document;
-  const value = loadQuickEditAdvancedContentState(sent.value);
-  if (!value) throw new Error('Advanced content is invalid.');
-  // Compare the same canonical shape the history boundary will persist.
-  if (JSON.stringify(value) === JSON.stringify(document.advancedContent)) return;
-  await session.commit({
-    id: crypto.randomUUID(),
-    at: Date.now(),
-    target: 'advancedContent',
-    before: document.advancedContent,
-    after: value,
-  });
-}
-
 /** Rebases edits staged during an acknowledged write onto that acknowledged target. */
 function pendingAfterAcknowledgement(
   current: PendingContent | null,
@@ -52,60 +36,14 @@ export function useReviewAdvancedContent(
 ) {
   const [, setVersion] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<PendingContent | null>(null);
-  const running = useRef<Promise<void> | null>(null);
+  const generation = useRef(0);
   const nextRevision = useRef(0);
   const optimistic = useRef<PendingContent | null>(null);
   const mounted = useRef(true);
-  const drain = useCallback(
-    async (idle: boolean): Promise<void> => {
-      while (pending.current) {
-        // Acknowledging an older automatic save does not end the current typing pause.
-        if (idle && pending.current.typing && timer.current !== null) break;
-        const sent = pending.current;
-        try {
-          await commitPendingContent(session, sent);
-        } catch (error) {
-          if (mounted.current) setSaveFailed(true);
-          throw error;
-        }
-        const acknowledged = pendingAfterAcknowledgement(pending.current, sent);
-        pending.current = acknowledged;
-        optimistic.current = acknowledged;
-        if (mounted.current) {
-          if (!acknowledged) setSaveFailed(false);
-          setVersion((value) => value + 1);
-        }
-      }
-    },
-    [session]
-  );
-  const save = useCallback(
-    (idle: boolean): Promise<void> => {
-      const attempt = async () => {
-        do {
-          if (!running.current) {
-            const task = drain(idle).finally(() => {
-              running.current = null;
-            });
-            running.current = task;
-          }
-          await running.current;
-        } while (
-          pending.current !== null &&
-          !(idle && pending.current.typing && timer.current !== null)
-        );
-      };
-      return attempt();
-    },
-    [drain]
-  );
-  const flush = useCallback((): Promise<void> => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    return save(false);
-  }, [save]);
+  const flush = useCallback(async (): Promise<void> => {
+    while (pending.current) await session.flushAutosave(['content']);
+  }, [session]);
   const stage = useCallback(
     (mutate: ContentMutation, typing = false) => {
       const previous = pending.current;
@@ -122,16 +60,33 @@ export function useReviewAdvancedContent(
       pending.current = entry;
       setVersion((value) => value + 1);
       setSaveFailed(false);
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(
+      const epoch = generation.current;
+      session.stageAutosave(
+        'content',
         () => {
-          timer.current = null;
-          void save(true).catch(() => undefined);
+          const sent = pending.current;
+          if (!sent) throw new Error('Review content buffer is unavailable.');
+          return {
+            change: { kind: 'content', content: sent.value },
+            acknowledge: () => {
+              if (epoch !== generation.current) return;
+              const acknowledged = pendingAfterAcknowledgement(pending.current, sent);
+              pending.current = acknowledged;
+              optimistic.current = acknowledged;
+              if (mounted.current) {
+                if (!acknowledged) setSaveFailed(false);
+                setVersion((value) => value + 1);
+              }
+            },
+            fail: () => {
+              if (epoch === generation.current && mounted.current) setSaveFailed(true);
+            },
+          };
         },
-        typing ? TEXT_TYPING_SAVE_DEBOUNCE_MS : ADVANCED_SAVE_DEBOUNCE_MS
+        { delay: typing ? TEXT_TYPING_SAVE_DEBOUNCE_MS : ADVANCED_SAVE_DEBOUNCE_MS }
       );
     },
-    [save, session]
+    [session]
   );
   useEffect(() => {
     mounted.current = true;
@@ -150,15 +105,15 @@ export function useReviewAdvancedContent(
     setVersion((value) => value + 1);
   }, [documentContent]);
   const reset = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
+    generation.current += 1;
+    session.cancelAutosave('content');
     pending.current = null;
     optimistic.current = null;
     if (mounted.current) {
       setSaveFailed(false);
       setVersion((value) => value + 1);
     }
-  }, []);
+  }, [session]);
   return {
     content: optimistic.current?.value ?? documentContent,
     saveFailed,

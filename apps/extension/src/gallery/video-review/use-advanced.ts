@@ -24,47 +24,15 @@ export function useReviewAdvanced(session: Session) {
   const [saveFailed, setSaveFailed] = useState(false);
   const currentRef = useRef(persisted);
   const pending = useRef<PendingSave | null>(null);
-  const running = useRef<Promise<void> | null>(null);
   const nextRevision = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const generation = useRef(0);
   const mounted = useRef(true);
   useEffect(() => {
     if (!optimistic) currentRef.current = persisted;
   }, [persisted, optimistic]);
-  const drain = useCallback(async (): Promise<void> => {
-    while (pending.current) {
-      const sent = pending.current;
-      try {
-        await session.saveAdvanced(sent.value);
-      } catch (error) {
-        if (mounted.current) setSaveFailed(true);
-        throw error;
-      }
-      if (pending.current?.revision === sent.revision) {
-        pending.current = null;
-        if (mounted.current) {
-          setSaveFailed(false);
-          setOptimistic(null);
-        }
-      }
-    }
+  const flush = useCallback(async (): Promise<void> => {
+    while (pending.current) await session.flushAutosave(['advanced']);
   }, [session]);
-  const flush = useCallback((): Promise<void> => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    const attempt = async () => {
-      do {
-        if (!running.current) {
-          const task = drain().finally(() => {
-            running.current = null;
-          });
-          running.current = task;
-        }
-        await running.current;
-      } while (pending.current !== null);
-    };
-    return attempt();
-  }, [drain]);
   const stage = useCallback(
     (update: (current: QuickEditAdvancedState) => QuickEditAdvancedState) => {
       const next = update(currentRef.current);
@@ -75,13 +43,32 @@ export function useReviewAdvanced(session: Session) {
       };
       pending.current = entry;
       setOptimistic(entry);
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        timer.current = null;
-        void flush().catch(() => undefined);
-      }, ADVANCED_SAVE_DEBOUNCE_MS);
+      const epoch = generation.current;
+      session.stageAutosave(
+        'advanced',
+        () => {
+          const sent = pending.current;
+          if (!sent) throw new Error('Review UI buffer is unavailable.');
+          return {
+            change: { kind: 'advanced', advanced: sent.value },
+            acknowledge: () => {
+              if (epoch !== generation.current || pending.current?.revision !== sent.revision)
+                return;
+              pending.current = null;
+              if (mounted.current) {
+                setSaveFailed(false);
+                setOptimistic(null);
+              }
+            },
+            fail: () => {
+              if (epoch === generation.current && mounted.current) setSaveFailed(true);
+            },
+          };
+        },
+        { delay: ADVANCED_SAVE_DEBOUNCE_MS }
+      );
     },
-    [flush]
+    [session]
   );
   useEffect(() => {
     mounted.current = true;
@@ -96,8 +83,8 @@ export function useReviewAdvanced(session: Session) {
     };
   }, [flush]);
   const reset = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
+    generation.current += 1;
+    session.cancelAutosave('advanced');
     pending.current = null;
     currentRef.current = session.getSnapshot().snapshot.workspace.advanced;
     contentState.reset();

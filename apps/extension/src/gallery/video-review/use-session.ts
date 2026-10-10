@@ -101,39 +101,11 @@ export function useReviewComposer(session: Session) {
   });
   const latest = useRef({ annotation, before, dirty: false, version: 0 });
   useComposerUnloadProtection(latest);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const firstDirtyAt = useRef<number | null>(null);
-  const draining = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
   const committing = useRef<Promise<void> | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const flush = useCallback((): Promise<void> => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    if (draining.current) return draining.current;
-    const task = (async () => {
-      if (mounted.current) setField((field) => ({ ...field, saving: true }));
-      try {
-        while (latest.current.dirty) {
-          const captured = { ...latest.current };
-          await session.saveDraft(captured.annotation, captured.before);
-          if (latest.current.version === captured.version) {
-            latest.current.dirty = false;
-            firstDirtyAt.current = null;
-            if (mounted.current) setField((field) => ({ ...field, dirty: false }));
-          }
-        }
-      } finally {
-        if (mounted.current) setField((field) => ({ ...field, saving: false }));
-      }
-    })();
-    draining.current = task;
-    void task
-      .finally(() => {
-        draining.current = null;
-      })
-      .catch(() => undefined);
-    return task;
+  const flush = useCallback(async (): Promise<void> => {
+    while (latest.current.dirty) await session.flushAutosave(['draft']);
   }, [session]);
   const change = useCallback(
     (value: ReviewAnnotation | null, previous = latest.current.before) => {
@@ -145,19 +117,31 @@ export function useReviewComposer(session: Session) {
         version: latest.current.version + 1,
       };
       setField((field) => ({ ...field, annotation: value, before: previous, dirty: true }));
-      firstDirtyAt.current ??= Date.now();
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(
+      session.stageAutosave(
+        'draft',
         () => {
-          void flush().catch(() => undefined);
+          const captured = { ...latest.current };
+          if (mounted.current) setField((field) => ({ ...field, saving: true }));
+          return {
+            change: { kind: 'draft', annotation: captured.annotation, before: captured.before },
+            acknowledge: () => {
+              if (latest.current.version === captured.version) latest.current.dirty = false;
+              if (mounted.current)
+                setField((field) => ({ ...field, dirty: latest.current.dirty, saving: false }));
+            },
+            fail: () => {
+              if (mounted.current) setField((field) => ({ ...field, saving: false }));
+            },
+          };
         },
-        Math.min(250, Math.max(0, 1000 - (Date.now() - firstDirtyAt.current)))
+        { delay: 250, maxWait: 1000 }
       );
     },
-    [flush]
+    [session]
   );
   useRecoveryLifecycle(flush, mounted);
   const clearLocal = () => {
+    session.cancelAutosave('draft');
     latest.current = {
       annotation: null,
       before: null,
@@ -198,8 +182,7 @@ export function useReviewComposer(session: Session) {
     ...completion,
     reload: () =>
       commitField(async () => {
-        if (timer.current) clearTimeout(timer.current);
-        await draining.current?.catch(() => undefined);
+        session.cancelAutosave('draft');
         await session.reload();
         const draft = session.getSnapshot().snapshot.draft;
         latest.current = {
