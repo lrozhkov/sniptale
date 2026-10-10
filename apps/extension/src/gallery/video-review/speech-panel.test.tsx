@@ -386,3 +386,17 @@ it('links both authored snapshots and recognized origins to individual canonical
   expect(onSelectText).toHaveBeenCalledWith('recognized');
   expect(host.querySelector('[data-ui="gallery.videoReview.textDocument"]')).toBeNull();
 });
+
+it('discloses original audio including cuts for complete and selected requests', async () => {
+  await mount(false, { start: 2, end: 4 });
+  expect(host.textContent).toContain('включая вырезанные участки');
+  expect(host.textContent).not.toContain('без вырезанных участков');
+  await act(async () => button(translate('gallery.videoReview.recognitionSelection')).click());
+  expect(host.textContent).toContain('включая вырезанные участки');
+  expect(host.textContent).not.toContain('без вырезанных участков');
+});
+it('preserves the retained-audio disclosure for voice clips', async () => {
+  await mount();
+  expect(host.textContent).toContain('без вырезанных участков');
+  expect(host.textContent).not.toContain('включая вырезанные участки');
+});

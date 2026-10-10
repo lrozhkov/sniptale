@@ -48,7 +48,32 @@ export function reviewRecognitionPhrases(
     phrases.push(...incoming);
     range = chunk.range;
   }
-  return phrases;
+  return phrases.flatMap((phrase) => {
+    if (phrase.text.length <= 16_000) return [phrase];
+    const parts: ReviewSpeechPhrase[] = [];
+    let remaining = phrase.text;
+    while (remaining.length) {
+      let boundary = Math.min(remaining.length, 16_000);
+      if (boundary < remaining.length) {
+        const whitespace = remaining.slice(0, boundary).search(/\s+\S*$/u);
+        if (whitespace > 0) boundary = whitespace;
+        else if (/[\uD800-\uDBFF]/u.test(remaining[boundary - 1]!)) boundary--;
+      }
+      const { words: _words, ...coarse } = phrase;
+      const text = remaining.slice(0, boundary).trim();
+      if (text)
+        parts.push({
+          ...coarse,
+          id: crypto.randomUUID(),
+          text,
+          originalText: text,
+          alignment: 'range',
+        });
+      remaining = remaining.slice(boundary).trimStart();
+    }
+    // Missing alignment cannot justify new per-part times; preserve the only proven range.
+    return parts;
+  });
 }
 
 /** Projects native phrase timing onto retained clip slices without acquiring media or writing state. */

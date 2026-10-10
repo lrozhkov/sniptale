@@ -5,6 +5,8 @@ import {
 
 export const AUDIO_JOB_PORT_NAME = 'sniptale-gallery-audio-job';
 export const AUDIO_INPUT_MAX_BYTES = 24 * 1024 * 1024;
+/** Maximum mono PCM16 duration at the extraction rate, including its 44-byte WAV header. */
+export const AUDIO_INPUT_MAX_SECONDS = Math.floor((AUDIO_INPUT_MAX_BYTES - 44) / 2) / 16_000;
 export const AUDIO_OUTPUT_MAX_BYTES = 32 * 1024 * 1024;
 export const AUDIO_STAGING_TTL_MS = 10 * 60 * 1000;
 export const AUDIO_JOB_TIMEOUT_MS = 120_000;
@@ -200,7 +202,7 @@ export function parseAudioJobScope(value: unknown): AudioJobScope | null {
     typeof value['nativeEnd'] !== 'number' ||
     !Number.isFinite(value['nativeEnd']) ||
     value['nativeEnd'] <= value['nativeStart'] ||
-    value['nativeEnd'] - value['nativeStart'] > 300
+    value['nativeEnd'] - value['nativeStart'] > AUDIO_INPUT_MAX_SECONDS
   )
     return null;
   const target = parseReviewSpeechTarget(value['target']);
@@ -327,7 +329,7 @@ function parseTranscript(value: unknown): AudioTranscriptResult | null {
         typeof item['end'] !== 'number' ||
         !Number.isFinite(item['end']) ||
         (key === 'words' ? item['end'] < item['start'] : item['end'] <= item['start']) ||
-        item['end'] > 300 ||
+        item['end'] > AUDIO_INPUT_MAX_SECONDS ||
         (parsed.length > 0 &&
           item['start'] < (key === 'words' ? parsed.at(-1)!.end : parsed.at(-1)!.start))
       )

@@ -70,8 +70,10 @@ async function encodeTranscription(
   form.set('response_format', params.responseFormat);
   if (params.language) form.set('language', params.language);
   if (params.prompt) form.set('prompt', params.prompt);
-  if (params.timestampGranularity !== 'none')
+  if (params.timestampGranularity !== 'none') {
     form.append('timestamp_granularities[]', params.timestampGranularity);
+    if (params.timestampGranularity === 'word') form.append('timestamp_granularities[]', 'segment');
+  }
   // Materialize the upload before fetch so network I/O never reads a live OPFS file.
   // Response owns multipart encoding and the matching boundary; no headers are guessed.
   const encoded = new Response(form);

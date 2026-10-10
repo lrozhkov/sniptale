@@ -165,6 +165,14 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
     ru: 'Будут заменены только связанные фразы в распознанном интервале, включая ваши правки. Остальной текст и звук сохранятся.',
     en: 'Only related phrases in the transcribed interval will be replaced, including your edits. Other text and audio are preserved.',
   },
+  recognitionOriginalScopeAll: {
+    ru: 'Отправляется весь исходный звук, включая вырезанные участки. Фразы сохраняют исходные таймкоды.',
+    en: 'All original audio is sent, including cuts. Phrases retain original source timecodes.',
+  },
+  recognitionOriginalScopeSelection: {
+    ru: 'Отправляется исходный звук выделенного интервала, включая вырезанные участки. Фразы сохраняют исходные таймкоды.',
+    en: 'The original audio of the selected interval is sent, including cuts. Phrases retain source timecodes.',
+  },
   recognitionScopeAll: {
     ru: 'Отправляется сохранённый звук этой дорожки, без вырезанных участков.',
     en: 'The retained audio of this track is sent, excluding cuts.',

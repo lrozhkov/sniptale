@@ -173,8 +173,10 @@ function recognitionSourceDisclosure(
     label: recognition.selectionUnavailable
       ? 'gallery.videoReview.recognitionSelectionMissing'
       : recognition.selectionOnly
-        ? 'gallery.videoReview.recognitionScopeSelection'
-        : 'gallery.videoReview.recognitionScopeAll',
+        ? 'gallery.videoReview.recognitionOriginalScopeSelection'
+        : access.target.kind === 'original'
+          ? 'gallery.videoReview.recognitionOriginalScopeAll'
+          : 'gallery.videoReview.recognitionScopeAll',
   } as const;
 }
 

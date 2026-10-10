@@ -4,13 +4,52 @@ import type { ReviewSpeechSession } from './speech-publication';
 import { parseAudioJobServerMessage } from '../../contracts/ai/audio';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  reviewSpeechChunks,
-  reviewSpeechPhrases,
-  transcribeReviewSpeech,
-} from './speech-transcription';
+import { reviewSpeechPhrases, transcribeReviewSpeech } from './speech-transcription';
 
 describe('native speech transcription', () => {
+  it('keeps provider segment timing and all text when some words have zero duration', () => {
+    const phrases = reviewSpeechPhrases(
+      {
+        text: 'Hello there! Next sentence.',
+        segments: [
+          { text: 'Hello there!', start: 0.1, end: 1 },
+          { text: 'Next sentence.', start: 2, end: 3 },
+        ],
+        words: [
+          { text: 'Hello', start: 0.1, end: 0.5 },
+          { text: 'there', start: 0.5, end: 0.5 },
+          { text: 'Next', start: 2, end: 2.4 },
+          { text: 'sentence', start: 2.4, end: 3 },
+        ],
+      },
+      10,
+      14
+    );
+    expect(phrases.map(({ text, start, end }) => ({ text, start, end }))).toEqual([
+      { text: 'Hello there!', start: 10.1, end: 11 },
+      { text: 'Next sentence.', start: 12, end: 13 },
+    ]);
+    expect(
+      phrases.flatMap((phrase) => phrase.words ?? []).every((word) => word.end > word.start)
+    ).toBe(true);
+  });
+  it('uses punctuation from complete provider text when word timing omits it', () => {
+    const phrases = reviewSpeechPhrases(
+      {
+        text: 'Hello world! Next sentence.',
+        words: [
+          { text: 'Hello', start: 0, end: 0.4 },
+          { text: 'world', start: 0.4, end: 1 },
+          { text: 'Next', start: 1, end: 1.4 },
+          { text: 'sentence', start: 1.4, end: 2 },
+        ],
+      },
+      0,
+      3,
+      { splitAtPauses: false }
+    );
+    expect(phrases.map((phrase) => phrase.text)).toEqual(['Hello world!', 'Next sentence.']);
+  });
   it.each([1, 2])(
     'retains text and reliable anchors through transport and persistence with zero word %i',
     (zero) => {
@@ -56,19 +95,6 @@ describe('native speech transcription', () => {
     );
     expect(phrases[0]).toMatchObject({ text: 'Done.', start: 10, end: 12, alignment: 'range' });
     expect(phrases[0]?.words).toBeUndefined();
-  });
-  it('does not bridge a cut or overlap text-only chunks', () => {
-    expect(
-      reviewSpeechChunks([
-        { start: 4, end: 125 },
-        { start: 140, end: 144 },
-      ])
-    ).toEqual([
-      { start: 4, end: 64 },
-      { start: 64, end: 124 },
-      { start: 124, end: 125 },
-      { start: 140, end: 144 },
-    ]);
   });
   it('splits provider words at real pauses and adds native offset once', () => {
     const phrases = reviewSpeechPhrases(
@@ -291,7 +317,7 @@ it.each([false, true])(
   }
 );
 
-it('recognizes selected original native ranges excluding cuts even when original is muted', async () => {
+it('recognizes selected original native ranges including cuts even when original is muted', async () => {
   const { createQuickEditAdvancedState } =
     await import('../../features/video/review/advanced/defaults');
   const advanced = createQuickEditAdvancedState();
@@ -342,10 +368,7 @@ it('recognizes selected original native ranges excluding cuts even when original
   );
   expect(workflow.plan).toHaveBeenLastCalledWith(
     file,
-    [
-      { start: 2, end: 4 },
-      { start: 6, end: 8 },
-    ],
+    [{ start: 2, end: 8 }],
     expect.any(AbortSignal)
   );
   expect(workflow.job.mock.calls.map((call) => call[0].scope)).toEqual([
@@ -354,19 +377,11 @@ it('recognizes selected original native ranges excluding cuts even when original
       assetId: 'source',
       workspaceRevision: 1,
       nativeStart: 2,
-      nativeEnd: 4,
-    }),
-    expect.objectContaining({
-      target: { kind: 'original' },
-      assetId: 'source',
-      workspaceRevision: 2,
-      nativeStart: 6,
       nativeEnd: 8,
     }),
   ]);
   expect(advanced.audio.originalSpeech?.transcript.phrases.map((p) => [p.start, p.end])).toEqual([
-    [2, 4],
-    [6, 8],
+    [2, 8],
   ]);
   expect(advanced.audio.original.muted).toBe(true);
   await expect(

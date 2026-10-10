@@ -1,3 +1,4 @@
+import { AUDIO_INPUT_MAX_BYTES, AUDIO_INPUT_MAX_SECONDS } from '../../contracts/ai/audio';
 import { resolveReviewAssetBytes } from './asset-bytes';
 
 const RATE = 16_000;
@@ -33,7 +34,7 @@ export function encodeReviewSpeechWav(samples: Float32Array): Blob {
 /** Only an entirely zero, locally encoded PCM16 interval is confirmed empty, never quiet speech. */
 export async function reviewSpeechWavIsSilent(wav: Blob, signal: AbortSignal): Promise<boolean> {
   signal.throwIfAborted();
-  if (wav.type !== 'audio/wav' || wav.size <= 44 || wav.size > 24 * 1024 * 1024) return false;
+  if (wav.type !== 'audio/wav' || wav.size <= 44 || wav.size > AUDIO_INPUT_MAX_BYTES) return false;
   const bytes = await wav.arrayBuffer();
   signal.throwIfAborted();
   const header = new DataView(bytes);
@@ -56,7 +57,7 @@ export async function reviewSpeechWavIsSilent(wav: Blob, signal: AbortSignal): P
   return samples.every((sample) => sample === 0);
 }
 
-/** Decode only the authorized native interval, bounded to five minutes. */
+/** Decode the authorized native interval within the PCM upload byte budget. */
 export async function extractReviewSpeechWav(
   source: string | Blob,
   start: number,
@@ -68,7 +69,7 @@ export async function extractReviewSpeechWav(
     !Number.isFinite(end) ||
     start < 0 ||
     end <= start ||
-    end - start > 300
+    end - start > AUDIO_INPUT_MAX_SECONDS
   )
     throw new Error('invalid-request');
   signal.throwIfAborted();
@@ -152,7 +153,7 @@ export async function planReviewSpeechChunks(
     let start = range.start;
     while (start < range.end - 1e-7) {
       signal.throwIfAborted();
-      let end = Math.min(range.end, start + 60);
+      let end = Math.min(range.end, start + AUDIO_INPUT_MAX_SECONDS);
       if (end < range.end) {
         const windowStart = end - 4;
         const wav = await extractReviewSpeechWav(source, windowStart, end, signal);

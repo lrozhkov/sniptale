@@ -112,13 +112,7 @@ function recognitionRanges(
   if (target.kind === 'voiceover' && getReviewSpeechClip(session, target.clipId).dormant) return [];
   const ranges =
     target.kind === 'original'
-      ? map
-          .filter((part) => part.kind !== 'cut')
-          .map((part) => ({
-            start: Math.max(part.sourceStart, selection?.start ?? 0),
-            end: Math.min(part.sourceEnd, selection?.end ?? duration),
-          }))
-          .filter((range) => range.end > range.start)
+      ? [{ start: selection?.start ?? 0, end: selection?.end ?? duration }]
       : projectReviewVoiceover([getReviewSpeechClip(session, target.clipId)], map).map((slice) => ({
           start: slice.sourceOffset,
           end: slice.sourceOffset + slice.duration * (slice.playbackRate ?? 1),
@@ -133,7 +127,7 @@ function recognitionRanges(
   return continuous;
 }
 
-/** Freezes source/text, saves the whole intended buffer once, then prepares only retained native intervals. */
+/** Freezes source/text, saves the whole intended buffer once, then prepares original native intervals independently of Cuts. */
 export async function prepareReviewRecognition(
   session: ReviewSpeechSession,
   target: ReviewSpeechTarget,

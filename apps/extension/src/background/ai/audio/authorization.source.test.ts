@@ -195,7 +195,7 @@ it.each([
   await connection.disconnect();
 });
 
-it('admits muted retained original and touching speed boundaries, but excludes cuts', async () => {
+it('admits complete muted original through Speed and Cut while retaining source bounds', async () => {
   workspace.advanced.audio.original.muted = true;
   workspace.advanced.audio.original.volume = 0;
   workspace.history = [
@@ -227,9 +227,15 @@ it('admits muted retained original and touching speed boundaries, but excludes c
       after: { id: 'cut', kind: 'cut', start: 1, end: 2, requestedStart: 1, requestedEnd: 2 },
     },
   ];
-  await expect(authorizeAudioJob(request)).rejects.toThrow('unauthorized');
+  await expect(authorizeAudioJob(request)).resolves.toBeUndefined();
   await expect(
     authorizeAudioJob({ ...request, scope: { ...request.scope, nativeStart: 1, nativeEnd: 2 } })
+  ).resolves.toBeUndefined();
+  await expect(
+    authorizeAudioJob({
+      ...request,
+      scope: { ...request.scope, nativeEnd: workspace.source.duration + 1 },
+    })
   ).rejects.toThrow('unauthorized');
   await expect(
     authorizeAudioJob({ ...request, scope: { ...request.scope, nativeStart: 2, nativeEnd: 4 } })

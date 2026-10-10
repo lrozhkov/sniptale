@@ -83,9 +83,11 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
     throw new Error('unauthorized');
   const ranges =
     target.kind === 'original'
-      ? timeMap
-          .filter((segment) => segment.kind !== 'cut')
-          .map((segment) => ({ start: segment.sourceStart, end: segment.sourceEnd }))
+      ? request.operation === 'transcription'
+        ? [{ start: 0, end: workspace.source.duration }]
+        : timeMap
+            .filter((segment) => segment.kind !== 'cut')
+            .map((segment) => ({ start: segment.sourceStart, end: segment.sourceEnd }))
       : projectReviewVoiceover([clip!], timeMap)
           .map((slice) => ({
             start: slice.sourceOffset,

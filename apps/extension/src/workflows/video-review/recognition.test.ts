@@ -395,7 +395,7 @@ describe('recognition continuity and placement', () => {
     expect(session.getSnapshot().document.advancedContent.audio.voiceover).toEqual([edited]);
     expect(session.getSnapshot().document.advancedContent.text?.fragments).toHaveLength(1);
   });
-  it('retains a sentence across Speed and splits extraction only at a source Cut', async () => {
+  it('recognizes the complete selected source through Speed and Cut', async () => {
     const { session } = fixture(10);
     for (const edit of [
       {
@@ -412,10 +412,7 @@ describe('recognition continuity and placement', () => {
     ])
       await session.commit({ id: edit.id, at: 1, target: 'edit', before: null, after: edit });
     const job = await prepare(session, { selection: { start: 1, end: 8 } });
-    expect(job.ranges).toEqual([
-      { start: 1, end: 4 },
-      { start: 6, end: 8 },
-    ]);
+    expect(job.ranges).toEqual([{ start: 1, end: 8 }]);
     remote.job.mockResolvedValueOnce({
       type: 'transcript',
       result: words([
@@ -432,10 +429,7 @@ describe('recognition continuity and placement', () => {
     });
     expect(
       remote.job.mock.calls.map((call) => [call[0].scope.nativeStart, call[0].scope.nativeEnd])
-    ).toEqual([
-      [1, 4],
-      [6, 8],
-    ]);
+    ).toEqual([[1, 8]]);
   });
   it('recognizes only retained trimmed native samples and projects tempo into result text', async () => {
     const { session } = fixture(10);
@@ -775,4 +769,23 @@ describe('recognition durable receipt recovery', () => {
       );
     }
   );
+});
+
+it('retains a long text-only response in admissible coarse fragments without invented timing', () => {
+  const text = Array.from({ length: 1300 }, () => 'transcription').join(' ');
+  const phrases = reviewRecognitionPhrases(
+    [{ range: 0, start: 0, end: 700, result: { text } }],
+    'sentences'
+  );
+  expect(phrases.length).toBeGreaterThan(1);
+  expect(phrases.map((phrase) => phrase.text).join(' ')).toBe(text);
+  expect(
+    phrases.every(
+      (phrase) =>
+        phrase.text.length <= 16000 &&
+        phrase.alignment === 'range' &&
+        phrase.start === 0 &&
+        phrase.end === 700
+    )
+  ).toBe(true);
 });

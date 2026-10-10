@@ -189,3 +189,14 @@ it('admits bounded request keepalive without admitting new work or malformed ide
   expect(parseAudioJobClientMessage({ type: 'keepalive', requestId: '' })).toBeNull();
   expect(parseAudioJobClientMessage({ type: 'keepalive', requestId: 'r\nsecret' })).toBeNull();
 });
+
+it('admits source and returned timings longer than five minutes within the upload budget', () => {
+  expect(parseAudioJobScope({ ...scope, nativeEnd: 330.425 })).not.toBeNull();
+  expect(
+    parseAudioJobServerMessage({
+      type: 'transcript',
+      requestId: 'r',
+      result: { text: 'Last.', segments: [{ text: 'Last.', start: 329, end: 330 }] },
+    })
+  ).not.toBeNull();
+});

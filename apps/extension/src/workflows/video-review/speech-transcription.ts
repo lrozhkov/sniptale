@@ -21,17 +21,30 @@ import {
   type ReviewSpeechSession,
 } from './speech-publication';
 
-/** Nonoverlapping chunks also give text-only providers honest fallback intervals. */
-export function reviewSpeechChunks(
-  ranges: readonly { start: number; end: number }[]
-): { start: number; end: number }[] {
-  return ranges.flatMap((range) => {
-    const chunks: { start: number; end: number }[] = [];
-    for (let start = range.start; start < range.end - 1e-7; start += 60)
-      chunks.push({ start, end: Math.min(range.end, start + 60) });
-    return chunks;
+/** Recover text spans only when the complete lexical sequence matches the timed words. */
+function wordTextSpans(result: AudioTranscriptResult) {
+  const lexical = (text: string) => text.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+  const words = result.words;
+  if (!words?.length || words.some((word) => !lexical(word.text))) return null;
+  if (lexical(result.text) !== words.map((word) => lexical(word.text)).join('')) return null;
+  let cursor = 0;
+  return words.map((word) => {
+    const from = cursor;
+    let remaining = Array.from(lexical(word.text)).length;
+    while (remaining > 0 && cursor < result.text.length) {
+      const character = String.fromCodePoint(result.text.codePointAt(cursor)!);
+      cursor += character.length;
+      if (/[\p{L}\p{N}]/u.test(character)) remaining--;
+    }
+    while (cursor < result.text.length) {
+      const character = String.fromCodePoint(result.text.codePointAt(cursor)!);
+      if (/[\p{L}\p{N}]/u.test(character)) break;
+      cursor += character.length;
+    }
+    return { from, to: cursor };
   });
 }
+
 /** Provider segments are not sentences; split words at pauses and punctuation. */
 export function reviewSpeechPhrases(
   result: AudioTranscriptResult,
@@ -80,15 +93,64 @@ export function reviewSpeechPhrases(
     (result.segments?.length && !valid(result.segments))
   )
     throw new Error('invalid-response');
-  if (result.words?.some((word) => word.start === word.end)) {
-    const anchors = result.words.filter((word) => word.end > word.start);
-    // The chunk is the only proven bound for missing alignment. Preserve the complete
-    // provider text and valid anchors without assigning invented times to missing words.
-    return [phrase(result.text.trim(), start, end, 'range', anchors.length ? anchors : undefined)];
+  const spans = wordTextSpans(result);
+  const segmentTextMatches =
+    result.segments
+      ?.map((segment) => segment.text)
+      .join('')
+      .replace(/\s/gu, '') === result.text.replace(/\s/gu, '');
+  if (
+    (result.words?.some((word) => word.start === word.end) || (result.words?.length && !spans)) &&
+    valid(result.segments) &&
+    segmentTextMatches
+  ) {
+    let cursor = 0;
+    return result
+      .segments!.filter((segment) => segment.text.trim())
+      .flatMap((segment) => {
+        const words: AudioTranscriptTiming[] = [];
+        while (cursor < (result.words?.length ?? 0)) {
+          const word = result.words![cursor]!;
+          if (word.start >= segment.end) break;
+          cursor++;
+          if (word.start >= segment.start && word.end <= segment.end)
+            words.push({
+              ...word,
+              start: word.start - segment.start,
+              end: word.end - segment.start,
+            });
+        }
+        const local = { text: segment.text.trim(), words };
+        return words.length &&
+          !words.some((word) => word.start === word.end) &&
+          wordTextSpans(local)
+          ? reviewSpeechPhrases(
+              local,
+              start + segment.start,
+              Math.min(end, start + segment.end),
+              options
+            )
+          : [
+              phrase(
+                segment.text.trim(),
+                start + segment.start,
+                Math.min(end, start + segment.end),
+                'segment'
+              ),
+            ];
+      });
+  }
+  if (result.words?.some((word) => word.start === word.end) || (result.words?.length && !spans)) {
+    const anchors = result.words?.filter((word) => word.end > word.start);
+    return [phrase(result.text.trim(), start, end, 'range', anchors?.length ? anchors : undefined)];
   }
   if (valid(result.words)) {
     const groups: AudioTranscriptTiming[][] = [];
-    for (const word of result.words!) {
+    const restored = result.words!.map((word, index) => ({
+      ...word,
+      text: result.text.slice(spans![index]!.from, spans![index]!.to).trim(),
+    }));
+    for (const word of restored) {
       const group = groups.at(-1);
       const previous = group?.at(-1);
       if (
@@ -102,9 +164,11 @@ export function reviewSpeechPhrases(
     }
     return groups.map((group) =>
       phrase(
-        group
-          .map((word) => word.text)
-          .join(' ')
+        result.text
+          .slice(
+            spans![restored.indexOf(group[0]!)]!.from,
+            spans![restored.indexOf(group.at(-1)!)]!.to
+          )
           .trim(),
         start + group[0]!.start,
         Math.min(end, start + group.at(-1)!.end),
@@ -168,16 +232,12 @@ export async function transcribeReviewSpeech(
   ).getSegments();
   const ranges =
     target.kind === 'original'
-      ? map
-          .filter((part) => part.kind !== 'cut')
-          .map((part) => ({
-            start: Math.max(part.sourceStart, selection?.start ?? 0),
-            end: Math.min(
-              part.sourceEnd,
-              selection?.end ?? state.snapshot.workspace.source.duration
-            ),
-          }))
-          .filter((range) => range.end > range.start)
+      ? [
+          {
+            start: selection?.start ?? 0,
+            end: selection?.end ?? state.snapshot.workspace.source.duration,
+          },
+        ]
       : projectReviewVoiceover([getReviewSpeechClip(session, target.clipId)], map).map((slice) => ({
           start: slice.sourceOffset,
           end: slice.sourceOffset + slice.duration * (slice.playbackRate ?? 1),

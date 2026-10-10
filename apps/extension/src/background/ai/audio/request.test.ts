@@ -124,7 +124,7 @@ it('accepts WAV alias and encodes optional synthesis parameters exactly once', a
     })
   );
 });
-it('includes prompt and optional word granularity only when explicitly configured', async () => {
+it('requests segment fallback alongside explicitly configured word timing', async () => {
   const fetchMock = vi.fn<typeof fetch>(
     async () => new Response('{"text":""}', { headers: { 'Content-Type': 'application/json' } })
   );
@@ -152,7 +152,7 @@ it('includes prompt and optional word granularity only when explicitly configure
   expect(verbose.get('response_format')).toBe('verbose_json');
   expect(verbose.get('language')).toBe('en');
   expect(verbose.get('prompt')).toBe('Names');
-  expect(verbose.get('timestamp_granularities[]')).toBe('word');
+  expect(verbose.getAll('timestamp_granularities[]')).toEqual(['word', 'segment']);
   await run(transcription, transcriptionConfig);
   const plainRequest = fetchMock.mock.calls[1]?.[1];
   const plain = await new Response(plainRequest?.body, {

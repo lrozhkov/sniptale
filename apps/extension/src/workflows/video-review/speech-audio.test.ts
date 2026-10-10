@@ -1,3 +1,4 @@
+import { AUDIO_INPUT_MAX_SECONDS } from '../../contracts/ai/audio';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   encodeReviewSpeechWav,
@@ -108,7 +109,7 @@ it('rejects unavailable, invalid and cancelled decode work without retaining a d
     [0, NaN],
     [-1, 1],
     [2, 1],
-    [0, 301],
+    [0, AUDIO_INPUT_MAX_SECONDS + 1],
   ])
     await expect(extractReviewSpeechWav('asset', a!, b!, signal)).rejects.toThrow(
       'invalid-request'
@@ -133,7 +134,7 @@ it('uses quiet local windows to bound chunk requests and preserves separate nati
       numberOfChannels: 1,
       numberOfFrames: 64000,
       sampleRate: 16000,
-      timestamp: 56,
+      timestamp: AUDIO_INPUT_MAX_SECONDS - 4,
       copyTo: (plane) => plane.fill(0),
       close: vi.fn(),
     },
@@ -141,22 +142,26 @@ it('uses quiet local windows to bound chunk requests and preserves separate nati
   const ranges = await planReviewSpeechChunks(
     'asset',
     [
-      { start: 0, end: 61 },
-      { start: 70, end: 72 },
+      { start: 0, end: AUDIO_INPUT_MAX_SECONDS + 1 },
+      { start: AUDIO_INPUT_MAX_SECONDS + 10, end: AUDIO_INPUT_MAX_SECONDS + 12 },
     ],
     new AbortController().signal
   );
   expect(ranges).toEqual([
-    { start: 0, end: 59.95 },
-    { start: 59.95, end: 61 },
-    { start: 70, end: 72 },
+    { start: 0, end: AUDIO_INPUT_MAX_SECONDS - 0.05 },
+    { start: AUDIO_INPUT_MAX_SECONDS - 0.05, end: AUDIO_INPUT_MAX_SECONDS + 1 },
+    { start: AUDIO_INPUT_MAX_SECONDS + 10, end: AUDIO_INPUT_MAX_SECONDS + 12 },
   ]);
   decoder.samples[0]!.copyTo = (plane) => plane.fill(0.5);
   expect(
-    await planReviewSpeechChunks('asset', [{ start: 0, end: 61 }], new AbortController().signal)
+    await planReviewSpeechChunks(
+      'asset',
+      [{ start: 0, end: AUDIO_INPUT_MAX_SECONDS + 1 }],
+      new AbortController().signal
+    )
   ).toEqual([
-    { start: 0, end: 60 },
-    { start: 60, end: 61 },
+    { start: 0, end: AUDIO_INPUT_MAX_SECONDS },
+    { start: AUDIO_INPUT_MAX_SECONDS, end: AUDIO_INPUT_MAX_SECONDS + 1 },
   ]);
 });
 it('measures generated duration from decoded PCM and closes contexts on malformed output', async () => {
@@ -204,4 +209,16 @@ it('extracts the already-bound original Blob without acquiring or copying a Libr
   expect(decoder.bytes).not.toHaveBeenCalled();
   expect(close).toHaveBeenCalledOnce();
   expect(decoder.dispose).toHaveBeenCalled();
+});
+
+it('keeps the supplied 330.425-second source in one upload under the PCM byte budget', async () => {
+  decoder.bytes.mockClear();
+  expect(
+    await planReviewSpeechChunks(
+      new Blob(['source']),
+      [{ start: 0, end: 330.425 }],
+      new AbortController().signal
+    )
+  ).toEqual([{ start: 0, end: 330.425 }]);
+  expect(decoder.bytes).not.toHaveBeenCalled();
 });
