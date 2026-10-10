@@ -81,6 +81,7 @@ it('returns sanitized model selection bootstrap without provider base URLs', asy
           connectionType: 'openai-compatible',
           createdAt: 1,
           destinationKind: 'external',
+          destinationBinding: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
           hasStoredApiKey: true,
           id: 'provider-1',
           name: 'Provider',

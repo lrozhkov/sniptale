@@ -1,3 +1,4 @@
+import { betaV16Fixture } from './beta-v16';
 import { betaV15Fixture } from './beta-v15';
 import { betaV14Fixture } from './beta-v14';
 import { betaV13Fixture } from './beta-v13';
@@ -44,4 +45,5 @@ export const SUPPORTED_BETA_DATABASE_FIXTURES: readonly BetaDatabaseFixtureContr
   betaV13Fixture,
   betaV14Fixture,
   betaV15Fixture,
+  betaV16Fixture,
 ];

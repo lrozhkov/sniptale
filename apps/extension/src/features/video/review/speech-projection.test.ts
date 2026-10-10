@@ -51,65 +51,45 @@ const schedule = (voice: QuickEditAudioClip[]) =>
     playbackRate: playbackRate ?? 1,
   }));
 
-describe('native speech replacement projection shared by preview and export', () => {
-  it('preserves both original sides and leaves the shorter result tail silent without overlay', () => {
-    expect(schedule([clip()])).toEqual([
+describe('ordinary authored projection with retained alpha transcript metadata', () => {
+  it('plays the ordinary clip once and retains descriptive legacy replacements without scheduling them', () => {
+    const before = clip();
+    const preserved = structuredClone(before);
+    expect(schedule([before])).toEqual([
       {
         assetId: 'project-asset:original',
         sourceOffset: 10,
         timelineStart: 0,
-        duration: 3,
-        playbackRate: 1,
-      },
-      {
-        assetId: 'project-asset:generated',
-        sourceOffset: 0,
-        timelineStart: 3,
-        duration: 2,
-        playbackRate: 1,
-      },
-      {
-        assetId: 'project-asset:original',
-        sourceOffset: 17,
-        timelineStart: 7,
-        duration: 3,
+        duration: 10,
         playbackRate: 1,
       },
     ]);
-    expect(plan([clip()]).map((entry) => entry.fadePhase)).toEqual([
-      { offset: 0, duration: 10 },
-      { offset: 3, duration: 10 },
-      { offset: 7, duration: 10 },
-    ]);
+    expect(plan([before])[0]).toMatchObject({ fadeIn: 2, fadeOut: 2, duration: 10 });
+    expect(plan([before])[0]?.fadePhase).toBeUndefined();
+    expect(before).toEqual(preserved);
+    expect(schedule([before]).some((entry) => entry.assetId === 'project-asset:generated')).toBe(
+      false
+    );
   });
-
-  it('keeps native binding under move and trim, including trim through a generated phrase', () => {
+  it('moves and trims the whole ordinary recording without creating implicit generated slices', () => {
     const map = buildReviewTimeMap(30, []);
     const anchored = anchorReviewVoiceover(clip(), map);
     const moved = moveReviewVoiceover(anchored, 5, 30, map);
     expect(
       schedule(projectReviewVoiceover([moved], map)).map((entry) => entry.timelineStart)
-    ).toEqual([5, 8, 12]);
+    ).toEqual([5]);
     const trimmed = trimReviewVoiceover(anchored, 'start', 4, 30, 30, map);
     expect(schedule(projectReviewVoiceover([trimmed], map))).toEqual([
       {
-        assetId: 'project-asset:generated',
-        sourceOffset: 1,
-        timelineStart: 4,
-        duration: 1,
-        playbackRate: 1,
-      },
-      {
         assetId: 'project-asset:original',
-        sourceOffset: 17,
-        timelineStart: 7,
-        duration: 3,
+        sourceOffset: 14,
+        timelineStart: 4,
+        duration: 6,
         playbackRate: 1,
       },
     ]);
   });
-
-  it('uses clip tempo and restores identical samples when a Cut is removed', () => {
+  it('projects actual Cut and tempo samples and restores the original recording after removing the Cut', () => {
     const uncut = buildReviewTimeMap(20, []);
     const anchored = anchorReviewVoiceover(clip(), uncut);
     const cut = buildReviewTimeMap(20, [
@@ -120,21 +100,14 @@ describe('native speech replacement projection shared by preview and export', ()
         assetId: 'project-asset:original',
         sourceOffset: 10,
         timelineStart: 0,
-        duration: 3,
-        playbackRate: 1,
-      },
-      {
-        assetId: 'project-asset:generated',
-        sourceOffset: 0,
-        timelineStart: 3,
-        duration: 1,
+        duration: 4,
         playbackRate: 1,
       },
       {
         assetId: 'project-asset:original',
-        sourceOffset: 17,
-        timelineStart: 5,
-        duration: 3,
+        sourceOffset: 16,
+        timelineStart: 4,
+        duration: 4,
         playbackRate: 1,
       },
     ]);
@@ -158,10 +131,6 @@ describe('native speech replacement projection shared by preview and export', ()
         entry.duration,
         entry.playbackRate,
       ])
-    ).toEqual([
-      [0, 1.5, 2],
-      [1.5, 1, 2],
-      [3.5, 1.5, 2],
-    ]);
+    ).toEqual([[0, 5, 2]]);
   });
 });

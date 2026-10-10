@@ -6,9 +6,296 @@ import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critic
 import {
   installSpeechPortFixture,
   persistedSpeech,
+  persistedReviewContent,
   speechModelResponse,
   syntheticSpeechWav,
 } from '../support/voiceover-speech-fixture';
+import {
+  REVIEW_TEXT_PORT_NAME,
+  type ReviewTextClientMessage,
+} from '../../../../apps/extension/src/contracts/ai/review-text';
+
+const textModelResponse = {
+  ...speechModelResponse,
+  modelSelection: {
+    ...speechModelResponse.modelSelection!,
+    providers: speechModelResponse.modelSelection!.providers.map((provider) => ({
+      ...provider,
+      destinationBinding: `sha256:${'a'.repeat(64)}`,
+    })),
+    models: [
+      ...speechModelResponse.modelSelection!.models,
+      {
+        id: '00000000-0000-4000-8000-000000000104',
+        providerId: '00000000-0000-4000-8000-000000000101',
+        modelCode: 'fixture-text',
+        displayName: 'Fixture text',
+        operation: 'text',
+      },
+    ],
+  },
+};
+
+async function installTextPortFixture(page: Page) {
+  await page.evaluate(
+    ({ name }) => {
+      const original = chrome.runtime.connect.bind(chrome.runtime);
+      chrome.runtime.connect = ((options: chrome.runtime.ConnectInfo) => {
+        if (options.name !== name) return original(options);
+        const listeners = new Set<(message: unknown) => void>();
+        const disconnects = new Set<() => void>();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let closed = false;
+        return {
+          name,
+          onMessage: {
+            addListener: (listener: (message: unknown) => void) => listeners.add(listener),
+            removeListener: (listener: (message: unknown) => void) => listeners.delete(listener),
+          },
+          onDisconnect: {
+            addListener: (listener: () => void) => disconnects.add(listener),
+            removeListener: (listener: () => void) => disconnects.delete(listener),
+          },
+          disconnect() {
+            closed = true;
+            clearTimeout(timer);
+            disconnects.forEach((listener) => listener());
+          },
+          postMessage(message: ReviewTextClientMessage) {
+            if (message.type !== 'start' || closed) return;
+            timer = setTimeout(() => {
+              const fragments = message.context.resegment
+                ? [
+                    {
+                      fromIds: message.context.fragments.map((fragment) => fragment.id),
+                      text: `AI: ${message.context.fragments.map((fragment) => fragment.text).join(' ')}`,
+                      ...message.context.window,
+                    },
+                  ]
+                : message.context.fragments.map((fragment) => ({
+                    fromIds: [fragment.id],
+                    text: `AI: ${fragment.text}`,
+                    ...(message.context.changeIntervals
+                      ? { start: fragment.start, end: fragment.end }
+                      : {}),
+                  }));
+              if (!closed)
+                listeners.forEach((listener) =>
+                  listener({
+                    type: 'proposal',
+                    requestId: message.requestId,
+                    proposal: { version: 1, fragments },
+                  })
+                );
+            }, 750);
+          },
+        } as unknown as chrome.runtime.Port;
+      }) as typeof chrome.runtime.connect;
+    },
+    { name: REVIEW_TEXT_PORT_NAME }
+  );
+}
+
+async function checkFullTextRewrite(
+  page: Page,
+  dialog: Locator,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => Promise<unknown>
+) {
+  const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
+  const before = await persistedReviewContent(page);
+  await document.getByRole('searchbox').fill('Вторая');
+  await expect(document.locator('[data-ui="gallery.videoReview.textPhrase"]')).toHaveCount(1);
+  await document
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteAll'), exact: true })
+    .click();
+  const form = dialog.locator('[data-ui="gallery.videoReview.textRewrite"]');
+  await expect(form).toContainText(
+    label('gallery.videoReview.textRewriteAllScope').replace('{count}', '2')
+  );
+  await form
+    .getByRole('textbox', { name: label('gallery.videoReview.textRewritePrompt'), exact: true })
+    .fill('Перепиши весь сценарий');
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteMode'), exact: true })
+    .click();
+  await page
+    .getByRole('option', { name: label('gallery.videoReview.textRewriteScript'), exact: true })
+    .click();
+  await expect(
+    form.getByRole('switch', {
+      name: label('gallery.videoReview.textRewriteStructure'),
+      exact: true,
+    })
+  ).toHaveCount(0);
+  await form
+    .getByRole('switch', { name: label('gallery.videoReview.textRewriteTiming'), exact: true })
+    .click();
+  const structure = form.getByRole('switch', {
+    name: label('gallery.videoReview.textRewriteStructure'),
+    exact: true,
+  });
+  await expect(structure).toHaveAttribute('aria-checked', 'false');
+  await structure.click();
+  await expect(structure).toHaveAttribute('aria-checked', 'true');
+  await capture('text-rewrite-permissions.png');
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteStart'), exact: true })
+    .click();
+  await expect(form).toContainText(
+    label('gallery.videoReview.textRewritePreview').replace('{count}', '1')
+  );
+  await form
+    .locator('summary')
+    .filter({ hasText: label('gallery.videoReview.textRewriteMapping') })
+    .click();
+  const sourceName = label('gallery.videoReview.textRewriteSource').replace('{index}', '1');
+  await expect(form.getByRole('button', { name: sourceName, exact: true })).toHaveCount(2);
+  await form
+    .getByRole('button', {
+      name: label('gallery.videoReview.textRewriteSourceRemove').replace('{index}', '1'),
+      exact: true,
+    })
+    .nth(1)
+    .click();
+  await form
+    .getByRole('button', {
+      name: label('gallery.videoReview.textRewriteSourceAdd').replace('{index}', '1'),
+      exact: true,
+    })
+    .click();
+  await page.getByRole('option').filter({ hasText: before!.text!.fragments[1]!.text }).click();
+  await expect(form.getByRole('button', { name: sourceName, exact: true })).toHaveCount(2);
+  await capture('text-rewrite-mapping.png');
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteVariant'), exact: true })
+    .click();
+  await expect(form).toContainText(label('gallery.videoReview.textRewriteApplied'));
+  const after = (await persistedReviewContent(page))!;
+  expect(after.audio).toEqual(before!.audio);
+  expect(after.text!.fragments.slice(0, 2)).toEqual(before!.text!.fragments);
+  expect(after.text!.fragments[2]).toMatchObject({
+    showInVideo: false,
+    timeDomain: 'result',
+    derivedFrom: before!.text!.fragments.map((fragment) => fragment.id),
+  });
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textVoiceBack'), exact: true })
+    .click();
+  await expect(document.getByRole('searchbox')).toHaveValue('Вторая');
+  await document.getByRole('searchbox').fill('');
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
+    .click();
+  await expect
+    .poll(async () => (await persistedReviewContent(page))!.text!.fragments.length)
+    .toBe(2);
+}
+
+async function checkTextRewrite(
+  page: Page,
+  dialog: Locator,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => Promise<unknown>,
+  viewportHeight: number
+) {
+  const before = await persistedReviewContent(page);
+  const audio = structuredClone(before!.audio);
+  const originalText = before!.text!.fragments[0]!.text;
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteTitle'), exact: true })
+    .click();
+  const form = dialog.locator('[data-ui="gallery.videoReview.textRewrite"]');
+  await expect(form).toBeVisible();
+  await expect(dialog.locator('[data-ui="gallery.videoReview.textVoice"]')).toHaveCount(0);
+  await expect(
+    form.getByRole('switch', { name: label('gallery.videoReview.textRewriteTiming'), exact: true })
+  ).toHaveAttribute('aria-checked', 'false');
+  await expect(
+    form.getByRole('switch', {
+      name: label('gallery.videoReview.textRewriteStructure'),
+      exact: true,
+    })
+  ).toHaveCount(0);
+  await form
+    .getByRole('textbox', { name: label('gallery.videoReview.textRewritePrompt'), exact: true })
+    .fill('Сократи текст');
+  const start = form.getByRole('button', {
+    name: label('gallery.videoReview.textRewriteStart'),
+    exact: true,
+  });
+  await expect(start).toBeEnabled();
+  await capture('text-rewrite-form.png');
+  await start.click();
+  await expect(form.locator('svg.animate-spin')).toBeVisible();
+  await form.getByRole('button', { name: label('common.actions.cancel'), exact: true }).click();
+  await expect(form.locator('svg.animate-spin')).toHaveCount(0);
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(form.locator('svg.animate-spin')).toBeVisible();
+  await capture('text-rewrite-waiting.png');
+  const result = form.getByRole('textbox', {
+    name: label('gallery.videoReview.textRewriteResult').replace('{index}', '1'),
+    exact: true,
+  });
+  await expect(result).toHaveValue(`AI: ${originalText}`);
+  expect((await persistedReviewContent(page))!.text).toEqual(before!.text);
+  const replacement = `Изменено: ${originalText}`;
+  await result.fill(replacement);
+  const replace = form.getByRole('button', {
+    name: label('gallery.videoReview.textRewriteReplace'),
+    exact: true,
+  });
+  await replace.scrollIntoViewIfNeeded();
+  const box = (await replace.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(viewportHeight);
+  await capture('text-rewrite-preview.png');
+  await replace.click();
+  await expect(form).toContainText(label('gallery.videoReview.textRewriteApplied'));
+  const after = (await persistedReviewContent(page))!;
+  expect(after.audio).toEqual(audio);
+  expect(after.text!.fragments[0]!.text).toBe(replacement);
+  expect(after.text!.fragments[0]!.id).toBe(before!.text!.fragments[0]!.id);
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textVoiceBack'), exact: true })
+    .click();
+  await expect(
+    dialog.getByRole('button', { name: label('gallery.videoReview.textRewriteTitle'), exact: true })
+  ).toBeFocused();
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
+    .click();
+  await expect(
+    dialog.getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
+  ).toHaveValue(originalText);
+  expect((await persistedReviewContent(page))!.text).toEqual(before!.text);
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteTitle'), exact: true })
+    .click();
+  await form
+    .getByRole('textbox', { name: label('gallery.videoReview.textRewritePrompt'), exact: true })
+    .fill('Предложи альтернативу');
+  await start.click();
+  await expect(result).toHaveValue(`AI: ${originalText}`);
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteVariant'), exact: true })
+    .click();
+  await expect(form).toContainText(label('gallery.videoReview.textRewriteApplied'));
+  const alternative = (await persistedReviewContent(page))!;
+  expect(alternative.audio).toEqual(audio);
+  expect(alternative.text!.fragments.slice(0, 2)).toEqual(before!.text!.fragments);
+  expect(alternative.text!.fragments[2]!.showInVideo).toBe(false);
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textVoiceBack'), exact: true })
+    .click();
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
+    .click();
+  await expect
+    .poll(async () => (await persistedReviewContent(page))!.text!.fragments.length)
+    .toBe(2);
+  expect((await persistedReviewContent(page))!.text).toEqual(before!.text);
+}
 
 async function checkLocalTakes(
   page: Page,
@@ -217,13 +504,17 @@ for (const variant of [
           'sniptale-locale-preference': variant.locale,
           'sniptale-theme-preference': variant.theme,
         },
-        runtimeResponses: { AI_SETTINGS_QUERY: speechModelResponse },
+        runtimeResponses: {
+          AI_SETTINGS_QUERY: textModelResponse,
+          REQUEST_LLM_SESSION: { success: true, token: 'fixture-review-text-token' },
+        },
       });
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
       await installSpeechPortFixture(page);
+      await installTextPortFixture(page);
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
@@ -393,11 +684,22 @@ for (const variant of [
       await expect(voice).toHaveCount(0);
       await expect(button('gallery.videoReview.speechGenerate')).toBeFocused();
       await expect(button('gallery.videoReview.speechGenerate')).toBeInViewport();
+      await checkTextRewrite(
+        page,
+        dialog,
+        label,
+        (name) =>
+          page.screenshot({ path: info.outputPath(name), fullPage: false, animations: 'disabled' }),
+        variant.height
+      );
       await button('gallery.videoReview.textTrackOpen').click();
       await expect(document).toBeVisible();
       await expect(
         dialog.getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
       ).toHaveCount(0);
+      await checkFullTextRewrite(page, dialog, label, (name) =>
+        page.screenshot({ path: info.outputPath(name), fullPage: false, animations: 'disabled' })
+      );
       await document
         .getByRole('button', {
           name: label('gallery.videoReview.speechBatch'),

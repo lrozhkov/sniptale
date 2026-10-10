@@ -25,6 +25,61 @@ const segments = buildReviewTimeMap(12, [
   },
 ]);
 
+it('opens v13 text, captions and linked mutes without dropping current or historical fields', () => {
+  const state = createQuickEditAdvancedState();
+  state.text = {
+    version: 1,
+    fragments: [
+      {
+        id: 'text',
+        text: 'Saved',
+        originalText: 'Saved',
+        start: 0,
+        end: 1,
+        timeDomain: 'source',
+        revision: 0,
+        timingRevision: 0,
+        alignment: 'manual',
+        showInVideo: true,
+        origin: { kind: 'original', start: 0, end: 1 },
+      },
+    ],
+  };
+  state.audio.voiceoverSegments = buildReviewTimeMap(12, []);
+  state.audio.voiceover = [
+    {
+      id: 'take',
+      assetId: 'project-asset:voice',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  state.audio.original.mutes = [{ id: 'bound', kind: 'take', clipId: 'take' }];
+  const current = loadQuickEditAdvancedState({ ...state, schemaVersion: 13 });
+  expect(current).toEqual(state);
+  const content = reviewAdvancedContentBaseline(state);
+  expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 13 })).toEqual(content);
+  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 15 })).toBeNull();
+  const invalid = {
+    ...state,
+    text: {
+      ...state.text,
+      fragments: [
+        {
+          ...state.text.fragments[0],
+          origins: [{ kind: 'original', start: 0, end: 1 }],
+        },
+      ],
+    },
+  };
+  expect(loadQuickEditAdvancedState(invalid)).toBeNull();
+});
+
 const v1State = (): QuickEditAdvancedState => {
   const state = createQuickEditAdvancedState();
   return {

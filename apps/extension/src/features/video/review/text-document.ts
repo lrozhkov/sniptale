@@ -1,8 +1,22 @@
+import type { ReviewSpeechWord } from './speech-transcript';
 import type {
-  ReviewSpeechPhrase,
-  ReviewSpeechProfile,
-  ReviewSpeechWord,
-} from './speech-transcript';
+  ReviewTextOrigin,
+  ReviewCaptionStyle,
+  ReviewCaptionSettings,
+  ReviewTextFragment,
+  ReviewTextDocument,
+  ReviewVoiceTextSnapshot,
+  ReviewTextEditResult,
+} from './text-types';
+export type {
+  ReviewTextOrigin,
+  ReviewCaptionStyle,
+  ReviewCaptionSettings,
+  ReviewTextFragment,
+  ReviewTextDocument,
+  ReviewVoiceTextSnapshot,
+  ReviewTextEditResult,
+} from './text-types';
 import { parseReviewTextDocument } from './text-validation';
 import type { AudioTextJobScope } from '../../../contracts/ai/audio';
 
@@ -22,65 +36,11 @@ export function matchesReviewTextScope(
   );
 }
 
-/** Provenance is descriptive, not an asset lease or authority to extract audio. */
-export interface ReviewTextOrigin {
-  kind: 'original' | 'voiceover';
-  clipId?: string;
-  /** Native seconds of the recognized source, independent of the current placement. */
-  start: number;
-  end: number;
-  words?: ReviewSpeechWord[];
-}
-
-/** Caption sizes are fractions of the final frame height, independent of camera zoom. */
-export interface ReviewCaptionStyle {
-  position: 'top' | 'bottom';
-  fontSize: number;
-  color: string;
-  background: string;
-}
-
-export interface ReviewCaptionSettings {
-  enabled: boolean;
-  style: ReviewCaptionStyle;
-}
-
-/** Words, start and end share the declared clock; revision counts content changes only. */
-export interface ReviewTextFragment extends ReviewSpeechPhrase {
-  timeDomain: 'source' | 'result';
-  timingRevision: number;
-  showInVideo: boolean;
-  style?: ReviewCaptionStyle;
-  origin?: ReviewTextOrigin;
-  language?: string;
-  variantId?: string;
-  derivedFrom?: string[];
-}
-
-/** Standalone authored text; audio clips and their lifetimes are independent. */
-export interface ReviewTextDocument {
-  version: 1;
-  fragments: ReviewTextFragment[];
-}
-
-/** Immutable association retained by an ordinary voiceover clip, even after text deletion. */
-export interface ReviewVoiceTextSnapshot {
-  kind: 'ai' | 'microphone' | 'gallery';
-  textId: string;
-  revision: number;
-  timingRevision: number;
-  text: string;
-  start: number;
-  end: number;
-  timeDomain: 'source' | 'result';
-  profile?: ReviewSpeechProfile;
-}
-
-export type ReviewTextEditResult =
-  | { ok: true; document: ReviewTextDocument }
-  | { ok: false; reason: 'stale' | 'invalid' | 'alignment' | 'gap' };
-
 export const createReviewTextDocument = (): ReviewTextDocument => ({ version: 1, fragments: [] });
+
+export function reviewTextOrigins(fragment: ReviewTextFragment): ReviewTextOrigin[] {
+  return fragment.origins ?? (fragment.origin ? [fragment.origin] : []);
+}
 
 /** Shared scene and per-fragment style defaults; legacy documents do not enable burn-in. */
 export function createReviewCaptionSettings(): ReviewCaptionSettings {
@@ -267,6 +227,7 @@ export function mergeReviewTextFragments(
     left.timeDomain !== right.timeDomain ||
     left.origin?.kind !== right.origin?.kind ||
     left.origin?.clipId !== right.origin?.clipId ||
+    JSON.stringify(left.origins) !== JSON.stringify(right.origins) ||
     left.showInVideo !== right.showInVideo ||
     JSON.stringify(left.style) !== JSON.stringify(right.style) ||
     left.language !== right.language ||

@@ -1,5 +1,7 @@
 import { createAudioJobService } from '../../../ai/audio/service';
 import { registerAudioJobPorts } from '../../../ai/audio/port';
+import { createReviewTextJobService } from '../../../ai/llm/review-text-job';
+import { registerReviewTextPorts } from '../../../ai/llm/review-text-port';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { initializeBackgroundContextMenus } from '../../context-menu/service';
 import {
@@ -39,8 +41,10 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   // The service worker has no localStorage paint hint, so keep its translation state hydrated.
   subscribeToLocaleChanges(() => undefined);
   const audioJobs = createAudioJobService();
-  configureAudioJobPrivacyErasurePort(audioJobs);
+  const textJobs = createReviewTextJobService();
+  configureAudioJobPrivacyErasurePort(audioJobs, textJobs);
   registerAudioJobPorts(audioJobs);
+  registerReviewTextPorts(textJobs);
   configureDownloadPort({ executeDownloadBlob });
   runStartupMaintenance(state, logger);
   registerInstallListener(logger);

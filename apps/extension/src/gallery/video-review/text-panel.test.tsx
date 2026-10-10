@@ -3,6 +3,10 @@ import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTextDocumentPanel } from './text-panel';
+import { ReviewSelectedTextProperties } from './selected-properties';
+import { createVideoReviewSession } from '../../workflows/video-review/session';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import type { ReviewTextVoiceAccess } from './use-text-voice';
 import { useReviewText } from './use-review-text';
 import type {
   ReviewTextDocument,
@@ -17,6 +21,28 @@ vi.mock('./use-speech', () => ({
   useReviewSpeech: () => {
     throw new Error('Text editing must not mount an audio job controller');
   },
+}));
+vi.mock('./text-rewrite-panel', () => ({
+  ReviewTextRewriteForm: (props: {
+    ids: readonly string[];
+    wholeDocument: boolean;
+    onClose(): void;
+  }) => (
+    <section
+      data-form="rewrite"
+      data-ids={props.ids.join(',')}
+      data-whole={String(props.wholeDocument)}
+    >
+      <button onClick={props.onClose}>Back</button>
+    </section>
+  ),
+}));
+vi.mock('./text-voice-panel', () => ({
+  ReviewTextVoiceForm: (props: { ids: readonly string[]; onClose(): void }) => (
+    <section data-form="voice" data-ids={props.ids.join(',')}>
+      <button onClick={props.onClose}>Back</button>
+    </section>
+  ),
 }));
 
 let host: HTMLDivElement;
@@ -35,7 +61,15 @@ const phrase = (index: number): ReviewTextFragment => ({
   alignment: 'manual',
   showInVideo: true,
 });
-function Fixture({ count = 120 }: { count?: number }) {
+function Fixture({
+  count = 120,
+  voice,
+  selectedId,
+}: {
+  count?: number;
+  voice?: ReviewTextVoiceAccess;
+  selectedId?: string;
+}) {
   const document = useRef<ReviewTextDocument>({
     version: 1,
     fragments: Array.from({ length: count }, (_, index) => phrase(index)),
@@ -55,7 +89,31 @@ function Fixture({ count = 120 }: { count?: number }) {
     seek,
     pause: vi.fn(),
   });
-  return <ReviewTextDocumentPanel editor={editor} snapshots={[]} busy={false} />;
+  return selectedId ? (
+    <ReviewSelectedTextProperties editor={editor} id={selectedId} busy={false} voice={voice} />
+  ) : (
+    <ReviewTextDocumentPanel editor={editor} snapshots={[]} busy={false} voice={voice} />
+  );
+}
+function voiceAccess(): ReviewTextVoiceAccess {
+  return {
+    beforeRequest: vi.fn(async () => undefined),
+    session: createVideoReviewSession({
+      workspace: {
+        aggregateId: 'video',
+        sourceAssetId: 'source',
+        formatVersion: 1,
+        revision: 1,
+        source: { duration: 600, width: 640, height: 360, size: 5, mimeType: 'video/webm' },
+        advanced: createQuickEditAdvancedState(),
+        history: [],
+        cursor: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      draft: null,
+    }),
+  };
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -82,6 +140,61 @@ afterEach(() => {
 });
 const button = (label: string) =>
   host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!;
+
+it('opens all-text rewriting independently of search and filtered batch scope, returning focus to its trigger', () => {
+  act(() => root.render(<Fixture count={3} voice={voiceAccess()} />));
+  const search = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      search,
+      'Phrase 2'
+    );
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => button('textRewriteAll').click());
+  expect(host.querySelector('[data-form]')?.getAttribute('data-ids')).toBe('text-0,text-1,text-2');
+  expect(host.querySelector('[data-form]')?.getAttribute('data-whole')).toBe('true');
+  act(() => host.querySelector<HTMLButtonElement>('[data-form] button')!.click());
+  expect(document.activeElement).toBe(button('textRewriteAll'));
+  expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('Phrase 2');
+  act(() => button('speechBatch').click());
+  act(() => button('textFragmentSelectFound').click());
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="rewrite:batch"]')!.click()
+  );
+  expect(host.querySelector('[data-form]')?.getAttribute('data-ids')).toBe('text-2');
+  expect(host.querySelector('[data-form]')?.getAttribute('data-whole')).toBe('false');
+  act(() => host.querySelector<HTMLButtonElement>('[data-form] button')!.click());
+  act(() => host.querySelector<HTMLButtonElement>('[data-text-id] button[aria-expanded]')!.click());
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="rewrite:text-2"]')!.click()
+  );
+  expect(host.querySelector('[data-form="rewrite"]')).not.toBeNull();
+  act(() => host.querySelector<HTMLButtonElement>('[data-form] button')!.click());
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="fragment:text-2"]')!.click()
+  );
+  expect(host.querySelector('[data-form="voice"]')).not.toBeNull();
+});
+
+it('keeps a selected fragment form exclusive and drops it on selection change or deletion', () => {
+  const voice = voiceAccess();
+  const render = (selectedId: string) =>
+    act(() => root.render(<Fixture count={2} voice={voice} selectedId={selectedId} />));
+  render('text-0');
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="rewrite:selected"]')!.click()
+  );
+  expect(host.querySelector('[data-form]')?.getAttribute('data-ids')).toBe('text-0');
+  render('text-1');
+  expect(host.querySelector('[data-form]')).toBeNull();
+  act(() => host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="selected"]')!.click());
+  expect(host.querySelector('[data-form="voice"]')?.getAttribute('data-ids')).toBe('text-1');
+  act(() => host.querySelector<HTMLButtonElement>('[data-form] button')!.click());
+  expect(document.activeElement).toBe(host.querySelector('[data-text-voice-trigger="selected"]'));
+  render('missing');
+  expect(host.childElementCount).toBe(0);
+});
 
 it('edits, hides and removes canonical text without changing timing or mounting an audio controller', () => {
   act(() => root.render(<Fixture count={1} />));

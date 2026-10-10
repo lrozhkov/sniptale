@@ -8,7 +8,10 @@ import { SpeechTranscriptionModelField } from './speech-profile';
 import { ReviewTextPhrase } from './speech-phrase';
 import { useReviewText } from './use-review-text';
 import { useReviewRecognition, type ReviewRecognitionAccess } from './use-recognition';
-import type { ReviewTextFragment } from '../../features/video/review/text-document';
+import {
+  reviewTextOrigins,
+  type ReviewTextFragment,
+} from '../../features/video/review/text-document';
 import { translate } from '../../platform/i18n';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 
@@ -69,8 +72,12 @@ export function ReviewSpeechPanel(props: Props) {
     recognition.snapshot.document.advancedContent.text?.fragments.filter(
       (fragment) =>
         fragment.id === linkedTextId ||
-        (fragment.origin?.kind === props.target.kind &&
-          (props.target.kind === 'original' || fragment.origin.clipId === props.target.clipId))
+        (reviewTextOrigins(fragment).length > 0 &&
+          reviewTextOrigins(fragment).every(
+            (origin) =>
+              origin.kind === props.target.kind &&
+              (props.target.kind === 'original' || origin.clipId === props.target.clipId)
+          ))
     ) ?? [];
   return (
     <section

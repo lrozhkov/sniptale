@@ -6,7 +6,11 @@ import {
 } from '../../../../features/ai/egress-authority';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createAiPrivacyProof, type LlmPrivacyPayload } from '../../../../features/ai/privacy';
-import { issueLlmSessionToken, resetLlmSessionTokensForTests } from '../session-tokens';
+import {
+  consumeLlmSessionToken,
+  issueLlmSessionToken,
+  resetLlmSessionTokensForTests,
+} from '../session-tokens';
 import {
   authorizeContentLlmRoute,
   authorizeLlmSessionRequestRoute,
@@ -96,6 +100,121 @@ function stubCryptoRandomUuid(): void {
 beforeEach(() => {
   resetLlmSessionTokensForTests();
   stubCryptoRandomUuid();
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+});
+
+it('admits review-text sessions only for the exact Gallery sender and matching purpose', () => {
+  const owned = {
+    id: 'test',
+    frameId: 0,
+    documentId: 'gallery',
+    url: 'chrome-extension://test/apps/extension/src/gallery/index.html',
+  };
+  const message = {
+    type: MessageType.REQUEST_LLM_SESSION,
+    purpose: 'review-text',
+    egressAuthority: {
+      contractVersion: 1,
+      purpose: 'review-text',
+      payloadHash: `sha256:${'a'.repeat(64)}`,
+    },
+  };
+  expect(authorizeLlmSessionRequestRoute({ message, sender: owned })).toEqual({ authorized: true });
+  for (const patch of [
+    { id: 'foreign' },
+    { frameId: 1 },
+    { documentId: '' },
+    { url: 'https://example.test/' },
+  ]) {
+    expect(
+      authorizeLlmSessionRequestRoute({
+        message,
+        sender: { ...owned, ...patch },
+      }).authorized
+    ).toBe(false);
+  }
+  expect(
+    authorizeLlmSessionRequestRoute({
+      message: { ...message, purpose: 'scenario-editor' },
+      sender: owned,
+    }).authorized
+  ).toBe(false);
+});
+
+it('refuses incomplete authority and isolates review purpose from legacy payload routes', async () => {
+  expect(
+    authorizeLlmSessionRequestRoute({
+      sender: {},
+      message: {
+        type: MessageType.REQUEST_LLM_SESSION,
+        purpose: 'review-text',
+      },
+    })
+  ).toEqual({ authorized: false, reason: 'Invalid LLM session request' });
+  await expect(
+    authorizeContentLlmRoute({
+      sender: {},
+      message: { type: MessageType.PROCESS_WITH_LLM, purpose: 'review-text' },
+    })
+  ).resolves.toEqual({
+    authorized: false,
+    reason: 'Missing AI privacy proof',
+  });
+  await expect(
+    authorizeContentLlmRoute({
+      sender: {},
+      message: {
+        type: MessageType.PROCESS_WITH_LLM,
+        purpose: 'review-text',
+        privacyProof: {},
+      },
+    })
+  ).resolves.toEqual({ authorized: false, reason: 'Invalid LLM request' });
+  await expect(
+    authorizeScenarioEditorLlmRoute({
+      sender: {},
+      message: {
+        type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
+        purpose: 'review-text',
+      },
+    })
+  ).resolves.toEqual({ authorized: false, reason: 'Invalid LLM request' });
+});
+
+it('refuses a changed legacy privacy payload before consuming its valid one-shot authority', async () => {
+  const llmSender = sender({ documentId: 'document-7', frameId: 0, tabId: 7, url: CONTENT_URL });
+  const payload = await withPrivacyProof({ jsonData: '{"fields":[{"id":"issued"}]}' });
+  const authority = await createContentAiEgressAuthority({
+    payload: { jsonData: payload.jsonData },
+    privacyProof: payload.privacyProof,
+  });
+  const token = issueLlmSessionToken({
+    egressAuthority: authority,
+    purpose: 'content-ai-pick',
+    sender: llmSender,
+  });
+  const result = await authorizeContentLlmRoute({
+    sender: llmSender,
+    message: {
+      ...payload,
+      jsonData: '{"fields":[{"id":"changed"}]}',
+      llmSessionToken: token ?? '',
+      prompt: 'Normalize',
+      type: MessageType.PROCESS_WITH_LLM,
+    },
+  });
+  expect(result).toEqual({
+    authorized: false,
+    reason: 'AI privacy proof payload binding mismatch',
+  });
+  expect(
+    consumeLlmSessionToken({
+      egressAuthority: authority,
+      purpose: 'content-ai-pick',
+      sender: llmSender,
+      token: token!,
+    })
+  ).toBe(true);
 });
 
 afterEach(() => {

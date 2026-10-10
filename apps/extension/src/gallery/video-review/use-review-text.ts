@@ -6,6 +6,7 @@ import {
   editReviewTextFragment,
   mergeReviewTextFragments,
   reviewVoiceTextStatus,
+  reviewTextOrigins,
   splitReviewTextFragment,
   type ReviewTextDocument,
   type ReviewTextEditResult,
@@ -43,7 +44,10 @@ export function queryReviewText(
     const status = voices.get(fragment.id);
     return (
       (!query || fragment.text.toLocaleLowerCase().includes(query)) &&
-      (filters.origin === 'all' || (fragment.origin?.kind ?? 'manual') === filters.origin) &&
+      (filters.origin === 'all' ||
+        (filters.origin === 'manual'
+          ? !reviewTextOrigins(fragment).length
+          : reviewTextOrigins(fragment).some((origin) => origin.kind === filters.origin))) &&
       (filters.visibility === 'all' || fragment.showInVideo === (filters.visibility === 'shown')) &&
       (filters.voice === 'all' ||
         (filters.voice === 'none'

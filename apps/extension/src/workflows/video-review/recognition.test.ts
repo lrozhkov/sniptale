@@ -562,7 +562,7 @@ describe('recognition Save and disposable proposal acceptance', () => {
   it('replaces only fully scoped recognized phrases and preserves edited unrelated text and audio', async () => {
     const { session } = fixture(10);
     let document = createReviewTextDocument();
-    for (const id of ['related', 'partial', 'manual']) {
+    for (const id of ['related', 'partial', 'manual', 'mixed']) {
       const added = addReviewTextFragment(document, {
         id,
         start: id === 'partial' ? 0 : 1,
@@ -576,13 +576,21 @@ describe('recognition Save and disposable proposal acceptance', () => {
     document = {
       ...document,
       fragments: document.fragments.map((fragment) =>
-        fragment.id === 'manual'
-          ? fragment
-          : {
+        fragment.id === 'mixed'
+          ? {
               ...fragment,
-              revision: 2,
-              origin: { kind: 'original', start: fragment.start, end: fragment.end },
+              origins: [
+                { kind: 'original', start: 1, end: 3 },
+                { kind: 'voiceover', clipId: 'other-take', start: 1, end: 3 },
+              ],
             }
+          : fragment.id === 'manual'
+            ? fragment
+            : {
+                ...fragment,
+                revision: 2,
+                origin: { kind: 'original', start: fragment.start, end: fragment.end },
+              }
       ),
     };
     const advanced = session.getSnapshot().snapshot.workspace.advanced;
@@ -599,6 +607,7 @@ describe('recognition Save and disposable proposal acceptance', () => {
     expect(state.text?.fragments.map((fragment) => fragment.text)).toEqual([
       'Edited partial',
       'Edited manual',
+      'Edited mixed',
       'Sentence.',
     ]);
     expect(state.audio.original).toEqual({ volume: 0.4, muted: true });

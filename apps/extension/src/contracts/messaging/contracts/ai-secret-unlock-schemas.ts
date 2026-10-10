@@ -16,7 +16,7 @@ export const aiSecretUnlockMessageSchema = defineAISecretUnlockMessageSchema(
     baseUnlockSchema
       .extend({
         operation: z.literal('start'),
-        purpose: z.enum(['content-ai-pick', 'scenario-editor']),
+        purpose: z.enum(['content-ai-pick', 'scenario-editor', 'review-text']),
       })
       .strict(),
     baseUnlockSchema

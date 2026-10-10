@@ -1,6 +1,7 @@
 import { ReviewTextPhrase } from './speech-phrase';
 import { ReviewTextVoiceForm } from './text-voice-panel';
-import { useReviewTextVoiceMode } from './text-voice-focus';
+import { ReviewTextRewriteForm } from './text-rewrite-panel';
+import { useReviewTextFormMode } from './text-voice-focus';
 import type { ReviewTextVoiceAccess } from './use-text-voice';
 import type { useReviewText } from './use-review-text';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
@@ -30,7 +31,7 @@ import type { useReviewExport } from './use-export';
 import { ReviewEditRangeFields } from './edit-range-fields';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
-import { Trash2, Volume2 } from 'lucide-react';
+import { Trash2, Volume2, WandSparkles } from 'lucide-react';
 import {
   ReviewButton,
   ReviewInterval,
@@ -495,14 +496,22 @@ export function ReviewSelectedTextProperties(props: {
   busy: boolean;
   voice?: ReviewTextVoiceAccess | undefined;
 }) {
-  const voiceMode = useReviewTextVoiceMode<HTMLFieldSetElement>();
+  const voiceMode = useReviewTextFormMode<HTMLFieldSetElement>(props.id);
   const fragment = props.editor.document.fragments.find((entry) => entry.id === props.id);
   if (!fragment) return null;
   if (voiceMode.ids && props.voice)
-    return (
+    return voiceMode.kind === 'rewrite' ? (
+      <ReviewTextRewriteForm
+        access={props.voice}
+        ids={voiceMode.ids}
+        wholeDocument={false}
+        disabled={props.busy}
+        onClose={voiceMode.close}
+      />
+    ) : (
       <ReviewTextVoiceForm
         access={props.voice}
-        ids={[fragment.id]}
+        ids={voiceMode.ids}
         disabled={props.busy}
         onClose={voiceMode.close}
       />
@@ -524,15 +533,26 @@ export function ReviewSelectedTextProperties(props: {
         onJump={() => props.editor.jump(fragment)}
         actions={
           props.voice && (
-            <ReviewButton
-              data-text-voice-trigger="selected"
-              label={translate('gallery.videoReview.speechGenerate')}
-              className={`${reviewTextButtonClassName} !w-8 !px-0`}
-              disabled={props.busy || !fragment.text.trim()}
-              onClick={() => voiceMode.open([fragment.id], 'selected')}
-            >
-              <Volume2 size={14} />
-            </ReviewButton>
+            <>
+              <ReviewButton
+                data-text-voice-trigger="selected"
+                label={translate('gallery.videoReview.speechGenerate')}
+                className={`${reviewTextButtonClassName} !w-8 !px-0`}
+                disabled={props.busy || !fragment.text.trim()}
+                onClick={() => voiceMode.open([fragment.id], 'selected')}
+              >
+                <Volume2 size={14} />
+              </ReviewButton>
+              <ReviewButton
+                data-text-voice-trigger="rewrite:selected"
+                label={translate('gallery.videoReview.textRewriteTitle')}
+                className={`${reviewTextButtonClassName} !w-8 !px-0`}
+                disabled={props.busy}
+                onClick={() => voiceMode.open([fragment.id], 'rewrite:selected', 'rewrite')}
+              >
+                <WandSparkles size={14} />
+              </ReviewButton>
+            </>
           )
         }
       />

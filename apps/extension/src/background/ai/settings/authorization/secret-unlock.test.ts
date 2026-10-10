@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { AISecretUnlockMessage } from '../../../../contracts/messaging/ai-secret-unlock';
 import { authorizeAISecretUnlockSenderForState, buildUnlockUrl } from './secret-unlock';
@@ -47,6 +47,25 @@ function createStatusMessage(requestId = 'request-1'): AISecretUnlockMessage {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal('chrome', { runtime: { id: 'extension-id' } });
+});
+afterEach(() => vi.unstubAllGlobals());
+
+it('binds Gallery review-text unlock status to the exact owned document', () => {
+  const sender = {
+    id: 'extension-id',
+    frameId: 0,
+    documentId: 'gallery-one',
+    url: 'chrome-extension://extension-id/apps/extension/src/gallery/index.html',
+  };
+  const message = createStatusMessage();
+  const record = { senderKey: 'review-text:document:gallery-one' };
+  expect(authorizeAISecretUnlockSenderForState({ message, record, sender })).toBeNull();
+  for (const patch of [{ id: 'foreign' }, { documentId: 'gallery-two' }, { frameId: 1 }]) {
+    expect(
+      authorizeAISecretUnlockSenderForState({ message, record, sender: { ...sender, ...patch } })
+    ).toBe('Unauthorized AI secret unlock status reader');
+  }
 });
 
 it('authorizes status reads only for the pending request owner', () => {

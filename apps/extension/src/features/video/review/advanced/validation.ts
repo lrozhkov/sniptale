@@ -481,6 +481,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     !isRecord(raw) ||
     (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 13 &&
       raw['schemaVersion'] !== 12 &&
       raw['schemaVersion'] !== 11 &&
       raw['schemaVersion'] !== 10 &&
@@ -494,6 +495,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
       raw['schemaVersion'] !== 2) ||
     (raw['webcam'] !== undefined &&
       raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 13 &&
       raw['schemaVersion'] !== 12 &&
       raw['schemaVersion'] !== 11 &&
       raw['schemaVersion'] !== 10 &&
@@ -510,6 +512,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 13 ||
       raw['schemaVersion'] === 12 ||
       raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
@@ -525,6 +528,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const audio = parseAudioState(
     raw['audio'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 13 ||
       raw['schemaVersion'] === 12 ||
       raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
@@ -544,6 +548,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 13 &&
     raw['schemaVersion'] !== 12 &&
     raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
@@ -559,6 +564,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     raw['presentation'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 13 &&
     raw['schemaVersion'] !== 12 &&
     raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
@@ -606,6 +612,7 @@ export function loadQuickEditAdvancedState(
   const version = raw['schemaVersion'];
   if (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+    version === 13 ||
     version === 12 ||
     version === 11 ||
     version === 10 ||
@@ -637,6 +644,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['webcam'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 13 &&
     raw['schemaVersion'] !== 12 &&
     raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
@@ -653,6 +661,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 13 ||
       raw['schemaVersion'] === 12 ||
       raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
@@ -668,6 +677,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const audio = parseAudioState(
     raw['audio'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 13 ||
       raw['schemaVersion'] === 12 ||
       raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
@@ -687,6 +697,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 13 &&
     raw['schemaVersion'] !== 12 &&
     raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
@@ -702,6 +713,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['presentation'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 13 &&
     raw['schemaVersion'] !== 12 &&
     raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&

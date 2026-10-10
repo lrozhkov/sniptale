@@ -1,4 +1,6 @@
 import type { ScenarioAIAttachment } from '../../../contracts/ai/scenario';
+import { reviewTextContextSchema, type ReviewTextStart } from '../../../contracts/ai/review-text';
+import type { AIProvider } from '../../../contracts/settings';
 import { createAiPayloadHash, type AiPrivacyProof, type LlmPrivacyPayload } from '../privacy';
 import { createSha256Digest } from '@sniptale/platform/security/digest';
 import { AiEgressAuthorityError } from './errors';
@@ -8,6 +10,7 @@ import {
   AI_EGRESS_AUTHORITY_CONTRACT_VERSION,
   type AiEgressAuthority,
   type ContentAiEgressAuthority,
+  type ReviewTextAiEgressAuthority,
   type ScenarioAiAttachmentSummary,
   type ScenarioEditorAiEgressAuthority,
   type ScenarioEditorCanonicalEgressPayload,
@@ -20,6 +23,7 @@ export {
   AI_EGRESS_AUTHORITY_CONTRACT_VERSION,
   type AiEgressAuthority,
   type ContentAiEgressAuthority,
+  type ReviewTextAiEgressAuthority,
   type ScenarioAiAttachmentSummary,
   type ScenarioAiAttachmentSummaryItem,
   type ScenarioEditorAiEgressAuthority,
@@ -110,6 +114,43 @@ export async function createScenarioEditorEgressAuthorityFromCanonical(
 
 export function createAiEgressAuthorityKey(authority: AiEgressAuthority): string {
   return stableStringify(authority);
+}
+
+/** Binds consent to text, permissions and destination without exposing a provider URL. */
+export async function createReviewTextEgressAuthority(
+  input: Pick<
+    ReviewTextStart,
+    | 'context'
+    | 'scope'
+    | 'modelId'
+    | 'approvedProviderId'
+    | 'approvedDestination'
+    | 'approvedModelCode'
+  >
+): Promise<ReviewTextAiEgressAuthority> {
+  const context = reviewTextContextSchema.parse(input.context);
+  return {
+    contractVersion: AI_EGRESS_AUTHORITY_CONTRACT_VERSION,
+    purpose: 'review-text',
+    payloadHash: await createAiEgressPayloadHash({
+      context,
+      scope: input.scope,
+      modelId: input.modelId,
+      approvedProviderId: input.approvedProviderId,
+      approvedDestination: input.approvedDestination,
+      approvedModelCode: input.approvedModelCode,
+    }),
+  };
+}
+
+export function createAIProviderDestinationBinding(
+  provider: Pick<AIProvider, 'id' | 'baseUrl' | 'connectionType'>
+): Promise<string> {
+  return createAiEgressPayloadHash({
+    id: provider.id,
+    baseUrl: provider.baseUrl,
+    connectionType: provider.connectionType,
+  });
 }
 
 async function createScenarioAttachmentSummary(

@@ -1,6 +1,7 @@
 import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import {
   createReviewTextDocument,
+  reviewTextOrigins,
   type ReviewTextDocument,
 } from '../../features/video/review/text-document';
 import { parseReviewTextDocument } from '../../features/video/review/text-validation';
@@ -192,10 +193,12 @@ export async function prepareReviewRecognition(
   job.relatedIds = (session.getSnapshot().document.advancedContent.text?.fragments ?? [])
     .filter(
       (fragment) =>
-        fragment.origin?.kind === target.kind &&
-        (target.kind === 'original' || fragment.origin.clipId === target.clipId) &&
-        ranges.some(
-          (range) => fragment.origin!.start >= range.start && fragment.origin!.end <= range.end
+        reviewTextOrigins(fragment).length > 0 &&
+        reviewTextOrigins(fragment).every(
+          (origin) =>
+            origin.kind === target.kind &&
+            (target.kind === 'original' || origin.clipId === target.clipId) &&
+            ranges.some((range) => origin.start >= range.start && origin.end <= range.end)
         )
     )
     .map((fragment) => fragment.id);

@@ -31,8 +31,30 @@ const workspace: VideoWorkspace = {
   updatedAt: 3,
 };
 
-it('restores source mute identities with their ordinary take while remapping only immutable assets', async () => {
+it('restores mixed text provenance and source mutes while remapping only immutable assets', async () => {
   const advanced = createQuickEditAdvancedState();
+  advanced.text = {
+    version: 1,
+    fragments: [
+      {
+        id: 'rewritten',
+        text: 'New script',
+        originalText: 'Old phrases',
+        start: 0,
+        end: 1,
+        timeDomain: 'result',
+        revision: 0,
+        timingRevision: 0,
+        alignment: 'manual',
+        showInVideo: false,
+        derivedFrom: ['first', 'second'],
+        origins: [
+          { kind: 'original', start: 0, end: 1, words: [{ text: 'Old', start: 0, end: 1 }] },
+          { kind: 'voiceover', clipId: 'take', start: 0, end: 1 },
+        ],
+      },
+    ],
+  };
   advanced.audio.voiceoverSegments = buildReviewTimeMap(workspace.source.duration, []);
   advanced.audio.voiceover = [
     {
@@ -67,6 +89,7 @@ it('restores source mute identities with their ordinary take while remapping onl
     assetIdMap: new Map([['voice', 'new-voice']]),
   });
   expect(restored.workspace.advanced.audio.original.mutes).toEqual(advanced.audio.original.mutes);
+  expect(restored.workspace.advanced.text).toEqual(advanced.text);
   expect(restored.workspace.advanced.audio.voiceover[0]).toMatchObject({
     id: 'take',
     assetId: 'project-asset:new-voice',

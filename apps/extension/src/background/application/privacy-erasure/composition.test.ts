@@ -116,21 +116,38 @@ it('configures screenshot cleanup through the application port', () => {
 it('cancels audio requests and waits for their staging writes before storage erasure', async () => {
   const events: string[] = [];
   const release = vi.fn(() => events.push('release'));
-  configureAudioJobPrivacyErasurePort({
-    connect: vi.fn(),
-    cancelActiveJob: async () => {
-      events.push('cancel');
+  configureAudioJobPrivacyErasurePort(
+    {
+      cancelActiveJob: async () => {
+        events.push('cancel');
+      },
+      reserveErasureExclusion: () => {
+        events.push('reserve');
+        return {
+          release,
+          waitForActiveMutations: async () => {
+            events.push('settled');
+          },
+        };
+      },
     },
-    reserveErasureExclusion: () => {
-      events.push('reserve');
-      return {
-        release,
-        waitForActiveMutations: async () => {
-          events.push('settled');
-        },
-      };
-    },
-  });
+    {
+      async cancelActiveJob() {
+        events.push('cancel-text');
+      },
+      reserveErasureExclusion() {
+        events.push('reserve-text');
+        return {
+          release() {
+            events.push('release-text');
+          },
+          async waitForActiveMutations() {
+            events.push('settled-text');
+          },
+        };
+      },
+    }
+  );
   storageCleanupMock.mockImplementationOnce(async () => {
     events.push('storage');
     return {
@@ -152,6 +169,16 @@ it('cancels audio requests and waits for their staging writes before storage era
     createBackgroundRuntimeState()
   );
   expect(result.success).toBe(true);
-  expect(events).toEqual(['reserve', 'cancel', 'settled', 'storage', 'release']);
+  expect(events).toEqual([
+    'reserve',
+    'reserve-text',
+    'cancel',
+    'cancel-text',
+    'settled',
+    'settled-text',
+    'storage',
+    'release',
+    'release-text',
+  ]);
   expect(release).toHaveBeenCalledOnce();
 });

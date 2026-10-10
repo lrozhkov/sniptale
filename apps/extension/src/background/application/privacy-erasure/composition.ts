@@ -35,8 +35,37 @@ const nativeIngestionCleanupProxy: NativeIngestionCleanupPort = {
 };
 
 let audioJobs: Pick<AudioJobService, 'reserveErasureExclusion' | 'cancelActiveJob'> | undefined;
-export function configureAudioJobPrivacyErasurePort(port: AudioJobService): void {
-  audioJobs = port;
+export function configureAudioJobPrivacyErasurePort(
+  ...ports: Array<Pick<AudioJobService, 'reserveErasureExclusion' | 'cancelActiveJob'>>
+): void {
+  audioJobs = {
+    async cancelActiveJob() {
+      await Promise.all(ports.map((port) => port.cancelActiveJob()));
+    },
+    reserveErasureExclusion() {
+      const reservations: Array<ReturnType<AudioJobService['reserveErasureExclusion']>> = [];
+      try {
+        for (const port of ports) reservations.push(port.reserveErasureExclusion());
+      } catch (error) {
+        reservations.forEach((reservation) => reservation.release());
+        throw error;
+      }
+      let released = false;
+      return {
+        release() {
+          if (!released) {
+            released = true;
+            reservations.forEach((reservation) => reservation.release());
+          }
+        },
+        async waitForActiveMutations() {
+          await Promise.all(
+            reservations.map((reservation) => reservation.waitForActiveMutations())
+          );
+        },
+      };
+    },
+  };
 }
 
 const privacyErasureUseCase = new PrivacyErasureUseCase({

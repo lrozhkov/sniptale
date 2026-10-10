@@ -8,6 +8,7 @@ export type AIProviderSelectorEntry = Pick<
   'connectionType' | 'createdAt' | 'hasStoredApiKey' | 'id' | 'name'
 > & {
   destinationKind: AIProviderDestinationKind;
+  destinationBinding?: string | undefined;
 };
 
 export type AIModelSelectionBootstrapPayload = {

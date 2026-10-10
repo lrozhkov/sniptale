@@ -74,6 +74,7 @@ it('filters provenance and visibility independently of text and audio ownership'
     ...fragment(2),
     origin: { kind: 'voiceover' as const, clipId: 'source', start: 0, end: 3 },
   };
+  const mixed = { ...fragment(3), origins: [original.origin, voiceover.origin] };
   expect(
     queryReviewText(
       [manual, original, voiceover],
@@ -83,6 +84,12 @@ it('filters provenance and visibility independently of text and audio ownership'
     ).eligible
   ).toEqual([original.id]);
   expect(
-    queryReviewText([manual, original, voiceover], [], { ...all, origin: 'manual' }, []).found
+    queryReviewText([manual, original, voiceover, mixed], [], { ...all, origin: 'manual' }, [])
+      .found
   ).toEqual([manual]);
+  for (const origin of ['original', 'voiceover'] as const) {
+    expect(queryReviewText([mixed], [], { ...all, origin }, [mixed.id]).eligible).toEqual([
+      mixed.id,
+    ]);
+  }
 });

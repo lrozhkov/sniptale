@@ -92,10 +92,11 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   };
   const plan = buildDatabaseMigrationPlan(14, DB_VERSION);
   expect(buildDatabaseMigrationPlan(13, DB_VERSION)?.map((step) => step.toDatabaseVersion)).toEqual(
-    [14, 15]
+    [14, 15, 16]
   );
-  expect(plan).toHaveLength(1);
+  expect(plan).toHaveLength(2);
   expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 13, to: 14 }]);
+  expect(plan?.[1]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 14, to: 15 }]);
   handleDatabaseUpgrade(db, 14, DB_VERSION, transaction);
   expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);

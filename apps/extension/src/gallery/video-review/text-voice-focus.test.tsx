@@ -2,7 +2,7 @@
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useReviewTextVoiceMode } from './text-voice-focus';
+import { useReviewTextFormMode } from './text-voice-focus';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -18,9 +18,17 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-function Mode({ triggerKey, omitReturn = false }: { triggerKey: string; omitReturn?: boolean }) {
+function Mode({
+  triggerKey,
+  omitReturn = false,
+  scope,
+}: {
+  triggerKey: string;
+  omitReturn?: boolean;
+  scope?: string;
+}) {
   const [returned, setReturned] = useState(false);
-  const mode = useReviewTextVoiceMode<HTMLElement>();
+  const mode = useReviewTextFormMode<HTMLElement>(scope);
   if (mode.ids)
     return (
       <button
@@ -40,7 +48,11 @@ function Mode({ triggerKey, omitReturn = false }: { triggerKey: string; omitRetu
         <button
           data-text-voice-trigger={triggerKey}
           onClick={() => {
-            mode.open(['text'], triggerKey);
+            mode.open(
+              ['text'],
+              triggerKey,
+              triggerKey.startsWith('rewrite:') ? 'rewrite' : 'voice'
+            );
           }}
         >
           Generate
@@ -50,24 +62,38 @@ function Mode({ triggerKey, omitReturn = false }: { triggerKey: string; omitRetu
   );
 }
 
-it.each(['selected', 'fragment:Пример 🎤', 'batch'])(
-  'restores %s after its trigger is remounted',
-  async (triggerKey) => {
-    await act(async () => root.render(<Mode triggerKey={triggerKey} />));
-    const original = host.querySelector('button')!;
-    original.focus();
-    await act(async () => original.click());
-    expect(document.activeElement?.textContent).toBe('Return');
-    await act(async () => host.querySelector('button')!.click());
-    const replacement = host.querySelector('button')!;
-    expect(replacement).not.toBe(original);
-    expect(document.activeElement).toBe(replacement);
-  }
-);
+it.each([
+  'selected',
+  'fragment:Пример 🎤',
+  'batch',
+  'rewrite:selected',
+  'rewrite:fragment:Пример',
+  'rewrite:batch',
+  'rewrite:all',
+])('restores %s after its trigger is remounted', async (triggerKey) => {
+  await act(async () => root.render(<Mode triggerKey={triggerKey} />));
+  const original = host.querySelector('button')!;
+  original.focus();
+  await act(async () => original.click());
+  expect(document.activeElement?.textContent).toBe('Return');
+  await act(async () => host.querySelector('button')!.click());
+  const replacement = host.querySelector('button')!;
+  expect(replacement).not.toBe(original);
+  expect(document.activeElement).toBe(replacement);
+});
 
 it('returns to the local search when the original trigger disappeared', async () => {
   await act(async () => root.render(<Mode triggerKey="fragment:removed" omitReturn />));
   await act(async () => host.querySelector('button')!.click());
   await act(async () => host.querySelector('button')!.click());
   expect(document.activeElement).toBe(host.querySelector('input'));
+});
+
+it('closes the temporary form when another selected fragment owns the inspector', async () => {
+  await act(async () => root.render(<Mode triggerKey="rewrite:selected" scope="first" />));
+  await act(async () => host.querySelector('button')!.click());
+  expect(document.activeElement?.textContent).toBe('Return');
+  await act(async () => root.render(<Mode triggerKey="rewrite:selected" scope="second" />));
+  expect(host.querySelector('button')?.textContent).toBe('Generate');
+  expect(host.textContent).not.toContain('Return');
 });

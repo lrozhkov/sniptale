@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, SlidersHorizontal, Trash2, Volume2 } from 'lucide-react';
+import { Plus, SlidersHorizontal, Trash2, Volume2, WandSparkles } from 'lucide-react';
 import { ReviewTextVoiceForm } from './text-voice-panel';
-import { useReviewTextVoiceMode } from './text-voice-focus';
+import { ReviewTextRewriteForm } from './text-rewrite-panel';
+import { useReviewTextFormMode } from './text-voice-focus';
 import type { ReviewTextVoiceAccess } from './use-text-voice';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SelectField } from '../../ui/compact-inspector-controls';
@@ -52,7 +53,7 @@ type TextDocumentPanelProps = {
 };
 
 export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
-  const voiceMode = useReviewTextVoiceMode<HTMLElement>();
+  const voiceMode = useReviewTextFormMode<HTMLElement>();
   const list = useReviewTextDocumentList(props);
   const {
     filters,
@@ -69,7 +70,15 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
     filtered,
   } = list;
   if (voiceMode.ids && props.voice)
-    return (
+    return voiceMode.kind === 'rewrite' ? (
+      <ReviewTextRewriteForm
+        access={props.voice}
+        ids={voiceMode.ids}
+        wholeDocument={voiceMode.wholeDocument}
+        disabled={props.busy}
+        onClose={voiceMode.close}
+      />
+    ) : (
       <ReviewTextVoiceForm
         access={props.voice}
         ids={voiceMode.ids}
@@ -84,24 +93,16 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
       className="min-w-0 space-y-2"
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.textFragmentCount')
-            .replace('{found}', String(query.found.length))
-            .replace('{total}', String(fragments.length))}
-        </span>
-        <ReviewButton
-          label={translate('gallery.videoReview.textFragmentAdd')}
-          className={`${reviewTextButtonClassName} !w-8 !px-0`}
-          disabled={props.busy || props.editor.projection.resultDuration <= 0}
-          onClick={() => {
-            setFilters(emptyTextFilters);
-            props.editor.add(false);
-          }}
-        >
-          <Plus size={14} />
-        </ReviewButton>
-      </div>
+      <TextDocumentCommands
+        props={props}
+        mode={voiceMode}
+        fragments={fragments}
+        found={query.found.length}
+        onAdd={() => {
+          setFilters(emptyTextFilters);
+          props.editor.add(false);
+        }}
+      />
       <div className="flex min-w-0 items-center gap-1">
         <HistorySearch
           query={filters.query}
@@ -131,6 +132,9 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
         busy={props.busy}
         remove={props.editor.remove}
         onVoice={props.voice ? (ids) => voiceMode.open(ids, 'batch') : undefined}
+        onRewrite={
+          props.voice ? (ids) => voiceMode.open(ids, 'rewrite:batch', 'rewrite') : undefined
+        }
       />
       {props.editor.error && (
         <p role="alert" className="text-xs">
@@ -175,15 +179,7 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
             onJump={() => props.editor.jump(fragment)}
             actions={
               props.voice && (
-                <ReviewButton
-                  data-text-voice-trigger={`fragment:${fragment.id}`}
-                  label={translate('gallery.videoReview.speechGenerate')}
-                  className={`${reviewTextButtonClassName} !w-8 !px-0`}
-                  disabled={props.busy || !fragment.text.trim()}
-                  onClick={() => voiceMode.open([fragment.id], `fragment:${fragment.id}`)}
-                >
-                  <Volume2 size={14} />
-                </ReviewButton>
+                <TextPhraseVoiceActions fragment={fragment} busy={props.busy} mode={voiceMode} />
               )
             }
           />
@@ -331,6 +327,7 @@ function TextDocumentBatchActions(props: {
   busy: boolean;
   remove(ids: readonly string[]): void;
   onVoice?: ((ids: readonly string[]) => void) | undefined;
+  onRewrite?: ((ids: readonly string[]) => void) | undefined;
 }) {
   return (
     <>
@@ -383,6 +380,17 @@ function TextDocumentBatchActions(props: {
                 {translate('gallery.videoReview.speechGenerateSelected')}
               </ReviewButton>
             )}
+            {props.onRewrite && (
+              <ReviewButton
+                data-text-voice-trigger="rewrite:batch"
+                label={translate('gallery.videoReview.textRewriteSelected')}
+                className={buttonClass}
+                disabled={props.busy || !props.query.eligible.length}
+                onClick={() => props.onRewrite?.(props.query.eligible)}
+              >
+                {translate('gallery.videoReview.textRewriteSelected')}
+              </ReviewButton>
+            )}
           </>
         )}
       </div>
@@ -394,5 +402,88 @@ function TextDocumentBatchActions(props: {
         </p>
       )}
     </>
+  );
+}
+
+function TextPhraseVoiceActions({
+  fragment,
+  busy,
+  mode,
+}: {
+  fragment: import('../../features/video/review/text-document').ReviewTextFragment;
+  busy: boolean;
+  mode: ReturnType<typeof useReviewTextFormMode>;
+}) {
+  return (
+    <>
+      <ReviewButton
+        data-text-voice-trigger={`fragment:${fragment.id}`}
+        label={translate('gallery.videoReview.speechGenerate')}
+        className={`${reviewTextButtonClassName} !w-8 !px-0`}
+        disabled={busy || !fragment.text.trim()}
+        onClick={() => mode.open([fragment.id], `fragment:${fragment.id}`)}
+      >
+        <Volume2 size={14} />
+      </ReviewButton>
+      <ReviewButton
+        data-text-voice-trigger={`rewrite:${fragment.id}`}
+        label={translate('gallery.videoReview.textRewriteTitle')}
+        className={`${reviewTextButtonClassName} !w-8 !px-0`}
+        disabled={busy}
+        onClick={() => mode.open([fragment.id], `rewrite:${fragment.id}`, 'rewrite')}
+      >
+        <WandSparkles size={14} />
+      </ReviewButton>
+    </>
+  );
+}
+
+function TextDocumentCommands({
+  props,
+  mode,
+  fragments,
+  found,
+  onAdd,
+}: {
+  props: TextDocumentPanelProps;
+  mode: ReturnType<typeof useReviewTextFormMode>;
+  fragments: import('../../features/video/review/text-document').ReviewTextFragment[];
+  found: number;
+  onAdd(): void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-[var(--sniptale-color-text-muted)]">
+        {translate('gallery.videoReview.textFragmentCount')
+          .replace('{found}', String(found))
+          .replace('{total}', String(fragments.length))}
+      </span>
+      {props.voice && (
+        <ReviewButton
+          data-text-voice-trigger="rewrite:all"
+          label={translate('gallery.videoReview.textRewriteAll')}
+          className={`${reviewTextButtonClassName} !w-8 !px-0`}
+          disabled={props.busy || !fragments.length}
+          onClick={() =>
+            mode.open(
+              fragments.map((entry) => entry.id),
+              'rewrite:all',
+              'rewrite',
+              true
+            )
+          }
+        >
+          <WandSparkles size={14} />
+        </ReviewButton>
+      )}
+      <ReviewButton
+        label={translate('gallery.videoReview.textFragmentAdd')}
+        className={`${reviewTextButtonClassName} !w-8 !px-0`}
+        disabled={props.busy || props.editor.projection.resultDuration <= 0}
+        onClick={onAdd}
+      >
+        <Plus size={14} />
+      </ReviewButton>
+    </div>
   );
 }

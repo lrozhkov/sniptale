@@ -8,7 +8,7 @@ import type {
   ReviewTextFragment,
   ReviewTextOrigin,
   ReviewVoiceTextSnapshot,
-} from './text-document';
+} from './text-types';
 
 const identity = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0 && value.length <= 256 && value.trim() === value;
@@ -90,6 +90,24 @@ function parseReviewTextFragment(value: unknown): ReviewTextFragment | null {
   const style = value['style'] === undefined ? undefined : parseReviewCaptionStyle(value['style']);
   const origin = value['origin'] === undefined ? undefined : parseOrigin(value['origin']);
   if (!phrase || style === null || origin === null) return null;
+  let origins: ReviewTextOrigin[] | undefined;
+  if (value['origins'] !== undefined) {
+    if (
+      origin ||
+      !Array.isArray(value['origins']) ||
+      value['origins'].length === 0 ||
+      value['origins'].length > 2_000
+    )
+      return null;
+    origins = [];
+    const seen = new Set<string>();
+    for (const raw of value['origins']) {
+      const entry = parseOrigin(raw);
+      if (!entry || seen.has(JSON.stringify(entry))) return null;
+      seen.add(JSON.stringify(entry));
+      origins.push(entry);
+    }
+  }
   let derivedFrom: string[] | undefined;
   if (value['derivedFrom'] !== undefined) {
     if (
@@ -108,6 +126,7 @@ function parseReviewTextFragment(value: unknown): ReviewTextFragment | null {
     showInVideo: value['showInVideo'],
     ...(style ? { style } : {}),
     ...(origin ? { origin } : {}),
+    ...(origins ? { origins } : {}),
     ...(typeof value['language'] === 'string' ? { language: value['language'] } : {}),
     ...(typeof value['variantId'] === 'string' ? { variantId: value['variantId'] } : {}),
     ...(derivedFrom ? { derivedFrom } : {}),
@@ -131,7 +150,10 @@ export function parseReviewTextDocument(value: unknown): ReviewTextDocument | nu
     const fragment = parseReviewTextFragment(raw);
     if (!fragment || ids.has(fragment.id)) return null;
     ids.add(fragment.id);
-    words += (fragment.words?.length ?? 0) + (fragment.origin?.words?.length ?? 0);
+    words +=
+      (fragment.words?.length ?? 0) +
+      (fragment.origin?.words?.length ?? 0) +
+      (fragment.origins?.reduce((total, origin) => total + (origin.words?.length ?? 0), 0) ?? 0);
     textUnits += fragment.text.length + fragment.originalText.length;
     if (words > 40_000 || textUnits > 2_000_000) return null;
     fragments.push(fragment);

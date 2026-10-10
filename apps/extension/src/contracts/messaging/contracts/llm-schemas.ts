@@ -89,7 +89,7 @@ export const requestLlmSessionMessageSchema = defineRequestLlmSessionMessageSche
     .object({
       egressAuthority: aiEgressAuthoritySchema,
       type: z.literal(MessageType.REQUEST_LLM_SESSION),
-      purpose: z.enum(['content-ai-pick', 'scenario-editor']),
+      purpose: z.enum(['content-ai-pick', 'scenario-editor', 'review-text']),
     })
     .strict()
 );

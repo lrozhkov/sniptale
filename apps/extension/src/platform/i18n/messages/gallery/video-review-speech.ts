@@ -1,6 +1,70 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  textRewriteTitle: { ru: 'Правка текста', en: 'Edit text' },
+  textRewriteAll: { ru: 'Правка всего текста', en: 'Edit all text' },
+  textRewriteSelected: { ru: 'Правка выбранного текста', en: 'Edit selected text' },
+  textRewriteAllScope: {
+    ru: 'Вся дорожка: {count} фрагментов. Поиск и фильтры не ограничивают эту операцию.',
+    en: 'Whole track: {count} fragments. Search and filters do not limit this operation.',
+  },
+  textRewriteSelectedScope: {
+    ru: 'Выбрано фрагментов: {count}. Другие фрагменты останутся без изменений.',
+    en: 'Selected fragments: {count}. Other fragments stay unchanged.',
+  },
+  textRewriteModel: { ru: 'Модель AI', en: 'AI model' },
+  textRewriteDestination: { ru: 'Получатель: {provider}', en: 'Recipient: {provider}' },
+  textRewritePrompt: { ru: 'Как изменить текст', en: 'How to change the text' },
+  textRewriteMode: { ru: 'Контекст правки', en: 'Editing context' },
+  textRewritePhrases: { ru: 'Каждая фраза', en: 'Each phrase' },
+  textRewriteScript: { ru: 'Сценарий целиком', en: 'Whole script' },
+  textRewriteTiming: { ru: 'Разрешить менять интервалы', en: 'Allow interval changes' },
+  textRewriteWindow: {
+    ru: 'Разрешённый интервал в готовом видео',
+    en: 'Allowed interval in the output video',
+  },
+  textRewriteStructure: { ru: 'Разрешить новое разбиение', en: 'Allow new segmentation' },
+  textRewriteDisclosure: {
+    ru: 'Выбранному провайдеру отправятся инструкция, текст, язык и интервалы фраз. Звук и видео не отправляются. В истории AI сохраняются только модель, время и статус запроса.',
+    en: 'The selected provider receives the instruction, text, language and phrase intervals. Audio and video are not sent. AI history stores only model, time and request status.',
+  },
+  textRewriteOutbound: { ru: 'Что будет отправлено', en: 'What will be sent' },
+  textRewriteBudget: {
+    ru: 'Слишком много текста для одного запроса. Выберите меньше фрагментов или сократите инструкцию.',
+    en: 'Too much text for one request. Select fewer fragments or shorten the instruction.',
+  },
+  textRewriteInvalid: {
+    ru: 'Предложение выходит за разрешённые границы. Исправьте текст или интервалы.',
+    en: 'The proposal exceeds the allowed bounds. Correct the text or intervals.',
+  },
+  textRewriteStart: { ru: 'Получить вариант', en: 'Generate a proposal' },
+  textRewritePreview: {
+    ru: 'Проверка результата: {count} фрагментов',
+    en: 'Review proposal: {count} fragments',
+  },
+  textRewriteBefore: { ru: 'Было', en: 'Before' },
+  textRewriteMapping: { ru: 'Связь с исходными фразами', en: 'Source phrase mapping' },
+  textRewriteSource: {
+    ru: 'Исходная фраза для фрагмента {index}',
+    en: 'Source phrase for fragment {index}',
+  },
+  textRewriteSourceAdd: {
+    ru: 'Добавить исходную фразу к фрагменту {index}',
+    en: 'Add source phrase to fragment {index}',
+  },
+  textRewriteSourceRemove: {
+    ru: 'Убрать связь для фрагмента {index}',
+    en: 'Remove source link for fragment {index}',
+  },
+  textRewriteResult: { ru: 'Новый текст, фрагмент {index}', en: 'New text, fragment {index}' },
+  textRewriteTakeHint: {
+    ru: 'Готовая озвучка сохранится. Для изменённого текста её нужно обновить отдельно. Точное выравнивание по старой речи не переносится.',
+    en: 'Existing voice takes are retained. Update them separately for changed text. Precise alignment to the old speech is not transferred.',
+  },
+  textRewriteReplace: { ru: 'Заменить текст', en: 'Replace text' },
+  textRewriteVariant: { ru: 'Создать скрытый вариант', en: 'Create a hidden variant' },
+  textRewriteApplied: { ru: 'Правка применена', en: 'Text changes applied' },
+  textRewriteWaiting: { ru: 'Ожидание: {seconds} с', en: 'Waiting: {seconds} s' },
   recognitionTitle: { ru: 'Распознавание речи', en: 'Transcription' },
   recognitionHistoryDisclosure: {
     ru: 'Звук и распознанный текст не сохраняются в истории AI-запросов.',
