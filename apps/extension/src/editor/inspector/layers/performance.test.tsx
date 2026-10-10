@@ -68,6 +68,7 @@ import { EditorControllerProvider } from '../../application/controller-context';
 import { createImageEditorController } from '../../controller';
 import { translate, setLocalePreference } from '../../../platform/i18n';
 import * as localeState from '../../../platform/i18n/locale/state';
+import * as layerIcons from '../../chrome/tool-icons';
 import { useEditorStore } from '../../state/useEditorStore';
 import { EditorInspectorLayersPanel } from './index';
 
@@ -150,6 +151,43 @@ it('shares the existing list locale subscription across all memoized rows', () =
   const subscribe = vi.spyOn(localeState, 'subscribeToLocaleChanges');
   render(Array.from({ length: 20 }, (_, index) => createLayer(String(index))));
   expect(subscribe).toHaveBeenCalledTimes(2);
+});
+
+it('skips unchanged selected group children and publishes changed members', () => {
+  const icons = vi.spyOn(layerIcons, 'getLayerIcon');
+  const group: EditorLayerItem = {
+    ...createLayer('group'),
+    selected: true,
+    groupChildren: Array.from({ length: 32 }, (_, index) => ({
+      id: `child-${index}`,
+      name: `Child ${index}`,
+      type: 'shape',
+      typeLabel: 'Shape',
+    })),
+  };
+  const layers = [group];
+  const open = vi.fn();
+  render(layers, open);
+  expect(icons).toHaveBeenCalledTimes(32);
+  icons.mockClear();
+  render(layers, vi.fn());
+  expect(icons).not.toHaveBeenCalled();
+  render(
+    [
+      {
+        ...group,
+        groupChildren: [{ id: 'new', name: 'New member', type: 'arrow', typeLabel: 'Arrow' }],
+      },
+    ],
+    open
+  );
+  expect(icons).toHaveBeenCalledOnce();
+  expect(icons).toHaveBeenCalledWith('arrow');
+  expect(container.querySelector('[data-ui="editor.layers.group-children"]')!.textContent).toBe(
+    'New member'
+  );
+  render([{ ...group, selected: false }], open);
+  expect(container.querySelector('[data-ui="editor.layers.group-children"]')).toBeNull();
 });
 
 it('retains optional overflow panel collapse and keeps row events available', () => {

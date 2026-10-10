@@ -156,7 +156,7 @@ export function EditorInspectorLayersHeader({
   );
 }
 
-export function EditorInspectorLayersList({
+export const EditorInspectorLayersList = React.memo(function EditorInspectorLayersList({
   layers,
   dragOverLayerId,
   setDraggedLayerId,
@@ -220,4 +220,4 @@ export function EditorInspectorLayersList({
       )}
     </div>
   );
-}
+});
