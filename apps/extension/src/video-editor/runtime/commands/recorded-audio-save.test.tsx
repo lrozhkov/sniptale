@@ -27,6 +27,18 @@ it('retries a failed authoritative recording save without a second asset, clip o
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   document.body.append(host);
   const project = createEmptyVideoProject('Voice');
+  const generation = Symbol();
+  let requestedVersion = 0;
+  function publish(saveState: Parameters<typeof publishVideoEditorSaveReadiness>[0]['saveState']) {
+    if (saveState === 'dirty') requestedVersion += 1;
+    publishVideoEditorSaveReadiness({
+      projectId: project.id,
+      saveState,
+      generation,
+      requestedVersion,
+      savedVersion: saveState === 'saved' ? requestedVersion : 0,
+    });
+  }
   const track = createVideoProjectTrack('Voice', 1, VideoTrackKind.AUDIO);
   project.tracks.push(track);
   project.duration = 20;
@@ -60,8 +72,8 @@ it('retries a failed authoritative recording save without a second asset, clip o
     upsertAssets: vi.fn(),
     updateProject: vi.fn((updater) => {
       Object.assign(project, updater(project));
-      publishVideoEditorSaveReadiness({ projectId: project.id, saveState: 'dirty' });
-      publishVideoEditorSaveReadiness({ projectId: project.id, saveState: 'error' });
+      publish('dirty');
+      publish('error');
     }),
   };
   let handlers: ReturnType<typeof useAssetHandlers> | null = null;
@@ -90,8 +102,8 @@ it('retries a failed authoritative recording save without a second asset, clip o
       signal,
       take
     );
-    publishVideoEditorSaveReadiness({ projectId: project.id, saveState: 'dirty' });
-    publishVideoEditorSaveReadiness({ projectId: project.id, saveState: 'saved' });
+    publish('dirty');
+    publish('saved');
     await retry;
   });
   expect(importAsset).toHaveBeenCalledOnce();
