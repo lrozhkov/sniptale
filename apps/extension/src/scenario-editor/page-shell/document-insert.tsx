@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import {
   FileText,
   Heading,
@@ -26,9 +26,8 @@ export function GuideInsertScope({
   breaks?: readonly string[];
   children: ReactNode;
 }) {
-  return (
-    <InsertionAvailability value={{ blocked: value, breaks }}>{children}</InsertionAvailability>
-  );
+  const availability = useMemo(() => ({ blocked: value, breaks }), [value, breaks]);
+  return <InsertionAvailability value={availability}>{children}</InsertionAvailability>;
 }
 
 type InsertTarget =
