@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 /** Temporary voice mode returns to the corresponding newly rendered text trigger. */
 export function useReviewTextFormMode<T extends HTMLElement>(scope?: string) {
   const [ids, setIds] = useState<readonly string[] | null>(null);
-  const [kind, setKind] = useState<'voice' | 'rewrite'>('voice');
+  const [kind, setKind] = useState<'voice' | 'rewrite' | 'subtitles'>('voice');
   const [wholeDocument, setWholeDocument] = useState(false);
   const root = useRef<T>(null);
   const returnKey = useRef<string | null>(null);
@@ -33,7 +33,7 @@ export function useReviewTextFormMode<T extends HTMLElement>(scope?: string) {
     open: (
       selected: readonly string[],
       key: string,
-      form: 'voice' | 'rewrite' = 'voice',
+      form: 'voice' | 'rewrite' | 'subtitles' = 'voice',
       whole = false
     ) => {
       returnKey.current = key;

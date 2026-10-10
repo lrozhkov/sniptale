@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, SlidersHorizontal, Trash2, Volume2, WandSparkles } from 'lucide-react';
+import { Download, Plus, SlidersHorizontal, Trash2, Volume2, WandSparkles } from 'lucide-react';
+import { ReviewTextSubtitlesForm } from './text-subtitles-panel';
 import { ReviewTextVoiceForm } from './text-voice-panel';
 import { ReviewTextRewriteForm } from './text-rewrite-panel';
 import { useReviewTextFormMode } from './text-voice-focus';
@@ -50,6 +51,7 @@ type TextDocumentPanelProps = {
   snapshots: readonly ReviewVoiceTextSnapshot[];
   busy: boolean;
   voice?: ReviewTextVoiceAccess | undefined;
+  subtitleMainOffset?: number | null;
 };
 
 export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
@@ -69,23 +71,8 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
     query,
     filtered,
   } = list;
-  if (voiceMode.ids && props.voice)
-    return voiceMode.kind === 'rewrite' ? (
-      <ReviewTextRewriteForm
-        access={props.voice}
-        ids={voiceMode.ids}
-        wholeDocument={voiceMode.wholeDocument}
-        disabled={props.busy}
-        onClose={voiceMode.close}
-      />
-    ) : (
-      <ReviewTextVoiceForm
-        access={props.voice}
-        ids={voiceMode.ids}
-        disabled={props.busy}
-        onClose={voiceMode.close}
-      />
-    );
+  const form = reviewTextDocumentForm(props, voiceMode);
+  if (form) return form;
   return (
     <section
       ref={voiceMode.root}
@@ -135,6 +122,7 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
         onRewrite={
           props.voice ? (ids) => voiceMode.open(ids, 'rewrite:batch', 'rewrite') : undefined
         }
+        onSubtitles={(ids) => voiceMode.open(ids, 'subtitles:batch', 'subtitles')}
       />
       {props.editor.error && (
         <p role="alert" className="text-xs">
@@ -195,6 +183,42 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
         </ReviewButton>
       )}
     </section>
+  );
+}
+
+/** The existing exclusive form receiver chooses one operation before the document list renders. */
+function reviewTextDocumentForm(
+  props: TextDocumentPanelProps,
+  mode: ReturnType<typeof useReviewTextFormMode>
+) {
+  if (!mode.ids) return null;
+  if (mode.kind === 'subtitles')
+    return (
+      <ReviewTextSubtitlesForm
+        document={props.editor.document}
+        ids={mode.ids}
+        wholeDocument={mode.wholeDocument}
+        mainOffset={props.subtitleMainOffset ?? null}
+        disabled={props.busy}
+        onClose={mode.close}
+      />
+    );
+  if (!props.voice) return null;
+  return mode.kind === 'rewrite' ? (
+    <ReviewTextRewriteForm
+      access={props.voice}
+      ids={mode.ids}
+      wholeDocument={mode.wholeDocument}
+      disabled={props.busy}
+      onClose={mode.close}
+    />
+  ) : (
+    <ReviewTextVoiceForm
+      access={props.voice}
+      ids={mode.ids}
+      disabled={props.busy}
+      onClose={mode.close}
+    />
   );
 }
 
@@ -328,6 +352,7 @@ function TextDocumentBatchActions(props: {
   remove(ids: readonly string[]): void;
   onVoice?: ((ids: readonly string[]) => void) | undefined;
   onRewrite?: ((ids: readonly string[]) => void) | undefined;
+  onSubtitles(ids: readonly string[]): void;
 }) {
   return (
     <>
@@ -391,6 +416,15 @@ function TextDocumentBatchActions(props: {
                 {translate('gallery.videoReview.textRewriteSelected')}
               </ReviewButton>
             )}
+            <ReviewButton
+              data-text-voice-trigger="subtitles:batch"
+              label={translate('gallery.videoReview.subtitlesSelected')}
+              className={buttonClass}
+              disabled={props.busy || !props.query.eligible.length}
+              onClick={() => props.onSubtitles(props.query.eligible)}
+            >
+              {translate('gallery.videoReview.subtitlesSelected')}
+            </ReviewButton>
           </>
         )}
       </div>
@@ -458,6 +492,22 @@ function TextDocumentCommands({
           .replace('{found}', String(found))
           .replace('{total}', String(fragments.length))}
       </span>
+      <ReviewButton
+        data-text-voice-trigger="subtitles:all"
+        label={translate('gallery.videoReview.subtitlesTitle')}
+        className={`${reviewTextButtonClassName} !w-8 !px-0`}
+        disabled={props.busy || !fragments.length}
+        onClick={() =>
+          mode.open(
+            fragments.map((fragment) => fragment.id),
+            'subtitles:all',
+            'subtitles',
+            true
+          )
+        }
+      >
+        <Download size={14} />
+      </ReviewButton>
       {props.voice && (
         <ReviewButton
           data-text-voice-trigger="rewrite:all"

@@ -1,3 +1,4 @@
+import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-export';
 import { ReviewOriginalSpeechPanel } from './speech-panel';
 import { ReviewTextDocumentPanel } from './text-panel';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
@@ -142,14 +143,7 @@ export function ReviewInspectorBinding({
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
-        textDocument={
-          <ReviewTextDocumentPanel
-            editor={state.text}
-            snapshots={state.text.snapshots}
-            busy={busy || editing.exporter.phase !== 'idle'}
-            voice={reviewTextVoiceAccess(state, canvasComments)}
-          />
-        }
+        textDocument={reviewInspectorTextDocument(state, canvasComments)}
         speech={
           <ReviewSourceSpeechBinding
             resource={resource}
@@ -254,6 +248,37 @@ export function ReviewInspectorBinding({
         />
       </ReviewInspector>
     </ReviewIntervalMap.Provider>
+  );
+}
+
+/** Joins the text document to the existing voice buffers and canonical final-video clock. */
+function reviewInspectorTextDocument(
+  state: Pick<
+    InspectorState,
+    | 'text'
+    | 'busy'
+    | 'composer'
+    | 'flushAdvanced'
+    | 'session'
+    | 'video'
+    | 'registerSpeechFlush'
+    | 'beforeAction'
+    | 'setVoiceoverSilent'
+    | 'editing'
+  >,
+  canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
+) {
+  return (
+    <ReviewTextDocumentPanel
+      editor={state.text}
+      snapshots={state.text.snapshots}
+      busy={state.busy || state.editing.exporter.phase !== 'idle'}
+      voice={reviewTextVoiceAccess(state, canvasComments)}
+      subtitleMainOffset={reviewSubtitleMainOffset(
+        state.editing.exporter.presentationDuration,
+        state.editing.exporter.hasBookends
+      )}
+    />
   );
 }
 

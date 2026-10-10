@@ -3,6 +3,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const downloads = vi.hoisted(() => ({
+  available: true,
   changed: undefined as ((delta: { id: number; state?: { current: string } }) => void) | undefined,
   created: undefined as
     | ((item: { finalUrl?: string; id: number; state: string; url: string }) => void)
@@ -12,7 +13,7 @@ const downloads = vi.hoisted(() => ({
 
 vi.mock('@sniptale/platform/browser/downloads', () => ({
   browserDownloads: {
-    isAvailable: () => true,
+    isAvailable: () => downloads.available,
     search: downloads.search,
     subscribeToChanged: (listener: typeof downloads.changed) => {
       downloads.changed = listener;
@@ -37,6 +38,61 @@ afterEach(() => {
   downloads.changed = undefined;
   downloads.created = undefined;
   downloads.search.mockClear();
+  downloads.available = true;
+});
+
+it('reports completion once even when terminal search and event both arrive', async () => {
+  downloads.search.mockResolvedValueOnce([{ id: 10, state: 'complete' }]);
+  const state = vi.fn();
+  const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:subtitles');
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  downloadBlob(new Blob(['WEBVTT']), 'subtitles.vtt', undefined, undefined, state);
+  downloads.created?.({ id: 10, state: 'in_progress', url: 'blob:subtitles' });
+  await vi.waitFor(() => expect(state).toHaveBeenCalledWith('complete'));
+  downloads.changed?.({ id: 10, state: { current: 'interrupted' } });
+  expect(state).toHaveBeenCalledOnce();
+  expect(revoke).toHaveBeenCalledOnce();
+});
+
+it('reports interrupted download separately from failed backing-file release', async () => {
+  const state = vi.fn();
+  const releaseError = vi.fn();
+  const release = vi.fn().mockRejectedValue(new Error('retention failure'));
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:interrupted');
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  downloadBlob(new Blob(['SRT']), 'subtitles.srt', release, releaseError, state);
+  downloads.created?.({ id: 11, state: 'in_progress', finalUrl: 'blob:interrupted', url: 'other' });
+  downloads.changed?.({ id: 12, state: { current: 'complete' } });
+  expect(state).not.toHaveBeenCalled();
+  downloads.changed?.({ id: 11, state: { current: 'interrupted' } });
+  expect(state).toHaveBeenCalledExactlyOnceWith('interrupted');
+  await vi.waitFor(() => expect(releaseError).toHaveBeenCalledOnce());
+});
+
+it('releases a failed click immediately and reports unconfirmed fallback honestly', async () => {
+  vi.useFakeTimers();
+  const state = vi.fn();
+  const release = vi.fn();
+  const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:click-failure');
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementationOnce(() => {
+    throw new Error('blocked');
+  });
+  expect(() => downloadBlob(new Blob(['vtt']), 'subtitles.vtt', release, undefined, state)).toThrow(
+    'blocked'
+  );
+  expect(state).toHaveBeenCalledExactlyOnceWith('interrupted');
+  await Promise.resolve();
+  expect(release).toHaveBeenCalledOnce();
+  expect(revoke).toHaveBeenCalledOnce();
+  downloads.available = false;
+  click.mockImplementation(() => undefined);
+  state.mockClear();
+  downloadBlob(new Blob(['vtt']), 'subtitles.vtt', undefined, undefined, state);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(state).toHaveBeenCalledExactlyOnceWith('unconfirmed');
 });
 
 it('keeps the Blob URL and backing OPFS file until Chrome reports terminal download state', async () => {

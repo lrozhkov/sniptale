@@ -44,6 +44,21 @@ vi.mock('./text-voice-panel', () => ({
     </section>
   ),
 }));
+vi.mock('./text-subtitles-panel', () => ({
+  ReviewTextSubtitlesForm: (props: {
+    ids: readonly string[];
+    wholeDocument: boolean;
+    onClose(): void;
+  }) => (
+    <section
+      data-form="subtitles"
+      data-ids={props.ids.join(',')}
+      data-whole={String(props.wholeDocument)}
+    >
+      <button onClick={props.onClose}>Back</button>
+    </section>
+  ),
+}));
 
 let host: HTMLDivElement;
 let root: Root;
@@ -140,6 +155,23 @@ afterEach(() => {
 });
 const button = (label: string) =>
   host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!;
+
+it('opens exclusive local subtitles without configured voice access and returns focus to scope trigger', () => {
+  act(() => root.render(<Fixture count={3} />));
+  act(() => button('subtitlesTitle').click());
+  expect(host.querySelector('[data-form]')?.getAttribute('data-ids')).toBe('text-0,text-1,text-2');
+  expect(host.querySelector('[data-form]')?.getAttribute('data-whole')).toBe('true');
+  expect(host.querySelector('[data-ui="gallery.videoReview.textDocument"]')).toBeNull();
+  act(() => host.querySelector<HTMLButtonElement>('[data-form] button')!.click());
+  expect(document.activeElement).toBe(button('subtitlesTitle'));
+  act(() => button('speechBatch').click());
+  act(() => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  act(() => button('subtitlesSelected').click());
+  expect(host.querySelector('[data-form]')?.getAttribute('data-ids')).toBe('text-0');
+  expect(host.querySelector('[data-form]')?.getAttribute('data-whole')).toBe('false');
+  act(() => host.querySelector<HTMLButtonElement>('[data-form] button')!.click());
+  expect(document.activeElement).toBe(button('subtitlesSelected'));
+});
 
 it('opens all-text rewriting independently of search and filtered batch scope, returning focus to its trigger', () => {
   act(() => root.render(<Fixture count={3} voice={voiceAccess()} />));

@@ -1,6 +1,61 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  subtitlesWebVtt: { ru: 'WebVTT', en: 'WebVTT' },
+  subtitlesSrt: { ru: 'SRT', en: 'SRT' },
+  subtitlesSimultaneous: {
+    ru: 'Пересекающиеся фразы сохранятся одновременно.',
+    en: 'Overlapping phrases remain simultaneous.',
+  },
+  subtitlesTitle: { ru: 'Субтитры', en: 'Subtitles' },
+  subtitlesSelected: { ru: 'Субтитры выбранных фраз', en: 'Selected phrase subtitles' },
+  subtitlesScope: { ru: 'Область', en: 'Scope' },
+  subtitlesFormat: { ru: 'Формат', en: 'Format' },
+  subtitlesLanguage: { ru: 'Язык', en: 'Language' },
+  subtitlesAllLanguages: { ru: 'Все языки', en: 'All languages' },
+  subtitlesUnspecifiedLanguage: { ru: 'Язык не указан', en: 'Language unspecified' },
+  subtitlesOnlyShown: { ru: 'Только показываемые в видео', en: 'Only phrases shown in video' },
+  subtitlesNormalize: { ru: 'Объединить пересекающиеся фразы', en: 'Combine overlapping phrases' },
+  subtitlesClock: {
+    ru: 'Время соответствует полному готовому видео, включая заставку. Выбор фраз не обрезает начало файла.',
+    en: 'Times match the full output video, including the intro. Selecting phrases does not trim the start.',
+  },
+  subtitlesUnavailable: {
+    ru: 'Невозможно подготовить субтитры. Проверьте интервалы и настройки готового видео либо выберите меньше фраз.',
+    en: 'Cannot prepare subtitles. Check phrase intervals and output settings, or select fewer phrases.',
+  },
+  subtitlesCount: { ru: 'Записей в файле: {count}', en: 'File cues: {count}' },
+  subtitlesNormalized: {
+    ru: 'Пересечения объединены только в файле субтитров.',
+    en: 'Overlaps are combined in the subtitle file.',
+  },
+  subtitlesOverlap: {
+    ru: 'Есть пересекающиеся фразы. Некоторые SRT-плееры могут показать только одну из них.',
+    en: 'Some phrases overlap. Certain SRT players may display only one of them.',
+  },
+  subtitlesExcluded: {
+    ru: 'Вырезанные участки отсутствуют в файле.',
+    en: 'Cut sections are omitted from the file.',
+  },
+  subtitlesBlankLines: {
+    ru: 'Пустые строки заменены неразрывным пробелом в файле, чтобы сохранить переносы.',
+    en: 'Empty lines use a non-breaking space in the file to preserve line breaks.',
+  },
+  subtitlesPreview: { ru: 'Просмотр файла', en: 'File preview' },
+  subtitlesPreviewLimited: {
+    ru: 'Показано начало; в файл попадёт весь выбранный текст.',
+    en: 'Only the beginning is shown; the file includes all selected text.',
+  },
+  subtitlesDownload: { ru: 'Скачать субтитры', en: 'Download subtitles' },
+  subtitlesDownloadFailed: {
+    ru: 'Скачивание не завершилось. Попробуйте ещё раз.',
+    en: 'Download did not complete. Try again.',
+  },
+  subtitlesDownloadStarted: {
+    ru: 'Файл передан браузеру для скачивания.',
+    en: 'File sent to the browser for download.',
+  },
+  subtitlesDownloaded: { ru: 'Субтитры скачаны.', en: 'Subtitles downloaded.' },
   textRewriteTitle: { ru: 'Правка текста', en: 'Edit text' },
   textRewriteAll: { ru: 'Правка всего текста', en: 'Edit all text' },
   textRewriteSelected: { ru: 'Правка выбранного текста', en: 'Edit selected text' },

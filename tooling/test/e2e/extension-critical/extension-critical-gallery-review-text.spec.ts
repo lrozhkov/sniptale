@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { startHostServer } from '../support/host-server';
@@ -35,6 +36,130 @@ const textModelResponse = {
     ],
   },
 };
+
+async function parseNativeSubtitles(page: Page, text: string) {
+  return page.evaluate(async (content) => {
+    const video = document.createElement('video');
+    const track = document.createElement('track');
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/vtt' }));
+    track.src = url;
+    video.append(track);
+    document.body.append(video);
+    track.track.mode = 'hidden';
+    try {
+      await new Promise<void>((resolve, reject) => {
+        track.onload = () => resolve();
+        track.onerror = () => reject(new Error('Native WebVTT parser refused downloaded file'));
+      });
+      return [...(track.track.cues ?? [])].map((cue) => {
+        if (!(cue instanceof VTTCue)) throw new Error('Unexpected native subtitle cue');
+        return { start: cue.startTime, end: cue.endTime, text: cue.getCueAsHTML().textContent };
+      });
+    } finally {
+      video.remove();
+      URL.revokeObjectURL(url);
+    }
+  }, text);
+}
+
+async function checkSubtitles(
+  page: Page,
+  dialog: Locator,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  outputPath: (name: string) => string,
+  height: number
+) {
+  const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
+  const second = document.locator('[data-ui="gallery.videoReview.textPhrase"]').nth(1);
+  const expand = second.locator('button[aria-expanded]');
+  if ((await expand.getAttribute('aria-expanded')) === 'false') await expand.click();
+  const literal = 'Вторая фраза — Łukasz 中文 <b>& -->\n\nСледующая строка';
+  await second
+    .getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
+    .fill(literal);
+  await expect
+    .poll(async () => (await persistedReviewContent(page))!.text!.fragments[1]!.text)
+    .toBe(literal);
+  const before = (await persistedReviewContent(page))!;
+  await document.getByRole('searchbox').fill('Вторая');
+  await document
+    .getByRole('button', { name: label('gallery.videoReview.subtitlesTitle'), exact: true })
+    .click();
+  const form = dialog.locator('[data-ui="gallery.videoReview.textSubtitles"]');
+  await expect(document).toHaveCount(0);
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textVoiceBack'), exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: outputPath('subtitles-options.png'), fullPage: false });
+  await expect(form).toContainText(
+    label('gallery.videoReview.subtitlesCount').replace('{count}', '2')
+  );
+  await form
+    .locator('summary')
+    .filter({ hasText: label('gallery.videoReview.subtitlesPreview') })
+    .click();
+  await expect(form.locator('pre')).toContainText('Первая фраза');
+  for (const width of [523, 524, 525]) {
+    await resizeInspectorContent(page, dialog, width);
+    await form
+      .getByRole('button', { name: label('gallery.videoReview.subtitlesDownload'), exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: outputPath(`subtitles-inspector-${width}.png`),
+      fullPage: false,
+    });
+  }
+  const launch = form.getByRole('button', {
+    name: label('gallery.videoReview.subtitlesDownload'),
+    exact: true,
+  });
+  await launch.scrollIntoViewIfNeeded();
+  const box = (await launch.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(height);
+  const downloaded = page.waitForEvent('download');
+  await launch.click();
+  const file = await downloaded;
+  expect(file.suggestedFilename()).toBe('subtitles.vtt');
+  await file.saveAs(outputPath('subtitles.vtt'));
+  const text = await readFile(outputPath('subtitles.vtt'), 'utf8');
+  const cues = await parseNativeSubtitles(page, text);
+  expect(cues).toHaveLength(2);
+  expect(cues.map((cue) => cue.text?.replace(/\u00a0/g, ''))).toEqual(
+    before.text!.fragments.map((fragment) => fragment.text)
+  );
+  expect(cues[0]).toMatchObject({
+    start: before.text!.fragments[0]!.start,
+    end: before.text!.fragments[0]!.end,
+  });
+  await expect(launch).toBeEnabled();
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.subtitlesFormat'), exact: true })
+    .click();
+  await page.getByRole('option', { name: 'SRT', exact: true }).click();
+  await expect(form).toContainText(label('gallery.videoReview.subtitlesOverlap'));
+  await form
+    .getByRole('switch', { name: label('gallery.videoReview.subtitlesNormalize'), exact: true })
+    .click();
+  await expect(form).toContainText(label('gallery.videoReview.subtitlesNormalized'));
+  const srtDownload = page.waitForEvent('download');
+  await launch.click();
+  const srt = await srtDownload;
+  await srt.saveAs(outputPath('subtitles.srt'));
+  expect(await readFile(outputPath('subtitles.srt'), 'utf8')).toContain(
+    'Первая фраза\nВторая фраза'
+  );
+  await form
+    .getByRole('button', { name: label('gallery.videoReview.textVoiceBack'), exact: true })
+    .click();
+  await expect(
+    document.getByRole('button', { name: label('gallery.videoReview.subtitlesTitle'), exact: true })
+  ).toBeFocused();
+  await expect(document.getByRole('searchbox')).toHaveValue('Вторая');
+  await document.getByRole('searchbox').fill('');
+  expect((await persistedReviewContent(page))!.text).toEqual(before.text);
+  expect((await persistedReviewContent(page))!.audio).toEqual(before.audio);
+}
 
 async function installTextPortFixture(page: Page) {
   await page.evaluate(
@@ -763,6 +888,7 @@ for (const variant of [
       await checkFullTextRewrite(page, dialog, label, (name) =>
         page.screenshot({ path: info.outputPath(name), fullPage: false, animations: 'disabled' })
       );
+      await checkSubtitles(page, dialog, label, (name) => info.outputPath(name), variant.height);
       await document
         .getByRole('button', {
           name: label('gallery.videoReview.speechBatch'),
