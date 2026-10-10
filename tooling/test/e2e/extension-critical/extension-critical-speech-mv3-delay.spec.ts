@@ -9,6 +9,9 @@ import {
   type ReviewMediaFixtureWriter,
 } from '../support/quick-editor-media-fixture';
 import { speechModelResponse } from '../support/voiceover-speech-fixture';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
+
+const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -109,7 +112,22 @@ class NativeSpeechBrowser {
       .toBe(true);
   }
   async click(session: string, name: string, selector = 'button'): Promise<void> {
-    await this.wait(session, () => !!document.body);
+    await expect
+      .poll(
+        () =>
+          this.evaluate(
+            session,
+            ({ name, selector }) =>
+              Array.from(document.querySelectorAll<HTMLButtonElement>(selector)).some(
+                (node) =>
+                  !node.disabled &&
+                  (node.getAttribute('aria-label') === name || node.textContent?.trim() === name)
+              ),
+            { name, selector }
+          ),
+        { timeout: 15_000 }
+      )
+      .toBe(true);
     await this.evaluate(
       session,
       ({ name, selector }) => {
@@ -262,20 +280,15 @@ async function prepareNativeSpeech(browser: NativeSpeechBrowser, providerPort: n
     gallery,
     () => !!document.querySelector('dialog [data-ui="gallery.videoReview.trackHeader"]')
   );
-  await browser.click(gallery, 'Advanced editing', 'dialog button');
-  await browser.wait(
-    gallery,
-    () => !!document.querySelector('dialog button[aria-label="Transcript and speech"]')
-  );
+  await browser.click(gallery, label('gallery.videoReview.advancedEditing'), 'dialog button');
   await browser.click(
     gallery,
-    'Transcript and speech',
+    label('gallery.videoReview.speechTitle'),
     'dialog [data-ui="gallery.videoReview.trackHeader"] button'
   );
-  await browser.wait(gallery, () =>
-    Array.from(document.querySelectorAll('button')).some(
-      (node) => node.textContent?.trim() === 'Transcribe all'
-    )
+  await browser.wait(
+    gallery,
+    () => !!document.querySelector('[data-ui="gallery.videoReview.speechPanel"]')
   );
   return { extensionId, gallery };
 }
@@ -335,19 +348,14 @@ for (const mode of ['fast', 'delay', 'cancel', 'deadline'] as const) {
       const socket = await connectNativeSpeechBrowser(child);
       browser = new NativeSpeechBrowser(socket);
       const { extensionId, gallery } = await prepareNativeSpeech(browser, address.port);
-      await browser.click(gallery, 'Transcribe all');
-      await browser.wait(gallery, () =>
-        Array.from(document.querySelectorAll('button')).some(
-          (node) => node.textContent?.trim() === 'Continue'
-        )
-      );
-      await browser.click(gallery, 'Continue');
+      await browser.click(gallery, label('gallery.videoReview.recognitionStart'));
+      await browser.click(gallery, label('gallery.videoReview.speechConsentContinue'));
       await expect.poll(() => requests).toBe(1);
       const began = Date.now();
       if (mode === 'cancel')
         await browser.click(
           gallery,
-          'Cancel',
+          label('common.actions.cancel'),
           '[data-ui="gallery.videoReview.speechPanel"] button'
         );
       const timeline: Array<{ elapsed: number; present: boolean; attached: boolean }> = [];
@@ -362,17 +370,29 @@ for (const mode of ['fast', 'delay', 'cancel', 'deadline'] as const) {
             const status = record(
               await browser!.evaluate(
                 gallery,
-                () => ({
-                  phrases: document.querySelectorAll('[data-ui="gallery.videoReview.speechPhrase"]')
-                    .length,
+                (startLabel) => ({
+                  phrases: document.querySelectorAll(
+                    '[data-ui="gallery.videoReview.recognitionResult"] [data-ui="gallery.videoReview.textPhrase"]'
+                  ).length,
+                  ready: Array.from(
+                    document.querySelectorAll<HTMLButtonElement>(
+                      '[data-ui="gallery.videoReview.speechPanel"] button'
+                    )
+                  ).some(
+                    (node) => node.getAttribute('aria-label') === startLabel && !node.disabled
+                  ),
                   alert:
                     document.querySelector(
                       '[data-ui="gallery.videoReview.speechPanel"] [role="alert"]'
                     )?.textContent ?? '',
                 }),
-                undefined
+                label('gallery.videoReview.recognitionStart')
               )
             );
+            if (mode === 'cancel')
+              return (
+                status['ready'] === true && status['phrases'] === 0 && Date.now() - began >= 41_000
+              );
             return success
               ? status['phrases'] === 1
               : typeof status['alert'] === 'string' && status['alert'].length > 0;
