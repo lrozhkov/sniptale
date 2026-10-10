@@ -24,7 +24,10 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { applyReviewOperation } from '../../../features/video/review/document';
+import {
+  applyReviewOperation,
+  createReviewAdvancedContentOperation,
+} from '../../../features/video/review/document';
 import { parseReviewOperation, parseReviewSource } from '../../../features/video/review/validation';
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type {
@@ -234,12 +237,21 @@ async function putWorkspace(
   workspace: VideoWorkspace,
   prepared: ReviewReadySources = { assets: new Map(), libraryAudioClaims: [] }
 ): Promise<VideoWorkspace> {
-  const next = parseVideoWorkspace({
+  const admitted = parseVideoWorkspace({
     ...workspace,
     revision: workspace.revision + 1,
     updatedAt: Math.max(Date.now(), workspace.updatedAt),
   });
-  if (!next) throw new VideoWorkspaceError('invalid');
+  if (!admitted) throw new VideoWorkspaceError('invalid');
+  // Re-encode only after full before-state and redo admission; each accepted step keeps its identity.
+  const next = {
+    ...admitted,
+    history: admitted.history.map((operation) =>
+      operation.target === 'advancedContent'
+        ? (createReviewAdvancedContentOperation(operation) ?? operation)
+        : operation
+    ),
+  };
   if (
     !(await areNewReviewSourcesAvailable(
       next,

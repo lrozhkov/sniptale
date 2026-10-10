@@ -2,12 +2,14 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import {
+  applyReviewOperation,
   createReviewAdvancedContentOperation,
   replayReviewHistory,
   reviewAdvancedContentBaseline,
 } from '../../../features/video/review/document';
 import type { ReviewOperation } from '../../../features/video/review/types';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
+import { collectReviewAssetReferences } from './asset-refs';
 import { createReviewWorkspaceStoreFixture } from './store.test-support';
 import type { VideoWorkspace } from './contracts';
 
@@ -18,6 +20,7 @@ const observed = vi.hoisted(() => ({
   replay: vi.fn(),
   reads: 0,
   writes: 0,
+  failWrite: false,
 }));
 vi.mock('../../../features/video/review/document', async (load) => {
   const actual = await load<typeof import('../../../features/video/review/document')>();
@@ -69,6 +72,7 @@ beforeEach(() => {
   observed.inspect.mockClear();
   observed.replay.mockClear();
   observed.reads = observed.writes = 0;
+  observed.failWrite = false;
   const fixture = createReviewWorkspaceStoreFixture(() => false);
   rows = fixture.rows;
   observed.database.mockResolvedValue({
@@ -89,6 +93,8 @@ beforeEach(() => {
             },
             put(value: Parameters<typeof store.put>[0]) {
               if (name === 'video_workspaces') observed.writes++;
+              if (name === 'video_workspaces' && observed.failWrite)
+                throw new DOMException('No space', 'QuotaExceededError');
               return store.put(value);
             },
           };
@@ -193,7 +199,10 @@ it.each([
   expect(operation.target).toBe('sourceAudio');
   expect(observed.replay.mock.calls.filter(([history]) => history.length > 0)).toHaveLength(0);
   expect(observed.replay).toHaveBeenCalledTimes(2);
-  expect(result.workspace.history.slice(0, previous.cursor)).toEqual(previous.history);
+  expect(
+    result.workspace.history.slice(0, previous.cursor).map(({ id, at }) => ({ id, at }))
+  ).toEqual(previous.history.map(({ id, at }) => ({ id, at })));
+  assertSameRetainedProjections(previous, result.workspace);
   expect(result.workspace.cursor).toBe(previous.cursor + 1);
   expect(result.workspace.revision).toBe(2);
   expect(Object.keys(result).sort()).toEqual(['draft', 'workspace']);
@@ -218,6 +227,99 @@ it('still rejects corrupt unapplied redo before any write', async () => {
   ).rejects.toMatchObject({ code: 'invalid' });
   expect(rows).toEqual(before);
   expect(observed.writes).toBe(0);
+});
+
+function assertSameRetainedProjections(previous: VideoWorkspace, next: VideoWorkspace) {
+  let original = replayReviewHistory(
+    [],
+    0,
+    previous.source,
+    reviewAdvancedContentBaseline(previous.advanced)
+  );
+  let compact = replayReviewHistory(
+    [],
+    0,
+    next.source,
+    reviewAdvancedContentBaseline(next.advanced)
+  );
+  expect(compact).toEqual(original);
+  for (const [index, operation] of previous.history.entries()) {
+    original = applyReviewOperation(original, operation, previous.source);
+    const replacement = next.history[index];
+    if (!replacement) throw new Error('Missing retained history step');
+    compact = applyReviewOperation(compact, replacement, next.source);
+    expect(compact).toEqual(original);
+  }
+  expect(collectReviewAssetReferences(next)).toEqual(collectReviewAssetReferences(previous));
+}
+
+it('bounds retained gain-only legacy history on a successful owner save without trimming steps', async () => {
+  const previous = workspace(80, 200);
+  const unchanged = structuredClone(previous);
+  rows.get('video_workspaces')!.set(id, previous);
+  expect((await readVideoWorkspace(id))?.workspace.history).toEqual(previous.history);
+  expect(observed.writes).toBe(0);
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(unchanged);
+  const result = await commitVideoWorkspace({
+    ...identity(previous),
+    operation: parameterEdit(previous),
+  });
+  expect(
+    new TextEncoder().encode(JSON.stringify(rows.get('video_workspaces')!.get(id))).byteLength
+  ).toBeLessThan(100_000);
+  expect(result.workspace.history).toHaveLength(81);
+  expect(result.workspace.history[0]?.target).toBe('advancedContent');
+  expect(
+    result.workspace.history.slice(1).every((operation) => operation.target === 'sourceAudio')
+  ).toBe(true);
+  expect(result.workspace.history.slice(0, 80).map(({ id, at }) => ({ id, at }))).toEqual(
+    previous.history.map(({ id, at }) => ({ id, at }))
+  );
+  assertSameRetainedProjections(previous, result.workspace);
+  expect(previous).toEqual(unchanged);
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(result.workspace);
+});
+
+it('retains all redo references and steps when a cursor mutation compacts legacy gain', async () => {
+  const previous = workspace(0);
+  const webcam = (name: string) => createQuickEditWebcam(`project-asset:${name}`, source, source);
+  previous.advanced.webcam = webcam('baseline');
+  previous.advanced.recoveryV1 = JSON.stringify({ webcam: webcam('recovery') });
+  const before = reviewAdvancedContentBaseline(previous.advanced);
+  const first = { ...before, webcam: webcam('redo') };
+  previous.history = [
+    { id: 'compound', at: 1, target: 'advancedContent', before, after: first },
+    {
+      id: 'gain-redo',
+      at: 2,
+      target: 'advancedContent',
+      before: first,
+      after: {
+        ...first,
+        audio: { ...first.audio, original: { ...first.audio.original, muted: true } },
+      },
+    },
+  ];
+  rows.get('video_workspaces')!.set(id, previous);
+  const result = await moveVideoWorkspaceHistory({ ...identity(previous), direction: 'redo' });
+  expect(result.workspace.cursor).toBe(1);
+  expect(result.workspace.history.map((operation) => operation.target)).toEqual([
+    'advancedContent',
+    'sourceAudio',
+  ]);
+  assertSameRetainedProjections(previous, result.workspace);
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(withReviewWorkspaceUsage(result.workspace));
+});
+
+it('preserves exact legacy rows when a compacted workspace put fails', async () => {
+  const previous = workspace(2);
+  rows.get('video_workspaces')!.set(id, previous);
+  const original = structuredClone(rows);
+  observed.failWrite = true;
+  await expect(
+    commitVideoWorkspace({ ...identity(previous), operation: parameterEdit(previous) })
+  ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect(rows).toEqual(original);
 });
 
 it('still rejects an invalid candidate without publishing a partial revision', async () => {
