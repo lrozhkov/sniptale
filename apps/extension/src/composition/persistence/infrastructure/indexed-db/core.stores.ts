@@ -1,7 +1,7 @@
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 19;
+export const DB_VERSION = 20;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -14,6 +14,7 @@ export const DIAGNOSTICS_EVENTS_STORE = 'diagnostics_events';
 export const VIDEO_PROJECTS_STORE = 'video_projects';
 export const SCENARIO_PROJECTS_STORE = 'scenario_projects';
 export const SCENARIO_PROJECT_HISTORY_STORE = 'scenario_project_history';
+export const SCENARIO_PROJECT_UNITS_STORE = 'scenario_project_units';
 export const PROJECT_ASSETS_STORE = 'project_assets';
 export const SCENARIO_ASSETS_STORE = 'scenario_assets';
 export const SCENARIO_PENDING_ASSETS_STORE = 'scenario_pending_assets';
@@ -48,6 +49,7 @@ export const EXPECTED_STORES = [
   VIDEO_PROJECTS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
@@ -83,6 +85,7 @@ export const EXPECTED_INDEXES = {
   [VIDEO_PROJECTS_STORE]: ['updatedAt', 'usageReferenceKeys'],
   [SCENARIO_PROJECTS_STORE]: ['updatedAt'],
   [SCENARIO_PROJECT_HISTORY_STORE]: ['projectId'],
+  [SCENARIO_PROJECT_UNITS_STORE]: ['projectId'],
   [PROJECT_ASSETS_STORE]: ['createdAt', 'originMediaId'],
   [SCENARIO_ASSETS_STORE]: ['projectId', 'createdAt', 'borrowedMediaId', 'galleryAssetId'],
   [SCENARIO_PENDING_ASSETS_STORE]: ['tabId', 'createdAt'],

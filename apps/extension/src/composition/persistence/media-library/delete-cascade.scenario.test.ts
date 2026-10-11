@@ -13,7 +13,7 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from '../../../features/scenario/project/public';
-import { materializeScenarioStorage } from '../scenario/storage-format';
+import { materializeScenarioUnitStorage } from '../scenario/storage-units';
 import { parseScenarioProjectEntry } from '../scenario/read-guards';
 import { createScenarioProjectEntry } from '../scenario/projects/entry';
 
@@ -136,7 +136,14 @@ it.each([false, true])(
       usageReferenceKeys: ['indexed:v1'],
       project: { assets: [], clips: [] },
     });
-    const saved = rows.get('scenario_projects')!.get(scenarioId) as typeof entry;
+    const saved = parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(
+        rows.get('scenario_projects')!.get(scenarioId),
+        [...(rows.get('scenario_project_history')?.values() ?? [])],
+        [...(rows.get('scenario_project_units')?.values() ?? [])]
+      )
+    );
+    if (!saved) throw new Error('Expected readable canonical scenario after cascade');
     expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
     expect(rows.get('scenario_assets')?.has(childId)).toBe(false);
     expect(rows.get('media_library')?.has(scenarioMediaId)).toBe(false);
@@ -228,9 +235,11 @@ it.each([
     expect(rows.get('scenario_assets')?.has('private-child')).toBe(false);
     expect(rows.get('asset_refs')?.has('private-object')).toBe(false);
     const saved = parseScenarioProjectEntry(
-      materializeScenarioStorage(rows.get('scenario_projects')!.get(project.id), [
-        ...(rows.get('scenario_project_history')?.values() ?? []),
-      ])
+      materializeScenarioUnitStorage(
+        rows.get('scenario_projects')!.get(project.id),
+        [...(rows.get('scenario_project_history')?.values() ?? [])],
+        [...(rows.get('scenario_project_units')?.values() ?? [])]
+      )
     );
     expect(saved).not.toBeNull();
     if (!saved) throw new Error('Expected a readable scenario after detaching narration.');
@@ -332,9 +341,11 @@ it('removes a published audio resource, narration and history on direct permanen
   expect(rows.get('scenario_assets')?.has('audio-child')).toBe(false);
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
   const saved = parseScenarioProjectEntry(
-    materializeScenarioStorage(rows.get('scenario_projects')!.get(project.id), [
-      ...(rows.get('scenario_project_history')?.values() ?? []),
-    ])
+    materializeScenarioUnitStorage(
+      rows.get('scenario_projects')!.get(project.id),
+      [...(rows.get('scenario_project_history')?.values() ?? [])],
+      [...(rows.get('scenario_project_units')?.values() ?? [])]
+    )
   );
   expect(saved).not.toBeNull();
   if (!saved) throw new Error('Expected a readable scenario after detaching narration.');

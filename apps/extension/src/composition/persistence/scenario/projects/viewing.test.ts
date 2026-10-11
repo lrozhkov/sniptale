@@ -44,7 +44,10 @@ it('reads the committed revision without recovery or writes and rejects unavaila
   expect(io.recover).not.toHaveBeenCalled();
   expect(io.transaction).toHaveBeenCalledTimes(4);
   for (const call of io.transaction.mock.calls)
-    expect(call).toEqual([['scenario_projects', 'scenario_project_history'], 'readonly']);
+    expect(call).toEqual([
+      ['scenario_projects', 'scenario_project_history', 'scenario_project_units'],
+      'readonly',
+    ]);
 });
 it('restricts media to the selected project and opens only a readonly transaction', async () => {
   const entry = {

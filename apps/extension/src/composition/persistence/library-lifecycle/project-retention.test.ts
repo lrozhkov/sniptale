@@ -1,5 +1,5 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { materializeScenarioStorage } from '../scenario/storage-format';
+import { materializeScenarioUnitStorage } from '../scenario/storage-units';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { expect, it, vi } from 'vitest';
 import {
@@ -42,6 +42,7 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
     ['video_projects', new Map<string, unknown>([[video.id, video]])],
     ['scenario_projects', new Map<string, unknown>([[scenario.id, scenario]])],
     ['scenario_project_history', new Map<string, unknown>()],
+    ['scenario_project_units', new Map<string, unknown>()],
     ['media_library', new Map<string, unknown>()],
     ['project_assets', new Map<string, unknown>()],
     ['scenario_assets', new Map<string, unknown>()],
@@ -68,16 +69,23 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
               .filter((row) => row['projectId'] === id),
         }),
         delete: async (key: IDBValidKey) => pending.get(name)?.delete(JSON.stringify(key)),
-        put: async (entry: { id?: string; projectId?: string; revision?: number }) => {
+        put: async (entry: {
+          id?: string;
+          projectId?: string;
+          revision?: number;
+          unitId?: string;
+        }) => {
           if (name === 'scenario_projects' && options.failScenarioPut) {
             throw new Error('scenario write failed');
           }
           pending
             .get(name)
             ?.set(
-              name === 'scenario_project_history'
-                ? JSON.stringify([entry.projectId, entry.revision])
-                : entry.id!,
+              name === 'scenario_project_units'
+                ? JSON.stringify([entry.projectId, entry.unitId, entry.revision])
+                : name === 'scenario_project_history'
+                  ? JSON.stringify([entry.projectId, entry.revision])
+                  : entry.id!,
               entry
             );
         },
@@ -96,9 +104,11 @@ it('promotes both legacy project roots once without changing documents, revision
     lifecycle: { savedAt: 100, storageClass: 'library', updatedAt: 100 },
   });
   expect(
-    materializeScenarioStorage(persisted.get('scenario_projects')?.get(scenario.id), [
-      ...persisted.get('scenario_project_history')!.values(),
-    ])
+    materializeScenarioUnitStorage(
+      persisted.get('scenario_projects')?.get(scenario.id),
+      [...persisted.get('scenario_project_history')!.values()],
+      [...persisted.get('scenario_project_units')!.values()]
+    )
   ).toEqual({
     ...scenario,
     history: undefined,

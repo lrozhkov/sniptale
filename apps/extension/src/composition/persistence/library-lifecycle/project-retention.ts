@@ -7,6 +7,7 @@ import { promoteScenarioSourceLifecycles } from '../scenario/library-publication
 import {
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -31,6 +32,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         VIDEO_WORKSPACE_HISTORY_STORE,
         SCENARIO_PROJECTS_STORE,
         SCENARIO_PROJECT_HISTORY_STORE,
+        SCENARIO_PROJECT_UNITS_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
         SCENARIO_ASSETS_STORE,

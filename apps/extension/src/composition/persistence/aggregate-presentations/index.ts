@@ -3,6 +3,7 @@ import {
   AGGREGATE_PRESENTATIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   VIDEO_PROJECTS_STORE,
   initDB,
 } from '../infrastructure/indexed-db/core';
@@ -56,7 +57,12 @@ export async function commitProjectAggregatePresentation(args: {
     const rootStoreName =
       args.ref.kind === 'scenario' ? SCENARIO_PROJECTS_STORE : VIDEO_PROJECTS_STORE;
     const tx = db.transaction(
-      [rootStoreName, SCENARIO_PROJECT_HISTORY_STORE, AGGREGATE_PRESENTATIONS_STORE],
+      [
+        rootStoreName,
+        SCENARIO_PROJECT_HISTORY_STORE,
+        SCENARIO_PROJECT_UNITS_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+      ],
       'readwrite'
     );
     const rawRoot: unknown =

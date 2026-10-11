@@ -5,6 +5,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import {
@@ -26,6 +27,7 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
         [
           SCENARIO_PROJECTS_STORE,
           SCENARIO_PROJECT_HISTORY_STORE,
+          SCENARIO_PROJECT_UNITS_STORE,
           SCENARIO_ASSETS_STORE,
           ASSET_OPERATIONS_STORE,
         ],

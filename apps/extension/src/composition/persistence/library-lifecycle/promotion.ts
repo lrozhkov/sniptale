@@ -8,6 +8,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -97,6 +98,7 @@ async function promoteScenarioAggregate(projectId: string): Promise<void> {
       [
         SCENARIO_PROJECTS_STORE,
         SCENARIO_PROJECT_HISTORY_STORE,
+        SCENARIO_PROJECT_UNITS_STORE,
         SCENARIO_ASSETS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
       ],

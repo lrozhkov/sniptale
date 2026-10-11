@@ -20,6 +20,7 @@ import {
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -47,6 +48,7 @@ export async function deleteOrphanedScenarioAggregateChild(args: {
       [
         SCENARIO_PROJECTS_STORE,
         SCENARIO_PROJECT_HISTORY_STORE,
+        SCENARIO_PROJECT_UNITS_STORE,
         childStoreName,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
@@ -148,6 +150,7 @@ function createScenarioCleanupTransaction(db: Awaited<ReturnType<typeof initDB>>
     [
       SCENARIO_PROJECTS_STORE,
       SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,
       VIDEO_PROJECTS_STORE,

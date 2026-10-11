@@ -52,7 +52,11 @@ const db = {
                 isRecord(value) &&
                 value['projectId'] === projectId &&
                 typeof value['revision'] === 'number'
-                  ? [[projectId, value['revision']]]
+                  ? [
+                      typeof value['unitId'] === 'string'
+                        ? [projectId, value['unitId'], value['revision']]
+                        : [projectId, value['revision']],
+                    ]
                   : []
               ),
           }),
@@ -66,10 +70,15 @@ const db = {
             stepId?: string;
             projectId?: string;
             revision?: number;
+            unitId?: string;
           }) => {
             const key =
               (value.projectId && value.revision !== undefined
-                ? JSON.stringify([value.projectId, value.revision])
+                ? JSON.stringify(
+                    value.unitId
+                      ? [value.projectId, value.unitId, value.revision]
+                      : [value.projectId, value.revision]
+                  )
                 : undefined) ??
               value.id ??
               value.stepId ??
@@ -211,6 +220,7 @@ beforeEach(() => {
     'scenario_exports',
     'scenario_projects',
     'scenario_project_history',
+    'scenario_project_units',
     'scenario_step_editor_documents',
     'prepared_editor_assets',
   ])

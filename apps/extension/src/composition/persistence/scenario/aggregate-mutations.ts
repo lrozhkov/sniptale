@@ -15,6 +15,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STORE_NAME,
   initDB,
@@ -160,6 +161,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
   const storeNames: Array<
     | typeof SCENARIO_PROJECTS_STORE
     | typeof SCENARIO_PROJECT_HISTORY_STORE
+    | typeof SCENARIO_PROJECT_UNITS_STORE
     | typeof SCENARIO_ASSETS_STORE
     | typeof SCENARIO_STEP_EDITOR_DOCUMENTS_STORE
     | typeof ASSET_REFS_STORE
@@ -172,6 +174,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
   > = [
     SCENARIO_PROJECTS_STORE,
     SCENARIO_PROJECT_HISTORY_STORE,
+    SCENARIO_PROJECT_UNITS_STORE,
     SCENARIO_ASSETS_STORE,
     MEDIA_LIBRARY_STORE,
     STORE_NAME,

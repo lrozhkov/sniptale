@@ -24,6 +24,7 @@ beforeEach(() => {
 function installTransaction(stores: Record<string, object>): void {
   const physicalStores: Record<string, object> = {
     scenario_project_history: { index: () => ({ getAll: async () => [] }) },
+    scenario_project_units: { index: () => ({ getAll: async () => [] }), put: vi.fn() },
     ...stores,
   };
   persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>

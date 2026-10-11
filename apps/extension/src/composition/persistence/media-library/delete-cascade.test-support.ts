@@ -50,6 +50,10 @@ export function mediaEntry(): MediaLibraryEntry {
 }
 
 function keyOf(store: string, value: Record<string, unknown>): string {
+  if (store === 'scenario_project_units')
+    return JSON.stringify([value['projectId'], value['unitId'], value['revision']]);
+  if (store === 'scenario_project_history')
+    return JSON.stringify([value['projectId'], value['revision']]);
   if (store === 'video_workspace_history')
     return JSON.stringify([value['aggregateId'], value['ordinal']]);
   if (store === 'asset_owners')

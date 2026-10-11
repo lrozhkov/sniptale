@@ -24,6 +24,7 @@ import {
   SCENARIO_PENDING_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STATE_MANAGER_STORE,
   STORE_NAME,
@@ -108,10 +109,11 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 5,
+    schemaVersion: 6,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
+      { storeName: SCENARIO_PROJECT_UNITS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_ASSETS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PENDING_ASSETS_STORE, dataClass: 'operational-recoverable' },
       { storeName: SCENARIO_EXPORTS_STORE, dataClass: 'durable-authority' },
@@ -589,6 +591,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     validate(db) {
       if (!db.objectStoreNames.contains(SCENARIO_PROJECT_HISTORY_STORE))
         throw new Error('Scenario project history store is unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'scenarioProjects', from: 5, to: 6 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 19,
+    toDatabaseVersion: 20,
+    risk: 'additive',
+    stores: [SCENARIO_PROJECT_UNITS_STORE],
+    migrate(db) {
+      const store = db.createObjectStore(SCENARIO_PROJECT_UNITS_STORE, {
+        keyPath: ['projectId', 'unitId', 'revision'],
+      });
+      store.createIndex('projectId', 'projectId');
+      return undefined;
+    },
+    validate(db) {
+      if (!db.objectStoreNames.contains(SCENARIO_PROJECT_UNITS_STORE))
+        throw new Error('Scenario project units store is unavailable.');
       return undefined;
     },
   },

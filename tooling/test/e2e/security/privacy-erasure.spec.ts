@@ -89,6 +89,7 @@ async function seedRetainedEditorHistory(page: Page, canary: string) {
               'video_workspace_history',
               'scenario_projects',
               'scenario_project_history',
+              'scenario_project_units',
             ],
             'readwrite'
           );
@@ -98,6 +99,12 @@ async function seedRetainedEditorHistory(page: Page, canary: string) {
           tx.objectStore('scenario_projects').put(scenarioHead);
           for (const row of scenarioRows) tx.objectStore('scenario_project_history').put(row);
           tx.objectStore('scenario_project_history').put(scenarioOrphan);
+          tx.objectStore('scenario_project_units').put({
+            projectId: scenarioOrphan.projectId,
+            unitId: 'guide:erasure-orphan',
+            revision: 1,
+            value: { retainedEvidence: scenarioOrphan.project.retainedEvidence },
+          });
           tx.oncomplete = () => {
             db.close();
             resolve();

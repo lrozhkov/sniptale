@@ -3,6 +3,7 @@ import {
   DB_VERSION,
   VIDEO_WORKSPACE_HISTORY_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
 } from '../core.stores';
 import { betaV17Fixture } from '../fixtures/beta-v17';
 import { DATABASE_MIGRATIONS } from '../schema-contracts';
@@ -28,14 +29,16 @@ it('adds only empty indexed history stores and publishes the current contracts a
   expect(db.createObjectStore.mock.calls).toEqual([
     [VIDEO_WORKSPACE_HISTORY_STORE, { keyPath: ['aggregateId', 'ordinal'] }],
     [SCENARIO_PROJECT_HISTORY_STORE, { keyPath: ['projectId', 'revision'] }],
+    [SCENARIO_PROJECT_UNITS_STORE, { keyPath: ['projectId', 'unitId', 'revision'] }],
   ]);
   expect(indexes.mock.calls).toEqual([
     ['aggregateId', 'aggregateId'],
     ['projectId', 'projectId'],
+    ['projectId', 'projectId'],
   ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
   expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 17 });
-  expect(puts).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 5 });
+  expect(puts).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 6 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });

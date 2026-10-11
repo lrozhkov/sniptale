@@ -104,7 +104,11 @@ beforeEach(() => {
         getAll: name === 'scenario_projects' ? () => dbGetAllMock(name) : vi.fn(async () => []),
         index: vi.fn(() => ({
           getAll:
-            name === 'scenario_project_history' ? async () => storedHistory : txIndexGetAllMock,
+            name === 'scenario_project_history'
+              ? async () => storedHistory
+              : name === 'scenario_project_units'
+                ? async () => []
+                : txIndexGetAllMock,
           getAllKeys: async () => [],
         })),
         put: txPutMock,

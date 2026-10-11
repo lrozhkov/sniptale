@@ -6,6 +6,8 @@ import {
 import { handleDatabaseUpgrade } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core';
 import { betaV18Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v18';
 import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
+import { createGuideStep } from '../../../../apps/extension/src/features/scenario/project/factories';
+import { probeScenarioUnitAdmission, probeScenarioUnitWrites } from './scenario-unit-storage-probe';
 import { createScenarioProjectEntry } from '../../../../apps/extension/src/composition/persistence/scenario/projects/entry';
 import { commitScenarioAggregateMutation } from '../../../../apps/extension/src/composition/persistence/scenario/aggregate-mutations';
 import { deleteOrphanedScenarioAggregateChild } from '../../../../apps/extension/src/composition/persistence/scenario/aggregate-cleanup';
@@ -28,6 +30,7 @@ const historyStore = 'scenario_project_history';
 const graphStores = [
   headStore,
   historyStore,
+  'scenario_project_units',
   'scenario_assets',
   'scenario_step_editor_documents',
   'asset_refs',
@@ -93,13 +96,17 @@ async function admission() {
     upgrade(db, old, next, tx) {
       handleDatabaseUpgrade(db, old, next, tx);
       db.deleteObjectStore(historyStore);
+      db.deleteObjectStore('scenario_project_units');
       for (const [domainId, schemaVersion] of Object.entries(betaV18Fixture.domainVersions))
         tx.objectStore('schema_contracts').put({ domainId, schemaVersion });
     },
   });
   let entry = createScenarioProjectEntry({
     existing: undefined,
-    project: createGuideProject('Legacy', 'native-guide', 1),
+    project: {
+      ...createGuideProject('Legacy', 'native-guide', 1),
+      items: [createGuideStep('Retained native unit', 'native-step')],
+    },
     updatedAt: 2,
   });
   for (let index = 0; index < 3; index++)
@@ -126,6 +133,7 @@ async function admission() {
   const rollback =
     prior.version === 18 &&
     !prior.objectStoreNames.contains(historyStore) &&
+    !prior.objectStoreNames.contains('scenario_project_units') &&
     before === JSON.stringify(await prior.get(headStore, entry.id));
   prior.close();
   const db = await openDB(DB_NAME, DB_VERSION, { upgrade: handleDatabaseUpgrade });
@@ -136,6 +144,7 @@ async function admission() {
 
 /** Exercises actual production mutation owners against native IndexedDB and OPFS. */
 export async function probe() {
+  const unitAdmission = await probeScenarioUnitAdmission();
   const admitted = await admission();
   const { db, entry } = admitted;
   const observed = observeRequests();
@@ -258,7 +267,11 @@ export async function probe() {
     let failure = '';
     try {
       await commitScenarioAggregateMutation(
-        { ...published.project, name: 'Must roll back' },
+        {
+          ...published.project,
+          name: 'Must roll back',
+          items: [{ ...createGuideStep('Rollback unit', 'native-step') }],
+        },
         {
           expectedRevision: published.workspaceRevision,
           children: { editorDocumentDeletes: ['native-document'] },
@@ -271,6 +284,10 @@ export async function probe() {
     const successfulRequestsBeforeFailure = observed.beforeFailure();
     const bytesAfterRollback =
       (await (await readAssetFile(prepared.ref, 'canary.png')).text()) === canary;
+    const failedUnitWrites = observed.writes.filter(
+      (row) => row.store === 'scenario_project_units'
+    ).length;
+    const unitProof = await probeScenarioUnitWrites(db, observed, prepared.ref, canary);
     observed.reset();
 
     for (let index = 0; index < 52; index++)
@@ -295,7 +312,7 @@ export async function probe() {
       project: { version: 99 },
     });
     const corruptBefore = await snapshot(db);
-    const tx = db.transaction([headStore, historyStore], 'readonly');
+    const tx = db.transaction([headStore, historyStore, 'scenario_project_units'], 'readonly');
     const corrupted = await readScenarioStorage(tx, entry.id);
     await tx.done;
     observed.reset();
@@ -316,6 +333,9 @@ export async function probe() {
     };
     return {
       admission: admitted.result,
+      unitAdmission,
+      unitProof,
+      failedUnitWrites,
       legacyReadonly,
       appendWrites,
       unchangedRows,

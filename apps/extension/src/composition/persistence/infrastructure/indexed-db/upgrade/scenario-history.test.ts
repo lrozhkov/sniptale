@@ -1,5 +1,9 @@
 import { expect, it, vi } from 'vitest';
-import { DB_VERSION, SCENARIO_PROJECT_HISTORY_STORE } from '../core.stores';
+import {
+  DB_VERSION,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
+} from '../core.stores';
 import { betaV18Fixture } from '../fixtures/beta-v18';
 import { DATABASE_MIGRATIONS } from '../schema-contracts';
 import { handleDatabaseUpgrade } from './core';
@@ -21,12 +25,16 @@ it('adds only an empty scenario history store before publishing the current cont
     deleteObjectStore: vi.fn(),
   };
   handleDatabaseUpgrade(db, 18, DB_VERSION, tx);
-  expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith(SCENARIO_PROJECT_HISTORY_STORE, {
-    keyPath: ['projectId', 'revision'],
-  });
-  expect(createIndex).toHaveBeenCalledExactlyOnceWith('projectId', 'projectId');
+  expect(db.createObjectStore.mock.calls).toEqual([
+    [SCENARIO_PROJECT_HISTORY_STORE, { keyPath: ['projectId', 'revision'] }],
+    [SCENARIO_PROJECT_UNITS_STORE, { keyPath: ['projectId', 'unitId', 'revision'] }],
+  ]);
+  expect(createIndex.mock.calls).toEqual([
+    ['projectId', 'projectId'],
+    ['projectId', 'projectId'],
+  ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 5 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 6 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });

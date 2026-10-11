@@ -4,6 +4,7 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import {
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   ASSET_REFS_STORE,
@@ -44,7 +45,7 @@ export async function clearScenarioSavedHistory(projectId: string, baseUpdatedAt
   await recoverScenarioAssetPublications();
   const project = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
-      [SCENARIO_PROJECTS_STORE, SCENARIO_PROJECT_HISTORY_STORE],
+      [SCENARIO_PROJECTS_STORE, SCENARIO_PROJECT_HISTORY_STORE, SCENARIO_PROJECT_UNITS_STORE],
       'readwrite'
     );
     try {
@@ -92,6 +93,7 @@ export function pruneScenarioResources(projectId: string): Promise<number | unde
         [
           SCENARIO_PROJECTS_STORE,
           SCENARIO_PROJECT_HISTORY_STORE,
+          SCENARIO_PROJECT_UNITS_STORE,
           SCENARIO_ASSETS_STORE,
           SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
           ASSET_REFS_STORE,
