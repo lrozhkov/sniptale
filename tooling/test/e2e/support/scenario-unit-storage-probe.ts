@@ -112,15 +112,45 @@ export async function probeScenarioUnitWrites(
   let published = await commitScenarioAggregateMutation(project);
   const initial = await db.getAllFromIndex(unitStore, 'projectId', project.id);
   observed.reset();
-  published = await commitScenarioAggregateMutation(
-    { ...published.project, name: 'Metadata only' },
-    { expectedRevision: published.workspaceRevision }
-  );
+  const input = { ...published.project, name: 'Metadata only' };
+  let nameHistoryClones = 0;
+  const originalClone = globalThis.structuredClone;
+  globalThis.structuredClone = function <T>(value: T, options?: StructuredSerializeOptions): T {
+    if (
+      Array.isArray(value) &&
+      value.some(
+        (row: unknown) =>
+          row !== null &&
+          typeof row === 'object' &&
+          Object.hasOwn(row, 'project') &&
+          Object.hasOwn(row, 'savedAt')
+      )
+    )
+      nameHistoryClones += 1;
+    return originalClone(value, options);
+  };
+  try {
+    published = await commitScenarioAggregateMutation(input, {
+      expectedRevision: published.workspaceRevision,
+    });
+  } finally {
+    globalThis.structuredClone = originalClone;
+  }
   const nameUnitWrites = observed.writes.filter((row) => row.store === unitStore).length;
   const nameRequests = [...observed.writes];
   const nameRetained =
     JSON.stringify(initial) ===
     JSON.stringify(await db.getAllFromIndex(unitStore, 'projectId', project.id));
+  const beforeMutation = await getScenarioProjectEntry(project.id);
+  if (!beforeMutation) throw new Error('Missing admitted native snapshot.');
+  input.items[0]!.title = 'Mutated input step';
+  input.tour!.slides[0]!.title = 'Mutated input slide';
+  published.project.items[0]!.title = 'Mutated returned step';
+  published.project.tour!.slides[0]!.title = 'Mutated returned slide';
+  published.project.name = 'Mutated returned root';
+  const detachedSnapshots =
+    JSON.stringify(beforeMutation) === JSON.stringify(await getScenarioProjectEntry(project.id));
+  published = { ...published, project: beforeMutation.project };
   const edit = structuredClone(published.project);
   edit.items[0]!.title = 'Changed A';
   observed.reset();
@@ -202,6 +232,8 @@ export async function probeScenarioUnitWrites(
   return {
     initialUnits: initial.length,
     nameUnitWrites,
+    nameHistoryClones,
+    detachedSnapshots,
     nameRequests,
     nameRetained,
     guideUnitWrites,

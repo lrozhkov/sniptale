@@ -22,6 +22,8 @@ export function createScenarioProjectEntry(args: {
   storageClass?: LibraryStorageClass;
   updatedAt?: number;
   historyPolicy?: 'append' | 'preserve' | 'discard';
+  /** Exclusive history is a private fresh canonical snapshot, never a caller's mutable state. */
+  historyOwnership?: 'borrowed' | 'exclusive';
 }): ScenarioProjectEntry {
   const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
   const history =
@@ -29,7 +31,7 @@ export function createScenarioProjectEntry(args: {
       ? []
       : args.historyPolicy === 'preserve'
         ? (args.existing?.history ?? [])
-        : appendScenarioSavedVersion(args.existing);
+        : appendScenarioSavedVersion(args.existing, args.historyOwnership);
   return {
     ...(history.length ? { history } : {}),
     id: args.project.id,

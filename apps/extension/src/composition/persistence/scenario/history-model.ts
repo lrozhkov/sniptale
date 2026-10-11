@@ -77,9 +77,14 @@ export function parseScenarioSavedVersions(
   return versions;
 }
 
-/** Appends only committed content; byte/count retention never duplicates physical image data. */
+/**
+ * Appends committed content with the same byte/count retention.
+ * Borrowed inputs detach by default. Exclusive inputs must be a private, freshly admitted
+ * canonical snapshot that the caller owns and never exposes or mutates after this append.
+ */
 export function appendScenarioSavedVersion(
-  existing: ScenarioProjectEntry | undefined
+  existing: ScenarioProjectEntry | undefined,
+  ownership: 'borrowed' | 'exclusive' = 'borrowed'
 ): ScenarioSavedVersion[] {
   if (!existing) return [];
   const versions = [
@@ -103,5 +108,6 @@ export function appendScenarioSavedVersion(
   }
   if (first === versions.length)
     throw new Error('The saved guide exceeds the history metadata limit.');
-  return structuredClone(versions.slice(first));
+  const retained = versions.slice(first);
+  return ownership === 'exclusive' ? retained : structuredClone(retained);
 }

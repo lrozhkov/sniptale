@@ -406,6 +406,8 @@ function createScenarioAggregateEntry(args: {
   return createScenarioProjectEntry({
     existing: args.existing,
     project: args.project,
+    // Both callers privately admit a fresh storage snapshot before constructing this entry.
+    historyOwnership: 'exclusive',
     ...(args.options.storageClass === undefined ? {} : { storageClass: args.options.storageClass }),
     ...(args.options.publicationUpdatedAt === undefined
       ? {}

@@ -93,6 +93,19 @@ it.each(['guide', 'tour'] as const)(
   }
 );
 
+it.each(['guide', 'tour'] as const)(
+  'does not clone a privately admitted %s history during aggregate save',
+  async (kind) => {
+    const previous = await baseline(kind);
+    const clone = vi.spyOn(globalThis, 'structuredClone');
+    await commitScenarioAggregateMutation(
+      { ...previous.project, name: 'Owned snapshot' },
+      { expectedRevision: previous.workspaceRevision }
+    );
+    expect(clone).not.toHaveBeenCalled();
+  }
+);
+
 it.each([
   ['guide', 'title'],
   ['guide', 'text'],

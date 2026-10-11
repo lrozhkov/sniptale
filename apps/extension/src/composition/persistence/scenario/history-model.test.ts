@@ -114,6 +114,35 @@ function unicodeEntry(guide: boolean, tour: boolean, emptySlides: boolean) {
   return previous;
 }
 
+it('keeps all borrowed history detached and reuses only an explicitly exclusive snapshot', () => {
+  const previous = unicodeEntry(true, true, false);
+  previous.history = [{ revision: 0, savedAt: 1, project: structuredClone(previous.project) }];
+  previous.history[0]!.project.updatedAt = 1;
+  const before = structuredClone(previous);
+  const project = structuredClone({ ...previous.project, name: 'Next' });
+  const borrowed = createScenarioProjectEntry({ existing: previous, project, updatedAt: 3 });
+  const clone = vi.spyOn(globalThis, 'structuredClone');
+  const owned = createScenarioProjectEntry({
+    existing: previous,
+    project,
+    updatedAt: 3,
+    historyOwnership: 'exclusive',
+  });
+  expect(clone).not.toHaveBeenCalled();
+  expect(owned).toEqual(borrowed);
+  expect(owned.history?.[0]).toBe(previous.history[0]);
+  expect(owned.history?.[1]?.project).toBe(previous.project);
+  expect(owned.history?.[1]?.project.items).not.toBe(owned.project.items);
+  expect(owned.history?.[1]?.project.tour?.slides).not.toBe(owned.project.tour?.slides);
+  expect(borrowed.history?.[0]).not.toBe(previous.history[0]);
+  expect(borrowed.history?.[1]?.project).not.toBe(previous.project);
+  borrowed.history![0]!.project.items[0]!.title = 'Changed older step';
+  borrowed.history![1]!.project.tour!.slides[0]!.title = 'Changed current slide';
+  borrowed.history![0]!.project.name = 'Changed older root';
+  borrowed.history![1]!.project.name = 'Changed previous root';
+  expect(previous).toEqual(before);
+});
+
 const byteCases = [
   { guide: false, tour: false, emptySlides: false },
   { guide: true, tour: false, emptySlides: false },

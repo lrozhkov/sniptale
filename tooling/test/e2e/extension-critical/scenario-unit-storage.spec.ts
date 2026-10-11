@@ -63,6 +63,8 @@ test('native scenario units preserve logical history and write only changed enti
     expect(result.unitProof).toMatchObject({
       initialUnits: 4,
       nameUnitWrites: 0,
+      nameHistoryClones: 0,
+      detachedSnapshots: true,
       nameRetained: true,
       guideUnitWrites: 1,
       tourUnitWrites: 1,
