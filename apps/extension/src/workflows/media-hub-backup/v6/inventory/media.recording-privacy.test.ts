@@ -129,7 +129,13 @@ it('projects nested recording source metadata in both exported metadata copies',
 });
 
 function emptyReviewTransaction() {
-  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+  return {
+    objectStore: () => ({
+      index: () => ({ getAll: async () => [] }),
+      get: async () => undefined,
+    }),
+    done: Promise.resolve(),
+  };
 }
 
 it('excludes acquisition snapshots from both recording copies when activity is excluded', async () => {

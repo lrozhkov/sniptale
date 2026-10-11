@@ -1,9 +1,9 @@
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
 type Message = Parameters<typeof translate>[0];
@@ -14,32 +14,10 @@ const variants = [
 ] as const;
 
 async function persistedWatermark(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = db
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        db.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  const workspace = await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  const workspace = parseVideoWorkspace(raw);
   if (!workspace) throw new Error('Expected a valid persisted video workspace');
   const operation = workspace.history
     .slice(0, workspace.cursor)
@@ -244,12 +222,20 @@ for (const variant of variants) {
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
       const fields = inspector.locator('[data-ui="gallery.videoReview.watermarkInspector"]');
-      await expect(inspector.locator('.review-inspector-section')).toHaveCount(6);
+      await expect(inspector.locator('.review-inspector-section')).toHaveCount(7);
       expect(
         await inspector
           .locator('.review-inspector-section')
           .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-section')))
-      ).toEqual(['canvas', 'window-header', 'background', 'presentation', 'watermark', 'audio']);
+      ).toEqual([
+        'captions',
+        'canvas',
+        'window-header',
+        'background',
+        'presentation',
+        'watermark',
+        'audio',
+      ]);
       await button('gallery.videoReview.backgroundSolid').click();
       await inspector
         .getByRole('textbox', {

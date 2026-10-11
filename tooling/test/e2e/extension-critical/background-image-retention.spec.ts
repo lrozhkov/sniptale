@@ -1,3 +1,4 @@
+import { materializeWorkspaceStorage } from '../../../../apps/extension/src/composition/persistence/review-workspaces/storage-format';
 import { expect, test, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
@@ -16,17 +17,21 @@ async function savedBackground(page: Page) {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    const tx = db.transaction(['video_workspaces', 'project_assets']);
+    const tx = db.transaction(['video_workspaces', 'video_workspace_history', 'project_assets']);
     const workspaces = tx.objectStore('video_workspaces').getAll();
+    const history = tx
+      .objectStore('video_workspace_history')
+      .index('aggregateId')
+      .getAll('recording:beta-v1-recording');
     const assets = tx.objectStore('project_assets').count();
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error);
     });
     db.close();
-    return { workspace: workspaces.result[0], assets: assets.result };
+    return { head: workspaces.result[0], rows: history.result, assets: assets.result };
   });
-  const workspace = parseVideoWorkspace(result.workspace);
+  const workspace = parseVideoWorkspace(materializeWorkspaceStorage(result.head, result.rows));
   if (!workspace) return null;
   const document = replayReviewHistory(
     workspace.history,
@@ -77,8 +82,36 @@ test('custom background survives paint switches and reopening without duplicate 
     if (!original?.background.enabled || original.background.type !== 'image')
       throw new Error('No imported image');
     const image = { assetId: original.background.assetId, imageFit: original.background.imageFit };
-    for (const kind of ['backgroundGradient', 'backgroundSolid', 'backgroundNone'] as const) {
-      await mode(translate(`gallery.videoReview.${kind}`, 'en')).click();
+    const gradient = async () => {
+      await mode(translate('gallery.videoReview.backgroundSolid', 'en')).click();
+      await dialog
+        .locator('.review-background-paint [data-ui="shared.ui.paint-selector.trigger"]')
+        .click();
+      const picker = page.locator('[data-ui="shared.ui.paint-selector.popup"]');
+      await picker
+        .getByRole('button', {
+          name: translate('highlighter.paintPicker.linear', 'en'),
+          exact: true,
+        })
+        .click();
+      await picker
+        .getByRole('button', { name: translate('shared.ui.colorSelectorApply', 'en'), exact: true })
+        .click();
+      await expect
+        .poll(async () => (await savedBackground(page))?.background)
+        .toMatchObject({ type: 'gradient' });
+    };
+    for (const kind of ['gradient', 'solid', 'none'] as const) {
+      if (kind === 'gradient') await gradient();
+      else
+        await mode(
+          translate(
+            kind === 'solid'
+              ? 'gallery.videoReview.backgroundSolid'
+              : 'gallery.videoReview.backgroundNone',
+            'en'
+          )
+        ).click();
       await expect
         .poll(async () => (await savedBackground(page))?.background.rememberedImage)
         .toEqual(image);
@@ -87,7 +120,7 @@ test('custom background survives paint switches and reopening without duplicate 
         .poll(async () => (await savedBackground(page))?.background)
         .toMatchObject({ type: 'image', ...image });
     }
-    await mode('Gradient').click();
+    await gradient();
     await expect
       .poll(async () => (await savedBackground(page))?.background.rememberedImage)
       .toEqual(image);

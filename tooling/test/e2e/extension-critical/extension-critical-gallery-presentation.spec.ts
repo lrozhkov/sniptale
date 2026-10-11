@@ -1,10 +1,10 @@
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
 type Message = Parameters<typeof translate>[0];
@@ -15,32 +15,10 @@ const variants = [
 ] as const;
 
 async function persistedPresentation(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = db
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        db.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  const workspace = await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  const workspace = parseVideoWorkspace(raw);
   if (!workspace) throw new Error('Expected a valid persisted workspace');
   const operation = workspace.history
     .slice(0, workspace.cursor)

@@ -96,7 +96,11 @@ function createDb() {
         delete: projectsDbMocks.txDeleteMock,
         get: projectsDbMocks.txGetMock,
         getAll: projectsDbMocks.txGetAllMock,
-        index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
+        index: vi.fn(() => ({
+          count: vi.fn().mockResolvedValue(0),
+          getAll: async () => [],
+          getAllKeys: async () => [],
+        })),
         put: projectsDbMocks.txPutMock,
       })),
     })),

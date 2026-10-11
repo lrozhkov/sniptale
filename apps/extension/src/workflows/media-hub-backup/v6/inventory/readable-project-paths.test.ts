@@ -103,6 +103,7 @@ describe('readable project archive paths', () => {
       const db = {
         transaction: () => ({
           objectStore: (store: string) => ({
+            index: () => ({ getAll: async () => [] }),
             get: async (key: string) =>
               store === 'video_workspaces' && key === review.aggregateId ? review : undefined,
           }),
@@ -245,5 +246,11 @@ describe('readable project archive paths', () => {
 });
 
 function emptyReviewTransaction() {
-  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+  return {
+    objectStore: () => ({
+      index: () => ({ getAll: async () => [] }),
+      get: async () => undefined,
+    }),
+    done: Promise.resolve(),
+  };
 }

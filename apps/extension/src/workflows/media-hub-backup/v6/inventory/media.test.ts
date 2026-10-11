@@ -94,6 +94,7 @@ it.each([true, false])(
     const db = {
       transaction: () => ({
         objectStore: (store: string) => ({
+          index: () => ({ getAll: async () => [] }),
           get: async () => (store === 'video_workspaces' ? review : undefined),
         }),
         done: Promise.resolve(),
@@ -433,5 +434,11 @@ it('uses the sanitized snapshot manifest in outer metadata when provenance is di
 });
 
 function emptyReviewTransaction() {
-  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+  return {
+    objectStore: () => ({
+      index: () => ({ getAll: async () => [] }),
+      get: async () => undefined,
+    }),
+    done: Promise.resolve(),
+  };
 }

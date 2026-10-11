@@ -120,6 +120,7 @@ function database(entry: MediaLibraryEntry) {
   return {
     transaction: () => ({
       objectStore: (store: string) => ({
+        index: () => ({ getAll: async () => [] }),
         get: async () => (store === 'video_workspaces' ? workspace : undefined),
       }),
       done: Promise.resolve(),

@@ -1,3 +1,4 @@
+import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { withVideoProjectUsage, withReviewWorkspaceUsage } from './usage-index-keys';
 import { sameMediaSource } from './dependencies';
 import {
@@ -27,7 +28,9 @@ import {
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
+  type IndexedDbWriteTransaction,
 } from '../infrastructure/indexed-db/core';
 import {
   buildPhysicalDeleteOperation,
@@ -62,9 +65,7 @@ import {
   type MediaDependencyTarget,
 } from './dependencies';
 
-type CascadeTransaction = ReturnType<
-  Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>['transaction']
->;
+type CascadeTransaction = IndexedDbWriteTransaction;
 type PhysicalDelete = ReturnType<typeof buildPhysicalDeleteOperation>;
 type CascadeDatabase = Awaited<
   ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>
@@ -161,7 +162,7 @@ async function loadCascadeGraph(
     tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
     tx.objectStore(SCENARIO_PROJECTS_STORE).getAll(),
     tx.objectStore(SCENARIO_ASSETS_STORE).getAll(),
-    tx.objectStore(VIDEO_WORKSPACES_STORE).getAll(),
+    createVideoWorkspaceStore(tx).getAll(),
   ]);
   const children = requireVerifiedGraphEntries(
     rawChildren,
@@ -273,7 +274,7 @@ async function detachReviewWorkspaces(
     let next = workspace;
     for (const ref of reviewReferencesForMedia(graph.media))
       next = stripReviewAssetReference(next, ref, now);
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).put!(withReviewWorkspaceUsage(next));
+    await createVideoWorkspaceStore(tx).put(withReviewWorkspaceUsage(next));
   }
   return affected;
 }
@@ -292,6 +293,7 @@ async function commitCascadeTransaction(
       SCENARIO_PROJECTS_STORE,
       SCENARIO_ASSETS_STORE,
       VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
       VIDEO_WORKSPACE_DRAFTS_STORE,
       PROJECT_ASSETS_STORE,
       PROJECT_EXPORTS_STORE,

@@ -1,3 +1,4 @@
+import { replaceNativeReviewWorkspace } from './support/native-review-workspace';
 import { chromium, expect, test as base, type Page, type ConsoleMessage } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../apps/extension/src/platform/i18n';
@@ -337,24 +338,7 @@ async function installRecipe(page: Page, recipe: Recipe) {
     throw new Error(
       `Invalid authored performance recipe: ${recipe}: ${JSON.stringify(inspected.failure)}`
     );
-  await page.evaluate(async (row) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const tx = db.transaction('video_workspaces', 'readwrite');
-      const done = new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onabort = () => reject(tx.error);
-      });
-      tx.objectStore('video_workspaces').put(row);
-      await done;
-    } finally {
-      db.close();
-    }
-  }, row);
+  await replaceNativeReviewWorkspace(page, row.aggregateId, row);
   return {
     recipe,
     advancedContent: after,

@@ -1,3 +1,7 @@
+import {
+  readNativeReviewWorkspaceValue,
+  replaceNativeReviewWorkspace,
+} from '../support/native-review-workspace';
 import { reviewAdvancedContentBaseline } from '../../../../apps/extension/src/features/video/review/document';
 import { expect, test, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -7,22 +11,7 @@ import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critic
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 
 async function readWorkspace(page: Page): Promise<unknown> {
-  return await page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<unknown>((resolve, reject) => {
-        const request = db.transaction('video_workspaces').objectStore('video_workspaces').getAll();
-        request.onsuccess = () => resolve(request.result[0]);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  });
+  return readNativeReviewWorkspaceValue(page, 'recording:beta-v1-recording');
 }
 
 for (const locale of ['en', 'ru'] as const) {
@@ -77,23 +66,7 @@ for (const locale of ['en', 'ru'] as const) {
           { id: 'no-op', at: 1, target: 'advancedContent', before: content, after: content },
         ],
       };
-      await page.evaluate(async (row) => {
-        const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = indexedDB.open('sniptale-db');
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-        try {
-          await new Promise<void>((resolve, reject) => {
-            const tx = db.transaction('video_workspaces', 'readwrite');
-            tx.objectStore('video_workspaces').put(row);
-            tx.oncomplete = () => resolve();
-            tx.onabort = () => reject(tx.error);
-          });
-        } finally {
-          db.close();
-        }
-      }, corrupt);
+      await replaceNativeReviewWorkspace(page, workspace!.aggregateId, corrupt);
       await page.reload();
       await open();
       await expect(page.getByRole('alert')).toContainText(

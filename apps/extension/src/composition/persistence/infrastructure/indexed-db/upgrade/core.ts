@@ -9,6 +9,7 @@ import {
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
@@ -119,6 +120,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, THUMBNAILS_STORE, 'assetId');
   createStore(db, IMAGE_WORKSPACES_STORE, 'aggregateId', ['updatedAt']);
   createStore(db, VIDEO_WORKSPACES_STORE, 'aggregateId', ['updatedAt', 'usageReferenceKeys']);
+  createStore(db, VIDEO_WORKSPACE_HISTORY_STORE, ['aggregateId', 'ordinal'], ['aggregateId']);
   createStore(db, VIDEO_WORKSPACE_DRAFTS_STORE, 'aggregateId', ['updatedAt']);
   createStore(db, AGGREGATE_PRESENTATIONS_STORE, ['aggregateKind', 'aggregateId'], ['updatedAt']);
   createStore(db, WEB_SNAPSHOTS_STORE, 'id', ['createdAt']);

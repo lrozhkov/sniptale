@@ -1,3 +1,4 @@
+import { DB_VERSION } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
 import { build } from 'esbuild';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
@@ -25,7 +26,7 @@ test('native project indexes migrate atomically and backfill 1001 legacy project
       }
     }, bundle.outputFiles[0]!.text);
     expect(result).toMatchObject({
-      admission: { databaseVersion: 9, status: 'ready' },
+      admission: { databaseVersion: DB_VERSION, status: 'ready' },
       aborted: true,
       rollback: true,
       pending: true,

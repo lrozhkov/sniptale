@@ -1,6 +1,6 @@
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { expect, test, type Page } from '@playwright/test';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import {
   replayReviewHistory,
@@ -152,40 +152,21 @@ for (const variant of [
 }
 
 async function persistedWorkspace(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = db
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        db.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  return await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  return parseVideoWorkspace(raw);
 }
 
 async function persistedSourceAudio(page: Page) {
   const workspace = await persistedWorkspace(page);
-  const latest = workspace?.history
-    .slice(0, workspace.cursor)
-    .findLast((operation) => operation.target === 'advancedContent');
-  return latest?.target === 'advancedContent' ? latest.after.audio.original : undefined;
+  if (!workspace) return undefined;
+  return replayReviewHistory(
+    workspace.history,
+    workspace.cursor,
+    workspace.source,
+    reviewAdvancedContentBaseline(workspace.advanced)
+  ).advancedContent.audio.original;
 }
 
 async function voiceTiming(page: Page) {

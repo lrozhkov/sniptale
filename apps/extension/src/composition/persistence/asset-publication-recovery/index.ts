@@ -1,3 +1,4 @@
+import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
 import { completePhysicalDeleteOperations } from '../assets/operations';
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
@@ -31,6 +32,7 @@ import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core';
 import {
   ASSET_OPERATIONS_STORE,
@@ -205,7 +207,7 @@ async function compensationIsStillExclusive(
         assets: tx.objectStore(PROJECT_ASSETS_STORE),
         projects: tx.objectStore(VIDEO_PROJECTS_STORE),
         scenarioAssets: tx.objectStore(SCENARIO_ASSETS_STORE),
-        videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+        videoWorkspaces: { getAll: () => readAllWorkspaceStorage(tx) },
       });
     } catch (error) {
       if (error instanceof MediaAssetDeletionBlockedError) return false;
@@ -238,6 +240,7 @@ async function compensateRestoreOperation(
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
       ],
       'readwrite'
     );

@@ -24,7 +24,7 @@ beforeEach(() => {
   mocks.mutate.mockImplementation(async (write) =>
     write({
       transaction: () => ({
-        store: { get: async () => current, put },
+        objectStore: () => ({ get: async () => current, put }),
         done: Promise.resolve(),
         abort,
       }),
@@ -70,4 +70,70 @@ it('aborts a failed transaction and propagates the failure to the advisory maint
     'Quota exceeded'
   );
   expect(abort).toHaveBeenCalledOnce();
+});
+
+it('indexes an admitted physical head without rewriting its baseline or retained redo', async () => {
+  const { createQuickEditAdvancedState } =
+    await import('../../../features/video/review/advanced/defaults');
+  const { workspaceStorageHead, workspaceStorageRows } =
+    await import('../review-workspaces/storage-format');
+  const { parseVideoWorkspace } = await import('../review-workspaces/parser');
+  const workspace = parseVideoWorkspace({
+    aggregateId: 'physical-review',
+    formatVersion: 1,
+    sourceAssetId: 'bytes',
+    source: { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 },
+    revision: 1,
+    cursor: 0,
+    createdAt: 1,
+    updatedAt: 1,
+    advanced: createQuickEditAdvancedState(),
+    history: [
+      {
+        id: 'retained',
+        at: 1,
+        target: 'sourceAudio',
+        before: { muted: false, volume: 1 },
+        after: { muted: false, volume: 0.4 },
+      },
+    ],
+  });
+  if (!workspace) throw new Error('Invalid physical maintenance fixture');
+  const head = workspaceStorageHead(workspace, []);
+  const history = workspaceStorageRows(workspace);
+  const before = structuredClone(history);
+  const writes = vi.fn();
+  mocks.initDB.mockResolvedValue({
+    getAllKeys: vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([workspace.aggregateId])
+      .mockResolvedValue([]),
+  });
+  mocks.mutate.mockImplementation(async (write) =>
+    write({
+      transaction: (names: string[]) => {
+        expect(names).toEqual(['video_workspaces', 'video_workspace_history']);
+        return {
+          objectStore: (name: string) =>
+            name === 'video_workspaces'
+              ? { get: async () => head, put: writes }
+              : {
+                  index: () => ({ getAll: async () => history }),
+                  put: () => {
+                    throw new Error('History rewrite forbidden');
+                  },
+                },
+          done: Promise.resolve(),
+          abort,
+        };
+      },
+    })
+  );
+  expect(await maintainProjectUsageIndex(new AbortController().signal)).toBe(true);
+  expect(writes).toHaveBeenCalledExactlyOnceWith({
+    ...head,
+    usageReferenceKeys: [USAGE_INDEX_MARKER],
+  });
+  expect(history).toEqual(before);
 });

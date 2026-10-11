@@ -1,3 +1,4 @@
+import { readNativeReviewWorkspace, replaceNativeReviewWorkspace } from './native-review-workspace';
 import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import type { Page } from '@playwright/test';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
@@ -15,26 +16,7 @@ import type {
 
 /** Reads the actual persisted sidecar after UI acquisition, including the complete undo history. */
 export async function readWebcamWorkspace(page: Page) {
-  const raw = await page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<unknown>((resolve, reject) => {
-        const request = db
-          .transaction('video_workspaces')
-          .objectStore('video_workspaces')
-          .get('recording:beta-v1-recording');
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  });
-  return parseVideoWorkspace(raw);
+  return readNativeReviewWorkspace(page, 'recording:beta-v1-recording');
 }
 
 /** Installs a validated authored composition, retaining the privately acquired source identity. */
@@ -163,24 +145,7 @@ export async function seedWebcamComposition(page: Page) {
     },
   });
   if (!row) throw new Error('Camera composition fixture is invalid');
-  await page.evaluate(async (row) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const transaction = db.transaction('video_workspaces', 'readwrite');
-      const done = new Promise<void>((resolve, reject) => {
-        transaction.oncomplete = () => resolve();
-        transaction.onabort = () => reject(transaction.error);
-      });
-      transaction.objectStore('video_workspaces').put(row);
-      await done;
-    } finally {
-      db.close();
-    }
-  }, row);
+  await replaceNativeReviewWorkspace(page, row.aggregateId, row);
 }
 
 /** Native decode of real exported bytes; normalized sample points are independent of the painter. */

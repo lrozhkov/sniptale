@@ -1,3 +1,5 @@
+import { workspaceStorageHead, workspaceStorageRows } from '../review-workspaces/storage-format';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -41,7 +43,13 @@ beforeEach(() => {
     getAll,
     getAllFromIndex,
     transaction: () => ({
-      objectStore: () => ({ count: async () => 0, index: () => ({ count: countFromIndex }) }),
+      objectStore: (store: string) => ({
+        count: async () => 0,
+        index: (index: string) => ({
+          count: countFromIndex,
+          getAll: (key: string) => getAllFromIndex(store, index, key),
+        }),
+      }),
       done: Promise.resolve(),
     }),
   });
@@ -130,10 +138,15 @@ it('finds review auxiliary audio through private provenance and excludes its own
     createdAt: 1,
     updatedAt: 1,
   };
-  rows['video_workspaces'] = [
-    withReviewWorkspaceUsage(workspace),
-    withReviewWorkspaceUsage({ ...workspace, aggregateId: media.id }),
-  ];
+  const physical = [workspace, { ...workspace, aggregateId: media.id }].map((value) => {
+    const admitted = parseVideoWorkspace(value);
+    if (!admitted) throw new Error('Invalid indexed review fixture');
+    return admitted;
+  });
+  rows['video_workspaces'] = physical.map((value) =>
+    workspaceStorageHead(value, withReviewWorkspaceUsage(value).usageReferenceKeys)
+  );
+  rows['video_workspace_history'] = physical.flatMap(workspaceStorageRows);
   expect(await readIndexedProjectUsage(media.id)).toEqual([
     { id: 'other', kind: 'review', name: media.filename, primary: false },
   ]);

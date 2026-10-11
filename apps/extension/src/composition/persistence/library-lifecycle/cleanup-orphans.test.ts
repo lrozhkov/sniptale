@@ -98,7 +98,11 @@ it('deletes an expired orphan project-asset blob and never schedules a library a
                 ? temporary
                 : undefined
           ),
-          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          index: vi.fn(() => ({
+            count: vi.fn(async () => 0),
+            getAll: vi.fn(async () => []),
+            getAllKeys: vi.fn(async () => []),
+          })),
           getAll: vi.fn(async () => []),
           put: vi.fn(),
         })),

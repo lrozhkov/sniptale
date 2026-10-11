@@ -23,6 +23,7 @@ import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-pref
 it('uses the canonical IndexedDB store inventory for local data erasure', () => {
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toEqual(EXPECTED_STORES);
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('image_workspaces');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspace_history');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('aggregate_presentations');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).not.toContain('editor_sessions');
 });

@@ -9,6 +9,7 @@ vi.mock('../infrastructure/indexed-db/core', () => ({
   initDB: harness.database,
   MEDIA_LIBRARY_STORE: 'media_library',
   VIDEO_WORKSPACES_STORE: 'video_workspaces',
+  VIDEO_WORKSPACE_HISTORY_STORE: 'video_workspace_history',
   VIDEO_WORKSPACE_DRAFTS_STORE: 'video_workspace_drafts',
 }));
 vi.mock('../assets/opfs-store', async (original) => ({

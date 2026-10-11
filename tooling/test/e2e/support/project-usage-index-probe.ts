@@ -23,6 +23,7 @@ export async function probe() {
   const legacy = await openDB(DB_NAME, 8, {
     upgrade(db, old, next, tx) {
       handleDatabaseUpgrade(db, old, next, tx);
+      db.deleteObjectStore('video_workspace_history');
       for (const [store, indexes] of [
         ['video_projects', ['usageReferenceKeys']],
         ['video_workspaces', ['usageReferenceKeys']],

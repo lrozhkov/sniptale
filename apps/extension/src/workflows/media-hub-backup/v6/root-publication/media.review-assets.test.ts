@@ -1,3 +1,6 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { materializeWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage-format';
+import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ checkpoint: vi.fn(), runMutation: vi.fn() }));
@@ -43,14 +46,32 @@ function installDatabase(metadata: ReturnType<typeof portableMetadata>) {
     const table = tables.get(name) ?? new Map<string, unknown>();
     tables.set(name, table);
     return {
-      get: async (key: IDBValidKey) => table.get(String(key)),
+      get: async (key: IDBValidKey) =>
+        table.get(Array.isArray(key) ? JSON.stringify(key) : String(key)),
       getAll: async () => [...table.values()],
-      delete: async (key: IDBValidKey) => table.delete(String(key)),
+      delete: async (key: IDBValidKey) =>
+        table.delete(Array.isArray(key) ? JSON.stringify(key) : String(key)),
       put: async (value: Record<string, unknown>) => {
-        const key = value['aggregateId'] ?? value['id'] ?? value['assetId'] ?? 'other';
+        const key =
+          name === 'video_workspace_history'
+            ? JSON.stringify([value['aggregateId'], value['ordinal']])
+            : (value['aggregateId'] ?? value['id'] ?? value['assetId'] ?? 'other');
         table.set(String(key), structuredClone(value));
       },
-      index: () => ({ count: async () => 0 }),
+      index: (indexName: string) => ({
+        count: async () => 0,
+        getAll: async (key: IDBValidKey) =>
+          [...table.values()].filter(isRecord).filter((row) => row[indexName] === key),
+        getAllKeys: async (key: IDBValidKey) =>
+          [...table.values()]
+            .filter(isRecord)
+            .filter((row) => row[indexName] === key)
+            .map((row) => {
+              if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
+                throw new Error('Invalid history fixture key');
+              return [row['aggregateId'], row['ordinal']];
+            }),
+      }),
     };
   };
   mocks.runMutation.mockImplementation(async (callback) =>
@@ -60,6 +81,17 @@ function installDatabase(metadata: ReturnType<typeof portableMetadata>) {
     })
   );
   return tables;
+}
+
+function logicalReviewValues(tables: Map<string, Map<string, unknown>>) {
+  return [...(tables.get('video_workspaces')?.values() ?? [])].map((head) => {
+    const ownRows = [...(tables.get('video_workspace_history')?.values() ?? [])].filter(
+      (row) => isRecord(row) && isRecord(head) && row['aggregateId'] === head['aggregateId']
+    );
+    const workspace = parseVideoWorkspace(materializeWorkspaceStorage(head, ownRows));
+    if (!workspace) throw new Error('Invalid restored workspace fixture');
+    return workspace;
+  });
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -93,18 +125,16 @@ it.each(
     expect(result.imported).toBe(strategy !== 'skip');
     if (strategy === 'skip') return;
 
-    const restoredId = [...tables.get('video_workspaces')!.entries()].find(
-      ([id, value]) =>
-        (strategy === 'replace' ? id === metadata.entry.id : id !== metadata.entry.id) &&
-        typeof value === 'object' &&
-        value !== null &&
-        'advanced' in value
-    )![0];
-    const workspace = tables.get('video_workspaces')!.get(restoredId) as ReturnType<
-      typeof reviewFixture
-    >['workspace'];
+    const workspace = logicalReviewValues(tables).find((value) =>
+      strategy === 'replace'
+        ? value.aggregateId === metadata.entry.id
+        : value.aggregateId !== metadata.entry.id
+    );
+    if (!workspace) throw new Error('Missing restored workspace');
     const refs = [
-      workspace.advanced.background.type === 'image' ? workspace.advanced.background.assetId : null,
+      workspace.advanced.background.enabled && workspace.advanced.background.type === 'image'
+        ? workspace.advanced.background.assetId
+        : null,
       workspace.advanced.audio.music[0]?.assetId,
       workspace.history[0]?.target === 'advancedContent'
         ? workspace.history[0].after.audio.voiceover[0]?.assetId
@@ -220,7 +250,7 @@ it.each(['replace', 'duplicate'] as const)(
       throw new Error('Missing restored logo');
     const reference = `project-asset:${saved.id}`;
     expect(tables.get('media_library')!.has(reference)).toBe(false);
-    const restored = [...tables.get('video_workspaces')!.values()].find((value) =>
+    const restored = logicalReviewValues(tables).find((value) =>
       JSON.stringify(value).includes(reference)
     );
     expect(restored).toHaveProperty('advanced.watermark.image.assetId', reference);
@@ -336,6 +366,7 @@ async function reviewResourceArchiveFixture(kind: 'bookends' | 'original-speech'
   const db = {
     transaction: () => ({
       objectStore: (name: string) => ({
+        index: () => ({ getAll: async () => [] }),
         get: async () => (name === 'video_workspaces' ? workspace : undefined),
       }),
       done: Promise.resolve(),
@@ -460,7 +491,7 @@ it.each(['bookends', 'original-speech'] as const)(
         const reference = `project-asset:${entry.id}`;
         expect(reference).not.toBe(`project-asset:${id}`);
         expect(tables.get('media_library')!.has(reference)).toBe(false);
-        const restored = [...tables.get('video_workspaces')!.values()].find((value) =>
+        const restored = logicalReviewValues(tables).find((value) =>
           JSON.stringify(value).includes(reference)
         );
         expect(restored).toBeDefined();

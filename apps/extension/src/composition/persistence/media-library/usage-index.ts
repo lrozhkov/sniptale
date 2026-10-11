@@ -1,8 +1,10 @@
+import { materializeWorkspaceHead } from '../review-workspaces/storage';
 import {
   initDB,
   MEDIA_LIBRARY_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   PROJECT_ASSETS_STORE,
@@ -85,9 +87,7 @@ export async function readIndexedProjectUsage(mediaId: string): Promise<MediaAss
     Promise.all(
       [...keys].map((key) => db.getAllFromIndex(VIDEO_PROJECTS_STORE, USAGE_REFERENCE_INDEX, key))
     ),
-    Promise.all(
-      [...keys].map((key) => db.getAllFromIndex(VIDEO_WORKSPACES_STORE, USAGE_REFERENCE_INDEX, key))
-    ),
+    readIndexedReviews(db, [...keys]),
     Promise.all(
       [...new Set(children.map((child) => child.projectId))].map((id) =>
         db.get(SCENARIO_PROJECTS_STORE, id)
@@ -100,7 +100,7 @@ export async function readIndexedProjectUsage(mediaId: string): Promise<MediaAss
     media,
     childIds,
     videos: videos.flat(),
-    reviews: reviews.flat(),
+    reviews,
     scenarios,
   });
 }
@@ -151,4 +151,19 @@ async function projectUsageFromMatches(args: {
     });
   }
   return [...result.values()];
+}
+
+/** Matching heads and immutable operations share one snapshot; no global workspace scan. */
+async function readIndexedReviews(db: Database, keys: string[]): Promise<unknown[]> {
+  const tx = db.transaction([VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE], 'readonly');
+  const heads = (
+    await Promise.all(
+      keys.map((key) =>
+        tx.objectStore(VIDEO_WORKSPACES_STORE).index(USAGE_REFERENCE_INDEX).getAll(key)
+      )
+    )
+  ).flat();
+  const reviews = await Promise.all(heads.map((head) => materializeWorkspaceHead(tx, head)));
+  await tx.done;
+  return reviews;
 }

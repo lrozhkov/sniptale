@@ -1,3 +1,4 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoProjectAssetType } from '../../../features/video/project/types/index';
 import { createMediaLibraryEntry, createVideoProjectEntry } from './index.test-support.ts';
@@ -69,7 +70,11 @@ function createDb() {
             : deleteMocks.txDeleteMock,
         get: deleteMocks.txGetMock,
         getAll: deleteMocks.txGetAllMock,
-        index: vi.fn(() => ({ count: deleteMocks.txCountMock })),
+        index: vi.fn(() => ({
+          count: deleteMocks.txCountMock,
+          getAll: async () => [],
+          getAllKeys: async () => [],
+        })),
         put: deleteMocks.txPutMock,
       })),
     })),
@@ -318,14 +323,38 @@ async function installNestedResourceGraph(failRelease = false) {
     updatedAt: 1,
   });
   const objectStore = (name: string) => ({
-    get: async (key: IDBValidKey) => table(name).get(String(key)),
+    get: async (key: IDBValidKey) =>
+      table(name).get(
+        name === 'video_workspace_history' && Array.isArray(key) ? JSON.stringify(key) : String(key)
+      ),
     getAll: async () => [...table(name).values()],
-    delete: async (key: IDBValidKey) => table(name).delete(String(key)),
+    delete: async (key: IDBValidKey) =>
+      table(name).delete(
+        name === 'video_workspace_history' && Array.isArray(key) ? JSON.stringify(key) : String(key)
+      ),
     put: async (value: Record<string, unknown>) => {
       if (name === 'asset_operations' && failRelease) throw new Error('release journal failed');
-      return table(name).set(String(value['id'] ?? value['aggregateId']), value);
+      return table(name).set(
+        name === 'video_workspace_history'
+          ? JSON.stringify([value['aggregateId'], value['ordinal']])
+          : String(value['id'] ?? value['aggregateId']),
+        value
+      );
     },
-    index: () => ({ count: async () => 0 }),
+    index: (indexName: string) => ({
+      count: async () => 0,
+      getAll: async (key: IDBValidKey) =>
+        [...table(name).values()].filter(isRecord).filter((row) => row[indexName] === key),
+      getAllKeys: async (key: IDBValidKey) =>
+        [...table(name).values()]
+          .filter(isRecord)
+          .filter((row) => row[indexName] === key)
+          .map((row) => {
+            if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
+              throw new Error('Invalid history fixture key');
+            return [row['aggregateId'], row['ordinal']];
+          }),
+    }),
   });
   deleteMocks.initDBMock.mockResolvedValue({
     get: (name: string, key: IDBValidKey) => objectStore(name).get(key),

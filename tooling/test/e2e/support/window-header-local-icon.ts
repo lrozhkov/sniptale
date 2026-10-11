@@ -1,6 +1,6 @@
+import { readNativeReviewWorkspace } from './native-review-workspace';
 import { writeFile } from 'node:fs/promises';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
@@ -86,32 +86,10 @@ export async function checkLocalWindowIcon(page: Page, settings: Locator, locale
 
 /** Reads the committed quick-editor history rather than assuming how consecutive edits coalesce. */
 export async function persistedQuickHeader(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = database
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        database.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  const workspace = await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  const workspace = parseVideoWorkspace(raw);
   const operation = workspace?.history
     .slice(0, workspace.cursor)
     .findLast((entry) => entry.target === 'advancedContent');

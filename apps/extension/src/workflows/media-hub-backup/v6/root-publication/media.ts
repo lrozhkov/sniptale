@@ -1,3 +1,4 @@
+import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import { freezeScenarioMediaRepresentations } from '../../../../composition/persistence/scenario/library-publication';
 import { sameMediaSource } from '../../../../composition/persistence/media-library/dependencies';
 import {
@@ -8,6 +9,7 @@ import {
 import { replaceSanitizedSnapshotPackage } from './page-package';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -550,6 +552,7 @@ async function commitPreparedMediaRoot(args: {
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
@@ -575,7 +578,7 @@ async function commitPreparedMediaRoot(args: {
       thumbnails: tx.objectStore(THUMBNAILS_STORE),
       snapshots: tx.objectStore(WEB_SNAPSHOTS_STORE),
       workspaces: tx.objectStore(IMAGE_WORKSPACES_STORE),
-      videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+      videoWorkspaces: createVideoWorkspaceStore(tx),
       videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
       videoProjects: tx.objectStore(VIDEO_PROJECTS_STORE),
       projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),

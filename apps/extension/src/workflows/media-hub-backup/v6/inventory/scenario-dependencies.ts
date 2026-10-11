@@ -1,3 +1,4 @@
+import { readAllWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
   parseProjectAssetEntry,
@@ -13,6 +14,7 @@ import {
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   type initDB,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
@@ -162,7 +164,11 @@ export async function resolveBackupDependencySelection(
       }
     }
   }
-  const reviews = (await db.getAll(VIDEO_WORKSPACES_STORE)).flatMap((raw) => {
+  const reviews = (
+    await readAllWorkspaceStorage(
+      db.transaction([VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE], 'readonly')
+    )
+  ).flatMap((raw) => {
     const workspace = parseVideoWorkspace(raw);
     return workspace ? [workspace] : [];
   });

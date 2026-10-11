@@ -137,8 +137,22 @@
         {
           "sink": "store.put",
           "keys": [
-            "VIDEO_WORKSPACES_STORE",
             "VIDEO_WORKSPACE_DRAFTS_STORE"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/review-workspaces/storage.ts",
+      "owner": "review-workspaces",
+      "justification": "Encodes admitted review baseline/history and compact head inside the existing caller-owned transaction; no independent retention or mutation authority.",
+      "reviewNote": "Local-only source-time annotations, edit intent, complete linear history, and final text inserted into the comment field. No raw recognition events, interim transcripts or audio. Explicit media backup only; drafts excluded from reports; no sync/logs/diagnostics. Deleted with media and verified local-data erasure.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "VIDEO_WORKSPACES_STORE",
+            "VIDEO_WORKSPACE_HISTORY_STORE"
           ]
         }
       ]

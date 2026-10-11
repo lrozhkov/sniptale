@@ -220,6 +220,17 @@
       "reviewDate": "2026-10-08",
       "astHash": "88a08b0d43890bff1b0368e1b31774caacd317a53d4cb460af52757d92aec3e0",
       "signatureHash": "7e731b2cca456f975c8c3aaa907d5b8c5086ab51cf1054b4eb6f487c62d2cbc0"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:composition:persistence",
+      "reason": "tool-noise: The existing single-owner review workspace fixture crosses800lines solely through the new history-store mock constant and replacing five intentional legacy/corrupt raw writes with the same fixture helper. No test case, effect, independent state receiver or recovery authority was added here; score2 delta0 and cohesion1.00. The helper clears only own auxiliary history before each existing legacy seed, preserving the assertions. Main inspected the complete diff; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any new independent test cluster, writer, effect, state receiver or recovery policy. Remove when the analyzer models this cohesive fixture shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-11",
+      "astHash": "2a307837d2e2cce4fae6a50c3e6b19a3ecde5d62bfdf75be4294b0cac2952179",
+      "signatureHash": "6b46a4caa5d000de8df094f7efc38e178347409429c224a8c690a3f971d9e494"
     }
   ]
 }

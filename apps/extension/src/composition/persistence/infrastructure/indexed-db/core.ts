@@ -1,5 +1,5 @@
 import { runStorageStartupPhase } from '../startup-diagnostics';
-import { openDB, type IDBPDatabase } from 'idb';
+import { openDB, type IDBPDatabase, type IDBPTransaction } from 'idb';
 import { createLazyDefaultOwner } from '@sniptale/foundation/default-owner';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createMemoryStateDomainAdapter } from '@sniptale/platform/data/state-manager/memory-adapter';
@@ -29,6 +29,9 @@ import {
 } from './core.stores.ts';
 
 export * from './core.stores.ts';
+
+/** A participant in the caller's admitted native write transaction. */
+export type IndexedDbWriteTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 const logger = createLogger({ namespace: 'SharedDbCore' });
 

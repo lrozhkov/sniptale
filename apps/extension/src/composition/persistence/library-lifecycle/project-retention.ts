@@ -1,3 +1,4 @@
+import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { promoteReviewSourceLifecycles } from '../review-workspaces/new-reference-admission';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { promoteProjectSourceLifecycles } from '../projects/new-reference-admission';
@@ -6,6 +7,7 @@ import {
   SCENARIO_PROJECTS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -24,6 +26,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
       [
         VIDEO_PROJECTS_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
         SCENARIO_PROJECTS_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
@@ -64,7 +67,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         const entry = parseScenarioProjectEntry(raw);
         if (entry) await promoteScenarioSourceLifecycles(tx, entry, now);
       }
-      for (const raw of await tx.objectStore(VIDEO_WORKSPACES_STORE).getAll()) {
+      for (const raw of await createVideoWorkspaceStore(tx).getAll()) {
         const workspace = parseVideoWorkspace(raw);
         if (workspace)
           await promoteReviewSourceLifecycles(

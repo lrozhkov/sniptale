@@ -1,3 +1,5 @@
+import { materializeWorkspaceStorage } from '../review-workspaces/storage-format';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { beforeEach, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import type { MediaLibraryEntry } from './contracts';
@@ -48,6 +50,8 @@ export function mediaEntry(): MediaLibraryEntry {
 }
 
 function keyOf(store: string, value: Record<string, unknown>): string {
+  if (store === 'video_workspace_history')
+    return JSON.stringify([value['aggregateId'], value['ordinal']]);
   if (store === 'asset_owners')
     return JSON.stringify([value['ownerKind'], value['ownerId'], value['role']]);
   if (store === 'video_workspaces' || store === 'video_workspace_drafts')
@@ -57,6 +61,16 @@ function keyOf(store: string, value: Record<string, unknown>): string {
 }
 
 export let rows: Map<string, Map<string, unknown>>;
+
+/** Observe full logical history after an atomic physical detach or parent cleanup. */
+export function readReviewWorkspaceFixture(aggregateId: string): unknown {
+  return materializeWorkspaceStorage(
+    rows.get('video_workspaces')?.get(aggregateId),
+    [...(rows.get('video_workspace_history')?.values() ?? [])].filter(
+      (row) => isRecord(row) && row['aggregateId'] === aggregateId
+    )
+  );
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -130,7 +144,21 @@ beforeEach(() => {
             delete: async (key: unknown) => {
               store.delete(Array.isArray(key) ? JSON.stringify(key) : String(key));
             },
-            index: () => ({
+            index: (indexName: string) => ({
+              getAll: async (key: IDBValidKey) =>
+                [...store.values()].filter((value) => isRecord(value) && value[indexName] === key),
+              getAllKeys: async (key: IDBValidKey) =>
+                [...store.values()]
+                  .filter(isRecord)
+                  .filter((value) => value[indexName] === key)
+                  .map((value) => {
+                    if (
+                      typeof value['aggregateId'] !== 'string' ||
+                      typeof value['ordinal'] !== 'number'
+                    )
+                      throw new Error('Invalid compound fixture key');
+                    return [value['aggregateId'], value['ordinal']];
+                  }),
               count: async (assetId: string) =>
                 [...store.values()].filter(
                   (value) => (value as { assetId?: string }).assetId === assetId

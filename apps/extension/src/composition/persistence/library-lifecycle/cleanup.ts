@@ -1,7 +1,9 @@
+import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { createMaintenanceLog } from './maintenance-log';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import {
@@ -127,6 +129,7 @@ async function deleteExpiredMedia(
       [
         MEDIA_LIBRARY_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
@@ -167,7 +170,7 @@ async function deleteExpiredMedia(
       );
       const reviewReferenced =
         reviewReferencesForMedia(target).size > 0 &&
-        (await tx.objectStore(VIDEO_WORKSPACES_STORE).getAll()).some((raw) => {
+        (await createVideoWorkspaceStore(tx).getAll()).some((raw) => {
           if (isRecord(raw) && raw['aggregateId'] === current.id) return false;
           const workspace = parseVideoWorkspace(raw);
           return !workspace || reviewWorkspaceUsesMedia(workspace, target);

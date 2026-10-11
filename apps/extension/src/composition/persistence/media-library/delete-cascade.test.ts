@@ -1,3 +1,4 @@
+import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
 import { expect, it } from 'vitest';
 import { harness, mediaId, physicalId, mediaEntry, rows } from './delete-cascade.test-support';
 import {
@@ -145,7 +146,7 @@ it.each(['music', 'voiceover'] as const)(
       { id: project.id, kind: 'video', name: project.project.name, primary: false },
       { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
     ]);
-    const review = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+    const review = parseVideoWorkspace(readReviewWorkspaceFixture('recording:other'));
     expect(review).not.toBeNull();
     expect(review!.advanced.audio[lane]).toEqual([]);
     expect(review!.advanced.audio.original.mutes).toEqual([
@@ -211,7 +212,7 @@ it('detaches a disabled webcam held only by redo history when its Library origin
   await deleteMediaAssetWithProjectCascade(mediaId, [
     { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
   ]);
-  const review = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+  const review = parseVideoWorkspace(readReviewWorkspaceFixture('recording:other'));
   expect(review).not.toBeNull();
   expect(review!.history).toEqual([]);
   expect(review!.advanced.webcam).toBeUndefined();

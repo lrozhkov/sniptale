@@ -1,3 +1,4 @@
+import { workspaceStorageHead, workspaceStorageRows } from './storage-format';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
@@ -110,33 +111,42 @@ const draft = {
   updatedAt: 3,
 };
 
-it('exports full undo/redo and field recovery, excluding the local source object identity', async () => {
-  const review = await readVideoReviewForBackup({
-    aggregateId: workspace.aggregateId,
-    sourceAssetId: 'original-local',
-    db: snapshotDatabase(workspace, draft),
-  });
-  expect(review?.workspace.history).toEqual(workspace.history);
-  expect(review?.workspace.cursor).toBe(0);
-  expect(review?.workspace).not.toHaveProperty('sourceAssetId');
-  expect(review?.draft).toEqual(draft);
-  const restored = prepareVideoReviewRestore({
-    review: review!,
-    sourceAggregateId: workspace.aggregateId,
-    targetAggregateId: 'recording:duplicate',
-    sourceAssetId: 'new-local',
-  });
-  expect(restored.workspace.aggregateId).toBe('recording:duplicate');
-  expect(restored.workspace.sourceAssetId).toBe('new-local');
-  expect(restored.draft?.aggregateId).toBe('recording:duplicate');
-  expect(restored.workspace.history).toEqual(workspace.history);
-  const workspaces = { put: vi.fn() };
-  const drafts = { put: vi.fn(), delete: vi.fn() };
-  await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
-  expect(drafts.put).toHaveBeenCalledWith(restored.draft);
-  expect(drafts.delete).not.toHaveBeenCalled();
-});
+it.each(['legacy', 'physical'] as const)(
+  'exports full %s undo/redo and field recovery, excluding the local source object identity',
+  async (format) => {
+    const review = await readVideoReviewForBackup({
+      aggregateId: workspace.aggregateId,
+      sourceAssetId: 'original-local',
+      db: snapshotDatabase(
+        format === 'physical' ? workspaceStorageHead(workspace, []) : workspace,
+        draft,
+        format === 'physical' ? workspaceStorageRows(workspace) : []
+      ),
+    });
+    expect(review?.workspace.history).toEqual(workspace.history);
+    expect(review?.workspace.cursor).toBe(0);
+    expect(review?.workspace).not.toHaveProperty('sourceAssetId');
+    expect(review?.workspace).toHaveProperty('formatVersion', 1);
+    expect(review?.workspace).not.toHaveProperty('historyLength');
+    expect(review?.draft).toEqual(draft);
+    const restored = prepareVideoReviewRestore({
+      review: review!,
+      sourceAggregateId: workspace.aggregateId,
+      targetAggregateId: 'recording:duplicate',
+      sourceAssetId: 'new-local',
+    });
+    expect(restored.workspace.aggregateId).toBe('recording:duplicate');
+    expect(restored.workspace.sourceAssetId).toBe('new-local');
+    expect(restored.draft?.aggregateId).toBe('recording:duplicate');
+    expect(restored.workspace.history).toEqual(workspace.history);
+    const workspaces = { put: vi.fn() };
+    const drafts = { put: vi.fn(), delete: vi.fn() };
+    await putVideoReviewRestore({ review: restored, workspaces, drafts });
+    expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+    expect(drafts.put).toHaveBeenCalledWith(restored.draft);
+    expect(drafts.delete).not.toHaveBeenCalled();
+  }
+);
 
 it('refuses corrupt or stale source state instead of silently dropping it from backup', async () => {
   const db = snapshotDatabase(workspace, undefined);
@@ -175,52 +185,61 @@ it('refuses corrupt or stale source state instead of silently dropping it from b
   ).resolves.toBeUndefined();
 });
 
-it('keeps recovery text when a draft-consuming Save interleaves with backup reads', async () => {
-  const pendingWorkspace: VideoWorkspace = { ...workspace, history: [], cursor: 0 };
-  let currentWorkspace = pendingWorkspace;
-  let currentDraft: typeof draft | undefined = draft;
-  const save = () => {
-    currentWorkspace = {
-      ...workspace,
-      cursor: 1,
-      history: [{ id: 'save', at: 4, target: 'annotation', before: null, after: draft.annotation }],
-    };
-    currentDraft = undefined;
-  };
-  const db = {
-    get: async (store: string) => {
-      if (store !== 'video_workspaces') return currentDraft;
-      const value = currentWorkspace;
-      save();
-      return value;
-    },
-    transaction: () => {
-      const capturedWorkspace = currentWorkspace;
-      const capturedDraft = currentDraft;
-      return {
-        objectStore: (store: string) => ({
-          get: async () => {
-            save();
-            return store === 'video_workspaces' ? capturedWorkspace : capturedDraft;
-          },
-        }),
-        done: Promise.resolve(),
+it.each(['legacy', 'physical'] as const)(
+  'keeps %s recovery text when a draft-consuming Save interleaves with backup reads',
+  async (format) => {
+    const pendingWorkspace: VideoWorkspace = { ...workspace, history: [], cursor: 0 };
+    let currentWorkspace = pendingWorkspace;
+    let currentDraft: typeof draft | undefined = draft;
+    const save = () => {
+      currentWorkspace = {
+        ...workspace,
+        cursor: 1,
+        history: [
+          { id: 'save', at: 4, target: 'annotation', before: null, after: draft.annotation },
+        ],
       };
-    },
-  };
-  const review = await readVideoReviewForBackup({
-    db,
-    aggregateId: workspace.aggregateId,
-    sourceAssetId: workspace.sourceAssetId,
-  });
-  expect(review?.draft?.annotation.text).toBe('Unsaved');
-  expect(review?.workspace.history).toEqual([]);
-});
+      currentDraft = undefined;
+    };
+    const db = {
+      get: async (store: string) => {
+        if (store !== 'video_workspaces') return currentDraft;
+        const value = currentWorkspace;
+        save();
+        return value;
+      },
+      transaction: () => {
+        const capturedWorkspace =
+          format === 'physical' ? workspaceStorageHead(currentWorkspace, []) : currentWorkspace;
+        const capturedHistory = format === 'physical' ? workspaceStorageRows(currentWorkspace) : [];
+        const capturedDraft = currentDraft;
+        return {
+          objectStore: (store: string) => ({
+            index: () => ({ getAll: async () => capturedHistory }),
+            get: async () => {
+              save();
+              return store === 'video_workspaces' ? capturedWorkspace : capturedDraft;
+            },
+          }),
+          done: Promise.resolve(),
+        };
+      },
+    };
+    const review = await readVideoReviewForBackup({
+      db,
+      aggregateId: workspace.aggregateId,
+      sourceAssetId: workspace.sourceAssetId,
+    });
+    expect(review?.draft?.annotation.text).toBe('Unsaved');
+    expect(review?.workspace.history).toEqual([]);
+  }
+);
 
-function snapshotDatabase(raw: unknown, rawDraft: unknown) {
+function snapshotDatabase(raw: unknown, rawDraft: unknown, rows: unknown[] = []) {
   return {
     transaction: () => ({
       objectStore: (store: string) => ({
+        index: () => ({ getAll: async () => rows }),
         get: async () => (store === 'video_workspaces' ? raw : rawDraft),
       }),
       done: Promise.resolve(),

@@ -10,7 +10,11 @@ import {
 import type { ReviewOperation } from '../../../features/video/review/types';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { collectReviewAssetReferences } from './asset-refs';
-import { createReviewWorkspaceStoreFixture } from './store.test-support';
+import {
+  createReviewWorkspaceStoreFixture,
+  replaceLegacyWorkspaceFixture,
+  fixtureWorkspaceValue,
+} from './store.test-support';
 import type { VideoWorkspace } from './contracts';
 
 const observed = vi.hoisted(() => ({
@@ -41,6 +45,7 @@ vi.mock('../infrastructure/indexed-db/core', () => ({
   initDB: observed.database,
   MEDIA_LIBRARY_STORE: 'media_library',
   VIDEO_WORKSPACES_STORE: 'video_workspaces',
+  VIDEO_WORKSPACE_HISTORY_STORE: 'video_workspace_history',
   VIDEO_WORKSPACE_DRAFTS_STORE: 'video_workspace_drafts',
 }));
 vi.mock('../assets/opfs-store', async (load) => ({
@@ -186,7 +191,7 @@ it.each([
   { historyLength: 80, fragments: 200 },
 ])('admits previous and candidate once for $historyLength retained operations', async (size) => {
   const previous = workspace(size.historyLength, size.fragments);
-  rows.get('video_workspaces')!.set(id, previous);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
   const operation = parameterEdit(previous);
   observed.replay.mockClear();
   const result = await commitVideoWorkspace({
@@ -216,7 +221,7 @@ it.each([
 
 it('still rejects corrupt unapplied redo before any write', async () => {
   const previous = workspace(2);
-  rows.get('video_workspaces')!.set(id, {
+  replaceLegacyWorkspaceFixture(rows, id, {
     ...previous,
     cursor: 0,
     history: [...previous.history, { ...previous.history[0], id: 'invalid-redo' }],
@@ -256,7 +261,7 @@ function assertSameRetainedProjections(previous: VideoWorkspace, next: VideoWork
 it('bounds retained gain-only legacy history on a successful owner save without trimming steps', async () => {
   const previous = workspace(80, 200);
   const unchanged = structuredClone(previous);
-  rows.get('video_workspaces')!.set(id, previous);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
   expect((await readVideoWorkspace(id))?.workspace.history).toEqual(previous.history);
   expect(observed.writes).toBe(0);
   expect(rows.get('video_workspaces')!.get(id)).toEqual(unchanged);
@@ -265,7 +270,12 @@ it('bounds retained gain-only legacy history on a successful owner save without 
     operation: parameterEdit(previous),
   });
   expect(
-    new TextEncoder().encode(JSON.stringify(rows.get('video_workspaces')!.get(id))).byteLength
+    new TextEncoder().encode(
+      JSON.stringify([
+        rows.get('video_workspaces')!.get(id),
+        ...rows.get('video_workspace_history')!.values(),
+      ])
+    ).byteLength
   ).toBeLessThan(100_000);
   expect(result.workspace.history).toHaveLength(81);
   expect(result.workspace.history[0]?.target).toBe('advancedContent');
@@ -300,7 +310,7 @@ it('retains all redo references and steps when a cursor mutation compacts legacy
       },
     },
   ];
-  rows.get('video_workspaces')!.set(id, previous);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
   const result = await moveVideoWorkspaceHistory({ ...identity(previous), direction: 'redo' });
   expect(result.workspace.cursor).toBe(1);
   expect(result.workspace.history.map((operation) => operation.target)).toEqual([
@@ -308,12 +318,12 @@ it('retains all redo references and steps when a cursor mutation compacts legacy
     'sourceAudio',
   ]);
   assertSameRetainedProjections(previous, result.workspace);
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(withReviewWorkspaceUsage(result.workspace));
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(result.workspace));
 });
 
 it('preserves exact legacy rows when a compacted workspace put fails', async () => {
   const previous = workspace(2);
-  rows.get('video_workspaces')!.set(id, previous);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
   const original = structuredClone(rows);
   observed.failWrite = true;
   await expect(
@@ -324,7 +334,7 @@ it('preserves exact legacy rows when a compacted workspace put fails', async () 
 
 it('still rejects an invalid candidate without publishing a partial revision', async () => {
   const previous = workspace(2);
-  rows.get('video_workspaces')!.set(id, previous);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
   const before = structuredClone(rows);
   await expect(
     commitVideoWorkspace({
@@ -353,23 +363,21 @@ it('derives retained usage keys for every workspace writer without accepting imp
       after: { ...reviewAdvancedContentBaseline(previous.advanced), webcam: webcam('redo') },
     },
   ];
-  rows.get('video_workspaces')!.set(id, { ...previous, usageReferenceKeys: ['forged'] });
+  replaceLegacyWorkspaceFixture(rows, id, { ...previous, usageReferenceKeys: ['forged'] });
   const moved = await moveVideoWorkspaceHistory({ ...identity(previous), direction: 'redo' });
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(withReviewWorkspaceUsage(moved.workspace));
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(moved.workspace));
   const advanced = await saveVideoWorkspaceAdvanced({
     ...identity(moved.workspace),
     advanced: moved.workspace.advanced,
   });
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(
-    withReviewWorkspaceUsage(advanced.workspace)
-  );
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(advanced.workspace));
   const saved = await saveVideoWorkspaceSnapshot({
     ...identity(advanced.workspace),
     expectedDraftRevision: null,
     workspace: { ...advanced.workspace, usageReferenceKeys: ['forged'] },
     draft: null,
   });
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(withReviewWorkspaceUsage(saved.workspace));
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(saved.workspace));
   const draft = await saveVideoWorkspaceDraft({
     ...identity(saved.workspace),
     expectedDraftRevision: null,
@@ -382,12 +390,11 @@ it('derives retained usage keys for every workspace writer without accepting imp
     annotation: null,
     before: null,
   });
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(
-    withReviewWorkspaceUsage(discarded.workspace)
-  );
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(discarded.workspace));
   rows.get('video_workspaces')!.delete(id);
+  rows.get('video_workspace_history')!.clear();
   const opened = await openVideoWorkspace(id, source);
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(withReviewWorkspaceUsage(opened.workspace));
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(opened.workspace));
   const reopened = await openVideoWorkspace(id, source);
   const unchanged = await moveVideoWorkspaceHistory({
     ...identity(opened.workspace),

@@ -79,6 +79,12 @@ beforeEach(() => {
   ];
   reviewRows = [];
   mocks.initDB.mockResolvedValue({
+    transaction: () => ({
+      objectStore: (store: string) => ({
+        getAll: async () => (store === 'video_workspaces' ? reviewRows : []),
+      }),
+      done: Promise.resolve(),
+    }),
     get: async (_store: string, id: string) => (id === media.id ? media : undefined),
     getAll: async (store: string) => {
       if (store === 'media_library') return extraMedia ? [media, extraMedia] : [media];
@@ -210,10 +216,14 @@ it('loads the full graph once for a batch instead of once per selected file', as
   mocks.initDB.mockResolvedValue({
     get: async (_store: string, id: string) => (id === media.id ? media : extraMedia),
     getAll,
+    transaction: () => ({
+      objectStore: (store: string) => ({ getAll: () => getAll(store) }),
+      done: Promise.resolve(),
+    }),
   });
   const previous = await Promise.all([media.id, extraMedia.id].map(listMediaAssetProjectUsage));
   expect(mocks.videos).toHaveBeenCalledTimes(2);
-  expect(getAll).toHaveBeenCalledTimes(8);
+  expect(getAll).toHaveBeenCalledTimes(10);
   mocks.videos.mockClear();
   mocks.scenarios.mockClear();
   getAll.mockClear();
@@ -232,7 +242,7 @@ it('loads the full graph once for a batch instead of once per selected file', as
   );
   expect(mocks.videos).toHaveBeenCalledOnce();
   expect(mocks.scenarios).toHaveBeenCalledOnce();
-  expect(getAll).toHaveBeenCalledTimes(4);
+  expect(getAll).toHaveBeenCalledTimes(5);
 });
 
 it('reads each deletion preparation freshly without trusting an advisory index', async () => {
@@ -296,7 +306,10 @@ it('reads inspector relationships through indexes without any global document li
     get: async (_store: string, id: string) => (id === media.id ? media : undefined),
     getAll,
     transaction: () => ({
-      objectStore: () => ({ count: async () => 0, index: () => ({ count: async () => 0 }) }),
+      objectStore: () => ({
+        count: async () => 0,
+        index: () => ({ count: async () => 0, getAll: async () => [] }),
+      }),
       done: Promise.resolve(),
     }),
     getAllFromIndex: async () => [],

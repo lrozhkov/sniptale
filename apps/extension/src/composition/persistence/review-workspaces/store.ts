@@ -1,3 +1,9 @@
+import {
+  readWorkspaceStorage,
+  replaceWorkspaceStorage,
+  writeWorkspaceStorage,
+  type WorkspaceStorageRead,
+} from './storage';
 import { usageReferenceKey, USAGE_INDEX_MARKER } from '../media-library/usage-index-keys';
 import { collectReviewAssetReferences } from './asset-refs';
 import { createNewWorkspacePresentationSettings } from '../../../features/video/review/advanced/presentation';
@@ -20,6 +26,7 @@ import {
   initDB,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -46,6 +53,7 @@ import {
 const stores = [
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   STORE_NAME,
   PROJECT_ASSETS_STORE,
@@ -102,13 +110,15 @@ async function readSourceAssetId(tx: Transaction, aggregateId: string): Promise<
 type AdmittedWorkspaceSnapshot = {
   snapshot: VideoWorkspaceSnapshot;
   document: ReviewDocument;
+  storage: WorkspaceStorageRead;
 };
 
 async function readSnapshot(
   tx: Transaction,
   aggregateId: string
 ): Promise<AdmittedWorkspaceSnapshot | null> {
-  const raw: unknown = await tx.objectStore(VIDEO_WORKSPACES_STORE).get(aggregateId);
+  const storage = await readWorkspaceStorage(tx, aggregateId);
+  const raw = storage.logical;
   const rawDraft: unknown = await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(aggregateId);
   if (raw === undefined && rawDraft === undefined) return null;
   const { workspace, document, failure } = inspectVideoWorkspace(raw);
@@ -122,7 +132,7 @@ async function readSnapshot(
   }
   if (workspace.sourceAssetId !== (await readSourceAssetId(tx, aggregateId)))
     throw new VideoWorkspaceError('changed-source');
-  return { snapshot: { workspace, draft }, document };
+  return { snapshot: { workspace, draft }, document, storage };
 }
 
 /** Read-only recovery: missing is distinct from invalid and never repairs durable content. */
@@ -210,7 +220,7 @@ export async function openVideoWorkspace(
       updatedAt: now,
     });
     if (!workspace) throw new VideoWorkspaceError('invalid');
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).put(indexedWorkspace(workspace));
+    await replaceWorkspaceStorage(tx, workspace, indexedWorkspace(workspace).usageReferenceKeys);
     return { workspace, draft: null };
   });
 }
@@ -235,6 +245,8 @@ async function putWorkspace(
   tx: WriteTransaction,
   previous: VideoWorkspace,
   workspace: VideoWorkspace,
+  storage: WorkspaceStorageRead,
+  mode: 'append' | 'cursor' | 'replace',
   prepared: ReviewReadySources = { assets: new Map(), libraryAudioClaims: [] }
 ): Promise<VideoWorkspace> {
   const admitted = parseVideoWorkspace({
@@ -273,7 +285,13 @@ async function putWorkspace(
     },
     prepared
   );
-  await tx.objectStore(VIDEO_WORKSPACES_STORE).put(indexedWorkspace(next));
+  await writeWorkspaceStorage(tx, {
+    previous,
+    workspace: next,
+    storage,
+    mode,
+    usageReferenceKeys: indexedWorkspace(next).usageReferenceKeys,
+  });
   return next;
 }
 
@@ -291,6 +309,7 @@ export async function commitVideoWorkspace(args: {
       const {
         snapshot: { workspace, draft },
         document,
+        storage,
       } = await requireSnapshot(
         tx,
         args.aggregateId,
@@ -327,6 +346,8 @@ export async function commitVideoWorkspace(args: {
           history: [...workspace.history.slice(0, workspace.cursor), operation],
           cursor: workspace.cursor + 1,
         },
+        storage,
+        'append',
         prepared
       );
       if (args.consumeDraftRevision !== undefined)
@@ -345,7 +366,7 @@ export async function moveVideoWorkspaceHistory(args: {
   direction: ReviewHistoryDirection;
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(args.aggregateId, async (tx) => {
-    const { snapshot } = await requireSnapshot(
+    const { snapshot, storage } = await requireSnapshot(
       tx,
       args.aggregateId,
       args.expectedRevision,
@@ -363,7 +384,13 @@ export async function moveVideoWorkspaceHistory(args: {
       return snapshot;
     return {
       ...snapshot,
-      workspace: await putWorkspace(tx, snapshot.workspace, { ...snapshot.workspace, cursor }),
+      workspace: await putWorkspace(
+        tx,
+        snapshot.workspace,
+        { ...snapshot.workspace, cursor },
+        storage,
+        'cursor'
+      ),
     };
   });
 }
@@ -378,7 +405,7 @@ export async function saveVideoWorkspaceAdvanced(args: {
   return mutate(
     args.aggregateId,
     async (tx, prepared) => {
-      const { snapshot } = await requireSnapshot(
+      const { snapshot, storage } = await requireSnapshot(
         tx,
         args.aggregateId,
         args.expectedRevision,
@@ -392,6 +419,8 @@ export async function saveVideoWorkspaceAdvanced(args: {
           tx,
           snapshot.workspace,
           { ...snapshot.workspace, advanced },
+          storage,
+          'replace',
           prepared
         ),
       };
@@ -410,7 +439,7 @@ export async function saveVideoWorkspaceDraft(args: {
   before: unknown;
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(args.aggregateId, async (tx) => {
-    const { snapshot } = await requireSnapshot(
+    const { snapshot, storage } = await requireSnapshot(
       tx,
       args.aggregateId,
       args.expectedRevision,
@@ -423,7 +452,7 @@ export async function saveVideoWorkspaceDraft(args: {
       // Advancing the workspace revision prevents an old writer matching a recreated draft.
       return {
         workspace: snapshot.draft
-          ? await putWorkspace(tx, snapshot.workspace, snapshot.workspace)
+          ? await putWorkspace(tx, snapshot.workspace, snapshot.workspace, storage, 'cursor')
           : snapshot.workspace,
         draft: null,
       };
@@ -456,7 +485,7 @@ export async function saveVideoWorkspaceSnapshot(args: {
   return mutate(
     args.aggregateId,
     async (tx, prepared) => {
-      const { snapshot: current } = await requireSnapshot(
+      const { snapshot: current, storage } = await requireSnapshot(
         tx,
         args.aggregateId,
         args.expectedRevision,
@@ -486,6 +515,8 @@ export async function saveVideoWorkspaceSnapshot(args: {
           revision: current.workspace.revision,
           createdAt: current.workspace.createdAt,
         },
+        storage,
+        'replace',
         prepared
       );
       const draft = parsedDraft

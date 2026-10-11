@@ -1,3 +1,7 @@
+import {
+  readAllWorkspaceStorage,
+  type WorkspaceStorageEnumerationTransaction,
+} from '../review-workspaces/storage';
 import type { AssetRef } from '../assets';
 import { parseAssetRef } from '../assets';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -21,18 +25,7 @@ import {
   VIDEO_WORKSPACES_STORE,
 } from '../infrastructure/indexed-db/core';
 
-interface StandaloneSourceTransaction {
-  objectStore(
-    name:
-      | typeof PROJECT_ASSETS_STORE
-      | typeof VIDEO_PROJECTS_STORE
-      | typeof SCENARIO_ASSETS_STORE
-      | typeof VIDEO_WORKSPACES_STORE
-  ): {
-    get(key: string): Promise<unknown>;
-    getAll(): Promise<unknown[]>;
-  };
-}
+type StandaloneSourceTransaction = WorkspaceStorageEnumerationTransaction;
 
 /** Standalone publication cannot replace even its own retained review's source bytes. */
 export async function assertStandaloneMediaSourceReplaceable(
@@ -45,7 +38,7 @@ export async function assertStandaloneMediaSourceReplaceable(
     assets: tx.objectStore(PROJECT_ASSETS_STORE),
     projects: tx.objectStore(VIDEO_PROJECTS_STORE),
     scenarioAssets: tx.objectStore(SCENARIO_ASSETS_STORE),
-    videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+    videoWorkspaces: { getAll: () => readAllWorkspaceStorage(tx) },
   });
 }
 

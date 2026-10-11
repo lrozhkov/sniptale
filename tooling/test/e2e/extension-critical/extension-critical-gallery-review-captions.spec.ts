@@ -1,3 +1,4 @@
+import { replaceNativeReviewWorkspace } from '../support/native-review-workspace';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -81,24 +82,7 @@ async function seedPixelStyle(page: Page, conflict = false) {
     cursor: history.length,
   });
   if (!row) throw new Error('Caption pixel fixture failed admission');
-  await page.evaluate(async (row) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const tx = db.transaction('video_workspaces', 'readwrite');
-      const done = new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onabort = () => reject(tx.error);
-      });
-      tx.objectStore('video_workspaces').put(row);
-      await done;
-    } finally {
-      db.close();
-    }
-  }, row);
+  await replaceNativeReviewWorkspace(page, row.aggregateId, row);
 }
 
 for (const variant of [

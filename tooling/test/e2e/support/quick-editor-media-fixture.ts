@@ -1,3 +1,4 @@
+import { readNativeReviewWorkspace } from './native-review-workspace';
 import { expect, type Page, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { readFile } from 'node:fs/promises';
@@ -13,7 +14,6 @@ import {
   WebMOutputFormat,
 } from 'mediabunny';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 
 /** The immutable fixture writer needs page evaluation, never a browser or worker attachment. */
 export interface ReviewMediaFixtureWriter {
@@ -236,32 +236,10 @@ async function withAudioGaps(bytes: Uint8Array) {
 }
 
 export async function persistedFocus(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = db
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        db.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  const workspace = await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  const workspace = parseVideoWorkspace(raw);
   const latest = workspace?.history
     .slice(0, workspace.cursor)
     .findLast((operation) => operation.target === 'advancedContent');

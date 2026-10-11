@@ -1,3 +1,4 @@
+import { readNativeReviewWorkspace } from './native-review-workspace';
 import type { Page } from '@playwright/test';
 import { aiSettingsQueryResponseSchema } from '../../../../apps/extension/src/contracts/messaging/contracts/ai-settings-schemas';
 import type {
@@ -7,7 +8,6 @@ import type {
 } from '../../../../apps/extension/src/contracts/ai/audio';
 import { AUDIO_JOB_PORT_NAME } from '../../../../apps/extension/src/contracts/ai/audio';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
@@ -236,32 +236,10 @@ export async function installSpeechPortFixture(page: Page, phraseCount?: number)
 }
 
 async function persistedReviewState(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = database
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        database.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  const workspace = await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  const workspace = parseVideoWorkspace(raw);
   if (!workspace) return null;
   const document = replayReviewHistory(
     workspace.history,

@@ -181,7 +181,11 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
-          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          index: vi.fn(() => ({
+            count: vi.fn(async () => 0),
+            getAll: async () => [],
+            getAllKeys: async () => [],
+          })),
           put: vi.fn(),
         })),
       })),
@@ -392,7 +396,11 @@ it('retains legacy project graphs and linked media when clearing drafts', async 
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
-          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          index: vi.fn(() => ({
+            count: vi.fn(async () => 0),
+            getAll: async () => [],
+            getAllKeys: async () => [],
+          })),
           put: vi.fn(async (value: { operationId?: string }) => {
             if (value.operationId) valuesByStore.get(name)?.set(value.operationId, value);
           }),
@@ -546,7 +554,11 @@ it.each(['scenario-snapshot', 'video-snapshot', 'review-audio'] as const)(
                     : [],
             delete: deletes,
             put: vi.fn(),
-            index: () => ({ count: async () => 0 }),
+            index: () => ({
+              count: async () => 0,
+              getAll: async () => [],
+              getAllKeys: async () => [],
+            }),
           }),
         }),
       })
@@ -618,7 +630,11 @@ it('reclaims private auxiliary bytes when their standalone temporary review root
           getAll: async () => [...(rows.get(name)?.values() ?? [])],
           delete: async (key: string) => rows.get(name)?.delete(key),
           put: vi.fn(),
-          index: () => ({ count: async () => 0 }),
+          index: () => ({
+            count: async () => 0,
+            getAll: async () => [],
+            getAllKeys: async () => [],
+          }),
         }),
       }),
     })

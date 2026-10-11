@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   buildMedia: vi.fn(),
   buildScenarios: vi.fn(),
   buildVideoProjects: vi.fn(),
-  db: { getAll: vi.fn() },
+  db: { getAll: vi.fn(), transaction: vi.fn() },
 }));
 
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
@@ -71,6 +71,10 @@ function scenarioRoot(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.db.transaction.mockImplementation(() => ({
+    done: Promise.resolve(),
+    objectStore: (name: string) => ({ getAll: () => mocks.db.getAll(name) }),
+  }));
   mocks.buildEffects.mockResolvedValue([]);
   mocks.buildMedia.mockResolvedValue([]);
   mocks.buildScenarios.mockResolvedValue([]);

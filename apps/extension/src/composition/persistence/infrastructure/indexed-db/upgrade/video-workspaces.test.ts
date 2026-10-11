@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { DATABASE_MIGRATIONS } from '../schema-contracts';
+import { DATABASE_MIGRATIONS, CURRENT_SCHEMA_CONTRACTS } from '../schema-contracts';
 import { handleDatabaseUpgrade } from './core';
 import { betaV1Fixture } from '../fixtures/beta-v1';
 import { VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE } from '../core.stores';
@@ -31,7 +31,7 @@ it('adds only the two workspace stores and preserves all beta1 stores and contra
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.abort).not.toHaveBeenCalled();
-  expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 8 });
+  expect(puts.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   for (const name of betaV1Fixture.stores) expect(names.has(name)).toBe(true);
 });
 

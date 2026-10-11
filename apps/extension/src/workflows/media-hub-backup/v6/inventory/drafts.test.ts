@@ -67,7 +67,13 @@ describe('project draft archive inventory', () => {
 });
 
 function emptyReviewTransaction() {
-  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+  return {
+    objectStore: () => ({
+      index: () => ({ getAll: async () => [] }),
+      get: async () => undefined,
+    }),
+    done: Promise.resolve(),
+  };
 }
 
 it.each([2, 3, 99])(

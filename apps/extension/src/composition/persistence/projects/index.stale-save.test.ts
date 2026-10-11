@@ -52,7 +52,7 @@ function createDb() {
       done: Promise.resolve(),
       objectStore: vi.fn(() => ({
         delete: projectsDbMocks.txDeleteMock,
-        index: () => ({ count: async () => 0 }),
+        index: () => ({ count: async () => 0, getAll: async () => [], getAllKeys: async () => [] }),
         getAll: projectsDbMocks.txGetAllMock,
         get: projectsDbMocks.txGetMock,
         put: projectsDbMocks.txPutMock,

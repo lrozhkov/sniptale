@@ -10,6 +10,7 @@ import {
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
@@ -74,12 +75,13 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 16,
+    schemaVersion: 17,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
       { storeName: IMAGE_WORKSPACES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_WORKSPACE_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_DRAFTS_STORE, dataClass: 'durable-authority' },
       { storeName: AGGREGATE_PRESENTATIONS_STORE, dataClass: 'derived-rebuildable' },
     ],
@@ -543,6 +545,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         )
       )
         throw new Error('Source gain operation workspace stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 16, to: 17 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 17,
+    toDatabaseVersion: 18,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACE_HISTORY_STORE],
+    migrate(db) {
+      const store = db.createObjectStore(VIDEO_WORKSPACE_HISTORY_STORE, {
+        keyPath: ['aggregateId', 'ordinal'],
+      });
+      store.createIndex('aggregateId', 'aggregateId');
+      return undefined;
+    },
+    validate(db) {
+      if (!db.objectStoreNames.contains(VIDEO_WORKSPACE_HISTORY_STORE))
+        throw new Error('Video workspace history store is unavailable.');
       return undefined;
     },
   },

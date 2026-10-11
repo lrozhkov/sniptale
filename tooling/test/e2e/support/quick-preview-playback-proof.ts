@@ -1,3 +1,4 @@
+import { replaceNativeReviewWorkspace } from './native-review-workspace';
 import { expect, type Page } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { readFile, stat, writeFile } from 'node:fs/promises';
@@ -214,23 +215,7 @@ export async function installHeldPreviewMotion(page: Page) {
     },
   });
   if (!row) throw new Error('Invalid held-source authored motion');
-  await page.evaluate(async (row) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction('video_workspaces', 'readwrite');
-        tx.oncomplete = () => resolve();
-        tx.onabort = () => reject(tx.error);
-        tx.objectStore('video_workspaces').put(row);
-      });
-    } finally {
-      db.close();
-    }
-  }, row);
+  await replaceNativeReviewWorkspace(page, row.aggregateId, row);
 }
 
 /** Observes committed canvases, not RAF/native callback counts. Small readbacks are correctness instrumentation. */

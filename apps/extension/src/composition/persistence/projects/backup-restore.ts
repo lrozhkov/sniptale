@@ -1,3 +1,4 @@
+import type { IDBPTransaction } from 'idb';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import { promoteProjectSourceLifecycles } from './new-reference-admission';
 import {
@@ -13,7 +14,6 @@ import {
   releaseMediaSource,
   releaseUnpublishedProjectAssets,
 } from '../media-library/delete-cascade.sources';
-import type { initDB } from '../infrastructure/indexed-db/core';
 import type {
   VideoWorkspace,
   VideoWorkspaceDraft,
@@ -106,7 +106,7 @@ export interface VideoProjectBackupRestoreStores {
   scenarioAssets: Store;
 }
 
-type RestoreTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+type RestoreTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 async function deleteExisting(args: {
   assetOwnership: ProjectAssetOwnership;

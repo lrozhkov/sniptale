@@ -87,10 +87,21 @@ describe('media v6 root publication', () => {
   it('publishes screenshot metadata and the restore checkpoint atomically', async () => {
     const stores = new Map<
       string,
-      { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> }
+      {
+        get: ReturnType<typeof vi.fn>;
+        put: ReturnType<typeof vi.fn>;
+        index: ReturnType<typeof vi.fn>;
+      }
     >();
     const storeFor = (name: string) => {
-      const store = stores.get(name) ?? { get: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+      const store = stores.get(name) ?? {
+        get: vi.fn().mockResolvedValue(undefined),
+        put: vi.fn(),
+        index: vi.fn(() => ({
+          getAll: vi.fn(async () => []),
+          getAllKeys: vi.fn(async () => []),
+        })),
+      };
       stores.set(name, store);
       return store;
     };

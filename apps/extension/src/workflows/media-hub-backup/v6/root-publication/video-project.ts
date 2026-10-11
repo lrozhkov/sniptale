@@ -1,3 +1,4 @@
+import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import {
   STORE_NAME,
   IMAGE_WORKSPACES_STORE,
@@ -11,6 +12,7 @@ import {
 } from './shared-project-media';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import { prepareVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
@@ -56,6 +58,7 @@ const VIDEO_PROJECT_RESTORE_STORES = [
   PROJECT_EXPORTS_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   THUMBNAILS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -261,7 +264,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             assets: tx.objectStore(PROJECT_ASSETS_STORE),
             exports: tx.objectStore(PROJECT_EXPORTS_STORE),
             media: tx.objectStore(MEDIA_LIBRARY_STORE),
-            videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+            videoWorkspaces: createVideoWorkspaceStore(tx),
             videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
             operations: tx.objectStore(ASSET_OPERATIONS_STORE),
             owners: tx.objectStore(ASSET_OWNERS_STORE),

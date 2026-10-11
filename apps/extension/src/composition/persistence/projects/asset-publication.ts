@@ -16,6 +16,7 @@ import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
 import {
@@ -113,6 +114,7 @@ async function publishProjectMediaAsset(args: {
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
       ],
       'readwrite'
     );

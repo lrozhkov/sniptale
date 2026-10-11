@@ -1,3 +1,6 @@
+import { materializeWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage-format';
+import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createVideoProjectEntry,
@@ -54,12 +57,23 @@ function publisherDatabase(values: Map<string, unknown[]> = new Map()) {
       values.set(name, [...(values.get(name) ?? []), value]);
     },
     delete: async () => undefined,
-    index: () => ({ getAll: async () => [], count: async () => 0 }),
+    index: () => ({ getAll: async () => [], getAllKeys: async () => [], count: async () => 0 }),
   });
   return {
     get: async () => undefined,
     transaction: () => ({ objectStore: store, done: Promise.resolve() }),
   };
+}
+
+function logicalRestoredWorkspaces(values: Map<string, unknown[]>) {
+  return (values.get('video_workspaces') ?? []).map((head) => {
+    const rows = (values.get('video_workspace_history') ?? []).filter(
+      (row) => isRecord(row) && isRecord(head) && row['aggregateId'] === head['aggregateId']
+    );
+    const workspace = parseVideoWorkspace(materializeWorkspaceStorage(head, rows));
+    if (!workspace) throw new Error('Invalid restored review fixture');
+    return workspace;
+  });
 }
 
 type PublishArgs = Parameters<typeof videoProjectRootPublisher.publish>[0];
@@ -187,7 +201,7 @@ it.each([true, false])(
     );
     expect(result.imported).toBe(true);
     expect(values.get('video_workspaces')).toHaveLength(1);
-    const workspace = values.get('video_workspaces')![0];
+    const workspace = logicalRestoredWorkspaces(values)[0];
     expect(workspace).toMatchObject({ sourceAssetId: 'new-local', history, cursor: 0 });
     expect(workspace).not.toMatchObject({ aggregateId: 'export:e' });
     expect(values.get('video_workspace_drafts')).toEqual([
@@ -283,10 +297,7 @@ it('duplicates review audio references to the restored asset ids', async () => {
     ])
   );
   expect(result.imported).toBe(true);
-  const workspaces = values.get('video_workspaces') as Array<{
-    aggregateId: string;
-    advanced: { audio: { music: Array<{ assetId: string }> } };
-  }>;
+  const workspaces = logicalRestoredWorkspaces(values);
   expect(workspaces).toHaveLength(2);
   const restoredMusic = workspaces.map((ws) => ws.advanced.audio.music[0]!.assetId);
   for (const assetId of restoredMusic) {
@@ -381,7 +392,11 @@ it('rolls back promoted recording and parent when the later archive checkpoint f
               delete: async (key: string) => {
                 table.delete(key);
               },
-              index: () => ({ getAll: async () => [], count: async () => 0 }),
+              index: () => ({
+                getAll: async () => [],
+                getAllKeys: async () => [],
+                count: async () => 0,
+              }),
             };
           },
           abort: () => {

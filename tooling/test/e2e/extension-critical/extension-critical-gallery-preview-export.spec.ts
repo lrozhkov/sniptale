@@ -1,3 +1,4 @@
+import { replaceNativeReviewWorkspace } from '../support/native-review-workspace';
 import { expect, test, type Page } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -278,24 +279,7 @@ async function seedCutZooms(page: Page) {
     },
   });
   if (!row) throw new Error('Invalid cut/zoom workspace');
-  await page.evaluate(async (row) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const tx = db.transaction('video_workspaces', 'readwrite');
-      const done = new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onabort = () => reject(tx.error);
-      });
-      tx.objectStore('video_workspaces').put(row);
-      await done;
-    } finally {
-      db.close();
-    }
-  }, row);
+  await replaceNativeReviewWorkspace(page, row.aggregateId, row);
 }
 
 for (const viewport of [

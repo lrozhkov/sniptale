@@ -1,3 +1,4 @@
+import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
 import { withVideoProjectUsage } from './usage-index-keys';
 import { expect, it } from 'vitest';
 import { mediaId, physicalId, mediaEntry, rows, harness } from './delete-cascade.test-support';
@@ -541,7 +542,7 @@ it('confirmed image-origin purge strips active and remembered logos from the ret
   await deleteMediaAssetWithProjectCascade(mediaId, [
     { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
   ]);
-  const review = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+  const review = parseVideoWorkspace(readReviewWorkspaceFixture('recording:other'));
   expect(review).not.toBeNull();
   expect(collectReviewAssetReferences(review!)).toEqual(new Set());
   expect(review!.advanced.watermark?.text).toEqual(watermark.text);

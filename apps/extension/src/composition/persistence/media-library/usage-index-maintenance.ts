@@ -1,8 +1,11 @@
+import { readWorkspaceStorage } from '../review-workspaces/storage';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   initDB,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { isProjectUsageIndexReady } from './usage-index';
@@ -33,20 +36,30 @@ export async function maintainProjectUsageIndex(signal: AbortSignal): Promise<bo
         if (signal.aborted) return false;
         await runWithIndexedDbMutation(async (currentDb) => {
           if (signal.aborted) return;
-          const tx = currentDb.transaction(name, 'readwrite');
+          const tx = currentDb.transaction(
+            name === VIDEO_WORKSPACES_STORE ? [name, VIDEO_WORKSPACE_HISTORY_STORE] : [name],
+            'readwrite'
+          );
+          const store = tx.objectStore(name);
           try {
-            const raw: unknown = await tx.store.get(key);
+            const raw: unknown = await store.get(key);
             const existingKeys = isRecord(raw) ? raw[USAGE_REFERENCE_INDEX] : undefined;
             if (
               isRecord(raw) &&
               !(Array.isArray(existingKeys) && existingKeys.includes(USAGE_INDEX_MARKER))
             ) {
-              await tx.store.put(
-                name === VIDEO_PROJECTS_STORE
-                  ? withVideoProjectUsage(raw)
-                  : withReviewWorkspaceUsage(raw)
-              );
-              changed = true;
+              const workspace =
+                name === VIDEO_WORKSPACES_STORE && typeof key === 'string'
+                  ? parseVideoWorkspace((await readWorkspaceStorage(tx, key)).logical)
+                  : null;
+              if (name === VIDEO_PROJECTS_STORE || workspace) {
+                const indexed =
+                  name === VIDEO_PROJECTS_STORE
+                    ? withVideoProjectUsage(raw)
+                    : withReviewWorkspaceUsage(workspace!);
+                await store.put({ ...raw, usageReferenceKeys: indexed.usageReferenceKeys });
+                changed = true;
+              }
             }
             await tx.done;
           } catch (error) {

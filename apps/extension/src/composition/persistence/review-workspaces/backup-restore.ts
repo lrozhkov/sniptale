@@ -1,7 +1,9 @@
+import { readWorkspaceStorage, type WorkspaceStorageReadTransaction } from './storage';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import type { VideoWorkspace, VideoWorkspaceDraft, VideoWorkspaceSnapshot } from './contracts';
@@ -56,10 +58,7 @@ export interface VideoReviewBackupDatabase {
   transaction(
     stores: string[],
     mode: 'readonly'
-  ): {
-    objectStore(name: string): { get(key: string): Promise<unknown> };
-    done: Promise<unknown>;
-  };
+  ): WorkspaceStorageReadTransaction & { done: Promise<unknown> };
 }
 
 /** Reads both authoritative sidecars, refusing corrupt or stale-source backups. */
@@ -69,11 +68,11 @@ export async function readVideoReviewForBackup(args: {
   sourceAssetId: string;
 }): Promise<PortableVideoReview | undefined> {
   const tx = args.db.transaction(
-    [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
     'readonly'
   );
   const [raw, rawDraft] = await Promise.all([
-    tx.objectStore(VIDEO_WORKSPACES_STORE).get(args.aggregateId),
+    readWorkspaceStorage(tx, args.aggregateId).then((stored) => stored.logical),
     tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(args.aggregateId),
   ]);
   await tx.done;

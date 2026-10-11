@@ -101,6 +101,10 @@ it('expires image aggregates from the root lifecycle and removes their sidecars'
         objectStore: vi.fn((name: string) => ({
           delete: vi.fn((id: string) => deletes(name, id)),
           get: vi.fn(async () => (name === 'media_library' ? media : undefined)),
+          index: vi.fn(() => ({
+            getAll: vi.fn(async () => []),
+            getAllKeys: vi.fn(async () => []),
+          })),
           getAll: vi.fn(async () => []),
         })),
       })),

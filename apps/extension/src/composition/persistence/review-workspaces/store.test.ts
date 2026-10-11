@@ -3,7 +3,10 @@ import { createQuickEditSpotlight } from '../../../features/video/review/advance
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
-import { createReviewWorkspaceStoreFixture } from './store.test-support';
+import {
+  createReviewWorkspaceStoreFixture,
+  replaceLegacyWorkspaceFixture,
+} from './store.test-support';
 import type { ReviewAnnotation, ReviewOperation } from '../../../features/video/review/types';
 import { parseVideoWorkspace } from './parser';
 
@@ -12,6 +15,7 @@ vi.mock('../infrastructure/indexed-db/core', () => ({
   initDB: harness.database,
   MEDIA_LIBRARY_STORE: 'media_library',
   VIDEO_WORKSPACES_STORE: 'video_workspaces',
+  VIDEO_WORKSPACE_HISTORY_STORE: 'video_workspace_history',
   VIDEO_WORKSPACE_DRAFTS_STORE: 'video_workspace_drafts',
 }));
 vi.mock('../assets/opfs-store', async (original) => ({
@@ -71,7 +75,7 @@ it('reopens exactly one durable history and rejects missing, malformed or change
   await expect(openVideoWorkspace(id, { ...source, duration: Infinity })).rejects.toMatchObject({
     code: 'invalid',
   });
-  rows.get('video_workspaces')!.set(id, { broken: true });
+  replaceLegacyWorkspaceFixture(rows, id, { broken: true });
   await expect(readVideoWorkspace(id)).rejects.toMatchObject({ code: 'invalid' });
   await expect(openVideoWorkspace(id, source)).rejects.toMatchObject({ code: 'invalid' });
   expect(rows.get('video_workspaces')!.get(id)).toEqual({ broken: true });
@@ -294,7 +298,7 @@ it('rejects a stale tab after restore even when imported history has the same nu
     ...betaV1Fixture.records.recordings[0],
     assetId: 'restored-local',
   });
-  rows.get('video_workspaces')!.set(id, { ...opened.workspace, sourceAssetId: 'restored-local' });
+  replaceLegacyWorkspaceFixture(rows, id, { ...opened.workspace, sourceAssetId: 'restored-local' });
   await expect(
     commitVideoWorkspace({
       aggregateId: id,
@@ -381,7 +385,7 @@ it('commits advanced content as a fixed-point history payload and reopens its ba
 });
 
 it('migrates a v1 advanced payload on load and keeps the workspace writable (R03)', async () => {
-  rows.get('video_workspaces')!.set(id, {
+  replaceLegacyWorkspaceFixture(rows, id, {
     aggregateId: id,
     sourceAssetId: 'beta-v1-recording-asset',
     formatVersion: 1,
@@ -755,7 +759,7 @@ it('recovers legacy header history read-only, then commits and reopens normalize
       },
     ],
   };
-  rows.get('video_workspaces')!.set(id, structuredClone(legacy));
+  replaceLegacyWorkspaceFixture(rows, id, structuredClone(legacy));
   const recovered = await readVideoWorkspace(id);
   expect(recovered?.workspace.history).toEqual([]);
   expect(recovered?.workspace.cursor).toBe(0);
@@ -791,8 +795,9 @@ it('authors new presentation defaults once and never installs them on legacy reo
   });
   expect(await openVideoWorkspace(id, source)).toEqual(opened);
   const { presentation: _presentation, ...legacyAdvanced } = opened.workspace.advanced;
-  rows
-    .get('video_workspaces')!
-    .set(id, { ...opened.workspace, advanced: { ...legacyAdvanced, schemaVersion: 5 } });
+  replaceLegacyWorkspaceFixture(rows, id, {
+    ...opened.workspace,
+    advanced: { ...legacyAdvanced, schemaVersion: 5 },
+  });
   expect((await openVideoWorkspace(id, source)).workspace.advanced.presentation).toBeUndefined();
 });

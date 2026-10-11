@@ -1,3 +1,4 @@
+import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { readIndexedProjectUsage } from './usage-index';
 import { parseProjectAssetEntry } from '../projects/read-guards';
 import {
@@ -15,6 +16,7 @@ import {
   SCENARIO_ASSETS_STORE,
   PROJECT_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core';
 import { parseMediaLibraryEntry } from './read-guards';
 import { MEDIA_LIBRARY_STORE } from '../infrastructure/indexed-db/core';
@@ -47,7 +49,9 @@ async function loadUsageSnapshot(db?: Awaited<ReturnType<typeof initDB>>): Promi
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
     connection.getAll(SCENARIO_ASSETS_STORE),
-    connection.getAll(VIDEO_WORKSPACES_STORE),
+    readAllWorkspaceStorage(
+      connection.transaction([VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE], 'readonly')
+    ),
     connection.getAll(MEDIA_LIBRARY_STORE),
     connection.getAll(PROJECT_ASSETS_STORE),
   ]);

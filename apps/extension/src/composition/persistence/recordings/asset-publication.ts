@@ -6,6 +6,7 @@ import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   PROJECT_ASSETS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
@@ -125,6 +126,7 @@ export async function publishRecordingAssetJournal(
           VIDEO_PROJECTS_STORE,
           SCENARIO_ASSETS_STORE,
           VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
           PROJECT_ASSETS_STORE,
         ] as const)
       : ([
@@ -136,6 +138,7 @@ export async function publishRecordingAssetJournal(
           VIDEO_PROJECTS_STORE,
           SCENARIO_ASSETS_STORE,
           VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
           PROJECT_ASSETS_STORE,
         ] as const);
     const tx = db.transaction(storeNames, 'readwrite');
