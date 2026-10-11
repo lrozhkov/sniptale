@@ -69,7 +69,7 @@ beforeEach(() => {
   io.prepare.mockImplementation(async ({ projectId }) => ({
     assetEntry: { id: 'copied-asset', projectId },
   }));
-  io.commit.mockImplementation(async (project) => ({ project }));
+  io.commit.mockImplementation(async (project) => ({ project, workspaceRevision: 2 }));
   io.reject.mockImplementation(async (_children, error) => {
     throw error;
   });
@@ -86,7 +86,7 @@ function apply(mode: 'appearance' | 'replace' | 'capture', project = fixture().p
 
 it('applies appearance without copying or replacing media and preserves the revision guard', async () => {
   const { project } = fixture();
-  const next = await apply('appearance', project);
+  const { project: next } = await apply('appearance', project);
   expect(next.items[0]).toMatchObject({
     title: 'Captured title',
     layout: 'side-by-side',
@@ -102,7 +102,7 @@ it('applies appearance without copying or replacing media and preserves the revi
 });
 
 it('replaces content with target-owned copied media while retaining step identity and numbering', async () => {
-  const next = await apply('replace');
+  const { project: next } = await apply('replace');
   expect(next.items[0]).toMatchObject({
     id: 'target-step',
     title: 'Reusable title',
@@ -123,7 +123,7 @@ it('replaces content with target-owned copied media while retaining step identit
 
 it('keeps the captured image and title, skipping the replaced template image before staging', async () => {
   io.asset.mockRejectedValue(new Error('Replaced image must not be read'));
-  const next = await apply('capture');
+  const { project: next } = await apply('capture');
   expect(next.items[0]).toMatchObject({
     title: 'Captured title',
     blocks: [

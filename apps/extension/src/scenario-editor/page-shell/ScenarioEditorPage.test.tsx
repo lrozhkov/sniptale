@@ -71,6 +71,12 @@ import { clickGuideControl, openGuideInsertionMenu } from './test-support/guide-
 
 let root: Root;
 let container: HTMLDivElement;
+function committedSnapshot(
+  project: ReturnType<typeof createGuideProject>,
+  workspaceRevision: number
+) {
+  return { project, workspaceRevision };
+}
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
@@ -85,13 +91,10 @@ beforeEach(() => {
   project.items.push(createGuideStep('First step', 'first'));
   io.load.mockResolvedValue(project);
   io.asset.mockResolvedValue(undefined);
-  io.save.mockImplementation(async (value) => ({ ...value, updatedAt: 101 }));
-  io.duplicate.mockImplementation(async (value, name) => ({
-    ...value,
-    id: 'copy',
-    name,
-    updatedAt: 102,
-  }));
+  io.save.mockImplementation(async (value) => committedSnapshot({ ...value, updatedAt: 101 }, 2));
+  io.duplicate.mockImplementation(async (value, name) =>
+    committedSnapshot({ ...value, id: 'copy', name, updatedAt: 102 }, 37)
+  );
   io.remove.mockResolvedValue(undefined);
 });
 afterEach(() => {
@@ -126,7 +129,7 @@ it('saves the edited project title and added steps against the loaded revision',
       name: 'Renamed guide',
       items: expect.arrayContaining([expect.objectContaining({ id: 'first' })]),
     }),
-    { baseUpdatedAt: 100 }
+    { expectedRevision: 1 }
   );
   expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
   expect(container.querySelector('.guide-page-feedback')).toBeNull();
@@ -155,7 +158,9 @@ it('does not create or overwrite an unavailable project', async () => {
 
 it('requires explicit creation for an empty editor route', async () => {
   window.history.replaceState({}, '', '/');
-  io.create.mockResolvedValue(createGuideProject('New guide', 'new-guide', 1));
+  io.create.mockResolvedValue(
+    committedSnapshot(createGuideProject('New guide', 'new-guide', 1), 2)
+  );
   await render();
   expect(io.create).not.toHaveBeenCalled();
   await click('New scenario');
@@ -289,7 +294,7 @@ it('renders optional blocks and keeps text edits isolated from images and other 
         project.items[2],
       ],
     }),
-    { baseUpdatedAt: 100 }
+    { expectedRevision: 1 }
   );
   expect(io.asset).toHaveBeenCalledTimes(1);
   await act(async () => root.render(null));
@@ -365,7 +370,7 @@ it('recovers a conflicted edit buffer by copying it and retains it if copying fa
   await click('Add step');
   await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'copy' }), {
-    baseUpdatedAt: 102,
+    expectedRevision: 37,
   });
 });
 
@@ -599,7 +604,7 @@ it('preserves undo performed during autosave and uses the acknowledged revision 
   io.save.mockImplementation(
     (project) =>
       new Promise((resolve) => {
-        complete = () => resolve({ ...project, updatedAt: 101 });
+        complete = () => resolve(committedSnapshot({ ...project, updatedAt: 101 }, 2));
       })
   );
   await render();
@@ -618,10 +623,12 @@ it('preserves undo performed during autosave and uses the acknowledged revision 
   expect(pendingUndoClose.defaultPrevented).toBe(true);
   await act(async () => complete?.());
   expect(container.querySelectorAll('article')).toHaveLength(1);
-  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
+  io.save.mockImplementation(async (project) =>
+    committedSnapshot({ ...project, updatedAt: 102 }, 2)
+  );
   await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ items: expect.any(Array) }), {
-    baseUpdatedAt: 101,
+    expectedRevision: 2,
   });
 });
 
@@ -684,11 +691,16 @@ it('routes block and item tools through reversible order-preserving mutations', 
 
 it('accepts image import as one undoable publication and saves undo against its new revision', async () => {
   vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:preview'), revokeObjectURL: vi.fn() });
-  io.importImages.mockImplementation(async ({ project }) => ({
-    ...project,
-    updatedAt: 105,
-    items: [...project.items, createGuideStep('Imported', 'imported')],
-  }));
+  io.importImages.mockImplementation(async ({ project }) =>
+    committedSnapshot(
+      {
+        ...project,
+        updatedAt: 105,
+        items: [...project.items, createGuideStep('Imported', 'imported')],
+      },
+      37
+    )
+  );
   await render();
   await editField('article#first .guide-step-title', 'Unsaved title');
   await click('Resources');
@@ -699,6 +711,7 @@ it('accepts image import as one undoable publication and saves undo against its 
   expect(io.importImages.mock.calls[0]?.[0]).toMatchObject({
     baseUpdatedAt: 100,
     project: { items: [{ title: 'Unsaved title' }] },
+    expectedRevision: 1,
   });
   expect(container.querySelectorAll('article')).toHaveLength(2);
   await click('Undo');
@@ -708,7 +721,7 @@ it('accepts image import as one undoable publication and saves undo against its 
     'Unsaved title'
   );
   await settleAutosave();
-  expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { baseUpdatedAt: 105 });
+  expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { expectedRevision: 37 });
 });
 
 it('settles autosave without writing when undo then redo returns to the durable snapshot', async () => {
@@ -733,7 +746,7 @@ it('opens stored revisions in ordinary undo and autosaves against the current re
   await click('Undo');
   expect(container.querySelector('input')?.value).toBe('Previous guide');
   await settleAutosave();
-  expect(io.save).toHaveBeenCalledWith(previous, { baseUpdatedAt: 100 });
+  expect(io.save).toHaveBeenCalledWith(previous, { expectedRevision: 1 });
   await click('Redo');
   expect(container.querySelector('input')?.value).toBe('Local guide');
 });

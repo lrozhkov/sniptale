@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../../../composition/persistence/scenario/contracts';
 import { useEffect, useRef } from 'react';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -13,7 +14,7 @@ type AutosaveInput = {
   enabled?: boolean;
   conflict: boolean;
   protectUnsaved: boolean;
-  saved: { current: GuideProject | null };
+  saved: { current: ScenarioProjectSnapshot | null };
   busy: { current: boolean };
   autosaving: { current: boolean };
   generation: { current: number };
@@ -23,7 +24,7 @@ type AutosaveInput = {
 type Session = {
   generation: number;
   projectId: string | undefined;
-  acknowledgement?: { source: GuideProject; committed: GuideProject };
+  acknowledgement?: { source: GuideProject; committed: ScenarioProjectSnapshot };
   conflict: boolean;
 };
 type Capture = { session: Session; args: AutosaveInput };
@@ -46,7 +47,7 @@ export function useGuideAutosave(input: AutosaveInput) {
     const protect = (event: BeforeUnloadEvent) => {
       const state = latest.current;
       if (!state.project) return;
-      if (state.project === state.saved.current && !state.autosaving.current) return;
+      if (state.project === state.saved.current?.project && !state.autosaving.current) return;
       if (!state.protectUnsaved && !state.autosaving.current) return;
       event.preventDefault();
       event.returnValue = '';
@@ -163,14 +164,14 @@ function createGuideAutosave(latest: () => AutosaveInput) {
           const args = latest();
           const source = args.project;
           const base = args.saved.current;
-          if (!source || !base || source.id !== base.id || args.conflict || turn.conflict)
+          if (!source || !base || source.id !== base.project.id || args.conflict || turn.conflict)
             return null;
           if (
             (source === turn.acknowledgement?.source && base === turn.acknowledgement.committed) ||
-            guideDraftContent(source) === guideDraftContent(base)
+            guideDraftContent(source) === guideDraftContent(base.project)
           ) {
             args.onStatus('saved');
-            return base;
+            return base.project;
           }
           if (!(await save())) return null;
         }
@@ -198,25 +199,25 @@ function persistGuideDraft(
   if (
     !source ||
     !base ||
-    source.id !== base.id ||
+    source.id !== base.project.id ||
     args.conflict ||
     turn.conflict ||
     args.busy.current
   )
     return Promise.reject(new Error('Scenario save admission is unavailable.'));
-  if (source === base) {
+  if (source === base.project) {
     args.onStatus('saved');
     return Promise.resolve(true);
   }
   args.busy.current = true;
   args.autosaving.current = true;
   args.onStatus('saving');
-  return saveScenarioProjectRecord(source, { baseUpdatedAt: base.updatedAt })
+  return saveScenarioProjectRecord(source, { expectedRevision: base.workspaceRevision })
     .then((committed) => {
       if (!isCurrent()) return false;
       turn.acknowledgement = { source, committed };
       args.saved.current = committed;
-      args.onPublish(committed, source);
+      args.onPublish(committed.project, source);
       args.onStatus(currentProject() === source ? 'saved' : 'dirty');
       return true;
     })

@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../contracts';
 import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
   admitTourImageImport,
@@ -57,11 +58,12 @@ export type GuideImageImportPlacement =
 export async function importScenarioImages(args: {
   project: GuideProject;
   baseUpdatedAt: number;
+  expectedRevision?: number;
   sources: readonly GuideImageImportSource[];
   placement: GuideImageImportPlacement | TourImageImportPlacement;
   signal: AbortSignal;
   onProgress?: (completed: number, total: number) => void;
-}): Promise<GuideProject> {
+}): Promise<ScenarioProjectSnapshot> {
   const { project, target, replacement } = admitImageImport(args);
   const assets: PreparedScenarioAssetEntry[] = [];
   const documents: ScenarioStepEditorDocumentEntry[] = [];
@@ -177,10 +179,11 @@ export async function importScenarioImages(args: {
     handedOff = true;
     const result = await commitScenarioAggregateMutation(project, {
       expectedUpdatedAt: args.baseUpdatedAt,
+      ...(args.expectedRevision === undefined ? {} : { expectedRevision: args.expectedRevision }),
       children: { assetPuts: assets, editorDocumentPuts: documents },
     });
     publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
-    return result.project;
+    return result;
   } catch (error) {
     if (!handedOff) return rejectScenarioMutationBeforeHandoff({ assetPuts: assets }, error);
     throw error;

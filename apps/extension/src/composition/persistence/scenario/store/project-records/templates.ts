@@ -19,7 +19,7 @@ export async function saveScenarioStepTemplate(
   if (parsed.status !== 'ok') throw new Error('Invalid template source.');
   const step = parsed.project.items.find((item) => item.id === stepId);
   if (step?.kind !== 'step') throw new Error('Template step is unavailable.');
-  return duplicateScenarioProjectRecord(
+  const committed = await duplicateScenarioProjectRecord(
     {
       ...parsed.project,
       purpose: 'step-template',
@@ -29,4 +29,5 @@ export async function saveScenarioStepTemplate(
     },
     name
   );
+  return committed.project;
 }

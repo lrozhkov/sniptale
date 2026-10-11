@@ -65,7 +65,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 it('publishes only the selected narration atomically and preserves authored source content', async () => {
   const args = input();
-  const result = await importScenarioNarration(args);
+  const { project: result } = await importScenarioNarration(args);
   expect(result.items).toEqual(args.project.items);
   expect(result.tour!.slides[1]).toEqual(args.project.tour!.slides[1]);
   expect(args.project.tour!.slides[0]!.narration).toBeNull();
@@ -95,7 +95,7 @@ it('replaces a matching narration without mutating or deleting the old resource 
     transcript: 'Text',
   };
   args.project.tour!.slides[0]!.narration = old;
-  const result = await importScenarioNarration({ ...args, expectedNarration: old });
+  const { project: result } = await importScenarioNarration({ ...args, expectedNarration: old });
   expect(result.tour!.slides[0]!.narration!.assetId).not.toBe('old');
   expect(args.project.tour!.slides[0]!.narration).toEqual(old);
   expect(io.commit.mock.calls[0]![1].children.assetDeletes).toBeUndefined();
@@ -193,7 +193,7 @@ it('attaches a recorded resource to the exact annotation, leaving the slide narr
   const slide = args.project.tour!.slides[0]!;
   if (slide.kind !== 'image') throw Error('image');
   slide.annotations = [{ id: 'hint', text: 'Hint', anchor: null, appearance: null }];
-  const result = await importScenarioNarration({ ...args, objectId: 'hint' });
+  const { project: result } = await importScenarioNarration({ ...args, objectId: 'hint' });
   expect(result.tour!.slides[0]!.narration).toBeNull();
   expect(result.tour).toMatchObject({
     audioResources: [{ duration: 4 }],
@@ -211,7 +211,7 @@ it('rejects an unavailable object before acquiring any bytes', async () => {
 
 it('imports to resources without attaching to a slide', async () => {
   const args = input();
-  const result = await importScenarioNarration({
+  const { project: result } = await importScenarioNarration({
     ...args,
     slideId: null,
     blob: new File(['voice'], 'Take.wav', { type: 'audio/wav' }),
@@ -236,7 +236,7 @@ it('keeps an object entry trigger when replacing its recorded audio', async () =
   slide.annotations = [
     { id: 'hint', text: 'Hint', anchor: null, appearance: null, narration: expected },
   ];
-  const result = await importScenarioNarration({
+  const { project: result } = await importScenarioNarration({
     ...args,
     objectId: 'hint',
     expectedNarration: expected,
@@ -254,7 +254,7 @@ it('atomically attaches and replaces music while preserving author settings and 
     loop: false,
   };
   args.project.tour!.backgroundMusic = expected;
-  const result = await importScenarioNarration({
+  const { project: result } = await importScenarioNarration({
     ...args,
     slideId: null,
     destination: { kind: 'background-music', expected },
@@ -326,7 +326,7 @@ it.each(['before', 'decode', 'stage', 'commit'] as const)(
   }
 );
 it('initializes music settings on first atomic attachment', async () => {
-  const result = await importScenarioNarration({
+  const { project: result } = await importScenarioNarration({
     ...input(),
     slideId: null,
     destination: { kind: 'background-music', expected: null },

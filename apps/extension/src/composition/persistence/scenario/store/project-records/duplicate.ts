@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../../contracts';
 import { createCopyChildren, remapCopyReferences } from './copy-children';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -10,7 +11,7 @@ import { publishMediaHubLibraryChanged } from '../../../../../features/media-hub
 export async function duplicateScenarioProjectRecord(
   source: GuideProject,
   name: string
-): Promise<GuideProject> {
+): Promise<ScenarioProjectSnapshot> {
   const now = Date.now();
   const parsed = parseGuideProject({ ...source, name });
   if (parsed.status !== 'ok') throw new Error('Invalid guide copy.');
@@ -33,7 +34,7 @@ export async function duplicateScenarioProjectRecord(
       children: { assetPuts: assets, editorDocumentPuts: documents },
     });
     publishMediaHubLibraryChanged('create', [`scenario:${result.project.id}`]);
-    return result.project;
+    return result;
   } catch (error) {
     if (!handedOff) return rejectScenarioMutationBeforeHandoff({ assetPuts: assets }, error);
     throw error;

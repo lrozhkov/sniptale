@@ -117,7 +117,7 @@ beforeEach(() => {
 it('copies repeated images and annotation documents once with independent logical identities', async () => {
   const source = sourceProject();
   const before = structuredClone(source);
-  const copied = await duplicateScenarioProjectRecord(source, 'Copy');
+  const { project: copied } = await duplicateScenarioProjectRecord(source, 'Copy');
   const copiedImages = images(copied);
   expect(source).toEqual(before);
   expect(copied.id).not.toBe(source.id);
@@ -237,7 +237,7 @@ it('does not discard a reused source when a copy fails before publication', asyn
 it('copies a text-only guide without reading or staging media', async () => {
   const source = createGuideProject('Text', 'text', 100);
   source.items = [createGuideStep('Instructions', 'step')];
-  const copied = await duplicateScenarioProjectRecord(source, 'Text copy');
+  const { project: copied } = await duplicateScenarioProjectRecord(source, 'Text copy');
   expect(copied.items[0]).toMatchObject({ title: 'Instructions', blocks: [] });
   expect(io.asset).not.toHaveBeenCalled();
   expect(io.write).not.toHaveBeenCalled();
@@ -403,7 +403,7 @@ it('copies tour images once across representations and independently copies narr
         }
       : image
   );
-  const result = await duplicateScenarioProjectRecord(source, 'Copy');
+  const { project: result } = await duplicateScenarioProjectRecord(source, 'Copy');
   const copied = result.tour?.slides[0];
   if (copied?.kind !== 'image') throw new Error('Expected tour image');
   expect(copied.image?.assetId).toBe(images(result)[0]?.assetId);

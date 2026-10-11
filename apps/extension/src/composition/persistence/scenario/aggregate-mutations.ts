@@ -18,7 +18,7 @@ import {
   initDB,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import type { ScenarioProjectEntry } from './contracts';
+import type { ScenarioProjectEntry, ScenarioProjectSnapshot } from './contracts';
 import { createScenarioProjectEntry } from './projects/entry';
 import { parseScenarioProjectEntry } from './read-guards';
 import { parseScenarioAssetEntry } from './read-guards';
@@ -103,10 +103,7 @@ interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
   children?: PreparedScenarioAggregateChildMutation;
 }
 
-interface ScenarioAggregateMutationResult {
-  project: GuideProject;
-  workspaceRevision: number;
-}
+type ScenarioAggregateMutationResult = ScenarioProjectSnapshot;
 
 type ScenarioAggregateTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
 

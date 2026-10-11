@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../../composition/persistence/scenario/contracts';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
@@ -42,10 +43,11 @@ export function buildScenarioEditedImageBlock(
 export async function applyScenarioImageEdit(args: {
   project: GuideProject;
   baseUpdatedAt: number;
+  expectedRevision?: number;
   target: GuideImageEditTarget;
   dataUrl: string;
   document: EditorDocument;
-}): Promise<GuideProject> {
+}): Promise<ScenarioProjectSnapshot> {
   const parsed = parseGuideProject(args.project);
   if (parsed.status !== 'ok' || !isImageDataUrl(args.dataUrl) || !isEditorDocument(args.document))
     throw new Error('Invalid image edit.');
@@ -75,6 +77,7 @@ export async function applyScenarioImageEdit(args: {
     handedOff = true;
     const result = await commitScenarioAggregateMutation(project, {
       expectedUpdatedAt: args.baseUpdatedAt,
+      ...(args.expectedRevision === undefined ? {} : { expectedRevision: args.expectedRevision }),
       children: {
         assetPuts: [prepared.entry],
         editorDocumentPuts: [
@@ -89,7 +92,7 @@ export async function applyScenarioImageEdit(args: {
       },
     });
     publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
-    return result.project;
+    return result;
   } catch (error) {
     if (!handedOff)
       return rejectScenarioMutationBeforeHandoff({ assetPuts: [prepared.entry] }, error);

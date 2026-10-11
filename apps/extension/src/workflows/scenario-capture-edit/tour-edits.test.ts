@@ -96,7 +96,7 @@ beforeEach(() => {
     asset: { id: 'new-image', width: 100, height: 80 },
     entry: { assetId: 'prepared' },
   });
-  io.commit.mockImplementation(async (project) => ({ project }));
+  io.commit.mockImplementation(async (project) => ({ project, workspaceRevision: 2 }));
   io.reject.mockImplementation(async (_children, error) => {
     throw error;
   });

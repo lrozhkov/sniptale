@@ -13,7 +13,9 @@ async function saveProjectIfChanged(args: {
     return args.currentProject;
   }
 
-  return saveScenarioProject(args.nextProject, { baseUpdatedAt: args.currentProject.updatedAt });
+  return (
+    await saveScenarioProject(args.nextProject, { baseUpdatedAt: args.currentProject.updatedAt })
+  ).project;
 }
 
 /** Removes a scenario step from the guide. */

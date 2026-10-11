@@ -122,6 +122,8 @@ Storage backends remain below this graph. A future WebDAV adapter needs remote i
 
 ## Operation owners
 
+The active scenario editor keeps a `ScenarioProjectSnapshot`: the committed project and owner-issued `workspaceRevision` returned together. Loading, creation, copying, autosave and Guide/Tour resource application propagate that pair; ordinary autosave and resource commands use the captured revision for admission. A late result cannot update another document generation. Manual latest readiness still returns the committed logical project after confirming the versioned saved authority. Metadata and project-step compatibility callers retain their timestamp predicate and unwrap the committed project explicitly; no caller infers a durable revision from timestamps or a local increment.
+
 | Supported path | Commit/policy owner |
 | --- | --- |
 | Image capture/import/editor save/copy | `index.screenshots`, `image-aggregates/mutations` |

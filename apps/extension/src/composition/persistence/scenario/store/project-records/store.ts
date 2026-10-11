@@ -1,4 +1,5 @@
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import type { ScenarioProjectSnapshot } from '../../contracts';
 import { createGuideProject } from '../../../../../features/scenario/project/public';
 import { getScenarioProject, listScenarioProjects, saveScenarioProject } from '../../projects';
 import type { SaveScenarioProjectOptions } from '../../projects/project';
@@ -9,16 +10,16 @@ import { createScenarioStoreMutationQueue } from '../mutation-queue';
 const enqueueProjectRecordMutation = createScenarioStoreMutationQueue();
 
 /**
- * Creates and persists a new scenario project.
+ * Creates a scenario project and returns its owner-issued committed snapshot.
  */
-export async function createScenarioProjectRecord(name: string): Promise<GuideProject> {
+export async function createScenarioProjectRecord(name: string): Promise<ScenarioProjectSnapshot> {
   return enqueueProjectRecordMutation(async () => {
     const project = createGuideProject(name);
     const savedProject = await saveScenarioProject(project, {
-      baseUpdatedAt: null,
+      expectedRevision: null,
       storageClass: 'library',
     });
-    publishMediaHubLibraryChanged('create', [`scenario:${savedProject.id}`]);
+    publishMediaHubLibraryChanged('create', [`scenario:${savedProject.project.id}`]);
     return savedProject;
   });
 }
@@ -31,12 +32,12 @@ export function getScenarioProjectRecord(id: string): Promise<GuideProject | und
 }
 
 /**
- * Persists the provided scenario project document.
+ * Persists the edit buffer and returns the owner-issued committed snapshot.
  */
 export async function saveScenarioProjectRecord(
   project: GuideProject,
   options: SaveScenarioProjectOptions = {}
-): Promise<GuideProject> {
+): Promise<ScenarioProjectSnapshot> {
   return enqueueProjectRecordMutation(async () => {
     const savedProject = await saveScenarioProject(project, options);
     publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
@@ -80,7 +81,7 @@ export async function updateScenarioProjectRecordMetadata(
       baseUpdatedAt: project.updatedAt,
     });
     publishMediaHubLibraryChanged('update', [`scenario:${projectId}`]);
-    return savedProject;
+    return savedProject.project;
   });
 }
 

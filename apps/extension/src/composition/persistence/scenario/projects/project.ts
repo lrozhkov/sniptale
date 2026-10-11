@@ -3,7 +3,7 @@ import { parseDbEntries } from '../../infrastructure/indexed-db/read-primitives'
 import { parseScenarioProjectEntry, parseScenarioProjectSummary } from '../read-guards';
 import type { ScenarioProjectSummary } from '../../../../features/scenario/contracts/types/project';
 import { initDB, SCENARIO_PROJECTS_STORE } from '../../infrastructure/indexed-db/core';
-import type { ScenarioProjectEntry } from '../contracts';
+import type { ScenarioProjectEntry, ScenarioProjectSnapshot } from '../contracts';
 import {
   commitScenarioAggregateMutation,
   recoverScenarioAssetPublications,
@@ -11,15 +11,18 @@ import {
 import { deleteScenarioAggregate } from '../aggregate-cleanup';
 
 export interface SaveScenarioProjectOptions {
+  /** Compatibility predicate for callers outside the versioned editor session. */
   baseUpdatedAt?: number | null;
+  /** Captured owner revision; null admits only a new root. */
   expectedRevision?: number | null;
   storageClass?: import('../../library-lifecycle/contracts').LibraryStorageClass;
 }
 
+/** Publishes through the aggregate owner and returns its exact committed project/revision pair. */
 export async function saveScenarioProject(
   project: GuideProject,
   options: SaveScenarioProjectOptions = {}
-): Promise<GuideProject> {
+): Promise<ScenarioProjectSnapshot> {
   const result = await commitScenarioAggregateMutation(project, {
     ...(options.baseUpdatedAt === undefined ? {} : { expectedUpdatedAt: options.baseUpdatedAt }),
     ...(options.expectedRevision === undefined
@@ -27,7 +30,7 @@ export async function saveScenarioProject(
       : { expectedRevision: options.expectedRevision }),
     ...(options.storageClass === undefined ? {} : { storageClass: options.storageClass }),
   });
-  return result.project;
+  return result;
 }
 
 export async function getScenarioProject(id: string): Promise<GuideProject | undefined> {

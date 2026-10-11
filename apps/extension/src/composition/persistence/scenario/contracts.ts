@@ -10,6 +10,12 @@ export interface ScenarioSavedVersion {
   project: GuideProject;
 }
 
+/** One committed project and its revision, issued together by the aggregate owner. */
+export interface ScenarioProjectSnapshot {
+  readonly project: GuideProject;
+  readonly workspaceRevision: number;
+}
+
 export interface ScenarioProjectEntry {
   id: string;
   project: GuideProject;

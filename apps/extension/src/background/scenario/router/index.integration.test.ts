@@ -78,9 +78,12 @@ beforeEach(() => {
   buildScenarioSessionPayloadMock.mockResolvedValue(createScenarioPayloadResponse());
   flushPendingCaptureIfNeededMock.mockResolvedValue({});
   createScenarioProjectRecordMock.mockResolvedValue({
-    id: 'project-created',
-    name: 'Created project',
-    updatedAt: 20,
+    project: {
+      id: 'project-created',
+      name: 'Created project',
+      updatedAt: 20,
+    },
+    workspaceRevision: 2,
   });
   saveScenarioCaptureStepToProjectMock.mockResolvedValue({
     project: { id: 'project-1', name: 'Project 1', updatedAt: 20 },

@@ -65,7 +65,10 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   listScenarioProjectsMock.mockResolvedValue([]);
-  saveScenarioProjectMock.mockImplementation(async (project) => project);
+  saveScenarioProjectMock.mockImplementation(async (project) => ({
+    project: project,
+    workspaceRevision: 2,
+  }));
   blobToDataUrlMock.mockResolvedValue('data:image/png;base64,preview');
   deleteScenarioExportMock.mockResolvedValue(undefined);
   deleteScenarioProjectMock.mockResolvedValue(undefined);

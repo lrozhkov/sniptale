@@ -98,12 +98,18 @@ beforeEach(() => {
   project.items.push(createGuideStep('First step', 'first'));
   io.load.mockResolvedValue(project);
   io.asset.mockResolvedValue(undefined);
-  io.save.mockImplementation(async (value) => ({ ...value, updatedAt: 101 }));
+  io.save.mockImplementation(async (value) => ({
+    project: { ...value, updatedAt: 101 },
+    workspaceRevision: 2,
+  }));
   io.duplicate.mockImplementation(async (value, name) => ({
-    ...value,
-    id: 'copy',
-    name,
-    updatedAt: 102,
+    project: {
+      ...value,
+      id: 'copy',
+      name,
+      updatedAt: 102,
+    },
+    workspaceRevision: 2,
   }));
   io.remove.mockResolvedValue(undefined);
 });
@@ -333,7 +339,11 @@ it('opens the selected tour image and restores its selection and focus after App
   project.tour = { ...createTourDocument(), slides: [first, second] };
   io.load.mockResolvedValue(project);
   io.asset.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
-  io.tourEdit.mockResolvedValue({ status: 'applied', project: { ...project, updatedAt: 101 } });
+  io.tourEdit.mockResolvedValue({
+    status: 'applied',
+    project: { ...project, updatedAt: 101 },
+    workspaceRevision: 2,
+  });
   vi.stubGlobal(
     'URL',
     class extends URL {
@@ -387,7 +397,7 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
   io.save.mockImplementationOnce(
     (source) =>
       new Promise((resolve) => {
-        finish = () => resolve({ ...source, updatedAt: 101 });
+        finish = () => resolve({ project: { ...source, updatedAt: 101 }, workspaceRevision: 2 });
       })
   );
   await render();
@@ -427,7 +437,7 @@ it('imports narration from the mounted tour inspector through the source-bound p
   const slide = createTourImageSlide('voice-slide');
   project.tour = { ...createTourDocument(), slides: [slide] };
   io.load.mockResolvedValue(project);
-  io.narration.mockResolvedValue({ ...project, updatedAt: 101 });
+  io.narration.mockResolvedValue({ project: { ...project, updatedAt: 101 }, workspaceRevision: 2 });
   await render();
   await click('Interactive tour');
   const selectedSlide = container.querySelector<HTMLButtonElement>('.tour-slide-select');

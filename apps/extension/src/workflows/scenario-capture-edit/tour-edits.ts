@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../../composition/persistence/scenario/contracts';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
@@ -40,11 +41,14 @@ function rasterDocument(dataUrl: string, width: number, height: number): EditorD
 export async function applyTourImageEdit(args: {
   project: GuideProject;
   baseUpdatedAt: number;
+  expectedRevision?: number;
   target: TourImageEditTarget;
   dataUrl: string;
   document: EditorDocument;
   allowTargetReview?: boolean;
-}): Promise<{ status: 'applied'; project: GuideProject } | { status: 'requires-target-review' }> {
+}): Promise<
+  ({ status: 'applied' } & ScenarioProjectSnapshot) | { status: 'requires-target-review' }
+> {
   const parsed = parseGuideProject(args.project);
   if (parsed.status !== 'ok' || !isImageDataUrl(args.dataUrl) || !isEditorDocument(args.document))
     throw new Error('Invalid tour image edit.');
@@ -102,6 +106,7 @@ export async function applyTourImageEdit(args: {
     handedOff = true;
     const result = await commitScenarioAggregateMutation(project, {
       expectedUpdatedAt: args.baseUpdatedAt,
+      ...(args.expectedRevision === undefined ? {} : { expectedRevision: args.expectedRevision }),
       children: {
         assetPuts: [prepared.entry],
         editorDocumentPuts: [
@@ -116,7 +121,7 @@ export async function applyTourImageEdit(args: {
       },
     });
     publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
-    return { status: 'applied', project: result.project };
+    return { status: 'applied', ...result };
   } catch (error) {
     if (!handedOff)
       return rejectScenarioMutationBeforeHandoff({ assetPuts: [prepared.entry] }, error);
