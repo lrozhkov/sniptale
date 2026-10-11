@@ -124,6 +124,8 @@ Storage backends remain below this graph. A future WebDAV adapter needs remote i
 
 The active scenario editor keeps a `ScenarioProjectSnapshot`: the committed project and owner-issued `workspaceRevision` returned together. Loading, creation, copying, autosave and Guide/Tour resource application propagate that pair; ordinary autosave and resource commands use the captured revision for admission. A late result cannot update another document generation. Manual latest readiness still returns the committed logical project after confirming the versioned saved authority. Metadata and project-step compatibility callers retain their timestamp predicate and unwrap the committed project explicitly; no caller infers a durable revision from timestamps or a local increment.
 
+Publishing an ordinary scenario autosave into its current disposable buffer retains unchanged Guide item references when their serialized contents match the canonical result. Canonical metadata, changed items and item ordering still win; a newer local edit keeps the existing late-acknowledgement policy. Manual Save and unload protection compare logical content when the buffer and canonical snapshot have different references. This projection does not change the canonical saved snapshot, revision admission, persisted history or resource authority.
+
 | Supported path | Commit/policy owner |
 | --- | --- |
 | Image capture/import/editor save/copy | `index.screenshots`, `image-aggregates/mutations` |

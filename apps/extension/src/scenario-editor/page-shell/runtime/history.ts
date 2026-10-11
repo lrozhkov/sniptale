@@ -22,6 +22,20 @@ type HistoryAction =
   | { kind: 'redo' }
   | { kind: 'seal' };
 
+/** Keeps equivalent serialized items stable while adopting the canonical published values. */
+function reusePublishedGuideItems(project: GuideProject, source: GuideProject): GuideProject {
+  const items = project.items.map((item, index) => {
+    const previous = source.items[index];
+    return previous?.id === item.id && JSON.stringify(previous) === JSON.stringify(item)
+      ? previous
+      : item;
+  });
+  const unchanged =
+    items.length === source.items.length &&
+    items.every((item, index) => item === source.items[index]);
+  return { ...project, items: unchanged ? source.items : items };
+}
+
 /** One reducer owns the current buffer and both directions of reversible edits. */
 export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): GuideHistory {
   if (action.kind === 'reset')
@@ -63,7 +77,7 @@ export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): 
       ...state,
       present:
         state.present === action.source
-          ? action.project
+          ? reusePublishedGuideItems(action.project, action.source)
           : { ...state.present, updatedAt: action.project.updatedAt },
     };
   if (action.kind === 'commit') return { ...state, present: action.project, group: null };

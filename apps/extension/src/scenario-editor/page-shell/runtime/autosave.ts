@@ -47,8 +47,15 @@ export function useGuideAutosave(input: AutosaveInput) {
     const protect = (event: BeforeUnloadEvent) => {
       const state = latest.current;
       if (!state.project) return;
-      if (state.project === state.saved.current?.project && !state.autosaving.current) return;
       if (!state.protectUnsaved && !state.autosaving.current) return;
+      const committed = state.saved.current?.project;
+      if (
+        committed &&
+        !state.autosaving.current &&
+        (state.project === committed ||
+          guideDraftContent(state.project) === guideDraftContent(committed))
+      )
+        return;
       event.preventDefault();
       event.returnValue = '';
       if (state.dirty && state.enabled !== false) void owner.current?.flushLatest();
@@ -205,7 +212,7 @@ function persistGuideDraft(
     args.busy.current
   )
     return Promise.reject(new Error('Scenario save admission is unavailable.'));
-  if (source === base.project) {
+  if (source === base.project || guideDraftContent(source) === guideDraftContent(base.project)) {
     args.onStatus('saved');
     return Promise.resolve(true);
   }

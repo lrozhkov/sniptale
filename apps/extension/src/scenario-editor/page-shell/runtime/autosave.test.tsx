@@ -66,6 +66,29 @@ it('admits the captured owner revision and keeps the exact nonconsecutive return
   expect(save).toHaveBeenLastCalledWith(input.project, { expectedRevision: 37 });
   expect(input.saved.current?.workspaceRevision).toBe(59);
 });
+
+it('does not acquire a manual writer for the unchanged canonical UI projection', async () => {
+  const source = createGuideProject('Guide', 'guide', 1);
+  source.items = [createGuideStep('Step', 'step')];
+  const project = structuredClone({ ...source, updatedAt: 2 });
+  const committed = { project, workspaceRevision: 37 };
+  const state = reduceGuideHistory(
+    { present: source, past: [], future: [], group: null },
+    {
+      kind: 'publish',
+      source,
+      project,
+    }
+  );
+  input = { ...input, project: state.present, dirty: false, protectUnsaved: false };
+  input.saved.current = committed;
+  save.mockResolvedValue(committed);
+  act(() => root.render(<Harness />));
+  await act(async () => expect(await autosave.save()).toBe(true));
+  expect(save).not.toHaveBeenCalled();
+  expect(input.saved.current).toBe(committed);
+  expect(input.onStatus).toHaveBeenCalledWith('saved');
+});
 it('cancels the debounce when the page unmounts', async () => {
   act(() => root.render(<Harness />));
   await act(async () => vi.advanceTimersByTimeAsync(100));

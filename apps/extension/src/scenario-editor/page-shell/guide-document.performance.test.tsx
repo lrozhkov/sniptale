@@ -3,6 +3,8 @@
 import { act, startTransition, Suspense, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
+import { reduceGuideHistory } from './runtime/history';
 
 import {
   createGuideParagraphs,
@@ -108,6 +110,39 @@ it('does not rerender unchanged step fields for project metadata or newer comman
 
   expect(renders).not.toHaveBeenCalled();
   expect(host.querySelectorAll('textarea')).toHaveLength(9);
+});
+
+it('keeps unchanged fields quiet through a canonical autosave publication and edits latest metadata', async () => {
+  const props = createProps();
+  const initial = parseGuideProject(props.project);
+  if (initial.status !== 'ok') throw new Error('Invalid source fixture');
+  props.project = initial.project;
+  await render(props);
+  renders.mockClear();
+  const published = parseGuideProject({ ...props.project, name: 'Saved name', updatedAt: 2 });
+  if (published.status !== 'ok') throw new Error('Invalid published fixture');
+  const state = reduceGuideHistory(
+    { present: props.project, past: [], future: [], group: null },
+    {
+      kind: 'publish',
+      source: props.project,
+      project: published.project,
+    }
+  );
+  if (!state.present) throw new Error('Missing published buffer');
+  await render({ ...props, project: state.present });
+  expect(renders).not.toHaveBeenCalled();
+  await input('#step-0 .guide-step-title', 'Latest title');
+  expect(props.onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: 'Saved name',
+      updatedAt: 2,
+      items: expect.arrayContaining([
+        expect.objectContaining({ id: 'step-0', title: 'Latest title' }),
+      ]),
+    }),
+    'step-title:step-0'
+  );
 });
 
 it('rerenders only the changed step fields when a sibling item changes', async () => {

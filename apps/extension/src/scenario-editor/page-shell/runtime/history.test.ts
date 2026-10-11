@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import {
   createGuideProject,
+  createGuideStep,
   createTourDocument,
   createTourImageSlide,
   applyTourCommands,
@@ -11,6 +13,65 @@ import { reduceGuideHistory, type GuideHistory } from './history';
 function initial(): GuideHistory {
   return { present: createGuideProject('Original', 'guide', 1), past: [], future: [], group: null };
 }
+
+it('retains unchanged canonical item references when publishing the current autosave source', () => {
+  const draft = createGuideProject('Guide', 'guide', 1);
+  draft.items = [createGuideStep('First', 'first'), createGuideStep('Second', 'second')];
+  const parsed = parseGuideProject(draft);
+  if (parsed.status !== 'ok') throw new Error('Invalid source fixture');
+  const source = parsed.project;
+  const committed = structuredClone({ ...source, name: 'Saved name', updatedAt: 2 });
+  const state: GuideHistory = { present: source, past: [draft], future: [], group: 'name' };
+  const next = reduceGuideHistory(state, { kind: 'publish', source, project: committed });
+  expect(next.present).toEqual(committed);
+  expect(next.present?.items).toBe(source.items);
+  expect(next.present?.items[0]).toBe(source.items[0]);
+  expect(next.present?.items[1]).toBe(source.items[1]);
+  expect(next.past).toBe(state.past);
+  expect(next.group).toBe(state.group);
+  expect(committed.items[0]).not.toBe(source.items[0]);
+});
+
+it('publishes changed canonical items and their order without mutating the source', () => {
+  const source = createGuideProject('Guide', 'guide', 1);
+  source.items = [createGuideStep('First', 'first'), createGuideStep('Second', 'second')];
+  const committed = structuredClone({
+    ...source,
+    name: 'Canonical name',
+    updatedAt: 2,
+    items: [{ ...source.items[1]!, title: 'Canonical second' }, createGuideStep('New', 'new')],
+  });
+  const next = reduceGuideHistory(
+    { ...initial(), present: source },
+    {
+      kind: 'publish',
+      source,
+      project: committed,
+    }
+  );
+  expect(next.present).toEqual(committed);
+  expect(next.present?.items).not.toBe(source.items);
+  expect(source.items.map((item) => item.title)).toEqual(['First', 'Second']);
+});
+
+it('adopts a canonical item correction while keeping its unchanged sibling stable', () => {
+  const source = createGuideProject('Guide', 'guide', 1);
+  source.items = [createGuideStep('First', 'first'), createGuideStep('Second', 'second')];
+  const committed = structuredClone({ ...source, updatedAt: 2 });
+  committed.items[0]!.title = 'Canonical correction';
+  const next = reduceGuideHistory(
+    { ...initial(), present: source },
+    {
+      kind: 'publish',
+      source,
+      project: committed,
+    }
+  );
+  expect(next.present).toEqual(committed);
+  expect(next.present?.items[0]).toBe(committed.items[0]);
+  expect(next.present?.items[1]).toBe(source.items[1]);
+  expect(source.items[0]?.title).toBe('First');
+});
 
 it('groups a field edit until blur and restores the prior content in both directions', () => {
   let state = initial();
