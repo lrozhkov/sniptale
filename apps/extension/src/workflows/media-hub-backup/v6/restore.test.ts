@@ -46,6 +46,8 @@ import { createArchiveWriter } from '../../../composition/archive-transfer';
 import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
 import { runWithDurableAssetOperationRecovery } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import { restoreMediaHubBackupV6 } from './restore';
+import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from './export';
+import { inspectMediaHubBackupV6 } from './inspect';
 
 const descriptor = {
   mediaSubtype: 'library-item' as const,
@@ -162,6 +164,74 @@ beforeEach(() => {
   mocks.restoreGalleryViews.mockResolvedValue([]);
 });
 
+it('keeps v2 JSON transport out of staging and ready journals before root publication', async () => {
+  const output = createArchiveMemorySink();
+  await exportMediaHubBackupV6({
+    plan: buildMediaHubBackupExportPlanV6({
+      layout: 'library-folders-v2',
+      roots: [
+        {
+          descriptor,
+          load: async () => ({
+            metadata: {
+              entry: { id: 'one', source: { kind: 'screenshot' }, tags: [] },
+              originalObjectId: object.objectId,
+            },
+            objects: [{ ref: object, blob: new Blob(['media']) }],
+          }),
+          summary: {
+            draftCount: 0,
+            recordingCount: 0,
+            sourceMetadataCount: 0,
+            telemetryCount: 0,
+            thumbnailCount: 0,
+            webSnapshotCount: 0,
+          },
+        },
+      ],
+      privacy: {
+        includeSourceMetadata: false,
+        includeTelemetry: false,
+        includeWebSnapshots: false,
+      },
+    }),
+    sink: output.sink,
+  });
+  const file = output.blob();
+  mocks.verify.mockResolvedValue({
+    inspection: await inspectMediaHubBackupV6(file),
+    session: currentSession,
+  });
+  await restoreMediaHubBackupV6({
+    file,
+    operationId: 'restore-1',
+    publishers: [
+      {
+        profile: 'media:library-item',
+        publish: async () => {
+          currentSession = {
+            ...currentSession,
+            committedRoots: ['media:library-item:one'],
+            currentRoot: null,
+          };
+          return { conflicted: false, imported: true, retainedAssetIds: ['local-asset'] };
+        },
+      },
+    ],
+  });
+  expect(mocks.stage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      envelope: expect.objectContaining({
+        objects: [object],
+        descriptor: expect.objectContaining({ objectCount: 1, totalBytes: 5 }),
+      }),
+    })
+  );
+  expect(mocks.createJournal).toHaveBeenCalledWith(
+    expect.objectContaining({ assetRefs: [expect.objectContaining({ assetId: 'local-asset' })] })
+  );
+  expect(mocks.discard).not.toHaveBeenCalled();
+});
 describe('media backup v6 restore orchestration', () => {
   it('restores portable Gallery views with the archive conflict policy before completion', async () => {
     currentSession = { ...currentSession, strategy: 'skip' };

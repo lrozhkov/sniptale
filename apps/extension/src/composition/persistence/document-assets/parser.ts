@@ -287,8 +287,7 @@ export function parsePersistedEditorDocument(value: unknown): PersistedEditorDoc
   let canvas: unknown;
   try {
     canvas = JSON.parse(value['canvasJson']);
-    if (containsEmbeddedBinary(canvas) || !hasValidCanvasAssetUrls(canvas, declaredIds))
-      return null;
+    if (!hasValidCanvasAssetUrls(canvas, declaredIds)) return null;
   } catch {
     return null;
   }

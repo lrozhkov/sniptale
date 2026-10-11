@@ -291,6 +291,18 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Не удалось выполнить действие. Попробуйте ещё раз.',
     en: 'Could not complete the action. Please try again.',
   },
+  backupMetadataLimit: {
+    ru: 'Метаданные превышают лимит резервной копии. Исходные файлы и история сохранены. Попробуйте экспортировать меньше материалов.',
+    en: 'Metadata exceeds the backup limit. Original files and history are preserved. Try backing up fewer items.',
+  },
+  backupInvalidMetadata: {
+    ru: 'Не удалось проверить данные резервной копии. Исходные материалы сохранены. Причина и этап указаны в журнале.',
+    en: 'Could not validate backup data. Original items are preserved. The log contains the reason and phase.',
+  },
+  backupWriteFailed: {
+    ru: 'Не удалось записать резервную копию. Проверьте доступ к выбранному файлу и свободное место.',
+    en: 'Could not write the backup. Check access to the selected file and available space.',
+  },
   savedViewDeleteTitle: {
     ru: 'Удалить сохранённый вид?',
     en: 'Delete saved view?',

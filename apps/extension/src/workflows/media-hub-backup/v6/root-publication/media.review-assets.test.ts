@@ -22,6 +22,13 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 }));
 
 import { mediaLibraryRootPublisher } from './media';
+import { DEFAULT_WINDOW_HEADER } from '../../../../features/browser-frame/header';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../../features/video/review/document';
+const favicon =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
 import {
   annotationReviewFixture,
   journal,
@@ -326,13 +333,40 @@ async function reviewResourceArchiveFixture(kind: 'bookends' | 'original-speech'
   const workspace = {
     ...fixture.workspace,
     sourceAssetId: 'source-bytes',
-    advanced: attach(fixture.workspace.advanced, true),
+    advanced: {
+      ...attach(fixture.workspace.advanced, true),
+      windowHeader: {
+        ...DEFAULT_WINDOW_HEADER,
+        title: 'Qk before',
+        faviconEnabled: true,
+        faviconSource: 'file' as const,
+        faviconDataUrl: favicon,
+      },
+    },
     history: fixture.workspace.history.map((operation) =>
       operation.target === 'advancedContent'
         ? {
             ...operation,
-            before: attach(operation.before, true),
-            after: attach(operation.after, false),
+            before: {
+              ...attach(operation.before, true),
+              windowHeader: {
+                ...DEFAULT_WINDOW_HEADER,
+                title: 'Qk before',
+                faviconEnabled: true,
+                faviconSource: 'file' as const,
+                faviconDataUrl: favicon,
+              },
+            },
+            after: {
+              ...attach(operation.after, false),
+              windowHeader: {
+                ...DEFAULT_WINDOW_HEADER,
+                title: 'data: after',
+                faviconEnabled: true,
+                faviconSource: 'file' as const,
+                faviconDataUrl: favicon,
+              },
+            },
           }
         : operation
     ),
@@ -447,6 +481,7 @@ it.each(['bookends', 'original-speech'] as const)(
       paths: createArchivePathAllocator(),
     });
     const plan = buildMediaHubBackupExportPlanV6({
+      layout: 'library-folders-v2',
       roots,
       privacy: {
         includeSourceMetadata: false,
@@ -457,13 +492,16 @@ it.each(['bookends', 'original-speech'] as const)(
     const output = createArchiveMemorySink();
     await exportMediaHubBackupV6({ plan, sink: output.sink });
     const inspected = await inspectMediaHubBackupV6(output.blob());
-    expect(inspected.manifest.totals.objects).toBe(6);
+    expect(inspected.manifest.totals.objects).toBe(8);
     const reader = await openArchiveReader(output.blob());
     try {
       const descriptor = inspected.descriptors[0]!;
-      const envelope = parseRootEnvelope(
+      const transport = parseRootEnvelope(
         JSON.parse(await reader.entry(descriptor.metadataPath)!.text())
       );
+      const { decodeBackupMetadata } = await import('../metadata-transport');
+      const { envelope } = await decodeBackupMetadata(reader, transport);
+      expect(envelope.objects).toHaveLength(6);
       const { restoredBytes, staged } = await stageBookendArchive(reader, envelope);
       const tables = installDatabase(base);
       const result = await mediaLibraryRootPublisher.publish({
@@ -473,6 +511,28 @@ it.each(['bookends', 'original-speech'] as const)(
         staged,
       });
       expect(result.imported).toBe(true);
+      const restoredWorkspace = logicalReviewValues(tables).find(
+        (value) => value.aggregateId !== base.entry.id
+      );
+      if (!restoredWorkspace) throw new Error('Missing restored review');
+      const baseline = reviewAdvancedContentBaseline(restoredWorkspace.advanced);
+      for (const cursor of [0, 1, 0, 1]) {
+        const document = replayReviewHistory(
+          restoredWorkspace.history,
+          cursor,
+          restoredWorkspace.source,
+          baseline
+        );
+        expect(document.advancedContent.windowHeader?.title).toBe(
+          cursor ? 'data: after' : 'Qk before'
+        );
+        const image = document.advancedContent.windowHeader?.faviconDataUrl;
+        expect(image).toBe(favicon);
+        expect(atob(image!.slice(image!.indexOf(',') + 1))).toBe(
+          atob(favicon.slice(favicon.indexOf(',') + 1))
+        );
+      }
+      expect(result.retainedAssetIds.every((id) => !id.startsWith('transport-'))).toBe(true);
       for (const id of ['opening', 'ending']) {
         const matches = await Promise.all(
           [...restoredBytes].map(async ([key, file]) =>

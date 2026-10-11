@@ -12,6 +12,7 @@ import {
 } from '../../../../features/scenario/project/public';
 import { createMediaHubBackupExportOptions } from '../options';
 import { MAX_ROOT_METADATA_BYTES } from '../contracts';
+import { parseRootEnvelope } from '../codec';
 import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import { buildScenarioProjectRootInventory } from './scenario-projects';
 it('exports large saved history as a separate bounded object without inflating root metadata', async () => {
@@ -103,6 +104,13 @@ it.each(['guide', 'tour'] as const)(
       paths: createArchivePathAllocator(),
     });
     const envelope = await roots[0]!.load();
+    expect(() =>
+      parseRootEnvelope({
+        descriptor: roots[0]!.descriptor,
+        metadata: envelope.metadata,
+        objects: envelope.objects.map((object) => object.ref),
+      })
+    ).not.toThrow();
     const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);
     const exported = metadata.exports.find((item) => item.id === 'saved')!;
     const object = envelope.objects.find((item) => item.ref.objectId === exported.html?.objectId)!;

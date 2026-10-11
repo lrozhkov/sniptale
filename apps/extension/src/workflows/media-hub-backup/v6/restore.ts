@@ -33,6 +33,8 @@ import {
 import { verifyMediaHubRestoreResume } from './restore-session';
 import { stageArchiveRootObjects, type StagedArchiveObject } from './staging';
 import { assertArchiveRootMetadataIdentity } from './root-codecs/root-identity';
+import { MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT, type MediaHubBackupLayout } from './layout';
+import { decodeBackupMetadata } from './metadata-transport';
 
 export interface ArchiveRootPublicationResult {
   conflicted: boolean;
@@ -101,7 +103,9 @@ async function cleanupStaged(staged: readonly StagedArchiveObject[]): Promise<vo
 
 async function loadEnvelope(
   reader: Awaited<ReturnType<typeof openArchiveReader>>,
-  descriptor: ArchiveRootDescriptor
+  descriptor: ArchiveRootDescriptor,
+  layout: MediaHubBackupLayout,
+  signal?: AbortSignal
 ): Promise<MediaHubBackupRootEnvelope> {
   const entry = reader.entry(descriptor.metadataPath);
   if (!entry) throw new Error(`Media backup root metadata is missing: ${descriptor.metadataPath}.`);
@@ -111,11 +115,16 @@ async function loadEnvelope(
   if (JSON.stringify(envelope.descriptor) !== JSON.stringify(descriptor)) {
     throw new Error('Media backup root descriptor changed after preflight.');
   }
-  assertArchiveRootMetadataIdentity(descriptor, envelope.metadata);
-  return envelope;
+  const decoded =
+    layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
+      ? (await decodeBackupMetadata(reader, envelope, signal)).envelope
+      : envelope;
+  assertArchiveRootMetadataIdentity(descriptor, decoded.metadata);
+  return decoded;
 }
 
 async function restoreArchiveRoot(args: {
+  layout: MediaHubBackupLayout;
   descriptor: ArchiveRootDescriptor;
   progress: ArchiveTransferProgress;
   publisher: ArchiveRootPublisher;
@@ -129,7 +138,7 @@ async function restoreArchiveRoot(args: {
   let staged: StagedArchiveObject[] = [];
   let journal: AssetReadyJournal | null = null;
   try {
-    let envelope = await loadEnvelope(args.reader, args.descriptor);
+    let envelope = await loadEnvelope(args.reader, args.descriptor, args.layout, args.signal);
     if (
       session.strategy === 'skip' &&
       args.publisher.checkpointSkipIfExisting &&
@@ -240,7 +249,12 @@ export async function restoreMediaHubBackupV6(args: {
         allDescriptors.push(...parseCatalog(await entry.text(MAX_CATALOG_SHARD_BYTES)));
       }
       const descriptors = await orderLibraryRestoreRoots(allDescriptors, async (descriptor) => {
-        const envelope = await loadEnvelope(reader, descriptor);
+        const envelope = await loadEnvelope(
+          reader,
+          descriptor,
+          inspection.manifest.layout,
+          args.signal
+        );
         const metadata = parsePortableMediaMetadata(envelope.metadata);
         return (metadata.reviewAssets ?? []).flatMap((asset) =>
           [asset.libraryMediaId, asset.entry.originMediaId].filter(
@@ -258,6 +272,7 @@ export async function restoreMediaHubBackupV6(args: {
         if (!publisher)
           throw new Error(`Media backup root publisher is unavailable: ${profile(descriptor)}.`);
         session = await restoreArchiveRoot({
+          layout: inspection.manifest.layout,
           descriptor,
           progress,
           publisher,

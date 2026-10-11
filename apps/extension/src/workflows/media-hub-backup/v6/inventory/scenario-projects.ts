@@ -197,7 +197,7 @@ async function buildScenarioExports(
         objectId: collector.addObject(
           file,
           row.filename,
-          file.type,
+          'text/html',
           withDraftRoot(project.lifecycle?.storageClass === 'temporary', [
             'Scenarios',
             project.project.name,

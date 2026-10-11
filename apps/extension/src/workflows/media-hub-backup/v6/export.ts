@@ -5,18 +5,33 @@ import {
   type ExportSink,
 } from '../../../composition/archive-transfer';
 import { encodeCatalogShards } from './catalog';
-import { parseArchiveRootDescriptor, parseRootEnvelope } from './codec';
+import {
+  parseArchiveRootDescriptor,
+  parseRootEnvelope,
+  parseBoundedJson,
+  parseManifestV6,
+} from './codec';
 import {
   MEDIA_HUB_BACKUP_FORMAT,
   MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER,
   MEDIA_HUB_BACKUP_VERSION,
+  MAX_ROOT_METADATA_BYTES,
+  MAX_EXPANDED_ARCHIVE_METADATA_BYTES,
   type JsonValue,
   type MediaHubBackupCatalogShard,
   type MediaHubBackupManifestV6,
   type MediaHubBackupPrivacyFlags,
   type MediaHubBackupRootEnvelope,
 } from './contracts';
-import { CATALOG_ROOT, MANIFEST_PATH, MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import {
+  CATALOG_ROOT,
+  MANIFEST_PATH,
+  MEDIA_HUB_BACKUP_LAYOUT,
+  MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  type MediaHubBackupLayout,
+} from './layout';
+import { encodeBackupMetadata } from './metadata-transport';
+import { assertBackupByteBudget } from './errors';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export interface ArchiveRootObjectSource {
@@ -89,6 +104,7 @@ function createArchiveId(): string {
 }
 
 export function buildMediaHubBackupExportPlanV6(args: {
+  layout?: MediaHubBackupLayout;
   archiveId?: string;
   exportedAt?: string;
   galleryViews?: GallerySavedView[];
@@ -149,7 +165,7 @@ export function buildMediaHubBackupExportPlanV6(args: {
     exportedAt: args.exportedAt ?? new Date().toISOString(),
     format: MEDIA_HUB_BACKUP_FORMAT,
     ...(args.galleryViews ? { galleryViews: structuredClone(args.galleryViews) } : {}),
-    layout: MEDIA_HUB_BACKUP_LAYOUT,
+    layout: args.layout ?? MEDIA_HUB_BACKUP_LAYOUT,
     privacy: args.privacy,
     totals: {
       bytes: roots.reduce((total, item) => total + item.descriptor.totalBytes, 0),
@@ -185,11 +201,26 @@ export async function exportMediaHubBackupV6(args: {
     throwIfAborted(args.signal);
     progress.currentFilename = MANIFEST_PATH;
     report();
-    await writer.addText(
-      MANIFEST_PATH,
-      JSON.stringify(args.plan.manifest),
-      signalOptions(args.signal)
+    if (args.plan.manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT) {
+      const roots: MediaHubBackupRootInventoryItem[] = [];
+      let expandedBytes = 0;
+      for (const [index, item] of args.plan.roots.entries()) {
+        throwIfAborted(args.signal);
+        const encoded = await encodeBackupMetadata(item, index + 1, args.signal);
+        expandedBytes += encoded.expandedBytes;
+        assertBackupByteBudget(expandedBytes, MAX_EXPANDED_ARCHIVE_METADATA_BYTES, 'encode');
+        roots.push(encoded.item);
+      }
+      args = { ...args, plan: buildMediaHubBackupExportPlanV6({ ...args.plan.manifest, roots }) };
+    }
+    const manifestText = JSON.stringify(args.plan.manifest);
+    assertBackupByteBudget(
+      new TextEncoder().encode(manifestText).byteLength,
+      MAX_ROOT_METADATA_BYTES,
+      'encode'
     );
+    parseManifestV6(parseBoundedJson(manifestText));
+    await writer.addText(MANIFEST_PATH, manifestText, signalOptions(args.signal));
     for (const catalog of args.plan.catalogs) {
       throwIfAborted(args.signal);
       progress.currentFilename = catalog.descriptor.path;
@@ -206,11 +237,13 @@ export async function exportMediaHubBackupV6(args: {
       });
       progress.currentFilename = item.descriptor.metadataPath;
       report();
-      await writer.addText(
-        item.descriptor.metadataPath,
-        JSON.stringify(envelope),
-        signalOptions(args.signal)
+      const metadataText = JSON.stringify(envelope);
+      assertBackupByteBudget(
+        new TextEncoder().encode(metadataText).byteLength,
+        MAX_ROOT_METADATA_BYTES,
+        'encode'
       );
+      await writer.addText(item.descriptor.metadataPath, metadataText, signalOptions(args.signal));
       for (const object of payload.objects) {
         throwIfAborted(args.signal);
         if (object.blob.size !== object.ref.size) {

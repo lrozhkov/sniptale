@@ -11,9 +11,17 @@ import { writeBrowserClipboardItems } from '@sniptale/platform/browser/clipboard
 import { translate } from '../../../platform/i18n';
 import { downloadGalleryBlob } from '../../shared/download';
 import type { GallerySurfaceController } from './controller-types';
+import { MediaBackupFailure } from '../../../workflows/media-hub-backup/index';
 
 type GalleryActionContext = {
-  stage: 'prepare-delete' | 'permanent-delete' | 'move-to-trash' | 'restore';
+  stage:
+    | 'prepare-delete'
+    | 'permanent-delete'
+    | 'move-to-trash'
+    | 'restore'
+    | 'backup-prepare'
+    | 'backup-export'
+    | 'backup-import';
   materialType: 'media' | 'scenario-project' | 'video-project' | 'scenario-export' | 'mixed';
 };
 export type GalleryBusyAction = (
@@ -66,8 +74,14 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
       const failure = describeActionFailure(error);
       logger.warn('gallery-action-failed', {
         code: failure.code,
-        stage: context?.stage ?? 'gallery-action',
+        stage:
+          error instanceof MediaBackupFailure
+            ? `backup-${error.phase}`
+            : (context?.stage ?? 'gallery-action'),
         materialType: context?.materialType ?? 'unspecified',
+        ...(error instanceof MediaBackupFailure
+          ? { ...error.metrics, resourceRole: error.resourceRole }
+          : {}),
       });
       actions.surface.setBanner(failure.message);
     } finally {
@@ -77,6 +91,18 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
 }
 
 function describeActionFailure(error: unknown): { code: string; message: string } {
+  if (error instanceof MediaBackupFailure) {
+    return {
+      code: `backup-${error.reason}`,
+      message: translate(
+        error.reason === 'metadata-budget'
+          ? 'gallery.app.backupMetadataLimit'
+          : error.reason === 'archive-write'
+            ? 'gallery.app.backupWriteFailed'
+            : 'gallery.app.backupInvalidMetadata'
+      ),
+    };
+  }
   if (error instanceof MediaLibraryDeleteError) error = error.cause;
   if (error instanceof MediaAssetDeletionBlockedError) {
     if (error.reason === 'invalid-graph' && error.graphDomain) {

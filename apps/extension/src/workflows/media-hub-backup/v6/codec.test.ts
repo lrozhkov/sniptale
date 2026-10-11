@@ -148,6 +148,23 @@ describe('media backup v6 codec', () => {
       version: 6,
     };
     expect(parseManifestV6(manifest)).toEqual(manifest);
+    const next = { ...manifest, layout: 'library-folders-v2' };
+    expect(parseManifestV6(next)).toEqual(next);
+    // Frozen entry gate from 799b87777, independent of current layout constants/decoder.
+    const releasedV1Gate = (value: { format: string; version: number; layout: string }) => {
+      if (
+        value.format === 'sniptale-media-hub-backup' &&
+        value.version === 6 &&
+        value.layout !== 'library-folders-v1'
+      )
+        throw new Error(
+          'Unsupported media backup v6 layout. Create a new backup with this version.'
+        );
+    };
+    expect(() => releasedV1Gate(JSON.parse(JSON.stringify(manifest)))).not.toThrow();
+    expect(() => releasedV1Gate(JSON.parse(JSON.stringify(next)))).toThrow(
+      'Unsupported media backup v6 layout'
+    );
     const { layout: _layout, ...legacyLayout } = manifest;
     expect(() => parseManifestV6(legacyLayout)).toThrow('Unsupported media backup v6 layout');
     expect(() => parseManifestV6({ ...manifest, version: 5 })).toThrow('Unsupported');

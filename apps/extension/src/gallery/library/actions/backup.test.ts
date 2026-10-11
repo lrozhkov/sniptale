@@ -164,7 +164,11 @@ async function verifyConfirmExportRequiresFreshDisclosureInspection() {
 
   await expect(
     createConfirmExportBackupAction(controller)(pendingOptions, runBusyAction)
-  ).rejects.toThrow('inspection failed');
+  ).rejects.toMatchObject({
+    reason: 'metadata-invalid',
+    phase: 'prepare',
+    cause: expect.objectContaining({ message: 'inspection failed' }),
+  });
 
   expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
   expect(getState().storage.pendingExport).toEqual({
@@ -180,7 +184,11 @@ async function verifyDirectSinkFailureIsAuthoritative() {
 
   await expect(
     createConfirmExportBackupAction(controller)(createAllBackupOptions(), runBusyAction)
-  ).rejects.toThrow('external disk write failed');
+  ).rejects.toMatchObject({
+    reason: 'archive-write',
+    phase: 'write',
+    cause: expect.objectContaining({ message: 'external disk write failed' }),
+  });
   expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
 }
 

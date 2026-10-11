@@ -27,6 +27,21 @@ function createPersistedDocument() {
   };
 }
 
+it.each(['data: описание URL', 'blob: пример ссылки', 'Qk ordinary text'])(
+  'preserves authored Canvas text %s independently of resource fields',
+  (text) => {
+    const document = createPersistedDocument();
+    const canvasJson = JSON.stringify({ objects: [{ type: 'textbox', text }] });
+    expect(parsePersistedEditorDocument({ ...document, canvasJson })?.canvasJson).toBe(canvasJson);
+    expect(
+      parsePersistedEditorDocument({
+        ...document,
+        canvasJson: JSON.stringify({ objects: [{ type: 'image', src: text }] }),
+      })
+    ).toBeNull();
+  }
+);
+
 it('constructs a fresh exact projection and strips unknown nested keys', () => {
   const expected = createPersistedDocument();
   const candidate = {

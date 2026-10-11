@@ -3,6 +3,135 @@ import { openArchiveReader } from '../../../composition/archive-transfer';
 import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
 import { inspectMediaHubBackupV6 } from './inspect';
 import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from './export';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
+import { MAX_ROOT_METADATA_BYTES } from './contracts';
+import { assertMetadataJson } from './codec';
+
+const favicon =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+
+it('roundtrips supported authored review headers and text through the v2 archive', async () => {
+  const item = root('123456');
+  item.descriptor.rootId = 'recording:one';
+  item.descriptor.metadataPath = '_sniptale/metadata/media/recording%3Aone.json';
+  const metadata = {
+    entry: {
+      id: 'recording:one',
+      kind: 'recording',
+      filename: 'one.webm',
+      originalFilename: 'one.webm',
+      source: { kind: 'recording', recordingId: 'one' },
+      mimeType: 'video/webm',
+      createdAt: 1,
+      updatedAt: 1,
+      duration: 2,
+      size: 6,
+      width: 640,
+      height: 360,
+      sourceUrl: null,
+      sourceTitle: null,
+      sourceFavicon: null,
+      tags: [],
+    },
+    originalObjectId: 'object-000001',
+    recording: {
+      entry: { id: 'one', filename: 'one.webm', createdAt: 1, mimeType: 'video/webm', size: 6 },
+    },
+    videoReview: {
+      workspace: {
+        aggregateId: 'recording:one',
+        formatVersion: 1,
+        source: { duration: 2, width: 640, height: 360, size: 6, mimeType: 'video/webm' },
+        revision: 1,
+        cursor: 0,
+        history: [],
+        advanced: {
+          ...createQuickEditAdvancedState(),
+          windowHeader: {
+            ...DEFAULT_WINDOW_HEADER,
+            faviconEnabled: true,
+            faviconSource: 'file',
+            faviconDataUrl: favicon,
+            title: 'Qk ordinary title',
+          },
+        },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      draft: null,
+    },
+  };
+  const original = await item.load();
+  const portable: unknown = metadata;
+  assertMetadataJson(portable);
+  const plan = buildMediaHubBackupExportPlanV6({
+    layout: 'library-folders-v2',
+    roots: [{ ...item, load: async () => ({ metadata: portable, objects: original.objects }) }],
+    privacy: { includeSourceMetadata: true, includeTelemetry: false, includeWebSnapshots: false },
+  });
+  const sink = createArchiveMemorySink();
+  await exportMediaHubBackupV6({ plan, sink: sink.sink });
+  expect((await inspectMediaHubBackupV6(sink.blob())).manifest.layout).toBe('library-folders-v2');
+});
+
+it('refuses oversized v1 root JSON before finalizing a successful backup', async () => {
+  const item = root();
+  const original = await item.load();
+  const sink = createArchiveMemorySink();
+  const plan = buildMediaHubBackupExportPlanV6({
+    roots: [
+      {
+        ...item,
+        load: async () => ({
+          ...original,
+          metadata: { parts: Array(5).fill('я'.repeat(MAX_ROOT_METADATA_BYTES / 8)) },
+        }),
+      },
+    ],
+    privacy: { includeSourceMetadata: false, includeTelemetry: false, includeWebSnapshots: false },
+  });
+  await expect(exportMediaHubBackupV6({ plan, sink: sink.sink })).rejects.toThrow('budget');
+});
+
+it.each([-1, 0, 1])('matches the reader UTF-8 root budget at delta %i', async (delta) => {
+  const item = root();
+  const payload = await item.load();
+  const parts = ['', '', '', ''];
+  const overhead = new TextEncoder().encode(
+    JSON.stringify({
+      descriptor: item.descriptor,
+      metadata: { parts },
+      objects: payload.objects.map((object) => object.ref),
+    })
+  ).byteLength;
+  let remaining = MAX_ROOT_METADATA_BYTES + delta - overhead;
+  for (let index = 0; index < 4; index++) {
+    const count = Math.min(1024 * 1024, remaining);
+    parts[index] = 'x'.repeat(count);
+    remaining -= count;
+  }
+  const plan = buildMediaHubBackupExportPlanV6({
+    roots: [{ ...item, load: async () => ({ ...payload, metadata: { parts } }) }],
+    privacy: { includeSourceMetadata: false, includeTelemetry: false, includeWebSnapshots: false },
+  });
+  const output = createArchiveMemorySink();
+  if (delta > 0) {
+    await expect(exportMediaHubBackupV6({ plan, sink: output.sink })).rejects.toThrow('budget');
+    return;
+  }
+  await exportMediaHubBackupV6({ plan, sink: output.sink });
+  const reader = await openArchiveReader(output.blob());
+  try {
+    expect(
+      new TextEncoder().encode(
+        await reader.entry(item.descriptor.metadataPath)!.text(MAX_ROOT_METADATA_BYTES)
+      ).byteLength
+    ).toBe(MAX_ROOT_METADATA_BYTES + delta);
+  } finally {
+    await reader.close();
+  }
+});
 
 function root(bytes = 'media') {
   const blob = new Blob([bytes], { type: 'image/png' });

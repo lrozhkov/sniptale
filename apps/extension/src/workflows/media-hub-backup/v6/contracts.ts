@@ -2,7 +2,7 @@ import type {
   ArchiveObjectRef,
   ArchiveRootDescriptor,
 } from '../../../composition/archive-transfer';
-import type { MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import type { MediaHubBackupLayout } from './layout';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export const MEDIA_HUB_BACKUP_FORMAT = 'sniptale-media-hub-backup';
@@ -10,6 +10,8 @@ export const MEDIA_HUB_BACKUP_VERSION = 6;
 export const MAX_CATALOG_SHARD_BYTES = 4 * 1024 * 1024;
 export const MAX_CATALOG_SHARD_ROOTS = 1_000;
 export const MAX_ROOT_METADATA_BYTES = 4 * 1024 * 1024;
+export const MAX_EXPANDED_ROOT_METADATA_BYTES = 128 * 1024 * 1024;
+export const MAX_EXPANDED_ARCHIVE_METADATA_BYTES = 512 * 1024 * 1024;
 /** Dependency order shared by archive planning and restore, including older v6 manifests. */
 export const MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER = [
   'media:library-item',
@@ -82,7 +84,7 @@ export interface MediaHubBackupManifestV6 {
   exportedAt: string;
   format: typeof MEDIA_HUB_BACKUP_FORMAT;
   galleryViews?: GallerySavedView[];
-  layout: typeof MEDIA_HUB_BACKUP_LAYOUT;
+  layout: MediaHubBackupLayout;
   privacy: MediaHubBackupPrivacyFlags;
   totals: {
     bytes: number;
