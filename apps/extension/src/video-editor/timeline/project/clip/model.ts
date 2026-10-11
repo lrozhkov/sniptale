@@ -23,6 +23,7 @@ export function buildProjectTimelineClipViewModel({
   pixelsPerSecond,
   projection,
   project,
+  junctions,
   trackClipTop = 0,
   trackClipRowHeight = DEFAULT_CLIP_ROW_HEIGHT,
   trackLocked,
@@ -35,6 +36,7 @@ export function buildProjectTimelineClipViewModel({
   | 'pixelsPerSecond'
   | 'projection'
   | 'project'
+  | 'junctions'
   | 'trackClipTop'
   | 'trackClipRowHeight'
   | 'trackLocked'
@@ -56,6 +58,7 @@ export function buildProjectTimelineClipViewModel({
     clip,
     pixelsPerSecond,
     project,
+    ...(junctions === undefined ? {} : { junctions }),
     width,
     offsetPixels: offsetSeconds * pixelsPerSecond,
   });
@@ -135,13 +138,14 @@ function getTimelineClipTransitionViewModel({
   clip,
   pixelsPerSecond,
   project,
+  junctions,
   width,
   offsetPixels,
-}: Pick<ProjectTimelineClipProps, 'clip' | 'pixelsPerSecond' | 'project'> &
+}: Pick<ProjectTimelineClipProps, 'clip' | 'pixelsPerSecond' | 'project' | 'junctions'> &
   Pick<ProjectTimelineClipViewModel, 'width'> & { offsetPixels: number }) {
   let bodyInsetLeft = 0;
   let bodyInsetRight = 0;
-  for (const junction of getTrackJunctions(project)) {
+  for (const junction of junctions ?? getTrackJunctions(project)) {
     const fullWidth = Math.max(1, clip.duration * pixelsPerSecond);
     const halfOverlap = Math.min(fullWidth, junction.duration * pixelsPerSecond) / 2;
     if (junction.trailingClip.id === clip.id)

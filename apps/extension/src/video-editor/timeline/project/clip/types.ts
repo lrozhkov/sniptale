@@ -2,6 +2,7 @@ import type { TimelineProjection } from '../interaction-state/projection';
 import type React from 'react';
 import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
 import type { TimelineClipPreview } from '../../../contracts/timeline-preview';
+import type { TrackJunction } from '../../../../features/video/project/transition/junctions';
 import type { DragMode } from '../types';
 
 export interface ProjectTimelineClipProps {
@@ -13,6 +14,8 @@ export interface ProjectTimelineClipProps {
   projection?: TimelineProjection | undefined;
   preview?: TimelineClipPreview;
   project: VideoProject;
+  /** Junctions derived from this render's project; standalone callers may omit them. */
+  junctions?: readonly TrackJunction[];
   trackClipTop?: number;
   trackClipRowHeight?: number;
   trackLocked: boolean;
