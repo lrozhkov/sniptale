@@ -1,17 +1,27 @@
-import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
+import {
+  parseGuideProject,
+  parseGuideProjectBatch,
+} from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { ScenarioProjectEntry, ScenarioSavedVersion } from './contracts';
 
 export const SCENARIO_HISTORY_LIMIT = 50;
 export const SCENARIO_HISTORY_BYTE_LIMIT = 64 * 1024 * 1024;
 const encoder = new TextEncoder();
-function versionSize(version: ScenarioSavedVersion, parts: Map<string, number>): number {
+function versionSize(
+  version: ScenarioSavedVersion,
+  parts: Map<string, number>,
+  units?: WeakMap<object, number>
+): number {
   function bytes(value: unknown): number {
+    const object = typeof value === 'object' && value !== null ? value : undefined;
+    const known = object ? units?.get(object) : undefined;
+    if (known !== undefined) return known;
     const json = JSON.stringify(value) ?? 'null';
     const previous = parts.get(json);
-    if (previous !== undefined) return previous;
-    const size = encoder.encode(json).byteLength;
+    const size = previous ?? encoder.encode(json).byteLength;
     parts.set(json, size);
+    if (object) units?.set(object, size);
     return size;
   }
   const { items, tour } = version.project;
@@ -30,12 +40,17 @@ function versionSize(version: ScenarioSavedVersion, parts: Map<string, number>):
   return size;
 }
 
-/** Admits a bounded, ordered history belonging to this aggregate and preceding its current revision. */
+/**
+ * Admits a bounded, ordered history belonging to this aggregate and preceding its current revision.
+ * Exclusive input must be a private freshly read graph; shared canonical items never leave that
+ * owner's immutable historical snapshots. Borrowed callers retain independent detached versions.
+ */
 export function parseScenarioSavedVersions(
   value: unknown,
   projectId: string,
   currentRevision: number,
-  currentSavedAt: number
+  currentSavedAt: number,
+  ownership: 'borrowed' | 'exclusive' = 'borrowed'
 ): ScenarioSavedVersion[] | null {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > SCENARIO_HISTORY_LIMIT) return null;
@@ -44,6 +59,11 @@ export function parseScenarioSavedVersions(
   let previousSavedAt = -1;
   let bytes = 0;
   const parts = new Map<string, number>();
+  const units = ownership === 'exclusive' ? new WeakMap<object, number>() : undefined;
+  const projects =
+    ownership === 'exclusive'
+      ? parseGuideProjectBatch(value.map((raw: unknown) => (isRecord(raw) ? raw['project'] : null)))
+      : undefined;
   for (const raw of value) {
     if (!isRecord(raw)) return null;
     const revision = raw['revision'];
@@ -60,15 +80,16 @@ export function parseScenarioSavedVersions(
       savedAt >= currentSavedAt
     )
       return null;
-    const parsed = parseGuideProject(raw['project']);
+    const parsed = projects ? projects.next().value : parseGuideProject(raw['project']);
     if (
+      !parsed ||
       parsed.status !== 'ok' ||
       parsed.project.id !== projectId ||
       parsed.project.updatedAt !== savedAt
     )
       return null;
     const version = { revision, savedAt, project: parsed.project };
-    bytes += versionSize(version, parts);
+    bytes += versionSize(version, parts, units);
     if (bytes > SCENARIO_HISTORY_BYTE_LIMIT) return null;
     versions.push(version);
     previousRevision = revision;
@@ -97,11 +118,12 @@ export function appendScenarioSavedVersion(
   ].slice(-SCENARIO_HISTORY_LIMIT);
   let bytes = 0;
   const parts = new Map<string, number>();
+  const units = ownership === 'exclusive' ? new WeakMap<object, number>() : undefined;
   let first = versions.length;
   for (let index = versions.length - 1; index >= 0; index -= 1) {
     const version = versions[index];
     if (!version) continue;
-    const size = versionSize(version, parts);
+    const size = versionSize(version, parts, units);
     if (bytes + size > SCENARIO_HISTORY_BYTE_LIMIT) break;
     bytes += size;
     first = index;

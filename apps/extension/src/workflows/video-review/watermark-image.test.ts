@@ -80,6 +80,8 @@ function keyOf(value: unknown): string {
   if (!isRecord(value)) throw new Error('Invalid fixture row');
   if (typeof value['ownerKind'] === 'string')
     return JSON.stringify([value['ownerKind'], value['ownerId'], value['role']]);
+  if (typeof value['aggregateId'] === 'string' && typeof value['ordinal'] === 'number')
+    return JSON.stringify([value['aggregateId'], value['ordinal']]);
   const key = value['id'] ?? value['aggregateId'] ?? value['operationId'] ?? value['assetId'];
   if (typeof key !== 'string') throw new Error('Missing fixture key');
   return key;
@@ -123,7 +125,7 @@ beforeEach(() => {
         objectStore(name: string) {
           const entries = table(name, pending);
           return {
-            get: async (key: string | string[]) =>
+            get: async (key: string | (string | number)[]) =>
               structuredClone(entries.get(typeof key === 'string' ? key : JSON.stringify(key))),
             getAll: async () => structuredClone([...entries.values()]),
             put: async (value: unknown) => {
@@ -131,14 +133,29 @@ beforeEach(() => {
                 throw new DOMException('Fixture quota', 'QuotaExceededError');
               entries.set(keyOf(value), structuredClone(value));
             },
-            delete: async (key: string | string[]) => {
+            delete: async (key: string | (string | number)[]) => {
               entries.delete(typeof key === 'string' ? key : JSON.stringify(key));
             },
-            index: () => ({
-              count: async (assetId: string) =>
-                [...entries.values()].filter(
-                  (value) => isRecord(value) && value['assetId'] === assetId
-                ).length,
+            index: (indexName: string) => ({
+              count: async (key: string) =>
+                [...entries.values()].filter((value) => isRecord(value) && value[indexName] === key)
+                  .length,
+              getAll: async (key: string) =>
+                structuredClone(
+                  [...entries.values()].filter(
+                    (value) => isRecord(value) && value[indexName] === key
+                  )
+                ),
+              getAllKeys: async (key: string) =>
+                [...entries]
+                  .filter(([, value]) => isRecord(value) && value[indexName] === key)
+                  .map(([storedKey, value]) =>
+                    isRecord(value) &&
+                    typeof value['aggregateId'] === 'string' &&
+                    typeof value['ordinal'] === 'number'
+                      ? [value['aggregateId'], value['ordinal']]
+                      : storedKey
+                  ),
             }),
           };
         },

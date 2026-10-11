@@ -19,12 +19,18 @@ import { mediaLibraryRootPublisher } from './media';
 it.each([false, true])(
   'retains the restored stored image original, workspace=%s',
   async (edited) => {
-    const stores = new Map<
-      string,
-      { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> }
-    >();
+    const createStore = () => ({
+      get: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+      index: vi.fn(() => ({
+        getAll: vi.fn(async () => []),
+        getAllKeys: vi.fn(async () => []),
+      })),
+    });
+    const stores = new Map<string, ReturnType<typeof createStore>>();
     const storeFor = (name: string) => {
-      const store = stores.get(name) ?? { get: vi.fn(), put: vi.fn() };
+      const store = stores.get(name) ?? createStore();
       stores.set(name, store);
       return store;
     };

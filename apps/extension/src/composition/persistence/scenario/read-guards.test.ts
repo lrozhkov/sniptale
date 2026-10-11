@@ -6,6 +6,31 @@ import {
   parseScenarioExportEntry,
 } from './read-guards';
 
+it('shares only privately admitted history while the current project and default reads stay detached', () => {
+  const item = createGuideStep('', 'step');
+  const project = { ...createGuideProject('Owned', 'owned', 1), items: [item], updatedAt: 3 };
+  const value = {
+    id: project.id,
+    project,
+    createdAt: 1,
+    updatedAt: 3,
+    workspaceRevision: 2,
+    history: [
+      { revision: 0, savedAt: 1, project: { ...project, updatedAt: 1 } },
+      { revision: 1, savedAt: 2, project: { ...project, updatedAt: 2 } },
+    ],
+  };
+  const owned = parseScenarioProjectEntry(value, 'exclusive');
+  const borrowed = parseScenarioProjectEntry(value);
+  expect(owned).toEqual(borrowed);
+  expect(owned?.history?.[0]?.project.items[0]).toBe(owned?.history?.[1]?.project.items[0]);
+  expect(owned?.project.items[0]).not.toBe(owned?.history?.[0]?.project.items[0]);
+  expect(owned?.history?.[0]?.project.items[0]).not.toBe(item);
+  expect(borrowed?.history?.[0]?.project.items[0]).not.toBe(
+    borrowed?.history?.[1]?.project.items[0]
+  );
+});
+
 it('retains template purpose for catalog routing even when content needs recovery', () => {
   const project = {
     ...createGuideProject('Template', 'template', 1),

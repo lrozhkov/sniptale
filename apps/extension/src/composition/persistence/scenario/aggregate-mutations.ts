@@ -78,7 +78,7 @@ const logger = createLogger({ namespace: 'ScenarioAggregatePublication' });
 
 function requireSupportedScenarioEntry(raw: unknown): ScenarioProjectEntry | undefined {
   if (raw === undefined) return undefined;
-  const entry = parseScenarioProjectEntry(raw);
+  const entry = parseScenarioProjectEntry(raw, 'exclusive');
   if (!entry) throw new Error('Scenario project content is unavailable.');
   return entry;
 }

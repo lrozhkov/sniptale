@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { parseGuideProject } from './guide-parser';
+import { describe, expect, it, vi } from 'vitest';
+import { guideItemSchemas, parseGuideProject, parseGuideProjectBatch } from './guide-parser';
+import { areBoundedScenarioInputs, isBoundedScenarioInput } from './input-bounds';
 import {
   GUIDE_LIMITS,
   type GuideCaptureSource,
@@ -8,6 +9,96 @@ import {
   type GuideProject,
   type GuideStep,
 } from './types/guide';
+
+it('checks a shared canonical item once per owned batch and validates each root independently', () => {
+  const item = step();
+  const values = Array.from({ length: 50 }, (_, index) => ({
+    ...project([item]),
+    updatedAt: index + 1,
+  }));
+  const parse = vi.spyOn(guideItemSchemas.step, 'safeParse');
+  try {
+    const result = [...parseGuideProjectBatch(values)];
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(values.map(parseGuideProject));
+    const first = result[0];
+    const last = result[49];
+    if (first?.status !== 'ok' || last?.status !== 'ok')
+      throw new Error('Missing canonical result');
+    expect(first.project.items[0]).toBe(last.project.items[0]);
+    expect(first.project.items[0]).not.toBe(item);
+    item.id = '';
+    expect([...parseGuideProjectBatch(values)]).toEqual(values.map(parseGuideProject));
+    expect([...parseGuideProjectBatch(values)].every((result) => result.status === 'invalid')).toBe(
+      true
+    );
+  } finally {
+    parse.mockRestore();
+  }
+});
+
+it('keeps scalar strict schema, duplicate identity, template and version semantics in owned batches', () => {
+  const shared = step();
+  const values = [
+    project([shared]),
+    { ...project([shared]), unknownSetting: true },
+    { ...project([shared]), name: 'x'.repeat(GUIDE_LIMITS.maxLabelLength + 1) },
+    { ...project([shared]), id: shared.id },
+    project([shared, shared]),
+    { ...project([shared]), purpose: 'step-template' },
+    { ...project(), purpose: 'step-template' },
+    { ...project([shared]), version: 99 },
+    { ...project([shared]), tour: { version: 99 } },
+    { ...project([shared]), tour: { version: 1 } },
+    project([{ ...shared, blocks: [image('duplicate'), image('duplicate')] }]),
+    project([{ ...shared, blocks: [{ ...image(), assetId: '' }] }]),
+    null,
+  ];
+  expect([...parseGuideProjectBatch(values)]).toEqual(values.map(parseGuideProject));
+});
+
+it('charges shared subtree visits, text and depth for every occurrence in each owned document', () => {
+  const shared = { text: 'x'.repeat(GUIDE_LIMITS.maxInputTextLength / 2) };
+  const sharedVisits = new Array(GUIDE_LIMITS.maxInputVisits / 2).fill(false);
+  const node = { leaf: 0 };
+  function nested(count: number): unknown {
+    let value: unknown = node;
+    for (let index = 0; index < count; index += 1) value = { child: value };
+    return value;
+  }
+  const cycle: Record<string, unknown> = {};
+  cycle['child'] = cycle;
+  const getter = vi.fn(() => 0);
+  const accessor = Object.defineProperty({}, 'x', { enumerable: true, get: getter });
+  const nullPrototype = { value: 1 };
+  Object.setPrototypeOf(nullPrototype, null);
+  const values = [
+    shared,
+    [shared],
+    [shared, shared],
+    node,
+    nested(15),
+    nested(16),
+    new Array(GUIDE_LIMITS.maxInputVisits - 1).fill(0),
+    new Array(GUIDE_LIMITS.maxInputVisits).fill(0),
+    sharedVisits,
+    [sharedVisits, sharedVisits],
+    nested(17),
+    new Array(10),
+    cycle,
+    accessor,
+    nullPrototype,
+    new Date(),
+    NaN,
+    undefined,
+  ];
+  const scalar = values.map(isBoundedScenarioInput);
+  expect([...areBoundedScenarioInputs(values)]).toEqual(scalar);
+  expect(scalar.slice(0, 6)).toEqual([true, true, false, true, true, false]);
+  expect(scalar.slice(6, 8)).toEqual([true, false]);
+  expect(scalar.slice(8, 11)).toEqual([true, false, false]);
+  expect(getter).not.toHaveBeenCalled();
+});
 
 function paragraph(text: string, href: string | null = null): GuideParagraph {
   return { runs: [{ text, bold: false, italic: false, href }] };

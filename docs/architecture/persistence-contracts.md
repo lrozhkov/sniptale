@@ -118,6 +118,8 @@ Compound parent/child writes, byte ownership, sidecars, revisions and journal ch
 
 Legacy compensation readmits current source, consumers and receipt-scoped owners before rollback; ambiguity retains the receipt. Maintenance may refresh explicit recording/export or existing project-asset mirrors, but never infer private publication or flat-delete stale sources. Read paths perform no repair.
 
+Private Scenario aggregate mutation reads admit historical Guide units once in a synchronous batch. The freshly materialized storage graph stays private and stable during that call; each root, document-wide bounds, identifier rules, revision order and exact fifty-version/64 MiB retention budget remains checked. Canonical historical items and their byte lengths may be reused within that owned call, with no cache across reads, persisted validation marker or schema change. Current editable projects and general borrowed read/archive/retention callers retain detached parsing. Tour admission keeps its canonical document and navigation checks. Mutation owners never expose or modify the shared historical graph.
+
 ## Archive restoration
 
 Restore is resumable per root, not globally atomic. Portable metadata is parsed before domain use; root publication and its archive checkpoint share one transaction. Existing replaced rows and external private-source consumers are admitted before mutation, with abort/drain on failure.

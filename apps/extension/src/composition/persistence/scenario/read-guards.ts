@@ -189,7 +189,16 @@ export function parseScenarioExportEntry(value: unknown): ScenarioExportEntry | 
   };
 }
 
-export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry | null {
+export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry | null;
+/** Exclusive history is restricted to a private, freshly read immutable aggregate snapshot. */
+export function parseScenarioProjectEntry(
+  value: unknown,
+  ownership: 'exclusive'
+): ScenarioProjectEntry | null;
+export function parseScenarioProjectEntry(
+  value: unknown,
+  ownership: 'borrowed' | 'exclusive' = 'borrowed'
+): ScenarioProjectEntry | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -224,7 +233,8 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
     value['history'],
     project.id,
     workspaceRevision,
-    project.updatedAt
+    project.updatedAt,
+    ownership
   );
   if (!history) return null;
   return {

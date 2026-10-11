@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import {
   createGuideProject,
   createGuideStep,
@@ -25,6 +25,54 @@ function entry() {
     updatedAt: 3,
   });
 }
+
+it.each(['guide', 'tour'] as const)(
+  'resolves a shared canonical %s unit once in one encode call and rechecks the next call',
+  (kind) => {
+    const source = entry();
+    const physical = encodeScenarioUnitStorage(source, []);
+    const project = structuredClone(source.project);
+    project.updatedAt = 51;
+    const historical = structuredClone(project);
+    const current = {
+      ...source,
+      project,
+      updatedAt: 51,
+      workspaceRevision: 50,
+      history: Array.from({ length: 50 }, (_, index) => ({
+        revision: index,
+        savedAt: index + 1,
+        project: { ...historical, updatedAt: index + 1 },
+      })),
+    };
+    const unitId = kind === 'guide' ? 'guide:step-a' : 'tour:slide-a';
+    const stored = physical.units.find((row) => row.unitId === unitId);
+    if (!stored) throw new Error('Missing stored unit');
+    const keys = vi.spyOn(Object, 'keys');
+    try {
+      const next = encodeScenarioUnitStorage(current, physical.units);
+      // The current editable object and shared historical object are independently detached.
+      expect(keys.mock.calls.filter(([value]) => value === stored.value)).toHaveLength(2);
+      keys.mockRestore();
+      expect(
+        parseScenarioProjectEntry(materializeScenarioUnitStorage(next.head, next.rows, next.units))
+      ).toEqual(current);
+      if (kind === 'guide') project.items[0]!.title = 'Changed next call';
+      else project.tour!.slides[0]!.title = 'Changed next call';
+      const changed = encodeScenarioUnitStorage(current, next.units);
+      expect(
+        changed.units.find((row) => row.unitId === unitId && row.revision === 2)?.value
+      ).toMatchObject({ title: 'Changed next call' });
+      expect(
+        parseScenarioProjectEntry(
+          materializeScenarioUnitStorage(changed.head, changed.rows, changed.units)
+        )
+      ).toEqual(current);
+    } finally {
+      keys.mockRestore();
+    }
+  }
+);
 
 it('shares unchanged Guide and Tour units across versions with exact logical content', () => {
   const logical = entry();

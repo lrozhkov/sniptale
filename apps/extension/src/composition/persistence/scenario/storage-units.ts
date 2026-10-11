@@ -136,7 +136,11 @@ export function materializeScenarioUnitStorage(
   );
 }
 
-/** One caller transaction determines row identities; none is a project revision or writer. */
+/**
+ * One caller transaction determines row identities; none is a project revision or writer.
+ * Canonical input stays stable during this synchronous call. Shared unit objects resolve once
+ * per kind; no resolution or content-equality evidence is retained for a later encoding call.
+ */
 export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingUnits: unknown[]) {
   const candidates = new Map<string, UnitRow[]>();
   for (const raw of existingUnits) {
@@ -153,8 +157,14 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
     candidates.set(row.unitId, own);
   }
   const used = new Map<string, UnitRow>();
+  const known = {
+    guide: new WeakMap<object, UnitRow>(),
+    tour: new WeakMap<object, UnitRow>(),
+  };
   function reference(value: { id: string }, kind: 'guide' | 'tour') {
     const unitId = `${kind}:${value.id}`;
+    const previous = known[kind].get(value);
+    if (previous) return { unitId, revision: previous.revision };
     const own = candidates.get(unitId) ?? [];
     let row = own.find((candidate) => sameScenarioStoredValue(candidate.value, value));
     if (!row) {
@@ -166,6 +176,7 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
       candidates.set(unitId, own);
     }
     used.set(unitKey(unitId, row.revision), row);
+    known[kind].set(value, row);
     return { unitId, revision: row.revision };
   }
   function project(value: GuideProject) {

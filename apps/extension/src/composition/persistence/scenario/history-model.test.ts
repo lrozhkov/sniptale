@@ -15,6 +15,7 @@ import {
   SCENARIO_HISTORY_LIMIT,
 } from './history-model';
 import type { ScenarioProjectEntry } from './contracts';
+import { guideItemSchemas } from '@sniptale/runtime-contracts/scenario/guide-parser';
 function entry(revision: number): ScenarioProjectEntry {
   const project = createGuideProject(`Version ${revision}`, 'guide', 1);
   project.updatedAt = revision + 1;
@@ -27,6 +28,48 @@ function entry(revision: number): ScenarioProjectEntry {
   };
 }
 afterEach(() => vi.restoreAllMocks());
+it('admits shared Guide units once only inside a freshly owned history batch', () => {
+  const source = unicodeEntry(true, false, false);
+  const versions = Array.from({ length: 50 }, (_, index) => ({
+    revision: index,
+    savedAt: index + 1,
+    project: { ...source.project, updatedAt: index + 1 },
+  }));
+  const owned = parseScenarioSavedVersions(versions, source.id, 50, 51, 'exclusive');
+  const borrowed = parseScenarioSavedVersions(versions, source.id, 50, 51);
+  expect(owned).toEqual(borrowed);
+  expect(owned?.[0]?.project.items[0]).toBe(owned?.[49]?.project.items[0]);
+  expect(owned?.[0]?.project.items[0]).not.toBe(source.project.items[0]);
+  expect(borrowed?.[0]?.project.items[0]).not.toBe(borrowed?.[49]?.project.items[0]);
+});
+
+it('rechecks changed unit data on the next owned history read', () => {
+  const source = unicodeEntry(true, false, false);
+  const version = { revision: 1, savedAt: source.project.updatedAt, project: source.project };
+  expect(parseScenarioSavedVersions([version], source.id, 2, 3, 'exclusive')).not.toBeNull();
+  source.project.items[0]!.id = '';
+  expect(parseScenarioSavedVersions([version], source.id, 2, 3, 'exclusive')).toBeNull();
+});
+
+it('stops owned item admission before invalid revision metadata or after the first byte overflow', () => {
+  const first = unicodeEntry(true, false, false);
+  const second = structuredClone(first);
+  second.project.updatedAt = 3;
+  const versions = [
+    { revision: 1, savedAt: 2, project: first.project },
+    { revision: 2, savedAt: 3, project: second.project },
+  ];
+  const parse = vi.spyOn(guideItemSchemas.step, 'safeParse');
+  expect(parseScenarioSavedVersions(versions, first.id, 1, 4, 'exclusive')).toBeNull();
+  expect(parse).not.toHaveBeenCalled();
+  parse.mockClear();
+  const measured = new Uint8Array();
+  Object.defineProperty(measured, 'byteLength', { value: SCENARIO_HISTORY_BYTE_LIMIT + 1 });
+  vi.spyOn(TextEncoder.prototype, 'encode').mockReturnValue(measured);
+  expect(parseScenarioSavedVersions(versions, first.id, 3, 4, 'exclusive')).toBeNull();
+  expect(parse).toHaveBeenCalledTimes(first.project.items.length);
+});
+
 it('retains committed content as a detached previous version and increments the current revision', () => {
   const previous = entry(1);
   const current = createScenarioProjectEntry({
@@ -68,8 +111,10 @@ it('rejects foreign, nonmonotonic, future and malformed historical snapshots', (
     [{ ...version, savedAt: NaN }],
     [{ ...version, project: { version: 3 } }],
     Array.from({ length: 51 }, () => version),
-  ])
+  ]) {
     expect(parseScenarioSavedVersions(values, 'guide', 2, 3)).toBeNull();
+    expect(parseScenarioSavedVersions(values, 'guide', 2, 3, 'exclusive')).toBeNull();
+  }
   expect(parseScenarioProjectEntry({ ...entry(2), history: [null] })).toBeNull();
 });
 it('enforces the metadata byte budget on append and on untrusted reads', () => {
@@ -151,12 +196,21 @@ const byteCases = [
   { guide: false, tour: true, emptySlides: true },
   { guide: true, tour: true, emptySlides: true },
 ].flatMap((body) =>
-  [false, true].flatMap((history) => [0, 1].map((delta) => ({ ...body, history, delta })))
+  [false, true].flatMap((history) =>
+    [0, 1].flatMap((delta) =>
+      (['borrowed', 'exclusive'] as const).map((ownership) => ({
+        ...body,
+        history,
+        delta,
+        ownership,
+      }))
+    )
+  )
 );
 
 it.each(byteCases)(
-  'keeps exact UTF8 boundaries and retention for $guide/$tour/$emptySlides/$history/$delta',
-  ({ guide, tour, emptySlides, history, delta }) => {
+  'keeps exact UTF8 boundaries and retention for $guide/$tour/$emptySlides/$history/$delta/$ownership',
+  ({ guide, tour, emptySlides, history, delta, ownership }) => {
     const previous = unicodeEntry(guide, tour, emptySlides);
     const version = { revision: 1, savedAt: 2, project: previous.project };
     if (history) {
@@ -188,11 +242,14 @@ it.each(byteCases)(
       }
       return bytes;
     });
-    const parsed = parseScenarioSavedVersions(versions, previous.id, 2, 3);
+    const parsed = parseScenarioSavedVersions(versions, previous.id, 2, 3, ownership);
     expect(parsed).toEqual(delta === 0 ? versions : null);
     firstRoot = true;
     if (delta === 1 && !history)
-      expect(() => appendScenarioSavedVersion(previous)).toThrow('limit');
-    else expect(appendScenarioSavedVersion(previous)).toEqual(delta === 0 ? versions : [version]);
+      expect(() => appendScenarioSavedVersion(previous, ownership)).toThrow('limit');
+    else
+      expect(appendScenarioSavedVersion(previous, ownership)).toEqual(
+        delta === 0 ? versions : [version]
+      );
   }
 );
