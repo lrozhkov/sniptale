@@ -73,6 +73,7 @@ import {
   hasMediaReviewAssetConflict,
   prepareMediaReviewAssets,
   prepareStandaloneMediaVideoReview,
+  verifyPreparedMediaReviewAnnotations,
   publishMediaReviewAssets,
 } from './media-review-assets';
 
@@ -404,6 +405,7 @@ async function prepareMediaRoot(args: {
     original,
     reviewAssets,
   });
+  if (videoReview) await verifyPreparedMediaReviewAnnotations(videoReview, reviewAssets);
   return {
     media,
     original,

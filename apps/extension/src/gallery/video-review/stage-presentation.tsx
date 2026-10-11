@@ -17,6 +17,8 @@ type PreviewInput = Parameters<typeof useReviewPreviewPresentation>[0];
 /** Presentation input is independent of the stage component that consumes this adapter. */
 type PresentationProps = {
   captions?: PreviewInput['scene']['captions'];
+  annotationEffects?: PreviewInput['scene']['annotationEffects'];
+  readAsset?: PreviewInput['readAsset'];
   onCaptionSelect?: ((id: string) => void) | undefined;
   video: PreviewInput['video'];
   url: string;
@@ -38,6 +40,7 @@ type PresentationProps = {
         playing: boolean;
         sourceToResult: PreviewInput['sourceToResult'];
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
+        sourceFrameRate?: number | undefined;
       }
     | undefined;
   cutPreview?: PreviewInput['cut'];
@@ -49,6 +52,7 @@ function stagePresentationScene(
     PresentationProps,
     | 'source'
     | 'captions'
+    | 'annotationEffects'
     | 'scene'
     | 'outerFadePlan'
     | 'watermark'
@@ -60,6 +64,7 @@ function stagePresentationScene(
 ): Parameters<typeof useReviewPreviewPresentation>[0]['scene'] {
   return {
     ...(props.captions ? { captions: props.captions } : {}),
+    ...(props.annotationEffects ? { annotationEffects: props.annotationEffects } : {}),
     outerFadePlan: props.outerFadePlan,
     source: { width: props.source.width, height: props.source.height },
     ...(props.scene?.canvas ? { canvas: props.scene.canvas } : {}),
@@ -115,6 +120,8 @@ export function useStagePresentation(
     video: props.video,
     host: publication,
     sourceIdentity: props.url,
+    ...(props.readAsset ? { readAsset: props.readAsset } : {}),
+    sourceFrameRate: props.preview?.sourceFrameRate,
     scene: stagePresentationScene(props),
     canonical: watermarkOutput,
     css: size,
@@ -205,8 +212,10 @@ export function ReviewStagePresentationFeedback({
       {manual && presentation.status.phase !== 'ready' ? (
         <div
           role={presentation.status.phase === 'failed' ? 'alert' : 'status'}
-          className="absolute inset-x-0 top-0 z-40 flex items-center gap-2
-              bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs"
+          className={[
+            'absolute inset-x-0 top-0 z-40 flex items-center gap-2',
+            'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
+          ].join(' ')}
         >
           <span>
             {translate(
@@ -226,8 +235,10 @@ export function ReviewStagePresentationFeedback({
       {showFrameRate ? (
         <output
           data-ui="gallery.videoReview.previewFPS"
-          className="pointer-events-none absolute bottom-2 left-2 z-40 rounded px-1.5 py-0.5 text-xs
-              tabular-nums bg-[var(--sniptale-color-surface-panel)]"
+          className={[
+            'pointer-events-none absolute bottom-2 left-2 z-40 rounded px-1.5 py-0.5 text-xs',
+            'tabular-nums bg-[var(--sniptale-color-surface-panel)]',
+          ].join(' ')}
           title={translate(
             manual
               ? 'gallery.videoReview.previewPresentedFrameRate'
@@ -251,8 +262,10 @@ export function ReviewHeaderFailure(props: { failed: boolean; retry(): void }) {
   return (
     <div
       role="alert"
-      className="absolute inset-x-0 top-0 z-20 flex items-center gap-2
-        bg-[var(--sniptale-color-surface-panel)] p-2 text-xs"
+      className={[
+        'absolute inset-x-0 top-0 z-20 flex items-center gap-2',
+        'bg-[var(--sniptale-color-surface-panel)] p-2 text-xs',
+      ].join(' ')}
     >
       <span>{translate('gallery.videoReview.windowHeaderFailed')}</span>
       <ReviewButton label={translate('gallery.videoReview.retry')} onClick={props.retry} />

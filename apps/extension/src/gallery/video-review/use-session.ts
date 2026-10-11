@@ -27,6 +27,7 @@ export function useLoadedReview(aggregateId: string) {
   useEffect(() => {
     const controller = new AbortController();
     let url: string | null = null;
+    let ownedSession: Session | null = null;
     setResource(null);
     setFailed(null);
     let loadedSource = false;
@@ -35,6 +36,7 @@ export function useLoadedReview(aggregateId: string) {
         if (controller.signal.aborted) return;
         loadedSource = true;
         const session = createVideoReviewSession(loaded.snapshot);
+        ownedSession = session;
         url = URL.createObjectURL(loaded.file);
         setResource({ ...loaded, url, session });
       })
@@ -53,6 +55,10 @@ export function useLoadedReview(aggregateId: string) {
       });
     return () => {
       controller.abort();
+      if (ownedSession)
+        void ownedSession
+          .dispose()
+          .catch(() => logger.warn('video-review-resource-cleanup-deferred'));
       if (url) URL.revokeObjectURL(url);
     };
   }, [aggregateId, attempt]);

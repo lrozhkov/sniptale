@@ -142,9 +142,9 @@ it('keeps immutable voice snapshots without requiring a surviving fragment and v
 it('opens the previous alpha project without inventing authored text', () => {
   const previous = { ...createQuickEditAdvancedState(), schemaVersion: 11 };
   const loaded = loadQuickEditAdvancedState(previous);
-  expect(loaded?.schemaVersion).toBe(14);
+  expect(loaded?.schemaVersion).toBe(15);
   expect(loaded?.text).toBeUndefined();
   expect(loaded?.captions).toBeUndefined();
   expect(loaded?.audio).toEqual(previous.audio);
-  expect(loadQuickEditAdvancedState({ ...previous, schemaVersion: 15 })).toBeNull();
+  expect(loadQuickEditAdvancedState({ ...previous, schemaVersion: 16 })).toBeNull();
 });

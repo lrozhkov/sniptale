@@ -447,6 +447,8 @@ export function reviewSelectionLabel(
   state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
 ): string | undefined {
   const selection = state.selection;
+  if (selection.kind === 'annotation-effect')
+    return translate('gallery.videoReview.annotationName');
   if (selection.kind === 'text') return translate('gallery.videoReview.textFragment');
   if (
     selection.kind === 'webcam' ||

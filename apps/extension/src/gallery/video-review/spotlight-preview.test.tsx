@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { ReviewStageFocusControl } from './stage-focus';
 import {
@@ -11,7 +12,6 @@ import type {
 import * as focusEvaluation from '../../features/video/review/advanced/focus';
 import { createQuickEditBorder } from '../../features/video/review/advanced/border';
 import { drawReviewBorders } from '../../workflows/video-review/render-border';
-// @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

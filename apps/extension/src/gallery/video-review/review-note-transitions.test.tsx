@@ -213,6 +213,8 @@ it.each(['success', 'cancel', 'failure'] as const)(
   async (outcome) => {
     vi.useFakeTimers();
     const fixture = createEditorFixture(integration);
+    // Synthetic media verifies transport controls; native browser proof owns raster painting.
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     integration.index.mockResolvedValue({
       duration: 4,
       width: 320,

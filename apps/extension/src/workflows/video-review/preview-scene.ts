@@ -7,11 +7,13 @@ import type { CanvasCommentExport } from '../../features/video/review/comments';
 import type { ReviewClickCue } from '../../features/video/review/click-animation';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
+import type { ReviewAnnotationScene } from './annotation-renderer';
 
 type Size = { width: number; height: number };
 
 export type PreviewSceneDimensions = { canonical: Size; backing: Size };
 export type PreviewScene = {
+  annotationEffects?: Omit<ReviewAnnotationScene, 'planes'> | undefined;
   captions?:
     | {
         document: QuickEditAdvancedState['text'];

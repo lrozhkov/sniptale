@@ -1,3 +1,6 @@
+import { verifyReviewAnnotationEffectSnapshot } from '../../../../features/video/review/annotation-effects/validation';
+import { readAssetFile } from '../../../../composition/persistence/assets';
+import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 import { assertPreparedProjectAssetSources } from '../../../../composition/persistence/projects/source-admission';
 import { readSharedProjectAsset, restoredOriginMediaId } from './shared-project-media';
 import {
@@ -148,5 +151,26 @@ export async function publishMediaReviewAssets(
         originalFilename: asset.filename,
       });
     }
+  }
+}
+
+/** Verifies all retained sources, including disabled and redo-only graphs, before archive mutation. */
+export async function verifyPreparedMediaReviewAnnotations(
+  review: VideoWorkspaceSnapshot,
+  assets: readonly Pick<PreparedMediaReviewAsset, 'entry' | 'ref'>[]
+): Promise<void> {
+  const signal = new AbortController().signal;
+  for (const snapshot of review.workspace.effectSnapshots ?? []) {
+    await verifyReviewAnnotationEffectSnapshot(
+      snapshot,
+      async (reference, readSignal) => {
+        readSignal.throwIfAborted();
+        const asset = assets.find(
+          (candidate) => `project-asset:${candidate.entry.id}` === reference
+        );
+        return asset ? readAssetFile(asset.ref, asset.entry.id) : undefined;
+      },
+      signal
+    );
   }
 }

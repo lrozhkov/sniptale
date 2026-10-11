@@ -20,7 +20,7 @@ export function createPresentationAdmission(
   transport: () => { playing: boolean; video: HTMLVideoElement | null },
   description: () => Description | null,
   time: () => number,
-  front: () => ReturnType<Renderer['render']> | null
+  front: () => Awaited<ReturnType<Renderer['render']>> | null
 ) {
   const resources = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
   let sourceBytes: number | null = null;

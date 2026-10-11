@@ -1,3 +1,4 @@
+import { useReviewAnnotationEffects } from './annotation-effects-editor';
 import { useReviewPresentation } from './use-review-presentation';
 import { useReviewWatermark } from './use-review-watermark';
 import { createReviewSpeechEditGuard } from './speech-edit-guard';
@@ -53,6 +54,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     advancedState,
     exporter,
     zoom,
+    annotationEffects: core.annotationEffects,
     activeSelection,
     setActiveSelection,
     clearAnnotation: setSelected,
@@ -150,13 +152,60 @@ function useReviewEditorCore(resource: LoadedReview) {
       base.advanced.ui.mode === 'advanced',
   });
   presentationPending.current = presentation.pending;
+  const annotationEffects = useReviewAnnotationEffects({
+    session: base.session,
+    lane: base.advanced.annotationEffects,
+    setLane: base.advancedState.setAnnotationEffects,
+    flush: base.advancedState.flush,
+    beforeAction: base.beforeAction,
+    performAction: base.performAction,
+    pause: () => timeline.video.current?.pause(),
+    select: base.setActiveSelection,
+    allowed: () =>
+      !base.actionBusy &&
+      !base.backgroundImport.pending &&
+      !webcam.pending &&
+      !watermark.pending &&
+      !presentation.pending &&
+      base.exporter.phase === 'idle' &&
+      !base.composer.getCurrent().annotation &&
+      base.advanced.ui.mode === 'advanced',
+  });
   return {
     ...base,
     ...timeline,
     webcam,
     watermark,
     presentation,
-    busy: base.busy || webcam.pending || watermark.pending || presentation.pending,
+    annotationEffects,
+    run: async (action: () => Promise<unknown>, success?: string) => {
+      try {
+        await annotationEffects.flush();
+        return await base.run(action, success);
+      } catch {
+        base.setMessage(translate('gallery.videoReview.saveFailed'));
+      }
+    },
+    beforeAction: (action: () => void) => {
+      if (!annotationEffects.hasPending()) return base.beforeAction(action);
+      void annotationEffects
+        .flush()
+        .then(() => base.beforeAction(action))
+        .catch(() => base.setMessage(translate('gallery.videoReview.saveFailed')));
+    },
+    setActiveSelection: (next: Parameters<typeof base.setActiveSelection>[0]) => {
+      if (!annotationEffects.hasPending()) return base.setActiveSelection(next);
+      void annotationEffects
+        .flush()
+        .then(() => base.setActiveSelection(next))
+        .catch(() => base.setMessage(translate('gallery.videoReview.saveFailed')));
+    },
+    busy:
+      base.busy ||
+      webcam.pending ||
+      watermark.pending ||
+      presentation.pending ||
+      annotationEffects.pending,
   };
 }
 
@@ -197,6 +246,8 @@ function useReviewEditorBase(resource: LoadedReview) {
     setMessage(translate('gallery.videoReview.saveFailed'))
   );
   const speechGuard = speechGuardRef.current;
+  const performAction = async (action: () => Promise<boolean>): Promise<boolean | undefined> =>
+    await speechGuard.perform(async () => await transitions.perform(action));
   const beforeAction: typeof transitions.beforeAction = (action) => {
     void speechGuard.perform(() => transitions.beforeAction(action));
   };
@@ -235,12 +286,14 @@ function useReviewEditorBase(resource: LoadedReview) {
     activeSelection,
     setActiveSelection,
     backgroundImport,
+    actionBusy,
     busy,
     setBusy,
     message,
     setMessage,
     run,
     runComposer: raw,
+    performAction,
     beforeAction,
     registerSpeechFlush: speechGuard.register,
     flushSpeech: speechGuard.flush,

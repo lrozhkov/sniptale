@@ -46,6 +46,7 @@ export interface PreviewRenderAllocationInput {
       preparation: { kind: 'text' } | { kind: 'image'; source: Size };
     };
     previousWatermarkCache: Size | null;
+    annotationSourceBytes?: number;
   };
   background: null | {
     cache: Size;
@@ -62,6 +63,7 @@ export interface PreviewRenderAllocationInput {
     border: Size | null;
     denseCommentGradient: Size | null;
     denseBackgroundGradient: Size | null;
+    annotationBitmaps?: readonly Size[];
   };
 }
 
@@ -87,6 +89,10 @@ function canvas(role: string, size: Size): Allocation {
 }
 function bitmap(role: string, size: Size | null): Allocation[] {
   return size ? [bytes(role, pixels(size) * 4)] : [];
+}
+function annotationSources(count = 0): Allocation[] {
+  integer(count, true);
+  return count ? [bytes('annotation-immutable-sources', count)] : [];
 }
 function optionalCanvas(role: string, size: Size | null): Allocation[] {
   return size ? [canvas(role, size)] : [];
@@ -189,6 +195,7 @@ function spotlight(value: PreviewRenderAllocationInput['scene']['spotlight']): {
 
 function preparation(input: PreviewRenderAllocationInput, front: Allocation[]) {
   const { assets } = input;
+  const sources = annotationSources(assets.annotationSourceBytes);
   const background = bitmap('background-bitmap', assets.backgroundBitmap);
   const header = bitmap('header-bitmap', assets.headerBitmap);
   const previous = optionalCanvas('previous-watermark-cache', assets.previousWatermarkCache);
@@ -197,13 +204,21 @@ function preparation(input: PreviewRenderAllocationInput, front: Allocation[]) {
     : [];
   const retainedTransition =
     input.admission.transition?.map((value, index) => capture(`transition-${index}`, value)) ?? [];
-  const ready = [...front, ...retainedCamera, ...retainedTransition, ...background, ...header];
+  const ready = [
+    ...front,
+    ...retainedCamera,
+    ...retainedTransition,
+    ...background,
+    ...header,
+    ...sources,
+  ];
   const phases = [
     phase('prepare-background', [
       ...front,
       ...retainedCamera,
       ...retainedTransition,
       ...background,
+      ...sources,
     ]),
     phase('prepare-header', ready),
   ];
@@ -247,6 +262,7 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
     ...bitmap('header-bitmap', input.assets.headerBitmap),
     ...bitmap('background-bitmap', input.assets.backgroundBitmap),
     ...optionalCanvas('watermark-cache', input.assets.watermark?.cache ?? null),
+    ...annotationSources(input.assets.annotationSourceBytes),
   ];
   const retained = [
     ...front,
@@ -255,6 +271,9 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
     ...assets,
     ...optionalCanvas('preview-transition-source', input.scene.transitionRaster),
     ...spatial(input.scene.spatial),
+    ...(input.scene.annotationBitmaps?.flatMap((size) =>
+      bitmap('annotation-output-bitmap', size)
+    ) ?? []),
   ];
   const cached = optionalCanvas('background-cache', input.background?.cache ?? null);
   const normal = [...retained, ...cached];
@@ -325,6 +344,7 @@ export interface PreviewPreparationAllocationInput {
   headerBitmap: Size | null;
   measurement: boolean;
   watermark: PreviewRenderAllocationInput['assets']['watermark'];
+  annotationSourceBytes?: number;
 }
 
 /** Positive empty-ledger limits are constructor control values, not allocated storage. */
@@ -337,6 +357,7 @@ export function calculatePreviewPreparationAllocation(input: PreviewPreparationA
     ...bitmap('background-bitmap', input.backgroundBitmap),
     ...bitmap('header-bitmap', input.headerBitmap),
     ...(input.measurement ? [canvas('watermark-measurement', { width: 1, height: 1 })] : []),
+    ...annotationSources(input.annotationSourceBytes),
   ];
   if (input.watermark) {
     allocations.push(canvas('watermark-cache', input.watermark.cache));

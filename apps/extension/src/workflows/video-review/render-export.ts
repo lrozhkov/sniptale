@@ -1,6 +1,7 @@
 import type { ReviewFrameExportInput } from './render-export-input';
 import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
+import { createReviewPresentationMain } from './presentation-main';
 import { createReviewWatermarkRenderer, type ReviewWatermarkRenderer } from './render-watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
@@ -63,6 +64,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSceneSize,
   evaluateQuickEditCameraAtTime,
 } from '../../features/video/review/advanced/scene';
 import {
@@ -103,30 +105,52 @@ export async function writeReviewFrames(
   let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
   let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
   let watermark: ReviewWatermarkRenderer | null = null;
+  let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
   try {
     source = await openReviewRenderSource(args, input, preparation);
-    watermark = await createReviewWatermarkRenderer(
-      preparation.effective.watermark,
-      { width: source.canvas.width, height: source.canvas.height },
-      args.signal,
-      args.readProjectAsset
-    );
-    if (preparation.effective.captions && args.fragmentOffset > 0 && !args.captionTimeMap)
-      throw new Error('Fragment captions require the full document time map.');
-    if (preparation.effective.webcam)
-      webcam = await createReviewWebcamRenderer(
-        preparation.effective.webcam,
-        args.readProjectAsset,
-        args.signal
+    if (preparation.effective.annotationEffects)
+      main = await createReviewPresentationMain({
+        file: args.file,
+        index: args.index,
+        edits: args.edits,
+        ...(args.captionTimeMap ? { captionTimeMap: args.captionTimeMap } : {}),
+        ...(args.effectSnapshots ? { effectSnapshots: args.effectSnapshots } : {}),
+        fps: preparation.fps,
+        effective: preparation.effective,
+        ...(args.comments ? { comments: args.comments } : {}),
+        ...(args.clickCues ? { clickCues: args.clickCues } : {}),
+        ...(args.keyCues ? { keyCues: args.keyCues } : {}),
+        fragmentOffset: args.fragmentOffset,
+        dimensions: source.dimensions,
+        readAsset: args.readProjectAsset,
+        signal: args.signal,
+      });
+    if (!main) {
+      watermark = await createReviewWatermarkRenderer(
+        preparation.effective.watermark,
+        source.dimensions.backing,
+        args.signal,
+        args.readProjectAsset
       );
-    const captions = await prepareReviewFinalCaptions({
-      input: args,
-      effective: preparation.effective,
-      source: { size: source.sourceSize, output: source.canvas },
-      webcamDuration: webcam?.duration,
-      watermarkBounds: watermark.bounds,
-      resultDuration: preparation.windows.at(-1)!.segment.resultEnd,
-    });
+      if (preparation.effective.captions && args.fragmentOffset > 0 && !args.captionTimeMap)
+        throw new Error('Fragment captions require the full document time map.');
+      if (preparation.effective.webcam)
+        webcam = await createReviewWebcamRenderer(
+          preparation.effective.webcam,
+          args.readProjectAsset,
+          args.signal
+        );
+    }
+    const captions = main
+      ? undefined
+      : await prepareReviewFinalCaptions({
+          input: args,
+          effective: preparation.effective,
+          source: { size: source.sourceSize, output: source.dimensions.backing },
+          webcamDuration: webcam?.duration,
+          watermarkBounds: watermark!.bounds,
+          resultDuration: preparation.windows.at(-1)!.segment.resultEnd,
+        });
     const receipt: ReviewPacketReceipt = {
       videoPackets: 0,
       audioPackets: 0,
@@ -151,8 +175,7 @@ export async function writeReviewFrames(
             codec: preparation.codec,
             quality: preparation.quality,
             fullCodecString: resolveReviewVideoEncoderConfig(preparation.codec, {
-              width: source.canvas.width,
-              height: source.canvas.height,
+              ...source.dimensions.backing,
               fps: preparation.fps,
             }).codec,
             frameRate: preparation.fps,
@@ -160,8 +183,7 @@ export async function writeReviewFrames(
             bitrate: resolveReviewRenderBitrate(
               {
                 fps: preparation.fps,
-                width: source.canvas.width,
-                height: source.canvas.height,
+                ...source.dimensions.backing,
               },
               args.renderSettings?.quality
             ),
@@ -182,9 +204,11 @@ export async function writeReviewFrames(
     if (!videoOut) throw new Error('Video output configuration changed.');
     const audioOut = tracks?.audio ?? null;
     await output?.start();
-    const frameSink = createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal);
+    const frameSink = main
+      ? null
+      : createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal);
     const transitions = planReviewCutTransitions(args.index.duration, args.edits);
-    if (transitions.length)
+    if (!main && transitions.length)
       transitionFrames = createReviewTransitionFrames(
         createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal),
         args.signal
@@ -223,6 +247,22 @@ export async function writeReviewFrames(
           signal: args.signal,
         });
       timeTracking?.finishAudio(segment);
+      if (main) {
+        receipt.videoPackets += await renderAnnotationWindow({
+          window,
+          main,
+          videoOut,
+          fps: preparation.fps,
+          adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
+          adaptiveBudget,
+          resultDuration: receipt.resultDuration,
+          onProgress: timeTracking?.renderProgress ?? args.onProgress,
+          signal: args.signal,
+        });
+        continue;
+      }
+      const visual = source.visual;
+      if (!visual || !frameSink) throw new Error('Legacy render source is unavailable.');
       receipt.videoPackets += await renderRenderWindowFrames({
         window,
         adaptiveBudget,
@@ -234,21 +274,21 @@ export async function writeReviewFrames(
         keyCues: args.keyCues,
         clickCues: args.clickCues,
         comments: args.comments ?? [],
-        canvas: source.canvas,
+        canvas: visual.canvas,
         sourceSize: source.sourceSize,
         sceneScale: source.sceneScale,
         baseCanvas: source.baseCanvas,
         windowHeader: preparation.effective.windowHeader,
-        headerImage: source.headerImage,
-        context: source.context,
-        image: source.image,
+        headerImage: visual.headerImage,
+        context: visual.context,
+        image: visual.image,
         frameSink,
         sourceTimeResolution,
         transitions,
         transitionFrames,
         webcam,
         watermark,
-        captions,
+        ...(captions ? { captions } : {}),
         videoOut,
         resultDuration: receipt.resultDuration,
         onProgress: timeTracking?.renderProgress ?? args.onProgress,
@@ -272,8 +312,9 @@ export async function writeReviewFrames(
     webcam?.dispose();
     watermark?.dispose();
     transitionFrames?.dispose();
-    source?.image?.close();
-    source?.headerImage?.close();
+    main?.dispose();
+    source?.visual?.image?.close();
+    source?.visual?.headerImage?.close();
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
   }
@@ -355,11 +396,14 @@ interface ReviewRenderSource {
   sampleRate: number;
   sceneScale: number;
   baseCanvas: { width: number; height: number };
-  headerImage: ImageBitmap | null;
-  canvas: HTMLCanvasElement;
   sourceSize: { width: number; height: number };
-  context: CanvasRenderingContext2D;
-  image: ImageBitmap | null;
+  dimensions: Parameters<typeof createReviewPresentationMain>[0]['dimensions'];
+  visual: {
+    canvas: HTMLCanvasElement;
+    context: CanvasRenderingContext2D;
+    image: ImageBitmap | null;
+    headerImage: ImageBitmap | null;
+  } | null;
 }
 
 /** Opens the render media: verified source tracks, audio codec probe, canvas, background. */
@@ -399,27 +443,49 @@ async function openReviewRenderSource(
     width: Math.round(await video.getDisplayWidth()),
     height: Math.round(await video.getDisplayHeight()),
   };
-  const canvas = document.createElement('canvas');
   const scene = resolveReviewSceneOutput(sourceSize, preparation.effective, preparation.resolution);
   if (!scene.supported) throw new QuickEditExportUnavailable(['canvas-size']);
-  const dimensions = scene.output;
-  canvas.width = dimensions.width;
-  canvas.height = dimensions.height;
+  const canonical = computeQuickEditSceneSize({
+    source: sourceSize,
+    canvas: preparation.effective.canvas,
+    background: preparation.effective.background,
+    windowHeader: preparation.effective.windowHeader,
+  });
+  const dimensions = {
+    canonical: { width: canonical.width, height: canonical.height },
+    backing: scene.output,
+  };
   const scale = scene.scale;
-  preparation.effective.background = scene.background;
 
   const supported = await supportedReviewVideoCodecs(preparation.container, {
-    width: canvas.width,
-    height: canvas.height,
+    ...dimensions.backing,
     fps: preparation.fps,
     bitrate: resolveReviewRenderBitrate(
-      { width: canvas.width, height: canvas.height, fps: preparation.fps },
+      { ...dimensions.backing, fps: preparation.fps },
       preparation.quality
     ),
   });
   if (!supported.includes(preparation.codec))
     throw new QuickEditExportUnavailable(['video-encoder']);
   signal.throwIfAborted();
+  const metadata = {
+    video,
+    audio: audio ?? null,
+    audioSink: audio ? new EncodedPacketSink(audio) : null,
+    audioConfig,
+    processedAudio,
+    sourceSize,
+    sceneScale: scale,
+    baseCanvas: scene.canvas,
+    dimensions,
+  };
+  signal.throwIfAborted();
+  if (preparation.effective.annotationEffects)
+    return { ...metadata, sampleRate: audio ? await audio.getSampleRate() : 0, visual: null };
+  preparation.effective.background = scene.background;
+  const canvas = document.createElement('canvas');
+  canvas.width = dimensions.backing.width;
+  canvas.height = dimensions.backing.height;
   const context = canvas.getContext('2d', { alpha: false, colorSpace: 'srgb' });
   if (!context) throw new Error('Canvas context is unavailable.');
   context.imageSmoothingEnabled = true;
@@ -439,28 +505,23 @@ async function openReviewRenderSource(
   }
   try {
     return {
-      video,
-      audio: audio ?? null,
-      audioSink: audio ? new EncodedPacketSink(audio) : null,
-      audioConfig,
-      processedAudio,
+      ...metadata,
       sampleRate: audio ? await audio.getSampleRate() : 0,
-      canvas,
-      sourceSize,
-      sceneScale: scale,
-      baseCanvas: scene.canvas,
-      headerImage: preparation.effective.windowHeader
-        ? await loadReviewWindowHeader(
-            reviewWindowHeaderUrl(
-              preparation.effective.windowHeader,
-              sourceSize.width,
-              sourceSize.height
-            ),
-            signal
-          )
-        : null,
-      context,
-      image: backgroundImage,
+      visual: {
+        canvas,
+        headerImage: preparation.effective.windowHeader
+          ? await loadReviewWindowHeader(
+              reviewWindowHeaderUrl(
+                preparation.effective.windowHeader,
+                sourceSize.width,
+                sourceSize.height
+              ),
+              signal
+            )
+          : null,
+        context,
+        image: backgroundImage,
+      },
     };
   } catch (error) {
     backgroundImage?.close();
@@ -750,6 +811,54 @@ export async function renderRenderWindowFrames(args: {
   return writer.count();
 }
 
+/** Shared scene output preserves ordinary window timestamps and audio draining. */
+async function renderAnnotationWindow(args: {
+  window: ReviewFrameWindow;
+  main: Awaited<ReturnType<typeof createReviewPresentationMain>>;
+  videoOut: { add(sample: VideoSample): Promise<void> };
+  fps: number;
+  adaptive: boolean;
+  adaptiveBudget: ReturnType<typeof createAdaptiveComparisonBudget>;
+  resultDuration: number;
+  onProgress: ((fraction: number) => void) | undefined;
+  signal: AbortSignal;
+}) {
+  let writer: ReturnType<typeof createReviewFrameWriter> | undefined;
+  try {
+    for (const [index, timestamp] of args.window.timestamps.entries()) {
+      args.signal.throwIfAborted();
+      const frame = await args.main.renderAtTime(timestamp);
+      try {
+        args.signal.throwIfAborted();
+        writer ??= createReviewFrameWriter({
+          canvas: frame.canvas,
+          context: frame.context,
+          videoOut: args.videoOut,
+          signal: args.signal,
+          adaptive: args.adaptive,
+          adaptiveBudget: args.adaptiveBudget,
+        });
+        await writer.add(
+          timestamp,
+          Math.min(
+            args.window.segment.resultEnd,
+            args.window.timestamps[index + 1] ?? timestamp + 1 / args.fps
+          ),
+          Math.min(1 / args.fps, args.window.segment.resultEnd - timestamp),
+          frame
+        );
+      } finally {
+        frame.release();
+      }
+      args.onProgress?.(Math.min(1, (timestamp + 1 / args.fps) / args.resultDuration));
+    }
+    await writer?.flush();
+    return writer?.count() ?? 0;
+  } finally {
+    writer?.dispose();
+  }
+}
+
 /** Owns sample lifetime and optional VFR retention after scene composition is complete. */
 function createReviewFrameWriter(args: {
   canvas: HTMLCanvasElement;
@@ -773,19 +882,33 @@ function createReviewFrameWriter(args: {
       sample.close();
     }
   };
-  const adaptive = args.adaptive
-    ? createAdaptiveFrameWriter(
-        args.context,
-        (frame, timestampUs, durationUs) =>
-          emit(frame.clone(), timestampUs / 1e6, durationUs / 1e6),
-        args.signal,
-        args.adaptiveBudget
-      )
-    : null;
+  const createAdaptive = (context: CanvasRenderingContext2D) =>
+    args.adaptive
+      ? createAdaptiveFrameWriter(
+          context,
+          (frame, timestampUs, durationUs) =>
+            emit(frame.clone(), timestampUs / 1e6, durationUs / 1e6),
+          args.signal,
+          args.adaptiveBudget
+        )
+      : null;
+  let context = args.context;
+  let adaptive = createAdaptive(context);
   return {
-    async add(timestamp: number, end: number, constantDuration: number) {
+    async add(
+      timestamp: number,
+      end: number,
+      constantDuration: number,
+      frame: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D } = args
+    ) {
+      if (frame.context !== context) {
+        await adaptive?.flush();
+        adaptive?.dispose();
+        context = frame.context;
+        adaptive = createAdaptive(context);
+      }
       if (!adaptive) {
-        await emit(args.canvas, timestamp, constantDuration);
+        await emit(frame.canvas, timestamp, constantDuration);
         return;
       }
       const startUs = Math.round(timestamp * 1e6);

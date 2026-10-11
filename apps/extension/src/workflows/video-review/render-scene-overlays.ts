@@ -13,7 +13,8 @@ import {
   computeQuickEditSpatialRasterLayout,
   computeQuickEditWindowTransform,
 } from '../../features/video/review/advanced/scene';
-import { drawReviewSceneComments, spatialReviewCommentSpace } from './scene-frame';
+import { clipReviewScene, drawReviewSceneComments, spatialReviewCommentSpace } from './scene-frame';
+import { drawReviewAnnotationFrame } from './annotation-renderer';
 import { drawReviewClicks } from './render-click-animation';
 import { drawReviewBorders } from './render-border';
 import { drawReviewSpotlights } from './render-spotlight';
@@ -35,6 +36,7 @@ export function drawReviewSceneOverlays(args: {
   cameraScale: number;
   sourceWidth: number;
   clicks?: readonly ReviewClickCue[] | undefined;
+  annotationFrames?: readonly Parameters<typeof drawReviewAnnotationFrame>[1][];
 }) {
   const { scene, context, canvas, renderer: spatialRenderer } = args;
   const { layout, background, comments: burned = [] } = scene;
@@ -84,12 +86,30 @@ export function drawReviewSceneOverlays(args: {
       comment.renderToVideo &&
       (scene.sourceTime === undefined || isCanvasCommentVisibleAt(comment, scene.sourceTime))
   );
-  if (spatial && !borders.length && !clicks.length && !hasContentComment) {
+  const annotationFrames = args.annotationFrames ?? [];
+  const paintViewport = () => {
+    for (const frame of annotationFrames)
+      if (frame.instance.attachment === 'viewport')
+        drawReviewAnnotationFrame(context, frame, {
+          x: 0,
+          y: 0,
+          width: canvas.width,
+          height: canvas.height,
+        });
+  };
+  if (
+    spatial &&
+    !borders.length &&
+    !clicks.length &&
+    !hasContentComment &&
+    !annotationFrames.some((frame) => frame.instance.attachment === 'content')
+  ) {
     drawReviewSceneComments(context, {
       ...scene,
       comments: burned.filter((comment) => comment.attachment === 'viewport'),
       cameraScale: 1,
     });
+    paintViewport();
     return;
   }
   const overlay = spatial ? spatial.surface('overlay', canvas.width, canvas.height) : null;
@@ -115,6 +135,17 @@ export function drawReviewSceneOverlays(args: {
     },
     scene.sample
   );
+  const contentFrames = annotationFrames.filter((frame) => frame.instance.attachment === 'content');
+  if (contentFrames.length) {
+    overlayContext.save();
+    try {
+      clipReviewScene(overlayContext, overlayLayout, overlayBackground);
+      for (const frame of contentFrames)
+        drawReviewAnnotationFrame(overlayContext, frame, overlayLayout.videoTransform);
+    } finally {
+      overlayContext.restore();
+    }
+  }
   drawReviewSceneComments(overlayContext, {
     ...scene,
     canvas: overlay?.canvas ?? canvas,
@@ -142,4 +173,5 @@ export function drawReviewSceneOverlays(args: {
       cameraScale: 1,
     });
   }
+  paintViewport();
 }

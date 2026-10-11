@@ -252,6 +252,8 @@ function createRenderer(args: Args, prepared: Preparation) {
       index: args.index,
       edits: args.edits,
       ...(args.captionTimeMap ? { captionTimeMap: args.captionTimeMap } : {}),
+      ...(args.effectSnapshots ? { effectSnapshots: args.effectSnapshots } : {}),
+      fps: prepared.profile.fps,
       effective: prepared.effective,
       ...(args.comments ? { comments: args.comments } : {}),
       ...(args.clickCues ? { clickCues: args.clickCues } : {}),

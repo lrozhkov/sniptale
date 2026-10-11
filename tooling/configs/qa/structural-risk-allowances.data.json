@@ -39,11 +39,11 @@
       "file": "apps/extension/src/gallery/video-review/stage.tsx",
       "symbol": "ReviewStage",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The154-line stage remains score5delta0 and8statements. It orders the existing native/manual image plane, interactions, overlays and feedback. This candidate adds one final outer-fade component to the native composition, matching the manual renderer. Pointer capture and publication still have one lifetime. Independent geometry/render layers already have named owners; splitting the remaining JSX for length would obscure explicit paint order. Main inspected the current body; independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "7f018631a44b50a6455c8ada7346dbf13a7dbe621960b68cc5e15840f998e501",
-      "signatureHash": "25f6a795e84bbf4f2ecc983277ca56be3560a879b56918727aa5e0f29e19f3ca"
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when measured stage geometry and final-layer ordering cease to delegate object capture and prepared effect pixels. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "18f18ccd6fa4458a36f14e7fafff778b8499882e394f5229f5b4070c3036010b",
+      "signatureHash": "25f6a795e84bbf4f2ecc983277ca56be3560a879b56918727aa5e0f29e19f3ca",
+      "reason": "tool-noise: This view composes the measured stage, native/manual publication plane and interactive overlays in explicit order. AnnotationGeometry publication is one callback and the editing SVG uses that canonical geometry; effect pixels still come from the existing manual owner. Native/manual, optional layer and feedback guards are JSX, not parallel state authority. Capture remains in named plane/overlay owners. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
     },
     {
       "rule": "structural-function-risk",
@@ -72,33 +72,22 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The existing editor wiring adds transient accepted-replacement selection and explicit navigation. Source playback, audio mutations, export and persistence still use existing hooks; score3 delta0. State aliases refer to one editor session and callbacks do not introduce independent runtime or recovery. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "148344c1520581fbbbc78b58bbec236717a14166f60462711ffbd941f58ec935",
-      "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e"
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when workspace composition adds a persistence writer or mutation queue rather than passing existing editor bindings. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "b479c42580f878c750a1db293b5e1ada8b630591d77daa5eb75df81e699c3d56",
+      "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e",
+      "reason": "tool-noise: The existing editor composes its session state, navigation, panel sizing, preview/inspector/timeline and audio layers. Added annotation bindings pass the same state commands, snapshots and source identity into existing children; they add no writer or queue. Caption/history/playback guards still use the existing beforeAction owner. Outer score is unchanged and the body remains one workspace view. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
     },
     {
+      "rule": "structural-file-risk",
       "file": "apps/extension/src/workflows/video-review/render-export.test.ts",
       "symbol": "<file>",
-      "rule": "structural-file-risk",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: This file holds the frame-render export contract tests and one shared decoder/output fixture. The added tests prove transition raster admission/cleanup and exact fractional output duration through the same writeReviewFrames entrypoint. Its score2 and cohesion1.00 are unchanged; the sole blocking change is848lines crossing the800-line file cap. Fixtures are reset for each test and no production state or owner is introduced. Splitting requires either a fixture-only forwarding surface or duplicated decoder mocks, without reducing an actual ownership defect.",
-      "removalCondition": "Remove when the exact AST or signature changes; reassess any independent ownership, new durable authority, mixed fixture lifecycle, or review finding. Remove when the analyzer models this cohesive JSX/test shape. Independent architecture review must validate the classification.",
-      "reviewDate": "2026-10-04",
-      "astHash": "2b8968699df53d14e6a37cf9fc1e15f69f6f85b2431b173fc9f3aadb61ca8856",
-      "signatureHash": "a2e7b978385578d8defe4646c0f15ffb22b2295ce641c6d881e0925898b7fbb6"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/workflows/video-review/session.ts",
-      "symbol": "createVideoReviewSession",
-      "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: This existing review factory retains one history/local/durable session receiver. Gallery producers and accepted explicit commands now share one injected package scheduling lane; persistence still issues revisions, source admission and resource authority. It owns no React buffers or second queue. The sole blocking metric is299 outer lines, including cohesive nested command methods; score1 delta0, outer cyclomatic1. Per-command extraction would distribute the same session state and recovery rather than isolate an independent lifecycle. Main inspected the implementation; fresh independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-10",
-      "astHash": "0f353fd08dd5457bbf0baa6ebf8f145dd6dd2dadd041bfb6ebee81827f03836b",
-      "signatureHash": "aed89eba9c2e167caeeaf39979c18b16f68ed33f8a375440b08514c8a3e1a7cb"
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when frame-export decoder/output fixture, cadence or muxed cleanup contract gains a separate state receiver. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "6bdb419e9a1deadd5803622fd62bcdde0854fb4733cd3c5d4eedfa550a96721d",
+      "signatureHash": "73d38cdece704fb98cfaf833ff3ba22461ebf6a00ce0686e6216bd70f67b02fc",
+      "reason": "tool-noise: The file tests writeReviewFrames with the existing decoder/output fixture. The annotation route proves no extra legacy decode, exact fractional cadence and shared painter; existing transition/window/audio cases are variants of the same muxed-frame contract. Fixtures reset before tests. Splitting only to satisfy the file cap would duplicate decoder/output mocks or introduce a fixture-only forwarding boundary. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
     },
     {
       "rule": "structural-function-risk",
@@ -160,11 +149,11 @@
       "file": "apps/extension/src/composition/persistence/projects/asset-publication.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The same publication fixture now verifies exact original/voiceover replacement claims and history-only recovery. Its adapter maps and counters are one shared transaction fixture, not independent production authorities; score2 delta0 and cohesion1. Moving assertions only to shorten this fixture would duplicate its setup. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "72018ecdf06ad801714384a179ec508a98251a872891b47dcc7c987bb4ae5cde",
-      "signatureHash": "80ae00ade1b6ba3c0d9bed24fed6982fc358cc34a161b697ca9f640b678189c2"
+      "reason": "tool-noise: One existing publication/recovery test receiver now also materializes real workspace head/history rows and asserts direct consuming-transaction claim denial/abort before any owner writes. Missing/purged/source-changed/unreferenced/resource-changed cases use the same mutation fixture; disabled redo/current retention cases preserve the exact existing claim contract. The correction adds no production authority or duplicated recovery receiver. File score2/delta0, owners4/effects0/state6/cohesion1 remain unchanged; line-only extraction would split this same participant proof. Fresh final architecture review independently accepted the preceding body; corrected exact body independently reinspected and its one-row binding supported by the read-only preliminary investigator; mandatory fresh final complete-candidate review remains required.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when project publication/recovery adapters, exact ready-claim/current-transaction admission or the workspace head/history mutation test receiver change. Remove when the analyzer models this cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate before closeout.",
+      "reviewDate": "2026-10-11",
+      "astHash": "8218dbab6b97b91a1388cd26bd770ad50406f2946ea593d2d51b0a7fa2dc69a6",
+      "signatureHash": "a485c2c79f6dc53202da4eb0b117ec35fb63bb0f889f7d1b8e0f7cc428d0bb2c"
     },
     {
       "rule": "structural-function-risk",
@@ -204,22 +193,22 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "ReviewTimelineBinding",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The existing timeline composition gains one adjacent source-anchored Revoice row and carries already-derived gain ranges. It owns the same projection/tool UI, not media scheduling or durable speech state. Score5 delta0; extracting forwarding lane JSX would not separate an authority. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "9c252081eb15e0463e6e23ebb95945d3c22ef9b4785dbccfd57c8e0a51df7811",
-      "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81"
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when conditional timeline/lane/picker wiring owns mutation, retention or a request lifecycle instead of injected commands. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "93f078e8665d0a2c8a80fb7e72e1cf5fc39b2e7950d08f64ec42984d2b774e13",
+      "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
+      "reason": "tool-noise: Seven outer statements create one source-to-timeline projection and existing focus/annotation placement hooks, then return the unified timeline/toolbar/lane/picker JSX. New conditional props select eligible advanced annotation UI and translate typed unsupported failure. Deferred admission, acquisition and mutation remain injected. Counted branches describe view eligibility; they create no state/effect/recovery owner in this component. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/workflows/video-review/export-lifecycle.test.ts",
       "symbol": "<file>",
-      "owner": "extension:workflows:video-review",
-      "reason": "tool-noise: The same export transaction fixture now proves Revoice packet/render dispatch and one fragment offset. Its mock state represents one lifecycle across success and refusal paths; score2 delta0 and cohesion1. Splitting solely for length would duplicate the lifecycle fixture. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "88a08b0d43890bff1b0368e1b31774caacd317a53d4cb460af52757d92aec3e0",
-      "signatureHash": "7e731b2cca456f975c8c3aaa907d5b8c5086ab51cf1054b4eb6f487c62d2cbc0"
+      "owner": "extension:app-core:workflows",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when export source/destination/publication receipt contract or per-case fixture transaction changes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "c1a11b2faccb72b5b058d4b96c125fb6de7d02a7a69989509f3fab949ccd42c1",
+      "signatureHash": "6a520bf7edb02dc4e0a0618e83d19318f49de8ade841ce3ddba31f2f3ce250c8",
+      "reason": "tool-noise: One createReviewExportFixture supplies source/destination/prepared writer and publication adapters. The new annotation fragment case asserts shared frame export, immutable registry, full clock and no packet/audio-only route through exportReviewedVideo. Existing destination/cancel/publication cases are states of the same export transaction; fixture creation is per-test and there is no additional product authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
     },
     {
       "rule": "structural-file-risk",
@@ -231,6 +220,314 @@
       "reviewDate": "2026-10-11",
       "astHash": "2a307837d2e2cce4fae6a50c3e6b19a3ecde5d62bfdf75be4294b0cac2952179",
       "signatureHash": "6b46a4caa5d000de8df094f7efc38e178347409429c224a8c690a3f971d9e494"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/projects/index.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when prepared-asset lease/private-publication/cancellation contract or database test receiver change. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "8ba42cbf7195c92442b66231de5f6a746a4e3c4c6b2e46003176638a1005c53a",
+      "signatureHash": "ca5c21808b7301620588e1be3b88183d84f3536b6878394e48a5a6869e0776ab",
+      "reason": "tool-noise: The prepared-annotation describe group uses the existing createDb/resetProjectsDbMocks fixture and index prepare/publish/read API, beside prepared scene resources. Private flags and failed ready claims are variants of the same prepared-asset contract; the file still has one database mock receiver and no production authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/review-workspaces/source-admission.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when consuming workspace source admission, pre-write byte validation or its transaction/rollback test receiver change. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "babb6fa00d963114973d89ae68fa2f0eec79ee786d18c54fd27d8553f46f5dcc",
+      "signatureHash": "7220ee166e6547e94323439500733b53a7384788d1a0d8c6b3802015cad4af96",
+      "reason": "tool-noise: One rows/journals/readFile mutation harness proves the consuming workspace transaction across ready, durable, missing and discarded references. Annotation cases additionally bind source hash and SVG bytes before that same writer; writesStarted/failWrites exercise rollback in that receiver. Existing background/audio/scene claims are neighboring cases of source admission, not independent runtimes. Splitting this contract would duplicate the transaction fake or create a forwarding fixture boundary. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/review/advanced/effective.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when applied advanced-state projection, render-requirement contract or the isolated authored-state fixture changes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "2f6110889edc83b0a0ec1fc1af87d5041df13c9e329e6685bd19550d356dda95",
+      "signatureHash": "d448ac9758e758583b3e39974be308e06d38978598f870ee54d9866c60cd6a29",
+      "reason": "tool-noise: Every case exercises applied-state or processing requirements from authored advanced content. The new annotation case verifies application disablement, dormant authored content and video-only processing using the same typed configuration fixture; no acquisition or storage effect is added. Literal scene/audio inputs are test cases, not separate mutable production authorities. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/review/advanced/validation.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when versioned advanced JSON composition gains another boundary, writer or lifecycle instead of delegated feature parsers. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "938c769174e116a9d76f60f3bb6eed17b40baa1de55227a8a7bf6059c3f3920a",
+      "signatureHash": "4deed6b4ff86216201f141d6f464937431d00111fa4a59f48eef46c872ba2d77",
+      "reason": "tool-noise: This owner composes UI, state and canonical-content parsers for the same versioned advanced JSON contract. Feature-specific parsers remain in named feature modules, including annotation-effects/validation. The added optional field uses that parser and exact version admission; the file has no writer, transport, runtime lifecycle or recovery. Further line-driven moves would separate the version matrix from its canonical return shape. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/advanced/validation.ts",
+      "symbol": "loadQuickEditAdvancedContentState",
+      "owner": "extension:app-core:features",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when explicit schema/field compatibility, canonical content return shape or delegated parser contracts change. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "a688b9fb8c4a6608bfa50a998faf4c5016a8be1cd6e3d06f9870e655b7358968",
+      "signatureHash": "1384261543c8c7a81d71a90f144336ddd5c02a73301e67299444309ba3a5566e",
+      "reason": "tool-noise: This boundary receives unknown, admits explicitly supported schema versions, rejects UI in content and composes existing exact feature parsers into one canonical content result. Most counted branches are flat explicit schema-version and optional-field guards; nesting is one, and there is no state/effect/recovery owner. Annotation parsing is delegated to its narrow owner. Preserve the enumerated legacy schema/feature compatibility contract rather than changing it to an open numeric range or distributing one canonicalizer. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when annotation command admission/draft/history/retry proof gains an independent session or acquisition receiver. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "4f8fe5694e31fbe4252fb9d009e2e69f92e56be0eba6ae1f1779d28532fe59f2",
+      "signatureHash": "b9e9cd9e474e8352fb8d1cd1ac5070380644732fed399b737d5c269325c8d53c",
+      "reason": "tool-noise: The fixture mounts useReviewAnnotationEffects over a real review session and advanced-content hook. Acquisition is injected, while session history, buffered Save and synchronous draft lifetime remain real. All cases prove that one command receiver: gesture cancel/commit/stale rebasing, pending admission, failed Save retry, unmount and unload protection. afterEach disposes the session/root; test inputs do not add production owners. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-editor.ts",
+      "symbol": "useReviewAnnotationEffects",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when session-bound annotation admission, draft, completion or recovery becomes a separate queue/state/resource authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "384f7362d9ca8842a9c45886e231a70b380fbd7d33392d822eb5248ffa56d6ce",
+      "signatureHash": "349ce5baa868ad5597c6e89dbdc69124b461033b8430575ae2cac5a0ae80700c",
+      "reason": "tool-noise: One disposable command adapter owns current draft, admitted operation controller and completion Promise for the same session. add/change/duplicate/gesture/flush/retry all converge through execute/mutate and the existing session/advanced-content queue; this hook owns no durable writer or resource retention. Source replacement/unmount cancels that same receiver. Separating capture, pending and retry closures would distribute the single admission/draft lifetime; outer cyclomatic four and nesting one do not evidence that defect. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-inspector.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when selected annotation view or private SDK-control adapter gains storage, transport or independent draft authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "e1a0c7e29e6f68c19625f6c6e81629a8efe8574470faafcaf4f3d64889953f84",
+      "signatureHash": "2db92be2596d6133f8619cad2aa3e1b11bbd86dcd1c020039e2d21509845ca4e",
+      "reason": "tool-noise: The file owns a selected annotation view and its private SDK-control adapter. It uses existing compact-inspector/UI primitives, i18n and public SDK control definitions; geometry conversion is already in annotation-effects-geometry and persistence remains in injected editor commands. Numeric drafts, colour/text/select controls and grouped sections edit one selected instance, with no privileged effect or storage writer. Import breadth reflects view adapters rather than new domain authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-inspector.tsx",
+      "symbol": "AnnotationParameters",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when selected-object preview/commit/Retry dispatch gains independent field transactions or persistence effects. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "24825431103b3998dd411f24a020bf4be0582d5a42113e6cac6d05502ffa3471",
+      "signatureHash": "0aaf8c678a020885faa7c480c99a2429d2165773117fe9817339780897a949f4",
+      "reason": "tool-noise: Timing, placement, presets, declared control groups and object actions are sections of one selected-instance inspector. Preview/commit delegate to the same injected annotation draft transaction; SDK control defaults/anchor conversion use existing pure owners. Section conditionals and JSX account for the body length; there is no effect cleanup, request lifetime, persistent receiver or recovery in this component. Splitting the transaction closures solely by section would duplicate admission policy and scatter the selected-object interaction. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-overlay.tsx",
+      "symbol": "ReviewAnnotationOverlay",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when annotation capture/deferred admission/cancellation separates into another gesture owner or begins painting effect pixels. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "f84fc36b5f631389b29da92da9dfd3100d6362bd53db03f182a875c868245f5b",
+      "signatureHash": "9ff2c8374fcb0d121f033de4d217ba70fe1b6d0ef821e38c2f7eea94b9923956",
+      "reason": "tool-noise: After extracting canonical move/resize/rotate/anchor math to the existing geometry owner, this component retains one pointer capture, deferred-note admission, Escape/unmount cancellation and accessible SVG body/handle view. Effect pixels remain in the prepared compositor. All handles use the same drag ref and injected editor transaction; no resource/read/storage authority is created. Further lifecycle splitting would distribute cancellation/capture. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-picker.tsx",
+      "symbol": "ReviewAnnotationEffectsPicker",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when anchored portal placement/dismissal/focus lifetime or externally supplied catalog/acquisition authority changes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "bca397d28160c98766374c1f5bb07b533bd839e98e8db99175bdc7a6a02c28c0",
+      "signatureHash": "053e2815ae9b9aa1fa174b644e1369e3dd86fe4b19508a5e8286992bc12e13c3",
+      "reason": "tool-noise: One anchored portaled dialog owns placement, ancestor/viewport listeners, outside dismissal, keyboard trap and focus restoration for supplied catalog choices. Catalog reads belong to useReviewAnnotationCatalog and acquisition to the injected command. The detached UI uses existing theme-safe/popover primitives. Its effect creates and removes one listener lifetime, while JSX lists choices and recovery; there is no second request or persistence owner. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-track.tsx",
+      "symbol": "ReviewAnnotationEffectsTrack",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when lane source-clock drag/admission/cancellation gains a second capture receiver or overlap rows become persistent order. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "b340e2b3ef807cbf5946d0fd06175ce180861a29cee884dccf6be9760a09c03b",
+      "signatureHash": "fdc66e6782295ab2c2d3ce1464a54f9fe32bc714d5d4d20100f0fc95e3f7d488",
+      "reason": "tool-noise: The lane owns one captured source-clock drag for draw/move/trim, with shared deferred note admission, release/Escape/teardown and transient range/guide. Overlap packing and label maps are disposable render derivations, not compositing order or durable state. All plates use that same drag receiver and injected begin/preview/commit/cancel commands; separating gesture callbacks into plate-local authorities would weaken the single-drag invariant. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/annotation-effects-track.tsx",
+      "symbol": "ReviewAnnotationEffectsTrack.props.instances.map callback",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when plate/edge markup gains an independent mutable gesture, listener, request or recovery lifetime. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "2eed8b0a53550c574f941d7b99cabbcab0c8a43786d561526253aec2ebabf824",
+      "signatureHash": "d8427a2f080e07cab8e2e1b9281c95636919bebb648e95170ef07bda38814baf",
+      "reason": "tool-noise: This callback returns one accessible plate with name, duration, bounds and two resize handles. It uses the enclosing lane drag ref, one finish callback and injected admission/commands; keyboard/pointer paths share that transaction. It has no effects, state, transport or recovery lifetime of its own. The length is JSX and the explicit hit-edge callbacks, not an independent mutable plate owner. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/preview-binding.tsx",
+      "symbol": "ReviewPreviewStage",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when preview eligibility/session asset-read adaptation gains an independent state, renderer or request lifetime. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "9da7779e8e33acef23e7cddcbb8b373bdfb8f487c62025f4bfe192f07a87ddd3",
+      "signatureHash": "30e4ade6ab65b903a524ea55ed1ce6b351e8e4972d000600ca219d4de50fe69f",
+      "reason": "tool-noise: The stage binding derives annotation eligibility from the same editor busy/playback/mode/overlay state and supplies the session-backed asset reader and current immutable registry. Geometry and painter/capture owners remain in stage/overlay/workflow modules. New branches configure optional props in the existing stage JSX; there is no parallel state, durable mutation or independent request lifetime in this binding. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/review-toolbar.tsx",
+      "symbol": "ReviewTimelineToolbar",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when toolbar advanced/busy admission becomes a captured-gesture, catalog or command authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "ca3dcc588a45d718362b00c02786554e1078430b942f31e882a955a00219f0c0",
+      "signatureHash": "e1ff77daa2f84b7f1dbad2e2eecae269fab7b8885d929c1680e08490127531c9",
+      "reason": "tool-noise: The existing timeline tool surface adds an annotation toggle to the same busy/export/composer admission and advanced-mode controls. It owns no captured gesture, catalog reader or mutation queue. Existing audio/cut/focus conditional JSX remains delegated to narrow tool controls; the new callback uses the same admit function. Unchanged score and nesting two do not evidence another authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/stage.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when stage paint/interaction ordering or native/manual geometry/publication contract introduces another writer or lifecycle. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "1462ccdd615a9848186b47352df1b8044ebe52034591a70ce4769574f252e882",
+      "signatureHash": "a6d3082aeecde0d87f52ec1167b159a966f9609f15e0a035659b2477026261c5",
+      "reason": "tool-noise: The stage owns explicit native/manual paint ordering and interaction composition. Prepared presentation, object geometry, resource rendering and annotation gesture math are already separate owners; the addition publishes canonical geometry and places the SVG editing layer above final painted effects. No persistence or privileged writer was introduced. The file remains one stage contract and its private view helpers; an additional forwarding layer would obscure paint order. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline-binding.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when real binding/source replacement/note admission/field flush proof gains another fixture session authority or media inspection contract. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "7db26aa853579e8a1459966e5cd7b092c7e07ccf755cdccc7c4ea235a5882e4e",
+      "signatureHash": "aaef421483bbba38d8fd8d8934aa77f69b5465cf6f8d013d9f003584fbd77d75",
+      "reason": "tool-noise: The real binding is mounted with useReviewEditorState and real local sessions; timeline scroll chrome/catalog listing are mocked and media inspection rejects the explicit Synthetic media fixture. The cases jointly prove selected range/free-lane addition, actual source replacement, held note admission and draft flush before Save/selection. Each test creates and disposes its resources/root; session identity and history assertions require the combined binding receiver, not isolated callback proxies. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when timeline composition/transient placement adds a command queue, resource authority or independent captured drag. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "de59280aac5351c9e52f04b0cc96eb55582eb175b238e6ad22a1f88efd11a8ae",
+      "signatureHash": "5c37390e64e844b00a30bcc2160ab812344334b77084b22edb837c922034ec91",
+      "reason": "tool-noise: The existing binding composes source selection, projected lanes, toolbar and track controls. New useAnnotationPlacement owns only transient anchor/source placement and calls the existing command; catalog subscription is a separate existing hook, while lane capture and durable/session authority remain in their owners. Ref aliases point to the same current props/source identity. No independent writer or queue is added, and file growth is explicit optional-lane/picker wiring. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when mounted manual-preview scheduler/publication/disposal test fixture gains independently managed render lifetimes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "04669b915c27a972a2fd488c50b9ac8513ee49c7d349d1d77f827b8bc64d2fab",
+      "signatureHash": "be757cb3047b9229806d267e986f4b3c24aceb428f1e7a77aa44ec3feae9dea8",
+      "reason": "tool-noise: One mounted hook fixture tracks scheduler ticks, prepared frame leases, publication and disposal; beforeEach resets IO, afterEach unmounts and restores mocks/globals. Annotation cases use the same manual renderer lifecycle at source cadence and disabled release. These are resource/publication states of the existing hook contract, not independent feature transactions requiring another fixture authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/annotation-acquisition.ts",
+      "symbol": "applyReviewAnnotationCatalogDocument",
+      "owner": "extension:app-core:workflows",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when verified catalog prepare/retain/adopt/unowned-handle compensation becomes multiple transactions or partial cleanup ownership changes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "66c597128c397e8b1e76ab5afdaa45a7201c916a7f78a8d9d7a1f2f9c44e4918",
+      "signatureHash": "5c9aa7dd1402a021312a0247906cf422d1b38b6363af8fa615aab23095dad1fb",
+      "reason": "tool-noise: Pure initial placement has moved to existing feature layout. The remaining workflow owns one verified-catalog prepare/adopt/compensate transaction: bind exact current source, verify immutable snapshot/bytes, register prepared resources before retain, transfer to the session, and clean only unowned handles on failure. Durable writes/resource lifetime remain in their named owners. The four counted recovery signals belong to this one transaction; splitting its accumulating handle set and compensation would obscure partial-commit recovery. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/render-export.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when frame-export preparation/window/audio helpers acquire another output, source writer or publication authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "671395b6189a74e8dd6db5176fb8a753b717955311e0a5f7b4e5d35806fd41a7",
+      "signatureHash": "638746957ace39c9b0d8696501011335a6507179ad14bdf01b9e1b094c08690a",
+      "reason": "tool-noise: One frame-export owner contains preparation, source admission, frame-window rendering and audio drain helpers for its muxer contract. Annotation composition delegates to createReviewPresentationMain and renderAnnotationWindow; it does not introduce a second muxer, source writer or publication authority. Native codec/scene/time/resource owners stay external. File length grows from passing the new composed path into the existing transaction, not a new runtime responsibility. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/render-export.ts",
+      "symbol": "writeReviewFrames",
+      "owner": "extension:app-core:workflows",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when main/legacy rendering, muxer finalization/cancellation or resource cleanup no longer share one output transaction. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "04db6c0dcaf13c083ff9f5015bb9749de8b75ca78f0a5b437ab0f74a68126ec3",
+      "signatureHash": "79016a60f2ec3726e5fa668fb35d99fdc7bea027440b8bc86c6296cf45df5de2",
+      "reason": "tool-noise: This function owns one input/output cancellation/finalization lifetime and receipt. The annotation main path and legacy frame path converge on the same window loop, audio drain, clock, close/finalize and catch/finally cleanup. All prepared renderers dispose there; destination publication is external. Factoring independent geometry/decoder/composition already occurs through narrow adapters; further splitting the transaction solely for line/cyclomatic pressure would distribute output cleanup. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/render-preview.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when prepared-preview budget/admission/disposal test proof introduces another mutable resource receiver. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "6a3213e95612e72ea4791da46237a0c2668f87f5d37c450f75a566a42f601ad2",
+      "signatureHash": "86530e711942f831e057a31412f0ad7d4765551f03cc348f6c0b445b2ffc90e9",
+      "reason": "tool-noise: One resource/IO fixture tests prepared preview ownership, admission and layer ordering. New annotation cases exercise unique-source/output budgets, refusal before sandbox execution and late-abort/dispose/supersede cleanup through the same renderer API. The mock resource leases are recreated and IO reset; variants of prepared scene lifetime do not create a second production receiver. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/session.ts",
+      "symbol": "createVideoReviewSession",
+      "owner": "extension:app-core:workflows",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when ordered session queue/autosave/snapshot/disposal is split or annotation retention acquires session mutation authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "5812ecb1039366a6e24018f71b38bf2c2430c2599c36111ca2700eb9a322d3a5",
+      "signatureHash": "aed89eba9c2e167caeeaf39979c18b16f68ed33f8a375440b08514c8a3e1a7cb",
+      "reason": "tool-noise: This registered session factory owns one autosave coordinator, ordered mutation queue, state publication and disposal. Annotation resources are delegated to createReviewAnnotationResourceRetention; applyAnnotationEffect joins the existing queue and transfers leases after atomic local admission, with Save failure retained for retry. All commands resolve one authoritative snapshot/history. The outer body has fourteen statements and cyclomatic one; extracting queue-dependent closures to pass the line cap would distribute one state authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-review-annotations.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when native Gallery annotation/retention/archive proof adds unrelated UI contracts or changes page/host fixture cleanup. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "120a6dd9912b27dfdafcfba5928b0e2be7875fd93f471e56a2cc0d07aa60bda2",
+      "signatureHash": "f9fac34e590e9cf21a22eb201ccccecc5096c7e900b73f217c747018723cf064",
+      "reason": "tool-noise: This native Gallery annotation proof contains one sequential imported-source retention/archive scenario and the two required viewport variants of the same real editor flow. Existing harness bootstrap/media/IDB readers and owner-local probes supply the boundaries; the imported-resource case explicitly closes page before host, while viewport cases close the host and use Playwright page-fixture teardown. It adds test dependency edges, not a production runtime or state owner. Separate files would duplicate startup/locator/draw helpers without changing the proved UI contract. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-review-annotations.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when continuous imported recording/history/resource retention/archive observations gain another shared mutable test authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "7af36a7ffe2574c90d88e98cb8cec304eb39dd24719b073a6907b1f0da449d8a",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
+      "reason": "tool-noise: One uninterrupted browser transaction imports exact PNG/SVG bytes, edits with autosave off/on, exercises Undo/Redo, removes the catalog, reopens and proves retained pixels plus portable archive/restore. Its dependent observations require the same real recording/history/source. try/finally closes the page before its own HTTP host, and actual native proof passed. Splitting the callback into separate tests would lose that retention history or require a shared mutable test authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/support/quick-review-annotation-render-probe.ts",
+      "symbol": "parityProbe",
+      "owner": "tooling:test:e2e",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when preview/export/plain witness matrix changes painters, reused source sample or per-case renderer/batch/resource cleanup. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "b51e0c375ebe2e922eb0c9b0d124fa1d0190705bb28909f3ffc6e607b30b0e94",
+      "signatureHash": "cb0d69a43755f315e912fa4955b3a69f9c07d0652a15256c03044653972a7d00",
+      "reason": "tool-noise: A fixed twelve-case attachment/camera/clock matrix compares actual prepared preview against the existing export painters and a nonempty plain-frame witness. One synthetic source sample is reused across the matrix; each iteration owns its renderer/batch, spatial renderer and resources, released in nested finally blocks. The DOM rows are retained visual proof only; no production persistence or new renderer implementation is created. Separation would scatter expected/actual/witness acquisition and cleanup for the same measured case. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/support/quick-review-annotation-render-probe.ts",
+      "symbol": "exportProbe",
+      "owner": "tooling:test:e2e",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess when actual encoded export/decode matrix changes clock/reference receipt, sample close or input disposal ownership. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
+      "astHash": "74f47793937e205d91a99049f4d869b0c27bc544002378baa5795dd4d275fec4",
+      "signatureHash": "b8ad0625a0a5ae6b376c2f16711495726f771a47a4a9367a052e3c18ae243d29",
+      "reason": "tool-noise: One fixed codec/variant matrix uses actual exporter, encoder/muxer and decoded samples to compare a captured lossless reference with encoded output at the full/fragment/presentation clock. Each decoded sample closes in finally and input disposes; typed fixture settings do not create product state. Main/full/fragment evidence depends on the same args/reference, not another runtime owner. This is executable cross-boundary proof, with exact durations/frame counts and witnesses asserted by its spec. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-11"
     }
   ]
 }

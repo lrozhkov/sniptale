@@ -136,6 +136,7 @@ export type ReviewSelection =
   | { kind: 'telemetry'; ref: NonNullable<ReviewAnnotation['telemetryRef']> }
   | { kind: 'edit'; id: string }
   | { kind: 'annotation'; id: string }
+  | { kind: 'annotation-effect'; id: string }
   | { kind: 'canvas-comment'; id: string }
   | { kind: 'text'; id: string }
   | { kind: 'original-audio'; id: string }

@@ -4,6 +4,9 @@ import { parseReviewOriginalSpeechTranscript } from '../../features/video/review
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
 import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import { pruneReviewAnnotationEffectSnapshots } from '../../composition/persistence/review-workspaces/asset-refs';
+import { mergeReviewAnnotationEffectSnapshots } from '../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 import {
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
@@ -19,7 +22,12 @@ export type LocalReviewChange =
   | { kind: 'reset' }
   | { kind: 'advanced'; advanced: unknown }
   | { kind: 'draft'; annotation: ReviewAnnotation | null; before: ReviewAnnotation | null }
-  | { kind: 'commit'; operation: ReviewOperation; consumeDraft: boolean }
+  | {
+      kind: 'commit';
+      operation: ReviewOperation;
+      consumeDraft: boolean;
+      effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
+    }
   | { kind: 'history'; direction: ReviewHistoryDirection };
 
 /** Prepares only the content change; the session retains queue, identity and commit ownership. */
@@ -116,6 +124,17 @@ export function applyLocalReviewChange(
             ),
     };
   } else {
+    const merged = change.effectSnapshots
+      ? mergeReviewAnnotationEffectSnapshots(
+          workspace.effectSnapshots ?? [],
+          change.effectSnapshots
+        )
+      : undefined;
+    if (
+      merged === null ||
+      (change.effectSnapshots && change.operation.target !== 'advancedContent')
+    )
+      throw new Error('Invalid immutable annotation sources');
     if (
       change.consumeDraft &&
       (!draft ||
@@ -137,12 +156,15 @@ export function applyLocalReviewChange(
         : change.operation;
     workspace = {
       ...workspace,
+      ...(merged ? { effectSnapshots: merged } : {}),
       history: [...workspace.history.slice(0, workspace.cursor), operation],
       cursor: workspace.cursor + 1,
     };
     if (change.consumeDraft) draft = null;
   }
-  const parsed = parseVideoWorkspace(workspace);
+  const parsed = parseVideoWorkspace(
+    change.kind === 'history' ? workspace : pruneReviewAnnotationEffectSnapshots(workspace)
+  );
   if (!parsed) throw new Error('Invalid review workspace');
   return { workspace: parsed, draft };
 }

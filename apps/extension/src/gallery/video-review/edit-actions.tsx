@@ -38,6 +38,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   webcam: 'gallery.videoReview.webcam',
   watermark: 'gallery.videoReview.watermark',
   captions: 'gallery.videoReview.captions',
+  'annotation-effects': 'gallery.videoReview.annotationEffects',
   'caption-layout': 'gallery.videoReview.captionConflict',
   presentation: 'gallery.videoReview.presentation',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',

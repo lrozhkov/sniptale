@@ -1,3 +1,4 @@
+import { verifyPreparedMediaReviewAnnotations } from './media-review-assets';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import {
   STORE_NAME,
@@ -218,6 +219,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           : null;
         if (videoReview && videoReview.workspace.source.size !== object.ref.size)
           throw new Error('Video review source bytes are inconsistent.');
+        if (videoReview) await verifyPreparedMediaReviewAnnotations(videoReview, assets);
         return {
           entry: parsed,
           ref: object.ref,
@@ -361,5 +363,9 @@ async function prepareProjectAssets(
       };
     })
   );
+  for (const asset of preparedAssets) {
+    if ('videoReview' in asset && asset.videoReview)
+      await verifyPreparedMediaReviewAnnotations(asset.videoReview, preparedAssets);
+  }
   return preparedAssets.filter((asset): asset is NonNullable<typeof asset> => asset !== null);
 }

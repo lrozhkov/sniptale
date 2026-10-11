@@ -30,6 +30,10 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
  */
 type ReviewStageBindingProps = {
   captions?: Parameters<typeof ReviewStage>[0]['captions'];
+  annotationEffects?: Parameters<typeof ReviewStage>[0]['annotationEffects'];
+  annotationEditing?: Parameters<typeof ReviewStage>[0]['annotationEditing'];
+  onAnnotationGeometry?: Parameters<typeof ReviewStage>[0]['onAnnotationGeometry'];
+  readAsset?: Parameters<typeof ReviewStage>[0]['readAsset'];
   onCaptionSelect?: Parameters<typeof ReviewStage>[0]['onCaptionSelect'];
   outerFadePlan?: Parameters<typeof ReviewStage>[0]['outerFadePlan'] | undefined;
   preview?: Parameters<typeof ReviewStage>[0]['preview'] | undefined;
@@ -146,6 +150,10 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
       ) : null}
       <ReviewStage
         captions={props.captions}
+        annotationEffects={props.annotationEffects}
+        annotationEditing={props.annotationEditing}
+        onAnnotationGeometry={props.onAnnotationGeometry}
+        readAsset={props.readAsset}
         onCaptionSelect={props.onCaptionSelect}
         outerFadePlan={props.outerFadePlan}
         preview={props.preview}

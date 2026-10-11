@@ -194,13 +194,31 @@ function parseBrowserFrame(
     (value['enabled'] !== undefined && !isBoolean(value['enabled'])) ||
     (value['appearance'] !== undefined &&
       value['appearance'] !== 'header' &&
-      value['appearance'] !== 'window')
+      value['appearance'] !== 'window') ||
+    (value['kind'] !== undefined &&
+      value['kind'] !== 'browser' &&
+      value['kind'] !== 'application') ||
+    (value['style'] !== undefined &&
+      value['style'] !== 'windows' &&
+      value['style'] !== 'macos' &&
+      value['style'] !== 'linux') ||
+    (value['theme'] !== undefined && value['theme'] !== 'light' && value['theme'] !== 'dark') ||
+    (value['faviconEnabled'] !== undefined && !isBoolean(value['faviconEnabled'])) ||
+    (value['faviconSource'] !== undefined &&
+      value['faviconSource'] !== null &&
+      value['faviconSource'] !== 'site' &&
+      value['faviconSource'] !== 'file')
   ) {
     return null;
   }
   return {
     ...(value['enabled'] === undefined ? {} : { enabled: value['enabled'] }),
     ...(value['appearance'] === undefined ? {} : { appearance: value['appearance'] }),
+    ...(value['kind'] === undefined ? {} : { kind: value['kind'] }),
+    ...(value['style'] === undefined ? {} : { style: value['style'] }),
+    ...(value['theme'] === undefined ? {} : { theme: value['theme'] }),
+    ...(value['faviconEnabled'] === undefined ? {} : { faviconEnabled: value['faviconEnabled'] }),
+    ...(value['faviconSource'] === undefined ? {} : { faviconSource: value['faviconSource'] }),
     title: value['title'],
     url: value['url'],
     favicon,

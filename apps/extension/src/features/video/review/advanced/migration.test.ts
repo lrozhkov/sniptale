@@ -64,7 +64,7 @@ it('opens v13 text, captions and linked mutes without dropping current or histor
   expect(current).toEqual(state);
   const content = reviewAdvancedContentBaseline(state);
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 13 })).toEqual(content);
-  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 15 })).toBeNull();
+  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 16 })).toBeNull();
   const invalid = {
     ...state,
     text: {

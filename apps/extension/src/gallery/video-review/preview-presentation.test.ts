@@ -50,10 +50,17 @@ function fixture() {
       events.push('capture');
       return captured;
     }),
-    render: vi.fn(() => {
-      events.push('render');
-      return completed;
-    }),
+    render: vi.fn(
+      (
+        _prepared: string,
+        _captured: string,
+        _request: unknown,
+        _signal: AbortSignal
+      ): typeof completed | Promise<typeof completed> => {
+        events.push('render');
+        return completed;
+      }
+    ),
     publish: vi.fn(() => {
       events.push('publish');
       publishTimes.push(time);
@@ -95,6 +102,39 @@ function fixture() {
     },
   };
 }
+
+it.each(['invalidate', 'dispose'] as const)(
+  'holds captured input through pending render and releases late output after %s',
+  async (kind) => {
+    const f = fixture();
+    const waiting = deferred<typeof f.completed>();
+    f.dependencies.render.mockReturnValueOnce(waiting.promise);
+    f.scheduler.update(f.state);
+    await f.step(0);
+    expect(f.dependencies.render).toHaveBeenCalledOnce();
+    const signal = f.dependencies.render.mock.calls[0]![3];
+    expect(f.captured.release).not.toHaveBeenCalled();
+    expect(f.prepared.release).not.toHaveBeenCalled();
+    expect(f.dependencies.publish).not.toHaveBeenCalled();
+    if (kind === 'invalidate') f.scheduler.update({ ...f.state, generation: '2', scene: 'new' });
+    else f.scheduler.dispose();
+    expect(signal.aborted).toBe(true);
+    await f.step(40);
+    expect(f.dependencies.prepare).toHaveBeenCalledOnce();
+    waiting.resolve(f.completed);
+    await flush();
+    expect(f.completed.release).toHaveBeenCalledOnce();
+    expect(f.captured.release).toHaveBeenCalledOnce();
+    expect(f.prepared.release).toHaveBeenCalledOnce();
+    expect(f.dependencies.publish).not.toHaveBeenCalled();
+    if (kind === 'invalidate') {
+      await f.step(80);
+      expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
+      expect(f.dependencies.publish).toHaveBeenCalledOnce();
+    }
+    f.scheduler.dispose();
+  }
+);
 
 it.each([15, 24, 30, 60])(
   'caps all publications at %i FPS while synthetic time advances without source callbacks',

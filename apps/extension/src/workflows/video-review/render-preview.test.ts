@@ -1,4 +1,14 @@
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { readFileSync } from 'node:fs';
+import {
+  resolveEffectV1ControlDefault,
+  sha256EffectV1Bytes,
+} from '@sniptale/runtime-contracts/effect-v1';
+import type {
+  EffectRuntimeFrameResult,
+  EffectRuntimeRenderCommand,
+} from '../../contracts/effect-runtime/types';
+import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
@@ -98,6 +108,178 @@ function setup() {
   };
   return { resources, leases, reservations };
 }
+
+async function annotationsFixture() {
+  const input = scene();
+  const source = readFileSync(
+    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'utf8'
+  );
+  const document = readReviewAnnotationEffectDocument(source)!;
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  input.annotationEffects = {
+    lane: {
+      enabled: true,
+      instances: ['content', 'viewport'].map((attachment, order) => ({
+        id: `annotation-${attachment}`,
+        snapshotId: `effect:${sha256}`,
+        start: 0,
+        end: 12,
+        enabled: true,
+        attachment: attachment === 'content' ? 'content' : 'viewport',
+        order,
+        transform: { x: 0.2, y: 0.3, width: 0.4, height: 0.15, rotation: 0 },
+        controls: Object.fromEntries(
+          document.controls.map((control) => [
+            control.id,
+            resolveEffectV1ControlDefault(control, 'en'),
+          ])
+        ),
+      })),
+    },
+    snapshots: [
+      {
+        id: `effect:${sha256}`,
+        sha256,
+        source,
+        documentId: document.id,
+        schemaVersion: 'sniptale.effect.v1',
+        kind: 'standalone',
+        retainedByteLength: new TextEncoder().encode(source).byteLength,
+        assets: [],
+      },
+    ],
+    segments: buildReviewTimeMap(12, []),
+  };
+  const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn> }[] = [];
+  const success = (request: EffectRuntimeRenderCommand): EffectRuntimeFrameResult => {
+    const bitmap = { width: request.renderWidth, height: request.renderHeight, close: vi.fn() };
+    bitmaps.push(bitmap);
+    return {
+      kind: 'frame',
+      bitmap,
+      width: bitmap.width,
+      height: bitmap.height,
+      requestId: request.requestId,
+      effectInstanceId: request.effectInstanceId,
+      snapshotId: request.snapshotId,
+      sequenceId: request.sequenceId,
+      acknowledged: {
+        documentId: request.documentRef.id,
+        assetSelectionId: request.assetSelectionRef.id,
+      },
+    };
+  };
+  const executor = {
+    renderFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => success(request)),
+    dispose: vi.fn(),
+  };
+  return { input, executor, bitmaps, success };
+}
+
+it('awaits plans, accounts for unique sources/outputs and releases them after painting', async () => {
+  const f = await annotationsFixture();
+  const { resources, reservations } = setup();
+  const replaceLimits = vi.fn();
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => f.executor,
+    allocation: { describe: allocationInput, replaceLimits },
+  });
+  const prepared = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+  expect(resources.bytes).toHaveBeenCalledWith(
+    'annotation-immutable-sources',
+    f.input.annotationEffects!.snapshots[0]!.retainedByteLength
+  );
+  const output = await renderer.render(prepared, frame());
+  expect(f.executor.renderFrame.mock.calls.map(([request]) => request.effectInstanceId)).toEqual([
+    'annotation-content',
+    'annotation-viewport',
+  ]);
+  expect(
+    io.overlays.mock.calls
+      .at(-1)![0]
+      .annotationFrames.map(
+        (entry: { instance: { attachment: string } }) => entry.instance.attachment
+      )
+  ).toEqual(['content', 'viewport']);
+  const bitmapBytes = f.bitmaps.reduce((sum, bitmap) => sum + bitmap.width * bitmap.height * 4, 0);
+  const declared = f.input.annotationEffects!.snapshots[0]!.retainedByteLength;
+  expect(replaceLimits.mock.calls.at(-1)![0].maximumManagedBytes).toBeGreaterThanOrEqual(
+    dimensions.backing.width * dimensions.backing.height * 4 + 1400 + declared + bitmapBytes
+  );
+  for (const bitmap of f.bitmaps) {
+    expect(resources.bytes).toHaveBeenCalledWith(
+      'annotation-output-bitmap',
+      bitmap.width * bitmap.height * 4
+    );
+    expect(bitmap.close).toHaveBeenCalledOnce();
+  }
+  expect(reservations[0]).not.toHaveBeenCalled();
+  renderer.dispose();
+  expect(reservations[0]).toHaveBeenCalledOnce();
+  output.release();
+});
+
+it('refuses parent annotation bitmap admission before sandbox execution and releases staging', async () => {
+  const f = await annotationsFixture();
+  const { resources, leases } = setup();
+  const replaceLimits = vi.fn();
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => f.executor,
+    allocation: { describe: allocationInput, replaceLimits },
+  });
+  const prepared = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+  replaceLimits.mockImplementation((limits) => {
+    if (limits.maximumManagedBytes > 1_000_000) throw new Error('annotation admission refused');
+  });
+  await expect(renderer.render(prepared, frame())).rejects.toThrow('admission refused');
+  expect(f.executor.renderFrame).not.toHaveBeenCalled();
+  expect(leases.at(-1)!.release).toHaveBeenCalledOnce();
+  renderer.dispose();
+});
+
+it.each(['abort', 'dispose', 'supersede'] as const)(
+  'late annotation output after %s cannot publish or retain captured raster resources',
+  async (kind) => {
+    const f = await annotationsFixture();
+    f.input.annotationEffects!.lane.instances.splice(1);
+    const { resources, leases } = setup();
+    const renderer = createReviewPreviewRenderer({
+      resources,
+      annotationExecutor: () => f.executor,
+    });
+    const prepared = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+    let finish!: (result: EffectRuntimeFrameResult) => void;
+    let begin!: () => void;
+    const started = new Promise<void>((resolve) => {
+      begin = resolve;
+    });
+    f.executor.renderFrame.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+          begin();
+        })
+    );
+    const controller = new AbortController();
+    const rendering = renderer.render(prepared, frame(), controller.signal);
+    const rejected = expect(rendering).rejects.toThrow();
+    await started;
+    await expect(renderer.render(prepared, frame())).rejects.toThrow('already admitted');
+    expect(io.frame).not.toHaveBeenCalled();
+    if (kind === 'abort') controller.abort();
+    else if (kind === 'dispose') renderer.dispose();
+    else await renderer.prepare(scene(), dimensions, new AbortController().signal);
+    finish(f.success(f.executor.renderFrame.mock.calls[0]![0]));
+    await rejected;
+    expect(io.frame).not.toHaveBeenCalled();
+    expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+    expect(leases[0]!.release).toHaveBeenCalledOnce();
+    renderer.dispose();
+  }
+);
 beforeEach(() => {
   io.order.length = 0;
   io.frame.mockImplementation(() => io.order.push('scene'));
@@ -158,7 +340,7 @@ it('paints cached captions before blackout and retains editor comment visibility
     (total, lease) => total + vi.mocked(lease.context.measureText).mock.calls.length,
     0
   );
-  const output = renderer.render(prepared, frame());
+  const output = await renderer.render(prepared, frame());
   expect(io.order).toEqual(['scene', 'overlays', 'keys', 'watermark', 'captions', 'blackout']);
   expect(io.overlays.mock.calls[0]![0].scene.comments[0].renderToVideo).toBe(true);
   expect(input.comments[0]!.renderToVideo).toBe(false);
@@ -178,13 +360,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('composes synchronously in layer order from frozen settings and reports actual source time', async () => {
+it('composes admitted frames in layer order from frozen settings and reports actual source time', async () => {
   const { resources, leases } = setup();
   const renderer = createReviewPreviewRenderer({ resources });
   const input = scene();
   const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
   input.source.width = 100;
-  const output = renderer.render(prepared, frame());
+  const output = await renderer.render(prepared, frame());
   expect(output).not.toBeInstanceOf(Promise);
   expect(io.order).toEqual(['scene', 'overlays', 'keys', 'watermark', 'blackout']);
   expect(output).toMatchObject({
@@ -219,7 +401,7 @@ it('passes the same authored layout inputs at both qualities and scales paint va
     layout: { padding: 60, cornerRadius: 30, blur: 12 },
   };
   const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
-  renderer.render(prepared, frame()).release();
+  (await renderer.render(prepared, frame())).release();
   const args = io.frame.mock.calls[0]![1];
   expect(args.background.layout).toMatchObject({ padding: 60, cornerRadius: 10, blur: 4 });
   expect(args.sceneScale).toBe(1 / 3);
@@ -253,10 +435,10 @@ it('cancels a request lease without destroying the reusable background session c
   controller.abort();
   expect(bitmap.close).not.toHaveBeenCalled();
   expect(reservations[0]).not.toHaveBeenCalled();
-  expect(() => renderer.render(prepared, frame())).toThrow('stale');
+  await expect(renderer.render(prepared, frame())).rejects.toThrow('stale');
   const next = await renderer.prepare(input, dimensions, new AbortController().signal);
   expect(createImageBitmap).toHaveBeenCalledOnce();
-  renderer.render(next, frame()).release();
+  (await renderer.render(next, frame())).release();
   next.release();
   renderer.dispose();
   expect(bitmap.close).toHaveBeenCalledOnce();
@@ -295,7 +477,45 @@ it('rejects superseded preparation and closes its late decoded bitmap', async ()
   finish(bitmap as unknown as ImageBitmap);
   await rejected;
   expect(bitmap.close).toHaveBeenCalledOnce();
-  renderer.render(current, frame()).release();
+  (await renderer.render(current, frame())).release();
+  renderer.dispose();
+});
+
+it('passes the prepare owner signal to protected asset reads and rejects late bytes before decoding', async () => {
+  const { resources, reservations } = setup();
+  let finish!: (value: Blob) => void;
+  const readAsset = vi.fn(
+    (_reference: string, _signal: AbortSignal) =>
+      new Promise<Blob>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const decode = vi.fn(async () => ({ width: 10, height: 10, close: vi.fn() }));
+  vi.stubGlobal('createImageBitmap', decode);
+  const renderer = createReviewPreviewRenderer({ resources, readAsset });
+  const input = scene();
+  input.background = {
+    enabled: true,
+    type: 'image',
+    assetId: 'project-asset:local',
+    imageFit: 'contain',
+    layout: { padding: 0, cornerRadius: 0 },
+  };
+  const controller = new AbortController();
+  const pending = renderer.prepare(input, dimensions, controller.signal);
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  await vi.waitFor(() => expect(readAsset).toHaveBeenCalledOnce());
+  const [reference, ownerSignal] = readAsset.mock.calls[0]!;
+  expect(reference).toBe('project-asset:local');
+  expect(ownerSignal.aborted).toBe(false);
+  controller.abort();
+  expect(ownerSignal.aborted).toBe(true);
+  finish(new Blob(['private image']));
+  await rejected;
+  expect(decode).not.toHaveBeenCalled();
+  expect(reservations).toHaveLength(0);
+  const current = await renderer.prepare(scene(), dimensions, new AbortController().signal);
+  (await renderer.render(current, frame())).release();
   renderer.dispose();
 });
 
@@ -306,9 +526,9 @@ it('releases staging when a layer fails and permits an explicit render retry', a
   io.overlays.mockImplementationOnce(() => {
     throw new Error('draw failed');
   });
-  expect(() => renderer.render(prepared, frame())).toThrow('draw failed');
+  await expect(renderer.render(prepared, frame())).rejects.toThrow('draw failed');
   expect(leases[0]!.release).toHaveBeenCalledOnce();
-  renderer.render(prepared, frame()).release();
+  (await renderer.render(prepared, frame())).release();
   expect(leases[1]!.release).toHaveBeenCalledOnce();
   renderer.dispose();
 });
@@ -324,13 +544,13 @@ it('reuses one spatial renderer over admitted frames and releases it when prepar
     },
   ];
   const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
-  renderer.render(prepared, frame()).release();
-  renderer.render(prepared, frame()).release();
+  (await renderer.render(prepared, frame())).release();
+  (await renderer.render(prepared, frame())).release();
   expect(io.spatial).toHaveBeenCalledOnce();
   const spatial = io.spatial.mock.results[0]!.value;
   await renderer.prepare(scene(), dimensions, new AbortController().signal);
   expect(spatial.dispose).toHaveBeenCalledOnce();
-  expect(() => renderer.render(prepared, frame())).toThrow('stale');
+  await expect(renderer.render(prepared, frame())).rejects.toThrow('stale');
   renderer.dispose();
 });
 
@@ -345,7 +565,7 @@ it('prepares a neutral enabled pose without acquiring a GPU renderer', async () 
     },
   ];
   const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
-  renderer.render(prepared, frame()).release();
+  (await renderer.render(prepared, frame())).release();
   expect(io.spatial).not.toHaveBeenCalled();
   renderer.dispose();
 });
@@ -355,9 +575,9 @@ it('reuses scene preparation across request leases and rejects a released lease'
   const renderer = createReviewPreviewRenderer({ resources });
   const input = scene();
   const first = await renderer.prepare(input, dimensions, new AbortController().signal);
-  renderer.render(first, frame()).release();
+  (await renderer.render(first, frame())).release();
   first.release();
-  expect(() => renderer.render(first, frame())).toThrow('stale');
+  await expect(renderer.render(first, frame())).rejects.toThrow('stale');
   const next = await renderer.prepare(
     structuredClone(input),
     structuredClone(dimensions),
@@ -366,7 +586,7 @@ it('reuses scene preparation across request leases and rejects a released lease'
   expect(io.watermark).toHaveBeenCalledOnce();
   expect(io.background).toHaveBeenCalledOnce();
   expect(next.generation).toBe(first.generation);
-  renderer.render(next, frame()).release();
+  (await renderer.render(next, frame())).release();
   next.release();
   renderer.dispose();
 });
@@ -398,7 +618,7 @@ it('uses admitted transition endpoints and webcam pixels before the final scene 
     placement: input.webcam.placement,
     drawable: { draw: vi.fn() },
   };
-  const output = renderer.render(prepared, admitted);
+  const output = await renderer.render(prepared, admitted);
   expect(io.order).toEqual([
     'transition',
     'scene',
@@ -466,7 +686,7 @@ it('reserves the selected header backing before decode and releases it with the 
   expect(vi.mocked(resources.bytes).mock.invocationCallOrder[0]).toBeLessThan(
     io.header.mock.invocationCallOrder[0]!
   );
-  renderer.render(prepared, frame()).release();
+  (await renderer.render(prepared, frame())).release();
   const bitmap = await io.header.mock.results[0]!.value;
   renderer.dispose();
   expect(bitmap.close).toHaveBeenCalledOnce();
@@ -603,17 +823,17 @@ it('evaluates the immutable outer plan at each represented frame after watermark
   if (!result.ok) throw new Error('Expected valid plan');
   const input = { ...scene(), outerFadePlan: result.plan };
   const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
-  const first = renderer.render(prepared, { ...frame(), resultTime: 0.2 });
+  const first = await renderer.render(prepared, { ...frame(), resultTime: 0.2 });
   expect(io.order.slice(-3)).toEqual(['watermark', 'blackout', 'outer-fade']);
   expect(leases[0]!.context.fillRect).toHaveBeenCalledExactlyOnceWith(0, 0, 640, 360);
   expect(leases[0]!.context.globalAlpha).toBeCloseTo(0.5);
   expect(leases[0]!.context.fillStyle).toBe('#ff0000ff');
   expect(leases[0]!.context.globalCompositeOperation).toBe('source-over');
   first.release();
-  renderer.render(prepared, { ...frame(), resultTime: 1 }).release();
+  (await renderer.render(prepared, { ...frame(), resultTime: 1 })).release();
   expect(leases[1]!.context.globalAlpha).toBe(0);
   expect(io.watermark).toHaveBeenCalledOnce();
-  renderer.render(prepared, { ...frame(), resultTime: 4 }).release();
+  (await renderer.render(prepared, { ...frame(), resultTime: 4 })).release();
   expect(leases[2]!.context.globalAlpha).toBe(1);
   renderer.dispose();
 });
@@ -660,7 +880,7 @@ it('dissolves independently composed zoom poses instead of blending their source
         right: { start: 4, end: 6 },
       },
     ])!;
-    const output = renderer.render(prepared, {
+    const output = await renderer.render(prepared, {
       ...admitted,
       transition: { blend, frames: { left, right } },
     });
@@ -719,7 +939,7 @@ it('admits the full output dissolve scratch and endpoint overlays before acquiri
     },
   ])!;
   const endpoint = { timestamp: 1.9, draw: vi.fn(), close: vi.fn() };
-  const output = renderer.render(prepared, {
+  const output = await renderer.render(prepared, {
     ...frame(),
     resultTime: 1.8,
     transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 4 } } },

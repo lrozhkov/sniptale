@@ -453,6 +453,9 @@ async function renderPreparedReviewExport(
         edits,
         advanced,
         captionTimeMap: buildReviewTimeMap(index.duration, document.edits),
+        ...(prepared.workspace.effectSnapshots
+          ? { effectSnapshots: prepared.workspace.effectSnapshots }
+          : {}),
         ...reviewExportPresentations(original.telemetry, advanced, index.duration, document.edits),
         comments: resolveQuickEditEffectiveFeatures(advanced).overlaysVisible
           ? resolveOverlayComments(document)

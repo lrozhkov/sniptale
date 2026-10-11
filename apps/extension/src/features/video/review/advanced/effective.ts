@@ -20,6 +20,7 @@ interface QuickEditEffectiveFeatures {
   zoomTrackVisible: boolean;
   audioTrackVisible: boolean;
   webcamTrackVisible: boolean;
+  annotationEffectsTrackVisible: boolean;
   /** In-frame comments follow the advanced-mode overlay visibility control. */
   overlaysVisible: boolean;
   /** Advanced effects are suppressed while the editor is in basic mode. */
@@ -27,6 +28,7 @@ interface QuickEditEffectiveFeatures {
   webcamApplied: boolean;
   watermarkApplied: boolean;
   captionsApplied: boolean;
+  annotationEffectsApplied: boolean;
   presentationApplied: boolean;
   zoomApplied: boolean;
   backgroundApplied: boolean;
@@ -50,6 +52,12 @@ export function resolveQuickEditEffectiveFeatures(
     audioTrackVisible: advanced && state.ui.tracks.audio,
     webcamTrackVisible: advanced && !!state.webcam && state.ui.tracks.webcam !== false,
     webcamApplied: advanced && !!state.webcam?.enabled && state.ui.tracks.webcam !== false,
+    annotationEffectsTrackVisible: advanced && state.ui.tracks.annotationEffects !== false,
+    annotationEffectsApplied:
+      advanced &&
+      state.ui.tracks.annotationEffects !== false &&
+      !!state.annotationEffects?.enabled &&
+      state.annotationEffects.instances.some((instance) => instance.enabled),
     watermarkApplied:
       advanced &&
       (state.watermark?.mode === 'text' ||
@@ -83,6 +91,7 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   captions: QuickEditAdvancedState['captions'];
   text: QuickEditAdvancedState['text'];
   presentation: QuickEditAdvancedState['presentation'];
+  annotationEffects: QuickEditAdvancedState['annotationEffects'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -107,6 +116,7 @@ export function resolveQuickEditEffectiveState(
     watermark: features.watermarkApplied ? state.watermark : undefined,
     captions: features.captionsApplied ? state.captions : undefined,
     text: features.captionsApplied ? state.text : undefined,
+    annotationEffects: features.annotationEffectsApplied ? state.annotationEffects : undefined,
     presentation:
       features.presentationApplied && state.presentation
         ? resolvePresentationSettings(state.presentation)
@@ -137,6 +147,7 @@ export type QuickEditExportReason =
   | 'webcam'
   | 'watermark'
   | 'captions'
+  | 'annotation-effects'
   | 'caption-layout'
   | 'presentation'
   | 'canvas-size'
@@ -228,6 +239,7 @@ export function resolveQuickEditExportPlan(args: {
   if (effective.webcam) visual.push('webcam');
   if (features.watermarkApplied) visual.push('watermark');
   if (features.captionsApplied) visual.push('captions');
+  if (features.annotationEffectsApplied) visual.push('annotation-effects');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
   if (
@@ -270,6 +282,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     !!state.canvas ||
     !!state.windowHeader ||
     !!state.webcam?.enabled ||
+    !!state.annotationEffects?.instances.length ||
     (!!state.captions?.enabled &&
       !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim())) ||
     state.watermark?.mode === 'text' ||

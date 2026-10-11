@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import * as sizeEstimator from '../estimate-size';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

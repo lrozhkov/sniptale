@@ -12,6 +12,8 @@ import { createReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewAnnotation, ReviewSource } from '../../features/video/review/types';
 import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
+import { createVideoReviewSession } from '../../workflows/video-review/session';
+import type { LoadedReview } from './use-session';
 
 const io = vi.hoisted(() => ({
   stage: vi.fn(),
@@ -43,6 +45,7 @@ let host: HTMLDivElement;
 let state: ComponentProps<typeof ReviewPreviewBinding>['state'];
 let active: import('../../features/video/review/types').ReviewSelection;
 let selection: import('../../features/video/review/types').ReviewAnchor;
+let session: LoadedReview['session'];
 const region = createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 2, endMax: 4 });
 const source: ReviewSource = {
   duration: 14,
@@ -59,11 +62,70 @@ async function render(sceneActive = true) {
       <ReviewPreviewBinding
         state={state}
         sceneActive={sceneActive}
-        resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video' }}
+        resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video', session }}
       />
     )
   );
 }
+
+it('forwards immutable session annotation sources and full clocks, reading local bytes without Save', async () => {
+  state.features.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 14,
+        attachment: 'content',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
+  const captured = session.getSnapshot();
+  const effectSnapshots = [
+    {
+      id: 'effect:frame',
+      schemaVersion: 'sniptale.effect.v1' as const,
+      kind: 'standalone' as const,
+      documentId: 'frame',
+      sha256: '0'.repeat(64),
+      source: '{}',
+      retainedByteLength: 2,
+      assets: [],
+    },
+  ];
+  vi.spyOn(session, 'getSnapshot').mockReturnValue({
+    ...captured,
+    snapshot: {
+      ...captured.snapshot,
+      workspace: { ...captured.snapshot.workspace, effectSnapshots },
+    },
+  });
+  const bytes = new Blob(['protected local image'], { type: 'image/png' });
+  const read = vi.spyOn(session, 'readAnnotationResource').mockResolvedValueOnce(bytes);
+  await render();
+  expect(stage().annotationEffects).toEqual({
+    lane: state.features.annotationEffects,
+    snapshots: effectSnapshots,
+    segments: state.timeline.timeMap.getSegments(),
+  });
+  const controller = new AbortController();
+  expect(await stage().readAsset!('project-asset:local', controller.signal)).toBe(bytes);
+  expect(read).toHaveBeenCalledExactlyOnceWith('project-asset:local', controller.signal);
+  expect(session.getSnapshot().snapshot.workspace.revision).toBe(1);
+  controller.abort();
+  await expect(stage().readAsset!('project-asset:other', controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  expect(read).toHaveBeenCalledOnce();
+  state.features.annotationEffects = undefined;
+  await render();
+  expect(stage().annotationEffects).toBeUndefined();
+});
 
 it('forwards caption clocks and guards conflict navigation', async () => {
   const fragment = {
@@ -101,6 +163,21 @@ beforeEach(() => {
   root = createRoot(host);
   active = { kind: 'annotation', id: 'note' };
   selection = { kind: 'point', time: 0 };
+  session = createVideoReviewSession({
+    workspace: {
+      aggregateId: 'recording:r',
+      sourceAssetId: 'original',
+      formatVersion: 1,
+      source,
+      revision: 1,
+      cursor: 0,
+      history: [],
+      advanced: createQuickEditAdvancedState(),
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    draft: null,
+  });
   state = {
     text: { jump: vi.fn() },
     busy: false,
@@ -120,6 +197,7 @@ beforeEach(() => {
       zoomTrackVisible: true,
       zoomRegions: [],
       overlaysVisible: true,
+      annotationEffects: undefined,
     },
     composer: { annotation: null, change: vi.fn() },
     snapshot: { document: { edits: [], canvasComments: [], annotations: [] } },
@@ -358,7 +436,7 @@ it('routes local preview preferences and inspector entry without changing editin
       <ReviewPreviewBinding
         state={state}
         sceneActive={false}
-        resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video' }}
+        resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video', session }}
         previewPreferences={preferences}
         onPreviewRaster={raster}
         onOpenPreviewSettings={open}
@@ -407,4 +485,59 @@ it('keeps decoder recovery busy without moving the restored frame to an annotati
   expect(host.querySelector('main')?.getAttribute('aria-busy')).toBe('true');
   stage().onReady();
   expect(state.seek).not.toHaveBeenCalled();
+});
+
+it('uses effective preview controls and retains geometry while overlays are hidden', async () => {
+  const instance: import('../../features/video/review/annotation-effects/types').ReviewAnnotationEffect =
+    {
+      id: 'selected',
+      snapshotId: 'immutable',
+      enabled: true,
+      start: 0,
+      end: 14,
+      attachment: 'content',
+      transform: { x: 0.1, y: 0.1, width: 0.4, height: 0.2, rotation: 0 },
+      controls: { title: 'Authored' },
+      order: 0,
+    };
+  const lane = { enabled: true, instances: [instance] };
+  const previewLane = { ...lane, instances: [{ ...instance, controls: { title: 'Disposable' } }] };
+  state.features.annotationEffects = lane;
+  state.annotationEffects = {
+    lane,
+    previewLane,
+    geometry: null,
+    gestureId: instance.id,
+    setGeometry: vi.fn(),
+    pending: false,
+    failure: null,
+    add: vi.fn(),
+    change: vi.fn(),
+    enabled: vi.fn(),
+    remove: vi.fn(),
+    duplicate: vi.fn(),
+    beginGesture: vi.fn(() => true),
+    previewGesture: vi.fn(),
+    cancelGesture: vi.fn(),
+    commitGesture: vi.fn(async () => true),
+    hasPending: vi.fn(() => false),
+    flush: vi.fn(async () => undefined),
+    retry: vi.fn(),
+  };
+  state.activeSelection = { kind: 'annotation-effect', id: instance.id };
+  await render();
+  expect(stage().annotationEffects?.lane).toBe(previewLane);
+  expect(stage().annotationEditing?.selectedId).toBe(instance.id);
+  expect(stage().annotationEditing?.time).toBe(state.timeline.sceneOutputTime);
+  expect(stage().onAnnotationGeometry).toBe(state.annotationEffects?.setGeometry);
+  state.features.overlaysVisible = false;
+  await render();
+  expect(stage().annotationEditing).toBeUndefined();
+  expect(stage().annotationEffects?.lane).toBe(previewLane);
+  expect(stage().onAnnotationGeometry).toBe(state.annotationEffects?.setGeometry);
+  state.features.annotationEffects = undefined;
+  state.advanced.ui.mode = 'basic';
+  await render();
+  expect(stage().annotationEffects).toBeUndefined();
+  expect(stage().annotationEditing).toBeUndefined();
 });

@@ -96,6 +96,7 @@ export function useReviewAdvanced(session: Session) {
   }, [contentState, session]);
   const content = contentState.content;
   const {
+    annotationEffects: _baselineAnnotationEffects,
     actionsEnabled: _baselineActionsEnabled,
     keyAnimations: _baselineKeys,
     clickAnimations: _baselineClicks,

@@ -37,8 +37,9 @@ interface Dependencies<Scene, Prepared, Captured, Completed> {
   render(
     prepared: Prepared,
     captured: Captured,
-    request: ReviewPresentationRequest<Scene>
-  ): ReviewPresentationLease<Completed>;
+    request: ReviewPresentationRequest<Scene>,
+    signal: AbortSignal
+  ): ReviewPresentationLease<Completed> | Promise<ReviewPresentationLease<Completed>>;
   publish(completed: Completed, request: ReviewPresentationRequest<Scene>): void;
   onError(error: unknown): void;
 }
@@ -105,7 +106,12 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
       if (!current(version)) return;
       captured = dependencies.capture(prepared.value, request.time);
       if (!current(version)) return;
-      completed = dependencies.render(prepared.value, captured.value, request);
+      completed = await dependencies.render(
+        prepared.value,
+        captured.value,
+        request,
+        controller.signal
+      );
       if (!current(version) || !due(lastPublished)) return;
       dependencies.publish(completed.value, request);
       if (current(version)) lastPublished = dependencies.now();

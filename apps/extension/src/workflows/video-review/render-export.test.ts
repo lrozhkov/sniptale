@@ -11,7 +11,10 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { createCanvasComment } from '../../features/video/review/comments';
 import { drainSegmentAudio, renderRenderWindowFrames, writeReviewFrames } from './render-export';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 const presentationExport = vi.hoisted(() => vi.fn());
+const annotationMain = vi.hoisted(() => ({ open: vi.fn() }));
+vi.mock('./presentation-main', () => ({ createReviewPresentationMain: annotationMain.open }));
 vi.mock('./render-presentation-export', () => ({
   writeReviewPresentationFrames: presentationExport,
 }));
@@ -37,6 +40,144 @@ function cutEdit(start: number, end: number) {
     requestedEnd: end,
   };
 }
+
+function annotationExportArgs() {
+  const args = argsFixture();
+  args.advanced.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 2,
+        attachment: 'viewport',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
+  return args;
+}
+
+it('composes annotations without extra decoding and preserves fractional cadence', async () => {
+  const args = annotationExportArgs();
+  args.edits = [cutEdit(0.2, 0.5)];
+  const frames: { release: ReturnType<typeof vi.fn> }[] = [];
+  const main = {
+    renderAtTime: vi.fn(async (_time: number) => {
+      const canvas = { width: 320, height: 180 } as HTMLCanvasElement;
+      const frame = { canvas, context: contextFixture(), release: vi.fn() };
+      frames.push(frame);
+      return frame;
+    }),
+    dispose: vi.fn(),
+  };
+  annotationMain.open.mockReset().mockResolvedValue(main);
+  const effectSnapshots = [
+    {
+      id: 'effect:frame',
+      schemaVersion: 'sniptale.effect.v1' as const,
+      kind: 'standalone' as const,
+      documentId: 'frame',
+      sha256: '0'.repeat(64),
+      source: '{}',
+      retainedByteLength: 2,
+      assets: [],
+    },
+  ];
+  const fullMap = buildReviewTimeMap(10, []);
+  const receipt = await writeReviewFrames({
+    ...args,
+    fragmentOffset: 5,
+    effectSnapshots,
+    captionTimeMap: fullMap,
+  });
+  expect(main.renderAtTime.mock.calls.map(([time]) => time)).toEqual([0, 0.2, 0.7, 1.2]);
+  expect(state.encoded.map((sample) => [sample.timestamp, sample.duration])).toEqual([
+    [0, 0.2],
+    [0.2, 0.5],
+    [0.7, 0.5],
+    [1.2, 0.5],
+  ]);
+  expect(annotationMain.open).toHaveBeenCalledWith(
+    expect.objectContaining({
+      effectSnapshots,
+      captionTimeMap: fullMap,
+      fragmentOffset: 5,
+      fps: 2,
+      effective: expect.objectContaining({ annotationEffects: args.advanced.annotationEffects }),
+      dimensions: { canonical: { width: 320, height: 180 }, backing: { width: 320, height: 180 } },
+    })
+  );
+  expect(state.drawn).toHaveLength(0);
+  expect(args.readProjectAsset).not.toHaveBeenCalled();
+  expect(frames.every((frame) => frame.release.mock.calls.length === 1)).toBe(true);
+  expect(main.dispose).toHaveBeenCalledOnce();
+  expect(receipt).toMatchObject({ videoPackets: 4, audioReencoded: false });
+});
+
+it('keeps original audio copy admission for annotation-only probes without requiring an audio encoder', async () => {
+  const args = annotationExportArgs();
+  state.audioTrack = {
+    codec: 'opus',
+    getDecoderConfig: async () => ({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2 }),
+    getSampleRate: async () => 48000,
+  };
+  const main = {
+    renderAtTime: vi.fn(async () => ({
+      canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+      context: contextFixture(),
+      release: vi.fn(),
+    })),
+    dispose: vi.fn(),
+  };
+  annotationMain.open.mockReset().mockResolvedValue(main);
+  const probe = vi.fn(async () => undefined);
+  const receipt = await writeReviewFrames({
+    ...args,
+    index: { ...args.index, audioCodec: 'opus' },
+    frameProbe: { add: probe },
+  });
+  expect(receipt).toMatchObject({ audioReencoded: false, outputAudioCodec: 'opus' });
+  expect(probe).toHaveBeenCalled();
+  expect(args.writer.writeAt).not.toHaveBeenCalled();
+  expect(main.dispose).toHaveBeenCalledOnce();
+});
+
+it.each(['compose', 'encode', 'abort'] as const)(
+  'releases shared annotation frame ownership after %s failure',
+  async (failure) => {
+    const args = annotationExportArgs();
+    const controller = new AbortController();
+    const release = vi.fn();
+    const main = {
+      renderAtTime: vi.fn(async () => {
+        if (failure === 'compose') throw new Error('effect source unavailable');
+        if (failure === 'abort') controller.abort();
+        return {
+          canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+          context: contextFixture(),
+          release,
+        };
+      }),
+      dispose: vi.fn(),
+    };
+    annotationMain.open.mockReset().mockResolvedValue(main);
+    const encode = vi.fn(async () => {
+      throw new Error('encode failed');
+    });
+    await expect(
+      writeReviewFrames({ ...args, signal: controller.signal, frameProbe: { add: encode } })
+    ).rejects.toThrow();
+    expect(release).toHaveBeenCalledTimes(failure === 'compose' ? 0 : 1);
+    expect(main.dispose).toHaveBeenCalledOnce();
+    expect(state.drawn).toHaveLength(0);
+    if (failure !== 'encode') expect(encode).not.toHaveBeenCalled();
+  }
+);
 
 describe('drawReviewSceneFrame', () => {
   const layout = {

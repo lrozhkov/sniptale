@@ -63,6 +63,8 @@ export function reviewSelectionExists(
     return document.annotations.some((item) => item.id === selection.id);
   if (selection.kind === 'canvas-comment')
     return document.canvasComments.some((item) => item.id === selection.id);
+  if (selection.kind === 'annotation-effect')
+    return !!advanced.annotationEffects?.instances.some((item) => item.id === selection.id);
   if (selection.kind === 'text')
     return !!advanced.text?.fragments.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom')
@@ -100,6 +102,7 @@ export function useReviewSelectionLifecycle(args: {
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
   deleteText?(id: string): void;
+  deleteAnnotationEffect?(id: string): void;
   deleteZoom(id: string): void;
   deleteZoomLink(id: string): void;
   deleteAudio(lane: 'voiceover' | 'music', id: string): void;
@@ -114,6 +117,8 @@ export function useReviewSelectionLifecycle(args: {
     const historyRemoval = selectedHistoryRemoval(args.selection, args.document);
     if (historyRemoval) void args.run(() => args.commit(historyRemoval));
     else if (args.selection.kind === 'canvas-comment') args.deleteCanvas(args.selection.id);
+    else if (args.selection.kind === 'annotation-effect')
+      args.deleteAnnotationEffect?.(args.selection.id);
     else if (args.selection.kind === 'text') args.deleteText?.(args.selection.id);
     else if (args.selection.kind === 'zoom') args.deleteZoom(args.selection.id);
     else if (args.selection.kind === 'zoom-link') args.deleteZoomLink(args.selection.id);
@@ -173,6 +178,10 @@ export function reviewSelectionSourceTime(
       const comment = document.canvasComments.find((item) => item.id === selection.id);
       return comment?.visible ? ((comment.start ?? 0) + (comment.end ?? duration)) / 2 : null;
     }
+    case 'annotation-effect':
+      return midpoint(
+        advanced.annotationEffects?.instances.find((item) => item.id === selection.id)
+      );
     case 'text': {
       const fragment = advanced.text?.fragments.find((item) => item.id === selection.id);
       if (!fragment) return null;
@@ -244,6 +253,8 @@ function selectionTrackVisible(
     case 'webcam-position':
     case 'webcam-hidden':
       return features.webcamTrackVisible;
+    case 'annotation-effect':
+      return features.annotationEffectsTrackVisible;
     case 'zoom':
       return features.zoomTrackVisible;
     case 'zoom-link':

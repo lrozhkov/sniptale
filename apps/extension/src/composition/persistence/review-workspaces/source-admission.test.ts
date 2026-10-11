@@ -1,5 +1,11 @@
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
+import { readReviewAnnotationEffectDocument } from '../../../features/video/review/annotation-effects/validation';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { applyLocalReviewChange } from '../../../workflows/video-review/local-session';
 import type { AssetReadyJournal } from '../assets/contracts';
 import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
 import { createReviewWorkspaceStoreFixture } from './store.test-support';
@@ -7,7 +13,7 @@ import { createVideoReviewSession } from '../../../workflows/video-review/sessio
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 
-const harness = vi.hoisted(() => ({ database: vi.fn(), journals: vi.fn() }));
+const harness = vi.hoisted(() => ({ database: vi.fn(), journals: vi.fn(), readFile: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: harness.database,
@@ -19,8 +25,16 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
 vi.mock('../assets/opfs-store', async (original) => ({
   ...(await original<typeof import('../assets/opfs-store')>()),
   listReadyJournals: harness.journals,
+  readAssetFile: harness.readFile,
 }));
-import { openVideoWorkspace, readVideoWorkspace, saveVideoWorkspaceAdvanced } from './store';
+import {
+  openVideoWorkspace,
+  readVideoWorkspace,
+  saveVideoWorkspaceAdvanced,
+  commitVideoWorkspace,
+  saveVideoWorkspaceSnapshot,
+  moveVideoWorkspaceHistory,
+} from './store';
 
 const id = 'recording:beta-v1-recording';
 const source = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
@@ -33,12 +47,339 @@ const entry = {
 };
 let rows: Map<string, Map<string, unknown>>;
 let journals: AssetReadyJournal[];
+let writesStarted: number;
+let failWrites: boolean;
 beforeEach(() => {
-  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  failWrites = false;
+  const fixture = createReviewWorkspaceStoreFixture(() => failWrites);
   rows = fixture.rows;
-  harness.database.mockResolvedValue(fixture.database);
+  writesStarted = 0;
+  harness.database.mockResolvedValue({
+    ...fixture.database,
+    transaction: (stores: string[], mode: string) => {
+      if (mode === 'readwrite') writesStarted++;
+      return fixture.database.transaction(stores, mode);
+    },
+  });
   journals = [];
   harness.journals.mockImplementation(async () => journals);
+  harness.readFile.mockReset();
+});
+
+async function effectSnapshot(imported = false): Promise<ReviewAnnotationEffectSnapshot> {
+  const source = readFileSync(
+    imported
+      ? 'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json'
+      : 'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'utf8'
+  );
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const document = readReviewAnnotationEffectDocument(source)!;
+  const assets = imported
+    ? document.assets.map((asset) => ({
+        id: asset.id,
+        kind: 'svg' as const,
+        mimeType: asset.mimeType,
+        sha256: asset.sha256!,
+        byteLength: asset.byteLength!,
+        assetId: 'project-asset:effect-mark',
+      }))
+    : [];
+  return {
+    id: `effect:${sha256}`,
+    sha256,
+    schemaVersion: 'sniptale.effect.v1',
+    kind: 'standalone',
+    documentId: document.id,
+    source,
+    retainedByteLength:
+      new TextEncoder().encode(source).byteLength +
+      assets.reduce((total, asset) => total + asset.byteLength, 0),
+    assets,
+  };
+}
+
+function effectOperation(
+  opened: Awaited<ReturnType<typeof openVideoWorkspace>>,
+  snapshot: ReviewAnnotationEffectSnapshot
+) {
+  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
+  return {
+    id: 'apply-effect',
+    at: 1,
+    target: 'advancedContent' as const,
+    before,
+    after: {
+      ...before,
+      annotationEffects: {
+        enabled: false,
+        instances: [
+          {
+            id: 'annotation',
+            snapshotId: snapshot.id,
+            enabled: false,
+            start: 1,
+            end: 4,
+            attachment: 'viewport' as const,
+            transform: { x: 0, y: 0, width: 0.5, height: 0.5, rotation: 0 },
+            controls: {},
+            order: 0,
+          },
+        ],
+      },
+    },
+  };
+}
+
+it('admits built-in source atomically, retains Undo and prunes discarded Redo', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const snapshot = await effectSnapshot();
+  const saved = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    operation: effectOperation(opened, snapshot),
+    effectSnapshots: [snapshot],
+  });
+  expect(saved.workspace.effectSnapshots).toEqual([snapshot]);
+  expect(saved.workspace.history).toHaveLength(1);
+  expect(rows.get('video_workspaces')!.get(id)).not.toHaveProperty('effectSnapshots');
+  expect(rows.get('video_workspace_history')!.get(JSON.stringify([id, 0]))).toHaveProperty(
+    'effectSnapshots',
+    [snapshot]
+  );
+  expect(rows.get('video_workspace_history')!.get(JSON.stringify([id, 1]))).not.toHaveProperty(
+    'effectSnapshots'
+  );
+  const undone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedRevision: saved.workspace.revision,
+    expectedSourceAssetId: saved.workspace.sourceAssetId,
+    direction: 'undo',
+  });
+  expect(undone.workspace.effectSnapshots).toEqual([snapshot]);
+  const before = reviewAdvancedContentBaseline(undone.workspace.advanced);
+  const branched = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedRevision: undone.workspace.revision,
+    expectedSourceAssetId: undone.workspace.sourceAssetId,
+    operation: {
+      id: 'branch',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after: {
+        ...before,
+        audio: { ...before.audio, original: { ...before.audio.original, volume: 0.3 } },
+      },
+    },
+  });
+  expect(branched.workspace.effectSnapshots).toEqual([]);
+  expect(branched.workspace.history.map((operation) => operation.id)).toEqual(['branch']);
+});
+
+it('rejects structurally valid but changed source bytes before any write transaction', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const snapshot = await effectSnapshot();
+  const capturedWrites = writesStarted;
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      operation: effectOperation(opened, snapshot),
+      effectSnapshots: [
+        {
+          ...snapshot,
+          source: snapshot.source + ' ',
+          retainedByteLength: snapshot.retainedByteLength + 1,
+        },
+      ],
+    })
+  ).rejects.toMatchObject({ code: 'invalid' });
+  expect(writesStarted).toBe(capturedWrites);
+  expect(await readVideoWorkspace(id)).toEqual(opened);
+});
+
+it('refuses rewriting retained immutable source on whole-buffer Save', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const snapshot = await effectSnapshot();
+  const saved = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    operation: effectOperation(opened, snapshot),
+    effectSnapshots: [snapshot],
+  });
+  await expect(
+    saveVideoWorkspaceSnapshot({
+      aggregateId: id,
+      expectedRevision: saved.workspace.revision,
+      expectedDraftRevision: null,
+      expectedSourceAssetId: saved.workspace.sourceAssetId,
+      workspace: {
+        ...saved.workspace,
+        effectSnapshots: [
+          {
+            ...snapshot,
+            source: snapshot.source + ' ',
+            retainedByteLength: snapshot.retainedByteLength + 1,
+          },
+        ],
+      },
+      draft: null,
+    })
+  ).rejects.toMatchObject({ code: 'invalid' });
+  expect(await readVideoWorkspace(id)).toEqual(saved);
+});
+
+it('verifies private SVG bytes before the write transaction and admits the exact unpublished source', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const snapshot = await effectSnapshot(true);
+  const descriptor = snapshot.assets[0]!;
+  const bytes = readFileSync('tooling/test/e2e/fixtures/effect-v1/assets/neutral-mark.svg');
+  const entry = {
+    id: 'effect-mark',
+    assetId: 'physical-effect-mark',
+    mimeType: descriptor.mimeType,
+    size: descriptor.byteLength,
+    createdAt: 1,
+  };
+  const ref = {
+    assetId: entry.assetId,
+    mimeType: entry.mimeType,
+    size: entry.size,
+    createdAt: 1,
+    sha256: null,
+    location: { kind: 'opfs' as const, objectKey: `objects/${entry.assetId}` },
+  };
+  journals.push({
+    journalId: 'ready-effect',
+    domain: 'project-assets',
+    createdAt: 1,
+    assetRefs: [ref],
+    payload: {
+      entry,
+      filename: 'mark.svg',
+      publishToLibrary: false,
+      expectedAssetId: null,
+      requiredReviewAnnotationEffect: {
+        aggregateId: id,
+        sourceAssetId: opened.workspace.sourceAssetId,
+        snapshotId: snapshot.id,
+        resourceId: descriptor.id,
+        sha256: descriptor.sha256,
+      },
+    },
+  });
+  rows.set('asset_refs', new Map());
+  const capturedWrites = writesStarted;
+  harness.readFile.mockImplementation(async () => {
+    expect(writesStarted).toBe(capturedWrites);
+    return new File([Uint8Array.from(bytes)], 'mark.svg', { type: entry.mimeType });
+  });
+  const args = {
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    operation: effectOperation(opened, snapshot),
+    effectSnapshots: [snapshot],
+  };
+  const saved = await commitVideoWorkspace(args);
+  expect(harness.readFile).toHaveBeenCalledExactlyOnceWith(ref, 'effect-mark');
+  expect(saved.workspace.history).toHaveLength(1);
+  expect(rows.get('project_assets')!.size).toBe(0);
+  expect(await readVideoWorkspace(id)).toEqual(saved);
+});
+
+it.each(['corrupt-bytes', 'missing', 'physical-replacement', 'revision-conflict'] as const)(
+  'refuses %s during verified source admission without inserting annotation history',
+  async (failure) => {
+    const opened = await openVideoWorkspace(id, source);
+    const snapshot = await effectSnapshot(true);
+    const descriptor = snapshot.assets[0]!;
+    const bytes = Uint8Array.from(
+      readFileSync('tooling/test/e2e/fixtures/effect-v1/assets/neutral-mark.svg')
+    );
+    const entry = {
+      id: 'effect-mark',
+      assetId: 'physical-mark',
+      createdAt: 1,
+      mimeType: descriptor.mimeType,
+      size: descriptor.byteLength,
+    };
+    const ref = {
+      assetId: entry.assetId,
+      createdAt: 1,
+      size: entry.size,
+      mimeType: entry.mimeType,
+      sha256: null,
+      location: { kind: 'opfs' as const, objectKey: `objects/${entry.assetId}` },
+    };
+    rows.get('project_assets')!.set(entry.id, entry);
+    rows.set('asset_refs', new Map([[ref.assetId, ref]]));
+    harness.readFile.mockImplementation(async () => {
+      if (failure === 'missing') throw new Error('Private raw OPFS error');
+      if (failure === 'corrupt-bytes') bytes[0] = 0;
+      if (failure === 'physical-replacement')
+        rows.get('project_assets')!.set(entry.id, { ...entry, assetId: 'replaced-mark' });
+      if (failure === 'revision-conflict') {
+        const head = rows.get('video_workspaces')!.get(id);
+        if (!isRecord(head) || typeof head['revision'] !== 'number')
+          throw new Error('Invalid fixture');
+        rows.get('video_workspaces')!.set(id, { ...head, revision: head['revision'] + 1 });
+      }
+      return new File([bytes], 'mark.svg', { type: entry.mimeType });
+    });
+    await expect(
+      commitVideoWorkspace({
+        aggregateId: id,
+        expectedRevision: opened.workspace.revision,
+        expectedSourceAssetId: opened.workspace.sourceAssetId,
+        operation: effectOperation(opened, snapshot),
+        effectSnapshots: [snapshot],
+      })
+    ).rejects.toMatchObject({
+      code:
+        failure === 'revision-conflict'
+          ? 'conflict'
+          : failure === 'corrupt-bytes'
+            ? 'invalid'
+            : 'missing-media',
+    });
+    const retained = await readVideoWorkspace(id);
+    expect(retained?.workspace.history).toEqual([]);
+    expect(retained?.workspace.effectSnapshots).toBeUndefined();
+  }
+);
+
+it('Save adopts the verified registry and preserves history and revisions after quota failure', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const snapshot = await effectSnapshot();
+  const candidate = applyLocalReviewChange(opened, {
+    kind: 'commit',
+    operation: effectOperation(opened, snapshot),
+    consumeDraft: false,
+    effectSnapshots: [snapshot],
+  });
+  const args = {
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedDraftRevision: null,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    workspace: candidate.workspace,
+    draft: candidate.draft,
+  };
+  failWrites = true;
+  await expect(saveVideoWorkspaceSnapshot(args)).rejects.toMatchObject({
+    name: 'QuotaExceededError',
+  });
+  expect(await readVideoWorkspace(id)).toEqual(opened);
+  failWrites = false;
+  const saved = await saveVideoWorkspaceSnapshot(args);
+  expect(saved.workspace.effectSnapshots).toEqual([snapshot]);
+  expect(saved.workspace.history).toHaveLength(1);
+  expect(saved.workspace.revision).toBe(opened.workspace.revision + 1);
 });
 
 it('refuses a buffered initial background reference after its published source was purged', async () => {

@@ -1,4 +1,12 @@
 import { createAutosaveCoordinator, type AutosavePolicy } from '@sniptale/platform/data/autosave';
+import {
+  createReviewAnnotationResourceRetention,
+  type ReviewPreparedAnnotationResource,
+} from './annotation-resources';
+import type {
+  ReviewAnnotationEffect,
+  ReviewAnnotationEffectSnapshot,
+} from '../../features/video/review/annotation-effects/types';
 import type {
   QuickEditAdvancedContent,
   QuickEditAdvancedState,
@@ -116,6 +124,14 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   let durable = structuredClone(initial);
   let failedHistory = false;
   let failedSpeechSave: string | undefined;
+  let disposed = false;
+  let disposal: Promise<void> | undefined;
+  const annotationResources = createReviewAnnotationResourceRetention({
+    readDurableReferences: async () => {
+      const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
+      return saved ? collectReviewAssetReferences(saved.workspace) : new Set<string>();
+    },
+  });
   const listeners = new Set<() => void>();
   const emit = () => {
     for (const listener of listeners) listener();
@@ -182,13 +198,23 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     classifyFailure: (error) => (failureCode(error) === 'storage' ? 'retry' : 'stop'),
   });
   async function persistBuffer() {
-    if (!state.dirty) return state.snapshot;
-    const snapshot = await deps.saveVideoWorkspaceSnapshot(
-      reviewSnapshotSaveRequest(durable, state.snapshot)
-    );
-    durable = snapshot;
-    state = { ...state, snapshot, dirty: false };
-    return snapshot;
+    if (state.dirty) {
+      const snapshot = await deps.saveVideoWorkspaceSnapshot(
+        reviewSnapshotSaveRequest(durable, state.snapshot)
+      );
+      durable = snapshot;
+      state = { ...state, snapshot, dirty: false };
+    }
+    try {
+      await annotationResources.reconcile(
+        collectReviewAssetReferences(state.snapshot.workspace),
+        true
+      );
+    } catch (error) {
+      state = { ...state, dirty: true };
+      throw error;
+    }
+    return state.snapshot;
   }
   async function transition(
     action: () => Promise<VideoWorkspaceSnapshot>,
@@ -196,10 +222,17 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     speechSaveKey?: string
   ) {
     try {
+      if (disposed) throw new Error('Review session is closed.');
       if (local && (!state.autosaveEnabled || (state.dirty && local.kind !== 'reset'))) {
         const snapshot = applyLocalReviewChange(state.snapshot, local);
         state = { ...state, snapshot, document: project(snapshot), dirty: true };
-        if (!state.autosaveEnabled) return snapshot;
+        if (!state.autosaveEnabled) {
+          await annotationResources.reconcile(
+            collectReviewAssetReferences(snapshot.workspace),
+            false
+          );
+          return snapshot;
+        }
         const committed = await persistBuffer();
         state = { ...state, snapshot: committed, document: project(committed), error: null };
         return committed;
@@ -209,6 +242,12 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
       durable = snapshot;
       failedSpeechSave = undefined;
       state = { ...state, snapshot, document: project(snapshot), dirty: false, error: null };
+      try {
+        await annotationResources.reconcile(collectReviewAssetReferences(snapshot.workspace), true);
+      } catch (error) {
+        state = { ...state, dirty: true };
+        throw error;
+      }
       return snapshot;
     } catch (error) {
       failedHistory = local?.kind === 'history';
@@ -236,6 +275,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     local?: LocalReviewChange,
     speechSaveKey?: string
   ) {
+    if (disposed) return Promise.reject(new Error('Review session is closed.'));
     state = { ...state, pending: state.pending + 1 };
     emit();
     return coordinator.runOrdered(() => transition(action, local, speechSaveKey));
@@ -244,6 +284,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     getSnapshot: () => state,
     /** Registers a lazy buffer capture; scheduling and admission belong to this session. */
     stageAutosave(key: AutosaveKey, capture: () => AutosaveCapture, policy: AutosavePolicy) {
+      if (disposed) return;
       captures.set(key, capture);
       coordinator.request(key, policy);
     },
@@ -259,6 +300,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
       project
     ),
     setAutosaveEnabled(enabled: boolean) {
+      if (disposed) return;
       state = { ...state, autosaveEnabled: enabled };
       emit();
       if (enabled && state.dirty)
@@ -310,6 +352,72 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         },
         { kind: 'commit', operation: captured, consumeDraft }
       );
+    },
+    /** Transfers leases only after atomic local admission; a failed Save retains authored content and retry. */
+    applyAnnotationEffect(args: {
+      expectedSourceAssetId: string;
+      snapshot: ReviewAnnotationEffectSnapshot;
+      instance: ReviewAnnotationEffect;
+      resources: readonly ReviewPreparedAnnotationResource[];
+      signal?: AbortSignal;
+    }) {
+      const captured = structuredClone({
+        snapshot: args.snapshot,
+        instance: args.instance,
+        expectedSourceAssetId: args.expectedSourceAssetId,
+      });
+      const resources = [...args.resources];
+      const signal = args.signal;
+      return enqueue(async () => {
+        signal?.throwIfAborted();
+        if (captured.expectedSourceAssetId !== state.snapshot.workspace.sourceAssetId)
+          throw new Error('Annotation source changed.');
+        const before = state.document.advancedContent;
+        const existing = before.annotationEffects?.instances ?? [];
+        if (existing.some((instance) => instance.id === captured.instance.id))
+          throw new Error('Annotation instance already exists.');
+        const instance = {
+          ...captured.instance,
+          order: Math.max(-1, ...existing.map((value) => value.order)) + 1,
+        };
+        const operation: ReviewOperation = {
+          id: crypto.randomUUID(),
+          at: Date.now(),
+          target: 'advancedContent',
+          before,
+          after: {
+            ...before,
+            annotationEffects: {
+              enabled: before.annotationEffects?.enabled ?? true,
+              instances: [...existing, instance],
+            },
+          },
+        };
+        const snapshot = applyLocalReviewChange(state.snapshot, {
+          kind: 'commit',
+          operation,
+          consumeDraft: false,
+          effectSnapshots: [captured.snapshot],
+        });
+        annotationResources.admit(
+          resources,
+          new Set(captured.snapshot.assets.map((asset) => asset.assetId))
+        );
+        state = { ...state, snapshot, document: project(snapshot), dirty: true };
+        if (state.autosaveEnabled) return persistBuffer();
+        await annotationResources.reconcile(
+          collectReviewAssetReferences(snapshot.workspace),
+          false
+        );
+        return snapshot;
+      });
+    },
+    /** Lets acquisition distinguish transferred leases from an admission failure without mutating them. */
+    ownsAnnotationResource: annotationResources.has,
+    /** Local preview/export reads use only admitted leases; publication uses the canonical reader. */
+    async readAnnotationResource(reference: string, signal: AbortSignal) {
+      signal.throwIfAborted();
+      return disposed ? null : annotationResources.read(reference, signal);
     },
     /** Builds speech history at queue execution time; only this failed save can be retried. */
     saveSpeechTranscript(
@@ -386,12 +494,24 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
       });
     },
     async flush(options?: { retryHistory: true }) {
+      if (disposed) return;
       const hadPending = state.pending > 0;
       await coordinator.flushCaptured();
       await coordinator.runOrdered(async () => undefined);
       // Only a completed history failure may be retried; pending/content failures stay strict.
       if (state.error && !(options?.retryHistory && failedHistory && !hadPending))
         throw new Error(`Review ${state.error}.`);
+    },
+    /** Only the mounted source owner disposes the session; beforeunload cancellation leaves it alive. */
+    dispose(): Promise<void> {
+      if (disposal) return disposal;
+      disposed = true;
+      for (const key of captures.keys()) coordinator.cancel(key);
+      captures.clear();
+      disposal = coordinator
+        .runOrdered(() => annotationResources.dispose())
+        .finally(() => coordinator.dispose());
+      return disposal;
     },
   };
 }

@@ -1,4 +1,8 @@
 import {
+  ReviewAnnotationOverlay,
+  type ReviewAnnotationEditing,
+} from './annotation-effects-overlay';
+import {
   presentationMainColorOpacity,
   presentationMainColor,
   type PresentationSequencePlan,
@@ -43,7 +47,7 @@ import {
   type ReviewStageFocusPicker,
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
-import { useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
 import { projectVideoRegion } from '../../features/video/review/geometry';
 import type {
@@ -81,7 +85,11 @@ type ReviewStageCommentBinding = {
 };
 
 type ReviewStageProps = {
+  annotationEditing?: ReviewAnnotationEditing | undefined;
+  onAnnotationGeometry?: ReviewAnnotationEditing['editor']['setGeometry'] | undefined;
   captions?: Parameters<typeof useStagePresentation>[0]['captions'];
+  annotationEffects?: Parameters<typeof useStagePresentation>[0]['annotationEffects'];
+  readAsset?: Parameters<typeof useStagePresentation>[0]['readAsset'];
   onCaptionSelect?: ((id: string) => void) | undefined;
   preview?:
     | {
@@ -89,6 +97,7 @@ type ReviewStageProps = {
         playing: boolean;
         sourceToResult(time: number): number | null;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
+        sourceFrameRate?: number | undefined;
       }
     | undefined;
   outerFadePlan?: PresentationSequencePlan | undefined;
@@ -180,6 +189,7 @@ export function ReviewStage(props: ReviewStageProps) {
   const {
     size,
     watermarkOutput,
+    annotationGeometry,
     sceneLayout,
     zoomLayout,
     backgroundPaint,
@@ -188,6 +198,11 @@ export function ReviewStage(props: ReviewStageProps) {
     borders,
     overlayClip,
   } = useReviewStageGeometry(props, host);
+  const reportAnnotationGeometry =
+    props.onAnnotationGeometry ?? props.annotationEditing?.editor.setGeometry;
+  useEffect(() => {
+    reportAnnotationGeometry?.(annotationGeometry);
+  }, [annotationGeometry, reportAnnotationGeometry]);
   const { presentation, beginInteraction } = useStagePresentation(
     props,
     publication,
@@ -204,8 +219,10 @@ export function ReviewStage(props: ReviewStageProps) {
     <div
       ref={host}
       onPointerDownCapture={beginInteraction}
-      className="relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]
-          bg-[var(--sniptale-color-surface-canvas)]"
+      className={[
+        'relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]',
+        'bg-[var(--sniptale-color-surface-canvas)]',
+      ].join(' ')}
     >
       <ReviewHeaderFailure failed={!manual && header.failed} retry={header.retry} />
       <div
@@ -314,6 +331,13 @@ export function ReviewStage(props: ReviewStageProps) {
             <ReviewStageOuterFade plan={props.outerFadePlan} time={props.scene?.focus?.time ?? 0} />
           </>
         ) : null}
+        {props.annotationEditing && annotationGeometry && (
+          <ReviewAnnotationOverlay
+            binding={props.annotationEditing}
+            geometry={annotationGeometry}
+            size={size}
+          />
+        )}
         <ReviewStagePresentationFeedback
           presentation={presentation}
           showFrameRate={props.preview?.preferences.showFrameRate ?? false}
@@ -717,8 +741,10 @@ function ReviewRegionOverlay(props: {
             <span
               key={corner}
               data-region-corner={corner}
-              className="absolute h-2.5 w-2.5 rounded-sm border border-[var(--sniptale-color-accent)]
-                  bg-[var(--sniptale-color-surface-panel)]"
+              className={[
+                'absolute h-2.5 w-2.5 rounded-sm border border-[var(--sniptale-color-accent)]',
+                'bg-[var(--sniptale-color-surface-panel)]',
+              ].join(' ')}
               style={{
                 left: corner.endsWith('w') ? -5 : undefined,
                 right: corner.endsWith('e') ? -5 : undefined,

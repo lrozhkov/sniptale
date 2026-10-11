@@ -121,7 +121,8 @@ function unchangedStoredHistory(storage: WorkspaceStorageRead, previous: VideoWo
     head['historyLength'] === previous.history.length &&
     isRecord(logical) &&
     storageValueEqual(logical['history'], previous.history) &&
-    storageValueEqual(logical['advanced'], previous.advanced)
+    storageValueEqual(logical['advanced'], previous.advanced) &&
+    storageValueEqual(logical['effectSnapshots'], previous.effectSnapshots)
   );
 }
 
@@ -137,6 +138,18 @@ export async function writeWorkspaceStorage(
   }
 ): Promise<void> {
   const { storage, previous, workspace, usageReferenceKeys, mode } = args;
+  if (mode === 'cursor' && !storageValueEqual(previous.effectSnapshots, workspace.effectSnapshots))
+    throw new Error('Invalid workspace cursor registry change.');
+  if (mode === 'append') {
+    const existing = new Map(
+      (previous.effectSnapshots ?? []).map((snapshot) => [snapshot.id, snapshot])
+    );
+    for (const snapshot of workspace.effectSnapshots ?? []) {
+      const retained = existing.get(snapshot.id);
+      if (retained && !storageValueEqual(retained, snapshot))
+        throw new Error('Immutable workspace effect snapshot changed.');
+    }
+  }
   const retained = mode === 'append' ? previous.cursor : previous.history.length;
   const unchanged =
     unchangedStoredHistory(storage, previous) &&
@@ -158,6 +171,15 @@ export async function writeWorkspaceStorage(
     await store.put({ aggregateId: workspace.aggregateId, ordinal: retained + 1, operation });
   } else if (workspace.history.length !== previous.history.length) {
     throw new Error('Invalid workspace cursor update.');
+  }
+  if (!storageValueEqual(previous.effectSnapshots, workspace.effectSnapshots)) {
+    if (mode !== 'append') throw new Error('Invalid workspace cursor registry change.');
+    await tx.objectStore(VIDEO_WORKSPACE_HISTORY_STORE).put({
+      aggregateId: workspace.aggregateId,
+      ordinal: 0,
+      advanced: workspace.advanced,
+      ...(workspace.effectSnapshots ? { effectSnapshots: workspace.effectSnapshots } : {}),
+    });
   }
   await tx
     .objectStore(VIDEO_WORKSPACES_STORE)

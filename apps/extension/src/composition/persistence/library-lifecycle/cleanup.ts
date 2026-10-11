@@ -1,3 +1,4 @@
+import { recoverMediaSourcePublications } from '../media-library/delete-cascade.recovery';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { createMaintenanceLog } from './maintenance-log';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -43,7 +44,6 @@ import {
   deleteMediaSidecars,
   releaseUnpublishedProjectAssets,
   releaseMediaSource,
-  recoverMediaSourcePublications,
 } from '../media-library/delete-cascade.sources';
 import { repairLinkedRecordingLifecycles } from './project-recordings';
 import { repairTemporaryProjectLifecycles } from './project-retention';

@@ -1,3 +1,5 @@
+import { annotationReviewFixture } from './media.review-assets.test-support';
+import { encodePortableReviewAssetRefs } from '../../../../composition/persistence/review-workspaces/asset-refs';
 import { materializeWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage-format';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -16,6 +18,7 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   appendCommittedArchiveRootInTransaction: mocks.checkpoint,
+  readAssetFile: vi.fn(),
 }));
 import { videoProjectRootPublisher } from './video-project';
 
@@ -440,4 +443,113 @@ it('rolls back promoted recording and parent when the later archive checkpoint f
   expect(mocks.checkpoint).toHaveBeenCalledOnce();
   expect(abort).toHaveBeenCalledOnce();
   expect(persisted).toEqual(before);
+});
+
+it.each(
+  (['asset', 'export'] as const).flatMap((kind) =>
+    (['source-hash', 'resource-hash', 'valid'] as const).map((mode) => ({ kind, mode }))
+  )
+)('checks retained annotation before nested $kind restore: $mode', async ({ kind, mode }) => {
+  const fixture = await annotationReviewFixture();
+  if (mode === 'source-hash')
+    fixture.snapshot.source = fixture.snapshot.source.replace(
+      'Neutral runtime conformance',
+      'Mutated runtime conformance'
+    );
+  const { readAssetFile } = await import('../../../../composition/persistence/assets');
+  const blob =
+    mode === 'resource-hash'
+      ? new Blob([(await fixture.blob.text()).replace('width="1"', 'width="2"')], {
+          type: fixture.blob.type,
+        })
+      : fixture.blob;
+  vi.mocked(readAssetFile).mockImplementation(async (reference) => {
+    if (reference.assetId !== 'mark-bytes') throw new Error('Unexpected prepared read');
+    return new File([blob], 'mark.svg', { type: blob.type });
+  });
+  const aggregateId = kind === 'asset' ? 'project-asset:clip' : 'export:e';
+  const review = encodePortableReviewAssetRefs({
+    ...fixture.review,
+    workspace: { ...fixture.review.workspace, aggregateId },
+    draft: null,
+  });
+  const values = new Map<string, unknown[]>();
+  mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
+  const baseProject = createVideoProjectEntryWithMediaClip({ id: 'p' });
+  const entry =
+    kind === 'asset'
+      ? {
+          ...baseProject,
+          id: 'p',
+          project: encodePortableVideoProjectAssetRefs({
+            ...baseProject.project,
+            assets: baseProject.project.assets.map((asset) => ({
+              ...asset,
+              source: { kind: 'project-asset', projectAssetId: 'clip' },
+            })),
+          }),
+        }
+      : createVideoProjectEntry({ id: 'p' }, { id: 'p' });
+  const metadata = {
+    entry,
+    projectAssets: [
+      {
+        entry: { id: 'mark', mimeType: 'image/svg+xml', size: fixture.blob.size, createdAt: 1 },
+        filename: 'mark.svg',
+        objectId: 'mark-object',
+        publishToLibrary: false,
+      },
+      ...(kind === 'asset'
+        ? [
+            {
+              entry: { id: 'clip', mimeType: 'video/webm', size: 6, createdAt: 1 },
+              filename: 'clip.webm',
+              objectId: 'o',
+              videoReview: review,
+            },
+          ]
+        : []),
+    ],
+    projectExports:
+      kind === 'export'
+        ? [
+            {
+              entry: {
+                id: 'e',
+                projectId: 'p',
+                createdAt: 1,
+                filename: 'export.webm',
+                mimeType: 'video/webm',
+                size: 6,
+                duration: 2,
+                width: 640,
+                height: 360,
+                fps: 30,
+              },
+              objectId: 'o',
+              videoReview: review,
+            },
+          ]
+        : [],
+  };
+  assertPortableJson(metadata);
+  const pending = videoProjectRootPublisher.publish(
+    publishArgs(metadata, [
+      stagedObject('o', 'new-local', 'video/webm', 6),
+      stagedObject('mark-object', 'mark-bytes', 'image/svg+xml', fixture.blob.size),
+    ])
+  );
+  if (mode !== 'valid') {
+    await expect(pending).rejects.toMatchObject({
+      code: mode === 'source-hash' ? 'source-integrity' : 'resource-integrity',
+    });
+    expect(values.size).toBe(0);
+    expect(mocks.checkpoint).not.toHaveBeenCalled();
+  } else {
+    await expect(pending).resolves.toMatchObject({ imported: true });
+    const restored = logicalRestoredWorkspaces(values)[0];
+    expect(restored?.cursor).toBe(0);
+    expect(restored?.effectSnapshots?.[0]?.assets[0]?.assetId).not.toBe('project-asset:mark');
+    expect(vi.mocked(readAssetFile)).toHaveBeenCalledOnce();
+  }
 });

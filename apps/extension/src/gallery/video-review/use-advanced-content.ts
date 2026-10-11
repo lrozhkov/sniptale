@@ -127,6 +127,16 @@ export function useReviewAdvancedContent(
 /** Authored mutations share the debounced history writer, independent of its React lifecycle. */
 function reviewContentCommands(stage: (mutation: ContentMutation, typing?: boolean) => void) {
   return {
+    setAnnotationEffects: (
+      update: (
+        lane: QuickEditAdvancedContent['annotationEffects']
+      ) => QuickEditAdvancedContent['annotationEffects']
+    ) =>
+      stage((content) => {
+        const { annotationEffects: previous, ...rest } = content;
+        const annotationEffects = update(previous);
+        return annotationEffects ? { ...rest, annotationEffects } : rest;
+      }),
     setText: (
       update: (text: QuickEditAdvancedContent['text']) => QuickEditAdvancedContent['text'],
       typing = false

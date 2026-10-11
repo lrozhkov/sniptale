@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { crc32 } from 'node:zlib';
 
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import { createMockDocument } from '../instance/bindings/test-fixtures-document';
@@ -79,7 +80,17 @@ it('stores repeated raster data once while keeping resize undo and redo loadable
 it('restores only image fields without reviver traversal of the full snapshot', () => {
   const image = `data:image/png;base64,${'A'.repeat(6_000)}`;
   const background = `data:image/png;base64,${'B'.repeat(6_000)}`;
-  const favicon = `data:image/png;base64,${'C'.repeat(6_000)}`;
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=',
+    'base64'
+  );
+  const text = Buffer.from(`Comment\0${'C'.repeat(6_000)}`);
+  const chunk = Buffer.alloc(text.length + 12);
+  chunk.writeUInt32BE(text.length);
+  chunk.write('tEXt', 4);
+  text.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(chunk.subarray(4, -4)), chunk.length - 4);
+  const favicon = `data:image/png;base64,${Buffer.concat([png.subarray(0, -12), chunk, png.subarray(-12)]).toString('base64')}`;
   const first = {
     ...createMockDocument(),
     sourceImageData: image,
@@ -89,6 +100,7 @@ it('restores only image fields without reviver traversal of the full snapshot', 
       title: 'Example',
       url: 'https://example.com',
       faviconDataUrl: favicon,
+      faviconEnabled: true,
       canvasMode: 'resize' as const,
       contentMode: 'push-down' as const,
     },

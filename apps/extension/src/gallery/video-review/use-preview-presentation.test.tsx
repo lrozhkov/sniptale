@@ -179,6 +179,51 @@ it('preserves Current mode and allocates no manual renderer for an FPS readout',
   );
 });
 
+it('uses the manual owner at source cadence and releases disabled annotations', async () => {
+  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
+  props.sourceFrameRate = 24;
+  props.scene.annotationEffects = {
+    lane: {
+      enabled: true,
+      instances: [
+        {
+          id: 'frame',
+          snapshotId: 'effect:frame',
+          enabled: true,
+          start: 0,
+          end: 2,
+          attachment: 'content',
+          transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+          controls: {},
+          order: 0,
+        },
+      ],
+    },
+    snapshots: [],
+    segments: [],
+  };
+  const readAsset = vi.fn(async () => new Blob(['private image']));
+  props.readAsset = readAsset;
+  await render();
+  expect(result.active).toBe(true);
+  expect(io.factory.mock.lastCall![0].readAsset).toBe(readAsset);
+  await step(0);
+  expect(io.prepare.mock.calls[0]![0].annotationEffects).toEqual(props.scene.annotationEffects);
+  expect(io.render.mock.calls[0]![1].fps).toBe(24);
+  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(1);
+  props.scene.annotationEffects.lane.enabled = false;
+  await render();
+  expect(result.active).toBe(false);
+  expect(props.host.current!.querySelector('canvas')).toBeNull();
+  expect(io.dispose).toHaveBeenCalledOnce();
+  expect(releases[0]).toHaveBeenCalledOnce();
+  props.scene.annotationEffects.lane.enabled = true;
+  props.scene.annotationEffects.lane.instances[0]!.enabled = false;
+  await render();
+  expect(result.active).toBe(false);
+  expect(io.factory).toHaveBeenCalledOnce();
+});
+
 it('publishes a complete manual frame at exact paused clocks and retains only its front lease', async () => {
   const pause = vi.spyOn(props.video.current!, 'pause').mockImplementation(() => {});
   await render();

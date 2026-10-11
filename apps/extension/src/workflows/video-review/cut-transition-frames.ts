@@ -154,19 +154,47 @@ export function paintReviewCutDissolve(
   target: CanvasRenderingContext2D,
   scratch: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D },
   incoming: number,
+  draw: (
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    side: 0 | 1
+  ) => Promise<void>,
+  canvas: HTMLCanvasElement
+): Promise<void>;
+export function paintReviewCutDissolve(
+  target: CanvasRenderingContext2D,
+  scratch: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D },
+  incoming: number,
   draw: (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement, side: 0 | 1) => void,
   canvas: HTMLCanvasElement
+): void;
+export function paintReviewCutDissolve(
+  target: CanvasRenderingContext2D,
+  scratch: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D },
+  incoming: number,
+  draw: (
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    side: 0 | 1
+  ) => void | Promise<void>,
+  canvas: HTMLCanvasElement
 ) {
-  draw(target, canvas, 0);
-  draw(scratch.context, scratch.canvas, 1);
-  target.save();
-  try {
-    target.globalCompositeOperation = 'source-over';
-    target.globalAlpha = incoming;
-    target.drawImage(scratch.canvas, 0, 0);
-  } finally {
-    target.restore();
-  }
+  const blend = () => {
+    target.save();
+    try {
+      target.globalCompositeOperation = 'source-over';
+      target.globalAlpha = incoming;
+      target.drawImage(scratch.canvas, 0, 0);
+    } finally {
+      target.restore();
+    }
+  };
+  const second = () => {
+    const completed = draw(scratch.context, scratch.canvas, 1);
+    return completed ? completed.then(blend) : blend();
+  };
+  const completed = draw(target, canvas, 0);
+  return completed ? completed.then(second) : second();
 }
 
 /** Blends only admitted source rasters; camera, background, overlays and audio stay with callers. */

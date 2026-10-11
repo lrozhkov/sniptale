@@ -9,6 +9,14 @@ export interface ProjectAssetPublicationOptions {
   originMediaId?: string;
   /** Private accepted speech is retained by this exact target and replacement. */
   requiredReviewSpeech?: { aggregateId: string; target: ReviewSpeechTarget; replacementId: string };
+  /** Private immutable visual bytes retained by one exact source/snapshot/resource binding. */
+  requiredReviewAnnotationEffect?: {
+    aggregateId: string;
+    sourceAssetId: string;
+    snapshotId: string;
+    resourceId: string;
+    sha256: string;
+  };
   /** Private scene resource retained by its exact review slot, including remembered settings. */
   requiredReviewResource?:
     | { aggregateId: string; slot: 'watermark' }
@@ -92,6 +100,23 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
   )
     return null;
   const librarySourceId = value['librarySourceId'];
+  const annotation = value['requiredReviewAnnotationEffect'];
+  const requiredReviewAnnotationEffect =
+    annotation === undefined ? undefined : parseProjectAssetAnnotationEffectClaim(annotation);
+  if (
+    requiredReviewAnnotationEffect === null ||
+    (requiredReviewAnnotationEffect &&
+      (value['publishToLibrary'] !== false ||
+        value['expectedAssetId'] !== null ||
+        !['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'].includes(entry.mimeType) ||
+        requiredReview !== undefined ||
+        requiredReviewSpeech !== undefined ||
+        requiredReviewResource !== undefined ||
+        librarySourceId !== undefined ||
+        entry.originMediaId !== undefined ||
+        value['originMediaId'] !== undefined))
+  )
+    return null;
   if (librarySourceId !== undefined) {
     if (
       typeof librarySourceId !== 'string' ||
@@ -129,6 +154,7 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
       : {}),
     ...(requiredReview ? { requiredReview } : {}),
     ...(requiredReviewSpeech ? { requiredReviewSpeech } : {}),
+    ...(requiredReviewAnnotationEffect ? { requiredReviewAnnotationEffect } : {}),
     ...(requiredReviewResource ? { requiredReviewResource } : {}),
     ...(typeof librarySourceId === 'string' ? { librarySourceId } : {}),
   };
@@ -203,4 +229,32 @@ export function parseProjectAssetSpeechClaim(
   return target
     ? { aggregateId: value['aggregateId'], target, replacementId: value['replacementId'] }
     : null;
+}
+
+/** Bounded annotation identity; no catalogue, Library or other slot can widen this claim. */
+export function parseProjectAssetAnnotationEffectClaim(
+  value: unknown
+): NonNullable<ProjectAssetPublicationOptions['requiredReviewAnnotationEffect']> | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some(
+      (key) => !['aggregateId', 'sourceAssetId', 'snapshotId', 'resourceId', 'sha256'].includes(key)
+    )
+  )
+    return null;
+  const { aggregateId, sourceAssetId, snapshotId, resourceId, sha256 } = value;
+  if (
+    [aggregateId, sourceAssetId, resourceId].some(
+      (id) => typeof id !== 'string' || !id || id.length > 256 || id.trim() !== id
+    ) ||
+    typeof aggregateId !== 'string' ||
+    typeof sourceAssetId !== 'string' ||
+    typeof resourceId !== 'string' ||
+    typeof snapshotId !== 'string' ||
+    !/^effect:[a-f0-9]{64}$/.test(snapshotId) ||
+    typeof sha256 !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(sha256)
+  )
+    return null;
+  return { aggregateId, sourceAssetId, snapshotId, resourceId, sha256 };
 }

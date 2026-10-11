@@ -1,3 +1,9 @@
+import { releaseUnpublishedProjectAssets } from '../media-library/delete-cascade.sources';
+import {
+  buildPhysicalDeleteOperation,
+  completePhysicalDeleteOperation,
+  type PhysicalDeleteAssetOperation,
+} from '../assets';
 import {
   readWorkspaceStorage,
   replaceWorkspaceStorage,
@@ -5,20 +11,38 @@ import {
   type WorkspaceStorageRead,
 } from './storage';
 import { usageReferenceKey, USAGE_INDEX_MARKER } from '../media-library/usage-index-keys';
-import { collectReviewAssetReferences } from './asset-refs';
+import { collectReviewAssetReferences, pruneReviewAnnotationEffectSnapshots } from './asset-refs';
+import {
+  parseReviewAnnotationEffectSnapshots,
+  mergeReviewAnnotationEffectSnapshots,
+  ReviewAnnotationEffectUnavailableError,
+} from '../../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 import { createNewWorkspacePresentationSettings } from '../../../features/video/review/advanced/presentation';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import {
+  runWithDurableAssetLifecycleLock,
+  type DurableAssetLifecyclePermit,
+} from '../infrastructure/mutation-barrier';
 import {
   areNewReviewSourcesAvailable,
   readReviewReadySources,
   promoteReviewSourceLifecycles,
+  verifyReviewAnnotationEffectSources,
 } from './new-reference-admission';
 import {
   STORE_NAME,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  VIDEO_PROJECTS_STORE,
+  SCENARIO_ASSETS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  THUMBNAILS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OPERATIONS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
@@ -58,6 +82,14 @@ const stores = [
   STORE_NAME,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  VIDEO_PROJECTS_STORE,
+  SCENARIO_ASSETS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  THUMBNAILS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OPERATIONS_STORE,
 ];
 type Database = Awaited<ReturnType<typeof initDB>>;
 type Transaction = ReturnType<Database['transaction']>;
@@ -148,11 +180,20 @@ export async function readVideoWorkspace(
 
 async function mutate<T>(
   aggregateId: string,
-  operation: (tx: WriteTransaction, prepared: ReviewReadySources) => Promise<T>,
-  admitsSources = false
+  operation: (
+    tx: WriteTransaction,
+    prepared: ReviewReadySources,
+    physicalDelete: PhysicalDeleteAssetOperation
+  ) => Promise<T>,
+  admitsSources = false,
+  effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[]
 ): Promise<T> {
-  const execute = (prepared: ReviewReadySources) =>
-    runWithIndexedDbMutation(async (db) => {
+  const execute = async (
+    prepared: ReviewReadySources,
+    lifecyclePermit?: DurableAssetLifecyclePermit
+  ) => {
+    const physicalDelete = buildPhysicalDeleteOperation([]);
+    const committed = await runWithIndexedDbMutation(async (db) => {
       const tx = beginWriteTransaction(db);
       try {
         const media = parseMediaLibraryEntry(
@@ -160,7 +201,9 @@ async function mutate<T>(
         );
         if (!media || !media.mimeType.startsWith('video/'))
           throw new VideoWorkspaceError('missing-media');
-        const result = await operation(tx, prepared);
+        const result = await operation(tx, prepared, physicalDelete);
+        if (physicalDelete.assetIds.length)
+          await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
         await tx.done;
         return result;
       } catch (error) {
@@ -173,11 +216,35 @@ async function mutate<T>(
         throw error;
       }
     });
+    // Authored content is already committed; a physical failure retains its durable replay intent.
+    if (physicalDelete.assetIds.length)
+      await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit).catch(() => undefined);
+    return committed;
+  };
   if (!admitsSources) return execute({ assets: new Map(), libraryAudioClaims: [] });
   await initDB();
-  return runWithDurableAssetLifecycleLock(async () =>
-    execute(await readReviewReadySources(aggregateId))
-  );
+  return runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+    let prepared = await readReviewReadySources(aggregateId);
+    if (effectSnapshots?.length) {
+      const previous = await readVideoWorkspace(aggregateId);
+      if (!previous) throw new VideoWorkspaceError('invalid');
+      try {
+        prepared = await verifyReviewAnnotationEffectSources(
+          previous.workspace,
+          effectSnapshots,
+          prepared
+        );
+      } catch (error) {
+        if (
+          error instanceof ReviewAnnotationEffectUnavailableError &&
+          error.code === 'resource-unavailable'
+        )
+          throw new VideoWorkspaceError('missing-media');
+        throw new VideoWorkspaceError('invalid');
+      }
+    }
+    return execute(prepared, lifecyclePermit);
+  });
 }
 
 type ReviewReadySources = Awaited<ReturnType<typeof readReviewReadySources>>;
@@ -247,10 +314,11 @@ async function putWorkspace(
   workspace: VideoWorkspace,
   storage: WorkspaceStorageRead,
   mode: 'append' | 'cursor' | 'replace',
+  physicalDelete: PhysicalDeleteAssetOperation,
   prepared: ReviewReadySources = { assets: new Map(), libraryAudioClaims: [] }
 ): Promise<VideoWorkspace> {
   const admitted = parseVideoWorkspace({
-    ...workspace,
+    ...(mode === 'cursor' ? workspace : pruneReviewAnnotationEffectSnapshots(workspace)),
     revision: workspace.revision + 1,
     updatedAt: Math.max(Date.now(), workspace.updatedAt),
   });
@@ -292,6 +360,17 @@ async function putWorkspace(
     mode,
     usageReferenceKeys: indexedWorkspace(next).usageReferenceKeys,
   });
+  if (mode !== 'cursor') {
+    const retained = collectReviewAssetReferences(next);
+    const removed = new Set(
+      (previous.effectSnapshots ?? []).flatMap((snapshot) =>
+        snapshot.assets
+          .filter((asset) => !retained.has(asset.assetId))
+          .map((asset) => asset.assetId.slice('project-asset:'.length))
+      )
+    );
+    await releaseUnpublishedProjectAssets(tx, removed, physicalDelete);
+  }
   return next;
 }
 
@@ -302,10 +381,22 @@ export async function commitVideoWorkspace(args: {
   expectedSourceAssetId: string;
   operation: unknown;
   consumeDraftRevision?: number;
+  /** Snapshot registry and authored operation are admitted by the same durable transaction. */
+  effectSnapshots?: unknown;
 }): Promise<VideoWorkspaceSnapshot> {
+  const effectSnapshots =
+    args.effectSnapshots === undefined
+      ? undefined
+      : parseReviewAnnotationEffectSnapshots(args.effectSnapshots);
+  if (
+    effectSnapshots === null ||
+    (effectSnapshots &&
+      (!isRecord(args.operation) || args.operation['target'] !== 'advancedContent'))
+  )
+    throw new VideoWorkspaceError('invalid');
   return mutate(
     args.aggregateId,
-    async (tx, prepared) => {
+    async (tx, prepared, physicalDelete) => {
       const {
         snapshot: { workspace, draft },
         document,
@@ -338,23 +429,30 @@ export async function commitVideoWorkspace(args: {
       )
         throw new VideoWorkspaceError('conflict');
       applyReviewOperation(document, operation, workspace.source);
+      const merged = effectSnapshots
+        ? mergeReviewAnnotationEffectSnapshots(workspace.effectSnapshots ?? [], effectSnapshots)
+        : undefined;
+      if (merged === null) throw new VideoWorkspaceError('invalid');
       const next = await putWorkspace(
         tx,
         workspace,
         {
           ...workspace,
+          ...(merged ? { effectSnapshots: merged } : {}),
           history: [...workspace.history.slice(0, workspace.cursor), operation],
           cursor: workspace.cursor + 1,
         },
         storage,
         'append',
+        physicalDelete,
         prepared
       );
       if (args.consumeDraftRevision !== undefined)
         await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
       return { workspace: next, draft: args.consumeDraftRevision === undefined ? draft : null };
     },
-    isRecord(args.operation) && args.operation['target'] === 'advancedContent'
+    isRecord(args.operation) && args.operation['target'] === 'advancedContent',
+    effectSnapshots
   );
 }
 
@@ -365,7 +463,7 @@ export async function moveVideoWorkspaceHistory(args: {
   expectedSourceAssetId: string;
   direction: ReviewHistoryDirection;
 }): Promise<VideoWorkspaceSnapshot> {
-  return mutate(args.aggregateId, async (tx) => {
+  return mutate(args.aggregateId, async (tx, _prepared, physicalDelete) => {
     const { snapshot, storage } = await requireSnapshot(
       tx,
       args.aggregateId,
@@ -389,7 +487,8 @@ export async function moveVideoWorkspaceHistory(args: {
         snapshot.workspace,
         { ...snapshot.workspace, cursor },
         storage,
-        'cursor'
+        'cursor',
+        physicalDelete
       ),
     };
   });
@@ -404,7 +503,7 @@ export async function saveVideoWorkspaceAdvanced(args: {
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(
     args.aggregateId,
-    async (tx, prepared) => {
+    async (tx, prepared, physicalDelete) => {
       const { snapshot, storage } = await requireSnapshot(
         tx,
         args.aggregateId,
@@ -421,6 +520,7 @@ export async function saveVideoWorkspaceAdvanced(args: {
           { ...snapshot.workspace, advanced },
           storage,
           'replace',
+          physicalDelete,
           prepared
         ),
       };
@@ -438,7 +538,7 @@ export async function saveVideoWorkspaceDraft(args: {
   annotation: unknown;
   before: unknown;
 }): Promise<VideoWorkspaceSnapshot> {
-  return mutate(args.aggregateId, async (tx) => {
+  return mutate(args.aggregateId, async (tx, _prepared, physicalDelete) => {
     const { snapshot, storage } = await requireSnapshot(
       tx,
       args.aggregateId,
@@ -452,7 +552,14 @@ export async function saveVideoWorkspaceDraft(args: {
       // Advancing the workspace revision prevents an old writer matching a recreated draft.
       return {
         workspace: snapshot.draft
-          ? await putWorkspace(tx, snapshot.workspace, snapshot.workspace, storage, 'cursor')
+          ? await putWorkspace(
+              tx,
+              snapshot.workspace,
+              snapshot.workspace,
+              storage,
+              'cursor',
+              physicalDelete
+            )
           : snapshot.workspace,
         draft: null,
       };
@@ -482,9 +589,11 @@ export async function saveVideoWorkspaceSnapshot(args: {
   workspace: unknown;
   draft: unknown;
 }): Promise<VideoWorkspaceSnapshot> {
+  const captured = parseVideoWorkspace(args.workspace);
+  if (!captured) throw new VideoWorkspaceError('invalid');
   return mutate(
     args.aggregateId,
-    async (tx, prepared) => {
+    async (tx, prepared, physicalDelete) => {
       const { snapshot: current, storage } = await requireSnapshot(
         tx,
         args.aggregateId,
@@ -493,7 +602,7 @@ export async function saveVideoWorkspaceSnapshot(args: {
       );
       if ((current.draft?.revision ?? null) !== args.expectedDraftRevision)
         throw new VideoWorkspaceError('conflict');
-      const workspace = parseVideoWorkspace(args.workspace);
+      const workspace = captured;
       if (
         !workspace ||
         workspace.aggregateId !== args.aggregateId ||
@@ -517,6 +626,7 @@ export async function saveVideoWorkspaceSnapshot(args: {
         },
         storage,
         'replace',
+        physicalDelete,
         prepared
       );
       const draft = parsedDraft
@@ -526,6 +636,7 @@ export async function saveVideoWorkspaceSnapshot(args: {
       else await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
       return { workspace: next, draft };
     },
-    true
+    true,
+    captured.effectSnapshots
   );
 }

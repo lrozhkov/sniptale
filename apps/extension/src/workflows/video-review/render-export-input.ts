@@ -9,6 +9,7 @@ import type { ReviewClickCue } from '../../features/video/review/click-animation
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import type { ReviewMediaIndex, ReviewRenderSettings } from './media-index';
 import type { ReviewExportClipPlan } from './audio-render';
+import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 
 /** Caller-owned inputs shared by ordinary and presentation frame export. */
 export interface ReviewFrameExportInput {
@@ -21,8 +22,10 @@ export interface ReviewFrameExportInput {
   index: ReviewMediaIndex;
   /** Fragment-local edits; `fragmentOffset` maps local time back to global output time. */
   edits: readonly ReviewEdit[];
-  /** Full document clocks preserve global caption slots in a fragment render. */
+  /** Full document clocks preserve caption slots and annotation phase in fragments. */
   captionTimeMap?: readonly ReviewTimeSegment[];
+  /** Immutable sources outside history; rendering never rereads the effect catalog. */
+  effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
   advanced: QuickEditAdvancedState;
   /** Text-resolved overlays; burning follows each comment's own renderToVideo flag. */
   comments?: readonly CanvasCommentExport[];

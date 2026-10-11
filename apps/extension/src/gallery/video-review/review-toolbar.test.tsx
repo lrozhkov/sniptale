@@ -6,6 +6,73 @@ import { ReviewTimelineToolbar, ReviewTrackControls } from './review-toolbar';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { translate } from '../../platform/i18n';
 
+it('annotation addition is advanced-only, admitted through the note owner and blocked during busy phases', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  const toggle = vi.fn();
+  let admitted: (() => void) | undefined;
+  const render = async (mode: 'basic' | 'advanced', busy = false) => {
+    advanced.ui.mode = mode;
+    await act(async () =>
+      root.render(
+        <ReviewTimelineToolbar
+          advanced={advanced}
+          busy={busy}
+          composerBusy={false}
+          selection={{ kind: 'point', time: 0 }}
+          edits={[]}
+          annotationTool={{ active: true, onToggle: toggle }}
+          beforeAction={(action) => {
+            admitted = action;
+          }}
+          setMode={vi.fn()}
+          setTrackVisibility={vi.fn()}
+          telemetryAvailable={false}
+          onDownloadFragment={vi.fn()}
+          editing={{
+            mode: null,
+            rate: 2,
+            audio: 'speed',
+            exporter: { index: null, phase: 'idle' },
+            setCutting: vi.fn(),
+            toggle: vi.fn(),
+            canApply: vi.fn(() => true),
+            changeRate: vi.fn(),
+            changeAudio: vi.fn(),
+          }}
+        />
+      )
+    );
+  };
+  const button = () =>
+    host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.annotationEffectsAdd')}"]`
+    );
+  try {
+    await render('basic');
+    expect(button()).toBeNull();
+    await render('advanced');
+    const trigger = button()!;
+    expect(trigger.getAttribute('aria-pressed')).toBe('true');
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+    await act(async () => trigger.click());
+    expect(toggle).not.toHaveBeenCalled();
+    act(() => admitted?.());
+    expect(toggle).toHaveBeenCalledExactlyOnceWith(trigger);
+    await render('advanced', true);
+    expect(button()?.disabled).toBe(true);
+    await act(async () => button()?.click());
+    expect(toggle).toHaveBeenCalledTimes(1);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it('moves the mode switch between the labelled toolbar and first compact lane control', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');

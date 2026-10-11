@@ -56,10 +56,12 @@ it('requires video and optional audio encoder support before MP4 export starts',
 });
 
 it('selects supported MP4 video and audio encoder candidates', async () => {
-  const videoSupportMock = vi
-    .fn()
-    .mockRejectedValueOnce(new Error('probe failed'))
-    .mockImplementationOnce(async (config: VideoEncoderConfig) => ({ supported: true, config }));
+  const videoSupportMock = vi.fn(async (config: VideoEncoderConfig) => {
+    if (config.codec === 'avc1.640028') {
+      throw new Error('probe failed');
+    }
+    return { supported: config.bitrateMode === 'variable', config };
+  });
   const audioSupportMock = vi.fn().mockResolvedValueOnce({
     supported: true,
     config: { codec: 'mp4a.40.2' },
@@ -73,12 +75,7 @@ it('selects supported MP4 video and audio encoder candidates', async () => {
   });
 
   const videoEncoder = await getSupportedMp4VideoEncoder(
-    {
-      width: 1920,
-      height: 1080,
-      fps: 30,
-      quality: VideoExportQualityPreset.MEDIUM,
-    } as never,
+    createVideoExportSettings(),
     VideoMp4Codec.AVC
   );
   const audioEncoder = await getSupportedMp4AudioEncoder({
@@ -101,9 +98,9 @@ it('selects supported MP4 video and audio encoder candidates', async () => {
   expect(audioEncoder.muxerCodec).toBe('aac');
 });
 
-it('passes the exact low-tier bitrate through the effective MP4 encoder config', async () => {
+it('passes the exact low-tier bitrate through the VBR fallback when quantizers are unavailable', async () => {
   const videoSupportMock = vi.fn(async (config: VideoEncoderConfig) => ({
-    supported: true,
+    supported: config.bitrateMode === 'variable',
     config,
   }));
   vi.stubGlobal('VideoEncoder', { isConfigSupported: videoSupportMock });

@@ -1,3 +1,4 @@
+import { createReviewAnnotationGeometry } from './annotation-effects-geometry';
 import { useEffect, useState, type RefObject } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
@@ -140,13 +141,22 @@ function resolveStageGeometry(
   // Drawing maps into the represented pixels, so the post-camera rect is authoritative.
   const content = sceneLayout ? sceneLayout.videoTransform : fitVideoRect(size, props.source);
   const decorations = resolveStageDecorations(props, size, sceneLayout);
+  const watermarkOutput = resolveVideoExportDimensions(
+    sceneSize.width,
+    sceneSize.height,
+    VideoResolutionPreset.SOURCE
+  );
   return {
     size,
-    watermarkOutput: resolveVideoExportDimensions(
-      sceneSize.width,
-      sceneSize.height,
-      VideoResolutionPreset.SOURCE
-    ),
+    watermarkOutput,
+    annotationGeometry: createReviewAnnotationGeometry({
+      source: props.source,
+      output: watermarkOutput,
+      background: props.scene?.background ?? { enabled: false },
+      canvas: props.scene?.canvas,
+      windowHeader: props.scene?.windowHeader,
+      camera: props.scene?.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 },
+    }),
     sceneLayout,
     zoomLayout,
     backgroundPaint,

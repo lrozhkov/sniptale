@@ -1,3 +1,4 @@
+import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 import type { ReviewBeforeAction } from './note-transitions';
 import { createReviewHistoryActions } from './history-actions';
 import { useMemo, useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
@@ -37,6 +38,7 @@ export function useReviewEditorWiring(args: {
   advancedState: ReturnType<typeof useReviewAdvanced>;
   exporter: ReturnType<typeof useReviewExport>;
   zoom: ReturnType<typeof useReviewZoomEditor>;
+  annotationEffects: ReturnType<typeof useReviewAnnotationEffects>;
   activeSelection: ReviewSelection;
   setActiveSelection: Dispatch<SetStateAction<ReviewSelection>>;
   clearAnnotation: Dispatch<SetStateAction<ReviewAnnotation | null>>;
@@ -133,6 +135,7 @@ export function useReviewEditorWiring(args: {
       const comment = args.document.canvasComments.find((item) => item.id === id);
       if (comment) void canvasComments.onDelete(comment);
     },
+    deleteAnnotationEffect: args.annotationEffects.remove,
     deleteText: (id) => text.remove([id]),
     deleteZoom: args.zoom.remove,
     deleteZoomLink: (id) => args.zoom.change(id, { linkTo: null }),

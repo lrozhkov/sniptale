@@ -6,6 +6,67 @@ import { createCanvasComment } from '../../features/video/review/comments';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
+it('routes annotation-only fragments with immutable workspace sources and the full main clock', async () => {
+  const { args, deps } = fixture();
+  args.snapshot.workspace.advanced.ui.mode = 'advanced';
+  args.snapshot.workspace.advanced.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 6,
+        attachment: 'content',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
+  args.snapshot.workspace.effectSnapshots = [
+    {
+      id: 'effect:frame',
+      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      documentId: 'frame',
+      sha256: '0'.repeat(64),
+      source: '{}',
+      retainedByteLength: 2,
+      assets: [],
+    },
+  ];
+  args.index.processedVideoCodec = 'vp8';
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 10,
+    audioPackets: 0,
+    resultDuration: 2,
+    audioRanges: [],
+  });
+  const before = structuredClone(args.snapshot);
+  await exportReviewedVideo(
+    { ...args, destination: 'download', selection: { kind: 'range', start: 4, end: 6 } },
+    deps
+  );
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+    expect.objectContaining({
+      effectSnapshots: before.workspace.effectSnapshots,
+      captionTimeMap: buildReviewTimeMap(6, [
+        { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+      ]),
+      fragmentOffset: 2,
+      advanced: expect.objectContaining({
+        annotationEffects: before.workspace.advanced.annotationEffects,
+      }),
+    })
+  );
+  expect(args.snapshot).toEqual(before);
+  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+  expect(deps.openAudioSource).not.toHaveBeenCalled();
+});
+
 it('publishes a new prepared asset once and returns a separate downloadable file and revision receipt', async () => {
   const { args, deps, writer, original, result } = fixture();
   const exported = await exportReviewedVideo(args, deps);

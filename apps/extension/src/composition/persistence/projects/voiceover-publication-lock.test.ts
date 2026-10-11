@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import {
   tryVoiceoverAttachmentLock,
   withVoiceoverAttachmentLock,
+  retainReviewAttachmentLock,
 } from './voiceover-publication-lock';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -69,4 +70,30 @@ it('fails closed when Web Locks are unavailable in the extension runtime', async
   await expect(tryVoiceoverAttachmentLock('asset-1', async () => undefined)).rejects.toThrow(
     'requires Web Locks'
   );
+});
+
+it('retains a disposable buffer while unrelated recovery proceeds and release may repeat', async () => {
+  vi.stubGlobal('navigator', undefined);
+  const release = await retainReviewAttachmentLock('annotation-resource');
+  expect(await tryVoiceoverAttachmentLock('annotation-resource', async () => 'ready')).toBe(
+    'defer'
+  );
+  expect(await tryVoiceoverAttachmentLock('other', async () => 'ready')).toBe('ready');
+  await release();
+  await release();
+  expect(await tryVoiceoverAttachmentLock('annotation-resource', async () => 'ready')).toBe(
+    'ready'
+  );
+});
+
+it('propagates Web Lock acquisition failure without a stranded release handle', async () => {
+  const failure = new Error('locks unavailable');
+  vi.stubGlobal('navigator', {
+    locks: {
+      request: async () => {
+        throw failure;
+      },
+    },
+  });
+  await expect(retainReviewAttachmentLock('annotation-resource')).rejects.toBe(failure);
 });

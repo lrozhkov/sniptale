@@ -211,6 +211,34 @@ afterEach(() => vi.restoreAllMocks());
 it('renders the complete rational sequence with explicit geometry and a partial final video sample', async () => {
   const args = fixture();
   args.captionTimeMap = buildReviewTimeMap(args.index.duration, []);
+  args.effectSnapshots = [
+    {
+      id: 'effect:frame',
+      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      documentId: 'frame',
+      sha256: '0'.repeat(64),
+      source: '{}',
+      retainedByteLength: 2,
+      assets: [],
+    },
+  ];
+  args.advanced.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 2,
+        attachment: 'content',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
   args.index.frameRate = 30000 / 1001;
   const result = await writeReviewPresentationFrames(args);
   expect(result.resultDuration).toBe(3.105);
@@ -221,6 +249,9 @@ it('renders the complete rational sequence with explicit geometry and a partial 
       plan: expect.objectContaining({ rate: { numerator: 30000, denominator: 1001 } }),
       main: expect.objectContaining({
         captionTimeMap: args.captionTimeMap,
+        effectSnapshots: args.effectSnapshots,
+        fps: 30000 / 1001,
+        effective: expect.objectContaining({ annotationEffects: args.advanced.annotationEffects }),
         dimensions: {
           canonical: { width: 320, height: 180 },
           backing: { width: 320, height: 180 },

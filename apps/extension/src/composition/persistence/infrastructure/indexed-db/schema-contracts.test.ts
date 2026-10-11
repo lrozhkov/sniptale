@@ -98,9 +98,9 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   };
   const plan = buildDatabaseMigrationPlan(14, DB_VERSION);
   expect(buildDatabaseMigrationPlan(13, DB_VERSION)?.map((step) => step.toDatabaseVersion)).toEqual(
-    [14, 15, 16, 17, 18, 19, 20]
+    [14, 15, 16, 17, 18, 19, 20, 21]
   );
-  expect(plan).toHaveLength(6);
+  expect(plan).toHaveLength(7);
   expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 13, to: 14 }]);
   expect(plan?.[1]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 14, to: 15 }]);
   expect(plan?.[2]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
@@ -260,7 +260,7 @@ it('admits compact source gain without workspace migration and refuses incompati
   expect(betaV17Fixture.records).toEqual(betaV16Fixture.records);
   expect(betaV17Fixture.opfsObjects).toEqual(betaV16Fixture.opfsObjects);
   const plan = buildDatabaseMigrationPlan(16, DB_VERSION);
-  expect(plan).toHaveLength(4);
+  expect(plan).toHaveLength(5);
   expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
   const put = vi.fn();
   const tx = {
@@ -296,4 +296,47 @@ it('admits compact source gain without workspace migration and refuses incompati
     )
   ).toBeNull();
   expect(buildDatabaseMigrationPlan(DB_VERSION, 16)).toBeNull();
+});
+
+it('annotation admission is metadata-only and aborts before publishing contracts on missing storage', async () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 20
+  )!;
+  const names = new Set(source.stores);
+  const put = vi.fn();
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn((_name: string) => ({
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: vi.fn(),
+    deleteObjectStore: vi.fn(),
+  };
+  const plan = buildDatabaseMigrationPlan(20, DB_VERSION)!;
+  expect(plan).toHaveLength(1);
+  expect(plan[0]).toMatchObject({
+    risk: 'additive',
+    fromDatabaseVersion: 20,
+    toDatabaseVersion: 21,
+    domainVersions: [{ domainId: 'mediaLibrary', from: 17, to: 18 }],
+  });
+  await expect(plan[0]!.estimateAdditionalBytes()).resolves.toBe(65536);
+  handleDatabaseUpgrade(db, 20, DB_VERSION, tx);
+  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  put.mockClear();
+  tx.objectStore.mockClear();
+  names.delete('video_workspace_history');
+  expect(() => handleDatabaseUpgrade(db, 20, DB_VERSION, tx)).toThrow('Annotation effect');
+  expect(tx.abort).toHaveBeenCalledOnce();
+  expect(tx.objectStore).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
 });

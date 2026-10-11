@@ -1,4 +1,9 @@
-import { parseProjectAssetPayload } from './asset-publication-payload';
+import {
+  parseProjectAssetPayload,
+  type ProjectAssetPublicationOptions,
+} from './asset-publication-payload';
+import { readWorkspaceStorage } from '../review-workspaces/storage';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
 export type {
   ProjectAssetPublicationOptions,
   ProjectAssetPublicationPayload,
@@ -9,6 +14,7 @@ import {
   reviewWorkspaceHasSpeechReplacement,
   reviewWorkspaceHasWatermarkImage,
   reviewWorkspaceHasSceneResource,
+  reviewWorkspaceHasAnnotationEffectResource,
 } from '../review-workspaces/asset-refs';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { assertStandaloneMediaSourceReplaceable } from './source-admission';
@@ -92,6 +98,7 @@ async function publishProjectMediaAsset(args: {
   filename?: string;
   expectedAssetId?: string | null;
   publishToLibrary?: boolean;
+  requiredReviewAnnotationEffect?: ProjectAssetPublicationOptions['requiredReviewAnnotationEffect'];
   journal: AssetReadyJournal;
   ownerKind: string;
   storeName: typeof PROJECT_ASSETS_STORE | typeof PROJECT_EXPORTS_STORE;
@@ -132,6 +139,20 @@ async function publishProjectMediaAsset(args: {
         throw new Error('Private resource Library source is unavailable.');
     }
     try {
+      if (args.requiredReviewAnnotationEffect) {
+        const claim = args.requiredReviewAnnotationEffect;
+        const stored = await readWorkspaceStorage(tx, claim.aggregateId);
+        const workspace = parseVideoWorkspace(stored.logical);
+        if (
+          !workspace ||
+          !reviewWorkspaceHasAnnotationEffectResource(workspace, claim, {
+            assetId: `project-asset:${args.entry.id}`,
+            mimeType: ref.mimeType,
+            byteLength: ref.size,
+          })
+        )
+          throw new SupersededAssetPublicationError();
+      }
       const domainStore = tx.objectStore(args.storeName);
       const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
       const previousRaw: unknown = await domainStore.get(args.entry.id);
@@ -222,6 +243,9 @@ export async function publishProjectAssetJournal(
       ? {}
       : { publishToLibrary: payload.publishToLibrary }),
     journal,
+    ...(payload.requiredReviewAnnotationEffect
+      ? { requiredReviewAnnotationEffect: payload.requiredReviewAnnotationEffect }
+      : {}),
     ...(lifecyclePermit ? { lifecyclePermit } : {}),
     ownerKind: PROJECT_ASSET_OWNER_KIND,
     storeName: PROJECT_ASSETS_STORE,
@@ -248,6 +272,7 @@ async function recoverProjectAssetJournal(
   const aggregateId =
     payload.requiredReview?.aggregateId ??
     payload.requiredReviewResource?.aggregateId ??
+    payload.requiredReviewAnnotationEffect?.aggregateId ??
     payload.requiredReviewSpeech?.aggregateId;
   if (aggregateId) {
     const assetId = `project-asset:${payload.entry.id}`;
@@ -255,29 +280,35 @@ async function recoverProjectAssetJournal(
       const review = await readVideoWorkspace(aggregateId);
       const referenced =
         !!review &&
-        (payload.requiredReviewSpeech
-          ? reviewWorkspaceHasSpeechReplacement(
+        (payload.requiredReviewAnnotationEffect
+          ? reviewWorkspaceHasAnnotationEffectResource(
               review.workspace,
-              payload.requiredReviewSpeech.target,
-              payload.requiredReviewSpeech.replacementId,
-              assetId
+              payload.requiredReviewAnnotationEffect,
+              { assetId, mimeType: payload.entry.mimeType, byteLength: payload.entry.size }
             )
-          : payload.requiredReviewResource
-            ? payload.requiredReviewResource.slot === 'watermark'
-              ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
-              : reviewWorkspaceHasSceneResource(
-                  review.workspace,
-                  payload.requiredReviewResource.slot,
-                  payload.requiredReviewResource.kind,
-                  assetId
-                )
-            : payload.librarySourceId
-              ? reviewWorkspaceHasAudioClip(
-                  review.workspace,
-                  payload.requiredReview!.clipId,
-                  assetId
-                )
-              : collectReviewAssetReferences(review.workspace).has(assetId));
+          : payload.requiredReviewSpeech
+            ? reviewWorkspaceHasSpeechReplacement(
+                review.workspace,
+                payload.requiredReviewSpeech.target,
+                payload.requiredReviewSpeech.replacementId,
+                assetId
+              )
+            : payload.requiredReviewResource
+              ? payload.requiredReviewResource.slot === 'watermark'
+                ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
+                : reviewWorkspaceHasSceneResource(
+                    review.workspace,
+                    payload.requiredReviewResource.slot,
+                    payload.requiredReviewResource.kind,
+                    assetId
+                  )
+              : payload.librarySourceId
+                ? reviewWorkspaceHasAudioClip(
+                    review.workspace,
+                    payload.requiredReview!.clipId,
+                    assetId
+                  )
+                : collectReviewAssetReferences(review.workspace).has(assetId));
       if (!referenced) {
         throw new SupersededAssetPublicationError();
       }

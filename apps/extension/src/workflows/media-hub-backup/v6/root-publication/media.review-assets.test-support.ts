@@ -1,3 +1,10 @@
+import { readFileSync } from 'node:fs';
+import {
+  sha256EffectV1Bytes,
+  validateEffectV1Document,
+} from '@sniptale/runtime-contracts/effect-v1';
+import { reviewAdvancedContentBaseline } from '../../../../features/video/review/document';
+import type { ReviewAnnotationEffectSnapshot } from '../../../../features/video/review/annotation-effects/types';
 import type {
   ArchiveRestoreSession,
   AssetReadyJournal,
@@ -176,4 +183,82 @@ export function session(strategy: 'skip' | 'replace' | 'duplicate'): ArchiveRest
 export function portableJson(value: unknown): JsonValue {
   assertPortableJson(value);
   return value;
+}
+
+export async function annotationReviewFixture() {
+  const result = validateEffectV1Document(
+    JSON.parse(
+      readFileSync(
+        'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+        'utf8'
+      )
+    )
+  );
+  if (!result.ok || !result.document) throw new Error('Invalid annotation fixture');
+  const blob = new Blob(
+    ['<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'],
+    { type: 'image/svg+xml' }
+  );
+  const resourceHash = await sha256EffectV1Bytes(new Uint8Array(await blob.arrayBuffer()));
+  const resource = result.document.assets[0];
+  if (!resource) throw new Error('Missing fixture resource');
+  const source = JSON.stringify({
+    ...result.document,
+    assets: [{ ...resource, sha256: resourceHash, byteLength: blob.size }],
+  });
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const snapshot: ReviewAnnotationEffectSnapshot = {
+    id: `effect:${sha256}`,
+    schemaVersion: 'sniptale.effect.v1',
+    kind: 'standalone',
+    documentId: result.document.id,
+    sha256,
+    source,
+    retainedByteLength: new TextEncoder().encode(source).byteLength + blob.size,
+    assets: [
+      {
+        id: resource.id,
+        assetId: 'project-asset:mark',
+        kind: 'svg',
+        mimeType: blob.type,
+        byteLength: blob.size,
+        sha256: resourceHash,
+      },
+    ],
+  };
+  const base = reviewFixture();
+  const advanced = {
+    ...createQuickEditAdvancedState(),
+    annotationEffects: { enabled: false, instances: [] },
+  };
+  const before = reviewAdvancedContentBaseline(advanced);
+  const instance = {
+    id: 'effect',
+    snapshotId: snapshot.id,
+    enabled: false,
+    start: 0,
+    end: 1,
+    attachment: 'viewport' as const,
+    transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+    controls: { accent: '#7cf7ff', intensity: 0.8 },
+    order: 0,
+  };
+  const operation: ReviewOperation = {
+    id: 'effect-redo',
+    at: 1,
+    target: 'advancedContent',
+    before,
+    after: { ...before, annotationEffects: { enabled: false, instances: [instance] } },
+  };
+  const review = {
+    ...base,
+    workspace: {
+      ...base.workspace,
+      advanced,
+      cursor: 0,
+      history: [operation],
+      effectSnapshots: [snapshot],
+    },
+  };
+  return { review, snapshot, blob };
 }

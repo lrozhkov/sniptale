@@ -11,7 +11,7 @@ vi.mock('../../workflows/video-review/estimate-size', () => ({
   estimateReviewExportSize: mocks.estimate,
 }));
 
-it.each(['overlays', 'zoom', 'audio'] as const)(
+it.each(['overlays', 'zoom', 'audio', 'annotationEffects'] as const)(
   'invalidates %s estimates for local UI edits with autosave disabled',
   async (toggle) => {
     vi.useFakeTimers();
@@ -81,6 +81,15 @@ it.each(['overlays', 'zoom', 'audio'] as const)(
       await act(async () => state.setVisible(true));
       await act(async () => vi.advanceTimersByTimeAsync(1000));
       expect(state.status?.kind).toBe('ready');
+      const input = mocks.estimate.mock.lastCall![0];
+      const bytes = new Blob(['protected private image'], { type: 'image/png' });
+      const read = vi
+        .spyOn(resource.session, 'readAnnotationResource')
+        .mockResolvedValueOnce(bytes);
+      expect(await input.readProjectAsset('project-asset:local')).toBe(bytes);
+      expect(read).toHaveBeenCalledWith('project-asset:local', expect.any(AbortSignal));
+      expect(resource.session.getSnapshot().snapshot.workspace.revision).toBe(1);
+      expect(resource.session.getSnapshot().document).toEqual(originalDocument);
       const updated = structuredClone(resource.session.getSnapshot().snapshot.workspace.advanced);
       if (toggle === 'overlays') updated.ui.overlaysVisible = !updated.ui.overlaysVisible;
       else updated.ui.tracks[toggle] = !updated.ui.tracks[toggle];

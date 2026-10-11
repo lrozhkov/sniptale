@@ -1,3 +1,4 @@
+import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-export';
 import { ReviewOriginalSpeechPanel } from './speech-panel';
 import { ReviewTextDocumentPanel } from './text-panel';
@@ -29,6 +30,7 @@ import type { useReviewEditorState } from './use-editor-state';
 
 type InspectorState = Pick<
   ReturnType<typeof useReviewEditorState>,
+  | 'annotationEffects'
   | 'selection'
   | 'text'
   | 'playbackRange'
@@ -206,9 +208,14 @@ export function ReviewInspectorBinding({
           state.activeSelection.kind === 'original-audio' ||
           state.activeSelection.kind === 'telemetry' ||
           (state.advanced.ui.mode === 'advanced' &&
-            ['zoom', 'canvas-comment', 'audio', 'webcam', 'webcam-position'].includes(
-              state.activeSelection.kind
-            ))
+            [
+              'zoom',
+              'canvas-comment',
+              'audio',
+              'webcam',
+              'webcam-position',
+              'annotation-effect',
+            ].includes(state.activeSelection.kind))
         }
         scene={
           <ReviewScenePropertiesBinding
@@ -533,6 +540,25 @@ function ReviewSelectionBinding({
   onBackToHistory?: (() => void) | undefined;
 }) {
   const video = state.video;
+  if (state.activeSelection.kind === 'annotation-effect') {
+    const selection = state.activeSelection;
+    const instance = state.annotationEffects.lane?.instances.find(
+      (item) => item.id === selection.id
+    );
+    const snapshot = state.snapshot.snapshot.workspace.effectSnapshots?.find(
+      (item) => item.id === instance?.snapshotId
+    );
+    return (
+      <ReviewAnnotationInspector
+        key={`${state.snapshot.snapshot.workspace.sourceAssetId}:${state.activeSelection.id}`}
+        editor={state.annotationEffects}
+        id={state.activeSelection.id}
+        source={snapshot?.source}
+        duration={resource.source.duration}
+        busy={state.busy || state.editing.exporter.phase !== 'idle'}
+      />
+    );
+  }
   if (state.activeSelection.kind === 'text')
     return (
       <ReviewSelectedTextProperties

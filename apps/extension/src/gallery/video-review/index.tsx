@@ -52,6 +52,7 @@ function ReviewHistoryControlBinding({
         onReload: () =>
           state.runComposer(async () => {
             await state.composer.reload();
+            state.annotationEffects.cancelGesture();
             state.resetAdvanced();
           }),
       }}
@@ -188,6 +189,15 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              annotationEffects={state.annotationEffects}
+              effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
+              annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
+              selectedAnnotationEffectId={
+                state.activeSelection.kind === 'annotation-effect' ? state.activeSelection.id : null
+              }
+              onSelectAnnotationEffect={(id) =>
+                state.setActiveSelection({ kind: 'annotation-effect', id })
+              }
               text={state.text}
               {...reviewTimelineInspectorCommands({
                 video: state.video,

@@ -17,6 +17,9 @@ export interface PresentationInput {
   video: RefObject<HTMLVideoElement | null>;
   host: RefObject<HTMLDivElement | null>;
   sourceIdentity: string;
+  /** Originating session resources are read within the existing prepare transaction. */
+  readAsset?: (reference: string, signal: AbortSignal) => Promise<Blob | null>;
+  sourceFrameRate?: number | undefined;
   scene: Scene;
   canonical: Size;
   css: Size;
@@ -48,6 +51,7 @@ export type Description = {
   dimensions: { canonical: Size; backing: Size };
   cameraTransform: RenderFrame['cameraTransform'];
   sourceTime: number;
+  fps?: number;
 };
 
 export type PresentationCameraState = {
@@ -80,6 +84,7 @@ export function resolvePresentationDescription(
     input.canonical,
     input.css,
     input.preferences,
+    input.sourceFrameRate,
     input.seekRevision,
     input.playing,
     interacting,
@@ -107,6 +112,12 @@ export function resolvePresentationDescription(
         dimensions: { canonical: input.canonical, backing },
         cameraTransform: !input.playing ? input.cameraTransform : undefined,
         sourceTime: input.pausedSourceTime,
+        fps:
+          input.preferences.frameRate === 'current'
+            ? Number.isFinite(input.sourceFrameRate) && (input.sourceFrameRate ?? 0) > 0
+              ? input.sourceFrameRate!
+              : 30
+            : Number(input.preferences.frameRate),
       },
     };
   }

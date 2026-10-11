@@ -29,13 +29,23 @@ export function fixtureWorkspaceValue(
 }
 
 /** Shared transactional fixture retains commit/abort and quota behavior. */
-export function createReviewWorkspaceStoreFixture(failure: () => boolean) {
+export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) => boolean) {
   const id = 'recording:beta-v1-recording';
   const rows: Map<string, Map<string, unknown>> = new Map([
     ['media_library', new Map([[id, betaV1Fixture.records.media_library[0]]])],
     ['recordings', new Map([['beta-v1-recording', betaV1Fixture.records.recordings[0]]])],
     ['project_assets', new Map()],
     ['project_exports', new Map()],
+    ...[
+      'video_projects',
+      'scenario_assets',
+      'image_workspaces',
+      'aggregate_presentations',
+      'thumbnails',
+      'asset_owners',
+      'asset_refs',
+      'asset_operations',
+    ].map((name): [string, Map<string, unknown>] => [name, new Map()]),
     ['video_workspaces', new Map()],
     ['video_workspace_history', new Map()],
     ['video_workspace_drafts', new Map()],
@@ -52,36 +62,50 @@ export function createReviewWorkspaceStoreFixture(failure: () => boolean) {
           if (!stores.includes(name)) throw new Error('Store outside transaction scope');
           const store = pending.get(name)!;
           const keyOf = (key: IDBValidKey) => (typeof key === 'string' ? key : JSON.stringify(key));
-          const ownRows = (key: IDBValidKey) =>
-            [...store].filter(([, value]) => isRecord(value) && value['aggregateId'] === key);
+          const ownRows = (key: IDBValidKey, indexName = 'aggregateId') =>
+            [...store].filter(([, value]) => isRecord(value) && value[indexName] === key);
           return {
             get: async (key: IDBValidKey) => structuredClone(store.get(keyOf(key))),
             getAll: async () => structuredClone([...store.values()]),
             index: (indexName: string) => {
-              if (indexName !== 'aggregateId') throw new Error('Unexpected test index');
+              if (indexName !== 'aggregateId' && indexName !== 'assetId')
+                throw new Error('Unexpected test index');
               return {
+                count: async (key: IDBValidKey) => ownRows(key, indexName).length,
                 getAll: async (key: IDBValidKey) =>
-                  structuredClone(ownRows(key).map(([, value]) => value)),
+                  structuredClone(ownRows(key, indexName).map(([, value]) => value)),
                 getAllKeys: async (key: IDBValidKey) =>
-                  ownRows(key).map(([encoded]) => {
+                  ownRows(key, indexName).map(([encoded]) => {
                     const parsed: unknown = JSON.parse(encoded);
                     if (
                       !Array.isArray(parsed) ||
-                      typeof parsed[0] !== 'string' ||
-                      typeof parsed[1] !== 'number'
+                      !parsed.length ||
+                      !parsed.every(
+                        (part: unknown) =>
+                          typeof part === 'string' ||
+                          (typeof part === 'number' && Number.isFinite(part))
+                      )
                     )
                       throw new Error('Invalid fixture compound key');
-                    return [parsed[0], parsed[1]];
+                    return parsed.filter(
+                      (part: unknown): part is string | number =>
+                        typeof part === 'string' || typeof part === 'number'
+                    );
                   }),
               };
             },
             put: async (value: unknown) => {
-              if (failure()) throw new DOMException('No space', 'QuotaExceededError');
+              if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
               if (!isRecord(value)) throw new Error('Invalid fixture row');
               const key =
                 name === 'video_workspace_history'
                   ? JSON.stringify([value['aggregateId'], value['ordinal']])
-                  : (value['aggregateId'] ?? value['id']);
+                  : name === 'asset_owners'
+                    ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
+                    : (value['aggregateId'] ??
+                      value['id'] ??
+                      value['operationId'] ??
+                      value['assetId']);
               if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
               store.set(key, structuredClone(value));
             },

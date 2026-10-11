@@ -48,6 +48,7 @@ export function reviewAdvancedContentBaseline(state: {
   presentation?: QuickEditAdvancedContent['presentation'];
   text?: QuickEditAdvancedContent['text'];
   captions?: QuickEditAdvancedContent['captions'];
+  annotationEffects?: QuickEditAdvancedContent['annotationEffects'];
 }): QuickEditAdvancedContent {
   return {
     schemaVersion: state.schemaVersion,
@@ -64,6 +65,7 @@ export function reviewAdvancedContentBaseline(state: {
     ...(state.presentation ? { presentation: state.presentation } : {}),
     ...(state.text ? { text: state.text } : {}),
     ...(state.captions ? { captions: state.captions } : {}),
+    ...(state.annotationEffects ? { annotationEffects: state.annotationEffects } : {}),
   };
 }
 

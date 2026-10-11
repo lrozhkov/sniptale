@@ -23,6 +23,7 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 
 import { mediaLibraryRootPublisher } from './media';
 import {
+  annotationReviewFixture,
   journal,
   portableJson,
   portableMetadata,
@@ -31,7 +32,9 @@ import {
   stagedObjects,
 } from './media.review-assets.test-support';
 
-function installDatabase(metadata: ReturnType<typeof portableMetadata>) {
+function installDatabase(
+  metadata: Pick<ReturnType<typeof portableMetadata>, 'entry' | 'projectExport'>
+) {
   const review = reviewFixture();
   const tables = new Map<string, Map<string, unknown>>([
     ['media_library', new Map([[metadata.entry.id, metadata.entry]])],
@@ -517,6 +520,126 @@ it.each(['bookends', 'original-speech'] as const)(
       }
     } finally {
       await reader.close();
+    }
+  }
+);
+
+it.each(['source-hash', 'resource-hash', 'mime', 'signature', 'unsafe-svg', 'valid'] as const)(
+  'checks retained redo annotation integrity before standalone Replace: %s',
+  async (mode) => {
+    const { sha256EffectV1Bytes } = await import('@sniptale/runtime-contracts/effect-v1');
+    const { encodePortableReviewAssetRefs } =
+      await import('../../../../composition/persistence/review-workspaces/asset-refs');
+    const { readAssetFile } = await import('../../../../composition/persistence/assets');
+    const fixture = await annotationReviewFixture();
+    let blob = fixture.blob;
+    if (mode === 'source-hash')
+      fixture.snapshot.source = fixture.snapshot.source.replace(
+        'Neutral runtime conformance',
+        'Mutated runtime conformance'
+      );
+    if (mode === 'resource-hash')
+      blob = new Blob([(await blob.text()).replace('width="1"', 'width="2"')], { type: blob.type });
+    if (mode === 'mime') blob = new Blob([await blob.arrayBuffer()], { type: 'image/png' });
+    if (mode === 'signature' || mode === 'unsafe-svg') {
+      blob = new Blob(
+        [
+          mode === 'signature'
+            ? 'x'.repeat(blob.size)
+            : '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        ],
+        { type: blob.type }
+      );
+      const hash = await sha256EffectV1Bytes(new Uint8Array(await blob.arrayBuffer()));
+      const { readReviewAnnotationEffectDocument } =
+        await import('../../../../features/video/review/annotation-effects/validation');
+      const document = readReviewAnnotationEffectDocument(fixture.snapshot.source);
+      if (!document || !document.assets[0] || !fixture.snapshot.assets[0])
+        throw new Error('Invalid fixture');
+      fixture.snapshot.assets[0] = {
+        ...fixture.snapshot.assets[0],
+        byteLength: blob.size,
+        sha256: hash,
+      };
+      fixture.snapshot.source = JSON.stringify({
+        ...document,
+        assets: [{ ...document.assets[0], byteLength: blob.size, sha256: hash }],
+      });
+      fixture.snapshot.sha256 = await sha256EffectV1Bytes(
+        new TextEncoder().encode(fixture.snapshot.source)
+      );
+      const oldId = fixture.snapshot.id;
+      fixture.snapshot.id = `effect:${fixture.snapshot.sha256}`;
+      for (const operation of fixture.review.workspace.history) {
+        if (operation.target === 'advancedContent')
+          for (const instance of operation.after.annotationEffects?.instances ?? [])
+            if (instance.snapshotId === oldId) instance.snapshotId = fixture.snapshot.id;
+      }
+      fixture.snapshot.retainedByteLength =
+        new TextEncoder().encode(fixture.snapshot.source).byteLength + blob.size;
+    }
+    const base = portableMetadata(true);
+    const metadata = {
+      ...base,
+      videoReview: encodePortableReviewAssetRefs(fixture.review),
+      reviewAssets: [
+        {
+          entry: { id: 'mark', createdAt: 1, mimeType: 'image/svg+xml', size: blob.size },
+          filename: 'mark.svg',
+          objectId: 'mark-object',
+          publishToLibrary: false,
+        },
+      ],
+    };
+    const tables = installDatabase(metadata);
+    const previous = structuredClone(tables);
+    vi.mocked(readAssetFile).mockImplementation(async (reference) => {
+      if (reference.assetId !== 'mark-bytes') throw new Error('Unexpected staged read');
+      return new File([blob], 'mark.svg', { type: blob.type });
+    });
+    const pending = mediaLibraryRootPublisher.publish({
+      envelope: {
+        descriptor: {
+          mediaSubtype: 'library-item',
+          metadataPath: '_sniptale/metadata/media/export-e.json',
+          objectCount: 2,
+          rootId: metadata.entry.id,
+          rootKind: 'media',
+          totalBytes: 6 + blob.size,
+        },
+        metadata: portableJson(metadata),
+        objects: [],
+      },
+      journal,
+      session: session('replace'),
+      staged: [
+        stagedObjects()[0]!,
+        {
+          objectId: 'mark-object',
+          ref: {
+            assetId: 'mark-bytes',
+            createdAt: 1,
+            location: { kind: 'opfs', objectKey: 'objects/mark-bytes' },
+            mimeType: blob.type,
+            size: blob.size,
+            sha256: null,
+          },
+        },
+      ],
+    });
+    if (mode !== 'valid') {
+      await expect(pending).rejects.toMatchObject({
+        code: mode === 'source-hash' ? 'source-integrity' : 'resource-integrity',
+      });
+      expect(tables).toEqual(previous);
+      expect(mocks.checkpoint).not.toHaveBeenCalled();
+    } else {
+      await expect(pending).resolves.toMatchObject({ imported: true });
+      const restored = logicalReviewValues(tables)[0];
+      expect(restored?.cursor).toBe(0);
+      expect(restored?.effectSnapshots?.[0]?.assets[0]?.assetId).not.toBe('project-asset:mark');
+      expect(restored?.history[0]?.target).toBe('advancedContent');
+      expect(vi.mocked(readAssetFile)).toHaveBeenCalledOnce();
     }
   }
 );

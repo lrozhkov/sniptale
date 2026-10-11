@@ -426,6 +426,10 @@ function ReviewInspectorHeader(
         size="compact"
         title={translate('common.actions.close')}
         disabled={props.busy}
+        onPointerDown={(event) => {
+          // The guarded exit owns field flush; blur must not disable Close before click.
+          if (event.button === 0) event.preventDefault();
+        }}
         onClick={props.onBack}
       >
         <X size={16} aria-hidden="true" />

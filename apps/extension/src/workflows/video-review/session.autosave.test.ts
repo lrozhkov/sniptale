@@ -2,6 +2,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from './session';
+import { readFileSync } from 'node:fs';
+import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
+import type {
+  ReviewAnnotationEffect,
+  ReviewAnnotationEffectSnapshot,
+} from '../../features/video/review/annotation-effects/types';
 
 function setup() {
   let stored: VideoWorkspaceSnapshot = {
@@ -60,6 +67,233 @@ function setup() {
 }
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+async function annotationFixture(suffix = '') {
+  const fixture = setup();
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+    'utf8'
+  ).replace('"neutral-runtime-conformance"', `"neutral-runtime-conformance${suffix}"`);
+  const effect = readReviewAnnotationEffectDocument(source)!;
+  const asset = effect.assets[0]!;
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const snapshot: ReviewAnnotationEffectSnapshot = {
+    id: `effect:${sha256}`,
+    sha256,
+    source,
+    schemaVersion: 'sniptale.effect.v1',
+    kind: 'standalone',
+    documentId: effect.id,
+    retainedByteLength: new TextEncoder().encode(source).byteLength + asset.byteLength!,
+    assets: [
+      {
+        id: asset.id,
+        assetId: `project-asset:mark${suffix}`,
+        kind: 'svg',
+        mimeType: asset.mimeType,
+        sha256: asset.sha256!,
+        byteLength: asset.byteLength!,
+      },
+    ],
+  };
+  const instance: ReviewAnnotationEffect = {
+    id: `annotation${suffix}`,
+    snapshotId: snapshot.id,
+    enabled: true,
+    start: 1,
+    end: 3,
+    attachment: 'content',
+    controls: {},
+    order: 0,
+    transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+  };
+  const resource = {
+    assetId: `project-asset:mark${suffix}`,
+    physicalAssetId: `physical-mark${suffix}`,
+    publish: vi.fn(async () => undefined),
+    cancel: vi.fn(async () => undefined),
+    release: vi.fn(async () => undefined),
+  };
+  return {
+    ...fixture,
+    resource,
+    args: { expectedSourceAssetId: 'source', snapshot, instance, resources: [resource] },
+  };
+}
+
+it('keeps autosave-off annotations local; header flush does not adopt and Save publishes once', async () => {
+  const { session, deps, resource, args } = await annotationFixture();
+  session.setAutosaveEnabled(false);
+  await session.applyAnnotationEffect(args);
+  expect(session.getSnapshot().snapshot.workspace).toMatchObject({
+    revision: 1,
+    cursor: 1,
+    effectSnapshots: [args.snapshot],
+  });
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(session.getSnapshot().dirty).toBe(true);
+  expect(session.ownsAnnotationResource(resource)).toBe(true);
+  await session.flush();
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  expect(resource.publish).not.toHaveBeenCalled();
+  await session.saveBuffered();
+  expect(session.getSnapshot().dirty).toBe(false);
+  expect(resource.publish).toHaveBeenCalledOnce();
+  expect(resource.cancel).not.toHaveBeenCalled();
+  expect(resource.release).toHaveBeenCalledOnce();
+  expect(session.ownsAnnotationResource(resource)).toBe(false);
+});
+
+it.each(['reset', 'dispose'] as const)(
+  'reads only admitted local resources until %s, without Save',
+  async (action) => {
+    const { session, deps, resource, args } = await annotationFixture();
+    const blob = new Blob(['private'], { type: 'image/svg+xml' });
+    const readable = { ...resource, read: vi.fn(async () => blob) };
+    const signal = new AbortController().signal;
+    session.setAutosaveEnabled(false);
+    expect(await session.readAnnotationResource(resource.assetId, signal)).toBeNull();
+    await session.applyAnnotationEffect({ ...args, resources: [readable] });
+    expect(await session.readAnnotationResource(resource.assetId, signal)).toBe(blob);
+    expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+    expect(resource.publish).not.toHaveBeenCalled();
+    await session[action]();
+    expect(await session.readAnnotationResource(resource.assetId, signal)).toBeNull();
+    await session.dispose();
+  }
+);
+
+it.each(['save', 'publication'] as const)(
+  'retains failed %s annotation state for Save retry without duplicate history',
+  async (failure) => {
+    const { session, deps, resource, args } = await annotationFixture();
+    if (failure === 'save')
+      deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Save failed'));
+    else resource.publish.mockRejectedValueOnce(new Error('Publication failed'));
+    await expect(session.applyAnnotationEffect(args)).rejects.toThrow('failed');
+    expect(session.getSnapshot()).toMatchObject({ dirty: true, pending: 0, error: 'storage' });
+    expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+    expect(session.ownsAnnotationResource(resource)).toBe(true);
+    expect(resource.release).not.toHaveBeenCalled();
+    expect(resource.cancel).not.toHaveBeenCalled();
+    await session.saveBuffered();
+    expect(session.getSnapshot().dirty).toBe(false);
+    expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+    expect(resource.release).toHaveBeenCalledOnce();
+  }
+);
+
+it('Undo keeps redo leases; a new branch releases only unadopted resources', async () => {
+  const { session, resource, args } = await annotationFixture();
+  session.setAutosaveEnabled(false);
+  await session.applyAnnotationEffect(args);
+  await session.history('undo');
+  expect(session.getSnapshot().document.advancedContent.annotationEffects).toBeUndefined();
+  expect(session.getSnapshot().snapshot.workspace.effectSnapshots).toEqual([args.snapshot]);
+  expect(resource.cancel).not.toHaveBeenCalled();
+  const before = session.getSnapshot().document.advancedContent;
+  await session.commit({
+    id: 'branch',
+    at: 2,
+    target: 'advancedContent',
+    before,
+    after: { ...before, actionsEnabled: false },
+  });
+  expect(session.getSnapshot().snapshot.workspace.effectSnapshots).toEqual([]);
+  expect(resource.cancel).toHaveBeenCalledOnce();
+  expect(resource.release).toHaveBeenCalledOnce();
+});
+
+it('applying a distinct annotation after Undo releases the discarded annotation branch immediately', async () => {
+  const first = await annotationFixture();
+  const second = await annotationFixture('-second');
+  first.session.setAutosaveEnabled(false);
+  await first.session.applyAnnotationEffect(first.args);
+  await first.session.history('undo');
+  expect(first.resource.cancel).not.toHaveBeenCalled();
+  await first.session.applyAnnotationEffect(second.args);
+  expect(first.session.getSnapshot().snapshot.workspace).toMatchObject({
+    revision: 1,
+    cursor: 1,
+    effectSnapshots: [second.args.snapshot],
+  });
+  expect(first.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(first.session.getSnapshot().document.advancedContent.annotationEffects?.instances).toEqual(
+    [{ ...second.args.instance, order: 0 }]
+  );
+  expect(first.resource.cancel).toHaveBeenCalledOnce();
+  expect(first.resource.release).toHaveBeenCalledOnce();
+  expect(first.resource.publish).not.toHaveBeenCalled();
+  expect(first.session.ownsAnnotationResource(first.resource)).toBe(false);
+  expect(first.session.ownsAnnotationResource(second.resource)).toBe(true);
+  expect(second.resource.cancel).not.toHaveBeenCalled();
+  expect(second.resource.release).not.toHaveBeenCalled();
+  expect(first.deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  await first.session.dispose();
+  await second.session.dispose();
+});
+
+it.each(['reset', 'reload', 'dispose'] as const)(
+  '%s cleans unadopted bytes without an implicit Save',
+  async (action) => {
+    const { session, deps, resource, args } = await annotationFixture();
+    session.setAutosaveEnabled(false);
+    await session.applyAnnotationEffect(args);
+    await session[action]();
+    expect(resource.publish).not.toHaveBeenCalled();
+    expect(resource.cancel).toHaveBeenCalledOnce();
+    expect(resource.release).toHaveBeenCalledOnce();
+    expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+    if (action === 'dispose') {
+      await session.dispose();
+      await expect(session.applyAnnotationEffect(args)).rejects.toThrow('closed');
+      expect(resource.release).toHaveBeenCalledOnce();
+    }
+  }
+);
+
+it('uncertain Save acknowledgement never cancels bytes retained by durable history during unmount', async () => {
+  const { session, deps, resource, args } = await annotationFixture();
+  const write = deps.saveVideoWorkspaceSnapshot.getMockImplementation()!;
+  deps.saveVideoWorkspaceSnapshot.mockImplementationOnce(async (request) => {
+    await write(request);
+    throw new Error('Lost acknowledgement');
+  });
+  await expect(session.applyAnnotationEffect(args)).rejects.toThrow('acknowledgement');
+  expect(session.getSnapshot().dirty).toBe(true);
+  await session.dispose();
+  expect(resource.publish).toHaveBeenCalledOnce();
+  expect(resource.cancel).not.toHaveBeenCalled();
+  expect(resource.release).toHaveBeenCalledOnce();
+});
+
+it('rejects stale sources before lease transfer and orders concurrent additions', async () => {
+  const { session, resource, args } = await annotationFixture();
+  session.setAutosaveEnabled(false);
+  await expect(
+    session.applyAnnotationEffect({ ...args, expectedSourceAssetId: 'other' })
+  ).rejects.toThrow('source changed');
+  expect(session.ownsAnnotationResource(resource)).toBe(false);
+  expect(session.getSnapshot().snapshot.workspace.history).toEqual([]);
+  await Promise.all([
+    session.applyAnnotationEffect(args),
+    session.applyAnnotationEffect({ ...args, instance: { ...args.instance, id: 'second' } }),
+  ]);
+  expect(
+    session
+      .getSnapshot()
+      .document.advancedContent.annotationEffects?.instances.map((instance) => [
+        instance.id,
+        instance.order,
+      ])
+  ).toEqual([
+    ['annotation', 0],
+    ['second', 1],
+  ]);
+  expect(session.getSnapshot().snapshot.workspace.effectSnapshots).toEqual([args.snapshot]);
+  await session.dispose();
+});
 
 it('includes staged producers in a session barrier and builds history from the admitted document', async () => {
   const { session, deps } = setup();
@@ -144,4 +378,30 @@ it('retains a failed staged buffer and stops other autosaves until source recove
   expect(session.getSnapshot().error).toBeNull();
   await session.flush();
   expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
+});
+
+it('aborting an annotation queued behind another operation prevents local admission and lease transfer', async () => {
+  const { session, deps, resource, args } = await annotationFixture();
+  let unblock!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    unblock = resolve;
+  });
+  const read = deps.saveVideoWorkspaceAdvanced.getMockImplementation()!;
+  deps.saveVideoWorkspaceAdvanced.mockImplementationOnce(async (request) => {
+    await gate;
+    return read(request);
+  });
+  const pending = session.saveAdvanced(session.getSnapshot().snapshot.workspace.advanced);
+  const controller = new AbortController();
+  const annotation = session.applyAnnotationEffect({ ...args, signal: controller.signal });
+  const rejected = expect(annotation).rejects.toMatchObject({ name: 'AbortError' });
+  controller.abort();
+  unblock();
+  await pending;
+  await rejected;
+  expect(session.getSnapshot().snapshot.workspace.history).toEqual([]);
+  expect(session.ownsAnnotationResource(resource)).toBe(false);
+  expect(resource.cancel).not.toHaveBeenCalled();
+  expect(resource.publish).not.toHaveBeenCalled();
+  await session.dispose();
 });

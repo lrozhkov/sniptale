@@ -55,6 +55,42 @@ it('counts exactly front, staging and frozen source without an arbitrary reserve
   expect(plan.maximumCanvases).toBe(3);
 });
 
+it('charges immutable annotations during preparation and all planned outputs through every composition phase', () => {
+  const graph = input();
+  graph.assets.annotationSourceBytes = 123;
+  graph.scene.annotationBitmaps = [
+    { width: 20, height: 5 },
+    { width: 7, height: 3 },
+  ];
+  const plan = calculatePreviewRenderAllocation(graph);
+  expect(plan.maximumManagedBytes).toBe(1200 + 123 + 400 + 84);
+  expect(plan.maximumCanvases).toBe(3);
+  expect(phase(plan, 'prepare-header').bytes).toBe(400 + 123);
+  for (const name of ['scene', 'spotlight-coverage', 'border', 'comment-gradient']) {
+    expect(
+      phase(plan, name)
+        .allocations.filter((entry) => entry.role === 'annotation-output-bitmap')
+        .map((entry) => entry.bytes)
+    ).toEqual([400, 84]);
+  }
+  const preparing = calculatePreviewPreparationAllocation({
+    previousFront: size,
+    retainedCamera: null,
+    backgroundBitmap: null,
+    headerBitmap: null,
+    measurement: false,
+    watermark: null,
+    annotationSourceBytes: 123,
+  });
+  expect(preparing.maximumManagedBytes).toBe(523);
+});
+
+it.each([NaN, -1, Infinity, 0.5])('rejects invalid annotation source allocation %s', (count) => {
+  const graph = input();
+  graph.assets.annotationSourceBytes = count;
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+});
+
 it('distinguishes video-frame storage from canvases and counts camera retained/active copies', () => {
   const graph = input();
   graph.admission.source = { kind: 'video-frame', allocationBytes: 150 };

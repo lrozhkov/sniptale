@@ -1,5 +1,5 @@
-import { ReviewInspectorPresentation } from './inspector-sections';
 // @vitest-environment jsdom
+import { ReviewInspectorPresentation } from './inspector-sections';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';

@@ -40,7 +40,10 @@ type ShortcutBinding = {
   addComment(): void;
   toggleCut(): void;
 };
-type LifecycleBinding = { deleteCanvas(id: string): void };
+type LifecycleBinding = {
+  deleteCanvas(id: string): void;
+  deleteAnnotationEffect(id: string): void;
+};
 
 it('wires selection, flush, history, and shortcut boundaries through one owner', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -66,6 +69,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     advancedContent: createQuickEditAdvancedContent(),
   };
   reviewDocument.canvasComments.push(createCanvasComment({ id: 'canvas-a', at: 1 }));
+  const annotationEffects = { remove: vi.fn() };
   const session = { flush: vi.fn(), history: vi.fn(), commit: vi.fn() };
   const advancedState = { flush: vi.fn(), setAudio: vi.fn() };
   const setActiveSelection = vi.fn();
@@ -79,6 +83,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     document: reviewDocument,
     advanced,
     advancedState,
+    annotationEffects,
     exporter: { phase: 'idle', index: { boundaries: [0, 1] } },
     zoom: { remove: vi.fn(), setDrawing: vi.fn() },
     activeSelection: { kind: 'canvas-comment', id: 'canvas-a' } satisfies ReviewSelection,
@@ -126,6 +131,8 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     expect(setActiveSelection).toHaveBeenLastCalledWith({ kind: 'original-audio', id: 'gain-a' });
 
     const lifecycle = mocks.lifecycle.mock.lastCall?.[0] as LifecycleBinding;
+    lifecycle.deleteAnnotationEffect('visual-a');
+    expect(annotationEffects.remove).toHaveBeenCalledWith('visual-a');
     lifecycle.deleteCanvas('missing');
     lifecycle.deleteCanvas('canvas-a');
     expect(canvas.onDelete).toHaveBeenCalledWith(reviewDocument.canvasComments[0]);

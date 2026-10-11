@@ -1,5 +1,5 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   loadReviewWindowHeader,

@@ -1,4 +1,10 @@
 import { isDiscardedHeaderChange, replayStoredReviewHistory } from './legacy-header-history';
+import {
+  parseReviewAnnotationEffectSnapshots,
+  readReviewAnnotationEffectDocument,
+  reviewAnnotationEffectMatchesDocument,
+} from '../../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   ReviewHistoryError,
@@ -28,6 +34,7 @@ export type VideoWorkspaceDiagnostic = {
     | 'history-operation'
     | 'history-replay'
     | 'advanced-state'
+    | 'effect-snapshots'
     | 'timeline'
     | 'workspace-identity'
     | 'draft';
@@ -129,6 +136,35 @@ function parseWorkspaceDocument(args: {
   return { ...replayed, advanced };
 }
 
+/** Every baseline and before/after payload retains its source even beyond the current cursor. */
+function validEffectSnapshotClosure(
+  snapshots: readonly ReviewAnnotationEffectSnapshot[],
+  advanced: QuickEditAdvancedState,
+  history: readonly ReviewOperation[],
+  duration: number
+): boolean {
+  const documents = new Map(
+    snapshots.map((snapshot) => [snapshot.id, readReviewAnnotationEffectDocument(snapshot.source)])
+  );
+  const content = [
+    advanced,
+    ...history.flatMap((operation) =>
+      operation.target === 'advancedContent' ? [operation.before, operation.after] : []
+    ),
+  ];
+  return content.every((state) =>
+    (state.annotationEffects?.instances ?? []).every((instance) => {
+      const document = documents.get(instance.snapshotId);
+      return (
+        document !== undefined &&
+        document !== null &&
+        instance.end <= duration &&
+        reviewAnnotationEffectMatchesDocument(instance, document)
+      );
+    })
+  );
+}
+
 /** Rejects corrupt history, including invalid operations in the unapplied redo suffix. */
 function parseWorkspace(
   value: unknown,
@@ -166,12 +202,24 @@ function parseWorkspace(
   });
   if (!parsed) return null;
   const { advanced, history, cursor } = parsed;
+  const effectSnapshots =
+    value['effectSnapshots'] === undefined
+      ? undefined
+      : parseReviewAnnotationEffectSnapshots(value['effectSnapshots']);
+  if (
+    effectSnapshots === null ||
+    !validEffectSnapshotClosure(effectSnapshots ?? [], advanced, history, source.duration)
+  ) {
+    report({ check: 'effect-snapshots', reason: 'invalid' });
+    return null;
+  }
   return {
     workspace: {
       aggregateId: value['aggregateId'],
       formatVersion: 1,
       source,
       sourceAssetId: value['sourceAssetId'],
+      ...(effectSnapshots ? { effectSnapshots } : {}),
       revision: value['revision'],
       history,
       cursor,

@@ -211,3 +211,18 @@ it('keeps flat click clipping unchanged and removes spatial mapping after its en
   await render({ source });
   expect(observed.overlayClip).toBeUndefined();
 });
+
+it('keeps annotation attachment planes canonical while CSS fit changes and consumes the supplied camera', async () => {
+  const actual = { scale: 2, centerX: 0.6, centerY: 0.4 };
+  await render({ source, scene: { background: { enabled: false }, camera: actual } });
+  const before = observed.annotationGeometry;
+  expect(before?.content).toEqual({ width: source.width, height: source.height });
+  expect(before?.viewport).toEqual(observed.watermarkOutput);
+  expect(before?.contentToViewport[0]).toBeCloseTo((1920 * 2) / source.width);
+  viewport = { width: 533, height: 241 };
+  act(() => resize());
+  expect(observed.annotationGeometry).toEqual(before);
+  expect(observed.size.width).toBeLessThanOrEqual(533);
+  await render({ source, scene: { background: { enabled: false }, camera } });
+  expect(observed.annotationGeometry?.contentToViewport).not.toEqual(before?.contentToViewport);
+});

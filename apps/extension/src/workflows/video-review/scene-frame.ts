@@ -240,7 +240,7 @@ export function drawReviewSceneComments(
   }
 }
 
-function clipReviewScene(
+export function clipReviewScene(
   context: CanvasRenderingContext2D,
   layout: Parameters<typeof drawReviewSceneSample>[1]['layout'],
   background: QuickEditAdvancedState['background']

@@ -11,6 +11,8 @@ export interface VideoWorkspace {
   formatVersion: 1;
   source: ReviewSource;
   sourceAssetId: string;
+  /** Immutable visual sources; history contains only snapshot identities and authored instances. */
+  effectSnapshots?: import('../../../features/video/review/annotation-effects/types').ReviewAnnotationEffectSnapshot[];
   revision: number;
   history: ReviewOperation[];
   cursor: number;

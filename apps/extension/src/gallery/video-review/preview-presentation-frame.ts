@@ -38,6 +38,7 @@ export function captureReviewPreviewFrame(args: {
     camera = args.captureCamera();
     const frame: RenderFrame = {
       generation: args.sequence,
+      fps: args.description.fps ?? 30,
       sourceTime: args.sourceTime(),
       resultTime: args.time,
       source: {

@@ -1,4 +1,4 @@
-import authoritativeSchema from '../fixtures/sniptale-effect-v1.schema.json';
+import authoritativeSchema from '../fixtures/sniptale-effect-v1.schema.json' with { type: 'json' };
 
 /**
  * The published SDK schema is kept as data so the extension validates against the exact

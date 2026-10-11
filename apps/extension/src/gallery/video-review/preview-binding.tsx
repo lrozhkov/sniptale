@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
+import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import { translate } from '../../platform/i18n';
 import { ReviewButton } from './controls';
@@ -38,6 +39,8 @@ type PreviewState = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  annotationEffects?: EditorState['annotationEffects'];
+  activeSelection?: EditorState['activeSelection'];
   text: Pick<EditorState['text'], 'jump'>;
   features: Pick<
     EditorState['features'],
@@ -49,6 +52,7 @@ type PreviewState = Pick<
     | 'zoomApplied'
     | 'zoomTrackVisible'
     | 'overlaysVisible'
+    | 'annotationEffects'
   >;
   composer: Pick<EditorState['composer'], 'annotation' | 'change'>;
   snapshot: {
@@ -84,7 +88,7 @@ export function ReviewPreviewBinding({
   onPreviewRaster,
   onOpenPreviewSettings,
 }: {
-  resource: Pick<LoadedReview, 'file' | 'url'>;
+  resource: Pick<LoadedReview, 'file' | 'url' | 'session'>;
   state: PreviewState;
   sceneActive: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
@@ -191,7 +195,7 @@ function ReviewPreviewStage({
   previewPreferences,
   onPreviewRaster,
 }: {
-  resource: Pick<LoadedReview, 'file' | 'url'>;
+  resource: Pick<LoadedReview, 'file' | 'url' | 'session'>;
   state: PreviewState;
   sceneActive: boolean;
   fullscreen: boolean;
@@ -232,6 +236,45 @@ function ReviewPreviewStage({
   return (
     <ReviewStageBinding
       {...captionPreview}
+      annotationEffects={
+        features.annotationEffects
+          ? {
+              lane: state.annotationEffects?.previewLane ?? features.annotationEffects,
+              snapshots: resource.session.getSnapshot().snapshot.workspace.effectSnapshots ?? [],
+              segments: state.timeline.timeMap.getSegments(),
+            }
+          : undefined
+      }
+      onAnnotationGeometry={state.annotationEffects?.setGeometry}
+      annotationEditing={
+        state.annotationEffects &&
+        state.advanced.ui.mode === 'advanced' &&
+        state.advanced.ui.tracks.annotationEffects !== false &&
+        sceneEditable &&
+        features.overlaysVisible
+          ? {
+              editor: state.annotationEffects,
+              selectedId:
+                state.activeSelection?.kind === 'annotation-effect'
+                  ? state.activeSelection.id
+                  : null,
+              snapshots: resource.session.getSnapshot().snapshot.workspace.effectSnapshots ?? [],
+              segments: state.timeline.timeMap.getSegments(),
+              time: state.timeline.sceneOutputTime,
+              busy,
+              beforeAction: state.beforeAction,
+              onSelect: (id) => state.setActiveSelection({ kind: 'annotation-effect', id }),
+            }
+          : undefined
+      }
+      readAsset={async (reference, signal) => {
+        signal.throwIfAborted();
+        const local = await resource.session.readAnnotationResource(reference, signal);
+        signal.throwIfAborted();
+        const bytes = local ?? (await resolveReviewAssetBytes(reference));
+        signal.throwIfAborted();
+        return bytes;
+      }}
       outerFadePlan={outerFadePlan}
       preview={
         previewPreferences
@@ -240,6 +283,7 @@ function ReviewPreviewStage({
               playing: state.playing,
               sourceToResult: state.timeline.timeMap.sourceToTimeline,
               onRaster: onPreviewRaster,
+              sourceFrameRate: state.exporter.index?.frameRate,
             }
           : undefined
       }

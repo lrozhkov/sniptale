@@ -13,6 +13,56 @@ import { createCanvasComment } from '../comments';
 import type { QuickEditAdvancedState } from './types';
 import { createQuickEditWebcam } from './webcam';
 
+it('keeps authored annotations editable while application is disabled and forces only video rendering', () => {
+  const state = createQuickEditAdvancedState();
+  state.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 2,
+        attachment: 'content',
+        transform: { x: 0.1, y: 0.2, width: 0.4, height: 0.3, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
+  const document = { edits: [], canvasComments: [] };
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  expect(resolveQuickEditEffectiveState(state).annotationEffects).toBeUndefined();
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state).annotationEffects).toBe(state.annotationEffects);
+  expect(
+    resolveQuickEditExportPlan({ document, advanced: state, audioProcessingAvailable: false })
+  ).toEqual({
+    kind: 'ready',
+    video: 'render',
+    audio: 'copy',
+    reasons: ['annotation-effects'],
+  });
+  state.annotationEffects.enabled = false;
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    annotationEffectsTrackVisible: true,
+    annotationEffectsApplied: false,
+  });
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  state.annotationEffects.enabled = true;
+  state.annotationEffects.instances[0]!.enabled = false;
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  state.annotationEffects.instances[0]!.enabled = true;
+  state.ui.tracks.annotationEffects = false;
+  expect(resolveQuickEditEffectiveState(state).annotationEffects).toBeUndefined();
+  expect(state.annotationEffects.instances).toHaveLength(1);
+});
+
 it('keeps the camera lane visible when application is disabled and retains its asset', () => {
   const state = createQuickEditAdvancedState();
   state.webcam = createQuickEditWebcam(

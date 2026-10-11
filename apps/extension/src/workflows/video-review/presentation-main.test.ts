@@ -259,6 +259,73 @@ it('clamps a last-in-range request to the final actual track tick without crossi
   frame.release();
 });
 
+it('composes immutable annotations with full clocks and export fps', async () => {
+  const args = fixture();
+  args.edits = [
+    { id: 'cut', kind: 'cut', start: 0, end: 0.2001, requestedStart: 0, requestedEnd: 0.2001 },
+  ];
+  args.captionTimeMap = buildReviewTimeMap(10, []);
+  args.fps = 60;
+  args.effective.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 10,
+        attachment: 'viewport',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
+  args.effectSnapshots = [
+    {
+      id: 'effect:frame',
+      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      documentId: 'frame',
+      sha256: '0'.repeat(64),
+      source: '{}',
+      retainedByteLength: 2,
+      assets: [],
+    },
+  ];
+  const owner = await open(args);
+  const frame = await owner.renderAtTime(0.3001);
+  expect(io.times).toEqual([0.5]);
+  expect(io.prepare.mock.calls[0]![0]).toMatchObject({
+    annotationEffects: {
+      lane: args.effective.annotationEffects,
+      snapshots: args.effectSnapshots,
+      segments: args.captionTimeMap,
+    },
+  });
+  expect(io.render.mock.calls[0]![0]).toMatchObject({
+    sourceTime: 0.5,
+    resultTime: 7.3001,
+    fps: 60,
+  });
+  await expect(owner.renderAtTime(0.4)).rejects.toThrow('unavailable');
+  frame.release();
+  await expect(owner.renderAtTime(3)).rejects.toThrow('clock');
+  const second = await owner.renderAtTime(0.4);
+  second.release();
+  expect(io.samples.every((sample) => sample.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('refuses fragment annotations before allocation without the full document clock', async () => {
+  const args = fixture();
+  args.effective.annotationEffects = { enabled: true, instances: [] };
+  await expect(open(args)).rejects.toThrow('full document time map');
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.sample).not.toHaveBeenCalled();
+  expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+});
+
 it('passes effective scene settings and independent camera pixels through the shared painter', async () => {
   const args = fixture();
   args.effective.webcam = createQuickEditWebcam(

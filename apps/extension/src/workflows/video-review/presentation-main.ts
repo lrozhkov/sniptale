@@ -20,6 +20,7 @@ import type { PreviewRenderAllocationInput } from './preview-render-allocation';
 import type { ReviewMediaIndex } from './media-index';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
+import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 
 type Renderer = ReturnType<typeof createReviewPreviewRenderer>;
 type Scene = Parameters<Renderer['prepare']>[0];
@@ -32,6 +33,8 @@ export interface ReviewPresentationMainInput {
   index: ReviewMediaIndex;
   edits: readonly ReviewEdit[];
   captionTimeMap?: readonly ReviewTimeSegment[];
+  effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
+  fps?: number;
   effective: ReturnType<typeof resolveQuickEditEffectiveState>;
   comments?: readonly CanvasCommentExport[];
   clickCues?: readonly ReviewClickCue[];
@@ -50,6 +53,7 @@ export async function createReviewPresentationMain(args: ReviewPresentationMainI
     await owner.open();
     return {
       render: owner.render.bind(owner),
+      renderAtTime: owner.renderAtTime.bind(owner),
       /** Borrowed from the same Input; expires on disposal or cancellation. */
       audioTrack: owner.audioTrack,
       dispose: owner.dispose,
@@ -78,7 +82,8 @@ class PresentationMain {
   private resolution = 0;
   private disposed = false;
   private busy = false;
-  private front: ReturnType<Renderer['render']> | null = null;
+  private frameGeneration = 0;
+  private front: Awaited<ReturnType<Renderer['render']>> | null = null;
   private sourceTime = 0;
   private resultTime = 0;
   private sourceBytes: number | null = null;
@@ -145,6 +150,14 @@ class PresentationMain {
     signal.throwIfAborted();
     this.audioTrack = audio;
     const effective = this.args.effective;
+    const documentSegments =
+      this.args.captionTimeMap ?? buildReviewTimeMap(this.args.index.duration, this.args.edits);
+    if (
+      this.args.fragmentOffset > 0 &&
+      (effective.captions || effective.annotationEffects) &&
+      !this.args.captionTimeMap
+    )
+      throw new Error('Fragment overlays require the full document time map.');
     this.scene = {
       source,
       ...(effective.canvas ? { canvas: effective.canvas } : {}),
@@ -156,14 +169,21 @@ class PresentationMain {
       comments: (this.args.comments ?? []).filter((comment) => comment.renderToVideo),
       keys: this.args.keyCues ?? [],
       clicks: this.args.clickCues ?? [],
+      ...(effective.annotationEffects
+        ? {
+            annotationEffects: {
+              lane: effective.annotationEffects,
+              snapshots: this.args.effectSnapshots ?? [],
+              segments: documentSegments,
+            },
+          }
+        : {}),
       ...(effective.captions
         ? {
             captions: {
               document: effective.text,
               settings: effective.captions,
-              segments:
-                this.args.captionTimeMap ??
-                buildReviewTimeMap(this.args.index.duration, this.args.edits),
+              segments: documentSegments,
             },
           }
         : {}),
@@ -208,15 +228,19 @@ class PresentationMain {
     const localTime = mapping.holdLast ? heldMainLocalTime : mapping.mainLocalTime;
     if (localTime === undefined || !Number.isFinite(localTime) || localTime < 0)
       throw new Error('A held main frame requires its last valid output clock');
-    const segment = this.segments.find(
-      (part) => localTime >= part.resultStart && localTime < part.resultEnd
-    );
     if (
-      !segment ||
       !Number.isFinite(mapping.globalMainTime) ||
       mapping.globalMainTime !== this.args.fragmentOffset + mapping.mainLocalTime
     )
       throw new Error('Invalid main presentation clock');
+    return this.mapTime(localTime);
+  }
+
+  private mapTime(localTime: number) {
+    const segment = this.segments.find(
+      (part) => localTime >= part.resultStart && localTime < part.resultEnd
+    );
+    if (!Number.isFinite(localTime) || !segment) throw new Error('Invalid main source clock');
     const firstTick = Math.ceil(segment.sourceStart * this.resolution) / this.resolution;
     const lastTick = (Math.ceil(segment.sourceEnd * this.resolution) - 1) / this.resolution;
     const requested = segment.sourceStart + (localTime - segment.resultStart) * segment.rate;
@@ -227,7 +251,7 @@ class PresentationMain {
     if (firstTick > lastTick) throw new Error('Main source interval has no representable tick');
     return {
       sourceTime,
-      resultTime: mapping.holdLast ? this.args.fragmentOffset + localTime : mapping.globalMainTime,
+      resultTime: this.args.fragmentOffset + localTime,
       localTime,
     };
   }
@@ -237,9 +261,17 @@ class PresentationMain {
    * A held candidate requires the last non-held main clock from the frozen output lattice.
    */
   async render(candidate: PresentationCandidate, options: { heldMainLocalTime?: number } = {}) {
+    return this.renderFrame(this.map(candidate, options.heldMainLocalTime), candidate.tick);
+  }
+
+  /** Ordinary export preserves the original segment-relative frame schedule. */
+  async renderAtTime(localTime: number) {
+    return this.renderFrame(this.mapTime(localTime), ++this.frameGeneration);
+  }
+
+  private async renderFrame(mapped: ReturnType<PresentationMain['mapTime']>, generation: number) {
     if (this.disposed || this.busy || this.front)
       throw new Error('Main presentation frame is unavailable');
-    const mapped = this.map(candidate, options.heldMainLocalTime);
     this.busy = true;
     this.sourceTime = mapped.sourceTime;
     this.resultTime = mapped.resultTime;
@@ -278,7 +310,8 @@ class PresentationMain {
           this.resources.bytes('main-transition', this.transitionBytes[0] + this.transitionBytes[1])
         );
       const frame: Frame = {
-        generation: candidate.tick,
+        generation,
+        fps: this.args.fps ?? this.args.index.frameRate ?? 30,
         sourceTime: this.sourceTime,
         resultTime: this.resultTime,
         source: {
@@ -290,7 +323,7 @@ class PresentationMain {
           ? {
               camera: {
                 representedMediaTime: camera.representedMediaTime,
-                generation: candidate.tick,
+                generation,
                 source: camera.source,
                 placement: camera.placement,
                 ...(camera.crop ? { crop: camera.crop } : {}),
@@ -302,7 +335,7 @@ class PresentationMain {
           ? { transition: { blend, frames: endpoints, resultOffset: this.args.fragmentOffset } }
           : {}),
       };
-      const output = this.renderer.render(prepared, frame);
+      const output = await this.renderer.render(prepared, frame, signal);
       this.front = output;
       let released = false;
       return {

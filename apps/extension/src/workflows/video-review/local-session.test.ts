@@ -13,6 +13,10 @@ import {
 } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit, ReviewOperation } from '../../features/video/review/types';
+import { readFileSync } from 'node:fs';
+import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 
 function initial(): VideoWorkspaceSnapshot {
   return {
@@ -45,6 +49,102 @@ function document(snapshot: VideoWorkspaceSnapshot) {
 function commit(snapshot: VideoWorkspaceSnapshot, operation: ReviewOperation) {
   return applyLocalReviewChange(snapshot, { kind: 'commit', operation, consumeDraft: false });
 }
+
+it('applies locally with Undo/Redo and clears only discarded resources', async () => {
+  const opened = initial();
+  const source = readFileSync(
+    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'utf8'
+  );
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const effect = readReviewAnnotationEffectDocument(source)!;
+  const retained: ReviewAnnotationEffectSnapshot = {
+    id: `effect:${sha256}`,
+    sha256,
+    source,
+    schemaVersion: 'sniptale.effect.v1',
+    kind: 'standalone',
+    documentId: effect.id,
+    retainedByteLength: new TextEncoder().encode(source).byteLength,
+    assets: [],
+  };
+  const before = document(opened).advancedContent;
+  const after = {
+    ...before,
+    annotationEffects: {
+      enabled: true,
+      instances: [
+        {
+          id: 'annotation',
+          snapshotId: retained.id,
+          start: 1,
+          end: 4,
+          enabled: true,
+          attachment: 'content' as const,
+          controls: {},
+          order: 0,
+          transform: { x: 0, y: 0, width: 0.5, height: 0.3, rotation: 0 },
+        },
+      ],
+    },
+  };
+  const operation: ReviewOperation = {
+    id: 'effect',
+    at: 1,
+    target: 'advancedContent',
+    before,
+    after,
+  };
+  const saved = applyLocalReviewChange(opened, {
+    kind: 'commit',
+    operation,
+    consumeDraft: false,
+    effectSnapshots: [retained],
+  });
+  expect(saved.workspace.revision).toBe(opened.workspace.revision);
+  expect(saved.draft).toEqual(opened.draft);
+  expect(saved.workspace.effectSnapshots).toEqual([retained]);
+  expect(saved.workspace.history).toHaveLength(1);
+  expect(opened.workspace).not.toHaveProperty('effectSnapshots');
+  const undone = applyLocalReviewChange(saved, { kind: 'history', direction: 'undo' });
+  expect(undone.workspace.effectSnapshots).toEqual([retained]);
+  expect(document(undone).advancedContent.annotationEffects).toBeUndefined();
+  expect(
+    document(applyLocalReviewChange(undone, { kind: 'history', direction: 'redo' })).advancedContent
+      .annotationEffects
+  ).toEqual(after.annotationEffects);
+  const branch = applyLocalReviewChange(undone, {
+    kind: 'commit',
+    consumeDraft: false,
+    operation: {
+      id: 'branch',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after: {
+        ...before,
+        audio: { ...before.audio, original: { ...before.audio.original, volume: 0.2 } },
+      },
+    },
+  });
+  expect(branch.workspace.effectSnapshots).toEqual([]);
+  expect(applyLocalReviewChange(saved, { kind: 'reset' }).workspace.effectSnapshots).toEqual([]);
+  expect(() =>
+    applyLocalReviewChange(saved, {
+      kind: 'commit',
+      operation,
+      consumeDraft: false,
+      effectSnapshots: [
+        {
+          ...retained,
+          source: retained.source + ' ',
+          retainedByteLength: retained.retainedByteLength + 1,
+        },
+      ],
+    })
+  ).toThrow('immutable');
+  expect(saved.workspace.effectSnapshots).toEqual([retained]);
+});
 
 it('prepares original speech without changing authored text, captions, gain or visibility', () => {
   const before = document(initial()).advancedContent;

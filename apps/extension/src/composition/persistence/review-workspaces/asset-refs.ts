@@ -116,6 +116,13 @@ function assertPortableContentRefs(content: unknown, inspectRecovery = true): vo
 /** Rejects runtime-only asset keys anywhere portable review content can retain them. */
 export function assertPortableReviewAssetRefs(workspace: unknown): void {
   if (!isRecord(workspace)) return;
+  for (const snapshot of Array.isArray(workspace['effectSnapshots'])
+    ? workspace['effectSnapshots']
+    : []) {
+    if (!isRecord(snapshot) || !Array.isArray(snapshot['assets'])) continue;
+    if (snapshot['assets'].some((asset: unknown) => isRecord(asset) && 'assetId' in asset))
+      throw new Error(LOCAL_ASSET_ERROR);
+  }
   assertPortableContentRefs(workspace['advanced']);
   const history = workspace['history'];
   if (!Array.isArray(history)) return;
@@ -147,6 +154,22 @@ function mapHistoryContent(
   return { ...value, history };
 }
 
+/** Registry descriptors own their resources separately from authored instance history. */
+function renameSnapshotRefs(value: unknown, from: string, to: string): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((snapshot: unknown) => {
+    if (!isRecord(snapshot) || !Array.isArray(snapshot['assets'])) return snapshot;
+    return {
+      ...snapshot,
+      assets: snapshot['assets'].map((asset: unknown) => {
+        if (!isRecord(asset) || typeof asset[from] !== 'string') return asset;
+        const { [from]: reference, ...rest } = asset;
+        return { ...rest, [to]: reference };
+      }),
+    };
+  });
+}
+
 /** Renames the audio and image asset keys so archive metadata stays portable-safe. */
 export function encodePortableReviewAssetRefs<T>(review: T): T {
   if (
@@ -160,6 +183,15 @@ export function encodePortableReviewAssetRefs<T>(review: T): T {
     ...review,
     workspace: {
       ...review['workspace'],
+      ...(review['workspace']['effectSnapshots'] === undefined
+        ? {}
+        : {
+            effectSnapshots: renameSnapshotRefs(
+              review['workspace']['effectSnapshots'],
+              'assetId',
+              PORTABLE_REF_KEY
+            ),
+          }),
       advanced: renameContentRefs(advanced, 'assetId', PORTABLE_REF_KEY),
       history: (
         mapHistoryContent(review['workspace'], (laneAudio) =>
@@ -176,6 +208,15 @@ export function decodePortableReviewAssetRefs<T>(workspace: T): T {
   const advanced = workspace['advanced'] as Record<string, unknown>;
   return {
     ...workspace,
+    ...(workspace['effectSnapshots'] === undefined
+      ? {}
+      : {
+          effectSnapshots: renameSnapshotRefs(
+            workspace['effectSnapshots'],
+            PORTABLE_REF_KEY,
+            'assetId'
+          ),
+        }),
     advanced: renameContentRefs(advanced, PORTABLE_REF_KEY, 'assetId'),
     history: (
       mapHistoryContent(workspace, (laneAudio) =>
@@ -348,11 +389,62 @@ export function reviewWorkspaceHasWatermarkImage(
   );
 }
 
-/** Collects every project-asset reference the review keeps, including history ops. */
-export function collectReviewAssetReferences(
+/** Authored source closure includes disabled baseline and both sides of retained redo. */
+export function collectReviewAnnotationEffectSnapshotIds(
   workspace: Pick<VideoWorkspace, 'advanced' | 'history'>
 ): ReadonlySet<string> {
+  const ids = new Set<string>();
+  const collect = (content: QuickEditAdvancedContent) => {
+    for (const instance of content.annotationEffects?.instances ?? []) ids.add(instance.snapshotId);
+  };
+  collect(workspace.advanced);
+  for (const operation of workspace.history) {
+    if (operation.target !== 'advancedContent') continue;
+    collect(operation.before);
+    collect(operation.after);
+  }
+  return ids;
+}
+
+/** Branch/reset prune only registry entries absent from the complete retained history. */
+export function pruneReviewAnnotationEffectSnapshots(workspace: VideoWorkspace): VideoWorkspace {
+  if (!workspace.effectSnapshots) return workspace;
+  const ids = collectReviewAnnotationEffectSnapshotIds(workspace);
+  return {
+    ...workspace,
+    effectSnapshots: workspace.effectSnapshots.filter((value) => ids.has(value.id)),
+  };
+}
+
+/** Exact resource ownership cannot be conferred by an unused immutable source alone. */
+export function reviewWorkspaceHasAnnotationEffectResource(
+  workspace: VideoWorkspace,
+  claim: { sourceAssetId: string; snapshotId: string; resourceId: string; sha256: string },
+  resource: { assetId: string; mimeType: string; byteLength: number }
+): boolean {
+  return (
+    workspace.sourceAssetId === claim.sourceAssetId &&
+    collectReviewAnnotationEffectSnapshotIds(workspace).has(claim.snapshotId) &&
+    !!workspace.effectSnapshots
+      ?.find((value) => value.id === claim.snapshotId)
+      ?.assets.some(
+        (asset) =>
+          asset.id === claim.resourceId &&
+          asset.sha256 === claim.sha256 &&
+          asset.assetId === resource.assetId &&
+          asset.mimeType === resource.mimeType &&
+          asset.byteLength === resource.byteLength
+      )
+  );
+}
+
+/** Collects every project-asset reference the review keeps, including history ops. */
+export function collectReviewAssetReferences(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history' | 'effectSnapshots'>
+): ReadonlySet<string> {
   const references = new Set<string>();
+  for (const snapshot of workspace.effectSnapshots ?? [])
+    for (const asset of snapshot.assets) references.add(asset.assetId);
   const advanced = workspace.advanced;
   collectContentReferences(advanced, references);
   if (advanced.recoveryV1) collectRecoveryReferences(advanced.recoveryV1, references);
@@ -605,11 +697,19 @@ function remapSnapshot(
   const recovery = advanced.recoveryV1
     ? remapRecoveryReferences(advanced.recoveryV1, assetIdMap)
     : null;
-  if (content === advanced && recovery === null) return snapshot;
+  const effectSnapshots = snapshot.workspace.effectSnapshots?.map((effect) => ({
+    ...effect,
+    assets: effect.assets.map((asset) => ({
+      ...asset,
+      assetId: requireMappedAssetId(assetIdMap, asset.assetId),
+    })),
+  }));
+  if (content === advanced && recovery === null && !effectSnapshots) return snapshot;
   return {
     ...snapshot,
     workspace: {
       ...snapshot.workspace,
+      ...(effectSnapshots ? { effectSnapshots } : {}),
       advanced: {
         ...advanced,
         ...content,

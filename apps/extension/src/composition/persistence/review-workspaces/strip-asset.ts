@@ -109,10 +109,21 @@ function stripRecoverySpeech(clip: unknown, assetId: string): unknown {
 
 function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedState>(
   content: T,
-  assetId: string
+  assetId: string,
+  removedSnapshots: ReadonlySet<string>
 ): T {
   const result = {
     ...content,
+    ...(content.annotationEffects
+      ? {
+          annotationEffects: {
+            ...content.annotationEffects,
+            instances: content.annotationEffects.instances.filter(
+              (instance) => !removedSnapshots.has(instance.snapshotId)
+            ),
+          },
+        }
+      : {}),
     background: stripBackground(content.background, assetId),
     ...(content.presentation
       ? { presentation: stripPresentation(content.presentation, assetId) }
@@ -205,14 +216,19 @@ export function stripReviewAssetReference(
   if (!collectReviewAssetReferences(workspace).has(assetId)) return workspace;
   if (workspace.sourceAssetId === assetId)
     throw new Error('The required quick-edit source cannot be removed.');
-  const advanced = stripContent(workspace.advanced, assetId);
+  const removedSnapshots = new Set(
+    (workspace.effectSnapshots ?? [])
+      .filter((snapshot) => snapshot.assets.some((asset) => asset.assetId === assetId))
+      .map((snapshot) => snapshot.id)
+  );
+  const advanced = stripContent(workspace.advanced, assetId, removedSnapshots);
   const recoveryV1 = stripRecovery(workspace.advanced.recoveryV1, assetId);
   let cursor = workspace.cursor;
   const history = workspace.history.flatMap<VideoWorkspace['history'][number]>(
     (operation, index) => {
       if (operation.target !== 'advancedContent') return [operation];
-      const before = stripContent(operation.before, assetId);
-      const after = stripContent(operation.after, assetId);
+      const before = stripContent(operation.before, assetId, removedSnapshots);
+      const after = stripContent(operation.after, assetId, removedSnapshots);
       // A source-only edit becomes a no-op; replay rejects it unless its cursor slot is removed.
       if (JSON.stringify(before) === JSON.stringify(after)) {
         if (index < workspace.cursor) cursor--;
@@ -223,6 +239,13 @@ export function stripReviewAssetReference(
   );
   const candidate = {
     ...workspace,
+    ...(workspace.effectSnapshots
+      ? {
+          effectSnapshots: workspace.effectSnapshots.filter(
+            (snapshot) => !removedSnapshots.has(snapshot.id)
+          ),
+        }
+      : {}),
     advanced: {
       ...advanced,
       ...(recoveryV1 === undefined ? {} : { recoveryV1 }),

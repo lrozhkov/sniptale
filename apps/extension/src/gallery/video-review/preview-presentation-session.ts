@@ -27,7 +27,7 @@ type PresentationSnapshot = {
 type CameraSource = ReturnType<typeof createReviewWebcamPreviewSource>;
 class PendingPresentation extends Error {}
 type Publication = {
-  completed: ReturnType<Renderer['render']>;
+  completed: Awaited<ReturnType<Renderer['render']>>;
   prepared: Prepared;
   retain(): void;
 };
@@ -48,7 +48,7 @@ class ManualPresentationSession {
   private sequence = 0;
   private current: Description | null = null;
   private resultTime = 0;
-  private front: ReturnType<Renderer['render']> | null = null;
+  private front: Awaited<ReturnType<Renderer['render']>> | null = null;
   private cameraSource: CameraSource | null = null;
   private cameraState: PresentationCameraState = { phase: 'loading', duration: 0, ready: false };
   private readonly publications: number[] = [];
@@ -115,8 +115,10 @@ class ManualPresentationSession {
 
   private createRenderer() {
     const { resources, graph } = this.admission;
+    const readAsset = this.latest().input.readAsset;
     return createReviewPreviewRenderer({
       resources,
+      ...(readAsset ? { readAsset } : {}),
       allocation: { describe: graph, replaceLimits: (limits) => resources.replaceLimits(limits) },
       onContextLost: () => {
         if (!this.disposed) {
@@ -211,8 +213,13 @@ class ManualPresentationSession {
     this.sourceFrameCallback = null;
   }
 
-  private render = (prepared: Prepared, frame: RenderFrame) => {
-    const completed = this.renderer.render(prepared, frame);
+  private render = async (
+    prepared: Prepared,
+    frame: RenderFrame,
+    _request: unknown,
+    signal: AbortSignal
+  ) => {
+    const completed = await this.renderer.render(prepared, frame, signal);
     let transferred = false;
     return {
       value: {

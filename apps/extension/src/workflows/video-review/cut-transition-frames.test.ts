@@ -26,6 +26,52 @@ const frame = (timestamp: number): ReviewTransitionSample => ({
   close: vi.fn(),
 });
 
+it('awaits each dissolve side before blending and propagates an asynchronous side failure', async () => {
+  const target = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    drawImage: vi.fn(),
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+  } as unknown as CanvasRenderingContext2D;
+  const canvas = {} as HTMLCanvasElement;
+  const scratch = { canvas, context: target };
+  let finish!: () => void;
+  const held = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const order: number[] = [];
+  const painting = paintReviewCutDissolve(
+    target,
+    scratch,
+    0.5,
+    async (_context, _canvas, side) => {
+      order.push(side);
+      if (side === 0) await held;
+    },
+    canvas
+  );
+  expect(order).toEqual([0]);
+  expect(target.drawImage).not.toHaveBeenCalled();
+  finish();
+  await painting;
+  expect(order).toEqual([0, 1]);
+  expect(target.drawImage).toHaveBeenCalledOnce();
+  vi.mocked(target.drawImage).mockClear();
+  await expect(
+    paintReviewCutDissolve(
+      target,
+      scratch,
+      0.5,
+      async () => {
+        throw new Error('side failed');
+      },
+      canvas
+    )
+  ).rejects.toThrow('side failed');
+  expect(target.drawImage).not.toHaveBeenCalled();
+});
+
 it('rejects preceding excluded frames even when returned by the range decoder', async () => {
   const left = frame(1.9),
     excluded = frame(3.9),

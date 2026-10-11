@@ -6,13 +6,13 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { VideoReviewLoadError } from '../../workflows/video-review/source';
 import { useLoadedReview } from './use-session';
 
-const mocks = vi.hoisted(() => ({ load: vi.fn(), error: vi.fn() }));
+const mocks = vi.hoisted(() => ({ load: vi.fn(), error: vi.fn(), warn: vi.fn() }));
 vi.mock('../../workflows/video-review/source', async (original) => ({
   ...(await original<typeof import('../../workflows/video-review/source')>()),
   loadVideoReviewSource: mocks.load,
 }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({ error: mocks.error }),
+  createLogger: () => ({ error: mocks.error, warn: mocks.warn }),
 }));
 let root: ReturnType<typeof createRoot>;
 let host: HTMLDivElement;
@@ -48,6 +48,7 @@ function loaded() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.error.mockClear();
+  mocks.warn.mockClear();
   mocks.load.mockReset();
   mocks.load.mockResolvedValue(loaded());
   vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:private'), revokeObjectURL: vi.fn() });
@@ -119,4 +120,25 @@ it('reduces unexpected loader exceptions to a fixed reason', async () => {
     reason: 'unknown',
   });
   expect(JSON.stringify(state.failed)).not.toContain('SECRET_PAYLOAD');
+});
+
+it('source owner disposes exactly once on actual unmount and never on a cancelled beforeunload event', async () => {
+  await act(async () => root.render(<Harness />));
+  const session = state.resource!.session;
+  const dispose = vi.spyOn(session, 'dispose');
+  window.addEventListener('beforeunload', (event) => event.preventDefault(), { once: true });
+  expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false);
+  expect(dispose).not.toHaveBeenCalled();
+  await act(async () => root.render(null));
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:private');
+});
+
+it('reports cleanup failure using a fixed content-free summary', async () => {
+  await act(async () => root.render(<Harness />));
+  vi.spyOn(state.resource!.session, 'dispose').mockRejectedValueOnce(
+    new Error('PRIVATE RESOURCE NAME')
+  );
+  await act(async () => root.render(null));
+  expect(mocks.warn).toHaveBeenCalledExactlyOnceWith('video-review-resource-cleanup-deferred');
 });

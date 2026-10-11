@@ -3,6 +3,7 @@ import { estimateReviewExportSize } from '../../workflows/video-review/estimate-
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { useState } from 'react';
 import type { LoadedReview } from './use-session';
 import type {
@@ -36,7 +37,13 @@ export function useReviewSizeEstimate({
       enabled &&
       estimateAdvanced.ui.mode === 'advanced' &&
       renderSettings.frameRateMode !== 'adaptive'
-      ? JSON.stringify([context, state.document, estimateAdvanced.ui, renderSettings])
+      ? JSON.stringify([
+          context,
+          state.document,
+          estimateAdvanced.ui,
+          state.snapshot.workspace.effectSnapshots,
+          renderSettings,
+        ])
       : null,
     (signal) => {
       if (!index) return Promise.reject(new Error('No export source'));
@@ -45,13 +52,24 @@ export function useReviewSizeEstimate({
         index,
         edits: state.document.edits,
         advanced: estimateAdvanced,
+        captionTimeMap: buildReviewTimeMap(index.duration, state.document.edits),
+        ...(state.snapshot.workspace.effectSnapshots
+          ? { effectSnapshots: state.snapshot.workspace.effectSnapshots }
+          : {}),
         comments: resolveQuickEditEffectiveFeatures(estimateAdvanced).overlaysVisible
           ? resolveOverlayComments(state.document)
           : [],
         fragmentOffset: 0,
         renderSettings,
         signal,
-        readProjectAsset: resolveReviewAssetBytes,
+        readProjectAsset: async (reference) => {
+          signal.throwIfAborted();
+          const local = await resource.session.readAnnotationResource(reference, signal);
+          signal.throwIfAborted();
+          const bytes = local ?? (await resolveReviewAssetBytes(reference));
+          signal.throwIfAborted();
+          return bytes;
+        },
       });
     }
   );

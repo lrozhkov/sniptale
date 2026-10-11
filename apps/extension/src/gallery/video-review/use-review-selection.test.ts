@@ -366,3 +366,33 @@ it('ignores an individually hidden canvas comment without clearing it', () => {
   expect(reviewSelectionSourceTime(selection, hidden, advanced, 10)).toBeNull();
   expect({ selection, hidden }).toEqual(before);
 });
+
+it('retains disabled effect selection and source timing, but stops navigation in basic mode', () => {
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.annotationEffects = {
+    enabled: false,
+    instances: [
+      {
+        id: 'visual',
+        snapshotId: 'effect:source',
+        enabled: false,
+        start: 2,
+        end: 6,
+        attachment: 'content',
+        controls: {},
+        order: 0,
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+      },
+    ],
+  };
+  const selected: ReviewSelection = { kind: 'annotation-effect', id: 'visual' };
+  expect(reviewSelectionExists(selected, document, advanced)).toBe(true);
+  expect(reviewSelectionSourceTime(selected, document, advanced, 10)).toBe(4);
+  expect(selectedHistoryRemoval(selected, document)).toBeNull();
+  advanced.ui.mode = 'basic';
+  expect(reviewSelectionSourceTime(selected, document, advanced, 10)).toBeNull();
+  expect(reviewSelectionExists(selected, document, advanced)).toBe(true);
+  advanced.annotationEffects.instances = [];
+  expect(reviewSelectionExists(selected, document, advanced)).toBe(false);
+});

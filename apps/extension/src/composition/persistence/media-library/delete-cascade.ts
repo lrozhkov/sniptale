@@ -1,3 +1,4 @@
+import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { withVideoProjectUsage, withReviewWorkspaceUsage } from './usage-index-keys';
@@ -53,7 +54,6 @@ import {
   deleteMediaSidecars,
   releaseMediaSource,
   releaseUnpublishedProjectAssets,
-  recoverMediaSourcePublications,
   mediaHasPendingPublication,
 } from './delete-cascade.sources';
 import {

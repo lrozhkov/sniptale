@@ -15,10 +15,15 @@ import {
   reviewWorkspaceHasWatermarkImage,
   reviewWorkspaceHasSceneResource,
   reviewWorkspaceHasSpeechReplacement,
+  reviewWorkspaceHasAnnotationEffectResource,
 } from './asset-refs';
 import { readLibraryAudioSource, sameLibraryAudioRef } from '../projects/library-audio-source';
 import type { AssetRef } from '../assets/contracts';
 import type { VideoWorkspace } from './contracts';
+import { initDB, PROJECT_ASSETS_STORE, ASSET_REFS_STORE } from '../infrastructure/indexed-db/core';
+import { readAssetFile } from '../assets/opfs-store';
+import { verifyReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 
 type ReadStore = { get(id: string): Promise<unknown> };
 
@@ -33,14 +38,26 @@ interface LibraryAudioClaim {
 interface ReviewReadySources {
   assets: ReadonlyMap<string, ProjectAssetEntry | null>;
   libraryAudioClaims: readonly LibraryAudioClaim[];
-  resourceClaims?: readonly { payload: ProjectAssetPublicationPayload; available: boolean }[];
+  resourceClaims?: readonly {
+    payload: ProjectAssetPublicationPayload;
+    available: boolean;
+    ref?: AssetRef;
+  }[];
+  annotationEffectSources?: readonly {
+    snapshot: ReviewAnnotationEffectSnapshot;
+    resources: ReadonlyMap<string, string>;
+  }[];
 }
 
 /** Read under the lifecycle lock, before opening the consuming IDB transaction. */
 export async function readReviewReadySources(aggregateId: string): Promise<ReviewReadySources> {
   const sources = new Map<string, ProjectAssetEntry | null>();
   const libraryAudioClaims: LibraryAudioClaim[] = [];
-  const resourceClaims: { payload: ProjectAssetPublicationPayload; available: boolean }[] = [];
+  const resourceClaims: {
+    payload: ProjectAssetPublicationPayload;
+    available: boolean;
+    ref?: AssetRef;
+  }[] = [];
   for (const journal of await listReadyJournals()) {
     if (journal.domain !== 'project-assets' || journal.operationId) continue;
     const payload = parseProjectAssetPayload(journal.payload);
@@ -50,13 +67,20 @@ export async function readReviewReadySources(aggregateId: string): Promise<Revie
       (payload.requiredReview && payload.requiredReview.aggregateId !== aggregateId) ||
       (payload.requiredReviewResource &&
         payload.requiredReviewResource.aggregateId !== aggregateId) ||
-      (payload.requiredReviewSpeech && payload.requiredReviewSpeech.aggregateId !== aggregateId)
+      (payload.requiredReviewSpeech && payload.requiredReviewSpeech.aggregateId !== aggregateId) ||
+      (payload.requiredReviewAnnotationEffect &&
+        payload.requiredReviewAnnotationEffect.aggregateId !== aggregateId)
     )
       continue;
-    if (payload.requiredReviewResource || payload.requiredReviewSpeech) {
+    if (
+      payload.requiredReviewResource ||
+      payload.requiredReviewSpeech ||
+      payload.requiredReviewAnnotationEffect
+    ) {
       resourceClaims.push({
         payload,
         available: !!ref && (await resourceClaimAvailable(payload, ref)),
+        ...(ref ? { ref } : {}),
       });
       continue;
     }
@@ -85,6 +109,71 @@ export async function readReviewReadySources(aggregateId: string): Promise<Revie
     );
   }
   return { assets: sources, libraryAudioClaims, resourceClaims };
+}
+
+/** Readonly metadata sampling finishes its transaction before any Blob or cryptographic await. */
+async function readAnnotationResource(reference: string, prepared: ReviewReadySources) {
+  const id = reference.slice('project-asset:'.length);
+  const db = await initDB();
+  const tx = db.transaction([PROJECT_ASSETS_STORE, ASSET_REFS_STORE], 'readonly');
+  const raw: unknown = await tx.objectStore(PROJECT_ASSETS_STORE).get(id);
+  const stored = parseProjectAssetEntry(raw);
+  const rawRef: unknown = stored
+    ? await tx.objectStore(ASSET_REFS_STORE).get(stored.assetId)
+    : undefined;
+  await tx.done;
+  const claim = prepared.resourceClaims?.find(
+    (value) =>
+      value.available &&
+      value.payload.requiredReviewAnnotationEffect &&
+      value.payload.entry.id === id
+  );
+  const entry = raw === undefined ? claim?.payload.entry : stored;
+  const ref = raw === undefined ? claim?.ref : parseAssetRef(rawRef);
+  if (
+    !entry ||
+    !ref ||
+    entry.id !== id ||
+    entry.assetId !== ref.assetId ||
+    entry.size !== ref.size ||
+    entry.mimeType !== ref.mimeType
+  )
+    return undefined;
+  return { blob: await readAssetFile(ref, id), physicalAssetId: ref.assetId };
+}
+
+/** New source bytes are sampled under lifecycle exclusion, never inside a write transaction. */
+export async function verifyReviewAnnotationEffectSources(
+  previous: VideoWorkspace,
+  snapshots: readonly ReviewAnnotationEffectSnapshot[],
+  prepared: ReviewReadySources
+): Promise<ReviewReadySources> {
+  const retained = new Map(
+    previous.effectSnapshots?.map((snapshot) => [snapshot.id, snapshot]) ?? []
+  );
+  const annotationEffectSources: NonNullable<
+    ReviewReadySources['annotationEffectSources']
+  >[number][] = [];
+  for (const snapshot of snapshots) {
+    const existing = retained.get(snapshot.id);
+    if (existing) {
+      if (JSON.stringify(existing) !== JSON.stringify(snapshot))
+        throw new Error('Immutable annotation source changed.');
+      continue;
+    }
+    const resources = new Map<string, string>();
+    const verified = await verifyReviewAnnotationEffectSnapshot(
+      snapshot,
+      async (reference) => {
+        const resource = await readAnnotationResource(reference, prepared);
+        if (resource) resources.set(reference, resource.physicalAssetId);
+        return resource?.blob;
+      },
+      new AbortController().signal
+    );
+    annotationEffectSources.push({ snapshot: verified.snapshot, resources });
+  }
+  return { ...prepared, annotationEffectSources };
 }
 
 async function libraryAudioClaimAvailable(
@@ -125,6 +214,12 @@ function hasResourceClaim(
   const resource = payload.requiredReviewResource;
   const assetId = `project-asset:${payload.entry.id}`;
   const speech = payload.requiredReviewSpeech;
+  if (payload.requiredReviewAnnotationEffect)
+    return reviewWorkspaceHasAnnotationEffectResource(
+      workspace,
+      payload.requiredReviewAnnotationEffect,
+      { assetId, mimeType: payload.entry.mimeType, byteLength: payload.entry.size }
+    );
   if (speech)
     return reviewWorkspaceHasSpeechReplacement(
       workspace,
@@ -198,11 +293,41 @@ export async function areNewReviewSourcesAvailable(
     resourceAssets.set(entry.id, entry);
   }
   const existing = collectReviewAssetReferences(previous);
+  const previousSnapshots = new Map(
+    previous.effectSnapshots?.map((snapshot) => [snapshot.id, snapshot]) ?? []
+  );
+  for (const snapshot of next.effectSnapshots ?? []) {
+    const retained = previousSnapshots.get(snapshot.id);
+    if (retained) {
+      if (JSON.stringify(retained) !== JSON.stringify(snapshot)) return false;
+      continue;
+    }
+    const verified = prepared.annotationEffectSources?.find(
+      (value) => value.snapshot.id === snapshot.id
+    );
+    if (!verified || JSON.stringify(verified.snapshot) !== JSON.stringify(snapshot)) return false;
+    for (const resource of snapshot.assets) {
+      const id = resource.assetId.slice('project-asset:'.length);
+      const raw = await stores.assets.get(id);
+      const entry = raw === undefined ? resourceAssets.get(id) : parseProjectAssetEntry(raw);
+      if (
+        !entry ||
+        entry.assetId !== verified.resources.get(resource.assetId) ||
+        entry.mimeType !== resource.mimeType ||
+        entry.size !== resource.byteLength
+      )
+        return false;
+    }
+  }
+  const annotationAssets = new Set(
+    next.effectSnapshots?.flatMap((snapshot) => snapshot.assets.map((asset) => asset.assetId)) ?? []
+  );
   for (const reference of collectReviewAssetReferences(next)) {
     if (existing.has(reference)) continue;
     const id = reference.slice('project-asset:'.length);
     const resource = resourceAssets.get(id);
     const raw = await stores.assets.get(id);
+    if (raw === undefined && annotationAssets.has(reference) && !resource) return false;
     const asset =
       raw === undefined
         ? (claimed.get(id) ?? resource ?? prepared.assets.get(id))

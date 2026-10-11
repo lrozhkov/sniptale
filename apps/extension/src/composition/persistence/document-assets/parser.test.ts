@@ -66,6 +66,11 @@ const invalidNestedOverrides: ReadonlyArray<
   ['malformed source image settings', { frame: { sourceImage: { opacity: 1 } } }],
   ['malformed browser enabled flag', { browserFrame: { enabled: 'yes' } }],
   ['malformed browser appearance', { browserFrame: { appearance: 'dialog' } }],
+  ['malformed browser kind', { browserFrame: { kind: 'popup' } }],
+  ['malformed browser style', { browserFrame: { style: 'classic' } }],
+  ['malformed browser theme', { browserFrame: { theme: 'auto' } }],
+  ['malformed browser favicon enabled', { browserFrame: { faviconEnabled: 'yes' } }],
+  ['malformed browser favicon source', { browserFrame: { faviconSource: 'remote' } }],
 ];
 
 it.each(invalidNestedOverrides)('rejects %s', (_label, override) => {
@@ -121,4 +126,32 @@ it('accepts legacy captions and validates an optional editable caption', () => {
   );
   for (const displayName of [null, 42, {}, []])
     expect(parsePersistedEditorDocument({ ...document, displayName })).toBeNull();
+});
+
+it('retains explicit decoration metadata and the selected favicon across persisted parsing', () => {
+  const document = createPersistedDocument();
+  const expected = {
+    ...document,
+    browserFrame: {
+      ...document.browserFrame,
+      kind: 'application',
+      style: 'macos',
+      theme: 'dark',
+      faviconEnabled: true,
+      faviconSource: 'file',
+      favicon: { assetId: 'favicon' },
+    },
+    assets: [...document.assets, { assetId: 'favicon', role: 'browser-favicon' }],
+  };
+  expect(parsePersistedEditorDocument(expected)).toEqual(expected);
+  expect(parsePersistedEditorDocument(parsePersistedEditorDocument(expected))).toEqual(expected);
+  const legacy = parsePersistedEditorDocument(document);
+  expect(legacy?.browserFrame).not.toHaveProperty('kind');
+  expect(legacy?.browserFrame).not.toHaveProperty('faviconEnabled');
+});
+
+it('preserves legacy null favicon source without adding or coercing decoration defaults', () => {
+  const document = createPersistedDocument();
+  const expected = { ...document, browserFrame: { ...document.browserFrame, faviconSource: null } };
+  expect(parsePersistedEditorDocument(expected)).toEqual(expected);
 });

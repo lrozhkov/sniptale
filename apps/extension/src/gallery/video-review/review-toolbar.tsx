@@ -20,7 +20,15 @@ import {
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
-import { Activity, AudioLines, Camera, Focus, PanelsTopLeft, Volume2 } from 'lucide-react';
+import {
+  Activity,
+  AudioLines,
+  Camera,
+  Focus,
+  PanelsTopLeft,
+  Volume2,
+  SquarePlus,
+} from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
 
 const plain = reviewIconButtonClassName;
@@ -29,6 +37,7 @@ type Editing = ReturnType<typeof useReviewEdits>;
 
 type ToolbarProps = {
   beforeAction?: ReviewBeforeAction | undefined;
+  annotationTool?: { active: boolean; open?: boolean; onToggle(anchor: HTMLElement): void };
   focusTool?: {
     active: boolean;
     available: boolean;
@@ -145,6 +154,28 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           onRate={(rate) => admit(() => props.editing.changeRate(rate))}
           onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
         />
+        {advanced.ui.mode === 'advanced' && props.annotationTool ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.annotationEffectsAdd')}
+            toolbarLabel={translate('gallery.videoReview.annotationEffects')}
+            title={translate(
+              props.annotationTool.active
+                ? 'gallery.videoReview.annotationEffectsDraw'
+                : 'gallery.videoReview.annotationEffectsAdd'
+            )}
+            aria-pressed={props.annotationTool.active}
+            aria-haspopup="dialog"
+            aria-expanded={props.annotationTool.open ?? false}
+            className={plain}
+            disabled={busy}
+            onClick={(event) => {
+              const anchor = event.currentTarget;
+              admit(() => props.annotationTool?.onToggle(anchor));
+            }}
+          >
+            <SquarePlus size={16} aria-hidden />
+          </ReviewButton>
+        ) : null}
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
           <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
         ) : null}

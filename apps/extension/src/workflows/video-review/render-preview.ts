@@ -44,6 +44,10 @@ import {
 import { QuickEditExportUnavailable } from './export-unavailable';
 import { prepareReviewCaptions } from './render-captions';
 import { reviewCaptionReservations } from './caption-reservations';
+import {
+  createReviewAnnotationRenderer,
+  reviewAnnotationPreparationBytes,
+} from './annotation-renderer';
 
 type Size = { width: number; height: number };
 type Drawable = {
@@ -56,6 +60,7 @@ type Drawable = {
   ): void;
 };
 type Frame = {
+  fps?: number;
   generation: number;
   sourceTime: number;
   resultTime: number;
@@ -89,6 +94,7 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  annotations: Awaited<ReturnType<typeof createReviewAnnotationRenderer>> | null;
   captions: Awaited<ReturnType<typeof prepareReviewCaptions>> | null;
   allocation: PreviewRenderAllocationInput['assets'];
   background: ImageBitmap | null;
@@ -105,6 +111,8 @@ function validSize(size: Size) {
 }
 
 function disposeAssets(assets: Assets) {
+  assets.annotations?.dispose();
+  assets.annotations = null;
   assets.captions = null;
   assets.watermark?.dispose();
   assets.watermark = null;
@@ -167,9 +175,18 @@ async function prepareAssets(
   resources: RenderResources,
   signal: AbortSignal,
   readAsset: typeof resolveReviewAssetBytes,
-  admit: (measurement: boolean) => void
+  admit: (measurement: boolean) => void,
+  annotationExecutor: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor']
 ) {
   const { scene, dimensions } = prepared;
+  const annotationScene = scene.annotationEffects
+    ? {
+        ...scene.annotationEffects,
+        planes: { content: scene.source, viewport: dimensions.canonical },
+      }
+    : undefined;
+  if (annotationScene)
+    assets.allocation.annotationSourceBytes = reviewAnnotationPreparationBytes(annotationScene);
   admit(false);
   if (scene.background.enabled && scene.background.type === 'image') {
     const blob = await readAsset(scene.background.assetId);
@@ -252,14 +269,30 @@ async function prepareAssets(
     });
     admit(false);
   }
+  if (annotationScene) {
+    assets.annotations = await createReviewAnnotationRenderer(annotationScene, {
+      resources,
+      signal,
+      readAsset: async (reference, signal) => {
+        signal.throwIfAborted();
+        const blob = await readAsset(reference);
+        signal.throwIfAborted();
+        return blob;
+      },
+      ...(annotationExecutor ? { createExecutor: annotationExecutor } : {}),
+    });
+    signal.throwIfAborted();
+  }
 }
 
-function drawPreparedFrame(
+async function drawPreparedFrame(
   prepared: PreparedScene,
   assets: Assets,
   output: RenderCanvasLease,
   frame: Frame,
-  resources: RenderResources
+  resources: RenderResources,
+  signal: AbortSignal,
+  admit: (frame: Frame, bitmaps: readonly Size[]) => void
 ) {
   const request = sceneRequest(prepared, frame);
   const { scene, dimensions } = prepared;
@@ -282,7 +315,7 @@ function drawPreparedFrame(
         draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
       };
     }
-    const draw = (
+    const draw = async (
       context: CanvasRenderingContext2D,
       canvas: HTMLCanvasElement,
       frame: Frame,
@@ -317,29 +350,56 @@ function drawPreparedFrame(
           cameraScale: request.camera.scale,
         },
       };
-      drawReviewSceneFrame(context, {
-        ...drawScene,
-        spatialRenderer: assets.spatial,
-        windowRasterBacking: {
-          width: Math.max(1, Math.ceil(request.layout.windowRect.width)),
-          height: Math.max(1, Math.ceil(request.layout.windowRect.height)),
+      const density = {
+        content: {
+          width: request.layout.videoTransform.width / scene.source.width,
+          height: request.layout.videoTransform.height / scene.source.height,
         },
-        motionBlur: frame.cameraTransform
-          ? undefined
-          : quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime),
-      });
-      drawReviewSceneOverlays({
-        scene: drawScene,
-        renderer: assets.spatial,
-        context,
-        canvas,
-        spotlightScratch: null,
-        regions: scene.zoomRegions,
-        globalResultTime: frame.resultTime,
-        cameraScale: request.camera.scale,
-        sourceWidth: scene.source.width,
-        clicks: scene.clicks,
-      });
+        viewport: {
+          width: dimensions.backing.width / dimensions.canonical.width,
+          height: dimensions.backing.height / dimensions.canonical.height,
+        },
+      };
+      const plans = assets.annotations?.describe(frame.resultTime, density, frame.fps ?? 30) ?? [];
+      admit(
+        frame,
+        plans.map(({ plan }) => plan.renderDimensions)
+      );
+      const annotations = await assets.annotations?.render(
+        frame.resultTime,
+        density,
+        frame.fps ?? 30,
+        signal
+      );
+      try {
+        signal.throwIfAborted();
+        drawReviewSceneFrame(context, {
+          ...drawScene,
+          spatialRenderer: assets.spatial,
+          windowRasterBacking: {
+            width: Math.max(1, Math.ceil(request.layout.windowRect.width)),
+            height: Math.max(1, Math.ceil(request.layout.windowRect.height)),
+          },
+          motionBlur: frame.cameraTransform
+            ? undefined
+            : quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime),
+        });
+        drawReviewSceneOverlays({
+          scene: drawScene,
+          renderer: assets.spatial,
+          context,
+          canvas,
+          spotlightScratch: null,
+          regions: scene.zoomRegions,
+          globalResultTime: frame.resultTime,
+          cameraScale: request.camera.scale,
+          sourceWidth: scene.source.width,
+          clicks: scene.clicks,
+          ...(annotations ? { annotationFrames: annotations.entries } : {}),
+        });
+      } finally {
+        annotations?.release();
+      }
     };
     if (frame.transition?.blend.plan.type === 'dissolve') {
       const { blend, frames, resultOffset } = frame.transition;
@@ -351,13 +411,13 @@ function drawPreparedFrame(
         resultOffset
       );
       transition = resources.canvas('preview-transition-source', dimensions.backing);
-      paintReviewCutDissolve(
+      await paintReviewCutDissolve(
         context,
         transition,
         blend.incoming,
         (target, surface, side) => {
           const endpoint = sides[side];
-          draw(
+          return draw(
             target,
             surface,
             { ...frame, resultTime: endpoint.resultTime, sourceTime: endpoint.sample.timestamp },
@@ -366,7 +426,8 @@ function drawPreparedFrame(
         },
         canvas
       );
-    } else draw(context, canvas, frame, sample);
+    } else await draw(context, canvas, frame, sample);
+    signal.throwIfAborted();
     if (frame.camera && scene.webcam)
       drawReviewWebcam(
         context,
@@ -416,7 +477,8 @@ function admitRender(
   allocation: Allocation | undefined,
   prepared: PreparedScene,
   assets: Assets,
-  frame?: Frame
+  frame?: Frame,
+  annotationBitmaps?: readonly Size[]
 ) {
   if (!allocation) return;
   const input = allocation.describe();
@@ -424,6 +486,7 @@ function admitRender(
     ...input,
     publication: { ...input.publication, backing: prepared.dimensions.backing },
     assets: assets.allocation,
+    scene: { ...input.scene, ...(annotationBitmaps ? { annotationBitmaps } : {}) },
   };
   const candidates = [calculatePreviewRenderAllocation(base)];
   if (frame?.transition?.blend.plan.type === 'dissolve') {
@@ -453,7 +516,11 @@ function admitRender(
         calculatePreviewRenderAllocation({
           ...base,
           background: graph.background,
-          scene: { ...graph.scene, transitionRaster: prepared.dimensions.backing },
+          scene: {
+            ...graph.scene,
+            transitionRaster: prepared.dimensions.backing,
+            ...(annotationBitmaps ? { annotationBitmaps } : {}),
+          },
         })
       );
     }
@@ -468,13 +535,15 @@ function admitRender(
 export function createReviewPreviewRenderer(args: {
   resources: RenderResources;
   allocation?: Allocation;
-  readAsset?: typeof resolveReviewAssetBytes;
+  readAsset?: (assetId: string, signal: AbortSignal) => Promise<Blob | null>;
   onContextLost?: () => void;
+  annotationExecutor?: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor'];
 }) {
   let generation = 0;
   let disposed = false;
   let current: { prepared: PreparedScene; assets: Assets; key: string } | null = null;
   let preparation: AbortController | null = null;
+  let rendering = false;
   const leases = new Set<Prepared>();
   const clear = () => {
     if (current) disposeAssets(current.assets);
@@ -498,8 +567,29 @@ export function createReviewPreviewRenderer(args: {
     return handle;
   };
   return {
-    async prepare(scene: Scene, dimensions: Dimensions, signal: AbortSignal): Promise<Prepared> {
+    async prepare(
+      sourceScene: Scene,
+      dimensions: Dimensions,
+      signal: AbortSignal
+    ): Promise<Prepared> {
       if (disposed) throw new Error('Preview renderer is disposed.');
+      const annotations = sourceScene.annotationEffects;
+      const instances = annotations?.lane.enabled
+        ? annotations.lane.instances.filter((instance) => instance.enabled)
+        : [];
+      const ids = new Set(instances.map((instance) => instance.snapshotId));
+      const scene: Scene = {
+        ...sourceScene,
+        ...(annotations
+          ? {
+              annotationEffects: {
+                ...annotations,
+                lane: { enabled: annotations.lane.enabled, instances },
+                snapshots: annotations.snapshots.filter((snapshot) => ids.has(snapshot.id)),
+              },
+            }
+          : {}),
+      };
       validSize(scene.source);
       validSize(dimensions.canonical);
       validSize(dimensions.backing);
@@ -517,6 +607,7 @@ export function createReviewPreviewRenderer(args: {
       signal.addEventListener('abort', abort, { once: true });
       const prepared = structuredClone({ generation: ++generation, scene, dimensions });
       const assets: Assets = {
+        annotations: null,
         captions: null,
         allocation: {
           backgroundBitmap: null,
@@ -538,7 +629,7 @@ export function createReviewPreviewRenderer(args: {
           assets,
           args.resources,
           controller.signal,
-          args.readAsset ?? resolveReviewAssetBytes,
+          (reference) => (args.readAsset ?? resolveReviewAssetBytes)(reference, controller.signal),
           (measurement) => {
             controller.signal.throwIfAborted();
             if (!args.allocation) return;
@@ -552,9 +643,11 @@ export function createReviewPreviewRenderer(args: {
                 headerBitmap: assets.allocation.headerBitmap,
                 watermark: assets.allocation.watermark,
                 measurement,
+                annotationSourceBytes: assets.allocation.annotationSourceBytes ?? 0,
               })
             );
-          }
+          },
+          args.annotationExecutor
         );
         controller.signal.throwIfAborted();
         admitRender(args.allocation, prepared, assets);
@@ -577,19 +670,40 @@ export function createReviewPreviewRenderer(args: {
         signal.removeEventListener('abort', abort);
       }
     },
-    render(prepared: Prepared, frame: Frame) {
+    async render(prepared: Prepared, frame: Frame, signal?: AbortSignal) {
+      if (rendering) throw new Error('Preview frame is already admitted.');
       if (disposed || !leases.has(prepared) || current?.prepared.generation !== prepared.generation)
         throw new Error('Preview scene is stale.');
       if (![frame.source.timestamp, frame.sourceTime, frame.resultTime].every(Number.isFinite))
         throw new Error('Invalid preview frame time.');
+      const captured = current;
+      const renderingSignal = signal ?? preparation?.signal;
+      if (!renderingSignal) throw new Error('Preview scene is stale.');
+      renderingSignal.throwIfAborted();
       admitRender(args.allocation, current.prepared, current.assets, frame);
       const output = args.resources.canvas(
         'preview-publication',
         current.prepared.dimensions.backing,
         { alpha: false }
       );
+      rendering = true;
       try {
-        drawPreparedFrame(current.prepared, current.assets, output, frame, args.resources);
+        await drawPreparedFrame(
+          captured.prepared,
+          captured.assets,
+          output,
+          frame,
+          args.resources,
+          renderingSignal,
+          (endpoint, bitmaps) => {
+            if (disposed || current !== captured || !leases.has(prepared))
+              throw new Error('Preview scene is stale.');
+            admitRender(args.allocation, captured.prepared, captured.assets, endpoint, bitmaps);
+          }
+        );
+        renderingSignal.throwIfAborted();
+        if (disposed || current !== captured || !leases.has(prepared))
+          throw new Error('Preview scene is stale.');
         return {
           ...output,
           generation: frame.generation,
@@ -604,6 +718,8 @@ export function createReviewPreviewRenderer(args: {
       } catch (failure) {
         output.release();
         throw failure;
+      } finally {
+        rendering = false;
       }
     },
     dispose() {

@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
-// @vitest-environment jsdom
 import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 import {
   createQuickEditZoomRegion,
@@ -581,4 +581,14 @@ it('does not enter the save queue for an unchanged authored proposal', async () 
   expect(advanced.pending).toBe(false);
   await act(async () => vi.advanceTimersByTimeAsync(300));
   expect(deps.saveVideoWorkspaceAdvanced).not.toHaveBeenCalled();
+});
+
+it('does not resurrect a removed optional annotation baseline after content replay', async () => {
+  const initial = createQuickEditAdvancedState();
+  initial.annotationEffects = { enabled: false, instances: [] };
+  const { session } = setup(initial);
+  act(() => advanced.setAnnotationEffects(() => undefined));
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.annotationEffects).toBeUndefined();
+  expect(advanced.advanced.annotationEffects).toBeUndefined();
 });
