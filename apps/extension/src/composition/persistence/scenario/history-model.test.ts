@@ -1,5 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../../features/scenario/project/public';
+import {
+  createGuideParagraphs,
+  createGuideStep,
+  createTourDocument,
+  createTourImageSlide,
+} from '../../../features/scenario/project/factories';
 import { createScenarioProjectEntry } from './projects/entry';
 import { parseScenarioProjectEntry } from './read-guards';
 import {
@@ -80,3 +86,84 @@ it('enforces the metadata byte budget on append and on untrusted reads', () => {
     )
   ).toBeNull();
 });
+
+function unicodeEntry(guide: boolean, tour: boolean, emptySlides: boolean) {
+  const previous = entry(1);
+  const text = 'Unicode 😀汉é, quotes " and slash \\, newline\n tab\t lone \ud800';
+  previous.project.name = text;
+  previous.project.tags = [text];
+  if (guide)
+    previous.project.items = Array.from({ length: 3 }, (_, index) => ({
+      ...createGuideStep(text, `step-${index}`),
+      blocks: [
+        {
+          kind: 'text' as const,
+          id: `block-${index}`,
+          paragraphs: createGuideParagraphs(text),
+        },
+      ],
+    }));
+  if (tour) {
+    previous.project.tour = createTourDocument('tour');
+    previous.project.tour.slides = Array.from({ length: emptySlides ? 0 : 3 }, (_, index) => ({
+      ...createTourImageSlide(`slide-${index}`),
+      title: text,
+      annotations: [{ id: `annotation-${index}`, text, anchor: null, appearance: null }],
+    }));
+  }
+  return previous;
+}
+
+const byteCases = [
+  { guide: false, tour: false, emptySlides: false },
+  { guide: true, tour: false, emptySlides: false },
+  { guide: false, tour: true, emptySlides: false },
+  { guide: true, tour: true, emptySlides: false },
+  { guide: false, tour: true, emptySlides: true },
+  { guide: true, tour: true, emptySlides: true },
+].flatMap((body) =>
+  [false, true].flatMap((history) => [0, 1].map((delta) => ({ ...body, history, delta })))
+);
+
+it.each(byteCases)(
+  'keeps exact UTF8 boundaries and retention for $guide/$tour/$emptySlides/$history/$delta',
+  ({ guide, tour, emptySlides, history, delta }) => {
+    const previous = unicodeEntry(guide, tour, emptySlides);
+    const version = { revision: 1, savedAt: 2, project: previous.project };
+    if (history) {
+      const earlier = structuredClone(version);
+      earlier.revision = 0;
+      earlier.savedAt = 1;
+      earlier.project.updatedAt = 1;
+      earlier.project.name = 'Earlier Unicode 汉';
+      if (earlier.project.items[0]) earlier.project.items[0].title = 'Earlier step é';
+      if (earlier.project.tour?.slides[0])
+        earlier.project.tour.slides[0].title = 'Earlier slide 😀';
+      previous.history = [earlier];
+    }
+    const versions = [...(previous.history ?? []), version];
+    const original = TextEncoder.prototype.encode;
+    const fullBytes = versions.reduce(
+      (total, value) => total + original.call(new TextEncoder(), JSON.stringify(value)).byteLength,
+      0
+    );
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+    let firstRoot = true;
+    encode.mockImplementation(function (this: TextEncoder, value) {
+      const bytes = original.call(this, value);
+      if (firstRoot && value?.includes('"project":{')) {
+        firstRoot = false;
+        Object.defineProperty(bytes, 'byteLength', {
+          value: bytes.byteLength + SCENARIO_HISTORY_BYTE_LIMIT - fullBytes + delta,
+        });
+      }
+      return bytes;
+    });
+    const parsed = parseScenarioSavedVersions(versions, previous.id, 2, 3);
+    expect(parsed).toEqual(delta === 0 ? versions : null);
+    firstRoot = true;
+    if (delta === 1 && !history)
+      expect(() => appendScenarioSavedVersion(previous)).toThrow('limit');
+    else expect(appendScenarioSavedVersion(previous)).toEqual(delta === 0 ? versions : [version]);
+  }
+);

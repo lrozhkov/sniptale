@@ -76,6 +76,23 @@ it.each(['guide', 'tour'] as const)(
   }
 );
 
+it.each(['guide', 'tour'] as const)(
+  'encodes each unchanged %s body once per history measurement',
+  async (kind) => {
+    const previous = await baseline(kind);
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+    await commitScenarioAggregateMutation(
+      { ...previous.project, name: 'Measured name' },
+      { expectedRevision: previous.workspaceRevision }
+    );
+    const repetitions = encode.mock.calls.reduce(
+      (count, [text]) => count + (text?.split(unchanged).length ?? 1) - 1,
+      0
+    );
+    expect(repetitions).toBe(6);
+  }
+);
+
 it.each([
   ['guide', 'title'],
   ['guide', 'text'],

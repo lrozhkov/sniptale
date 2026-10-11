@@ -5,8 +5,29 @@ import type { ScenarioProjectEntry, ScenarioSavedVersion } from './contracts';
 export const SCENARIO_HISTORY_LIMIT = 50;
 export const SCENARIO_HISTORY_BYTE_LIMIT = 64 * 1024 * 1024;
 const encoder = new TextEncoder();
-function versionSize(version: ScenarioSavedVersion): number {
-  return encoder.encode(JSON.stringify(version)).byteLength;
+function versionSize(version: ScenarioSavedVersion, parts: Map<string, number>): number {
+  function bytes(value: unknown): number {
+    const json = JSON.stringify(value) ?? 'null';
+    const previous = parts.get(json);
+    if (previous !== undefined) return previous;
+    const size = encoder.encode(json).byteLength;
+    parts.set(json, size);
+    return size;
+  }
+  const { items, tour } = version.project;
+  const project = {
+    ...version.project,
+    items: [],
+    ...(tour ? { tour: { ...tour, slides: [] } } : {}),
+  };
+  // Empty arrays already supply brackets; only encoded elements and commas remain.
+  let size = bytes({ ...version, project }) + Math.max(0, items.length - 1);
+  for (const item of items) size += bytes(item);
+  if (tour) {
+    size += Math.max(0, tour.slides.length - 1);
+    for (const slide of tour.slides) size += bytes(slide);
+  }
+  return size;
 }
 
 /** Admits a bounded, ordered history belonging to this aggregate and preceding its current revision. */
@@ -22,6 +43,7 @@ export function parseScenarioSavedVersions(
   let previousRevision = -1;
   let previousSavedAt = -1;
   let bytes = 0;
+  const parts = new Map<string, number>();
   for (const raw of value) {
     if (!isRecord(raw)) return null;
     const revision = raw['revision'];
@@ -46,7 +68,7 @@ export function parseScenarioSavedVersions(
     )
       return null;
     const version = { revision, savedAt, project: parsed.project };
-    bytes += versionSize(version);
+    bytes += versionSize(version, parts);
     if (bytes > SCENARIO_HISTORY_BYTE_LIMIT) return null;
     versions.push(version);
     previousRevision = revision;
@@ -69,11 +91,12 @@ export function appendScenarioSavedVersion(
     },
   ].slice(-SCENARIO_HISTORY_LIMIT);
   let bytes = 0;
+  const parts = new Map<string, number>();
   let first = versions.length;
   for (let index = versions.length - 1; index >= 0; index -= 1) {
     const version = versions[index];
     if (!version) continue;
-    const size = versionSize(version);
+    const size = versionSize(version, parts);
     if (bytes + size > SCENARIO_HISTORY_BYTE_LIMIT) break;
     bytes += size;
     first = index;
