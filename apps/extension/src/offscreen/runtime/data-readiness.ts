@@ -18,10 +18,12 @@ export function createOffscreenDataReadiness(deps: Dependencies) {
   let generation = 0;
   let admission: Promise<void> | null = null;
   let admitted = false;
+  let assetsReady = false;
   let recovery: Promise<void> | null = null;
   const unsubscribe = deps.subscribeTermination(() => {
     generation += 1;
     admitted = false;
+    assetsReady = false;
     admission = null;
     recovery = null;
   });
@@ -38,6 +40,7 @@ export function createOffscreenDataReadiness(deps: Dependencies) {
       );
       if (current !== generation) throw new Error('Offscreen data connection changed');
       if (phase === 'admission') admitted = true;
+      else assetsReady = true;
       logger.debug('Data readiness completed', {
         phase,
         durationMs: Math.round(performance.now() - start),
@@ -63,7 +66,10 @@ export function createOffscreenDataReadiness(deps: Dependencies) {
   function ensureAssets(): Promise<void> {
     if (!recovery) {
       const pending = ensureAdmission()
-        .then(() => run('recovery', deps.recover))
+        .then(() => {
+          requireAdmission();
+          return run('recovery', deps.recover);
+        })
         .catch((error) => {
           if (recovery === pending) recovery = null;
           throw error;
@@ -75,7 +81,10 @@ export function createOffscreenDataReadiness(deps: Dependencies) {
   function requireAdmission(): void {
     if (!admitted) throw new Error('Offscreen data is not admitted');
   }
-  return { ensureAdmission, requireAdmission, ensureAssets, dispose: unsubscribe };
+  function requireAssets(): void {
+    if (!admitted || !assetsReady) throw new Error('Offscreen assets are not prepared');
+  }
+  return { ensureAdmission, requireAdmission, ensureAssets, requireAssets, dispose: unsubscribe };
 }
 
 export const offscreenDataReadiness = createOffscreenDataReadiness({

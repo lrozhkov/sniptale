@@ -43,6 +43,19 @@ const isFilename = (value: unknown): boolean =>
   typeof value === 'string' && value.length > 0 && value.length <= 240;
 
 export const runtimeActionPagePackageDownloadLeaseContracts = {
+  [MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD message',
+      createMessageGuard({
+        type: MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD,
+        required: { capabilityToken: isString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD response',
+      createRuntimeResponseGuard({ required: { result: (value) => value === 'accepted' } })
+    ),
+  },
   [MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE message',

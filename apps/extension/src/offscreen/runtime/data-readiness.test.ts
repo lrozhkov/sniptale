@@ -113,3 +113,50 @@ it('prepares a new recording without entering whole-library recovery', async () 
     reconcile.mockRestore();
   }
 });
+
+it('requires recovered assets without joining a lock wait on a cold or terminated connection', async () => {
+  const f = fixture();
+  expect(() => f.service.requireAssets()).toThrow('Offscreen assets are not prepared');
+  expect(f.admit).not.toHaveBeenCalled();
+  await f.service.ensureAdmission();
+  expect(() => f.service.requireAssets()).toThrow('Offscreen assets are not prepared');
+  f.recover.mockRejectedValueOnce(new Error('recovery failed'));
+  await expect(f.service.ensureAssets()).rejects.toThrow('recovery failed');
+  expect(() => f.service.requireAssets()).toThrow('Offscreen assets are not prepared');
+  await f.service.ensureAssets();
+  expect(() => f.service.requireAssets()).not.toThrow();
+  f.terminate();
+  expect(() => f.service.requireAssets()).toThrow('Offscreen assets are not prepared');
+  expect(f.admit).toHaveBeenCalledOnce();
+});
+
+it('does not admit assets from recovery that finished after connection termination', async () => {
+  const f = fixture();
+  let finish!: () => void;
+  f.recover.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const old = f.service.ensureAssets();
+  await vi.waitFor(() => expect(f.recover).toHaveBeenCalledOnce());
+  f.terminate();
+  finish();
+  await expect(old).rejects.toThrow('Offscreen data connection changed');
+  expect(() => f.service.requireAssets()).toThrow('Offscreen assets are not prepared');
+  await f.service.ensureAssets();
+  expect(() => f.service.requireAssets()).not.toThrow();
+});
+
+it('rejects termination between admission and the queued recovery continuation', async () => {
+  const f = fixture();
+  await f.service.ensureAdmission();
+  const pending = f.service.ensureAssets();
+  f.terminate();
+  await expect(pending).rejects.toThrow('Offscreen data is not admitted');
+  expect(f.recover).not.toHaveBeenCalled();
+  expect(() => f.service.requireAssets()).toThrow('Offscreen assets are not prepared');
+  await f.service.ensureAssets();
+  expect(() => f.service.requireAssets()).not.toThrow();
+});

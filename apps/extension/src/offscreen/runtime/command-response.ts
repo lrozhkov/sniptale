@@ -228,6 +228,7 @@ export function buildOffscreenCommandResponse(
       return buildDesktopFrameResponse(result);
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
       return buildStopRecordingResponse(result);
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
       return buildAcceptedScalarResponse(type, result);

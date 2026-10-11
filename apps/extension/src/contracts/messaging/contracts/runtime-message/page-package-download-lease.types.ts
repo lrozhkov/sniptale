@@ -11,6 +11,10 @@ export type PagePackageDownloadAssetRefPayload = {
 };
 
 export type RuntimePagePackageDownloadLeaseRequestByType = {
+  [MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD]: {
+    type: typeof MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD;
+    capabilityToken: string;
+  };
   [MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE]: {
     type: typeof MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE;
     capabilityToken: string;
@@ -34,6 +38,9 @@ export type RuntimePagePackageDownloadLeaseRequestByType = {
 };
 
 export type RuntimePagePackageDownloadLeaseResponseByType = {
+  [MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD]: RuntimeMessageResponse<{
+    result: 'accepted';
+  }>;
   [MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE]: RuntimeMessageResponse<{
     leaseId: string;
     result: 'leased';

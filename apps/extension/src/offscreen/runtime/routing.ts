@@ -110,6 +110,7 @@ export function resolveOffscreenErrorPhase(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
     case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE:
@@ -149,6 +150,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
     case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE:
@@ -208,8 +210,11 @@ export async function handleOffscreenRuntimeMessage(
   | 'stale'
 > {
   switch (message.type) {
-    case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
       await offscreenDataReadiness.ensureAssets();
+      return 'accepted';
+    case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+      offscreenDataReadiness.requireAssets();
       return createPagePackageDownloadLease(message);
     case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
       return confirmPagePackageDownloadLease(message);

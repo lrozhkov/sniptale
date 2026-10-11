@@ -242,7 +242,7 @@ it('downloads staged pages and publishes terminal status only after browser comp
   const onFinished = vi.fn();
   await executePopupExportJob(job, onFinished);
 
-  expect(mocks.prepareDownloadRuntime).toHaveBeenCalledOnce();
+  expect(mocks.prepareDownloadRuntime).toHaveBeenCalledWith(job.abortController.signal);
   expect(mocks.prepareDownloadRuntime.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.collect.mock.invocationCallOrder[0]!
   );
