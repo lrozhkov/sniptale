@@ -1,3 +1,4 @@
+import { createScenarioProjectStore } from '../../../../composition/persistence/scenario/storage';
 import type { DurableAssetLifecyclePermit } from '../../../../composition/persistence/infrastructure/mutation-barrier';
 import {
   appendCommittedArchiveRootInTransaction,
@@ -15,6 +16,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
@@ -67,6 +69,7 @@ export async function commitScenarioProjectPublication(
     const tx = db.transaction(
       [
         SCENARIO_PROJECTS_STORE,
+        SCENARIO_PROJECT_HISTORY_STORE,
         SCENARIO_ASSETS_STORE,
         SCENARIO_EXPORTS_STORE,
         SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
@@ -107,7 +110,7 @@ export async function commitScenarioProjectPublication(
           operations: tx.objectStore(ASSET_OPERATIONS_STORE),
           owners: tx.objectStore(ASSET_OWNERS_STORE),
           presentations: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
-          projects: tx.objectStore(SCENARIO_PROJECTS_STORE),
+          projects: createScenarioProjectStore(tx),
           refs: tx.objectStore(ASSET_REFS_STORE),
           stepDocuments: tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
           thumbnails: tx.objectStore(THUMBNAILS_STORE),

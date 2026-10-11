@@ -1,3 +1,5 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { materializeScenarioStorage } from '../scenario/storage-format';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { expect, it, vi } from 'vitest';
 import {
@@ -39,6 +41,7 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
   const persisted = new Map([
     ['video_projects', new Map<string, unknown>([[video.id, video]])],
     ['scenario_projects', new Map<string, unknown>([[scenario.id, scenario]])],
+    ['scenario_project_history', new Map<string, unknown>()],
     ['media_library', new Map<string, unknown>()],
     ['project_assets', new Map<string, unknown>()],
     ['scenario_assets', new Map<string, unknown>()],
@@ -58,11 +61,25 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
       objectStore: (name: string) => ({
         get: async (id: string) => pending.get(name)?.get(id),
         getAll: async () => [...(pending.get(name)?.values() ?? [])],
-        put: async (entry: { id: string }) => {
+        index: () => ({
+          getAll: async (id: string) =>
+            [...(pending.get(name)?.values() ?? [])]
+              .filter(isRecord)
+              .filter((row) => row['projectId'] === id),
+        }),
+        delete: async (key: IDBValidKey) => pending.get(name)?.delete(JSON.stringify(key)),
+        put: async (entry: { id?: string; projectId?: string; revision?: number }) => {
           if (name === 'scenario_projects' && options.failScenarioPut) {
             throw new Error('scenario write failed');
           }
-          pending.get(name)?.set(entry.id, entry);
+          pending
+            .get(name)
+            ?.set(
+              name === 'scenario_project_history'
+                ? JSON.stringify([entry.projectId, entry.revision])
+                : entry.id!,
+              entry
+            );
         },
       }),
     };
@@ -78,8 +95,13 @@ it('promotes both legacy project roots once without changing documents, revision
     ...video,
     lifecycle: { savedAt: 100, storageClass: 'library', updatedAt: 100 },
   });
-  expect(persisted.get('scenario_projects')?.get(scenario.id)).toEqual({
+  expect(
+    materializeScenarioStorage(persisted.get('scenario_projects')?.get(scenario.id), [
+      ...persisted.get('scenario_project_history')!.values(),
+    ])
+  ).toEqual({
     ...scenario,
+    history: undefined,
     lifecycle: { savedAt: 100, storageClass: 'library', trashedAt: 20, updatedAt: 100 },
   });
   expect(await repairTemporaryProjectLifecycles(200)).toBe(0);

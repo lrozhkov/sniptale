@@ -98,9 +98,9 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   };
   const plan = buildDatabaseMigrationPlan(14, DB_VERSION);
   expect(buildDatabaseMigrationPlan(13, DB_VERSION)?.map((step) => step.toDatabaseVersion)).toEqual(
-    [14, 15, 16, 17, 18]
+    [14, 15, 16, 17, 18, 19]
   );
-  expect(plan).toHaveLength(4);
+  expect(plan).toHaveLength(5);
   expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 13, to: 14 }]);
   expect(plan?.[1]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 14, to: 15 }]);
   expect(plan?.[2]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
@@ -108,9 +108,10 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   handleDatabaseUpgrade(db, 14, DB_VERSION, transaction);
   expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('video_workspace_history', {
-    keyPath: ['aggregateId', 'ordinal'],
-  });
+  expect(db.createObjectStore.mock.calls).toEqual([
+    ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
+    ['scenario_project_history', { keyPath: ['projectId', 'revision'] }],
+  ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
     ([domainId, schemaVersion]) => ({ domainId, schemaVersion })
@@ -177,9 +178,10 @@ it('admits speech without rewriting workspace history or the durable asset graph
 
   names.add('video_workspace_drafts');
   handleDatabaseUpgrade(db, 4, DB_VERSION, transaction);
-  expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('video_workspace_history', {
-    keyPath: ['aggregateId', 'ordinal'],
-  });
+  expect(db.createObjectStore.mock.calls).toEqual([
+    ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
+    ['scenario_project_history', { keyPath: ['projectId', 'revision'] }],
+  ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual([
     ['video_projects'],
@@ -237,6 +239,10 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('video_workspace_history', {
         keyPath: ['aggregateId', 'ordinal'],
       });
+    else if (migration.fromDatabaseVersion === 18)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('scenario_project_history', {
+        keyPath: ['projectId', 'revision'],
+      });
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -248,7 +254,7 @@ it('admits compact source gain without workspace migration and refuses incompati
   expect(betaV17Fixture.records).toEqual(betaV16Fixture.records);
   expect(betaV17Fixture.opfsObjects).toEqual(betaV16Fixture.opfsObjects);
   const plan = buildDatabaseMigrationPlan(16, DB_VERSION);
-  expect(plan).toHaveLength(2);
+  expect(plan).toHaveLength(3);
   expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
   const put = vi.fn();
   const tx = {
@@ -269,9 +275,10 @@ it('admits compact source gain without workspace migration and refuses incompati
   handleDatabaseUpgrade(db, 16, DB_VERSION, tx);
   expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('video_workspace_history', {
-    keyPath: ['aggregateId', 'ordinal'],
-  });
+  expect(db.createObjectStore.mock.calls).toEqual([
+    ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
+    ['scenario_project_history', { keyPath: ['projectId', 'revision'] }],
+  ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
     parseStoredSchemaContracts(

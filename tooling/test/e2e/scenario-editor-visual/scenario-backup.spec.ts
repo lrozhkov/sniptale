@@ -33,7 +33,10 @@ test('Gallery backup restores an editable guide with raster assets and saved und
   page,
   hostOrigin,
 }) => {
-  await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
+  await applyHarnessBootstrap(page, {
+    preserveMediaLibrary: true,
+    storage: { 'sniptale-locale-preference': 'en' },
+  });
   const id = `backup-${crypto.randomUUID()}`;
   const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
   url.search = new URLSearchParams({

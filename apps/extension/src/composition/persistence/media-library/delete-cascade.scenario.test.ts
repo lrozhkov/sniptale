@@ -13,6 +13,8 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from '../../../features/scenario/project/public';
+import { materializeScenarioStorage } from '../scenario/storage-format';
+import { parseScenarioProjectEntry } from '../scenario/read-guards';
 import { createScenarioProjectEntry } from '../scenario/projects/entry';
 
 it.each([false, true])(
@@ -225,7 +227,13 @@ it.each([
     expect(rows.get('media_library')?.has(mediaId)).toBe(false);
     expect(rows.get('scenario_assets')?.has('private-child')).toBe(false);
     expect(rows.get('asset_refs')?.has('private-object')).toBe(false);
-    const saved = rows.get('scenario_projects')!.get(project.id) as typeof entry;
+    const saved = parseScenarioProjectEntry(
+      materializeScenarioStorage(rows.get('scenario_projects')!.get(project.id), [
+        ...(rows.get('scenario_project_history')?.values() ?? []),
+      ])
+    );
+    expect(saved).not.toBeNull();
+    if (!saved) throw new Error('Expected a readable scenario after detaching narration.');
     expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
   }
 );
@@ -323,7 +331,13 @@ it('removes a published audio resource, narration and history on direct permanen
   expect(rows.get('media_library')?.has(audioMediaId)).toBe(false);
   expect(rows.get('scenario_assets')?.has('audio-child')).toBe(false);
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
-  const saved = rows.get('scenario_projects')!.get(project.id) as typeof entry;
+  const saved = parseScenarioProjectEntry(
+    materializeScenarioStorage(rows.get('scenario_projects')!.get(project.id), [
+      ...(rows.get('scenario_project_history')?.values() ?? []),
+    ])
+  );
+  expect(saved).not.toBeNull();
+  if (!saved) throw new Error('Expected a readable scenario after detaching narration.');
   expect(saved.history?.length).toBeGreaterThan(0);
   for (const content of [
     saved.project,

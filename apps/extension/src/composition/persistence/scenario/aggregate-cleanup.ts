@@ -1,3 +1,4 @@
+import { createScenarioProjectStore } from './storage';
 import { detachScenarioVideoAssets } from './video-asset-detachment';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import {
@@ -18,6 +19,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -25,7 +27,11 @@ import { SCENARIO_ASSET_OWNER_KIND, SCENARIO_ASSET_ROLE } from './asset-staging'
 import { recoverScenarioAssetPublications } from './aggregate-mutations';
 import { SCENARIO_EDITOR_DOCUMENT_OWNER_KIND } from './editor-document-staging';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.guards';
-import { parseScenarioAssetEntry, parseScenarioExportEntry } from './read-guards';
+import {
+  parseScenarioAssetEntry,
+  parseScenarioExportEntry,
+  parseScenarioProjectEntry,
+} from './read-guards';
 import { recoverScenarioHtmlPublications, unlinkScenarioHtmlOwnership } from './export-artifacts';
 
 export async function deleteOrphanedScenarioAggregateChild(args: {
@@ -40,6 +46,7 @@ export async function deleteOrphanedScenarioAggregateChild(args: {
     const tx = db.transaction(
       [
         SCENARIO_PROJECTS_STORE,
+        SCENARIO_PROJECT_HISTORY_STORE,
         childStoreName,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
@@ -66,7 +73,7 @@ export async function deleteOrphanedScenarioAggregateChild(args: {
         return;
       }
       const projectId = child.projectId;
-      if (await tx.objectStore(SCENARIO_PROJECTS_STORE).get(projectId)) {
+      if (await createScenarioProjectStore(tx).get(projectId)) {
         throw new Error(
           `Scenario ${args.kind} ${args.id} still belongs to aggregate ${projectId}.`
         );
@@ -140,6 +147,7 @@ function createScenarioCleanupTransaction(db: Awaited<ReturnType<typeof initDB>>
   return db.transaction(
     [
       SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,
       VIDEO_PROJECTS_STORE,
@@ -163,6 +171,9 @@ async function removeScenarioAggregateGraph(
   projectId: string,
   physicalDelete: PhysicalDeleteAssetOperation
 ) {
+  const stored = await createScenarioProjectStore(tx).get(projectId);
+  if (stored !== undefined && !parseScenarioProjectEntry(stored))
+    throw new Error('Unavailable scenario project cannot be deleted.');
   const [rawAssets, rawExports, rawDocuments] = await Promise.all([
     tx.objectStore(SCENARIO_ASSETS_STORE).index!('projectId').getAll(projectId),
     tx.objectStore(SCENARIO_EXPORTS_STORE).index!('projectId').getAll(projectId),
@@ -189,7 +200,7 @@ async function removeScenarioAggregateGraph(
     return stepId ? [stepId] : [];
   });
   await detachScenarioVideoAssets(tx, projectId, new Set(assetIds));
-  await tx.objectStore(SCENARIO_PROJECTS_STORE).delete(projectId);
+  await createScenarioProjectStore(tx).delete(projectId);
   const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
   for (const assetId of assetIds) {
     const asset = parseScenarioAssetEntry(await tx.objectStore(SCENARIO_ASSETS_STORE).get(assetId));

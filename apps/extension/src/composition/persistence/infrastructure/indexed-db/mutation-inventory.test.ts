@@ -22,6 +22,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   // Uses only the caller's transaction under its existing active mutation permit.
   'apps/extension/src/composition/persistence/review-workspaces/storage.ts',
+  // Reads and writes only the existing caller transaction; caller owns its active permit/commit/abort.
+  'apps/extension/src/composition/persistence/scenario/storage.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
   'apps/extension/src/composition/persistence/web-snapshots/backup-restore.ts',
   // Called only from media root publication under its active mutation permit.

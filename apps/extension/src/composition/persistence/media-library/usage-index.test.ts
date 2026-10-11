@@ -45,6 +45,8 @@ beforeEach(() => {
     transaction: () => ({
       objectStore: (store: string) => ({
         count: async () => 0,
+        get: async (id: string) =>
+          rows[store]?.filter(isRecord).find((row) => (row['id'] ?? row['aggregateId']) === id),
         index: (index: string) => ({
           count: countFromIndex,
           getAll: (key: string) => getAllFromIndex(store, index, key),

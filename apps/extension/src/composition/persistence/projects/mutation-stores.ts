@@ -1,3 +1,4 @@
+import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import {
   VIDEO_WORKSPACES_STORE,
@@ -16,6 +17,7 @@ import {
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -32,6 +34,7 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
       AGGREGATE_PRESENTATIONS_STORE,
       SCENARIO_ASSETS_STORE,
       SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,
@@ -53,7 +56,7 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
     scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
-    scenarioProjectStore: tx.objectStore(SCENARIO_PROJECTS_STORE),
+    scenarioProjectStore: createScenarioProjectStore(tx),
     recordingStore: tx.objectStore(STORE_NAME),
     tx,
   };

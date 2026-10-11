@@ -1,10 +1,14 @@
 import { expect, it, vi } from 'vitest';
-import { DB_VERSION, VIDEO_WORKSPACE_HISTORY_STORE } from '../core.stores';
+import {
+  DB_VERSION,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+} from '../core.stores';
 import { betaV17Fixture } from '../fixtures/beta-v17';
 import { DATABASE_MIGRATIONS } from '../schema-contracts';
 import { handleDatabaseUpgrade } from './core';
 
-it('adds only an empty indexed history store and publishes the current contract after validation', () => {
+it('adds only empty indexed history stores and publishes the current contracts after validation', () => {
   const names = new Set<string>(betaV17Fixture.stores);
   const indexes = vi.fn();
   const puts = vi.fn();
@@ -21,12 +25,17 @@ it('adds only an empty indexed history store and publishes the current contract 
     deleteObjectStore: vi.fn(),
   };
   handleDatabaseUpgrade(db, 17, DB_VERSION, tx);
-  expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith(VIDEO_WORKSPACE_HISTORY_STORE, {
-    keyPath: ['aggregateId', 'ordinal'],
-  });
-  expect(indexes).toHaveBeenCalledExactlyOnceWith('aggregateId', 'aggregateId');
+  expect(db.createObjectStore.mock.calls).toEqual([
+    [VIDEO_WORKSPACE_HISTORY_STORE, { keyPath: ['aggregateId', 'ordinal'] }],
+    [SCENARIO_PROJECT_HISTORY_STORE, { keyPath: ['projectId', 'revision'] }],
+  ]);
+  expect(indexes.mock.calls).toEqual([
+    ['aggregateId', 'aggregateId'],
+    ['projectId', 'projectId'],
+  ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
   expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 17 });
+  expect(puts).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 5 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });

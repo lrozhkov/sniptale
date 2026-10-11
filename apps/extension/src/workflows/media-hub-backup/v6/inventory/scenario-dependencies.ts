@@ -1,3 +1,4 @@
+import { getAllScenarioStoredProjects } from '../../../../composition/persistence/scenario/storage';
 import { readAllWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
@@ -8,7 +9,6 @@ import { parseVideoWorkspace } from '../../../../composition/persistence/review-
 import { collectReviewAssetReferences } from '../../../../composition/persistence/review-workspaces/asset-refs';
 import {
   SCENARIO_ASSETS_STORE,
-  SCENARIO_PROJECTS_STORE,
   VIDEO_PROJECTS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -134,7 +134,7 @@ export async function resolveBackupDependencySelection(
     ...videoDependencies.scenarioIds,
   ]);
   const admittedScenarios = admittedScenarioIds(
-    await db.getAll(SCENARIO_PROJECTS_STORE),
+    await getAllScenarioStoredProjects(db),
     selectedScenarioIds,
     options.includeDrafts
   );

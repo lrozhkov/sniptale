@@ -1,6 +1,6 @@
+import { getScenarioStoredProject } from '../storage';
 import {
   initDB,
-  SCENARIO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   ASSET_REFS_STORE,
 } from '../../infrastructure/indexed-db/core';
@@ -10,7 +10,7 @@ import { parseAssetRef, readAssetFile } from '../../assets';
 /** Reads one committed document without publication recovery or editor writes. */
 export async function readScenarioViewingSnapshot(id: string) {
   const db = await initDB();
-  const entry = parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, id));
+  const entry = parseScenarioProjectEntry(await getScenarioStoredProject(db, id));
   if (
     !entry ||
     entry.lifecycle?.trashedAt !== undefined ||

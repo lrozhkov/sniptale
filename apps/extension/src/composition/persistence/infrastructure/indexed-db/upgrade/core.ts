@@ -22,6 +22,7 @@ import {
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   SCHEMA_CONTRACTS_STORE,
   STATE_MANAGER_STORE,
@@ -105,6 +106,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, DIAGNOSTICS_EVENTS_STORE, ['recordingId', 'chunkIndex'], ['recordingId']);
   createStore(db, VIDEO_PROJECTS_STORE, 'id', ['updatedAt', 'usageReferenceKeys']);
   createStore(db, SCENARIO_PROJECTS_STORE, 'id', ['updatedAt']);
+  createStore(db, SCENARIO_PROJECT_HISTORY_STORE, ['projectId', 'revision'], ['projectId']);
   createStore(db, PROJECT_ASSETS_STORE, 'id', ['createdAt', 'originMediaId']);
   createStore(db, SCENARIO_ASSETS_STORE, 'id', [
     'projectId',

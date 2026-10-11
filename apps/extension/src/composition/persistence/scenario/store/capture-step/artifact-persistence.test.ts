@@ -131,8 +131,12 @@ function persistCaptureProject(args: {
   });
 }
 
+let storedHistory: unknown[];
 beforeEach(() => {
   vi.clearAllMocks();
+  txGetMock.mockReset();
+  txPutMock.mockReset();
+  storedHistory = [];
   initDBMock.mockResolvedValue({
     get: txGetMock,
     transaction: vi.fn(() => ({
@@ -140,8 +144,11 @@ beforeEach(() => {
       objectStore: vi.fn((storeName: string) => ({
         delete: vi.fn(),
         get: storeName === 'scenario_projects' ? txGetMock : vi.fn(),
-        index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
-        put: txPutMock,
+        index: vi.fn(() => ({ count: vi.fn(async () => 0), getAll: async () => storedHistory })),
+        put: async (value: { projectId?: string; revision?: number }) => {
+          if (storeName === 'scenario_project_history') storedHistory.push(value);
+          return txPutMock(value);
+        },
       })),
     })),
   });
@@ -192,7 +199,14 @@ async function verifyArtifactPersistenceWithDocument() {
     },
     updatedAt: 11,
     workspaceRevision: 1,
-    history: [{ revision: 0, savedAt: project.updatedAt, project }],
+    historyFormatVersion: 1,
+    savedVersionRevisions: [0],
+  });
+  expect(txPutMock).toHaveBeenCalledWith({
+    projectId: project.id,
+    revision: 0,
+    savedAt: project.updatedAt,
+    project,
   });
   expect(txPutMock).toHaveBeenCalledWith({
     stepId: 'step-1',
@@ -225,7 +239,7 @@ async function verifyArtifactPersistenceWithoutDocument() {
     stepDocument: null,
   });
 
-  expect(txPutMock).toHaveBeenCalledTimes(6);
+  expect(txPutMock).toHaveBeenCalledTimes(7);
 }
 
 async function verifyStaleArtifactPersistenceRejectsBeforeWrites() {

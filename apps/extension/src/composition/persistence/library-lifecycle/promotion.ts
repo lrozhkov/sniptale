@@ -1,3 +1,4 @@
+import { createScenarioProjectStore } from '../scenario/storage';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
@@ -6,6 +7,7 @@ import {
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -92,10 +94,15 @@ function assertCurrentPresentation(args: {
 async function promoteScenarioAggregate(projectId: string): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
-      [SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE, AGGREGATE_PRESENTATIONS_STORE],
+      [
+        SCENARIO_PROJECTS_STORE,
+        SCENARIO_PROJECT_HISTORY_STORE,
+        SCENARIO_ASSETS_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+      ],
       'readwrite'
     );
-    const store = tx.objectStore(SCENARIO_PROJECTS_STORE);
+    const store = createScenarioProjectStore(tx);
     const project = parseScenarioProjectEntry(await store.get(projectId));
     if (!project) throw new Error(`Stored scenario-project ${projectId} was not found.`);
     const lifecycle = project.lifecycle ?? createLibraryLifecycle('library', project.updatedAt);

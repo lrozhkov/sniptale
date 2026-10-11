@@ -1,7 +1,9 @@
+import { createScenarioProjectStore } from './storage';
 import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   ASSET_REFS_STORE,
@@ -41,9 +43,12 @@ function references(projects: GuideProject[]) {
 export async function clearScenarioSavedHistory(projectId: string, baseUpdatedAt: number) {
   await recoverScenarioAssetPublications();
   const project = await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(SCENARIO_PROJECTS_STORE, 'readwrite');
+    const tx = db.transaction(
+      [SCENARIO_PROJECTS_STORE, SCENARIO_PROJECT_HISTORY_STORE],
+      'readwrite'
+    );
     try {
-      const store = tx.objectStore(SCENARIO_PROJECTS_STORE);
+      const store = createScenarioProjectStore(tx);
       const existing = parseScenarioProjectEntry(await store.get(projectId));
       if (!existing) throw new Error('Guide history is unavailable.');
       if (existing.project.updatedAt !== baseUpdatedAt) {
@@ -86,6 +91,7 @@ export function pruneScenarioResources(projectId: string): Promise<number | unde
       const tx = db.transaction(
         [
           SCENARIO_PROJECTS_STORE,
+          SCENARIO_PROJECT_HISTORY_STORE,
           SCENARIO_ASSETS_STORE,
           SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
           ASSET_REFS_STORE,
@@ -98,7 +104,7 @@ export function pruneScenarioResources(projectId: string): Promise<number | unde
         'readwrite'
       );
       try {
-        const store = tx.objectStore(SCENARIO_PROJECTS_STORE);
+        const store = createScenarioProjectStore(tx);
         const raw: unknown = await store.get(projectId);
         if (raw === undefined) {
           await tx.done;

@@ -27,7 +27,7 @@ it('admits Trash without mutating existing aggregates or their durable object gr
   expect(put).toHaveBeenCalledWith(
     CURRENT_SCHEMA_CONTRACTS.find((contract) => contract.domainId === 'mediaLibrary')
   );
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 4 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 5 });
   expect(put).toHaveBeenCalledWith({ domainId: 'videoProjects', schemaVersion: 3 });
   const migration = DATABASE_MIGRATIONS.find((entry) => entry.fromDatabaseVersion === 3)!;
   expect(await migration.estimateAdditionalBytes()).toBe(64 * 1024);

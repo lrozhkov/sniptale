@@ -1,3 +1,4 @@
+import { getScenarioStoredProject } from '../scenario/storage';
 import { materializeWorkspaceHead } from '../review-workspaces/storage';
 import {
   initDB,
@@ -5,7 +6,6 @@ import {
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
-  SCENARIO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   PROJECT_ASSETS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -90,7 +90,7 @@ export async function readIndexedProjectUsage(mediaId: string): Promise<MediaAss
     readIndexedReviews(db, [...keys]),
     Promise.all(
       [...new Set(children.map((child) => child.projectId))].map((id) =>
-        db.get(SCENARIO_PROJECTS_STORE, id)
+        getScenarioStoredProject(db, id)
       )
     ),
   ]);

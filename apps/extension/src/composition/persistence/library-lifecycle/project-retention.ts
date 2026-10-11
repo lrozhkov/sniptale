@@ -1,3 +1,4 @@
+import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { promoteReviewSourceLifecycles } from '../review-workspaces/new-reference-admission';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
@@ -5,6 +6,7 @@ import { promoteProjectSourceLifecycles } from '../projects/new-reference-admiss
 import { promoteScenarioSourceLifecycles } from '../scenario/library-publication';
 import {
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -28,6 +30,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_HISTORY_STORE,
         SCENARIO_PROJECTS_STORE,
+        SCENARIO_PROJECT_HISTORY_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
         SCENARIO_ASSETS_STORE,
@@ -41,7 +44,10 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         [VIDEO_PROJECTS_STORE, parseVideoProjectEntry],
         [SCENARIO_PROJECTS_STORE, parseScenarioProjectEntry],
       ] as const) {
-        const store = tx.objectStore(storeName);
+        const store =
+          storeName === SCENARIO_PROJECTS_STORE
+            ? createScenarioProjectStore(tx)
+            : tx.objectStore(storeName);
         for (const raw of await store.getAll()) {
           const entry = parse(raw);
           if (!isRecord(raw) || entry?.lifecycle?.storageClass !== 'temporary') continue;
@@ -57,7 +63,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
         recordingStore: tx.objectStore(STORE_NAME),
         scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
-        scenarioProjectStore: tx.objectStore(SCENARIO_PROJECTS_STORE),
+        scenarioProjectStore: createScenarioProjectStore(tx),
       };
       for (const raw of await tx.objectStore(VIDEO_PROJECTS_STORE).getAll()) {
         const entry = parseVideoProjectEntry(raw);

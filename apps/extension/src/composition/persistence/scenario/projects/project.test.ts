@@ -82,7 +82,9 @@ function createScenarioExportRecord(id: string) {
   };
 }
 
+let storedHistory: unknown[];
 beforeEach(() => {
+  storedHistory = [];
   vi.clearAllMocks();
   dbGetMock.mockReset();
   txGetMock.mockReset();
@@ -91,13 +93,20 @@ beforeEach(() => {
     getAll: dbGetAllMock,
     getAllFromIndex: dbGetAllFromIndexMock,
     put: dbPutMock,
-    transaction: vi.fn(() => ({
+    transaction: vi.fn((_stores: string[], mode: string) => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
+      objectStore: vi.fn((name: string) => ({
         delete: txDeleteMock,
-        get: txGetMock,
-        getAll: vi.fn(async () => []),
-        index: vi.fn(() => ({ getAll: txIndexGetAllMock })),
+        get:
+          name === 'scenario_projects' && mode === 'readonly'
+            ? (id: string) => dbGetMock(name, id)
+            : txGetMock,
+        getAll: name === 'scenario_projects' ? () => dbGetAllMock(name) : vi.fn(async () => []),
+        index: vi.fn(() => ({
+          getAll:
+            name === 'scenario_project_history' ? async () => storedHistory : txIndexGetAllMock,
+          getAllKeys: async () => [],
+        })),
         put: txPutMock,
       })),
     })),
@@ -300,7 +309,9 @@ it('advances same-millisecond writes before rejecting a stale writer', async () 
   let storedEntry = createProjectRecord('project-1', 'Existing', 10, 500);
   txGetMock.mockImplementation(async () => storedEntry);
   txPutMock.mockImplementation(async (entry) => {
-    storedEntry = entry;
+    if (entry.id === storedEntry.id) storedEntry = entry;
+    else if (entry.projectId === storedEntry.id && typeof entry.revision === 'number')
+      storedHistory.push(entry);
   });
 
   await expect(

@@ -1,3 +1,4 @@
+import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { withVideoProjectUsage, withReviewWorkspaceUsage } from './usage-index-keys';
 import { sameMediaSource } from './dependencies';
@@ -24,6 +25,7 @@ import {
   RECORDING_TELEMETRY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
@@ -160,7 +162,7 @@ async function loadCascadeGraph(
   const target = mediaDependencyTarget(media, await tx.objectStore(PROJECT_ASSETS_STORE).getAll());
   const [rawVideo, rawScenario, rawChildren, rawReview] = await Promise.all([
     tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
-    tx.objectStore(SCENARIO_PROJECTS_STORE).getAll(),
+    createScenarioProjectStore(tx).getAll(),
     tx.objectStore(SCENARIO_ASSETS_STORE).getAll(),
     createVideoWorkspaceStore(tx).getAll(),
   ]);
@@ -244,7 +246,7 @@ async function detachScenarioProjects(
     if (!childIds?.size) continue;
     affected.push({ id: entry.id, kind: 'scenario', name: entry.project.name, primary: false });
     const next = removeScenarioAssetReferences(entry, childIds, now);
-    await tx.objectStore(SCENARIO_PROJECTS_STORE).put!(next);
+    await createScenarioProjectStore(tx).put(next);
     await applyScenarioAssetMutations(
       tx,
       entry.id,
@@ -291,6 +293,7 @@ async function commitCascadeTransaction(
       MEDIA_LIBRARY_STORE,
       VIDEO_PROJECTS_STORE,
       SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
       SCENARIO_ASSETS_STORE,
       VIDEO_WORKSPACES_STORE,
       VIDEO_WORKSPACE_HISTORY_STORE,

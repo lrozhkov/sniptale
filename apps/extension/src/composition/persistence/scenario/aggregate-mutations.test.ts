@@ -13,6 +13,7 @@ import {
   createGuideImageBlock,
 } from '../../../features/scenario/project/factories';
 import { pruneScenarioResources, clearScenarioSavedHistory } from './retention';
+import { getScenarioProjectEntry } from './projects/project';
 vi.mock('./resource-sessions', () => ({
   tryScenarioResourceCleanup: async (_id: string, operation: () => Promise<unknown>) => operation(),
 }));
@@ -387,7 +388,9 @@ it('guards snapshot commits and orphan cleanup against concurrent owners', async
 
 it('discards staged snapshot assets when the pre-handoff project read fails', async () => {
   const project = createGuideProject('Aggregate');
-  db.get.mockRejectedValueOnce(new Error('scenario project read failed'));
+  db.transaction.mockImplementationOnce(() => {
+    throw new Error('scenario project read failed');
+  });
 
   await expect(
     commitScenarioAggregateSnapshotMutation({
@@ -603,6 +606,7 @@ it('keeps graph discovery and failed deletion inside one rollback-capable transa
       getAll: async () => [...getStore(name).values()],
       index: () => ({
         count: async () => 0,
+        getAllKeys: async () => [],
         getAll: async (projectId: string) =>
           [...getStore(name).values()].filter(
             (value) => (value as { projectId?: string }).projectId === projectId
@@ -676,7 +680,7 @@ it('records previous committed content once and leaves history unchanged on exac
     { ...first.project, name: 'Second' },
     { expectedUpdatedAt: first.project.updatedAt }
   );
-  const saved = getStore('scenario_projects').get(first.project.id);
+  const saved = await getScenarioProjectEntry(first.project.id);
   expect(saved).toMatchObject({
     workspaceRevision: 2,
     history: [{ revision: 1, savedAt: first.project.updatedAt, project: first.project }],
@@ -684,7 +688,7 @@ it('records previous committed content once and leaves history unchanged on exac
   await commitScenarioAggregateMutation(second.project, {
     expectedUpdatedAt: second.project.updatedAt,
   });
-  expect(getStore('scenario_projects').get(first.project.id)).toEqual(saved);
+  expect(await getScenarioProjectEntry(first.project.id)).toEqual(saved);
 });
 
 it('retains saved-version assets and documents, then prunes only unreachable children after clear', async () => {

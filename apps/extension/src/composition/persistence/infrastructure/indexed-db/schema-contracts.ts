@@ -23,6 +23,7 @@ import {
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STATE_MANAGER_STORE,
   STORE_NAME,
@@ -107,9 +108,10 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 4,
+    schemaVersion: 5,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
+      { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_ASSETS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PENDING_ASSETS_STORE, dataClass: 'operational-recoverable' },
       { storeName: SCENARIO_EXPORTS_STORE, dataClass: 'durable-authority' },
@@ -566,6 +568,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     validate(db) {
       if (!db.objectStoreNames.contains(VIDEO_WORKSPACE_HISTORY_STORE))
         throw new Error('Video workspace history store is unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'scenarioProjects', from: 4, to: 5 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 18,
+    toDatabaseVersion: 19,
+    risk: 'additive',
+    stores: [SCENARIO_PROJECT_HISTORY_STORE],
+    migrate(db) {
+      const store = db.createObjectStore(SCENARIO_PROJECT_HISTORY_STORE, {
+        keyPath: ['projectId', 'revision'],
+      });
+      store.createIndex('projectId', 'projectId');
+      return undefined;
+    },
+    validate(db) {
+      if (!db.objectStoreNames.contains(SCENARIO_PROJECT_HISTORY_STORE))
+        throw new Error('Scenario project history store is unavailable.');
       return undefined;
     },
   },

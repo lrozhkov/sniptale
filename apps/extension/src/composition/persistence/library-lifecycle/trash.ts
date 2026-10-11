@@ -1,7 +1,9 @@
+import { createScenarioProjectStore, getScenarioStoredProject } from '../scenario/storage';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
   MEDIA_LIBRARY_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_EXPORTS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -95,6 +97,7 @@ async function mutateTrash(
         [
           MEDIA_LIBRARY_STORE,
           SCENARIO_PROJECTS_STORE,
+          SCENARIO_PROJECT_HISTORY_STORE,
           VIDEO_PROJECTS_STORE,
           SCENARIO_EXPORTS_STORE,
         ],
@@ -102,7 +105,10 @@ async function mutateTrash(
       );
       try {
         for (const target of targets) {
-          const store = tx.objectStore(targetStore(target));
+          const store =
+            target.kind === 'scenario-project'
+              ? createScenarioProjectStore(tx)
+              : tx.objectStore(targetStore(target));
           const entry = parseTarget(target, await store.get(target.id));
           if (!entry) throw new StaleTrashItemError();
           const lifecycle = entry.lifecycle ?? createLibraryLifecycle('library', entry.updatedAt);
@@ -167,7 +173,12 @@ export function runWithTrashedStoredItem<T>(
 ): Promise<T> {
   return withTrashLock(async () => {
     await runWithIndexedDbMutation(async (db) => {
-      const entry = parseTarget(target, await db.get(targetStore(target), target.id));
+      const entry = parseTarget(
+        target,
+        target.kind === 'scenario-project'
+          ? await getScenarioStoredProject(db, target.id)
+          : await db.get(targetStore(target), target.id)
+      );
       if (!entry || entry.lifecycle?.trashedAt !== expectedTrashedAt)
         throw new StaleTrashItemError();
     });
@@ -190,7 +201,12 @@ export function runWithStoredItemLifecycle<T>(
     )
       throw new StaleTrashItemError();
     await runWithIndexedDbMutation(async (db) => {
-      const entry = parseTarget(target, await db.get(targetStore(target), target.id));
+      const entry = parseTarget(
+        target,
+        target.kind === 'scenario-project'
+          ? await getScenarioStoredProject(db, target.id)
+          : await db.get(targetStore(target), target.id)
+      );
       if (!entry) throw new StaleTrashItemError();
       const lifecycle = entry.lifecycle ?? createLibraryLifecycle('library', entry.updatedAt);
       if (lifecycle.updatedAt !== expected.updatedAt || lifecycle.trashedAt !== expected.trashedAt)

@@ -1,3 +1,4 @@
+import { getAllScenarioStoredProjects } from '../../../../composition/persistence/scenario/storage';
 import { scenarioLibraryMediaId } from '../../../../composition/persistence/scenario/library-publication';
 import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
@@ -6,7 +7,6 @@ import {
   MEDIA_LIBRARY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
-  SCENARIO_PROJECTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   THUMBNAILS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
@@ -288,12 +288,12 @@ async function buildScenarioProjectRoot(args: {
 }
 
 export async function buildScenarioProjectRootInventory(args: {
-  db: InventoryDatabase;
+  db: InventoryDatabase & Parameters<typeof getAllScenarioStoredProjects>[0];
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const projects = readSelectedScenarioProjects(
-    await args.db.getAll(SCENARIO_PROJECTS_STORE),
+    await getAllScenarioStoredProjects(args.db),
     args.options
   );
   const roots: MediaHubBackupRootInventoryItem[] = [];

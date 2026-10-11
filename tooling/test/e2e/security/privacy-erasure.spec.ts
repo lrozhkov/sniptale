@@ -7,6 +7,12 @@ import {
   workspaceStorageRows,
 } from '../../../../apps/extension/src/composition/persistence/review-workspaces/storage-format';
 import type { VideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/contracts';
+import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
+import { createScenarioProjectEntry } from '../../../../apps/extension/src/composition/persistence/scenario/projects/entry';
+import {
+  scenarioStorageHead,
+  scenarioStorageRows,
+} from '../../../../apps/extension/src/composition/persistence/scenario/storage-format';
 import {
   collectRetentionText,
   controlCheckpoint,
@@ -35,7 +41,17 @@ const ERASURE_MODES = [
   },
 ] as const;
 
-async function seedRetainedReviewHistory(page: Page, canary: string) {
+async function seedRetainedEditorHistory(page: Page, canary: string) {
+  const first = createScenarioProjectEntry({
+    existing: undefined,
+    project: createGuideProject(canary, `scenario-${canary}`, 1),
+    updatedAt: 1,
+  });
+  const scenario = createScenarioProjectEntry({
+    existing: first,
+    project: first.project,
+    updatedAt: 2,
+  });
   const workspace: VideoWorkspace = {
     aggregateId: `erasure-${canary}`,
     formatVersion: 1,
@@ -57,7 +73,7 @@ async function seedRetainedReviewHistory(page: Page, canary: string) {
     ],
   };
   await page.evaluate(
-    ({ databaseName, head, rows, orphan }) =>
+    ({ databaseName, head, rows, orphan, scenarioHead, scenarioRows, scenarioOrphan }) =>
       new Promise<void>((resolve, reject) => {
         const request = indexedDB.open(databaseName);
         request.onupgradeneeded = () => {
@@ -67,10 +83,21 @@ async function seedRetainedReviewHistory(page: Page, canary: string) {
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
           const db = request.result;
-          const tx = db.transaction(['video_workspaces', 'video_workspace_history'], 'readwrite');
+          const tx = db.transaction(
+            [
+              'video_workspaces',
+              'video_workspace_history',
+              'scenario_projects',
+              'scenario_project_history',
+            ],
+            'readwrite'
+          );
           tx.objectStore('video_workspaces').put(head);
           for (const row of rows) tx.objectStore('video_workspace_history').put(row);
           tx.objectStore('video_workspace_history').put(orphan);
+          tx.objectStore('scenario_projects').put(scenarioHead);
+          for (const row of scenarioRows) tx.objectStore('scenario_project_history').put(row);
+          tx.objectStore('scenario_project_history').put(scenarioOrphan);
           tx.oncomplete = () => {
             db.close();
             resolve();
@@ -83,6 +110,14 @@ async function seedRetainedReviewHistory(page: Page, canary: string) {
       }),
     {
       databaseName: DB_NAME,
+      scenarioHead: scenarioStorageHead(scenario),
+      scenarioRows: scenarioStorageRows(scenario),
+      scenarioOrphan: {
+        projectId: `scenario-orphan-${canary}`,
+        revision: 1,
+        savedAt: 1,
+        project: { retainedEvidence: canary },
+      },
       head: workspaceStorageHead(workspace, ['indexed:v1']),
       rows: workspaceStorageRows(workspace),
       orphan: {
@@ -117,7 +152,7 @@ for (const mode of ERASURE_MODES) {
       .toBe(true);
     await gallery.close();
     const historyCanary = `review-history-${mode.providerId}`;
-    await seedRetainedReviewHistory(eraser, historyCanary);
+    await seedRetainedEditorHistory(eraser, historyCanary);
     expect(await collectRetentionText(eraser)).toContain(historyCanary);
     await eraser.evaluate(() =>
       localStorage.setItem('sniptale-theme-preference', 'security-preserved-theme')

@@ -199,7 +199,7 @@ describe('readable project archive paths', () => {
     };
     mocks.readAssetFile.mockResolvedValue(new File(['x'], asset.id, { type: asset.mimeType }));
     const db = {
-      transaction: emptyReviewTransaction,
+      transaction: () => emptyReviewTransaction([entry]),
       get: vi.fn(async (store: string) => {
         if (store === 'asset_refs') return ref(asset.assetId, asset.mimeType);
         if (store === 'thumbnails') {
@@ -245,9 +245,10 @@ describe('readable project archive paths', () => {
   });
 });
 
-function emptyReviewTransaction() {
+function emptyReviewTransaction(scenarioRoots: unknown[] = []) {
   return {
-    objectStore: () => ({
+    objectStore: (store: string) => ({
+      getAll: async () => (store === 'scenario_projects' ? scenarioRoots : []),
       index: () => ({ getAll: async () => [] }),
       get: async () => undefined,
     }),

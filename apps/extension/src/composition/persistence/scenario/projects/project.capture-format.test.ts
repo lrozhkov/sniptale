@@ -4,7 +4,15 @@ const { readProjectRow } = vi.hoisted(() => ({ readProjectRow: vi.fn() }));
 
 vi.mock('../../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../infrastructure/indexed-db/core')>()),
-  initDB: async () => ({ get: readProjectRow }),
+  initDB: async () => ({
+    transaction: () => ({
+      objectStore: (name: string) =>
+        name === 'scenario_projects'
+          ? { get: (id: string) => readProjectRow(name, id) }
+          : { index: () => ({ getAll: async () => [] }) },
+      done: Promise.resolve(),
+    }),
+  }),
 }));
 
 vi.mock('../aggregate-mutations', () => ({

@@ -18,7 +18,16 @@ vi.mock('../../assets', () => ({
 }));
 vi.mock('../aggregate-mutations', () => ({ recoverScenarioAssetPublications: io.recover }));
 import { readScenarioViewingSnapshot, readScenarioViewingAsset } from './viewing';
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  io.transaction.mockImplementation(() => ({
+    objectStore: (name: string) =>
+      name === 'scenario_projects'
+        ? { get: io.get }
+        : { index: () => ({ getAll: async () => [] }) },
+    done: Promise.resolve(),
+  }));
+});
 it('reads the committed revision without recovery or writes and rejects unavailable roots', async () => {
   const project = createGuideProject('Guide');
   const entry = { id: project.id, project, createdAt: 1, updatedAt: 1, workspaceRevision: 7 };
@@ -33,7 +42,9 @@ it('reads the committed revision without recovery or writes and rejects unavaila
     expect(await readScenarioViewingSnapshot(project.id)).toBeNull();
   }
   expect(io.recover).not.toHaveBeenCalled();
-  expect(io.transaction).not.toHaveBeenCalled();
+  expect(io.transaction).toHaveBeenCalledTimes(4);
+  for (const call of io.transaction.mock.calls)
+    expect(call).toEqual([['scenario_projects', 'scenario_project_history'], 'readonly']);
 });
 it('restricts media to the selected project and opens only a readonly transaction', async () => {
   const entry = {
