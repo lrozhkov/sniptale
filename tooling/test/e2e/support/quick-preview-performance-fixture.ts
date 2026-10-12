@@ -148,7 +148,8 @@ async function probe(path: string, profile: Profile): Promise<ProbeSummary> {
     '-show_format',
     '-show_packets',
     '-show_entries',
-    'stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,nb_read_frames:format=duration:packet=stream_index,pts_time',
+    'stream=index,codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,nb_r' +
+      'ead_frames:format=duration:packet=stream_index,pts_time',
     '-of',
     'json',
     path,
@@ -161,7 +162,12 @@ function generationArguments(profile: Profile): string[] {
   const { width, height, fps } = profile;
   const drawing =
     `drawbox=x=0:y=0:w=120:h=120:color=white:t=fill:enable='lt(mod(t,1),0.05)',` +
-    `drawtext=fontfile=${FONT}:text='frame %{n} time %{pts\\:hms}':x=140:y=30:fontsize=48:fontcolor=white:box=1:boxcolor=black`;
+    [
+      'drawtext=fontfile=',
+      String(FONT),
+      ":text='frame %{n} time %{pts\\:hms}':x=140:y=30:fontsize=48:fontcolor=white:box=1",
+      ':boxcolor=black',
+    ].join('');
   return [
     '-hide_banner',
     '-loglevel',

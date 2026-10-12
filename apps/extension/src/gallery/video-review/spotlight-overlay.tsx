@@ -22,15 +22,7 @@ function SingleSpotlightOverlay(props: {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(props.output.width);
   const visible = !!props.frame;
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const measure = () => setWidth(node.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [visible]);
+  useEffect(() => observeSpotlightWidth(ref.current, setWidth), [visible]);
   if (!props.frame) return null;
   const scale = width / props.output.width;
   const frame = {
@@ -121,15 +113,7 @@ function CombinedSpotlightOverlay(props: {
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(props.output.width);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const measure = () => setWidth(node.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+  useEffect(() => observeSpotlightWidth(ref.current, setWidth), []);
   // Fresh transport samples have new object identities even while the mask is stationary.
   const key = JSON.stringify([
     props.output.width,
@@ -182,4 +166,13 @@ function CombinedSpotlightOverlay(props: {
       <div className="absolute inset-0 bg-black" style={maskStyle(masks.dim)} />
     </div>
   );
+}
+
+function observeSpotlightWidth(node: HTMLElement | null, setWidth: (value: number) => void) {
+  if (!node) return;
+  const measure = () => setWidth(node.clientWidth);
+  measure();
+  const observer = new ResizeObserver(measure);
+  observer.observe(node);
+  return () => observer.disconnect();
 }

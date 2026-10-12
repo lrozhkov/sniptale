@@ -2,7 +2,7 @@ import type { ArchiveReader, ArchiveRootDescriptor } from '../../../composition/
 import { isWindowHeaderFavicon } from '../../../features/browser-frame/header';
 import { assertMetadataJson, parseBoundedJson } from './codec';
 import { MAX_EXPANDED_ROOT_METADATA_BYTES, type MediaHubBackupRootEnvelope } from './contracts';
-import type { ArchiveRootPayload, MediaHubBackupRootInventoryItem } from './export';
+import type { ArchiveRootPayload, MediaHubBackupRootInventoryItem } from './contracts';
 import { createInternalObjectSegments } from './layout';
 import { assertBackupByteBudget, backupFailure, MediaBackupFailure } from './errors';
 import { decodeBackupHeader, encodeBackupHeader, mapBackupHeaders } from './header-transport';

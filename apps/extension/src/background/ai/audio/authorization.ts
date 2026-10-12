@@ -1,3 +1,4 @@
+import { sameReviewSourceIdentity } from '../../../features/video/review/source-identity';
 import { readLibrarySceneSource } from '../../../composition/persistence/projects/library-scene-source';
 import { readAssetFile } from '../../../composition/persistence/assets/opfs-store';
 import type { VideoWorkspace } from '../../../composition/persistence/review-workspaces/contracts';
@@ -28,13 +29,7 @@ async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSo
     throw new Error('unauthorized');
   try {
     const source = await readLibrarySceneSource(workspace.aggregateId, 'video');
-    if (
-      source.ref.assetId !== workspace.sourceAssetId ||
-      source.ref.size !== workspace.source.size ||
-      // Inspection adds codec parameters; immutable storage records the container MIME.
-      source.ref.mimeType.split(';', 1)[0]?.trim().toLowerCase() !==
-        workspace.source.mimeType.split(';', 1)[0]?.trim().toLowerCase()
-    )
+    if (!sameReviewSourceIdentity(source.ref, workspace.sourceAssetId, workspace.source))
       throw new Error('unauthorized');
     await readAssetFile(source.ref, source.filename);
   } catch {

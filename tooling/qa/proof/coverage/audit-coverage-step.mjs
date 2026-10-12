@@ -9,13 +9,18 @@ import {
 import { PRODUCT_QA_SUITE } from '../../composition/scope/qa-scope.mjs';
 import { fromRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import { measureAsyncStep } from '../../runtime/observability/step-timing.helpers.mjs';
-import { resolveProductUnitTestPool, runUnitTests } from '../unit/verify-unit-tests.mjs';
+import {
+  resolveProductUnitTestPool,
+  runRepoNodeEntryAsync,
+  runUnitTests,
+} from '../unit/verify-unit-tests.mjs';
 import {
   collectCoverageAuditReport,
   formatCoverageAuditReport,
   writeCanonicalCoverageArtifacts,
 } from './coverage-audit-report.mjs';
 import {
+  createCoverageProofInputs,
   materializeReusableCoverageProof,
   recordSuccessfulCoverageProof,
   resolveReusableCoverageProof,
@@ -45,15 +50,20 @@ function prepareFullCoverageDirectory() {
 export async function collectFullCoverageAuditStep({
   maxWorkers = resolveQaResourceProfile().vitestMaxWorkers,
 } = {}) {
-  const pool = resolveProductUnitTestPool();
-  const reusable = resolveReusableCoverageProof();
+  const pool = resolveProductUnitTestPool() ?? 'threads';
+  const reusable = resolveReusableCoverageProof({ pool });
   if (reusable.matched) {
     materializeReusableCoverageProof(reusable);
-    recordSuccessfulCoverageProof({ reusedFrom: reusable.proof.producer ?? null });
+    recordSuccessfulCoverageProof({
+      pool,
+      inputs: reusable.inputs,
+      reusedFrom: reusable.proof.proofDigest,
+    });
     recordSuccessfulFullUnitProof({
       maxWorkers,
       pool,
       source: 'full-product-coverage',
+      expectedInputDigest: reusable.proof.fullUnit.inputDigest,
       reusedFrom: reusable.proof.proofDigest,
       suite: PRODUCT_QA_SUITE,
     });
@@ -62,11 +72,13 @@ export async function collectFullCoverageAuditStep({
       0
     );
   }
+  const inputs = createCoverageProofInputs({ pool });
   prepareFullCoverageDirectory();
   const { durationMs, value: unitResult } = await measureAsyncStep(() =>
     runUnitTests({
       coverage: true,
       coverageMode: 'manual',
+      execute: runRepoNodeEntryAsync,
       maxWorkers,
       pool,
       suite: PRODUCT_QA_SUITE,
@@ -94,10 +106,11 @@ export async function collectFullCoverageAuditStep({
 
   try {
     writeCanonicalCoverageArtifacts({ report: coverageReport });
-    recordSuccessfulCoverageProof();
+    recordSuccessfulCoverageProof({ inputs, pool });
     recordSuccessfulFullUnitProof({
       maxWorkers,
       pool,
+      expectedInputDigest: inputs.fullUnit.inputDigest,
       source: 'full-product-coverage',
       suite: PRODUCT_QA_SUITE,
     });

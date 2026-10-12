@@ -1,3 +1,4 @@
+import { reviewCueWindow } from './cue-window';
 import type { ReviewTelemetryMarker } from './telemetry';
 import type { ReviewTimeSegment } from './timeline';
 import type { ReviewClickAnimation, ReviewClickStyle } from './advanced/click-animation';
@@ -36,18 +37,9 @@ export function scheduleReviewClicks(
   return markers.flatMap((marker) => {
     const style = isReviewClick(marker) ? styles.get(marker.ref.id) : undefined;
     if (!style || style.effect === 'off' || !marker.focusPoint) return [];
-    const index = segments.findIndex(
-      (part) => marker.start >= part.sourceStart && marker.start < part.sourceEnd
-    );
-    const part = segments[index];
-    if (!part || part.kind === 'cut') return [];
-    let first = index;
-    let last = index;
-    while (first > 0 && segments[first - 1]!.kind !== 'cut') first--;
-    while (last + 1 < segments.length && segments[last + 1]!.kind !== 'cut') last++;
-    const anchor = part.resultStart + (marker.start - part.sourceStart) / part.rate + style.offset;
-    const start = Math.max(segments[first]!.resultStart, anchor - style.before);
-    const end = Math.min(segments[last]!.resultEnd, anchor + style.after);
+    const window = reviewCueWindow(segments, marker.start, style.offset, style.before, style.after);
+    if (!window) return [];
+    const { anchor, start, end } = window;
     return end > start
       ? [
           {

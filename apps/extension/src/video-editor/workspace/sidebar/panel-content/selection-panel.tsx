@@ -78,12 +78,7 @@ function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProp
     selectedClip: props.selectedClip,
     selectedTransition: props.selectedTransition,
     selectedCursorSample: props.selectedCursorSample,
-    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
-    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
-    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
-    ...(props.onApplyTypingCompression
-      ? { onApplyTypingCompression: props.onApplyTypingCompression }
-      : {}),
+    ...selectionTypingProps(props),
     selectedActionOccurrence: props.selectedActionOccurrence,
     selectedMotionRegion: props.selectedMotionRegion,
     ...(props.selectedObjectTrack === undefined
@@ -197,12 +192,7 @@ function createSelectionPanelStateProps(
     recentColors: props.recentColors ?? [],
     canAddCameraPosition: props.canAddCameraPosition ?? false,
     selectedClip: props.selectedClip,
-    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
-    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
-    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
-    ...(props.onApplyTypingCompression
-      ? { onApplyTypingCompression: props.onApplyTypingCompression }
-      : {}),
+    ...selectionTypingProps(props),
     selectedActionOccurrence: props.selectedActionOccurrence ?? null,
     selectedCursorSample: props.selectedCursorSample ?? null,
     selectedMotionRegion: props.selectedMotionRegion ?? null,
@@ -283,4 +273,25 @@ function createSelectionPanelAnnotationUpdateProps(
 
 export function WorkspaceSidebarSelectionPanel(props: WorkspaceSidebarSelectionPanelProps) {
   return <WorkspaceSidebarSelectionBody {...createSelectionBodyProps(props)} />;
+}
+
+function selectionTypingProps(
+  props:
+    | Pick<
+        WorkspaceSidebarSelectionPanelSourceProps,
+        'currentTime' | 'typingProject' | 'recordingTelemetry' | 'onApplyTypingCompression'
+      >
+    | Pick<
+        WorkspaceSidebarSelectionPanelProps,
+        'currentTime' | 'typingProject' | 'recordingTelemetry' | 'onApplyTypingCompression'
+      >
+) {
+  return {
+    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
+    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
+    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
+  };
 }

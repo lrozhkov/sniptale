@@ -250,3 +250,21 @@ it('ignores workspace-local receipts for candidate external-only authority', asy
     }
   });
 });
+
+it('refuses to publish a unit receipt against a different coverage execution fingerprint', async () => {
+  const root = createProofRoot();
+  await withCwd(root, async () => {
+    const module = await import('./unit-test-proof.mjs');
+    const original = module.createFullUnitProofInputs({ cwd: root, pool: 'threads' });
+    writeFile(root, 'apps/extension/src/example.constants.ts', 'export const changed = true;\n');
+    expect(() =>
+      module.recordSuccessfulFullUnitProof({
+        cwd: root,
+        pool: 'threads',
+        expectedInputDigest: original.inputDigest,
+        source: 'full-product-coverage',
+      })
+    ).toThrow('Full unit inputs changed since coverage execution or admission.');
+    expect(fs.existsSync(path.join(root, '.tmp/qa/unit-proof.json'))).toBe(false);
+  });
+});

@@ -154,13 +154,7 @@ export function useReviewCutTransitionProvider(
   managed = false,
   admit?: (bytes: readonly [number, number]) => { release(): void }
 ) {
-  const duration = binding?.duration;
-  const edits = binding?.edits;
-  const plans = useMemo(
-    () => (duration !== undefined && edits ? planReviewCutTransitions(duration, edits) : []),
-    [duration, edits]
-  );
-  const blend = reviewCutTransitionAt(binding?.time ?? 0, plans);
+  const { plans, blend } = useReviewCutTransitionProjection(binding);
   const next = blend?.plan ?? plans.find((plan) => plan.seam + plan.after > (binding?.time ?? 0));
   const { current, retry } = useTransitionEndpoints(binding?.file, next, managed, admit);
   const latest = useRef({ plans, current, managed });
@@ -261,13 +255,7 @@ function transitionAllocation(frames: ReviewTransitionFrames): readonly [number,
 
 /** Final output-plane fade, independent of source raster geometry and decoder readiness. */
 export function ReviewCutBlackout({ binding }: { binding: ReviewCutPreviewBinding | undefined }) {
-  const duration = binding?.duration;
-  const edits = binding?.edits;
-  const plans = useMemo(
-    () => (duration !== undefined && edits ? planReviewCutTransitions(duration, edits) : []),
-    [duration, edits]
-  );
-  const blend = reviewCutTransitionAt(binding?.time ?? 0, plans);
+  const { blend } = useReviewCutTransitionProjection(binding);
   return blend?.plan.type === 'fade-black' && blend.black > 0 ? (
     <div
       aria-hidden="true"
@@ -276,4 +264,15 @@ export function ReviewCutBlackout({ binding }: { binding: ReviewCutPreviewBindin
       style={{ opacity: blend.black, backgroundColor: blend.plan.color ?? '#000000' }}
     />
   ) : null;
+}
+
+function useReviewCutTransitionProjection(binding: ReviewCutPreviewBinding | undefined) {
+  const duration = binding?.duration;
+  const edits = binding?.edits;
+  const plans = useMemo(
+    () => (duration !== undefined && edits ? planReviewCutTransitions(duration, edits) : []),
+    [duration, edits]
+  );
+  const blend = reviewCutTransitionAt(binding?.time ?? 0, plans);
+  return { plans, blend };
 }

@@ -1,3 +1,4 @@
+import { movePresetOrder } from '../preset-order';
 import { useState } from 'react';
 import {
   ProductModal,
@@ -76,13 +77,8 @@ export function BackgroundPresetsSettings() {
             }
           }}
           onMove={(intent) => {
-            const ids = catalog.presets.map((item) => item.id);
-            const from = ids.indexOf(intent.itemId);
-            if (from < 0) return;
-            ids.splice(from, 1);
-            const to = intent.beforeItemId === null ? ids.length : ids.indexOf(intent.beforeItemId);
-            if (to < 0) return;
-            ids.splice(to, 0, intent.itemId);
+            const ids = movePresetOrder(catalog.presets, intent);
+            if (!ids) return;
             void run(() => catalog.edit({ type: 'reorder', ids }));
           }}
         />

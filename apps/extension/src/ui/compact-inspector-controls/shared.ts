@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 export function cx(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
 }
@@ -55,4 +57,14 @@ export function parseCompactNumber(value: string, unit: CompactInspectorUnit = '
       : withoutApiUnit;
   const parsed = Number(withoutUnit.trim());
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Shared disclosure input; workspace owners retain preference storage and DOM styling. */
+export interface InspectorDisclosureProps {
+  label: string;
+  preferenceId: string;
+  children: ReactNode;
+  icon?: LucideIcon;
+  level?: 'section' | 'group';
+  initiallyOpen?: boolean;
 }

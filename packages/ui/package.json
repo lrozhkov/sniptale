@@ -128,17 +128,20 @@
     "./theme/dom": "./src/theme/dom.ts",
     "./theme/safe-portal": "./src/theme/safe-portal.tsx",
     "./theme/types": "./src/theme/types.ts",
-    "./voice-input/use-push-to-talk": "./src/voice-input/use-push-to-talk.ts"
+    "./voice-input/use-push-to-talk": "./src/voice-input/use-push-to-talk.ts",
+    "./viewport-pan": "./src/viewport-pan/index.ts",
+    "./product-modal/native-drawer": "./src/product-modal/native-drawer.tsx",
+    "./material-browser/selectable-card": "./src/material-browser/selectable-card.tsx"
   },
   "dependencies": {
     "@sniptale/foundation": "0.5.0",
     "@sniptale/runtime-contracts": "0.5.0",
     "lucide-react": "^1.33.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "vitest": "^4.1.10"
+    "vitest": "5.0.3"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/ui/src",

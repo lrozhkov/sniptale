@@ -1,3 +1,4 @@
+import { cancelReviewRemoteJob, keepReviewRemoteJobAlive } from './remote-job-port';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import {
   AUDIO_JOB_PORT_NAME,
@@ -44,22 +45,11 @@ export function runReviewSpeechJob(
       if (result) resolve(result);
       else reject(error ?? new Error('interrupted'));
     };
-    const cancel = () => {
-      try {
-        port.postMessage({ type: 'cancel', requestId: start.requestId });
-      } catch {
-        /* disconnected */
-      }
-      finish(undefined, new DOMException('Cancelled', 'AbortError'));
-    };
+    const cancel = () => cancelReviewRemoteJob(port, start.requestId, finish);
     const timer = setTimeout(() => finish(undefined, new Error('timeout')), AUDIO_JOB_TIMEOUT_MS);
     const keepalive = setInterval(() => {
       if (finished) return;
-      try {
-        port.postMessage({ type: 'keepalive', requestId: start.requestId });
-      } catch {
-        finish(undefined, new Error('interrupted'));
-      }
+      keepReviewRemoteJobAlive(port, start.requestId, finish);
     }, AUDIO_JOB_KEEPALIVE_MS);
     options.signal.addEventListener('abort', cancel, { once: true });
     port.onDisconnect.addListener(() => {

@@ -1,3 +1,4 @@
+import { mergedReviewPhraseFields } from './phrase-merge';
 import type { ReviewSpeechWord } from './speech-transcript';
 import type {
   ReviewTextOrigin,
@@ -245,10 +246,7 @@ export function mergeReviewTextFragments(
   const { words: _words, ...base } = left;
   const merged: ReviewTextFragment = {
     ...base,
-    end: right.end,
-    text: [left.text, right.text].filter(Boolean).join(' '),
-    originalText: [left.originalText, right.originalText].filter(Boolean).join(' '),
-    revision: Math.max(left.revision, right.revision) + 1,
+    ...mergedReviewPhraseFields(left, right),
     timingRevision: Math.max(left.timingRevision, right.timingRevision) + 1,
     alignment: 'manual',
     derivedFrom: [leftId, rightId],

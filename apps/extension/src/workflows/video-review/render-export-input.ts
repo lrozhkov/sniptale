@@ -40,3 +40,13 @@ export interface ReviewFrameExportInput {
   onProgress?(fraction: number): void;
   onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
 }
+
+export function reviewFrameDecorations(
+  args: Pick<ReviewFrameExportInput, 'comments' | 'clickCues' | 'keyCues'>
+) {
+  return {
+    ...(args.comments ? { comments: args.comments } : {}),
+    ...(args.clickCues ? { clickCues: args.clickCues } : {}),
+    ...(args.keyCues ? { keyCues: args.keyCues } : {}),
+  };
+}

@@ -209,16 +209,9 @@ function drawVideoLayer(
     return;
   }
 
-  const windowHeader = layer.trackRole === 'CAMERA' ? undefined : layer.clip.windowHeader;
-  const headerImage = windowHeader
-    ? loadedImages[windowHeaderImageKey(layer.clip.id, windowHeader)]
-    : undefined;
-  if (headerImage?.complete && headerImage.naturalWidth === 0) {
-    throw new Error('Window header image could not be decoded.');
-  }
+  const header = admittedVisualWindowHeader(layer.clip, loadedImages, layer.trackRole === 'CAMERA');
   drawFittedMediaLayer({
-    ...(headerImage ? { windowHeaderImage: headerImage } : {}),
-    ...(headerImage && layer.clip.windowHeader ? { windowHeader: layer.clip.windowHeader } : {}),
+    ...header,
     ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
     context,
     displayScale,
@@ -293,15 +286,9 @@ function drawImageLayer(
     return;
   }
 
-  const headerImage = layer.clip.windowHeader
-    ? loadedImages[windowHeaderImageKey(layer.clip.id, layer.clip.windowHeader)]
-    : undefined;
-  if (headerImage?.complete && headerImage.naturalWidth === 0) {
-    throw new Error('Window header image could not be decoded.');
-  }
+  const header = admittedVisualWindowHeader(layer.clip, loadedImages, false);
   drawFittedMediaLayer({
-    ...(headerImage ? { windowHeaderImage: headerImage } : {}),
-    ...(headerImage && layer.clip.windowHeader ? { windowHeader: layer.clip.windowHeader } : {}),
+    ...header,
     ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
     context,
     displayScale,
@@ -315,4 +302,18 @@ function drawImageLayer(
       drawContext.drawImage(image, drawX, drawY, drawWidth, drawHeight);
     },
   });
+}
+
+function admittedVisualWindowHeader(
+  clip: { id: string; windowHeader?: import('../../../browser-frame/header').WindowHeader },
+  images: Record<string, HTMLImageElement>,
+  camera: boolean
+) {
+  const header = camera ? undefined : clip.windowHeader;
+  const image = header ? images[windowHeaderImageKey(clip.id, header)] : undefined;
+  if (image?.complete && image.naturalWidth === 0)
+    throw new Error('Window header image could not be decoded.');
+  return image && clip.windowHeader
+    ? { windowHeaderImage: image, windowHeader: clip.windowHeader }
+    : {};
 }

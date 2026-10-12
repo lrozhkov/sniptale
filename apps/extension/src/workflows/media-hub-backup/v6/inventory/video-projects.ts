@@ -1,3 +1,8 @@
+import {
+  inventoryProjectThumbnail,
+  projectInventoryDescriptor,
+  projectInventoryLoader,
+} from './helpers';
 import { projectRecordingMetadataPrivacy } from '../privacy';
 import {
   readVideoReviewForBackup,
@@ -33,7 +38,7 @@ import {
   encodePortableVideoProjectAssetRefs,
   type PortableVideoProjectMetadata,
 } from '../root-codecs/projects';
-import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
+import type { MediaHubBackupExportOptions } from '../contracts';
 import type { MediaHubBackupRootInventoryItem } from '../export';
 import {
   createObjectCollector,
@@ -314,19 +319,12 @@ async function buildVideoProjectRoot(args: {
   ];
   const { effectSnapshots: _effectSnapshots, ...project } = args.entry.project;
   const portableSnapshots = buildPortableEffectSnapshots(args.entry, collector);
-  const storedProjectThumbnail = parseMediaThumbnailEntry(
-    await args.db.get(THUMBNAILS_STORE, `video-project:${args.entry.id}`)
+  const projectThumbnail = await inventoryProjectThumbnail(
+    args.db,
+    `video-project:${args.entry.id}`,
+    args.entry.id,
+    collector
   );
-  const projectThumbnail = storedProjectThumbnail
-    ? encodePortableThumbnail(
-        storedProjectThumbnail,
-        collector.addObject(
-          storedProjectThumbnail.blob,
-          `${args.entry.id}-thumbnail`,
-          storedProjectThumbnail.blob.type || 'image/png'
-        )
-      )
-    : undefined;
   const presentation = await buildPortableAggregatePresentation({
     addObject: collector.addObject,
     aggregateId: args.entry.id,
@@ -347,14 +345,13 @@ async function buildVideoProjectRoot(args: {
     ...(presentation ? { presentation } : {}),
   };
   return {
-    descriptor: {
-      metadataPath: `${METADATA_ROOT}/video-projects/${encodeURIComponent(args.entry.id)}.json`,
-      objectCount: collector.objects.length,
-      rootId: args.entry.id,
-      rootKind: 'video-project',
-      totalBytes: collector.objects.reduce((sum, object) => sum + object.ref.size, 0),
-    },
-    load: async () => ({ metadata: metadata as unknown as JsonValue, objects: collector.objects }),
+    descriptor: projectInventoryDescriptor(
+      'video-project',
+      args.entry.id,
+      `${METADATA_ROOT}/video-projects/${encodeURIComponent(args.entry.id)}.json`,
+      collector.objects
+    ),
+    load: projectInventoryLoader(metadata, collector.objects),
     summary: {
       draftCount: args.entry.lifecycle?.storageClass === 'temporary' ? 1 : 0,
       recordingCount: projectExports.length,

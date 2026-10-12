@@ -34,7 +34,9 @@ for (const format of ['zip', 'html'] as const) {
     await context.route(`${host.origin}/**`, (route) =>
       route.fulfill({
         contentType: 'text/html',
-        body: '<!doctype html><html><head><title>Cold export</title></head><body><h1>Cold export</h1><p>Deterministic page export proof.</p></body></html>',
+        body:
+          '<!doctype html><html><head><title>Cold export</title></head><body><h1>Cold ' +
+          'export</h1><p>Deterministic page export proof.</p></body></html>',
       })
     );
     const page = await context.newPage();
@@ -127,7 +129,7 @@ for (const format of ['zip', 'html'] as const) {
         }),
       ]);
       expect(result.downloads?.[0]?.bytesReceived).toBeGreaterThan(0);
-      expect(result.status?.result?.filename).toMatch(new RegExp(`\\.${format}$`));
+      expect(result.status?.result?.filename?.endsWith(`.${format}`)).toBe(true);
       const unauthorized = await popup.evaluate(() =>
         chrome.runtime.sendMessage({
           type: 'OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD',

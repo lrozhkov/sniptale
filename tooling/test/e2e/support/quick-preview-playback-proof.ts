@@ -280,7 +280,9 @@ export async function observePreviewPlayback(
           elapsed: performance.now() - start,
           samples,
           transport,
-          note: 'Publication wall time and contemporaneous native clock, not represented source timestamp or physical audio latency.',
+          note:
+            'Publication wall time and contemporaneous native clock, not represented source ' +
+            'timestamp or physical audio latency.',
         };
       },
       dispose() {

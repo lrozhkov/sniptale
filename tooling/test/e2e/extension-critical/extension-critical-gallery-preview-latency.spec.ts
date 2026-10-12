@@ -275,7 +275,9 @@ for (let repetition = 1; repetition <= 3; repetition++) {
               'Fresh browser context; browser process, OS, fixture and font caches may be warm',
             activationStart: 'Before opening preview settings and selecting360p through the UI',
             semantics:
-              'Native currentTime seek events; publication time precedes64×36 diagnostic readback; independent source decoder runs after measurement; DOM publication is not scanout',
+              'Native currentTime seek events; publication time precedes64×36 diagnostic ' +
+              'readback; independent source decoder runs after measurement; DOM publication is ' +
+              'not scanout',
             editorOpenToDecodedMs: decodedReady - openStarted,
             activationMs: activationFirst!.now - activationData.started,
             activation: activationData.samples.map(({ pixels, ...sample }) => ({

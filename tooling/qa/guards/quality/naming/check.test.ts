@@ -19,7 +19,17 @@ vi.mock('../../../analysis/repository/shared-files.mjs', async (importOriginal) 
   };
 });
 
+vi.mock('./facades.mjs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./facades.mjs')>();
+  return {
+    ...original,
+    hasAmbiguousSameNameFacadeSource: vi.fn(original.hasAmbiguousSameNameFacadeSource),
+    isThinFacadeSource: vi.fn(original.isThinFacadeSource),
+  };
+});
+
 import { collectNamingViolations, parseSuccessfulGitFileList, runNamingCheck } from './check.mjs';
+import { hasAmbiguousSameNameFacadeSource, isThinFacadeSource } from './facades.mjs';
 
 const tempDirs: string[] = [];
 
@@ -38,6 +48,8 @@ function createTempRoot() {
 
 afterEach(() => {
   collectCodeFilesMock.mockReset();
+  vi.mocked(hasAmbiguousSameNameFacadeSource).mockClear();
+  vi.mocked(isThinFacadeSource).mockClear();
   while (tempDirs.length > 0) {
     fs.rmSync(tempDirs.pop()!, { recursive: true, force: true });
   }
@@ -295,6 +307,8 @@ async function verifiesContentOnlyWorkspaceChangesDoNotRescanPathDebt() {
   const result = await withCwd(root, () => runNamingCheck({ files: [file], scope: 'workspace' }));
 
   expect(result.violations).toEqual([]);
+  expect(hasAmbiguousSameNameFacadeSource).not.toHaveBeenCalled();
+  expect(isThinFacadeSource).not.toHaveBeenCalled();
 }
 
 async function verifiesAddedWorkspacePathsStillEnforceNaming() {
@@ -313,6 +327,8 @@ async function verifiesAddedWorkspacePathsStillEnforceNaming() {
   const result = await withCwd(root, () => runNamingCheck({ files: [file], scope: 'workspace' }));
 
   expect(result.violations).toEqual([expect.objectContaining({ rule: 'repeated-prefix-naming' })]);
+  expect(hasAmbiguousSameNameFacadeSource).toHaveBeenCalledTimes(1);
+  expect(isThinFacadeSource).toHaveBeenCalledTimes(1);
 }
 
 describe('collectNamingViolations', () => {

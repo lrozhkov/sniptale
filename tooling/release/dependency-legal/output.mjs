@@ -62,7 +62,18 @@ function formatDependencySection(entry) {
     ? `\n- MPL-2.0 corresponding source: ${entry.correspondingSourceUrl}`
     : '';
   const modificationLines = entry.modifiedSource
-    ? `\n- Supplied modifications (combine with upstream source above):\n${entry.modifiedSource.files.map((file) => `  - [${file.archivePath}](${file.archivePath}) (SHA-256: ${file.sha256})`).join('\n')}\n- Original package integrity: ${entry.modifiedSource.upstreamIntegrity}`
+    ? [
+        '\n- Supplied modifications (combine with upstream source above):\n',
+        String(
+          entry.modifiedSource.files
+            .map(
+              (file) => `  - [${file.archivePath}](${file.archivePath}) (SHA-256: ${file.sha256})`
+            )
+            .join('\n')
+        ),
+        '\n- Original package integrity: ',
+        String(entry.modifiedSource.upstreamIntegrity),
+      ].join('')
     : '';
   const provenanceLines = entry.licenseProvenance
     ? `

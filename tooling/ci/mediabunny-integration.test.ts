@@ -65,9 +65,9 @@ it('pins both package declarations and exposes explicit setup without a lifecycl
   const root = JSON.parse(read('package.json'));
   const extension = JSON.parse(read('apps/extension/package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  expect(root.dependencies?.mediabunny ?? root.devDependencies.mediabunny).toBe('1.55.2');
-  expect(extension.dependencies.mediabunny).toBe('1.55.2');
-  expect(lock.packages['node_modules/mediabunny'].version).toBe('1.55.2');
+  expect(root.dependencies?.mediabunny ?? root.devDependencies.mediabunny).toBe('1.61.3');
+  expect(extension.dependencies.mediabunny).toBe('1.61.3');
+  expect(lock.packages['node_modules/mediabunny'].version).toBe('1.61.3');
   expect(root.scripts['dependencies:normalize']).toBe('node tooling/ci/mediabunny/normalize.mjs');
   for (const lifecycle of ['preinstall', 'install', 'postinstall'])
     expect(root.scripts[lifecycle]).toBeUndefined();

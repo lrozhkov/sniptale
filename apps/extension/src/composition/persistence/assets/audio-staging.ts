@@ -1,3 +1,4 @@
+import { sameReviewSourceIdentity } from '../../../features/video/review/source-identity';
 import { readLibrarySceneSource } from '../projects/library-scene-source';
 import { readVideoWorkspace } from '../review-workspaces/store';
 import {
@@ -94,13 +95,7 @@ async function assertScopeExists(scope: AudioJobScope): Promise<void> {
     if (workspace.aggregateId !== scope.workspaceId || workspace.sourceAssetId !== scope.assetId)
       throw new Error('Missing audio staging scope.');
     const source = await readLibrarySceneSource(workspace.aggregateId, 'video');
-    if (
-      source.ref.assetId !== workspace.sourceAssetId ||
-      source.ref.size !== workspace.source.size ||
-      // Inspection adds codec parameters; immutable storage records the container MIME.
-      source.ref.mimeType.split(';', 1)[0]?.trim().toLowerCase() !==
-        workspace.source.mimeType.split(';', 1)[0]?.trim().toLowerCase()
-    )
+    if (!sameReviewSourceIdentity(source.ref, workspace.sourceAssetId, workspace.source))
       throw new Error('Missing audio staging scope.');
     return;
   }

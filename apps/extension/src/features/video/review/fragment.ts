@@ -1,4 +1,4 @@
-import { nearestReviewBoundary } from './cuts';
+import { snapReviewRange } from './cuts';
 import { buildReviewTimeMap } from './timeline';
 import type { ReviewAnchor, ReviewEdit } from './types';
 
@@ -26,14 +26,7 @@ export function createReviewFragment(args: {
     selection.start >= selection.end
   )
     return null;
-  const start =
-    args.snapToKeyframes === false
-      ? selection.start
-      : nearestReviewBoundary(selection.start, boundaries);
-  const end =
-    args.snapToKeyframes === false
-      ? selection.end
-      : nearestReviewBoundary(selection.end, boundaries);
+  const { start, end } = snapReviewRange(selection, boundaries, args.snapToKeyframes);
   if (start < 0 || end > duration || start >= end) return null;
   const edits = args.edits
     .filter((edit) => edit.start < end && edit.end > start)

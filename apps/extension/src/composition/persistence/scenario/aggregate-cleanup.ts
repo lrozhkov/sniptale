@@ -1,3 +1,4 @@
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { createScenarioProjectStore } from './storage';
 import { detachScenarioVideoAssets } from './video-asset-detachment';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
@@ -107,13 +108,7 @@ export async function deleteOrphanedScenarioAggregateChild(args: {
       }
       await tx.done;
     } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* The transaction may already be closed. */
-      }
-      await tx.done.catch(() => undefined);
-      throw error;
+      await abortIndexedDbMutation(tx, error);
     }
   });
   if (physicalDelete.assetIds.length > 0) {
@@ -131,13 +126,7 @@ export async function deleteScenarioAggregate(projectId: string): Promise<void> 
       await removeScenarioAggregateGraph(tx, projectId, physicalDelete);
       await tx.done;
     } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* The transaction may already have closed. */
-      }
-      await tx.done.catch(() => undefined);
-      throw error;
+      await abortIndexedDbMutation(tx, error);
     }
   });
   if (physicalDelete.assetIds.length > 0) {

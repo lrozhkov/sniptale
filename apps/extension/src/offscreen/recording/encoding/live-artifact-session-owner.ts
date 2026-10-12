@@ -1,3 +1,4 @@
+import { createRecordingTerminal, finalizeRecordingArtifact } from './artifact-terminal';
 import {
   AppendOnlyStreamTarget,
   MediaStreamAudioTrackSource,
@@ -129,10 +130,10 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   private readonly firstEncodedVideoPacket: Promise<void>;
   private readonly resolveFirstEncodedVideoPacket: () => void;
   private readonly rejectFirstEncodedVideoPacket: (error: Error) => void;
-  private terminalSettled = false;
+  private readonly terminalSettlement: ReturnType<
+    typeof createRecordingTerminal<FinalizedRecordingStagingArtifact>
+  >;
   private readonly terminal: Promise<FinalizedRecordingStagingArtifact>;
-  private readonly resolveTerminal: (artifact: FinalizedRecordingStagingArtifact) => void;
-  private readonly rejectTerminal: (error: Error) => void;
 
   constructor(private readonly input: CreateLiveRecordingArtifactSessionOwnerInput) {
     const [videoTrack] = input.stream.getVideoTracks();
@@ -233,15 +234,8 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       return source;
     });
 
-    let resolveTerminal!: (artifact: FinalizedRecordingStagingArtifact) => void;
-    let rejectTerminal!: (error: Error) => void;
-    this.terminal = new Promise((resolve, reject) => {
-      resolveTerminal = resolve;
-      rejectTerminal = reject;
-    });
-    this.resolveTerminal = resolveTerminal;
-    this.rejectTerminal = rejectTerminal;
-    void this.terminal.catch(() => undefined);
+    this.terminalSettlement = createRecordingTerminal<FinalizedRecordingStagingArtifact>();
+    this.terminal = this.terminalSettlement.promise;
     let resolveVideoDrainRequested!: () => void;
     this.videoDrainRequested = new Promise<void>((resolve) => {
       resolveVideoDrainRequested = resolve;
@@ -364,7 +358,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     this.phase = 'aborted';
     const abortError = new Error(`Recording artifact ${this.input.artifactId} was aborted.`);
     this.rejectFirstEncodedVideoPacket(abortError);
-    this.rejectTerminalOnce(abortError);
+    this.terminalSettlement.reject(abortError);
     this.videoFrameBuffer.abort();
     this.nativeVideoSource?.close();
     const abortPromise = this.abortEncoderResources();
@@ -424,15 +418,15 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       await this.nativeVideoSource?.finalize();
       await this.output.finalize();
       this.logEncodedCadence();
-      const artifact = await this.input.writer.finalize();
-      if (this.cannotCompleteFinalization()) return;
-      if (artifact.size === 0) {
-        throw new Error(`Recording ${this.input.artifactId} produced no media bytes.`);
-      }
-      await this.callbacks.onStop?.(artifact);
-      if (this.cannotCompleteFinalization()) return;
+      const artifact = await finalizeRecordingArtifact(
+        this.input.writer,
+        this.input.artifactId,
+        () => !this.cannotCompleteFinalization(),
+        (artifact) => this.callbacks.onStop?.(artifact)
+      );
+      if (!artifact) return;
       this.phase = 'finalized';
-      this.resolveTerminalOnce(artifact);
+      this.terminalSettlement.resolve(artifact);
     } catch (error) {
       this.fail(error);
     }
@@ -657,22 +651,10 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     this.nativeVideoSource?.close();
     const abortPromise = this.abortEncoderResources();
     void abortPromise.catch(() => undefined);
-    this.rejectTerminalOnce(terminalError);
+    this.terminalSettlement.reject(terminalError);
   }
 
   private cannotCompleteFinalization(): boolean {
-    return this.phase === 'aborted' || this.terminalSettled;
-  }
-
-  private resolveTerminalOnce(artifact: FinalizedRecordingStagingArtifact): void {
-    if (this.terminalSettled) return;
-    this.terminalSettled = true;
-    this.resolveTerminal(artifact);
-  }
-
-  private rejectTerminalOnce(error: Error): void {
-    if (this.terminalSettled) return;
-    this.terminalSettled = true;
-    this.rejectTerminal(error);
+    return this.phase === 'aborted' || this.terminalSettlement.settled;
   }
 }

@@ -65,7 +65,7 @@ for (const variant of [
       await page.keyboard.press('Enter');
       await page
         .getByRole('option', {
-          name: new RegExp(label('videoEditor.exportDialog.frameRateAdaptive')),
+          name: label('videoEditor.exportDialog.frameRateAdaptive'),
         })
         .click();
       await expect(fps).toContainText(label('videoEditor.exportDialog.frameRateAdaptive'));
@@ -112,7 +112,7 @@ for (const variant of [
       await page.keyboard.press('Enter');
       await page
         .getByRole('option', {
-          name: new RegExp(label('videoEditor.exportDialog.frameRateAdaptive')),
+          name: label('videoEditor.exportDialog.frameRateAdaptive'),
         })
         .click();
       await expect(mode).toContainText(label('videoEditor.exportDialog.frameRateAdaptive'));

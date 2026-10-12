@@ -1,5 +1,5 @@
+import { useViewportPanGesture } from '@sniptale/ui/viewport-pan';
 import {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -176,18 +176,7 @@ export function useLibraryFullscreen(setFailed: (failed: boolean) => void) {
 }
 
 function useLibraryPreviewPan(viewport: RefObject<HTMLDivElement | null>, enabled: boolean) {
-  const gesture = useRef<{ id: number; x: number; y: number; left: number; top: number } | null>(
-    null
-  );
-  const [dragging, setDragging] = useState(false);
-  const finish = useCallback(() => {
-    const active = gesture.current;
-    gesture.current = null;
-    setDragging(false);
-    if (active && viewport.current?.hasPointerCapture(active.id)) {
-      viewport.current.releasePointerCapture(active.id);
-    }
-  }, [viewport]);
+  const { dragging, finish, start, move, end } = useViewportPanGesture(viewport);
   useEffect(() => {
     if (!enabled) finish();
     return finish;
@@ -196,34 +185,12 @@ function useLibraryPreviewPan(viewport: RefObject<HTMLDivElement | null>, enable
     dragging,
     handlers: {
       onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
-        if (!enabled || event.button !== 0 || gesture.current) return;
-        event.preventDefault();
-        const node = event.currentTarget;
-        gesture.current = {
-          id: event.pointerId,
-          x: event.clientX,
-          y: event.clientY,
-          left: node.scrollLeft,
-          top: node.scrollTop,
-        };
-        node.setPointerCapture(event.pointerId);
-        setDragging(true);
+        if (enabled) start(event);
       },
-      onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
-        const active = gesture.current;
-        if (!active || active.id !== event.pointerId) return;
-        event.currentTarget.scrollLeft = active.left + active.x - event.clientX;
-        event.currentTarget.scrollTop = active.top + active.y - event.clientY;
-      },
-      onPointerUp: (event: PointerEvent<HTMLDivElement>) => {
-        if (gesture.current?.id === event.pointerId) finish();
-      },
-      onPointerCancel: (event: PointerEvent<HTMLDivElement>) => {
-        if (gesture.current?.id === event.pointerId) finish();
-      },
-      onLostPointerCapture: (event: PointerEvent<HTMLDivElement>) => {
-        if (gesture.current?.id === event.pointerId) finish();
-      },
+      onPointerMove: move,
+      onPointerUp: end,
+      onPointerCancel: end,
+      onLostPointerCapture: end,
     },
   };
 }

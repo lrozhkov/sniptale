@@ -1,3 +1,4 @@
+import type { AudioJobScope } from '../../contracts/ai/audio';
 import {
   AUDIO_STAGING_TTL_MS,
   type AudioSourceJobScope,
@@ -136,9 +137,7 @@ export async function generateReviewSpeech(
   );
   if (result.type !== 'audio') throw new Error('invalid-response');
   try {
-    const blob = await readAudioStaging(result.staged, scope);
-    const duration = await decodeReviewSpeechDuration(blob);
-    signal.throwIfAborted();
+    const { blob, duration } = await readPreparedReviewSpeechAudio(result.staged, scope, signal);
     const current = getReviewSpeechTarget(session, target);
     const currentPhrase = current.transcript?.phrases.find((entry) => entry.id === phraseId);
     if (
@@ -303,4 +302,15 @@ export async function applyReviewSpeech(
         if (!retained) await asset.cancel();
       }
   }
+}
+
+export async function readPreparedReviewSpeechAudio(
+  staged: AudioStagedHandle,
+  scope: AudioJobScope,
+  signal: AbortSignal
+) {
+  const blob = await readAudioStaging(staged, scope);
+  const duration = await decodeReviewSpeechDuration(blob);
+  signal.throwIfAborted();
+  return { blob, duration };
 }

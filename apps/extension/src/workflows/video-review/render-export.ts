@@ -1,3 +1,4 @@
+import { reviewFrameDecorations } from './render-export-input';
 import type { ReviewFrameExportInput } from './render-export-input';
 import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
@@ -117,9 +118,7 @@ export async function writeReviewFrames(
         ...(args.effectSnapshots ? { effectSnapshots: args.effectSnapshots } : {}),
         fps: preparation.fps,
         effective: preparation.effective,
-        ...(args.comments ? { comments: args.comments } : {}),
-        ...(args.clickCues ? { clickCues: args.clickCues } : {}),
-        ...(args.keyCues ? { keyCues: args.keyCues } : {}),
+        ...reviewFrameDecorations(args),
         fragmentOffset: args.fragmentOffset,
         dimensions: source.dimensions,
         readAsset: args.readProjectAsset,

@@ -11,31 +11,40 @@ test('opaque lens live pixels match export, with identity endpoints and moving s
 }, info) => {
   const bundle = await build({
     stdin: {
-      contents: `
- import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';
- import {ReviewClickOverlay} from './apps/extension/src/gallery/video-review/click-animation-overlay';
- import {drawReviewClicks} from './apps/extension/src/workflows/video-review/render-click-animation';
- import {evaluateReviewClicks} from './apps/extension/src/features/video/review/click-animation';
- import {REVIEW_CLICK_DEFAULT} from './apps/extension/src/features/video/review/advanced/click-animation';
- export async function probe(){
- const source=document.createElement('canvas');source.width=400;source.height=240;
- const s=source.getContext('2d');s.fillStyle='#246';s.fillRect(0,0,400,240);s.fillStyle='#ff0000';s.fillRect(190,110,20,20);
- const rect={x:0,y:0,width:400,height:240};
- const settings={...REVIEW_CLICK_DEFAULT,effect:'magnify',radius:60,magnification:2,before:1,after:1,lensShadow:0,color:'#00000000'};
- const cue={settings,point:{x:.5,y:.5},anchor:1,start:0,end:2};
- const host=document.createElement('div');document.body.append(host);host.style='position:relative;width:400px;height:240px';const root=createRoot(host);
- const render=async(time,shape)=>{cue.settings.lensShape=shape;flushSync(()=>root.render(React.createElement(ReviewClickOverlay,{cues:[cue],time,output:rect,video:rect,sourceWidth:400,clip:{rect,radius:0},getFrame:()=>source})));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return host.querySelector('canvas');};
- const samples=[];
- for(const shape of ['circle','rounded']){
-  const live=await render(1,shape);const exportCanvas=document.createElement('canvas');exportCanvas.width=400;exportCanvas.height=240;document.body.append(exportCanvas);
-  drawReviewClicks(exportCanvas.getContext('2d'),evaluateReviewClicks([cue],1),rect,400,{rect,radius:0},{draw:(c,x,y,w,h)=>c.drawImage(source,x,y,w,h)});
-  const a=live.getContext('2d').getImageData(0,0,400,240).data,b=exportCanvas.getContext('2d').getImageData(0,0,400,240).data;
-  samples.push({mismatch:a.reduce((n,v,i)=>n+(v!==b[i]),0),enlarged:Array.from(live.getContext('2d').getImageData(184,120,1,1).data)});
- }
- s.fillStyle='#00ff00';s.fillRect(190,110,20,20);const updated=await render(1,'circle');const current=Array.from(updated.getContext('2d').getImageData(200,120,1,1).data);
- const identity=await render(0,'circle');const alpha=identity.getContext('2d').getImageData(200,120,1,1).data[3];
- root.unmount();return {samples,current,alpha};}
- `,
+      contents:
+        "\n import React from 'react';import {createRoot} from 'react-dom/client';impo" +
+        "rt {flushSync} from 'react-dom';\n import {ReviewClickOverlay} from './apps/e" +
+        "xtension/src/gallery/video-review/click-animation-overlay';\n import {drawRev" +
+        "iewClicks} from './apps/extension/src/workflows/video-review/render-click-an" +
+        "imation';\n import {evaluateReviewClicks} from './apps/extension/src/features" +
+        "/video/review/click-animation';\n import {REVIEW_CLICK_DEFAULT} from './apps/" +
+        "extension/src/features/video/review/advanced/click-animation';\n export async" +
+        " function probe(){\n const source=document.createElement('canvas');source.wid" +
+        "th=400;source.height=240;\n const s=source.getContext('2d');s.fillStyle='#246" +
+        "';s.fillRect(0,0,400,240);s.fillStyle='#ff0000';s.fillRect(190,110,20,20);\n " +
+        'const rect={x:0,y:0,width:400,height:240};\n const settings={...REVIEW_CLICK_' +
+        "DEFAULT,effect:'magnify',radius:60,magnification:2,before:1,after:1,lensShad" +
+        "ow:0,color:'#00000000'};\n const cue={settings,point:{x:.5,y:.5},anchor:1,sta" +
+        "rt:0,end:2};\n const host=document.createElement('div');document.body.append(" +
+        "host);host.style='position:relative;width:400px;height:240px';const root=cre" +
+        'ateRoot(host);\n const render=async(time,shape)=>{cue.settings.lensShape=shap' +
+        'e;flushSync(()=>root.render(React.createElement(ReviewClickOverlay,{cues:[cu' +
+        'e],time,output:rect,video:rect,sourceWidth:400,clip:{rect,radius:0},getFrame' +
+        ':()=>source})));await new Promise(r=>requestAnimationFrame(()=>requestAnimat' +
+        "ionFrame(r)));return host.querySelector('canvas');};\n const samples=[];\n for" +
+        "(const shape of ['circle','rounded']){\n  const live=await render(1,shape);co" +
+        "nst exportCanvas=document.createElement('canvas');exportCanvas.width=400;exp" +
+        'ortCanvas.height=240;document.body.append(exportCanvas);\n  drawReviewClicks(' +
+        "exportCanvas.getContext('2d'),evaluateReviewClicks([cue],1),rect,400,{rect,r" +
+        'adius:0},{draw:(c,x,y,w,h)=>c.drawImage(source,x,y,w,h)});\n  const a=live.ge' +
+        "tContext('2d').getImageData(0,0,400,240).data,b=exportCanvas.getContext('2d'" +
+        ').getImageData(0,0,400,240).data;\n  samples.push({mismatch:a.reduce((n,v,i)=' +
+        ">n+(v!==b[i]),0),enlarged:Array.from(live.getContext('2d').getImageData(184," +
+        "120,1,1).data)});\n }\n s.fillStyle='#00ff00';s.fillRect(190,110,20,20);const " +
+        "updated=await render(1,'circle');const current=Array.from(updated.getContext" +
+        "('2d').getImageData(200,120,1,1).data);\n const identity=await render(0,'circ" +
+        "le');const alpha=identity.getContext('2d').getImageData(200,120,1,1).data[3]" +
+        ';\n root.unmount();return {samples,current,alpha};}\n ',
       resolveDir: process.cwd(),
       loader: 'tsx',
     },

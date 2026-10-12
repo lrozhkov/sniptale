@@ -1,3 +1,4 @@
+import { admitsLibrarySourceRef, sameLibrarySourceRef } from './library-source-ref';
 import {
   ASSET_REFS_STORE,
   initDB,
@@ -71,13 +72,7 @@ export async function readLibraryAudioSource(mediaId: string): Promise<LibraryAu
       assetId = recording.assetId;
     } else throw new LibraryAudioBindingError('unavailable');
     const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(assetId));
-    if (
-      !ref ||
-      ref.assetId !== assetId ||
-      ref.size !== media.size ||
-      ref.mimeType !== media.mimeType ||
-      (entry && (entry.size !== ref.size || entry.mimeType !== ref.mimeType))
-    )
+    if (!admitsLibrarySourceRef(ref, assetId, media, entry))
       throw new LibraryAudioBindingError('unavailable');
     return { mediaId, filename: media.filename, source: media.source, entry, ref };
   } finally {
@@ -87,13 +82,5 @@ export async function readLibraryAudioSource(mediaId: string): Promise<LibraryAu
 
 /** Byte identity includes the immutable object's locator and admitted metadata. */
 export function sameLibraryAudioRef(left: AssetRef, right: AssetRef): boolean {
-  return (
-    left.assetId === right.assetId &&
-    left.location.kind === right.location.kind &&
-    left.location.objectKey === right.location.objectKey &&
-    left.size === right.size &&
-    left.mimeType === right.mimeType &&
-    left.sha256 === right.sha256 &&
-    left.createdAt === right.createdAt
-  );
+  return sameLibrarySourceRef(left, right);
 }

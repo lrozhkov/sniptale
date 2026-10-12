@@ -151,293 +151,312 @@ for (const variant of [
     lane: 'voiceover',
   },
 ] as const) {
-  test(`music Library preserves source and modal workflow ${variant.width}/${'lane' in variant ? variant.lane : 'music'}`, async ({
-    page,
-  }, info) => {
-    await page.setViewportSize({ width: variant.width, height: variant.height });
-    const host = await startHostServer();
-    const lane = 'lane' in variant ? variant.lane : 'music';
-    const pickerLabel =
-      lane === 'voiceover' ? 'gallery.videoReview.audioImport' : 'gallery.videoReview.musicLibrary';
-    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
-    try {
-      await applyHarnessBootstrap(page, {
-        preserveMediaLibrary: true,
-        storage: {
-          'sniptale-locale-preference': variant.locale,
-          'sniptale-theme-preference': variant.theme,
-          sniptale_gallery_saved_views: {
-            version: 1,
-            views: [
-              {
-                id: 'audio-tagged',
-                name: 'Music tagged',
-                folderFilter: 'audio',
-                createdAt: 1,
-                updatedAt: 1,
-                filters: { activeTags: ['music'], scope: 'all', facetFilters: emptyFacets },
-              },
-              {
-                id: 'all-media',
-                name: 'All media',
-                folderFilter: 'all',
-                createdAt: 1,
-                updatedAt: 1,
-                filters: { activeTags: [], scope: 'all', facetFilters: emptyFacets },
-              },
-              {
-                id: 'images',
-                name: 'Images only',
-                folderFilter: 'screenshot',
-                createdAt: 1,
-                updatedAt: 1,
-                filters: { activeTags: [], scope: 'all', facetFilters: emptyFacets },
-              },
-            ],
+  test(
+    [
+      'music Library preserves source and modal workflow ',
+      String(variant.width),
+      '/',
+      String('lane' in variant ? variant.lane : 'music'),
+    ].join(''),
+    async ({ page }, info) => {
+      await page.setViewportSize({ width: variant.width, height: variant.height });
+      const host = await startHostServer();
+      const lane = 'lane' in variant ? variant.lane : 'music';
+      const pickerLabel =
+        lane === 'voiceover'
+          ? 'gallery.videoReview.audioImport'
+          : 'gallery.videoReview.musicLibrary';
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      try {
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          storage: {
+            'sniptale-locale-preference': variant.locale,
+            'sniptale-theme-preference': variant.theme,
+            sniptale_gallery_saved_views: {
+              version: 1,
+              views: [
+                {
+                  id: 'audio-tagged',
+                  name: 'Music tagged',
+                  folderFilter: 'audio',
+                  createdAt: 1,
+                  updatedAt: 1,
+                  filters: { activeTags: ['music'], scope: 'all', facetFilters: emptyFacets },
+                },
+                {
+                  id: 'all-media',
+                  name: 'All media',
+                  folderFilter: 'all',
+                  createdAt: 1,
+                  updatedAt: 1,
+                  filters: { activeTags: [], scope: 'all', facetFilters: emptyFacets },
+                },
+                {
+                  id: 'images',
+                  name: 'Images only',
+                  folderFilter: 'screenshot',
+                  createdAt: 1,
+                  updatedAt: 1,
+                  filters: { activeTags: [], scope: 'all', facetFilters: emptyFacets },
+                },
+              ],
+            },
           },
-        },
-      });
-      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
-      await page.locator('[data-ui="gallery.page.root"]').waitFor();
-      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
-      await seedMusic(page, variant.source);
-      await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
-      await review
-        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
-        .click();
-      const header = review.locator('[data-ui="gallery.videoReview.trackHeader"]').filter({
-        hasText: label(
-          lane === 'voiceover'
-            ? 'gallery.videoReview.audioVoiceover'
-            : 'gallery.videoReview.audioMusic'
-        ),
-      });
-      await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
-      const drawer = page.locator('[data-ui="music.library.drawer"]');
-      await expect(drawer).toBeVisible();
-      await expect(drawer.locator('li')).toHaveCount(36);
-      const search = drawer.getByRole('searchbox');
-      const filter = drawer.getByRole('button', {
-        name: label('gallery.videoReview.musicFilter'),
-        exact: true,
-      });
-      const upload = drawer.getByRole('button', {
-        name: label('gallery.videoReview.musicUpload'),
-        exact: true,
-      });
-      const close = drawer.getByRole('button', {
-        name: label('common.actions.close'),
-        exact: true,
-      });
-      const list = drawer.locator('[data-ui="music.library.list"]');
-      expect((await search.boundingBox())!.x).toBeLessThan((await filter.boundingBox())!.x);
-      await expect(upload).toHaveCSS('height', '32px');
-      expect((await upload.boundingBox())!.width).toBeGreaterThan(80);
-      if (variant.width === 1280) {
-        // Drawer width switches at viewport−24 = 960 and at 80vw = 960.
-        for (const width of [983, 984, 985, 1199, 1200, 1201]) {
-          await page.setViewportSize({ width, height: variant.height });
-          await expect(search).toBeInViewport({ ratio: 1 });
-          await expect(upload).toBeInViewport({ ratio: 1 });
-          await expect(close).toBeInViewport({ ratio: 1 });
-          await page.screenshot({
-            path: info.outputPath(`music-library-width-${width}.png`),
-            fullPage: false,
-          });
+        });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedReviewVideo(page, 'review-vp8-opus.webm', {
+          width: 160,
+          height: 90,
+          duration: 12,
+        });
+        await seedMusic(page, variant.source);
+        await page.reload();
+        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+        await review
+          .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+          .click();
+        const header = review.locator('[data-ui="gallery.videoReview.trackHeader"]').filter({
+          hasText: label(
+            lane === 'voiceover'
+              ? 'gallery.videoReview.audioVoiceover'
+              : 'gallery.videoReview.audioMusic'
+          ),
+        });
+        await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
+        const drawer = page.locator('[data-ui="music.library.drawer"]');
+        await expect(drawer).toBeVisible();
+        await expect(drawer.locator('li')).toHaveCount(36);
+        const search = drawer.getByRole('searchbox');
+        const filter = drawer.getByRole('button', {
+          name: label('gallery.videoReview.musicFilter'),
+          exact: true,
+        });
+        const upload = drawer.getByRole('button', {
+          name: label('gallery.videoReview.musicUpload'),
+          exact: true,
+        });
+        const close = drawer.getByRole('button', {
+          name: label('common.actions.close'),
+          exact: true,
+        });
+        const list = drawer.locator('[data-ui="music.library.list"]');
+        expect((await search.boundingBox())!.x).toBeLessThan((await filter.boundingBox())!.x);
+        await expect(upload).toHaveCSS('height', '32px');
+        expect((await upload.boundingBox())!.width).toBeGreaterThan(80);
+        if (variant.width === 1280) {
+          // Drawer width switches at viewport−24 = 960 and at 80vw = 960.
+          for (const width of [983, 984, 985, 1199, 1200, 1201]) {
+            await page.setViewportSize({ width, height: variant.height });
+            await expect(search).toBeInViewport({ ratio: 1 });
+            await expect(upload).toBeInViewport({ ratio: 1 });
+            await expect(close).toBeInViewport({ ratio: 1 });
+            await page.screenshot({
+              path: info.outputPath(`music-library-width-${width}.png`),
+              fullPage: false,
+            });
+          }
+          await page.setViewportSize({ width: variant.width, height: variant.height });
         }
-        await page.setViewportSize({ width: variant.width, height: variant.height });
+        const searchY = (await search.boundingBox())!.y;
+        await expect
+          .poll(() => list.evaluate((node) => node.scrollHeight > node.clientHeight))
+          .toBe(true);
+        await list.evaluate((node) => {
+          node.scrollTop = node.scrollHeight;
+        });
+        await expect(drawer.locator('li').last()).toBeInViewport({ ratio: 1 });
+        expect((await search.boundingBox())!.y).toBeCloseTo(searchY, 0);
+        await expect(upload).toBeInViewport({ ratio: 1 });
+        await expect(close).toBeInViewport({ ratio: 1 });
+        await page.screenshot({
+          path: info.outputPath('music-library-scroll.png'),
+          fullPage: false,
+        });
+        await list.evaluate((node) => {
+          node.scrollTop = 0;
+        });
+        await filter.click();
+        await expect(page.getByRole('option', { name: 'Images only', exact: true })).toHaveCount(0);
+        await page.getByRole('option', { name: 'Music tagged', exact: true }).click();
+        await expect(drawer.locator('li')).toHaveCount(18);
+        await search.fill('Song 01');
+        await search.press('Enter');
+        await expect(drawer.locator('li')).toHaveCount(0);
+        await expect(filter).toContainText('Music tagged');
+        await search.fill('Song 00');
+        await search.press('Enter');
+        await expect(drawer.locator('li')).toHaveCount(1);
+        await filter.click();
+        await page.getByRole('option', { name: 'All media', exact: true }).click();
+        await search.fill('');
+        await search.press('Enter');
+        await expect(drawer.locator('li')).toHaveCount(36);
+        await filter.click();
+        await page
+          .getByRole('option', { name: label('gallery.videoReview.musicAll'), exact: true })
+          .click();
+        await search.fill('not-existing');
+        await search.press('Enter');
+        await expect(drawer.locator('li')).toHaveCount(0);
+        await expect(
+          drawer.getByRole('button', { name: label('common.actions.close'), exact: true })
+        ).toBeVisible();
+        await search.fill('Song 00');
+        await search.press('Enter');
+        await expect(drawer.locator('li')).toHaveCount(1);
+        await search.press('Space');
+        await expect
+          .poll(() =>
+            review
+              .locator('video')
+              .first()
+              .evaluate((node: HTMLVideoElement) => node.paused)
+          )
+          .toBe(true);
+        await search.fill('Song 00');
+        await search.press('Enter');
+        await expect
+          .poll(async () => {
+            const boxes = await Promise.all([
+              search.boundingBox(),
+              upload.boundingBox(),
+              close.boundingBox(),
+            ]);
+            if (boxes.some((box) => !box)) return false;
+            const [searchBox, uploadBox, closeBox] = boxes;
+            const overlapsRow = (
+              a: NonNullable<typeof searchBox>,
+              b: NonNullable<typeof searchBox>
+            ) => Math.min(a.y + a.height, b.y + b.height) > Math.max(a.y, b.y);
+            return (
+              (!overlapsRow(searchBox!, uploadBox!) ||
+                searchBox!.x + searchBox!.width <= uploadBox!.x) &&
+              (!overlapsRow(uploadBox!, closeBox!) ||
+                uploadBox!.x + uploadBox!.width <= closeBox!.x)
+            );
+          })
+          .toBe(true);
+        const duration = drawer.locator('li').first().locator(':scope > span');
+        const add = drawer
+          .locator('li')
+          .first()
+          .getByRole('button', { name: `${label('gallery.videoReview.musicAdd')}:` });
+        expect(
+          (await duration.boundingBox())!.x + (await duration.boundingBox())!.width
+        ).toBeLessThanOrEqual((await add.boundingBox())!.x);
+        await page.screenshot({
+          path: info.outputPath('music-library-search.png'),
+          fullPage: false,
+        });
+        const row = drawer.locator('li').first();
+        await row
+          .getByRole('button', { name: `${label('gallery.videoReview.musicPlay')}:` })
+          .click();
+        await expect(
+          row.getByRole('button', { name: `${label('gallery.videoReview.musicStop')}:` })
+        ).toBeVisible();
+        await close.focus();
+        await page.keyboard.press('Escape');
+        await expect(drawer).toHaveCount(0);
+        await expect(review).toBeVisible();
+        await expect
+          .poll(() =>
+            review
+              .locator('video')
+              .first()
+              .evaluate((node: HTMLVideoElement) => node.paused)
+          )
+          .toBe(true);
+        await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
+        await expect(drawer).toBeVisible();
+        await expect(
+          drawer.getByRole('button', {
+            name: `${label('gallery.videoReview.musicStop')}:`,
+          })
+        ).toHaveCount(0);
+        await expect
+          .poll(() =>
+            review
+              .locator('video')
+              .first()
+              .evaluate((node: HTMLVideoElement) => node.paused)
+          )
+          .toBe(true);
+        await search.fill('Song 00');
+        await search.press('Enter');
+        await expect(drawer.locator('li')).toHaveCount(1);
+        await row
+          .getByRole('button', { name: `${label('gallery.videoReview.musicAdd')}:` })
+          .click();
+        await expect(drawer).toHaveCount(0);
+        await expect(review.locator(`[data-audio-lane="${lane}"] [data-audio-id]`)).toHaveCount(1);
+        await page.screenshot({ path: info.outputPath('music-inserted.png'), fullPage: false });
+        await expect.poll(() => libraryCounts(page)).toEqual([37, 2]);
+        const button = (key: Parameters<typeof translate>[0]) =>
+          review.getByRole('button', { name: label(key), exact: true });
+        const clips = review.locator(`[data-audio-lane="${lane}"] [data-audio-id]`);
+        const selectedId = await clips.first().getAttribute('data-audio-id');
+        await button('gallery.videoReview.undo').click();
+        await expect(clips).toHaveCount(0);
+        expect(await libraryCounts(page)).toEqual([37, 2]);
+        await button('gallery.videoReview.redo').click();
+        await expect(clips).toHaveCount(1);
+        await expect(clips.first()).toHaveAttribute('data-audio-id', selectedId!);
+        await button('common.actions.close').click();
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(clips).toHaveCount(1);
+        await expect(clips.first()).toHaveAttribute('data-audio-id', selectedId!);
+        if (variant.width === 1920) {
+          const download = page.waitForEvent('download');
+          await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
+          const result = await download;
+          await result.saveAs(info.outputPath('library-music.webm'));
+          expect(await result.failure()).toBeNull();
+          expect(
+            (await readFile(info.outputPath('library-music.webm'))).byteLength
+          ).toBeGreaterThan(0);
+        }
+        // Undo frees the captured insertion position while retaining the selected source in history.
+        await button('gallery.videoReview.undo').click();
+        await expect(clips).toHaveCount(0);
+        await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
+        await expect(drawer).toBeVisible();
+        const chooser = page.waitForEvent('filechooser');
+        await upload.click();
+        await (
+          await chooser
+        ).setFiles({
+          name: 'Uploaded music.wav',
+          mimeType: 'audio/wav',
+          buffer: await readFile(new URL('../fixtures/review-voice-speech.wav', import.meta.url)),
+        });
+        await expect(drawer).toHaveCount(0);
+        await expect(clips).toHaveCount(1);
+        const uploadedId = await clips.first().getAttribute('data-audio-id');
+        expect(uploadedId).not.toBe(selectedId);
+        await expect.poll(() => libraryCounts(page)).toEqual([38, 3]);
+        await button('gallery.videoReview.undo').click();
+        await expect(clips).toHaveCount(0);
+        expect(await libraryCounts(page)).toEqual([38, 3]);
+        await button('gallery.videoReview.redo').click();
+        await expect(clips).toHaveCount(1);
+        await expect(clips.first()).toHaveAttribute('data-audio-id', uploadedId!);
+        await button('common.actions.close').click();
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(clips).toHaveCount(1);
+        await expect(clips.first()).toHaveAttribute('data-audio-id', uploadedId!);
+        expect(await libraryCounts(page)).toEqual([38, 3]);
+        await page.screenshot({
+          path: info.outputPath('music-upload-reopened.png'),
+          fullPage: false,
+        });
+      } finally {
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
       }
-      const searchY = (await search.boundingBox())!.y;
-      await expect
-        .poll(() => list.evaluate((node) => node.scrollHeight > node.clientHeight))
-        .toBe(true);
-      await list.evaluate((node) => {
-        node.scrollTop = node.scrollHeight;
-      });
-      await expect(drawer.locator('li').last()).toBeInViewport({ ratio: 1 });
-      expect((await search.boundingBox())!.y).toBeCloseTo(searchY, 0);
-      await expect(upload).toBeInViewport({ ratio: 1 });
-      await expect(close).toBeInViewport({ ratio: 1 });
-      await page.screenshot({ path: info.outputPath('music-library-scroll.png'), fullPage: false });
-      await list.evaluate((node) => {
-        node.scrollTop = 0;
-      });
-      await filter.click();
-      await expect(page.getByRole('option', { name: 'Images only', exact: true })).toHaveCount(0);
-      await page.getByRole('option', { name: 'Music tagged', exact: true }).click();
-      await expect(drawer.locator('li')).toHaveCount(18);
-      await search.fill('Song 01');
-      await search.press('Enter');
-      await expect(drawer.locator('li')).toHaveCount(0);
-      await expect(filter).toContainText('Music tagged');
-      await search.fill('Song 00');
-      await search.press('Enter');
-      await expect(drawer.locator('li')).toHaveCount(1);
-      await filter.click();
-      await page.getByRole('option', { name: 'All media', exact: true }).click();
-      await search.fill('');
-      await search.press('Enter');
-      await expect(drawer.locator('li')).toHaveCount(36);
-      await filter.click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.musicAll'), exact: true })
-        .click();
-      await search.fill('not-existing');
-      await search.press('Enter');
-      await expect(drawer.locator('li')).toHaveCount(0);
-      await expect(
-        drawer.getByRole('button', { name: label('common.actions.close'), exact: true })
-      ).toBeVisible();
-      await search.fill('Song 00');
-      await search.press('Enter');
-      await expect(drawer.locator('li')).toHaveCount(1);
-      await search.press('Space');
-      await expect
-        .poll(() =>
-          review
-            .locator('video')
-            .first()
-            .evaluate((node: HTMLVideoElement) => node.paused)
-        )
-        .toBe(true);
-      await search.fill('Song 00');
-      await search.press('Enter');
-      await expect
-        .poll(async () => {
-          const boxes = await Promise.all([
-            search.boundingBox(),
-            upload.boundingBox(),
-            close.boundingBox(),
-          ]);
-          if (boxes.some((box) => !box)) return false;
-          const [searchBox, uploadBox, closeBox] = boxes;
-          const overlapsRow = (
-            a: NonNullable<typeof searchBox>,
-            b: NonNullable<typeof searchBox>
-          ) => Math.min(a.y + a.height, b.y + b.height) > Math.max(a.y, b.y);
-          return (
-            (!overlapsRow(searchBox!, uploadBox!) ||
-              searchBox!.x + searchBox!.width <= uploadBox!.x) &&
-            (!overlapsRow(uploadBox!, closeBox!) || uploadBox!.x + uploadBox!.width <= closeBox!.x)
-          );
-        })
-        .toBe(true);
-      const duration = drawer.locator('li').first().locator(':scope > span');
-      const add = drawer
-        .locator('li')
-        .first()
-        .getByRole('button', { name: new RegExp(`^${label('gallery.videoReview.musicAdd')}:`) });
-      expect(
-        (await duration.boundingBox())!.x + (await duration.boundingBox())!.width
-      ).toBeLessThanOrEqual((await add.boundingBox())!.x);
-      await page.screenshot({ path: info.outputPath('music-library-search.png'), fullPage: false });
-      const row = drawer.locator('li').first();
-      await row
-        .getByRole('button', { name: new RegExp(`^${label('gallery.videoReview.musicPlay')}:`) })
-        .click();
-      await expect(
-        row.getByRole('button', { name: new RegExp(`^${label('gallery.videoReview.musicStop')}:`) })
-      ).toBeVisible();
-      await close.focus();
-      await page.keyboard.press('Escape');
-      await expect(drawer).toHaveCount(0);
-      await expect(review).toBeVisible();
-      await expect
-        .poll(() =>
-          review
-            .locator('video')
-            .first()
-            .evaluate((node: HTMLVideoElement) => node.paused)
-        )
-        .toBe(true);
-      await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
-      await expect(drawer).toBeVisible();
-      await expect(
-        drawer.getByRole('button', {
-          name: new RegExp(`^${label('gallery.videoReview.musicStop')}:`),
-        })
-      ).toHaveCount(0);
-      await expect
-        .poll(() =>
-          review
-            .locator('video')
-            .first()
-            .evaluate((node: HTMLVideoElement) => node.paused)
-        )
-        .toBe(true);
-      await search.fill('Song 00');
-      await search.press('Enter');
-      await expect(drawer.locator('li')).toHaveCount(1);
-      await row
-        .getByRole('button', { name: new RegExp(`^${label('gallery.videoReview.musicAdd')}:`) })
-        .click();
-      await expect(drawer).toHaveCount(0);
-      await expect(review.locator(`[data-audio-lane="${lane}"] [data-audio-id]`)).toHaveCount(1);
-      await page.screenshot({ path: info.outputPath('music-inserted.png'), fullPage: false });
-      await expect.poll(() => libraryCounts(page)).toEqual([37, 2]);
-      const button = (key: Parameters<typeof translate>[0]) =>
-        review.getByRole('button', { name: label(key), exact: true });
-      const clips = review.locator(`[data-audio-lane="${lane}"] [data-audio-id]`);
-      const selectedId = await clips.first().getAttribute('data-audio-id');
-      await button('gallery.videoReview.undo').click();
-      await expect(clips).toHaveCount(0);
-      expect(await libraryCounts(page)).toEqual([37, 2]);
-      await button('gallery.videoReview.redo').click();
-      await expect(clips).toHaveCount(1);
-      await expect(clips.first()).toHaveAttribute('data-audio-id', selectedId!);
-      await button('common.actions.close').click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      await expect(clips).toHaveCount(1);
-      await expect(clips.first()).toHaveAttribute('data-audio-id', selectedId!);
-      if (variant.width === 1920) {
-        const download = page.waitForEvent('download');
-        await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
-        const result = await download;
-        await result.saveAs(info.outputPath('library-music.webm'));
-        expect(await result.failure()).toBeNull();
-        expect((await readFile(info.outputPath('library-music.webm'))).byteLength).toBeGreaterThan(
-          0
-        );
-      }
-      // Undo frees the captured insertion position while retaining the selected source in history.
-      await button('gallery.videoReview.undo').click();
-      await expect(clips).toHaveCount(0);
-      await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
-      await expect(drawer).toBeVisible();
-      const chooser = page.waitForEvent('filechooser');
-      await upload.click();
-      await (
-        await chooser
-      ).setFiles({
-        name: 'Uploaded music.wav',
-        mimeType: 'audio/wav',
-        buffer: await readFile(new URL('../fixtures/review-voice-speech.wav', import.meta.url)),
-      });
-      await expect(drawer).toHaveCount(0);
-      await expect(clips).toHaveCount(1);
-      const uploadedId = await clips.first().getAttribute('data-audio-id');
-      expect(uploadedId).not.toBe(selectedId);
-      await expect.poll(() => libraryCounts(page)).toEqual([38, 3]);
-      await button('gallery.videoReview.undo').click();
-      await expect(clips).toHaveCount(0);
-      expect(await libraryCounts(page)).toEqual([38, 3]);
-      await button('gallery.videoReview.redo').click();
-      await expect(clips).toHaveCount(1);
-      await expect(clips.first()).toHaveAttribute('data-audio-id', uploadedId!);
-      await button('common.actions.close').click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      await expect(clips).toHaveCount(1);
-      await expect(clips.first()).toHaveAttribute('data-audio-id', uploadedId!);
-      expect(await libraryCounts(page)).toEqual([38, 3]);
-      await page.screenshot({
-        path: info.outputPath('music-upload-reopened.png'),
-        fullPage: false,
-      });
-    } finally {
-      await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
-  });
+  );
 }

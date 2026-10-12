@@ -1,4 +1,5 @@
-import { Info, Keyboard, Palette, Clock3, Move, RotateCcw } from 'lucide-react';
+import { reviewInformationSections } from './inspector-sections';
+import { Keyboard, Palette, Clock3, Move, RotateCcw } from 'lucide-react';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
@@ -59,14 +60,7 @@ export function reviewKeySections(props: {
       ) : null}
     </>
   );
-  const sections: Parameters<typeof ReviewInspectorSections>[0]['sections'][number][] = [];
-  if (props.information)
-    sections.push({
-      id: 'information',
-      label: translate('gallery.videoReview.actionInformation'),
-      icon: Info,
-      content: props.information,
-    });
+  const sections = reviewInformationSections(props.information);
   sections.push({
     id: 'display',
     label: translate('gallery.videoReview.keyDisplay'),

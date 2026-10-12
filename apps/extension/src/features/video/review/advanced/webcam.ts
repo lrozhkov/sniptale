@@ -1,4 +1,4 @@
-import { normalizePaintColor } from '@sniptale/foundation/paint';
+import { parseQuickEditShadow } from './shadow-validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   DEFAULT_CAMERA_APPEARANCE,
@@ -154,10 +154,9 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
   const shadow = value['shadow'];
   let parsedShadow: QuickEditWebcam['shadow'];
   if (shadow !== undefined) {
-    if (!isRecord(shadow) || !isBoundedNumber(shadow['intensity'], 0, 100)) return null;
-    const color = typeof shadow['color'] === 'string' ? normalizePaintColor(shadow['color']) : null;
-    if (!color) return null;
-    parsedShadow = { intensity: shadow['intensity'], color };
+    const parsed = parseQuickEditShadow(shadow);
+    if (!parsed) return null;
+    parsedShadow = parsed;
   }
   return {
     assetId: value['assetId'],

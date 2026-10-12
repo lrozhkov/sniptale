@@ -612,3 +612,26 @@ it('round-trips optional background blur without rewriting legacy history layout
     ).toBeNull();
   }
 });
+
+it('rejects unsupported schema identities and UI-bearing history content while retaining released schemas', () => {
+  const content = createQuickEditAdvancedContent();
+  for (
+    let schemaVersion = 2;
+    schemaVersion <= QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
+    schemaVersion++
+  ) {
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).not.toBeNull();
+  }
+  for (const schemaVersion of [0, 1, 2.5, '2', NaN, QUICK_EDIT_ADVANCED_SCHEMA_VERSION + 1]) {
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).toBeNull();
+  }
+  expect(loadQuickEditAdvancedContentState({ ...content, ui: advanced().ui })).toBeNull();
+  expect(loadQuickEditAdvancedState({ ...advanced(), ui: { mode: 'unknown' } })).toBeNull();
+  expect(Object.keys(loadQuickEditAdvancedState(advanced())!)).toEqual([
+    'schemaVersion',
+    'ui',
+    'zoom',
+    'background',
+    'audio',
+  ]);
+});

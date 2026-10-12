@@ -10,7 +10,11 @@ import type { QuickEditBackgroundSettings } from '../../../../apps/extension/src
 /** Real SVG decode, shared live raster and export scene, including camera exposure passes. */
 export async function probe() {
   const source = Object.assign(document.createElement('canvas'), { width: 320, height: 180 });
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><defs><pattern id="p" width="4" height="4" patternUnits="userSpaceOnUse"><path fill="white" d="M0 0h2v4H0z"/><path fill="black" d="M2 0h2v4H2z"/></pattern></defs><path fill="url(#p)" d="M0 0h320v180H0z"/></svg>`;
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><defs><pattern ' +
+    'id="p" width="4" height="4" patternUnits="userSpaceOnUse"><path fill="white" ' +
+    'd="M0 0h2v4H0z"/><path fill="black" d="M2 0h2v4H2z"/></pattern></defs><path ' +
+    'fill="url(#p)" d="M0 0h320v180H0z"/></svg>';
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   const image = new Image();
   image.src = url;

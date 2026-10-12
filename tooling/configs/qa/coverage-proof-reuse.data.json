@@ -3,16 +3,25 @@
   "artifactKind": "sniptale-coverage-proof-reuse-policy",
   "proofPath": ".tmp/qa/coverage-proof.json",
   "reportDirectory": ".tmp/coverage/canonical",
-  "productionRoots": ["apps/extension/src", "packages"],
-  "testRoots": ["apps/extension", "packages", "tooling/test"],
-  "testSupportRoots": ["tooling/test/harness", "tooling/test/support"],
+  "productionRoots": [
+    "apps/extension/src",
+    "packages"
+  ],
+  "testRoots": [
+    "apps/extension",
+    "packages",
+    "tooling/test"
+  ],
+  "testSupportRoots": [
+    "tooling/test/harness",
+    "tooling/test/support"
+  ],
   "configFiles": [
     "tooling/ci/mediabunny/normalize.mjs",
     "tooling/ci/mediabunny/patch-manifest.json",
     "tooling/ci/mediabunny/patch-payload.json.gz",
     "tooling/ci/mediabunny/source.patch",
     "tooling/ci/mediabunny/LICENSE",
-
     "package.json",
     "package-lock.json",
     "vitest.config.ts",
@@ -26,7 +35,12 @@
     "tooling/qa/proof/coverage/test-coverage/thresholds.mjs",
     "tooling/qa/policy/quality/quality.config.mjs"
   ],
-  "reportFiles": ["coverage-final.json", "coverage-summary.json", "lcov.info", "html/index.html"],
+  "reportFiles": [
+    "coverage-final.json",
+    "coverage-summary.json",
+    "lcov.info",
+    "html/index.html"
+  ],
   "owners": {
     "decision": "tooling/qa/proof/coverage/coverage-proof.mjs",
     "execution": "tooling/qa/proof/coverage/audit-coverage-step.mjs",
@@ -43,12 +57,15 @@
     "tooling/ci/artifacts.mjs",
     ".github/workflows/_canonical-proof.yml",
     ".github/workflows/provenance.yml",
-    ".github/workflows/release.yml"
+    ".github/workflows/release.yml",
+    "tooling/qa/composition/checkpoint/focused/full-proof-steps.mjs",
+    "tooling/qa/composition/repository/full-verification/unit-test-steps.mjs"
   ],
   "modes": {
-    "local": "full coverage executes or reuses an exact validated receipt inside Fast proof",
+    "local": "full coverage executes or reuses an exact validated receipt; full verification and checkpoint may admit its complete product test execution",
     "candidate": "full coverage executes in Fast proof and seals the complete canonical reports",
-    "release": "exact Fast proof admission and inherited report hashes; no coverage execution fallback"
+    "release": "exact Fast proof admission and inherited report hashes; no coverage execution fallback",
+    "checkpoint": "Ambiguous existing focused scope may reuse exact full product coverage with its own full runtime/execution identity and sealed report bytes; current changed/new-file thresholds still apply."
   },
   "digests": [
     "canonical production source inventory and contents",
@@ -56,7 +73,8 @@
     "coverage scope, thresholds, configuration, and owner implementation",
     "package manifest and lockfile",
     "QA image digest",
-    "every canonical JSON, LCOV, and HTML report file"
+    "every canonical JSON, LCOV, and HTML report file",
+    "complete full-unit runtime and execution fingerprint of the coverage producer, including excluded runtime sources and actual pool"
   ],
   "proof": "Only successfully validated full product coverage may write the receipt; every blocking consumer recomputes all input and report digests.",
   "rollback": "Delete the disposable Fast proof and rerun ci:proof to force full coverage.",

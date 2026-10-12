@@ -220,7 +220,8 @@ export async function startQuickPreviewPerformanceProbe(
                   (publications.at(-1)!.now - publications[0]!.now)
                 : null,
             measurement:
-              'visible manual canvas DOM replacement; application publication, not GPU scanout; transportTime is not represented frame timestamp',
+              'visible manual canvas DOM replacement; application publication, not GPU scanout; ' +
+              'transportTime is not represented frame timestamp',
           },
           quality: {
             total: quality.totalVideoFrames - initial.quality.totalVideoFrames,
@@ -528,7 +529,8 @@ export async function installQuickPreviewMediaDiagnostic(page: Page) {
           overflow,
           expired,
           measurement:
-            'Opt-in existing-callback/media-event observation; detached candidate identity does not prove camera admission; timestamps use performance.now.',
+            'Opt-in existing-callback/media-event observation; detached candidate identity ' +
+            'does not prove camera admission; timestamps use performance.now.',
         };
       },
       dispose() {

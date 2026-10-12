@@ -553,7 +553,8 @@ for (const recipe of selected)
               viewport: { width: 1920, height: 900, dpr: 1 },
               limitations: [
                 'Native video FPS is not composed-overlay FPS.',
-                'Manual cadence observes canvas DOM publication, not GPU scanout; observer may coalesce synchronous swaps.',
+                'Manual cadence observes canvas DOM publication, not GPU scanout; observer may ' +
+                  'coalesce synchronous swaps.',
                 'Same-file camera is workload evidence, not independent A/V synchronization proof.',
               ],
             },

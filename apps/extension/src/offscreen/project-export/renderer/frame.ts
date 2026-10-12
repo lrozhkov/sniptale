@@ -24,7 +24,7 @@ import type {
 import { drawExportSceneBackground, type ExportSceneBackgroundCache } from './background';
 import { drawCompositionLayer } from './clip';
 import type { LoadedImagesMap } from './types';
-import { resolveOrderedVisualPassLayers } from './visual-pass-layers';
+import { resolveOrderedVisualPassLayers } from '../../../features/video/composition/visual-pass-layers';
 import { drawExportTransitionOverlayPasses, resolveExportEffectDrawState } from './frame-effects';
 import { drawExportOverlayPass } from './frame-overlays';
 

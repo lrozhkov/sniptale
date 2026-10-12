@@ -80,14 +80,7 @@ function reviewRange(args: Parameters<typeof createReviewCut>[0], kind: ReviewEd
     selection.start >= selection.end
   )
     return null;
-  const start =
-    args.snapToKeyframes === false
-      ? selection.start
-      : nearestReviewBoundary(selection.start, boundaries);
-  const end =
-    args.snapToKeyframes === false
-      ? selection.end
-      : nearestReviewBoundary(selection.end, boundaries);
+  const { start, end } = snapReviewRange(selection, boundaries, args.snapToKeyframes);
   if (start < 0 || end > duration || start >= end) return null;
   if (edits.some((edit) => edit.kind === kind && edit.start < end && edit.end > start)) return null;
   return {
@@ -205,3 +198,18 @@ export function reviewCutTransitionAt(time: number, plans: readonly ReviewCutTra
 }
 
 /** Invalid authored transitions refuse the operation instead of degrading it to a hard cut. */
+
+export function snapReviewRange(
+  selection: { start: number; end: number },
+  boundaries: readonly number[],
+  snapToKeyframes?: boolean
+) {
+  return {
+    start:
+      snapToKeyframes === false
+        ? selection.start
+        : nearestReviewBoundary(selection.start, boundaries),
+    end:
+      snapToKeyframes === false ? selection.end : nearestReviewBoundary(selection.end, boundaries),
+  };
+}

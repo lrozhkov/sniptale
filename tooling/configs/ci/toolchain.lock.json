@@ -15,11 +15,11 @@
     },
     "oxlint": {
       "packagePath": "node_modules/oxlint",
-      "version": "1.79.0"
+      "version": "1.87.0"
     },
     "oxlintTsgolint": {
       "packagePath": "node_modules/oxlint-tsgolint",
-      "version": "7.0.2001"
+      "version": "7.0.2004"
     },
     "typescriptNative": {
       "packagePath": "node_modules/@typescript/native",
@@ -40,7 +40,7 @@
   },
   "dependencyGraph": {
     "packagePath": "node_modules/dependency-cruiser",
-    "version": "18.2.0"
+    "version": "18.5.0"
   },
   "openstackController": {
     "pythonVersion": "3.12.13",
@@ -63,29 +63,29 @@
     }
   },
   "playwright": {
-    "version": "1.62.1",
-    "npmLockSha256": "6595faa266799d7485828963aada5aae944cdf0c9128408aead5832f8cfffabb",
+    "version": "1.64.0",
+    "npmLockSha256": "f7aa01093f08797cf23dd35f4ca1ee26e66455a3a23c70531c48327f79816464",
     "browser": "chromium",
-    "browserRevision": "1234",
-    "browserVersion": "151.0.7922.34",
+    "browserRevision": "1248",
+    "browserVersion": "156.0.8078.4",
     "assets": [
       {
-        "id": "chromium-1234",
-        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip",
-        "sha256": "ae8736ac28bc69278551500f219fc749575648263c43ec5990749eff43b9fcf8",
-        "executable": "chrome-linux64/chrome"
+        "id": "chromium-1248",
+        "url": "https://cdn.playwright.dev/builds/cft/156.0.8078.4/linux64/chrome-linux64.zip",
+        "executable": "chrome-linux64/chrome",
+        "sha256": "43fd31766c7533a02dda2ded5ad50c2f861cd5400be7509c0abad71129f79d79"
       },
       {
-        "id": "chromium_headless_shell-1234",
-        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-headless-shell-linux64.zip",
-        "sha256": "3cfc2bd00d1bafcf8a68dc74c9c92bb7150ddc8d26ade948a776316e1cec4f14",
-        "executable": "chrome-headless-shell-linux64/chrome-headless-shell"
+        "id": "chromium_headless_shell-1248",
+        "url": "https://cdn.playwright.dev/builds/cft/156.0.8078.4/linux64/chrome-headless-shell-linux64.zip",
+        "executable": "chrome-headless-shell-linux64/chrome-headless-shell",
+        "sha256": "c3e50596aef52c58f8fda3c6b3411c33d34c88b177b3ed1c2243359fd3b8ba20"
       },
       {
-        "id": "ffmpeg-1011",
-        "url": "https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-linux.zip",
-        "sha256": "ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc",
-        "executable": "ffmpeg-linux"
+        "id": "ffmpeg-1013",
+        "url": "https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1013/ffmpeg-linux.zip",
+        "executable": "ffmpeg-linux",
+        "sha256": "ee986434d158f74fb5d9c5ff1092026ceedb63f324fe90b5be89460926b7b679"
       }
     ]
   },
@@ -112,6 +112,6 @@
   },
   "mutationRunner": {
     "packageJsonSha256": "8f796a9278d7205228d12055b64ec792151d0b61fa0785dedef8b56c2bf7f1b7",
-    "packageLockSha256": "0d136b303c788fae07aa94abc8be14ada2ac77605eb6644dbefedfb9707a20d2"
+    "packageLockSha256": "4a4c8415cfea16b210cf171a9ad37535aeec9ab879bbc49bbb3a04fc92b46532"
   }
 }

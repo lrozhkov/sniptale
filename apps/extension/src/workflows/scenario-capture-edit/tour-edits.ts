@@ -1,3 +1,4 @@
+import { commitScenarioEditedImage } from './edits';
 import type { ScenarioProjectSnapshot } from '../../composition/persistence/scenario/contracts';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -10,9 +11,9 @@ import {
   type EditorDocument,
 } from '../../features/editor/document/public';
 import { remapTourImageGeometry } from '../../features/scenario/project/public';
-import { commitScenarioAggregateMutation } from '../../composition/persistence/scenario/aggregate-mutations';
+
 import { rejectScenarioMutationBeforeHandoff } from '../../composition/persistence/scenario/asset-staging';
-import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
+
 import { loadScenarioImageEditorSource } from './source';
 import { discardPreparedScenarioAsset } from '../../composition/persistence/scenario/projects';
 import { prepareScenarioEditedCaptureAsset } from './edits';
@@ -104,23 +105,7 @@ export async function applyTourImageEdit(args: {
       Object.assign(slide, geometry.slide, { image: replacement });
     else if (slide.kind === 'navigation') slide.background.image = replacement;
     handedOff = true;
-    const result = await commitScenarioAggregateMutation(project, {
-      expectedUpdatedAt: args.baseUpdatedAt,
-      ...(args.expectedRevision === undefined ? {} : { expectedRevision: args.expectedRevision }),
-      children: {
-        assetPuts: [prepared.entry],
-        editorDocumentPuts: [
-          {
-            projectId: project.id,
-            stepId: documentId,
-            document: args.document,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-        ],
-      },
-    });
-    publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
+    const result = await commitScenarioEditedImage(project, args, documentId, prepared.entry);
     return { status: 'applied', ...result };
   } catch (error) {
     if (!handedOff)

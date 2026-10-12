@@ -3,6 +3,7 @@ export {
   createTourDocument,
   createTourImageSlide,
   createGuideParagraphs,
+  guideParagraphText,
   createGuideProject,
   createGuideStep,
 } from './factories';

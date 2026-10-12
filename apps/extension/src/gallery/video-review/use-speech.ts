@@ -55,7 +55,7 @@ function failure(error: unknown): Failure {
 }
 
 /** Coordinates configured model discovery and cancellable remote speech operations. */
-export function useReviewSpeech(args: {
+export interface ReviewSpeechAccess {
   session: ReviewSpeechSession;
   target: ReviewSpeechTarget;
   original?: { file: Blob; sourceAssetId: string } | undefined;
@@ -64,7 +64,9 @@ export function useReviewSpeech(args: {
   beforeAction: ReviewBeforeAction;
   flushAdvanced(): Promise<void>;
   registerSpeechFlush(owner: ReviewSpeechFlushRegistration): () => void;
-}) {
+}
+
+export function useReviewSpeech(args: ReviewSpeechAccess) {
   const snapshot = useSyncExternalStore(
     args.session.subscribe,
     args.session.getSnapshot,

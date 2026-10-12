@@ -198,6 +198,20 @@ for (const variant of [
       ] as const) {
         await page.setViewportSize({ width, height });
         if (fullHeight) await button('videoEditor.app.panelFullHeight').click();
+        const scroll = dialog.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
+        if (width < 1280) {
+          await expect
+            .poll(() => scroll.evaluate((node) => node.scrollWidth - node.clientWidth))
+            .toBeGreaterThan(0);
+          await scroll.evaluate((node) => {
+            node.scrollLeft = node.scrollWidth;
+          });
+          await expect.poll(() => scroll.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+        } else {
+          await scroll.evaluate((node) => {
+            node.scrollLeft = 0;
+          });
+        }
         await expect
           .poll(async () => toolbar.evaluate((node) => node.scrollWidth - node.clientWidth))
           .toBeLessThanOrEqual(1);
@@ -247,8 +261,10 @@ for (const variant of [
           'gallery.videoReview.exportVideo',
           'gallery.videoReview.downloadVideo',
         ] as const) {
-          await button(destination).scrollIntoViewIfNeeded();
-          await expect(button(destination)).toBeInViewport({ ratio: 1 });
+          await expect(async () => {
+            await button(destination).scrollIntoViewIfNeeded();
+            await expect(button(destination)).toBeInViewport({ ratio: 1, timeout: 100 });
+          }).toPass({ timeout: 10_000 });
           await expect(button(destination)).toBeEnabled();
         }
         await expect(inspector.locator('header h2')).toBeInViewport();
@@ -341,6 +357,16 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
     await expect(button('gallery.videoReview.exportQuality')).toContainText(
       label('videoEditor.exportDialog.qualityHigh')
     );
+    const nativeAacSupported = await page.evaluate(async () => {
+      if (typeof AudioEncoder === 'undefined') return false;
+      const support = await AudioEncoder.isConfigSupported({
+        codec: 'mp4a.40.2',
+        sampleRate: 48000,
+        numberOfChannels: 2,
+        bitrate: 128_000,
+      });
+      return support.supported === true;
+    });
     for (const format of ['mp4', 'webm'] as const) {
       await button('videoEditor.exportDialog.formatLabel').click();
       await page
@@ -350,8 +376,23 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
         format === 'mp4' ? 'H.264' : 'VP9'
       );
       await page.screenshot({ path: testInfo.outputPath(`export-profile-${format}.png`) });
-      const downloading = page.waitForEvent('download');
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+      if (format === 'mp4' && !nativeAacSupported) {
+        await button('gallery.videoReview.downloadVideo').click();
+        await expect(button('gallery.videoReview.downloadVideo')).toBeDisabled();
+        await expect(
+          dialog.getByRole('status').filter({
+            hasText: label('gallery.videoReview.exportBlockerAudioEncoder'),
+          })
+        ).toBeVisible();
+        await page.screenshot({
+          path: testInfo.outputPath('export-profile-mp4-unavailable.png'),
+          fullPage: false,
+        });
+        continue;
+      }
+      await expect(button('gallery.videoReview.downloadVideo')).toBeEnabled();
+      const downloading = page.waitForEvent('download');
       await button('gallery.videoReview.downloadVideo').click();
       const download = await downloading;
       expect(download.suggestedFilename().endsWith(`.${format}`)).toBe(true);

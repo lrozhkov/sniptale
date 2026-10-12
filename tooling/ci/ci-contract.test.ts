@@ -234,8 +234,8 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   ]);
   const expectedToolchainPackages = {
     oxfmt: ['node_modules/oxfmt', '0.64.0'],
-    oxlint: ['node_modules/oxlint', '1.79.0'],
-    oxlintTsgolint: ['node_modules/oxlint-tsgolint', '7.0.2001'],
+    oxlint: ['node_modules/oxlint', '1.87.0'],
+    oxlintTsgolint: ['node_modules/oxlint-tsgolint', '7.0.2004'],
     typescriptCompilerApi: ['node_modules/@typescript/old', '6.0.3'],
     typescriptCompilerApiShim: ['node_modules/typescript', '6.0.2'],
     typescriptNative: ['node_modules/@typescript/native', '7.0.2'],
@@ -255,7 +255,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   }
   expect(lock.dependencyGraph).toEqual({
     packagePath: 'node_modules/dependency-cruiser',
-    version: '18.2.0',
+    version: '18.5.0',
   });
   expect(projectLock.packages[lock.dependencyGraph.packagePath].version).toBe(
     lock.dependencyGraph.version

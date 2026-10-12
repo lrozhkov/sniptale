@@ -13,15 +13,7 @@ import { drawSceneGradient } from '../../features/video/project/scene/background
 export function drawReviewComments(
   context: CanvasRenderingContext2D,
   comments: readonly CanvasCommentExport[],
-  args: {
-    attachment: CanvasCommentExport['attachment'];
-    canvas: { width: number; height: number };
-    videoTransform: { x: number; y: number; width: number; height: number } | null;
-    scale: number;
-    sourceTime: number | undefined;
-    resources?: RenderResources | undefined;
-    rasterScale?: { x: number; y: number } | undefined;
-  }
+  args: ReviewCommentPaintArgs & { attachment: CanvasCommentExport['attachment'] }
 ): void {
   for (const comment of comments) {
     if (
@@ -37,14 +29,7 @@ export function drawReviewComments(
 function drawReviewComment(
   context: CanvasRenderingContext2D,
   comment: CanvasCommentExport,
-  args: {
-    canvas: { width: number; height: number };
-    videoTransform: { x: number; y: number; width: number; height: number } | null;
-    scale: number;
-    sourceTime: number | undefined;
-    resources?: RenderResources | undefined;
-    rasterScale?: { x: number; y: number } | undefined;
-  }
+  args: ReviewCommentPaintArgs
 ): void {
   const { point, pointRadius, box } = measureReviewComment(context, comment, args);
   const phase = overlayPulsePhase(args.sourceTime ?? 0, comment.start);
@@ -223,4 +208,13 @@ function wrapCanvasText(
     if (lines.length >= maxLines) return lines;
   }
   return lines;
+}
+
+interface ReviewCommentPaintArgs {
+  canvas: { width: number; height: number };
+  videoTransform: { x: number; y: number; width: number; height: number } | null;
+  scale: number;
+  sourceTime: number | undefined;
+  resources?: RenderResources | undefined;
+  rasterScale?: { x: number; y: number } | undefined;
 }

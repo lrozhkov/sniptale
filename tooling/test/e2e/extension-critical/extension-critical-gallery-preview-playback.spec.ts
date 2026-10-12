@@ -293,7 +293,9 @@ test('manual camera offset pixels follow cut speed and loop transport', async ({
           slow,
           loop,
           limitation:
-            'Camera pixels prove decoded offset at paused source times. Native clocks/rates and publication traces do not measure speaker output, AV physical latency, or the timestamp represented by a live composed frame.',
+            'Camera pixels prove decoded offset at paused source times. Native clocks/rates ' +
+            'and publication traces do not measure speaker output, AV physical latency, or ' +
+            'the timestamp represented by a live composed frame.',
         },
         null,
         2

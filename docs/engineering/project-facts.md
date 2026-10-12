@@ -132,6 +132,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/color-selector`
 - `apps/extension/src/ui/command-palette`
 - `apps/extension/src/ui/compact-inspector-controls`
+- `apps/extension/src/ui/document-autosave-labels.ts`
 - `apps/extension/src/ui/drawing-tools`
 - `apps/extension/src/ui/editor-start`
 - `apps/extension/src/ui/effect-catalog-controls.test.tsx`
@@ -146,6 +147,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/keyboard`
 - `apps/extension/src/ui/media-library-header.test.tsx`
 - `apps/extension/src/ui/media-library-header.tsx`
+- `apps/extension/src/ui/media-library-list.tsx`
 - `apps/extension/src/ui/page-bootstrap`
 - `apps/extension/src/ui/paint-selector`
 - `apps/extension/src/ui/popup-shell`

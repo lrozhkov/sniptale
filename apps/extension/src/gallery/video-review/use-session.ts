@@ -1,3 +1,4 @@
+import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import {
   useCallback,
   useEffect,
@@ -253,17 +254,3 @@ function createComposerCompletion(args: {
 }
 
 /** Browser visibility/unmount flushes share the same serialized recovery transaction. */
-function useRecoveryLifecycle(flush: () => Promise<void>, mounted: RefObject<boolean>) {
-  useEffect(() => {
-    mounted.current = true;
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') void flush().catch(() => undefined);
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      mounted.current = false;
-      document.removeEventListener('visibilitychange', onVisibility);
-      void flush().catch(() => undefined);
-    };
-  }, [flush, mounted]);
-}

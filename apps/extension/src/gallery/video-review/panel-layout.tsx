@@ -46,7 +46,7 @@ function panelKeySize(panel: Panel, key: string, size: number, min: number, max:
   return Object.hasOwn(sizes, key) ? sizes[key] : undefined;
 }
 
-const resizeKeys = new Set([
+const resizeKeys: readonly string[] = [
   'ArrowLeft',
   'ArrowRight',
   'ArrowUp',
@@ -55,7 +55,7 @@ const resizeKeys = new Set([
   'End',
   'Enter',
   ' ',
-]);
+];
 
 /** Mounted-editor preferences; effective bounds never overwrite the user's requested sizes. */
 export function useReviewPanelLayout(enabled: boolean) {
@@ -174,7 +174,7 @@ export function useReviewPanelLayout(enabled: boolean) {
           }
           return;
         }
-        if (!resizeKeys.has(event.key)) return;
+        if (!resizeKeys.includes(event.key)) return;
         event.preventDefault();
         event.stopPropagation();
         finish(false);

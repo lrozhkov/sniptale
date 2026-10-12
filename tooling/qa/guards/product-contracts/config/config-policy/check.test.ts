@@ -11,8 +11,8 @@ function createPassingPackageJson() {
       packageManager: { name: 'npm', version: '11.19.1', onFail: 'error' },
     },
     dependencies: {
-      react: '^19.2.5',
-      'react-dom': '^19.2.5',
+      react: '^19.3.0',
+      'react-dom': '^19.3.0',
     },
     devDependencies: {
       '@types/react': '^19.2.14',
@@ -202,7 +202,7 @@ it('rejects lockfile engine drift independently from the root package', async ()
 it('rejects malformed versions that merely share the governed prefix', async () => {
   const root = createTempRoot('verify-config-policy-version-prefix-');
   const packageJson = createPassingPackageJson();
-  packageJson.dependencies.react = '^19.2.not-semver';
+  packageJson.dependencies.react = '^19.3.not-semver';
   packageJson.devDependencies['@vitejs/plugin-react'] = '^6.1.preview';
   writePassingConfigPolicyFixture(root);
   writeConfigPolicyPackageJson(root, packageJson);

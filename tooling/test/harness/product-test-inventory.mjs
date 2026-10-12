@@ -5,12 +5,16 @@ import path from 'node:path';
 import { globSync } from 'tinyglobby';
 
 const JSDOM_DIRECTIVE = '// @vitest-environment jsdom\n';
-const PRODUCT_TEST_GLOBS = [
+export const PRODUCT_TEST_GLOBS = [
   'apps/extension/src/**/*.{test,spec}.{ts,tsx}',
   'packages/*/src/**/*.{test,spec}.{ts,tsx}',
 ];
 
 export const JSDOM_VM_THREADS_COMPATIBILITY_FILES = [
+  {
+    file: 'apps/extension/src/gallery/video-review/review.test.tsx',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
   {
     file: 'apps/extension/src/content/parser/export-manager/diagnostics/source.test.ts',
     reason: 'redefines the ambient window global',
@@ -47,9 +51,117 @@ export const JSDOM_VM_THREADS_COMPATIBILITY_FILES = [
     file: 'apps/extension/src/features/video/composition/canvas/buffer-canvas.test.ts',
     reason: 'redefines the ambient document global',
   },
+  {
+    file: 'apps/extension/src/content/selection/selection-mode/frozen.test.ts',
+    reason: 'redefines the ambient document global',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.autosave.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.image-framing.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/ai-parameter-preview.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/generation.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/image-drop.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/inspector.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/library.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/music-settings.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/selection.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/tour/workspace.test.tsx',
+    reason: 'validates host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/ui/effect-catalog-preview.test.tsx',
+    reason: 'imports host-realm archive fixtures',
+  },
 ];
 
 export const NODE_VM_THREADS_COMPATIBILITY_FILES = [
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.review-assets.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/restore.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/metadata-transport.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/export.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/storage.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/storage-units.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/storage-format.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/aggregate-unit-storage.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/aggregate-history-storage.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/review-workspaces/store-performance.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/review-workspaces/store-annotation-retention.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/review-workspaces/storage.test.ts',
+    reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/features/video/audio/tempo.test.ts',
+    reason: 'exceeds the unchanged wrapper timeout under vmThreads coverage instrumentation',
+  },
   {
     file: 'apps/extension/src/composition/persistence/ai-settings/provider-secrets.read-state.test.ts',
     reason: 'asserts host Error identity for a cross-realm WebCrypto DOMException',
@@ -65,6 +177,118 @@ export const NODE_VM_THREADS_COMPATIBILITY_FILES = [
   {
     file: 'apps/extension/src/workflows/page-package/collection/archive.test.ts',
     reason: 'asserts the host AbortSignal reason across a VM realm boundary',
+  },
+  {
+    file: 'apps/extension/src/background/offscreen-document/readiness.test.ts',
+    reason: 'asserts host Error identity for a cross-realm AbortSignal DOMException',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/media-library/delete-cascade.scenario.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/aggregate-cleanup.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/aggregate-mutations.shared-source.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/asset-reference-removal.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/history-model.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/store/audio-import.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/store/capture-step/artifact-persistence.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/store/image-import-tour.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/store/image-import.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/store/project-records/duplicate.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/scenario/store/project-records/template-apply.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/features/scenario/project/ai-proposal.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/features/scenario/project/mutations.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/features/scenario/project/numbering.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/features/scenario/project/spatial-placement.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/features/scenario/project/tour-commands.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/features/scenario/project/tour-generation.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/runtime/history.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/scenario-editor/page-shell/runtime/tour-html.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/scenario-tour.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.frozen-roundtrip.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'apps/extension/src/workflows/scenario-capture-edit/tour-materials.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
+  },
+  {
+    file: 'packages/runtime-contracts/src/scenario/tour-parser.test.ts',
+    reason: 'validates or compares host-realm structured-cloned project records',
   },
 ];
 

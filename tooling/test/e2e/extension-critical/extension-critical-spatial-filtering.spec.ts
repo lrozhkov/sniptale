@@ -11,7 +11,9 @@ test('perspective filters subpixel rules and depth blur without moving line copi
 }, info) => {
   const bundle = await build({
     stdin: {
-      contents: `export { createReviewSpatialRenderer } from './apps/extension/src/workflows/video-review/spatial-renderer';`,
+      contents:
+        "export { createReviewSpatialRenderer } from './apps/extension/src/workflows/" +
+        "video-review/spatial-renderer';",
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -173,9 +175,13 @@ test('visual focus contours bound the real WebGL sharp and fully blurred regions
 }, info) => {
   const bundle = await build({
     stdin: {
-      contents: `export { createReviewSpatialRenderer } from './apps/extension/src/workflows/video-review/spatial-renderer';
-        export { quickEditPlaneProjection, projectQuickEditPoint } from './apps/extension/src/features/video/review/advanced/spatial-geometry';
-        export { resolveReviewSpatialFocusGeometry, unprojectReviewSpatialPoint } from './apps/extension/src/gallery/video-review/spatial-control-geometry';`,
+      contents:
+        "export { createReviewSpatialRenderer } from './apps/extension/src/workflows/" +
+        "video-review/spatial-renderer';\n        export { quickEditPlaneProjection, p" +
+        "rojectQuickEditPoint } from './apps/extension/src/features/video/review/adva" +
+        "nced/spatial-geometry';\n        export { resolveReviewSpatialFocusGeometry, " +
+        "unprojectReviewSpatialPoint } from './apps/extension/src/gallery/video-revie" +
+        "w/spatial-control-geometry';",
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -492,7 +498,11 @@ test('a straight faint rule keeps its center across a spatially varying depth bl
 }, info) => {
   const bundle = await build({
     stdin: {
-      contents: `export { createReviewSpatialRenderer } from './apps/extension/src/workflows/video-review/spatial-renderer'; export {quickEditPlaneProjection, projectQuickEditPoint} from './apps/extension/src/features/video/review/advanced/spatial-geometry';`,
+      contents:
+        "export { createReviewSpatialRenderer } from './apps/extension/src/workflows/" +
+        "video-review/spatial-renderer'; export {quickEditPlaneProjection, projectQui" +
+        "ckEditPoint} from './apps/extension/src/features/video/review/advanced/spati" +
+        "al-geometry';",
       resolveDir: process.cwd(),
     },
     bundle: true,

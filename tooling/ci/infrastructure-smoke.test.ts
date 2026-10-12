@@ -41,8 +41,8 @@ function runSmoke(metadataReachable = false, nodeFailure = false, staleHostNpx =
   fs.writeFileSync(
     docker,
     `#!/bin/sh
-browser_json='{"revision":"1234",'\
-'"browserVersion":"151.0.7922.34",'\
+browser_json='{"revision":"1248",'\
+'"browserVersion":"156.0.8078.4",'\
 '"assets":[{"exists":true},{"exists":true},{"exists":true}]}'
 runtime_json='{"schemaVersion":1,"artifactKind":"sniptale-runtime-parity",'\
 '"platform":"linux/amd64","runtimeRoot":"/usr/local",'\
@@ -58,13 +58,13 @@ case "$*" in
   *"osv-scanner --version"*) printf '%s\n' '2.5.1' ;;
   *"gitleaks --version"*) printf '%s\n' '8.30.1' ;;
   *"actionlint --version"*) printf '%s\n' '1.7.12' ;;
-  *"playwright --version"*) printf '%s\n' '1.62.1' ;;
+  *"playwright --version"*) printf '%s\n' '1.64.0' ;;
   *"/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js --version"*) printf '%s\n' '9.6.1' ;;
   *"ps --version"*) printf '%s\n' 'ps from procps-ng 4.0.2' ;;
   *"node -e"*) printf '%s\n' "$browser_json" ;;
-  *"/opt/playwright/chromium-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
-  *"/opt/playwright/chromium_headless_shell-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
-  *"/opt/playwright/ffmpeg-1011/"*) printf '%s\n' 'ffmpeg version 7' ;;
+  *"/opt/playwright/chromium-1248/"*) printf '%s\n' 'Chromium 156.0.8078.4' ;;
+  *"/opt/playwright/chromium_headless_shell-1248/"*) printf '%s\n' 'Chromium 156.0.8078.4' ;;
+  *"/opt/playwright/ffmpeg-1013/"*) printf '%s\n' 'ffmpeg version 7' ;;
   *"curl --silent"*) [ "$MOCK_METADATA_REACHABLE" = 1 ] && exit 0 || exit 7 ;;
   *) exit 2 ;;
 esac
@@ -114,7 +114,7 @@ describe('Selectel infrastructure smoke', () => {
   it('bounds only the immutable image cold start above the default smoke timeout', () => {
     expect(getInfrastructureSmokeTimeoutMs('container-runtime-parity')).toBe(180_000);
     expect(getInfrastructureSmokeTimeoutMs('codeql')).toBe(30_000);
-    expect(getInfrastructureSmokeTimeoutMs('playwright-asset-chromium-1234')).toBe(30_000);
+    expect(getInfrastructureSmokeTimeoutMs('playwright-asset-chromium-1248')).toBe(30_000);
   });
 
   it('does not inject tool-specific network environment into offline checks', () => {
@@ -147,9 +147,9 @@ describe('Selectel infrastructure smoke', () => {
       'stryker',
       'process-tools',
       'playwright-chromium',
-      'playwright-asset-chromium-1234',
-      'playwright-asset-chromium_headless_shell-1234',
-      'playwright-asset-ffmpeg-1011',
+      'playwright-asset-chromium-1248',
+      'playwright-asset-chromium_headless_shell-1248',
+      'playwright-asset-ffmpeg-1013',
       'container-metadata-denied',
     ]);
     expect(receipt.runtimeParity).toMatchObject({

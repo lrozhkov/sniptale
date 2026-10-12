@@ -1,12 +1,10 @@
+import { readPreparedReviewSpeechAudio } from './speech-publication';
 import {
   AUDIO_STAGING_TTL_MS,
   type AudioStagedHandle,
   type AudioTextJobScope,
 } from '../../contracts/ai/audio';
-import {
-  discardAudioStaging,
-  readAudioStaging,
-} from '../../composition/persistence/assets/audio-staging';
+import { discardAudioStaging } from '../../composition/persistence/assets/audio-staging';
 import { matchesReviewTextScope } from '../../features/video/review/text-document';
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
@@ -22,7 +20,7 @@ import {
   type ReviewTextTakeOptions,
 } from './text-take';
 import { runReviewSpeechJob } from './speech-client';
-import { decodeReviewSpeechDuration } from './speech-audio';
+
 import type { createVideoReviewSession } from './session';
 
 type Session = ReturnType<typeof createVideoReviewSession>;
@@ -108,9 +106,7 @@ export async function generateReviewTextVoice(
   );
   if (result.type !== 'audio') throw new Error('invalid-response');
   try {
-    const blob = await readAudioStaging(result.staged, scope);
-    const duration = await decodeReviewSpeechDuration(blob);
-    signal.throwIfAborted();
+    const { blob, duration } = await readPreparedReviewSpeechAudio(result.staged, scope, signal);
     const restriction = reviewAudioRestriction({ mimeType: blob.type, size: blob.size, duration });
     if (restriction) throw new Error(restriction === 'duration' ? 'duration' : 'invalid-response');
     const preview: ReviewTextVoicePreview = {

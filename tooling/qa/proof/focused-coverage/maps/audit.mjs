@@ -96,9 +96,7 @@ export const AUDIT_OWNER_MAPPINGS = [
     productionPrefix: 'apps/extension/src/offscreen/project-export/',
     exclusive: true,
     reason: 'Offscreen project export changes are covered by focused export suites.',
-    testFiles: [
-      'apps/extension/src/offscreen/project-export/service/lifecycle.test.ts',
-    ],
+    testFiles: ['apps/extension/src/offscreen/project-export/service/lifecycle.test.ts'],
   },
   {
     owner: 'audit-security-boundaries',

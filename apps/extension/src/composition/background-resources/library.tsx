@@ -1,12 +1,8 @@
-import { MediaLibraryHeader } from '../../ui/media-library-header';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import {
-  resolveThemeSafePortalTarget,
-  useResolvedPortalTheme,
-} from '@sniptale/ui/theme/safe-portal';
-import { ProductModal } from '@sniptale/ui/product-modal';
-import { MaterialBrowser } from '@sniptale/ui/material-browser';
+import { MediaLibraryList } from '../../ui/media-library-list';
+import { NativeDrawer } from '@sniptale/ui/product-modal/native-drawer';
+import { DebouncedMediaLibraryHeader } from '../../ui/media-library-header';
+import { useEffect, useRef, useState } from 'react';
+
 import {
   listMediaLibrary,
   getMediaThumbnail,
@@ -68,52 +64,15 @@ export function BackgroundLibraryDrawer(props: {
   onSelect(id: string): void;
   busy: boolean;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const theme = useResolvedPortalTheme(props.anchor);
-  useLayoutEffect(() => {
-    const element = dialog.current;
-    const trigger = document.activeElement;
-    element?.showModal();
-    return () => {
-      element?.close();
-      if (trigger instanceof HTMLElement && trigger.isConnected) {
-        trigger.focus({ preventScroll: true });
-      }
-    };
-  }, []);
-  const title = translate('settings.editor.backgrounds.library');
-  return createPortal(
-    <dialog
-      ref={dialog}
-      role="dialog"
-      data-theme={theme ?? undefined}
-      aria-label={title}
-      onCancel={(event) => {
-        event.preventDefault();
-        props.onClose();
-      }}
-      className={[
-        'm-0 h-screen max-h-none w-screen max-w-none border-0 bg-transparent p-0',
-        'text-[var(--sniptale-color-text-primary)]',
-      ].join(' ')}
+  return (
+    <NativeDrawer
+      anchor={props.anchor}
+      onClose={props.onClose}
+      title={translate('settings.editor.backgrounds.library')}
+      dataUi="background.library.drawer"
     >
-      <ProductModal
-        onClose={props.onClose}
-        width="max(960px, 80vw)"
-        maxWidth="calc(100vw - 24px)"
-        maxHeight="100vh"
-        role="presentation"
-        dialogClassName={[
-          '!bottom-0 !left-0 !top-0 !h-screen !transform-none !rounded-none !border-l-0',
-          '!bg-[color:rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]',
-        ].join(' ')}
-      >
-        <div className="flex h-full min-h-0 flex-col" data-ui="background.library.drawer">
-          <BackgroundLibraryContent {...props} />
-        </div>
-      </ProductModal>
-    </dialog>,
-    resolveThemeSafePortalTarget(props.anchor)
+      <BackgroundLibraryContent {...props} />
+    </NativeDrawer>
   );
 }
 
@@ -171,45 +130,17 @@ function BackgroundLibraryContent(props: {
         onQuery={setAppliedQuery}
         onClose={props.onClose}
       />
-      <div className="flex min-h-0 flex-1 p-4">
-        <MaterialBrowser
-          labels={{ list: title, show: title, hide: title }}
-          listClassName="auto-rows-max"
-          status={
-            status === 'loading' ? (
-              <p>{translate('settings.editor.backgrounds.loading')}</p>
-            ) : status === 'failed' ? (
-              <button onClick={() => setAttempt((n) => n + 1)}>
-                {translate('settings.editor.backgrounds.retry')}
-              </button>
-            ) : items.length === 0 ? (
-              <p>{translate('settings.editor.backgrounds.empty')}</p>
-            ) : visibleItems.length === 0 ? (
-              <p>{translate('settings.editor.backgrounds.noResults')}</p>
-            ) : undefined
-          }
-        >
-          {visibleItems.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              disabled={props.busy}
-              title={item.filename}
-              onClick={() => props.onSelect(item.id)}
-              className={[
-                'flex min-h-0 flex-col overflow-hidden rounded border text-left',
-                'border-[var(--sniptale-color-border-subtle)]',
-                'hover:border-[var(--sniptale-color-text-secondary)] disabled:opacity-50',
-              ].join(' ')}
-            >
-              <span className="block h-44 w-full shrink-0 bg-[var(--sniptale-color-surface-canvas)]">
-                <BackgroundLibraryThumbnail mediaId={item.id} fit="contain" />
-              </span>
-              <span className="block w-full shrink-0 truncate p-2 text-xs">{item.filename}</span>
-            </button>
-          ))}
-        </MaterialBrowser>
-      </div>
+      <MediaLibraryList
+        label={title}
+        status={status}
+        total={items.length}
+        items={visibleItems}
+        busy={props.busy}
+        onSelect={props.onSelect}
+        onRetry={() => setAttempt((n) => n + 1)}
+        emptyLabel={translate('settings.editor.backgrounds.empty')}
+        thumbnail={(item) => <BackgroundLibraryThumbnail mediaId={item.id} fit="contain" />}
+      />
     </>
   );
 }
@@ -222,22 +153,11 @@ function BackgroundLibraryHeader(props: {
   onQuery(query: string): void;
   onClose(): void;
 }) {
-  const [query, setQuery] = useState('');
-  const [composing, setComposing] = useState(false);
-  const { onQuery } = props;
-  useEffect(() => {
-    if (composing) return;
-    const timer = setTimeout(() => onQuery(query), 250);
-    return () => clearTimeout(timer);
-  }, [query, onQuery, composing]);
   return (
-    <MediaLibraryHeader
+    <DebouncedMediaLibraryHeader
       title={translate('settings.editor.backgrounds.library')}
       dataUi="background.library"
-      query={query}
-      onQueryChange={setQuery}
-      onApplyQuery={() => onQuery(query)}
-      onComposingChange={setComposing}
+      onQuery={props.onQuery}
       searchLabel={translate('settings.editor.backgrounds.search')}
       filterLabel={translate('settings.editor.backgrounds.filter')}
       viewId={props.viewId}

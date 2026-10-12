@@ -346,11 +346,11 @@ export function parseAudioStagedHandle(value: unknown): AudioStagedHandle | null
 }
 
 function parseTranscript(value: unknown): AudioTranscriptResult | null {
-  if (!record(value) || typeof value['text'] !== 'string' || value['text'].length > 100000)
-    return null;
-  const result: AudioTranscriptResult = { text: value['text'] };
+  const header = readAudioTranscriptHeader(value);
+  if (!header) return null;
+  const { result, value: fields } = header;
   for (const key of ['segments', 'words'] as const) {
-    const entries = value[key];
+    const entries = fields[key];
     if (entries === undefined) continue;
     if (!Array.isArray(entries) || entries.length > 10000) return null;
     const parsed: AudioTranscriptTiming[] = [];
@@ -415,4 +415,12 @@ export function parseAudioJobServerMessage(value: unknown): AudioJobServerMessag
     return code ? { type: 'failure', requestId, code } : null;
   }
   return null;
+}
+
+export function readAudioTranscriptHeader(
+  value: unknown
+): { value: Record<string, unknown>; result: AudioTranscriptResult } | null {
+  if (!record(value) || typeof value['text'] !== 'string' || value['text'].length > 100000)
+    return null;
+  return { value, result: { text: value['text'] } };
 }

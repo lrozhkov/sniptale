@@ -1,3 +1,4 @@
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
@@ -205,13 +206,7 @@ export async function publishRecordingAssetJournal(
       }
       await tx.done;
     } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* The transaction may already have aborted. */
-      }
-      await tx.done.catch(() => undefined);
-      throw error;
+      await abortIndexedDbMutation(tx, error);
     }
   });
   if (physicalDelete.assetIds.length > 0)

@@ -1,3 +1,4 @@
+import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -20,16 +21,9 @@ function unitKey(unitId: string, revision: number): string {
 export function sameScenarioStoredValue(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (Array.isArray(left) && Array.isArray(right))
-    return (
-      left.length === right.length &&
-      left.every((value, index) => sameScenarioStoredValue(value, right[index]))
-    );
+    return sameHistoryArray(left, right, sameScenarioStoredValue);
   if (!isRecord(left) || !isRecord(right)) return false;
-  const keys = Object.keys(left);
-  return (
-    keys.length === Object.keys(right).length &&
-    keys.every((key) => Object.hasOwn(right, key) && sameScenarioStoredValue(left[key], right[key]))
-  );
+  return sameHistoryRecord(left, right, sameScenarioStoredValue);
 }
 
 function unavailable(head: unknown, rows: unknown[], units: unknown[]) {

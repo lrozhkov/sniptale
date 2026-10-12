@@ -1,12 +1,8 @@
-import { MediaLibraryHeader } from '../../ui/media-library-header';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import {
-  resolveThemeSafePortalTarget,
-  useResolvedPortalTheme,
-} from '@sniptale/ui/theme/safe-portal';
-import { ProductModal } from '@sniptale/ui/product-modal';
-import { MaterialBrowser } from '@sniptale/ui/material-browser';
+import { MediaLibraryList } from '../../ui/media-library-list';
+import { NativeDrawer } from '@sniptale/ui/product-modal/native-drawer';
+import { DebouncedMediaLibraryHeader } from '../../ui/media-library-header';
+import { useState } from 'react';
+
 import type { GallerySavedView } from '../../composition/persistence/gallery-saved-views';
 import {
   usePresentationLibrary,
@@ -44,57 +40,16 @@ export function ReviewPresentationLibrary(props: {
   onSelect(id: string): void;
   busy: boolean;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const theme = useResolvedPortalTheme(props.anchor);
-  useLayoutEffect(() => {
-    const element = dialog.current;
-    const trigger = document.activeElement;
-    element?.showModal();
-    return () => {
-      element?.close();
-      if (trigger instanceof HTMLElement && trigger.isConnected) {
-        trigger.focus({ preventScroll: true });
-      }
-    };
-  }, []);
-  const title = translate('settings.editor.backgrounds.library');
-  return createPortal(
-    <dialog
-      ref={dialog}
-      role="dialog"
-      data-theme={theme ?? undefined}
-      aria-label={title}
-      onKeyDown={(event) => event.stopPropagation()}
-      onKeyUp={(event) => event.stopPropagation()}
-      onCancel={(event) => {
-        event.preventDefault();
-        props.onClose();
-      }}
-      className={[
-        'm-0 h-screen max-h-none w-screen max-w-none border-0 bg-transparent p-0',
-        'text-[var(--sniptale-color-text-primary)]',
-      ].join(' ')}
+  return (
+    <NativeDrawer
+      anchor={props.anchor}
+      onClose={props.onClose}
+      title={translate('settings.editor.backgrounds.library')}
+      dataUi="gallery.videoReview.presentationLibrary.drawer"
+      containKeys
     >
-      <ProductModal
-        onClose={props.onClose}
-        width="max(960px, 80vw)"
-        maxWidth="calc(100vw - 24px)"
-        maxHeight="100vh"
-        role="presentation"
-        dialogClassName={[
-          '!bottom-0 !left-0 !top-0 !h-screen !transform-none !rounded-none !border-l-0',
-          '!bg-[color:rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]',
-        ].join(' ')}
-      >
-        <div
-          className="flex h-full min-h-0 flex-col"
-          data-ui="gallery.videoReview.presentationLibrary.drawer"
-        >
-          <PresentationLibraryContent {...props} />
-        </div>
-      </ProductModal>
-    </dialog>,
-    resolveThemeSafePortalTarget(props.anchor)
+      <PresentationLibraryContent {...props} />
+    </NativeDrawer>
   );
 }
 
@@ -123,43 +78,17 @@ function PresentationLibraryContent(props: {
         onQuery={setAppliedQuery}
         onClose={props.onClose}
       />
-      <div className="flex min-h-0 flex-1 p-4">
-        <MaterialBrowser
-          labels={{ list: title, show: title, hide: title }}
-          listClassName="auto-rows-max"
-          status={
-            status === 'loading' ? (
-              <p>{translate('settings.editor.backgrounds.loading')}</p>
-            ) : status === 'failed' ? (
-              <button onClick={retry}>{translate('settings.editor.backgrounds.retry')}</button>
-            ) : items.length === 0 ? (
-              <p>{translate('gallery.videoReview.presentationLibraryEmpty')}</p>
-            ) : visibleItems.length === 0 ? (
-              <p>{translate('settings.editor.backgrounds.noResults')}</p>
-            ) : undefined
-          }
-        >
-          {visibleItems.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              disabled={props.busy}
-              title={item.filename}
-              onClick={() => props.onSelect(item.id)}
-              className={[
-                'flex min-h-0 flex-col overflow-hidden rounded border text-left',
-                'border-[var(--sniptale-color-border-subtle)]',
-                'hover:border-[var(--sniptale-color-text-secondary)] disabled:opacity-50',
-              ].join(' ')}
-            >
-              <span className="block h-44 w-full shrink-0 bg-[var(--sniptale-color-surface-canvas)]">
-                <PresentationLibraryThumbnail mediaId={item.id} fit="contain" />
-              </span>
-              <span className="block w-full shrink-0 truncate p-2 text-xs">{item.filename}</span>
-            </button>
-          ))}
-        </MaterialBrowser>
-      </div>
+      <MediaLibraryList
+        label={title}
+        status={status}
+        total={items.length}
+        items={visibleItems}
+        busy={props.busy}
+        onSelect={props.onSelect}
+        onRetry={retry}
+        emptyLabel={translate('gallery.videoReview.presentationLibraryEmpty')}
+        thumbnail={(item) => <PresentationLibraryThumbnail mediaId={item.id} fit="contain" />}
+      />
     </>
   );
 }
@@ -173,22 +102,11 @@ function PresentationLibraryHeader(props: {
   onQuery(query: string): void;
   onClose(): void;
 }) {
-  const [query, setQuery] = useState('');
-  const [composing, setComposing] = useState(false);
-  const { onQuery } = props;
-  useEffect(() => {
-    if (composing) return;
-    const timer = setTimeout(() => onQuery(query), 250);
-    return () => clearTimeout(timer);
-  }, [query, onQuery, composing]);
   return (
-    <MediaLibraryHeader
+    <DebouncedMediaLibraryHeader
       title={translate('settings.editor.backgrounds.library')}
       dataUi="gallery.videoReview.presentationLibrary"
-      query={query}
-      onQueryChange={setQuery}
-      onApplyQuery={() => onQuery(query)}
-      onComposingChange={setComposing}
+      onQuery={props.onQuery}
       searchLabel={translate(
         props.kind === 'media'
           ? 'gallery.videoReview.presentationSearchMedia'

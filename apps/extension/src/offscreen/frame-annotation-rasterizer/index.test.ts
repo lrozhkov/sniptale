@@ -98,7 +98,6 @@ it('rasterizes through SnapDOM with the bounded offscreen options and cleans its
   expect(mocks.toCanvas).toHaveBeenCalledWith(
     expect.any(HTMLElement),
     expect.objectContaining({
-      compress: false,
       dpr: 1,
       embedFonts: true,
       reconcile: true,

@@ -1,3 +1,4 @@
+import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import { useReviewAdvancedContent } from './use-advanced-content';
@@ -70,18 +71,7 @@ export function useReviewAdvanced(session: Session) {
     },
     [session]
   );
-  useEffect(() => {
-    mounted.current = true;
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') void flush().catch(() => undefined);
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      mounted.current = false;
-      document.removeEventListener('visibilitychange', onVisibility);
-      void flush().catch(() => undefined);
-    };
-  }, [flush]);
+  useRecoveryLifecycle(flush, mounted);
   const reset = useCallback(() => {
     generation.current += 1;
     session.cancelAutosave('advanced');

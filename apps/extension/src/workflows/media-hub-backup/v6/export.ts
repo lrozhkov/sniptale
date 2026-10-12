@@ -17,11 +17,10 @@ import {
   MEDIA_HUB_BACKUP_VERSION,
   MAX_ROOT_METADATA_BYTES,
   MAX_EXPANDED_ARCHIVE_METADATA_BYTES,
-  type JsonValue,
+  type MediaHubBackupRootInventoryItem,
   type MediaHubBackupCatalogShard,
   type MediaHubBackupManifestV6,
   type MediaHubBackupPrivacyFlags,
-  type MediaHubBackupRootEnvelope,
 } from './contracts';
 import {
   CATALOG_ROOT,
@@ -34,28 +33,11 @@ import { encodeBackupMetadata } from './metadata-transport';
 import { assertBackupByteBudget } from './errors';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
-export interface ArchiveRootObjectSource {
-  blob: Blob;
-  ref: MediaHubBackupRootEnvelope['objects'][number];
-}
-
-export interface ArchiveRootPayload {
-  metadata: JsonValue;
-  objects: ArchiveRootObjectSource[];
-}
-
-export interface MediaHubBackupRootInventoryItem {
-  descriptor: ArchiveRootDescriptor;
-  load(signal?: AbortSignal): Promise<ArchiveRootPayload>;
-  summary: {
-    draftCount: number;
-    recordingCount: number;
-    sourceMetadataCount: number;
-    telemetryCount: number;
-    thumbnailCount: number;
-    webSnapshotCount: number;
-  };
-}
+export type {
+  ArchiveRootObjectSource,
+  ArchiveRootPayload,
+  MediaHubBackupRootInventoryItem,
+} from './contracts';
 
 interface PlannedCatalog {
   descriptor: MediaHubBackupCatalogShard;

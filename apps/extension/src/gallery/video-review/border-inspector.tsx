@@ -1,3 +1,4 @@
+import { ReviewFocusRoundness, ReviewFocusAreaFields } from './focus-area-fields';
 import { RotateCw, RotateCcw } from 'lucide-react';
 import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
@@ -6,7 +7,7 @@ import type {
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
-import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
+
 import { ReviewPreviewNumberRow } from './number-row';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
 
@@ -58,62 +59,24 @@ export function ReviewBorderInspector(props: {
           })
         }
       />
-      <ReviewPreviewNumberRow
-        label={translate('gallery.videoReview.focusRoundness')}
-        min={0}
-        max={50}
-        step={1}
-        precision={0}
-        unit="%"
-        value={value.roundness * 100}
+      <ReviewFocusRoundness
+        value={value.roundness}
         onPreview={(roundness) =>
-          props.onPreview?.(
-            roundness === null ? null : { border: { ...value, roundness: roundness / 100 } }
-          )
+          props.onPreview?.(roundness === null ? null : { border: { ...value, roundness } })
         }
-        onChange={(roundness) => onChange({ ...value, roundness: roundness / 100 })}
+        onChange={(roundness) => onChange({ ...value, roundness })}
       />
       <ReviewDetails
         preferenceId="gallery.videoReview.borderPreciseArea"
         label={translate('gallery.videoReview.preciseArea')}
       >
-        {(
-          [
-            ['x', 'focusAreaX'],
-            ['y', 'focusAreaY'],
-            ['width', 'focusAreaWidth'],
-            ['height', 'focusAreaHeight'],
-          ] as const
-        ).map(([field, label]) => (
-          <ReviewPreviewNumberRow
-            key={field}
-            label={translate(`gallery.videoReview.${label}`)}
-            min={field === 'x' || field === 'y' ? 0 : 1}
-            max={100}
-            step={1}
-            precision={1}
-            unit="%"
-            value={value.area[field] * 100}
-            onPreview={(next) =>
-              props.onPreview?.(
-                next === null
-                  ? null
-                  : {
-                      border: {
-                        ...value,
-                        area: clampQuickEditSpotlightArea({ ...value.area, [field]: next / 100 }),
-                      },
-                    }
-              )
-            }
-            onChange={(next) =>
-              onChange({
-                ...value,
-                area: clampQuickEditSpotlightArea({ ...value.area, [field]: next / 100 }),
-              })
-            }
-          />
-        ))}
+        <ReviewFocusAreaFields
+          area={value.area}
+          onPreview={(area) =>
+            props.onPreview?.(area === null ? null : { border: { ...value, area } })
+          }
+          onChange={(area) => onChange({ ...value, area })}
+        />
       </ReviewDetails>
     </div>
   );

@@ -1,4 +1,5 @@
-import { MousePointer2, Palette, Clock3, Move, RotateCcw, Info } from 'lucide-react';
+import { reviewInformationSections } from './inspector-sections';
+import { MousePointer2, Palette, Clock3, Move, RotateCcw } from 'lucide-react';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -86,14 +87,7 @@ export function reviewClickSections(props: {
       />
     );
   };
-  const sections: Parameters<typeof ReviewInspectorSections>[0]['sections'][number][] = [];
-  if (props.information)
-    sections.push({
-      id: 'information',
-      label: translate('gallery.videoReview.actionInformation'),
-      icon: Info,
-      content: props.information,
-    });
+  const sections = reviewInformationSections(props.information);
   sections.push({
     id: 'animation',
     label: translate('gallery.videoReview.clickEffect'),

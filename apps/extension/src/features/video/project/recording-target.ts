@@ -38,7 +38,7 @@ const roleKinds: Readonly<Record<string, RecordingTargetKind>> = {
   menuitemcheckbox: 'menuitem',
   menuitemradio: 'menuitem',
 };
-const otherRoles = new Set([
+const otherRoles: readonly string[] = [
   'alert',
   'alertdialog',
   'application',
@@ -104,12 +104,14 @@ const otherRoles = new Set([
   'treegrid',
   'treeitem',
   'radiogroup',
-]);
+];
 
 /** Uses the first recognized role, including recognized roles outside our control taxonomy. */
 export function recordingTargetRole(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  return value.split(/\s+/).find((role) => Object.hasOwn(roleKinds, role) || otherRoles.has(role));
+  return value
+    .split(/\s+/)
+    .find((role) => Object.hasOwn(roleKinds, role) || otherRoles.includes(role));
 }
 
 const inputKinds: Readonly<Record<string, RecordingTargetKind>> = {
@@ -140,7 +142,7 @@ const tagKinds: Readonly<Record<string, RecordingTargetKind>> = {
   textarea: 'text-field',
   select: 'select',
 };
-const listInputTypes = new Set(['text', 'search', 'email', 'url', 'tel']);
+const listInputTypes: readonly string[] = ['text', 'search', 'email', 'url', 'tel'];
 const allowedRoles: Readonly<Partial<Record<RecordingTargetKind, readonly string[]>>> = {
   button: [
     'button',
@@ -194,7 +196,7 @@ function nativeKind(data: Readonly<Record<string, unknown>>): RecordingTargetKin
       : 'unknown';
   const type = data['targetType'];
   if (typeof type !== 'string') return 'unknown';
-  if (listInputTypes.has(type) && data['targetHasList'] === 'yes') return 'combobox';
+  if (listInputTypes.includes(type) && data['targetHasList'] === 'yes') return 'combobox';
   return Object.hasOwn(inputKinds, type) ? (inputKinds[type] ?? 'unknown') : 'unknown';
 }
 

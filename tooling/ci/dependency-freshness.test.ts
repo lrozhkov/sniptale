@@ -78,6 +78,9 @@ it('is a deterministic read-only operator plan with no mutation owner', () => {
 });
 
 it('classifies current, available, failed, and unverifiable upstream identities read-only', async () => {
+  const simulatedLatest = createDependencyRefreshPlan().npmLockRoots.flatMap(
+    (lock) => lock.dependencies
+  );
   const fetchImpl = async (input: string | URL) => {
     const url = String(input);
     if (url.includes('actions/checkout')) {
@@ -91,9 +94,9 @@ it('classifies current, available, failed, and unverifiable upstream identities 
     }
     if (url.includes('registry.npmjs.org')) {
       const dependency = decodeURIComponent(url.split('/').at(-2) ?? '');
-      const current = createDependencyRefreshPlan()
-        .npmLockRoots.flatMap((lock) => lock.dependencies)
-        .find(({ upstreamName }) => upstreamName === dependency)?.current;
+      const current = simulatedLatest.find(
+        ({ upstreamName }) => upstreamName === dependency
+      )?.current;
       return new Response(JSON.stringify({ version: current }), { status: 200 });
     }
     return new Response(JSON.stringify({ tag_name: 'v0.0.0' }), { status: 200 });
@@ -111,9 +114,16 @@ it('classifies current, available, failed, and unverifiable upstream identities 
   expect(report.toolchainAuthorities.some(({ status }) => status === 'upstream-unverifiable')).toBe(
     true
   );
-  expect(
-    report.npmLockRoots
-      .flatMap(({ dependencies }) => dependencies)
-      .every(({ status }) => ['current', 'upstream-unverifiable'].includes(status))
-  ).toBe(true);
+  for (const dependency of report.npmLockRoots.flatMap((lock) => lock.dependencies)) {
+    const latest = simulatedLatest.find(
+      (entry) => entry.upstreamName === dependency.upstreamName
+    )?.current;
+    expect(dependency.status, dependency.name).toBe(
+      !dependency.current
+        ? 'upstream-unverifiable'
+        : dependency.current === latest
+          ? 'current'
+          : 'update-available'
+    );
+  }
 });

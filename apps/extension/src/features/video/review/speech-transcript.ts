@@ -1,3 +1,4 @@
+import { mergedReviewPhraseFields } from './phrase-merge';
 /** Absolute seconds in the intact original audio asset. */
 export interface ReviewSpeechWord {
   text: string;
@@ -188,10 +189,7 @@ export function mergeReviewSpeechPhrases<R extends ReviewSpeechReplacement>(
   const { words: _words, ...base } = left;
   const merged: ReviewSpeechPhrase = {
     ...base,
-    end: right.end,
-    text: [left.text, right.text].filter(Boolean).join(' '),
-    originalText: [left.originalText, right.originalText].filter(Boolean).join(' '),
-    revision: Math.max(left.revision, right.revision) + 1,
+    ...mergedReviewPhraseFields(left, right),
     alignment: 'manual',
   };
   return replacePhrases(

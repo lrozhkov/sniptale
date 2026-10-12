@@ -252,24 +252,8 @@ export interface QuickEditAudioState {
 }
 
 /** Advanced quick-editor state persisted beside the edit history in the same workspace record. */
-export interface QuickEditAdvancedState {
-  text?: import('../text-document').ReviewTextDocument;
-  captions?: import('../text-document').ReviewCaptionSettings;
-  annotationEffects?: import('../annotation-effects/types').ReviewAnnotationEffects;
-  /** Missing on older projects means enabled. */
-  actionsEnabled?: boolean;
-  keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
-  clickAnimations?: import('./click-animation').ReviewClickAnimation[];
-  schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
+export interface QuickEditAdvancedState extends QuickEditAdvancedContent {
   ui: QuickEditUiState;
-  zoom: QuickEditZoomState;
-  background: QuickEditBackgroundSettings;
-  canvas?: QuickEditCanvasSize;
-  windowHeader?: QuickEditWindowHeader;
-  webcam?: QuickEditWebcam;
-  watermark?: import('./watermark').QuickEditWatermarkSettings;
-  presentation?: import('./presentation').QuickEditPresentationSettings;
-  audio: QuickEditAudioState;
   /** Raw v1 payload retained by the deterministic load-time migration. */
   recoveryV1?: string;
 }

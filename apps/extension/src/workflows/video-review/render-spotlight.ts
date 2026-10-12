@@ -204,11 +204,9 @@ function paintSingleMaskTile(
     const outside = 1 - opening[pixel]! / 255;
     const dimCoverage = Math.max(0, frame.dim * outside);
     const blurCoverage = Math.max(0, frame.blur * outside);
-    dimPixels.data[pixel] = Math.round(255 * dimCoverage);
-    blurPixels.data[pixel] = radius ? Math.round((255 * blurCoverage) / radius) : 0;
+    writeSpotlightCoverage(dimPixels, blurPixels, pixel, dimCoverage, blurCoverage, radius);
   }
-  dim.putImageData(dimPixels, tile.x, tile.y);
-  blur.putImageData(blurPixels, tile.x, tile.y);
+  publishSpotlightPixels(dim, blur, dimPixels, blurPixels, tile);
 }
 
 function rasterizeMaskOpening(
@@ -299,11 +297,9 @@ function paintMaskTile(
       blurCoverage = Math.max(blurCoverage, frames[i]!.blur * outside);
       suffix *= 1 - ((frames[i]!.presence ?? 1) * protections[i]![pixel]!) / 255;
     }
-    dimPixels.data[pixel] = Math.round(255 * dimCoverage);
-    blurPixels.data[pixel] = radius ? Math.round((255 * blurCoverage) / radius) : 0;
+    writeSpotlightCoverage(dimPixels, blurPixels, pixel, dimCoverage, blurCoverage, radius);
   }
-  dim.putImageData(dimPixels, tile.x, tile.y);
-  blur.putImageData(blurPixels, tile.x, tile.y);
+  publishSpotlightPixels(dim, blur, dimPixels, blurPixels, tile);
 }
 
 /** Blur reads the original scene once; dim follows blur and borders are painted later. */
@@ -370,4 +366,26 @@ function projectedOpening(rect: QuickEditRect, radius: number, matrix: QuickEdit
     }
   path.closePath();
   return path;
+}
+
+function writeSpotlightCoverage(
+  dim: ImageData,
+  blur: ImageData,
+  pixel: number,
+  dimCoverage: number,
+  blurCoverage: number,
+  radius: number
+) {
+  dim.data[pixel] = Math.round(255 * dimCoverage);
+  blur.data[pixel] = radius ? Math.round((255 * blurCoverage) / radius) : 0;
+}
+function publishSpotlightPixels(
+  dim: CanvasRenderingContext2D,
+  blur: CanvasRenderingContext2D,
+  dimPixels: ImageData,
+  blurPixels: ImageData,
+  tile: { x: number; y: number }
+) {
+  dim.putImageData(dimPixels, tile.x, tile.y);
+  blur.putImageData(blurPixels, tile.x, tile.y);
 }

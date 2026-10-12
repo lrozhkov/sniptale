@@ -21,6 +21,8 @@ const ROOT_CONFIG_REFERENCES = [
   /\bvite\.(?:content-runtime-build-id|injected-build(?:-shim-guard)?)\.ts\b/gu,
 ];
 const REFERENCE_PATTERNS = [...SOURCE_REFERENCES, PUBLIC_REFERENCE, ...ROOT_CONFIG_REFERENCES];
+const REFERENCE_HINT =
+  /src\/|public\/|features\/video\/|offscreen\/|video-editor\/|postcss\.|tailwind\.|vite\./u;
 const TRACKED_HISTORICAL_CONTROL_FILES = new Set([
   'tooling/configs/qa/gitleaks-baseline.json',
   'tooling/configs/qa/technical-debt.data.json',
@@ -34,6 +36,7 @@ function isQualifiedSourceReference(line, index) {
 }
 
 function lineReferences(line) {
+  if (!REFERENCE_HINT.test(line)) return [];
   const matches = [];
   for (const pattern of REFERENCE_PATTERNS) {
     pattern.lastIndex = 0;

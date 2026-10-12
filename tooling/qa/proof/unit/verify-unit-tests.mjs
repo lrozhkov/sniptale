@@ -24,6 +24,7 @@ const testEnv = {
   SNIPTALE_HARNESS_VITEST_PARTITION: null,
   SNIPTALE_PRODUCT_VITEST_PARTITION: null,
   SNIPTALE_PRODUCT_VITEST_POOL: null,
+  SNIPTALE_PRODUCT_VITEST_PROJECTS: null,
   TMPDIR: '/tmp',
   TMP: '/tmp',
   TEMP: '/tmp',
@@ -31,7 +32,6 @@ const testEnv = {
 const WRAPPER_TIMEOUT_MODE = 'wrapper';
 const DEFAULT_COVERAGE_MODE = 'diff';
 const SUPPORTED_POOLS = new Set(['forks', 'threads']);
-const PRODUCT_PARTITIONS = ['jsdom-vm', 'node-vm', 'threads'];
 const HARNESS_PARTITIONS = ['node-vm-a', 'node-vm-b', 'jsdom-vm', 'forks'];
 const MAX_CHILD_OUTPUT_BYTES = 64 * 1024 * 1024;
 
@@ -111,6 +111,7 @@ export function createUnitTestEnv({
   harnessPartition = null,
   pool = null,
   productPartition = null,
+  productProjects = false,
   suite = PRODUCT_QA_SUITE,
 } = {}) {
   const normalizedSuite = normalizeQaSuite(suite);
@@ -121,6 +122,7 @@ export function createUnitTestEnv({
     ...(pool ? { SNIPTALE_PRODUCT_VITEST_POOL: pool } : {}),
     ...(harnessPartition ? { SNIPTALE_HARNESS_VITEST_PARTITION: harnessPartition } : {}),
     ...(productPartition ? { SNIPTALE_PRODUCT_VITEST_PARTITION: productPartition } : {}),
+    ...(productProjects ? { SNIPTALE_PRODUCT_VITEST_PROJECTS: '1' } : {}),
   };
 
   if (!coverage || coverageMode === 'manual') {
@@ -136,17 +138,6 @@ export function createUnitTestEnv({
         }
       : {}),
   };
-}
-
-export function resolveProductUnitTestPartitions({
-  coverage = false,
-  focused = false,
-  pool = null,
-  suite = PRODUCT_QA_SUITE,
-} = {}) {
-  return normalizeQaSuite(suite) === PRODUCT_QA_SUITE && pool == null && !coverage && !focused
-    ? PRODUCT_PARTITIONS
-    : [null];
 }
 
 export function resolveHarnessUnitTestPartitions({
@@ -306,12 +297,6 @@ export function runUnitTests({
     normalizedSuite === PRODUCT_QA_SUITE ? env.SNIPTALE_PRODUCT_VITEST_POOL : null;
   const effectivePool = normalizeUnitTestPool(pool ?? inheritedProductPool);
   const focused = directFiles.length > 0 || relatedFiles.length > 0;
-  const productPartitions = resolveProductUnitTestPartitions({
-    coverage,
-    focused,
-    pool: effectivePool,
-    suite: normalizedSuite,
-  });
   const harnessPartitions = resolveHarnessUnitTestPartitions({
     coverage,
     focused,
@@ -321,7 +306,7 @@ export function runUnitTests({
   const partitions =
     normalizedSuite === 'harness'
       ? harnessPartitions.map((harnessPartition) => ({ harnessPartition, productPartition: null }))
-      : productPartitions.map((productPartition) => ({ harnessPartition: null, productPartition }));
+      : [{ harnessPartition: null, productPartition: null }];
   const run = (args, { harnessPartition, productPartition }) =>
     execute(args[0], args.slice(1), {
       cwd,
@@ -332,11 +317,18 @@ export function runUnitTests({
         harnessPartition,
         pool: effectivePool,
         productPartition,
+        productProjects: !focused && effectivePool == null && normalizedSuite === PRODUCT_QA_SUITE,
         suite: normalizedSuite,
       }),
       stdio: 'pipe',
     });
   const runPartitions = (args) => {
+    if (partitions.length === 1) {
+      const result = run(args, partitions[0]);
+      return typeof result?.then === 'function'
+        ? result.then((value) => combineUnitTestResults([value]))
+        : combineUnitTestResults([result]);
+    }
     const results = [];
     for (const partition of partitions) {
       const result = run(args, partition);
@@ -374,12 +366,14 @@ if (isExecutedAsScript(import.meta.url)) {
   const argv = process.argv.slice(2);
   const coverage = argv.includes('--coverage');
   const pool = getOptionValue(argv, '--pool');
+  const workerOption = getOptionValue(argv, '--maxWorkers');
+  const maxWorkers = workerOption == null ? null : Number(workerOption);
   const relatedFiles = parseFilesArgument(argv);
   const suite = getOptionValue(argv, '--suite') ?? PRODUCT_QA_SUITE;
   const result =
     suite === HARNESS_QA_SUITE && !coverage && pool == null && relatedFiles.length === 0
       ? await runFullHarnessUnitTests()
-      : runUnitTests({ coverage, pool, relatedFiles, suite });
+      : runUnitTests({ coverage, maxWorkers, pool, relatedFiles, suite });
 
   emitCommandResult(result, 'Unit tests passed\n');
 }

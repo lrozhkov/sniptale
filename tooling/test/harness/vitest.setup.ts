@@ -50,15 +50,22 @@ for (const name of [
   });
 }
 
-const nativeDigest = globalThis.crypto.subtle.digest.bind(globalThis.crypto.subtle);
-
-Object.defineProperty(globalThis.crypto.subtle, 'digest', {
-  configurable: true,
-  value(algorithm: AlgorithmIdentifier, data: BufferSource): Promise<ArrayBuffer> {
-    const bytes = ArrayBuffer.isView(data)
-      ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
-      : Buffer.from(new Uint8Array(data));
-    return nativeDigest(algorithm, bytes);
-  },
-  writable: true,
-});
+const digestNormalization = Symbol.for('sniptale.test.digest.buffer-normalization');
+// WebCrypto is shared by VM contexts; repeated wrapping retains previous contexts.
+if (!Object.hasOwn(globalThis.crypto.subtle.digest, digestNormalization)) {
+  const nativeDigest = globalThis.crypto.subtle.digest.bind(globalThis.crypto.subtle);
+  const normalizedDigest = Object.assign(
+    function digest(algorithm: AlgorithmIdentifier, data: BufferSource): Promise<ArrayBuffer> {
+      const bytes = ArrayBuffer.isView(data)
+        ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+        : Buffer.from(new Uint8Array(data));
+      return nativeDigest(algorithm, bytes);
+    },
+    { [digestNormalization]: true }
+  );
+  Object.defineProperty(globalThis.crypto.subtle, 'digest', {
+    configurable: true,
+    value: normalizedDigest,
+    writable: true,
+  });
+}

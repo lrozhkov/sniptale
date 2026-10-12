@@ -19,6 +19,13 @@ function graphics() {
     NO_ERROR: 0,
     FRAMEBUFFER_COMPLETE: 17,
     FRAMEBUFFER: 18,
+    TEXTURE_2D: 3553,
+    TEXTURE_MIN_FILTER: 10241,
+    TEXTURE_MAG_FILTER: 10240,
+    TEXTURE_WRAP_S: 10242,
+    TEXTURE_WRAP_T: 10243,
+    LINEAR: 9729,
+    CLAMP_TO_EDGE: 33071,
     createFramebuffer: vi.fn<() => object | null>(() => ({})),
     deleteFramebuffer: vi.fn(),
     bindFramebuffer: vi.fn(),
@@ -327,4 +334,26 @@ it('cleans managed constructor and drawing-buffer admission failures', () => {
   renderer.dispose();
   resources.dispose();
   expect(resources.counters.managedBytes).toBe(0);
+});
+
+it('retains linear filtering and edge clamping when a reserved texture is replaced after resize', () => {
+  const { gl } = graphics();
+  const textures = createReviewSpatialTextures(
+    gl as unknown as WebGLRenderingContext,
+    resourceSession()
+  );
+  const source = document.createElement('canvas');
+  source.width = 32;
+  source.height = 18;
+  textures.upload(source);
+  gl.texParameteri.mockClear();
+  source.width = 64;
+  source.height = 36;
+  textures.upload(source);
+  expect(gl.texParameteri).toHaveBeenCalledWith(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  expect(gl.texParameteri).toHaveBeenCalledWith(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  expect(gl.texParameteri).toHaveBeenCalledWith(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  expect(gl.texParameteri).toHaveBeenCalledWith(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  expect(gl.deleteTexture).toHaveBeenCalled();
+  textures.dispose();
 });

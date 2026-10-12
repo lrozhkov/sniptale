@@ -112,42 +112,6 @@
       }
     },
     {
-      "id": "1259020c9fccaae996b5965ced92a1e8babd8bfaf5d0d2202bd8cbb572490e2b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/controls.tsx <-> apps/extension/src/video-editor/workspace/sidebar/selection/shared/details.tsx",
-      "reason": "Native details adapters already use useInspectorDisclosure; review and video retain separate preference identities, data-ui roots and body geometry.",
-      "removalCondition": "Remove when the exact pair disappears or both hosts share one disclosure presentation contract.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/controls.tsx",
-        "start": 184,
-        "end": 192
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/shared/details.tsx",
-        "start": 20,
-        "end": 28
-      }
-    },
-    {
-      "id": "130ebb220c1232afe302c19832789595355343d67b885081a50d1a2dfaa02215",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/asset-publication.ts <-> apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
-      "reason": "Project asset publication puts a media row, while scenario cleanup deletes owned children and presentation. Both journal physical deletions within their own atomic transaction and call the existing physical-delete owner after commit; merging tails would hide distinct transaction authority.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
-        "start": 168,
-        "end": 177
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
-        "start": 161,
-        "end": 170
-      }
-    },
-    {
       "id": "13fbf2747777be21dfb44431858f89a8a1bae45a23089d7ed8632522b6e5ced2",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
@@ -163,60 +127,6 @@
         "path": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
         "start": 1,
         "end": 9
-      }
-    },
-    {
-      "id": "1550bb833f2ff7773c66a675a4832993698092fc3601942a0679692736f75b4c",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/library-preview/viewport.tsx <-> apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-      "reason": "Library pointerdown and video capture-phase pointerdown differ in propagation and admission; matching scroll arithmetic does not merge their view lifetimes.",
-      "removalCondition": "Remove when the exact pair disappears or one pan owner explicitly owns both admission and cleanup policies.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
-        "start": 182,
-        "end": 200
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-        "start": 214,
-        "end": 232
-      }
-    },
-    {
-      "id": "1703d602edfb5e5226e687265ed971d3e2db8f6fab395f99adba7f681db66e77",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/library-preview <-> apps/extension/src/workflows/video-review",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
-      "firstFile": {
-        "path": "apps/extension/src/composition/library-preview/audio-peaks-stream.ts",
-        "start": 25,
-        "end": 36
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/video-review/waveform.ts",
-        "start": 82,
-        "end": 94
-      }
-    },
-    {
-      "id": "1917c30360faa44d877715820468450a8598610166d43a145002ca4560274b0b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
-      "reason": "Orphan cleanup proves parent absence and opens a child-graph transaction; root cleanup also recovers HTML publications and detaches the complete graph. Matching abort/settle/postcommit deletion is protocol boilerplate, not one destructive authority.",
-      "removalCondition": "Remove when the exact pair disappears or the cleanup operations legitimately share one atomic transaction contract.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
-        "start": 123,
-        "end": 137
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
-        "start": 99,
-        "end": 113
       }
     },
     {
@@ -310,24 +220,6 @@
       }
     },
     {
-      "id": "22c3c1b594effa6037773fab8dab78a010895b640786cbef95652a1cad9c40e5",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
-      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
-        "start": 25,
-        "end": 61
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
-        "start": 31,
-        "end": 67
-      }
-    },
-    {
       "id": "24e651b249ceaebb22337b40fed580cbf1ba14575a0992bf95c8acf091a6599a",
       "classification": "tool-noise",
       "owner": "apps/extension/src/video-editor/workspace/sidebar/selection",
@@ -343,24 +235,6 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/transition-template-actions.tsx",
         "start": 99,
         "end": 105
-      }
-    },
-    {
-      "id": "25112a4704bcdec27d0c43be8f23d67e115a8c9a8ccd83af0927123dcd175c9f",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/review/advanced/validation.ts",
-      "reason": "Content loading rejects ui while complete state loading requires ui and validates recoveryV1; zoom/background/audio parsing is already shared.",
-      "removalCondition": "Remove when the exact pair disappears or the accepted persisted projections become the same schema.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
-        "start": 334,
-        "end": 339
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
-        "start": 374,
-        "end": 379
       }
     },
     {
@@ -436,24 +310,6 @@
       }
     },
     {
-      "id": "29a2c825976c961c0cd652d84608a51c367d3735d720ac2e2ec7239faf2c8626",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/workspace/sidebar/panel-content/selection-panel.tsx",
-      "reason": "The two projections target different inspector contracts and intentionally differ in defaults and nullability; matching optional-property syntax is not one operation.",
-      "removalCondition": "Remove when the destination contracts converge on one projection or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/panel-content/selection-panel.tsx",
-        "start": 196,
-        "end": 203
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/panel-content/selection-panel.tsx",
-        "start": 77,
-        "end": 84
-      }
-    },
-    {
       "id": "302a6361c8bf1f6c973b70854331ce71dabb6f517ea769f90b24d55bc1a90dbe",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/inspector/content-sections/content-body.tsx <-> apps/extension/src/editor/inspector/content-sections/document-panel.tsx",
@@ -526,42 +382,6 @@
       }
     },
     {
-      "id": "33723fe2dce03604796de8548c084f90af8c33a27d9a5795901a2856dd5e24e2",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/review/advanced/zoom.ts",
-      "reason": "Move preserves region length and requested missing-id position; trim preserves the opposite edge and minimum length with zero missing-id fallback. Similar neighbor lookup does not duplicate the full edit operation.",
-      "removalCondition": "Remove when the exact pair disappears or an actual shared region-window contract replaces the parallel policies.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
-        "start": 221,
-        "end": 228
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
-        "start": 244,
-        "end": 250
-      }
-    },
-    {
-      "id": "3532c88ff5ca62e2f01b942e92601a079b40fd05119d4f6fefedb129e5ea89d6",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/review/cuts.ts <-> apps/extension/src/features/video/review/fragment.ts",
-      "reason": "Cut/speed creation rejects same-kind overlap and requires boundaries; fragment selection validates raw bounds, clips edits and may allow unsnapped missing boundaries. nearestReviewBoundary already supplies shared snapping.",
-      "removalCondition": "Remove when the exact pair disappears or cut and fragment admissibility/results become one operation.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/review/cuts.ts",
-        "start": 78,
-        "end": 90
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/fragment.ts",
-        "start": 25,
-        "end": 37
-      }
-    },
-    {
       "id": "36c7858be6ac7dc0c11d6c598beec291af45b3da136dabad62847d481873202b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/video-editor/project/history/index.ts",
@@ -631,6 +451,24 @@
         "path": "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
         "start": 27,
         "end": 35
+      }
+    },
+    {
+      "id": "3c57c58ff692095476e2d8e57c85c770b9d0318fb8bff0d1a62b5fa3c44c86b7",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/background-resources and gallery/video-review",
+      "reason": "Exact configuration calls connect shared header/list views to different listing owners. Query state, status and cards already have common presentation operations; available views, retry, media admission and thumbnail lifetime remain owner-local. Another container would only forward a props bag.",
+      "removalCondition": "Remove when this exact pair disappears; reassess if executable acquisition, filtering, lifecycle or rendering is duplicated, or one owner legitimately owns both compositions.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/background-resources/library.tsx",
+        "start": 128,
+        "end": 140
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/presentation-library.tsx",
+        "start": 76,
+        "end": 88
       }
     },
     {
@@ -1048,24 +886,6 @@
       }
     },
     {
-      "id": "5c3e9ccde120114abc10639b8ad9a09ca9af2f05f0604d07f8e01b01081cf964",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding",
-      "reason": "Standard and live recording owners independently settle terminal promises; sharing the methods would require a mutable lifecycle delegate across authorities.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 160,
-        "end": 174
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 427,
-        "end": 441
-      }
-    },
-    {
       "id": "5d181690bb7dd4950dfb7566aea7cccafd02499b337c54357393c03de0c0b05a",
       "classification": "tool-noise",
       "owner": "apps/extension/src/ui/highlighter-preset-editor",
@@ -1099,42 +919,6 @@
         "path": "apps/extension/src/features/video/project/validation/interaction.ts",
         "start": 163,
         "end": 168
-      }
-    },
-    {
-      "id": "5e790acfa059d2932dfc98ba74b6cf1eed81062b9954f52872944acfc456d2a9",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/toolbar/legacy-actions.css",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
-        "start": 123,
-        "end": 134
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
-        "start": 58,
-        "end": 69
-      }
-    },
-    {
-      "id": "5eafcb352736758db1342ae850d2c9907c1a7b7ccca2e231bcb2c0f7eb1f6915",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding",
-      "reason": "Standard and live recording owners independently settle terminal promises; sharing the methods would require a mutable lifecycle delegate across authorities.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 98,
-        "end": 103
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 344,
-        "end": 349
       }
     },
     {
@@ -1189,24 +973,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
         "start": 1052,
         "end": 1058
-      }
-    },
-    {
-      "id": "62c69fce5aa7752431f19a05e9dbeefe6c1f86a9d61e8640725b27471a5f7f0c",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx <-> apps/extension/src/scenario-editor/page-shell/note-block.tsx",
-      "reason": "Both already use GuideVoiceField and paragraph construction; note and body keep different labels, classes and typed mutations.",
-      "removalCondition": "Remove when the exact pair disappears or note/body editing becomes one actual typed control contract.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 500,
-        "end": 506
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/note-block.tsx",
-        "start": 68,
-        "end": 74
       }
     },
     {
@@ -1534,24 +1300,6 @@
       }
     },
     {
-      "id": "73c083127e216da9556089ebf623b7066e88cedd6841a8e111cbdc3739511863",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-      "reason": "Step and section title updates target the same item identity pattern but preserve different type labels and history groups. Matching expression excludes those important binding distinctions.",
-      "removalCondition": "Remove when the exact pair disappears or title kinds acquire one history/mutation contract.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 264,
-        "end": 275
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 533,
-        "end": 544
-      }
-    },
-    {
       "id": "7634c5a1ab163c31b7f9b9dfb887a67208db1c8248561a68096f9c0a21fd3f18",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/video-review/inspector.css <-> apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
@@ -1588,21 +1336,39 @@
       }
     },
     {
-      "id": "7745c8967ced82ddb8fb54726d97ba53f5cd0c4ec2a976d24ba57ecbdd542b00",
+      "id": "77029748781459a10ed6a912c7f4fefaae5f5d96a33e73d3ac5e6775fce0a42c",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/scenario-capture-edit",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
+      "owner": "apps/extension/src/offscreen/recording/encoding",
+      "reason": "Exact local finalization adapters set each session phase and settle its terminal through the existing common writer-finalization operation. Live output completion and failure cleanup remain distinct producer authorities; forwarding phase/fail callbacks would split that authority.",
+      "removalCondition": "Remove when the exact pair disappears or both producers acquire one accepted state-machine and failure-cleanup owner.",
+      "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/workflows/scenario-capture-edit/edits.ts",
-        "start": 74,
-        "end": 92
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 156,
+        "end": 170
       },
       "secondFile": {
-        "path": "apps/extension/src/workflows/scenario-capture-edit/tour-edits.ts",
-        "start": 101,
-        "end": 119
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 421,
+        "end": 435
+      }
+    },
+    {
+      "id": "77ad7ce7f092f49efbafa5350798d6974d9de9c7058defa567877203a0144e58",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding",
+      "reason": "Exact stop-admission adapters belong to different state machines: recorder inactivity and live starting admission differ, as do producer stop and drain transitions. Shared terminal mechanics are already extracted.",
+      "removalCondition": "Remove when the exact pair disappears or both producers acquire one accepted state-machine and failure-cleanup owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 92,
+        "end": 97
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 338,
+        "end": 343
       }
     },
     {
@@ -1732,60 +1498,6 @@
       }
     },
     {
-      "id": "82eea7261ee4368b5f612a8b9384719d83b57356677ddde4270258009ec5645c",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/editor/inspector/compact/inspector/browser-frame-details.tsx <-> apps/extension/src/editor/inspector/environment/browser-frame.tsx",
-      "reason": "Both hosts use TextField and fireAndReportEditorAction already. Compact commands supply summary and empty-value text; environment fields supply invalid/describedBy accessibility state. The matching change handler is primitive binding, not a second text-field owner.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/editor/inspector/compact/inspector/browser-frame-details.tsx",
-        "start": 50,
-        "end": 58
-      },
-      "secondFile": {
-        "path": "apps/extension/src/editor/inspector/environment/browser-frame.tsx",
-        "start": 23,
-        "end": 31
-      }
-    },
-    {
-      "id": "8409e42d9a2a5c23c78ed3e30534379cf22f8f3fe879ac0e111046575c568813",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/background-inspector.tsx <-> apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/colors.tsx",
-      "reason": "Quick review and full-editor background hosts bind the same gradient catalog/paint serializer. Their button classes, current value and update callbacks belong to different draft owners; matching favorite ordering and button attributes are small declarative projections.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/background-inspector.tsx",
-        "start": 97,
-        "end": 109
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/colors.tsx",
-        "start": 43,
-        "end": 55
-      }
-    },
-    {
-      "id": "842bb5d011c7620a567dbd6d546c45b8cc298617dd254a9f36e714f91c7dccd0",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
-      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
-        "start": 82,
-        "end": 89
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
-        "start": 88,
-        "end": 95
-      }
-    },
-    {
       "id": "85de3566caf9097aa246a868c93363766c5d7149925e0af503bc74d4e8006ec5",
       "classification": "tool-noise",
       "owner": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
@@ -1801,42 +1513,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
         "start": 271,
         "end": 281
-      }
-    },
-    {
-      "id": "864340c8ac47b202b67128d9525aef27d12e0905f39c38dcf3644a530f69121a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/backup-restore.ts <-> apps/extension/src/workflows/media-hub-backup/v6/root-publication/media-review-assets.ts",
-      "reason": "Video project replacement unlinks an entity with its supplied owner kind; backup review retention unlinks a fixed PROJECT_ASSET_OWNER_KIND entry. Their caller-owned transaction store sets and rollback responsibility differ; the repeated reference-count protocol must stay inside each.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/backup-restore.ts",
-        "start": 95,
-        "end": 102
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/media-review-assets.ts",
-        "start": 109,
-        "end": 116
-      }
-    },
-    {
-      "id": "86c6008ab434b019d88f7f039bf45cac4c02747a31378c8d18854cd22750aee1",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/backup-restore.ts <-> apps/extension/src/composition/persistence/scenario/backup-restore.ts",
-      "reason": "Video and scenario restore promote lifecycle after different conflict/child validation and replacement. Video preserves lifecycle.updatedAt, scenario uses Date.now, then publishes different child sets; the similar success projection does not form one restore transaction.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/backup-restore.ts",
-        "start": 275,
-        "end": 283
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/scenario/backup-restore.ts",
-        "start": 208,
-        "end": 216
       }
     },
     {
@@ -1873,42 +1549,6 @@
         "path": "packages/ui/src/styles/product-form-controls/range.css",
         "start": 75,
         "end": 88
-      }
-    },
-    {
-      "id": "8955ce6561445f1138262cc57b3aff6fbf139a739b3defcf6e017bc0160ee9d5",
-      "classification": "tool-noise",
-      "owner": "video viewport layer projection across editor and offscreen runtimes",
-      "reason": "Editor preview and offscreen export project runtime-specific layer types; sharing the short loop would introduce a cross-runtime contract for no independent behavior.",
-      "removalCondition": "Remove when both runtimes consume one layer projection contract or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/project-export/renderer/visual-pass-layers.ts",
-        "start": 9,
-        "end": 19
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/scene/render-visual.ts",
-        "start": 244,
-        "end": 254
-      }
-    },
-    {
-      "id": "89d04f56698f007953f3ad50c96b6164cda11f0c43429dd08ef69928fd23e24b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
-      "reason": "Source-to-frame and frame-to-source mappings are explicit inverse public geometry operations; mirrored setup keeps direction and rounding visible.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
-        "start": 274,
-        "end": 280
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
-        "start": 298,
-        "end": 304
       }
     },
     {
@@ -1981,24 +1621,6 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 99,
         "end": 105
-      }
-    },
-    {
-      "id": "8d9851c070d1c6711ac643cfd52d457c45d77eb29ce52467927a5f4e5faf35d7",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding",
-      "reason": "Standard and live recording owners independently settle terminal promises; sharing the methods would require a mutable lifecycle delegate across authorities.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 70,
-        "end": 79
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 234,
-        "end": 244
       }
     },
     {
@@ -2107,24 +1729,6 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 58,
         "end": 69
-      }
-    },
-    {
-      "id": "958217fb9c3fb69a3cc9b1439d327d7edab50b11bd5f4d6b5c33fa2ba2c648ee",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/library-preview/viewport.tsx <-> apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-      "reason": "The library pointer-down bubbles and checks enabled; fullscreen video uses capture, stops propagation and checks fullscreen plus zoom. The repeated scroll delta is DOM glue within those distinct gesture boundaries.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
-        "start": 182,
-        "end": 200
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-        "start": 213,
-        "end": 231
       }
     },
     {
@@ -2344,24 +1948,6 @@
       }
     },
     {
-      "id": "9f1f7c5222b8590c72a23ee80f58cb6d27dd51ac0407270804605de12ba57735",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/settings/sections/styles",
-      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
-        "start": 74,
-        "end": 82
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
-        "start": 63,
-        "end": 71
-      }
-    },
-    {
       "id": "a1fef2c65d557db47cdbecf4cfd7f30a48d1d72713e57a5ca88bad68c2a29225",
       "classification": "tool-noise",
       "owner": "apps/extension/src/ui/highlighter-preset-editor",
@@ -2380,24 +1966,6 @@
       }
     },
     {
-      "id": "a3bf37df0e70d88927492150c043bf273cba5de7567809d71d1a94119b3823d4",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts <-> apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-      "reason": "Scenario and video inventory adapters share descriptor output fields but differ in root metadata, privacy/history traversals and recording/telemetry counts; common result shape is not common traversal authority.",
-      "removalCondition": "Remove when the exact pair disappears or one evidenced root traversal replaces both adapters.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
-        "start": 272,
-        "end": 278
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-        "start": 354,
-        "end": 360
-      }
-    },
-    {
       "id": "a3ce8e8a5fdf6b433589ec0151c8580d4781620f45aaba9ec97e629e7a5a886c",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence",
@@ -2413,42 +1981,6 @@
         "path": "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
         "start": 40,
         "end": 46
-      }
-    },
-    {
-      "id": "a4801b008c8afdc8f2ee0f72107f4a9261938513cf7697a984ff66e4f097fc98",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/use-advanced-content.ts",
-        "start": 112,
-        "end": 125
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/video-review/use-advanced.ts",
-        "start": 79,
-        "end": 92
-      }
-    },
-    {
-      "id": "a4cb2cbe46d734fa53d0eb1f23e2b20377c2f2e4003d40e12e9e71ca2a10622b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/backup-restore.ts <-> apps/extension/src/composition/persistence/scenario/backup-restore.ts",
-      "reason": "Video restore unlinks the fixed PROJECT_MEDIA_ASSET_ROLE for an entity; scenario restore unlinks a supplied role for an owner. These are projections into different caller-owned restore transactions, with reference counting performed within each transaction.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/backup-restore.ts",
-        "start": 95,
-        "end": 102
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/scenario/backup-restore.ts",
-        "start": 63,
-        "end": 70
       }
     },
     {
@@ -2632,24 +2164,6 @@
       }
     },
     {
-      "id": "aea8993cab271b7b2841d659c3042d9a553cc1e8878f9452e3ca32c61898c4a1",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/use-advanced-content.ts <-> apps/extension/src/gallery/video-review/use-session.ts",
-      "reason": "Advanced-content commit queue and recovery session both flush on browser hide/unmount. Each callback owns different serialized state and mounted ref; the visibility subscription is local lifetime glue and must not make the queues share persistence authority.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/use-advanced-content.ts",
-        "start": 114,
-        "end": 125
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/video-review/use-session.ts",
-        "start": 252,
-        "end": 263
-      }
-    },
-    {
       "id": "b074aa91b89d7d1cfd07218eb0d0b67355602f4ebd32b0a0df45ca30e7eba0bd",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal/shell.css",
@@ -2701,42 +2215,6 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
         "start": 86,
         "end": 99
-      }
-    },
-    {
-      "id": "b3862e22d5b9369aea6c22cbf9d56f9007f1e0ee73ec732253685892228b040b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-      "reason": "Project assets and export assets read review state with different aggregate ids and metadata/file provenance. Shared readVideoReviewForBackup and encodePortableReviewAssetRefs already own review serialization; matching output props bind two distinct inventory row types.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-        "start": 112,
-        "end": 122
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-        "start": 161,
-        "end": 171
-      }
-    },
-    {
-      "id": "b3d9a3bac21e7e4630befbbfd305704c5bde4321e7aff3c97c5d0feb3ca0ccb4",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/use-advanced-content.ts",
-        "start": 74,
-        "end": 94
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/video-review/use-advanced.ts",
-        "start": 44,
-        "end": 64
       }
     },
     {
@@ -2938,24 +2416,6 @@
       }
     },
     {
-      "id": "c4717970c444690d6297a998f1ca465ff3e753d924da507787d054ac8c811f9b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/block-actions.tsx <-> apps/extension/src/scenario-editor/page-shell/step-actions.tsx",
-      "reason": "Block actions dispatch move-block with itemId plus blockId; step/section actions dispatch move-item with itemId. Both already use GuideActionMenu; matching icons and translated move labels do not merge those discriminated operations.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/block-actions.tsx",
-        "start": 29,
-        "end": 37
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/step-actions.tsx",
-        "start": 34,
-        "end": 42
-      }
-    },
-    {
       "id": "c500ec86924ff1c6e90c42e4ce78c8e6e4fc82a823484829e18a069d8164c53d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/frame-annotation-controls",
@@ -3007,24 +2467,6 @@
         "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
         "start": 40,
         "end": 63
-      }
-    },
-    {
-      "id": "c8fe35f26b08dd1df51ca4fd20ae36a97a64c4071374a1a7e1548ec8727d89e0",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/editor/workspace/floating/document-autosave-status.tsx <-> apps/extension/src/gallery/video-review/timeline-chrome.tsx",
-      "reason": "Image and review both use AutosaveControl; conflict-copy/reload and review confirmation/error overrides have separate service and error lifetimes. Shared labels do not justify merging those sessions.",
-      "removalCondition": "Remove when the exact pair disappears or autosave actions and error lifecycle gain one shared owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/editor/workspace/floating/document-autosave-status.tsx",
-        "start": 54,
-        "end": 67
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/video-review/timeline-chrome.tsx",
-        "start": 304,
-        "end": 317
       }
     },
     {
@@ -3100,24 +2542,6 @@
       }
     },
     {
-      "id": "cb6b51262a76a61c1c2af55a7141de22fc0caf0dc31204871d56c5088d43249a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
-      "reason": "Source-to-frame and frame-to-source mappings are explicit inverse public geometry operations; mirrored setup keeps direction and rounding visible.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
-        "start": 112,
-        "end": 124
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
-        "start": 95,
-        "end": 107
-      }
-    },
-    {
       "id": "cb706ceb56eb7256898bccd3a6bccbce9df622bb9aede26a6fc2317f8b02617b",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/input-controls.css",
@@ -3169,24 +2593,6 @@
         "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "start": 26,
         "end": 37
-      }
-    },
-    {
-      "id": "cbe82a5d949e99c242944df913f7f43b8db528c4a40b27b19ad9bf4a5090fa57",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
-      "reason": "Mutation includes recording/scenario stores; deletion excludes them and exposes aggregate-presentation. Common objectStore fields are explicit capability inventories, not a duplicated mutation algorithm.",
-      "removalCondition": "Remove when the exact pair disappears or both operations legitimately require the same transaction capability.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
-        "start": 44,
-        "end": 51
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
-        "start": 80,
-        "end": 87
       }
     },
     {
@@ -3280,24 +2686,6 @@
       }
     },
     {
-      "id": "d6fb3d09434bfd1db27ae01990cdf95a4a65174bad5005445bfd139d8f6d2729",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/asset-publication.ts <-> apps/extension/src/composition/persistence/recordings/asset-publication.ts",
-      "reason": "Project publication writes one asset/export; recording publication batches assets and owns a replay-sensitive completion outbox. Project swallows postcommit physical-delete failure while recording propagates it; shared transaction-tail syntax must not erase that distinction.",
-      "removalCondition": "Remove when the exact pair disappears or both outbox and postcommit failure contracts become one publication operation.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
-        "start": 178,
-        "end": 193
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/recordings/asset-publication.ts",
-        "start": 199,
-        "end": 214
-      }
-    },
-    {
       "id": "d89ed9a8151a66bd45841521da4084ec221befa25d45687a88dfcef2892fd008",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/annotations",
@@ -3331,24 +2719,6 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
         "start": 111,
         "end": 132
-      }
-    },
-    {
-      "id": "dbb93db7362dd401012fbcb5ca6a16b7d6602b7fd533f38ea14d7a6ca114122d",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/asset-publication.ts <-> apps/extension/src/composition/persistence/web-snapshots/cleanup.ts",
-      "reason": "Project publication and web-snapshot deletion modify different aggregate stores before journaling physical deletion. The actual delete executor is already shared; transaction completion and best-effort replay stay adjacent to their owning publication/deletion.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
-        "start": 168,
-        "end": 177
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/web-snapshots/cleanup.ts",
-        "start": 68,
-        "end": 77
       }
     },
     {
@@ -3424,24 +2794,6 @@
       }
     },
     {
-      "id": "e14374db1b57476211c13d9780d6cc8be1fc8628e48584d812e1e3c70fcc6c26",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/library-preview/viewport.tsx <-> apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-      "reason": "Video pan stops on fullscreen or zoom exit and resets scroll in layout effect; library pan uses its viewport-enabled lifetime. Shared pointer-capture protocol must not merge those state authorities.",
-      "removalCondition": "Remove when the exact pair disappears or one owner explicitly unifies both enable/reset lifecycles.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
-        "start": 160,
-        "end": 169
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-        "start": 182,
-        "end": 192
-      }
-    },
-    {
       "id": "e162eaf56f5ffe630928deae21e11ebfade84a88b8b33982f4fb010fccc8a459",
       "classification": "tool-noise",
       "owner": "apps/extension/src/content/selection/frame-runtime/session <-> apps/extension/src/features/highlighter/step-badge-presets",
@@ -3514,24 +2866,6 @@
       }
     },
     {
-      "id": "e98c2fd26b0cad05268d62741782cef155ae2c6712ad839bc33a33879a87abd3",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document/lifecycle/open/image",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/content/parser/web-snapshot/asset-fetch.ts",
-        "start": 108,
-        "end": 121
-      },
-      "secondFile": {
-        "path": "apps/extension/src/editor/controller/document/lifecycle/open/image/favicon.ts",
-        "start": 57,
-        "end": 70
-      }
-    },
-    {
       "id": "eaa8989640e24d6495952981843e4694c35b6c7930e270ac30dbaed5064d51e1",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src/validation",
@@ -3565,24 +2899,6 @@
         "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
         "start": 42,
         "end": 46
-      }
-    },
-    {
-      "id": "ecdb307f0d001b786b552f54c25a296058206ac75fd86c73ea93c35f0feb20ad",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-      "reason": "Guide document and typed step-body props share callback signatures while retaining parent/child responsibilities, selection and instructions; the matching declarations are not duplicate effects.",
-      "removalCondition": "Remove when the exact pair disappears or one actual props contract replaces both boundary declarations.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 317,
-        "end": 325
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 50,
-        "end": 58
       }
     },
     {
@@ -3637,24 +2953,6 @@
         "path": "packages/ui/src/styles/toolbar-shell/button.css",
         "start": 99,
         "end": 110
-      }
-    },
-    {
-      "id": "f47b57688f9acc08d1127c8fedcc9b746e91c382a60fc3ab979befc79934d41a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
-      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
-        "start": 61,
-        "end": 75
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
-        "start": 67,
-        "end": 81
       }
     },
     {
@@ -3730,24 +3028,6 @@
       }
     },
     {
-      "id": "f9ecb2039a551bb27457958a9e077cfca7b66795e09981c2e6062ff22b2c0378",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding",
-      "reason": "Standard and live recording owners independently settle terminal promises; sharing the methods would require a mutable lifecycle delegate across authorities.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 212,
-        "end": 225
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 665,
-        "end": 678
-      }
-    },
-    {
       "id": "fa396eea4c889d5204d9cecd362bd58b46827d0434de2749e25e7a0b8c6f73a6",
       "classification": "tool-noise",
       "owner": "apps/extension/src/video-editor project operations",
@@ -3781,24 +3061,6 @@
         "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
         "start": 661,
         "end": 666
-      }
-    },
-    {
-      "id": "fd0fe2cfccef2a4fa5ac80051523f21638d733a598591726eec460f90825cdf9",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts <-> apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-      "reason": "Scenario and video thumbnail keys and aggregate kinds differ while both use encodePortableThumbnail/buildPortableAggregatePresentation; collector insertion order preserves archive identity and root privacy remains local.",
-      "removalCondition": "Remove when the exact pair disappears or thumbnail identity and inventory ordering become one semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
-        "start": 229,
-        "end": 244
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-        "start": 318,
-        "end": 333
       }
     },
     {

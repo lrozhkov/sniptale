@@ -74,10 +74,10 @@
   },
   "dependencies": {
     "@sniptale/foundation": "0.5.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
-    "vitest": "^4.1.10"
+    "vitest": "5.0.3"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/runtime-contracts/src",

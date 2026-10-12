@@ -1,4 +1,4 @@
-import type { mapVisualLayerToViewportSpace } from '../../../features/video/composition/motion/layer-camera';
+import type { mapVisualLayerToViewportSpace } from './motion/layer-camera';
 
 type ViewportLayer = ReturnType<typeof mapVisualLayerToViewportSpace>;
 

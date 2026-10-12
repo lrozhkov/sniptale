@@ -1,6 +1,6 @@
 --- a/src/isobmff/isobmff-muxer.ts
 +++ b/src/isobmff/isobmff-muxer.ts
-@@ -496,6 +496,10 @@
+@@ -528,6 +528,10 @@
  		assert(meta.decoderConfig);
  
  		const decoderConfig = { ...meta.decoderConfig };
@@ -11,7 +11,7 @@
  		let requiresAdtsStripping = false;
  
  		if (track.source._codec === 'aac' && !decoderConfig.description) {
-@@ -556,7 +560,7 @@
+@@ -588,7 +592,7 @@
  				requiresAdtsStripping,
  				primingPacket: packet,
  			},
@@ -32,16 +32,17 @@
  	EBMLReadVersion = 0x42f7,
 --- a/src/matroska/matroska-muxer.ts
 +++ b/src/matroska/matroska-muxer.ts
-@@ -364,7 +364,7 @@
+@@ -375,6 +375,9 @@
  				trackData.codecPrivate
  					? { id: EBMLId.CodecPrivate, data: toUint8Array(trackData.codecPrivate) }
  					: null,
--				{ id: EBMLId.CodecDelay, data: 0 },
-+				{ id: EBMLId.CodecDelay, data: trackData.track.isAudioTrack() && trackData.track.metadata.presentationWindow?.kind === 'opus-webm' ? Math.round(parseOpusIdentificationHeader(toUint8Array(trackData.codecPrivate!)).preSkip * 1e9 / 48000) : 0 },
- 				{ id: EBMLId.SeekPreRoll, data: seekPreRollNs },
++				trackData.track.isAudioTrack() && trackData.track.metadata.presentationWindow?.kind === 'opus-webm'
++					? { id: EBMLId.CodecDelay, data: Math.round(parseOpusIdentificationHeader(toUint8Array(trackData.codecPrivate!)).preSkip * 1e9 / 48000) }
++					: null,
+ 				seekPreRollNs > 0 ? { id: EBMLId.SeekPreRoll, data: seekPreRollNs } : null,
  				trackData.track.metadata.name !== undefined
  					? { id: EBMLId.Name, data: new EBMLUnicodeString(trackData.track.metadata.name) }
-@@ -829,6 +829,15 @@
+@@ -889,6 +892,15 @@
  		assert(meta.decoderConfig);
  
  		const decoderConfig = { ...meta.decoderConfig };
@@ -57,7 +58,7 @@
  		let requiresAdtsStripping = false;
  
  		if (track.source._codec === 'aac' && !decoderConfig.description) {
-@@ -1201,7 +1210,11 @@
+@@ -1270,7 +1282,11 @@
  		const msDuration = Math.round(1000 * chunk.duration);
  
  		// Subtitle cues need an explicit BlockDuration (a SimpleBlock has none)
@@ -70,7 +71,7 @@
  
  		if (!needsBlockGroup) {
  			// No additions, we can write out a SimpleBlock
-@@ -1233,12 +1246,13 @@
+@@ -1302,12 +1318,13 @@
  						] }
  					: null,
  				msDuration > 0 ? { id: EBMLId.BlockDuration, data: msDuration } : null,
@@ -87,7 +88,7 @@
  		if (!this.trackDatasInCurrentCluster.has(trackData)) {
 --- a/src/media-source.ts
 +++ b/src/media-source.ts
-@@ -39,6 +39,7 @@
+@@ -42,6 +42,7 @@
  	UnthrottledTimerHandle,
  	wait,
  } from './misc';
@@ -95,7 +96,7 @@
  import { Muxer } from './muxer';
  import { SubtitleParser } from './subtitles';
  import { toAlaw, toUlaw } from './pcm';
-@@ -1792,6 +1793,16 @@
+@@ -1901,6 +1902,16 @@
   * @public
   */
  export class EncodedAudioPacketSource extends AudioSource {
@@ -112,7 +113,7 @@
  	/** Creates a new {@link EncodedAudioPacketSource} whose packets are encoded using `codec`. */
  	constructor(codec: AudioCodec) {
  		super(codec);
-@@ -1818,6 +1829,34 @@
+@@ -1927,6 +1938,34 @@
  		}
  
  		this._ensureValidAdd();
@@ -149,8 +150,8 @@
  }
 --- a/src/output.ts
 +++ b/src/output.ts
-@@ -9,8 +9,8 @@
- import { assert, AsyncMutex, EventEmitter, isIso639Dash2LanguageCode, MaybePromise, Rotation, toArray } from './misc';
+@@ -19,8 +19,8 @@
+ } from './misc';
  import { MetadataTags, TrackDisposition, validateMetadataTags, validateTrackDisposition } from './metadata';
  import { Muxer } from './muxer';
 -import { OutputFormat } from './output-format';
@@ -160,7 +161,7 @@
  import { PathedTarget, Target, TargetRequest } from './target';
  import { Writer } from './writer';
  import { Logging } from './logging';
-@@ -280,6 +280,13 @@
+@@ -316,6 +316,13 @@
   * @public
   */
  export type AudioTrackMetadata = BaseTrackMetadata & {
@@ -174,7 +175,7 @@
  	/**
  	 * The decoder config for this audio track, provided ahead of time. This is provided automatically when media data
  	 * added to the track, but by specifying it here, you give the muxer additional information that it can make use of.
-@@ -668,6 +675,29 @@
+@@ -729,6 +736,29 @@
  			throw new TypeError('source must be an AudioSource.');
  		}
  		validateBaseTrackMetadata(metadata);
@@ -204,7 +205,7 @@
  		if (metadata.decoderConfig !== undefined) {
  			validateAudioChunkMetadata({ decoderConfig: metadata.decoderConfig }, source._codec);
  		}
-@@ -680,7 +710,7 @@
+@@ -741,7 +771,7 @@
  			}
  		}
  

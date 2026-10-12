@@ -14,7 +14,7 @@ import {
 
 const roots: string[] = [];
 const owner = 'tooling/ci/mediabunny';
-const modifiedSources = [{ packageName: 'mediabunny', version: '1.55.2', owner }];
+const modifiedSources = [{ packageName: 'mediabunny', version: '1.61.3', owner }];
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
 });
@@ -22,11 +22,11 @@ afterEach(async () => {
 async function fixture() {
   const manifest = JSON.parse(await fs.readFile(`${owner}/patch-manifest.json`, 'utf8'));
   const repoRoot = await createLegalFixture({
-    rootDependencies: { mediabunny: '1.55.2', alpha: '1.0.0' },
+    rootDependencies: { mediabunny: '1.61.3', alpha: '1.0.0' },
     packages: [
       {
         name: 'mediabunny',
-        version: '1.55.2',
+        version: '1.61.3',
         license: 'MPL-2.0',
         resolved: manifest.resolved,
         integrity: manifest.integrity,

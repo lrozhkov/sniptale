@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 314,
-  "findingDigest": "sha256:aec05f4a589f9afc3368b38975951ee279b6830ea7df7dd902e05ffc0bf7d24c",
+  "findingCount": 315,
+  "findingDigest": "sha256:d2855731808e1cc9a6a5da05228a97695c5669ba9c66ab8e7f20b0f9bca4be95",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -108,6 +108,13 @@
       "owner": "packages/platform/src/i18n/format.ts",
       "reason": "numberFormatters and dateFormatters are advisory caches of Intl formatter instances, capped at 64 entries each and rebuilt on misses. Keys include locale/options and the date local-zone signature; unsafe-to-cache options bypass memoization. Discarding entries changes construction cost rather than domain authority.",
       "removalCondition": "Remove if cached values become correctness or privilege authority, payload/lifetime changes invalidate this assessment, or the detector distinguishes advisory formatter memoization."
+    },
+    {
+      "id": "noise.policy-state-descriptor.privacy-erasure-composition-forwarded-exclusion",
+      "owner": "apps/extension/src/background/application/privacy-erasure/composition.ts",
+      "reason": "Exact mutation-queue-name matches the forwarded waitForActiveMutations method on caller-held exclusion reservations. This composition creates no queue, token store or authorization decision: existing lifecycle owners issue reservations and PrivacyErasureUseCase owns execution ordering.",
+      "removalCondition": "Remove this exact entry when forwarding method stops matching the signal or this composition starts owning a queue, lease, token or admission authority.",
+      "classification": "tool-noise"
     }
   ],
   "findings": [
@@ -146,6 +153,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/background/application/privacy-erasure/composition.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.privacy-erasure-composition-forwarded-exclusion"
     },
     {
       "file": "apps/extension/src/background/capture-surface/index.ts",

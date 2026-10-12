@@ -1,3 +1,4 @@
+import { documentAutosaveLabels } from '../../ui/document-autosave-labels';
 import { ReviewTrackRow } from './track-row';
 import { ReviewKeyboardHelp } from './keyboard-help';
 import { reviewWheelZoom } from './timeline-geometry';
@@ -474,19 +475,10 @@ function ReviewAutosaveControl(props: {
           ) : null
         }
         labels={{
-          title: translate('editor.documentActions.autosaveTitle'),
-          switch: translate('editor.documentActions.autosaveSwitch'),
-          on: translate('editor.documentActions.autosaveOnDescription'),
-          off: translate('editor.documentActions.autosaveOffDescription'),
-          paused: translate('editor.documentActions.autosaveOffStatus'),
-          dirty: translate('common.states.dirty'),
-          saving: translate('common.states.saving'),
-          saved: translate('common.states.saved'),
-          error: translate('editor.documentActions.saveErrorTitle'),
+          ...documentAutosaveLabels(),
           errorDescription:
             props.errorMessage ?? translate('editor.documentActions.autosaveErrorDescription'),
           conflict: translate('editor.documentActions.autosaveConflict'),
-          close: translate('common.actions.close'),
         }}
       />
       <ProductConfirmDialog

@@ -29,7 +29,8 @@ it('draws an admitted keystroke label without a captured point', () => {
     null
   );
   expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 960, expect.closeTo(1034.4, 8), 80);
-  expect(context.restore).toHaveBeenCalledTimes(2);
+  expect(context.save).toHaveBeenCalled();
+  expect(context.restore).toHaveBeenCalledTimes(vi.mocked(context.save).mock.calls.length);
 });
 
 it('does not draw a NONE presentation for a click fact', () => {

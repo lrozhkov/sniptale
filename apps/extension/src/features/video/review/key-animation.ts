@@ -1,3 +1,4 @@
+import { reviewCueWindow } from './cue-window';
 import type { ReviewTelemetryMarker } from './telemetry';
 import type { ReviewTimeSegment } from './timeline';
 import type { ReviewKeyAnimation, ReviewKeyStyle } from './advanced/key-animation';
@@ -21,18 +22,9 @@ export function scheduleReviewKeys(
   return markers.flatMap((marker) => {
     const style = isReviewKey(marker) ? styles.get(marker.ref.id) : undefined;
     if (!style?.enabled || !marker.target) return [];
-    const index = segments.findIndex(
-      (part) => marker.start >= part.sourceStart && marker.start < part.sourceEnd
-    );
-    const part = segments[index];
-    if (!part || part.kind === 'cut') return [];
-    let first = index,
-      last = index;
-    while (first > 0 && segments[first - 1]!.kind !== 'cut') first--;
-    while (last + 1 < segments.length && segments[last + 1]!.kind !== 'cut') last++;
-    const anchor = part.resultStart + (marker.start - part.sourceStart) / part.rate + style.offset;
-    const start = Math.max(segments[first]!.resultStart, anchor - style.before);
-    const end = Math.min(segments[last]!.resultEnd, anchor + style.after);
+    const window = reviewCueWindow(segments, marker.start, style.offset, style.before, style.after);
+    if (!window) return [];
+    const { start, end } = window;
     return end > start ? [{ label: marker.target, settings: style, start, end }] : [];
   });
 }

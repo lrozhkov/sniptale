@@ -110,13 +110,7 @@ export function getFittedMediaContentFrame(params: {
   });
 }
 
-export function mapSourcePointToFittedMediaFrame(params: {
-  fitMode: VideoMediaFitMode;
-  frame: MediaFrame;
-  point: SourcePoint;
-  sourceHeight: number;
-  sourceWidth: number;
-}): SourcePoint {
+export function mapSourcePointToFittedMediaFrame(params: FittedMediaPointMapping): SourcePoint {
   const frame = getFittedMediaContentFrame(params);
   const sourceWidth = Math.max(1, params.sourceWidth);
   const sourceHeight = Math.max(1, params.sourceHeight);
@@ -127,13 +121,7 @@ export function mapSourcePointToFittedMediaFrame(params: {
   };
 }
 
-export function mapFittedMediaFramePointToSource(params: {
-  fitMode: VideoMediaFitMode;
-  frame: MediaFrame;
-  point: SourcePoint;
-  sourceHeight: number;
-  sourceWidth: number;
-}): SourcePoint {
+export function mapFittedMediaFramePointToSource(params: FittedMediaPointMapping): SourcePoint {
   const frame = getFittedMediaContentFrame(params);
   const sourceWidth = Math.max(1, params.sourceWidth);
   const sourceHeight = Math.max(1, params.sourceHeight);
@@ -368,11 +356,7 @@ export function mapSourceNormalizedPointToVisualLayer(
     y: content.y + params.point.y * content.height,
   };
   if (!isInsideFrame(point, params.frame)) return null;
-  const center = {
-    x: params.frame.x + params.frame.width / 2,
-    y: params.frame.y + params.frame.height / 2,
-  };
-  const angle = (params.frame.rotation * Math.PI) / 180;
+  const { center, angle } = visualLayerRotation(params.frame);
   const x = point.x - center.x;
   const y = point.y - center.y;
   return {
@@ -392,11 +376,7 @@ export function mapVisualLayerPointToSourceNormalized(
   params: VisualLayerSourcePointMapping
 ): SourcePoint | null {
   if (!isValidPointMapping(params)) return null;
-  const center = {
-    x: params.frame.x + params.frame.width / 2,
-    y: params.frame.y + params.frame.height / 2,
-  };
-  const angle = (params.frame.rotation * Math.PI) / 180;
+  const { center, angle } = visualLayerRotation(params.frame);
   const x = (params.point.x - center.x - params.renderState.translateX) / params.renderState.scaleX;
   const y = (params.point.y - center.y - params.renderState.translateY) / params.renderState.scaleY;
   const point = {
@@ -409,4 +389,19 @@ export function mapVisualLayerPointToSourceNormalized(
     x: Math.min(1, Math.max(0, (point.x - content.x) / content.width)),
     y: Math.min(1, Math.max(0, (point.y - content.y) / content.height)),
   };
+}
+
+function visualLayerRotation(frame: MediaFrame & { rotation: number }) {
+  return {
+    center: { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 },
+    angle: (frame.rotation * Math.PI) / 180,
+  };
+}
+
+interface FittedMediaPointMapping {
+  fitMode: VideoMediaFitMode;
+  frame: MediaFrame;
+  point: SourcePoint;
+  sourceHeight: number;
+  sourceWidth: number;
 }

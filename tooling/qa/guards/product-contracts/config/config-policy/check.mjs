@@ -39,8 +39,8 @@ const REQUIRED_NODE_ENGINE = '>=24.18.0 <25';
 const REQUIRED_PACKAGE_MANAGER = 'npm@11.19.1';
 const REQUIRED_NPM_CONFIG = Object.freeze(['loglevel=error', 'min-release-age=7']);
 const REQUIRED_PACKAGE_DEPENDENCY_BASELINES = {
-  react: /^\^19\.2\.\d+$/u,
-  'react-dom': /^\^19\.2\.\d+$/u,
+  react: /^\^19\.3\.\d+$/u,
+  'react-dom': /^\^19\.3\.\d+$/u,
 };
 const REQUIRED_PACKAGE_DEV_DEPENDENCY_BASELINES = {
   '@types/react': /^\^19\.2\.\d+$/u,

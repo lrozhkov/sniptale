@@ -47,9 +47,11 @@ function createUnreadableIframe(): HTMLIFrameElement {
   });
   Object.defineProperty(iframe, 'contentWindow', {
     configurable: true,
-    get: () => {
-      throw new Error('Cross-origin');
-    },
+    get: () => ({
+      get document() {
+        throw new Error('Cross-origin');
+      },
+    }),
   });
   iframe.getBoundingClientRect = () => new DOMRect(120, 240, 640, 360);
   return iframe;

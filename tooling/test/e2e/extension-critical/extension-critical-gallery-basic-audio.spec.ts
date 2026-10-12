@@ -61,114 +61,120 @@ for (const variant of [
   { locale: 'ru', theme: 'dark' },
   { locale: 'en', theme: 'light', viewport: { width: 1200, height: 560 } },
 ] as const) {
-  test(`Basic source volume and ranges stay editable (${variant.locale}${'viewport' in variant ? ', narrow' : ''})`, async ({
-    page,
-  }, info) => {
-    if ('viewport' in variant) await page.setViewportSize(variant.viewport);
-    const host = await startHostServer();
-    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
-    try {
-      await applyHarnessBootstrap(page, {
-        preserveMediaLibrary: true,
-        storage: {
-          'sniptale-locale-preference': variant.locale,
-          'sniptale-theme-preference': variant.theme,
-        },
-      });
-      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
-      await page.locator('[data-ui="gallery.page.root"]').waitFor();
-      await seedReviewVideo(page, 'review-vp8-opus.webm', {
-        width: 160,
-        height: 90,
-        duration: 12.01,
-      });
-      await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      const dialog = page.locator('dialog');
-      const button = (key: Parameters<typeof translate>[0]) =>
-        dialog.getByRole('button', { name: label(key), exact: true });
-      const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video');
-      const master = dialog.getByRole('textbox', {
-        name: label('gallery.videoReview.sourceAudioVolume'),
-        exact: true,
-      });
-      const original = dialog.locator('[data-original-audio-lane]');
-      await expect(original).toBeVisible();
-      await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
-        'aria-pressed',
-        'false'
-      );
-      await expect(button('gallery.videoReview.scene')).toHaveCount(0);
-      await master.fill('50');
-      await master.press('Enter');
-      await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.volume)).toBe(0.5);
-      await button('gallery.videoReview.undo').click();
-      await expect(master).toHaveValue('100');
-      await button('gallery.videoReview.redo').click();
-      await expect(master).toHaveValue('50');
-      await button('gallery.videoReview.originalAudioRange').click();
-      await original.scrollIntoViewIfNeeded();
-      const rect = (await original.boundingBox())!;
-      await page.mouse.move(rect.x + rect.width * 0.25, rect.y + 16);
-      await page.mouse.down();
-      await page.mouse.move(rect.x + rect.width * 0.4, rect.y + 16, { steps: 4 });
-      await page.mouse.up();
-      const range = original.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
-      await expect(range).toHaveCount(1);
-      const volume = dialog.getByRole('textbox', {
-        name: label('gallery.videoReview.volume'),
-        exact: true,
-      });
-      await expect(volume).toBeVisible();
-      await expect.poll(async () => (await persistedSourceAudio(page))?.ranges?.length).toBe(1);
-      const initialRangeVolume = await volume.inputValue();
-      await volume.fill('0');
-      await volume.press('Enter');
-      await expect(range).toHaveAttribute('aria-pressed', 'true');
-      await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
-        'aria-pressed',
-        'false'
-      );
-      await page.screenshot({ path: info.outputPath('basic-audio-range.png'), fullPage: false });
-      await button('gallery.videoReview.undo').click();
-      await expect(volume).toHaveValue(initialRangeVolume);
-      await button('gallery.videoReview.redo').click();
-      await expect(volume).toHaveValue('0');
-      const download = page.waitForEvent('download');
-      await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
-      const output = (await readFile(await (await download).path())).toString('base64');
-      const source = (
-        await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url))
-      ).toString('base64');
-      const built = await bundle();
-      const comparison = await page.evaluate(
-        async ({ text, source, output }) => {
-          const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
-          try {
-            const mod = await import(url);
-            return { source: await mod.inspect(source), output: await mod.inspect(output) };
-          } finally {
-            URL.revokeObjectURL(url);
-          }
-        },
-        { text: built.outputFiles[0]!.text, source, output }
-      );
-      expect(comparison.output.packets).toEqual(comparison.source.packets);
-      expect(comparison.output.rms / comparison.source.rms).toBeCloseTo(0.5, 1);
-      await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      await expect(master).toHaveValue('50');
-      await expect(range).toHaveCount(1);
-      await range.click();
-      await expect(volume).toHaveValue('0');
-    } finally {
-      await new Promise<void>((resolve, reject) =>
-        host.server.close((error) => (error ? reject(error) : resolve()))
-      );
+  test(
+    [
+      'Basic source volume and ranges stay editable (',
+      String(variant.locale),
+      String('viewport' in variant ? ', narrow' : ''),
+      ')',
+    ].join(''),
+    async ({ page }, info) => {
+      if ('viewport' in variant) await page.setViewportSize(variant.viewport);
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      try {
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          storage: {
+            'sniptale-locale-preference': variant.locale,
+            'sniptale-theme-preference': variant.theme,
+          },
+        });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedReviewVideo(page, 'review-vp8-opus.webm', {
+          width: 160,
+          height: 90,
+          duration: 12.01,
+        });
+        await page.reload();
+        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        const dialog = page.locator('dialog');
+        const button = (key: Parameters<typeof translate>[0]) =>
+          dialog.getByRole('button', { name: label(key), exact: true });
+        const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video');
+        const master = dialog.getByRole('textbox', {
+          name: label('gallery.videoReview.sourceAudioVolume'),
+          exact: true,
+        });
+        const original = dialog.locator('[data-original-audio-lane]');
+        await expect(original).toBeVisible();
+        await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
+          'aria-pressed',
+          'false'
+        );
+        await expect(button('gallery.videoReview.scene')).toHaveCount(0);
+        await master.fill('50');
+        await master.press('Enter');
+        await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.volume)).toBe(0.5);
+        await button('gallery.videoReview.undo').click();
+        await expect(master).toHaveValue('100');
+        await button('gallery.videoReview.redo').click();
+        await expect(master).toHaveValue('50');
+        await button('gallery.videoReview.originalAudioRange').click();
+        await original.scrollIntoViewIfNeeded();
+        const rect = (await original.boundingBox())!;
+        await page.mouse.move(rect.x + rect.width * 0.25, rect.y + 16);
+        await page.mouse.down();
+        await page.mouse.move(rect.x + rect.width * 0.4, rect.y + 16, { steps: 4 });
+        await page.mouse.up();
+        const range = original.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
+        await expect(range).toHaveCount(1);
+        const volume = dialog.getByRole('textbox', {
+          name: label('gallery.videoReview.volume'),
+          exact: true,
+        });
+        await expect(volume).toBeVisible();
+        await expect.poll(async () => (await persistedSourceAudio(page))?.ranges?.length).toBe(1);
+        const initialRangeVolume = await volume.inputValue();
+        await volume.fill('0');
+        await volume.press('Enter');
+        await expect(range).toHaveAttribute('aria-pressed', 'true');
+        await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
+          'aria-pressed',
+          'false'
+        );
+        await page.screenshot({ path: info.outputPath('basic-audio-range.png'), fullPage: false });
+        await button('gallery.videoReview.undo').click();
+        await expect(volume).toHaveValue(initialRangeVolume);
+        await button('gallery.videoReview.redo').click();
+        await expect(volume).toHaveValue('0');
+        const download = page.waitForEvent('download');
+        await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
+        const output = (await readFile(await (await download).path())).toString('base64');
+        const source = (
+          await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url))
+        ).toString('base64');
+        const built = await bundle();
+        const comparison = await page.evaluate(
+          async ({ text, source, output }) => {
+            const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+            try {
+              const mod = await import(url);
+              return { source: await mod.inspect(source), output: await mod.inspect(output) };
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          },
+          { text: built.outputFiles[0]!.text, source, output }
+        );
+        expect(comparison.output.packets).toEqual(comparison.source.packets);
+        expect(comparison.output.rms / comparison.source.rms).toBeCloseTo(0.5, 1);
+        await page.reload();
+        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(master).toHaveValue('50');
+        await expect(range).toHaveCount(1);
+        await range.click();
+        await expect(volume).toHaveValue('0');
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
     }
-  });
+  );
 }
 
 async function persistedWorkspace(page: Page) {

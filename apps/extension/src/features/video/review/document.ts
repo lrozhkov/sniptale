@@ -1,3 +1,4 @@
+import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { loadQuickEditAdvancedContentState } from './advanced/validation';
 import { anchorReviewVoiceover, normalizeReviewVoiceoverTempo } from './voiceover-edits';
 import { buildReviewTimeMap } from './timeline';
@@ -106,21 +107,11 @@ function replaceAdvancedContent(
 
 function equalAdvancedContentValue(left: unknown, right: unknown): boolean {
   if (left === right) return true;
-  if (Array.isArray(left) || Array.isArray(right))
-    return (
-      Array.isArray(left) &&
-      Array.isArray(right) &&
-      left.length === right.length &&
-      left.every((value: unknown, index) => equalAdvancedContentValue(value, right[index]))
-    );
-  if (!isRecord(left) || !isRecord(right)) return false;
-  const keys = Object.keys(left);
-  return (
-    keys.length === Object.keys(right).length &&
-    keys.every(
-      (key) => Object.hasOwn(right, key) && equalAdvancedContentValue(left[key], right[key])
-    )
-  );
+  if (Array.isArray(left) && Array.isArray(right))
+    return sameHistoryArray(left, right, equalAdvancedContentValue);
+  if (!isRecord(left) || !isRecord(right) || Array.isArray(left) || Array.isArray(right))
+    return false;
+  return sameHistoryRecord(left, right, equalAdvancedContentValue);
 }
 
 /** Encodes admitted source gain edits without unchanged content; compound edits retain a full snapshot. */

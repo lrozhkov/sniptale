@@ -335,7 +335,7 @@ export function reviewWorkspaceHasAudioClip(
   clipId: string,
   assetId: string
 ): boolean {
-  const matches = (content: unknown, recovery = true): boolean => {
+  const matches = (content: unknown): boolean => {
     if (!isRecord(content)) return false;
     const audio = content['audio'];
     if (isRecord(audio)) {
@@ -351,16 +351,9 @@ export function reviewWorkspaceHasAudioClip(
           return true;
       }
     }
-    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+    return false;
   };
-  return (
-    matches(workspace.advanced) ||
-    workspace.history.some(
-      (operation) =>
-        operation.target === 'advancedContent' &&
-        (matches(operation.before) || matches(operation.after))
-    )
-  );
+  return retainedReviewContentMatches(workspace, matches);
 }
 
 /** Exact watermark ownership survives disabled modes, undo/redo and legacy recovery. */
@@ -368,7 +361,7 @@ export function reviewWorkspaceHasWatermarkImage(
   workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
   assetId: string
 ): boolean {
-  const matches = (content: unknown, recovery = true): boolean => {
+  const matches = (content: unknown): boolean => {
     if (!isRecord(content)) return false;
     const watermark = content['watermark'];
     if (
@@ -377,16 +370,9 @@ export function reviewWorkspaceHasWatermarkImage(
       watermark['image']['assetId'] === assetId
     )
       return true;
-    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+    return false;
   };
-  return (
-    matches(workspace.advanced) ||
-    workspace.history.some(
-      (operation) =>
-        operation.target === 'advancedContent' &&
-        (matches(operation.before) || matches(operation.after))
-    )
-  );
+  return retainedReviewContentMatches(workspace, matches);
 }
 
 /** Authored source closure includes disabled baseline and both sides of retained redo. */
@@ -726,22 +712,15 @@ export function reviewWorkspaceHasSceneResource(
   kind: 'image' | 'video',
   assetId: string
 ): boolean {
-  const matches = (content: unknown, recovery = true): boolean => {
+  const matches = (content: unknown): boolean => {
     if (!isRecord(content)) return false;
     const presentation = content['presentation'];
     const entry = isRecord(presentation) ? presentation[slot] : undefined;
     const resource = isRecord(entry) ? entry[kind] : undefined;
     if (isRecord(resource) && resource['assetId'] === assetId) return true;
-    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+    return false;
   };
-  return (
-    matches(workspace.advanced) ||
-    workspace.history.some(
-      (operation) =>
-        operation.target === 'advancedContent' &&
-        (matches(operation.before) || matches(operation.after))
-    )
-  );
+  return retainedReviewContentMatches(workspace, matches);
 }
 
 /** Exact accepted identity retained independently of draft phrases, lane enablement or cuts. */
@@ -751,7 +730,7 @@ export function reviewWorkspaceHasSpeechReplacement(
   replacementId: string,
   assetId: string
 ): boolean {
-  const matches = (content: unknown, recovery = true): boolean => {
+  const matches = (content: unknown): boolean => {
     if (!isRecord(content)) return false;
     const audio = content['audio'];
     if (isRecord(audio)) {
@@ -773,14 +752,24 @@ export function reviewWorkspaceHasSpeechReplacement(
       )
         return true;
     }
-    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+    return false;
   };
+  return retainedReviewContentMatches(workspace, matches);
+}
+
+/** Current, undo/redo and one admitted legacy recovery projection retain resources equally. */
+function retainedReviewContentMatches(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  matches: (content: unknown) => boolean
+): boolean {
+  const retained = (content: unknown): boolean =>
+    matches(content) || (isRecord(content) && matches(parseRecoveryContent(content['recoveryV1'])));
   return (
-    matches(workspace.advanced) ||
+    retained(workspace.advanced) ||
     workspace.history.some(
       (operation) =>
         operation.target === 'advancedContent' &&
-        (matches(operation.before) || matches(operation.after))
+        (retained(operation.before) || retained(operation.after))
     )
   );
 }

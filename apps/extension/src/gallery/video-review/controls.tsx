@@ -1,9 +1,11 @@
+import { InspectorDisclosureView } from '../../ui/compact-inspector-controls/disclosure';
+import type { InspectorDisclosureProps } from '../../ui/compact-inspector-controls/shared';
 import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import { useContext } from 'react';
 import { ReviewIntervalMap, reviewIntervalDuration } from './interval-timing';
-import { ChevronDown, Clock3, type LucideIcon } from 'lucide-react';
+import { Clock3 } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 import {
@@ -256,38 +258,15 @@ export function reviewEventLabel(kind: string): string {
 }
 
 /** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */
-export function ReviewDetails({
-  label,
-  preferenceId,
-  children,
-  icon: Icon,
-  level = 'group',
-  initiallyOpen,
-}: {
-  label: string;
-  preferenceId: string;
-  children: ReactNode;
-  icon?: LucideIcon;
-  level?: 'section' | 'group';
-  initiallyOpen?: boolean;
-}) {
-  const [open, setOpen] = useInspectorDisclosure(preferenceId, initiallyOpen ?? false);
-  const Heading = level === 'section' ? 'h3' : 'h4';
+export function ReviewDetails(props: InspectorDisclosureProps) {
+  const [open, setOpen] = useInspectorDisclosure(props.preferenceId, props.initiallyOpen ?? false);
   return (
-    <details
-      data-ui="gallery.videoReview.disclosure"
-      data-level={level}
+    <InspectorDisclosureView
+      {...props}
       open={open}
-      onToggle={(event) => {
-        if (event.currentTarget.open !== open) setOpen(event.currentTarget.open);
-      }}
-    >
-      <summary>
-        {Icon ? <Icon size={16} aria-hidden="true" /> : null}
-        <Heading>{label}</Heading>
-        <ChevronDown size={level === 'section' ? 16 : 14} aria-hidden="true" />
-      </summary>
-      <div className="review-inspector-section-body">{children}</div>
-    </details>
+      onOpenChange={setOpen}
+      dataUi="gallery.videoReview.disclosure"
+      bodyClassName="review-inspector-section-body"
+    />
   );
 }

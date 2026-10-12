@@ -1,7 +1,11 @@
 {
   "schemaVersion": 1,
-  "allowedProtocols": ["https"],
-  "allowedRegistryHosts": ["registry.npmjs.org"],
+  "allowedProtocols": [
+    "https"
+  ],
+  "allowedRegistryHosts": [
+    "registry.npmjs.org"
+  ],
   "sourceExceptions": [],
   "installScriptApprovals": [
     {
@@ -37,15 +41,6 @@
       "dependencyScope": "transitive-development",
       "artifactInclusion": "development-only",
       "reason": "Optional macOS development watcher binary remains lock-pinned and non-production.",
-      "approvalOwner": "repository-owner",
-      "expiresOn": "2027-07-12"
-    },
-    {
-      "packageName": "fsevents",
-      "resolvedVersion": "2.3.2",
-      "dependencyScope": "transitive-development",
-      "artifactInclusion": "development-only",
-      "reason": "Nested optional macOS development watcher binary remains lock-pinned and non-production.",
       "approvalOwner": "repository-owner",
       "expiresOn": "2027-07-12"
     }

@@ -1,3 +1,4 @@
+import { guideParagraphText } from '../../features/scenario/project/public';
 import { useGuideInsertPlacement } from './document-insert-placement';
 import { GuideBlockRows } from './block-rows';
 import { GuideVoiceField } from './voice-field';
@@ -41,7 +42,15 @@ export type GuideFocusRequest = {
 
 type GuideImageUploadHandler = GuideDocumentCommandInputs['onUploadImage'];
 
-type GuideDocumentProps = {
+type GuideImageCallbacks = {
+  onOperate: (operation: GuideStructureOperation) => void;
+  onEditImage: (itemId: string, blockId: string) => void;
+  onUploadImage: GuideImageUploadHandler;
+  framedImageId: string | null;
+  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+};
+
+type GuideDocumentProps = GuideImageCallbacks & {
   project: GuideProject;
   selectedId: string | null;
   selectedBlockId?: string | null;
@@ -50,11 +59,7 @@ type GuideDocumentProps = {
   images: Record<string, string | null>;
   disabled: boolean;
   onChange: (project: GuideProject, group?: string | null) => void;
-  onOperate: (operation: GuideStructureOperation) => void;
-  onEditImage: (itemId: string, blockId: string) => void;
-  onUploadImage: GuideImageUploadHandler;
-  framedImageId: string | null;
-  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+
   onSelectBlock: (itemId: string, blockId: string | null) => void;
   t: Translate;
 };
@@ -305,9 +310,7 @@ const GuideSectionFields = memo(function GuideSectionFields({
         rows={1}
         aria-label={t('scenario.editor.body')}
         placeholder={t('scenario.editor.body')}
-        value={item.paragraphs
-          .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-          .join('\n')}
+        value={guideParagraphText(item.paragraphs)}
         disabled={disabled}
         onValueChange={(value) => onParagraphsChange(item.id, value)}
       />
@@ -315,7 +318,7 @@ const GuideSectionFields = memo(function GuideSectionFields({
   );
 });
 
-type GuideStepBodyProps = {
+type GuideStepBodyProps = GuideImageCallbacks & {
   projectId: string;
   purpose: GuideProject['purpose'];
   item: GuideStep;
@@ -324,11 +327,7 @@ type GuideStepBodyProps = {
   images: Record<string, string | null>;
   disabled: boolean;
   onChangeBlock: (itemId: string, block: GuideBlock, group: string | null) => void;
-  onOperate: (operation: GuideStructureOperation) => void;
-  onEditImage: (itemId: string, blockId: string) => void;
-  onUploadImage: GuideImageUploadHandler;
-  framedImageId: string | null;
-  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+
   t: Translate;
 };
 
@@ -493,9 +492,7 @@ function GuideTextBlock({
       style={guideTextAppearance(block)}
       placeholder={t('scenario.editor.body')}
       rows={1}
-      value={block.paragraphs
-        .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-        .join('\n')}
+      value={guideParagraphText(block.paragraphs)}
       onValueChange={(value) => onChange({ ...block, paragraphs: createGuideParagraphs(value) })}
     />
   );

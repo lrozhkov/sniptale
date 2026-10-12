@@ -185,3 +185,32 @@ it('admits only the explicit event history database adapter', () => {
     expect.objectContaining({ rule: 'indexed-db-entrypoint-owner-bypass' }),
   ]);
 });
+
+it('distinguishes erased transaction types from runtime idb entrypoints', () => {
+  const root = createTempRoot();
+  const erased = writeFile(
+    root,
+    'apps/extension/src/example/erased.ts',
+    "import type { IDBPTransaction } from 'idb';\n"
+  );
+  const namedType = writeFile(
+    root,
+    'apps/extension/src/example/named-type.ts',
+    "import { type IDBPTransaction } from 'idb';\n"
+  );
+  const runtime = writeFile(
+    root,
+    'apps/extension/src/example/runtime.ts',
+    "import { type IDBPTransaction, openDB } from 'idb';\n"
+  );
+  const sideEffect = writeFile(
+    root,
+    'apps/extension/src/example/side-effect.ts',
+    "import 'idb';\n"
+  );
+  expect(collectPersistenceOwnershipViolations([erased, namedType])).toEqual([]);
+  expect(collectPersistenceOwnershipViolations([runtime, sideEffect])).toEqual([
+    expect.objectContaining({ rule: 'indexed-db-entrypoint-owner-bypass' }),
+    expect.objectContaining({ rule: 'indexed-db-entrypoint-owner-bypass' }),
+  ]);
+});

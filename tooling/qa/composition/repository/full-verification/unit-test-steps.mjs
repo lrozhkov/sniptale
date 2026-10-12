@@ -16,6 +16,7 @@ import {
   recordSuccessfulFullUnitProof,
   resolveReusableFullUnitProof,
 } from '../../../proof/unit/unit-test-proof.mjs';
+import { resolveReusableCoverageProof } from '../../../proof/coverage/coverage-proof.mjs';
 import { runUnitTests } from '../../../proof/unit/verify-unit-tests.mjs';
 import { PRODUCT_QA_SUITE } from '../../scope/qa-scope.mjs';
 import {
@@ -111,7 +112,21 @@ function resolveReusableRelatedUnitTestPlan({
   targetFiles,
 }) {
   if (coveragePlan.forceFullSuite && !hasCoverage(coveragePlan)) {
-    return resolveReusableFullUnitProof({ maxWorkers, pool, suite });
+    const unitProof = resolveReusableFullUnitProof({ maxWorkers, pool, suite });
+    if (unitProof.matched || suite !== PRODUCT_QA_SUITE) return unitProof;
+    try {
+      const coverageProof = resolveReusableCoverageProof({ pool: pool ?? 'threads' });
+      if (coverageProof.matched)
+        return {
+          ...coverageProof,
+          plan: { mode: 'full' },
+          kind: 'coverage',
+          source: `verified ${coverageProof.source}; full product coverage proof=${coverageProof.proof.proofDigest}`,
+        };
+    } catch {
+      // Missing or malformed coverage inputs retain the complete unit-suite fallback.
+    }
+    return unitProof;
   }
   return resolveReusableUnitTestPlan({
     targetFiles,
@@ -161,7 +176,7 @@ async function collectRelatedUnitTestStepResult({
     : { matched: false };
 
   if (reusableUnitTestPlan.matched) {
-    if (coveragePlan.forceFullSuite) {
+    if (coveragePlan.forceFullSuite && reusableUnitTestPlan.kind !== 'coverage') {
       recordSuccessfulFullUnitProof({
         maxWorkers,
         pool,

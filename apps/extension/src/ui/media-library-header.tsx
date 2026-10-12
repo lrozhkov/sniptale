@@ -1,3 +1,5 @@
+import type { ComponentProps } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Search, Filter, X } from 'lucide-react';
 import { ProductModalHeader } from '@sniptale/ui/product-modal';
@@ -99,5 +101,37 @@ export function MediaLibraryHeader(props: {
         }
       />
     </div>
+  );
+}
+
+/** Header typing is disposable; applied filters remain with the owning listing. */
+function useMediaLibraryQuery(onQuery: (value: string) => void) {
+  const [query, setQuery] = useState('');
+  const [composing, setComposing] = useState(false);
+  useEffect(() => {
+    if (composing) return;
+    const timer = setTimeout(() => onQuery(query), 250);
+    return () => clearTimeout(timer);
+  }, [query, onQuery, composing]);
+  return { query, setQuery, setComposing };
+}
+
+/** Transient input lifecycle; callers own applied filters and available options. */
+export function DebouncedMediaLibraryHeader(
+  props: Omit<
+    ComponentProps<typeof MediaLibraryHeader>,
+    'query' | 'onQueryChange' | 'onApplyQuery' | 'onComposingChange'
+  > & { onQuery(value: string): void }
+) {
+  const { onQuery, ...visual } = props;
+  const { query, setQuery, setComposing } = useMediaLibraryQuery(onQuery);
+  return (
+    <MediaLibraryHeader
+      {...visual}
+      query={query}
+      onQueryChange={setQuery}
+      onApplyQuery={() => onQuery(query)}
+      onComposingChange={setComposing}
+    />
   );
 }

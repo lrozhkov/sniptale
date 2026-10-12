@@ -365,3 +365,70 @@ it('rechecks a newly selected outro even when intro already retains the object',
   await prepared.cancel();
   expect(harness.objects.has(ref.assetId)).toBe(true);
 });
+
+it.each(['read', 'prepare'] as const)(
+  'rejects unavailable object bytes during %s without creating a publication journal',
+  async (operation) => {
+    const { mediaId, media } = seed('stored-asset');
+    const source = await readLibrarySceneBindingSource(mediaId, 'video');
+    harness.objects.delete(ref.assetId);
+    const result =
+      operation === 'read'
+        ? readLibrarySceneBindingSource(mediaId, 'video')
+        : prepareLibrarySceneBinding(source, claim, 'private');
+    await expect(result).rejects.toMatchObject({ code: 'unavailable' });
+    expect(harness.journals.size).toBe(0);
+    expect(table('media_library').get(mediaId)).toEqual(media);
+    expect(table('project_assets').size).toBe(0);
+  }
+);
+it.each(['project_assets', 'media_library'] as const)(
+  'preserves an occupied target in %s and refuses a new claim',
+  async (store) => {
+    const { mediaId } = seed('stored-asset');
+    const source = await readLibrarySceneBindingSource(mediaId, 'video');
+    const key = store === 'project_assets' ? 'private' : 'project-asset:private';
+    const occupied =
+      store === 'project_assets'
+        ? {
+            id: 'private',
+            assetId: ref.assetId,
+            size: ref.size,
+            mimeType: ref.mimeType,
+            createdAt: 1,
+          }
+        : createMediaLibraryEntry({
+            id: key,
+            source: { kind: 'project-asset', projectAssetId: 'private' },
+            kind: 'video',
+            mimeType: ref.mimeType,
+            size: ref.size,
+            filename: 'existing.webm',
+            originalFilename: 'existing.webm',
+          });
+    table(store).set(key, occupied);
+    await expect(prepareLibrarySceneBinding(source, claim, 'private')).rejects.toMatchObject({
+      code: 'changed-source',
+    });
+    expect(table(store).get(key)).toEqual(occupied);
+    expect(harness.journals.size).toBe(0);
+    expect(harness.objects.has(ref.assetId)).toBe(true);
+  }
+);
+it.each(['aggregateId', 'assetId'] as const)(
+  'rejects an empty %s before creating any claim',
+  async (field) => {
+    const { mediaId } = seed('stored-asset');
+    const source = await readLibrarySceneBindingSource(mediaId, 'video');
+    await expect(
+      prepareLibrarySceneBinding(
+        source,
+        { ...claim, aggregateId: field === 'aggregateId' ? '' : aggregateId },
+        field === 'assetId' ? '' : 'private'
+      )
+    ).rejects.toMatchObject({ code: 'unavailable' });
+    expect(harness.journals.size).toBe(0);
+    expect(table('project_assets').size).toBe(0);
+    expect(harness.objects.has(ref.assetId)).toBe(true);
+  }
+);

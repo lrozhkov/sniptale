@@ -7,7 +7,8 @@ import { evaluateQuickEditCameraAtTime } from '../../../../apps/extension/src/fe
 function createSurface() {
   const stylesheet = document.createElement('style');
   stylesheet.textContent =
-    '.relative{position:relative}.absolute{position:absolute}.flex-1{flex:1}.overflow-hidden{overflow:hidden}.inset-0{inset:0}.bg-black{background:black}';
+    '.relative{position:relative}.absolute{position:absolute}.flex-1{flex:1}.overflow' +
+    '-hidden{overflow:hidden}.inset-0{inset:0}.bg-black{background:black}';
   document.head.append(stylesheet);
   const host = document.createElement('div');
   host.style.cssText =

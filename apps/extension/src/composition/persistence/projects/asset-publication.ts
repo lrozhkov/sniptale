@@ -1,3 +1,4 @@
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import {
   parseProjectAssetPayload,
   type ProjectAssetPublicationOptions,
@@ -210,13 +211,7 @@ async function publishProjectMediaAsset(args: {
       }
       await tx.done;
     } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* The transaction may already have aborted. */
-      }
-      await tx.done.catch(() => undefined);
-      throw error;
+      await abortIndexedDbMutation(tx, error);
     }
   });
   if (physicalDelete.assetIds.length > 0) {

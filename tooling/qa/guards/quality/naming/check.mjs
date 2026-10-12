@@ -308,10 +308,10 @@ export function runNamingCheck({ files = [], repoWide = false, scope = 'workspac
     const pathViolations = collectNamingViolations(delta.pathFiles, {
       includeRepeatedPrefix: true,
     }).filter((violation) => violation.rule !== 'repeated-child-prefix-topology');
-    const topologyViolations = collectNamingViolations(delta.currentFiles, {
-      baselineTopologyFiles: delta.previousFiles,
-      includeRepeatedPrefix: true,
-    }).filter((violation) => violation.rule === 'repeated-child-prefix-topology');
+    const topologyViolations = collectRepeatedChildPrefixViolations(
+      collectNamingEntries(delta.currentFiles),
+      collectNamingEntries(delta.previousFiles)
+    );
     return { files: delta.pathFiles, violations: [...pathViolations, ...topologyViolations] };
   }
   const namingFiles = files.length > 0 ? files : collectCodeFiles();

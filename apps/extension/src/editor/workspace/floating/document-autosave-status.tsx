@@ -1,3 +1,4 @@
+import { documentAutosaveLabels } from '../../../ui/document-autosave-labels';
 import { useState } from 'react';
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -55,18 +56,9 @@ export function DocumentAutosaveStatus() {
         ) : null
       }
       labels={{
-        title: translate('editor.documentActions.autosaveTitle'),
-        switch: translate('editor.documentActions.autosaveSwitch'),
-        on: translate('editor.documentActions.autosaveOnDescription'),
-        off: translate('editor.documentActions.autosaveOffDescription'),
-        paused: translate('editor.documentActions.autosaveOffStatus'),
-        dirty: translate('common.states.dirty'),
-        saving: translate('common.states.saving'),
-        saved: translate('common.states.saved'),
-        error: translate('editor.documentActions.saveErrorTitle'),
+        ...documentAutosaveLabels(),
         errorDescription: translate('editor.documentActions.saveErrorDescription'),
         conflict: translate('editor.documentActions.conflictDescription'),
-        close: translate('common.actions.close'),
       }}
     />
   );

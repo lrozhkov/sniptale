@@ -3,8 +3,13 @@ import { fileURLToPath } from 'node:url';
 import { tourPlayerScript } from './apps/extension/build/tour-player-script.ts';
 import { defineConfig } from 'vitest/config';
 
-import { collectProductTestInventory } from './tooling/test/harness/product-test-inventory.mjs';
+import {
+  collectProductTestInventory,
+  PRODUCT_TEST_GLOBS,
+} from './tooling/test/harness/product-test-inventory.mjs';
 import { collectHarnessTestInventory } from './tooling/test/harness/harness-test-inventory.mjs';
+import { collectProductionCoverageFiles } from './tooling/qa/proof/coverage/coverage-audit-report.mjs';
+import { globSync } from 'tinyglobby';
 
 normalizeMediabunny({ root: fileURLToPath(new URL('.', import.meta.url)), check: true });
 
@@ -36,7 +41,8 @@ const wrapperCoverageTargets = parseWrapperCoverageTargets();
 const isWrapperCoverageMode = wrapperCoverageMode !== 'manual';
 const isWrapperTimeoutMode = process.env.SNIPTALE_VITEST_TIMEOUT_MODE === 'wrapper';
 const vitestSuite = resolveVitestSuite(process.env.SNIPTALE_VITEST_SUITE);
-const useBatchedProductCoverage = vitestSuite === 'product';
+const isProductCoverage = vitestSuite === 'product';
+const useCoverageProfiler = isProductCoverage && process.env.SNIPTALE_COVERAGE_PROFILE === '1';
 const productPoolOverride =
   vitestSuite === 'product'
     ? resolveProductPoolOverride(process.env.SNIPTALE_PRODUCT_VITEST_POOL)
@@ -45,7 +51,13 @@ const productPartition =
   vitestSuite === 'product' && productPoolOverride === undefined
     ? resolveProductPartition(process.env.SNIPTALE_PRODUCT_VITEST_PARTITION)
     : undefined;
-const productTestInventory = productPartition ? collectProductTestInventory() : null;
+const useProductProjects =
+  vitestSuite === 'product' &&
+  productPoolOverride === undefined &&
+  productPartition === undefined &&
+  process.env.SNIPTALE_PRODUCT_VITEST_PROJECTS === '1';
+const productTestInventory =
+  productPartition || useProductProjects ? collectProductTestInventory() : null;
 const harnessPartition =
   vitestSuite === 'harness'
     ? resolveHarnessPartition(process.env.SNIPTALE_HARNESS_VITEST_PARTITION)
@@ -103,15 +115,13 @@ function resolveHarnessMaxWorkers(value: string | undefined) {
 
 function resolveSuiteInclude() {
   if (vitestSuite === 'product') {
+    if (useProductProjects) return [];
     if (productPartition === 'jsdom-vm') {
       return productTestInventory?.jsdomVmThreadsFiles ?? [];
     }
     if (productPartition === 'node-vm') return productTestInventory?.nodeVmThreadsFiles ?? [];
     if (productPartition === 'threads') return productTestInventory?.threadsFiles ?? [];
-    return [
-      'apps/extension/src/**/*.{test,spec}.{ts,tsx}',
-      'packages/*/src/**/*.{test,spec}.{ts,tsx}',
-    ];
+    return PRODUCT_TEST_GLOBS;
   }
   if (vitestSuite === 'harness') {
     if (harnessPartition === 'node-vm-a') return harnessTestInventory?.nodeVmThreadsFilesA ?? [];
@@ -121,11 +131,7 @@ function resolveSuiteInclude() {
     return ['tooling/**/*.{test,spec}.{ts,tsx}'];
   }
 
-  return [
-    'apps/extension/src/**/*.{test,spec}.{ts,tsx}',
-    'packages/*/src/**/*.{test,spec}.{ts,tsx}',
-    'tooling/**/*.{test,spec}.{ts,tsx}',
-  ];
+  return [...PRODUCT_TEST_GLOBS, 'tooling/**/*.{test,spec}.{ts,tsx}'];
 }
 
 function resolveCoverageInclude() {
@@ -148,11 +154,49 @@ function resolveCoverageInclude() {
   return ['apps/extension/src/**/*.{ts,tsx}', 'packages/*/src/**/*.{ts,tsx}'];
 }
 
+function resolveCanonicalCoverageExclude() {
+  if (
+    vitestSuite !== 'product' ||
+    (wrapperCoverageMode !== 'manual' && wrapperCoverageMode !== 'full')
+  ) {
+    return [];
+  }
+  const canonicalFiles = new Set(collectProductionCoverageFiles());
+  return globSync(['apps/extension/src/**/*.{ts,tsx}', 'packages/*/src/**/*.{ts,tsx}'], {
+    ignore: ['**/*.{test,spec}.{ts,tsx}'],
+  })
+    .filter((file) => !canonicalFiles.has(file))
+    .sort();
+}
+
 export default defineConfig({
   plugins: [tourPlayerScript()],
   test: {
     include: resolveSuiteInclude(),
+    ...(useProductProjects
+      ? {
+          vmMemoryLimit: '512MB',
+          projects: [
+            {
+              test: {
+                name: 'vm',
+                include: PRODUCT_TEST_GLOBS,
+                exclude: productTestInventory?.threadsFiles ?? [],
+                pool: 'vmThreads' as const,
+              },
+            },
+            {
+              test: {
+                name: 'threads',
+                include: productTestInventory?.threadsFiles ?? [],
+                pool: 'threads' as const,
+              },
+            },
+          ],
+        }
+      : {}),
     exclude: ['cases/**', 'tooling/test/e2e/**/*.spec.ts', 'dist/**', '**/node_modules/**'],
+    clearMocks: false,
     setupFiles: ['./tooling/test/harness/vitest.setup.ts'],
     testTimeout: isWrapperTimeoutMode ? 15000 : undefined,
     hookTimeout: isWrapperTimeoutMode ? 15000 : undefined,
@@ -169,13 +213,12 @@ export default defineConfig({
               ? { pool: 'threads' as const }
               : {}),
     coverage: {
-      provider: useBatchedProductCoverage ? 'custom' : 'v8',
-      ...(useBatchedProductCoverage
+      provider: useCoverageProfiler ? 'custom' : 'v8',
+      ...(useCoverageProfiler
         ? {
             customProviderModule: './tooling/qa/proof/coverage/profile-v8-coverage-provider.mjs',
           }
         : {}),
-      all: vitestSuite === 'harness' || !isWrapperCoverageMode,
       reportsDirectory:
         vitestSuite === 'harness'
           ? './.tmp/coverage/tooling'
@@ -184,7 +227,7 @@ export default defineConfig({
             : './.tmp/coverage/unit',
       reporter: vitestSuite === 'product' ? ['json'] : ['text', 'json-summary', 'json', 'html'],
       include: resolveCoverageInclude(),
-      ...(useBatchedProductCoverage ? { processingConcurrency: 8 } : {}),
+      ...(isProductCoverage ? { processingConcurrency: 8 } : {}),
       ...(vitestSuite === 'harness'
         ? {
             reportOnFailure: true,
@@ -192,6 +235,7 @@ export default defineConfig({
           }
         : {}),
       exclude: [
+        ...resolveCanonicalCoverageExclude(),
         'cases/**',
         'dist/**',
         '**/node_modules/**',

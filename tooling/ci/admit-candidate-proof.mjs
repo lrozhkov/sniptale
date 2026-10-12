@@ -1,3 +1,4 @@
+import { parseCoverageProof } from '../qa/proof/contracts/coverage-proof-contract.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -230,7 +231,14 @@ function validateCoverageEvidence(root, manifest, declared, trustedRoot) {
   ) {
     throw new Error(`Malformed release proof policy: ${COVERAGE_PROOF_POLICY_PATH}`);
   }
-  const receipt = validateReceipt(root, policy.proofPath, 'sniptale-coverage-proof');
+  let receipt;
+  try {
+    receipt = parseCoverageProof(
+      JSON.parse(fs.readFileSync(path.join(root, policy.proofPath), 'utf8'))
+    );
+  } catch {
+    throw new Error(`Malformed candidate receipt: ${policy.proofPath}`);
+  }
   if (receipt.producer?.controlDigest !== manifest.controlDigest) {
     throw new Error('Candidate coverage receipt crosses QA control digests.');
   }
@@ -405,6 +413,7 @@ function validateReuseReceipts(root, manifest, lane, archives, declared, lanePol
       throw new Error('Candidate receipt crosses QA control digests: .tmp/qa/unit-proof.json');
     }
     validateReceiptReuse(manifest, 'unit', unit);
+    validateCoverageEvidence(root, manifest, declared, trustedRoot);
   }
   if (lane !== 'release') return;
   const admission = JSON.parse(

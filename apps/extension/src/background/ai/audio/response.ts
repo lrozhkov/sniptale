@@ -1,3 +1,4 @@
+import { readAudioTranscriptHeader } from '../../../contracts/ai/audio';
 import type { AudioTranscriptResult, AudioTranscriptTiming } from '../../../contracts/ai/audio';
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -31,11 +32,11 @@ export function parseAudioTranscriptResponse(
   value: unknown,
   duration: number
 ): AudioTranscriptResult | null {
-  if (!record(value) || typeof value['text'] !== 'string' || value['text'].length > 100000)
-    return null;
-  const result: AudioTranscriptResult = { text: value['text'] };
+  const header = readAudioTranscriptHeader(value);
+  if (!header) return null;
+  const { result, value: fields } = header;
   for (const key of ['segments', 'words'] as const) {
-    const raw = value[key];
+    const raw = fields[key];
     if (raw === undefined) continue;
     if (!Array.isArray(raw) || raw.length > 10000) return null;
     const parsed: AudioTranscriptTiming[] = [];

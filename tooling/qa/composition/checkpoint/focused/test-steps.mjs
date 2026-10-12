@@ -15,6 +15,7 @@ import {
   filterImportOrMockOnlyDiffFiles,
 } from '../../../analysis/imports/import-only-diff/check.mjs';
 import { createFocusedCoverageResult } from './coverage-result.mjs';
+import { createReusableFullProofSteps } from './full-proof-steps.mjs';
 import { createFocusedEarlyExitSteps } from './blocked-steps.mjs';
 import { createImportOnlyCodeFocusedSteps } from './import-only-steps.mjs';
 import { fromRelativePath } from '../../../analysis/repository/shared-paths.mjs';
@@ -208,6 +209,10 @@ export async function runFocusedUnitTests(
     focusedScopeOverride,
     newFiles,
   });
+  if (focusedScope.verdict === 'defer-ambiguous-existing') {
+    const fullProofSteps = createReusableFullProofSteps({ codeFiles, pool });
+    if (fullProofSteps) return fullProofSteps;
+  }
   const earlyExitSteps = createFocusedEarlyExitSteps({
     codeFiles: behavioralCodeFiles,
     directTestFiles,

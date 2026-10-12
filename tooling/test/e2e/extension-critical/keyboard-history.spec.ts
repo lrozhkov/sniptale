@@ -141,27 +141,30 @@ test('keyboard preview pixels match the export painter and latest command replac
   const { build } = await import('esbuild');
   const bundle = await build({
     stdin: {
-      contents: `
-    import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';
-    import {ReviewKeyOverlay} from './apps/extension/src/gallery/video-review/key-animation-overlay';
-    import {drawReviewKeys} from './apps/extension/src/workflows/video-review/render-key-animation';
-    import {REVIEW_KEY_DEFAULT} from './apps/extension/src/features/video/review/advanced/key-animation';
-    export async function probe(){
-      const output={width:640,height:360,x:100,y:50};
-      const style={...REVIEW_KEY_DEFAULT.style,fontSize:60,entrance:'none'};
-      const cues=[{label:'Ctrl+C',start:0,end:4,settings:{...REVIEW_KEY_DEFAULT,enabled:true,style}},
-        {label:'Ctrl+V',start:1,end:2,settings:{...REVIEW_KEY_DEFAULT,enabled:true,style}}];
-      const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
-      flushSync(()=>root.render(React.createElement(ReviewKeyOverlay,{cues,time:1.5,output})));
-      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-      const live=host.querySelector('canvas');const exported=document.createElement('canvas');exported.width=640;exported.height=360;
-      drawReviewKeys(exported.getContext('2d'),cues,1.5,{width:640,height:360});
-      const a=live.getContext('2d').getImageData(0,0,640,360).data,b=exported.getContext('2d').getImageData(0,0,640,360).data;
-      const mismatch=a.reduce((n,v,i)=>n+(v!==b[i]),0), visible=a.some(v=>v>0);
-      const labels=[];const ctx=exported.getContext('2d');ctx.fillText=(label)=>labels.push(label);
-      drawReviewKeys(ctx,cues,1.5,output);drawReviewKeys(ctx,cues,2.5,output);
-      root.unmount();return {mismatch,visible,labels};
-    }`,
+      contents:
+        "\n    import React from 'react';import {createRoot} from 'react-dom/client';i" +
+        "mport {flushSync} from 'react-dom';\n    import {ReviewKeyOverlay} from './ap" +
+        "ps/extension/src/gallery/video-review/key-animation-overlay';\n    import {dr" +
+        "awReviewKeys} from './apps/extension/src/workflows/video-review/render-key-a" +
+        "nimation';\n    import {REVIEW_KEY_DEFAULT} from './apps/extension/src/featur" +
+        "es/video/review/advanced/key-animation';\n    export async function probe(){\n" +
+        '      const output={width:640,height:360,x:100,y:50};\n      const style={...' +
+        "REVIEW_KEY_DEFAULT.style,fontSize:60,entrance:'none'};\n      const cues=[{la" +
+        "bel:'Ctrl+C',start:0,end:4,settings:{...REVIEW_KEY_DEFAULT,enabled:true,styl" +
+        "e}},\n        {label:'Ctrl+V',start:1,end:2,settings:{...REVIEW_KEY_DEFAULT,e" +
+        "nabled:true,style}}];\n      const host=document.createElement('div');documen" +
+        't.body.append(host);const root=createRoot(host);\n      flushSync(()=>root.re' +
+        'nder(React.createElement(ReviewKeyOverlay,{cues,time:1.5,output})));\n      a' +
+        'wait new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));\n  ' +
+        "    const live=host.querySelector('canvas');const exported=document.createEl" +
+        "ement('canvas');exported.width=640;exported.height=360;\n      drawReviewKeys" +
+        "(exported.getContext('2d'),cues,1.5,{width:640,height:360});\n      const a=l" +
+        "ive.getContext('2d').getImageData(0,0,640,360).data,b=exported.getContext('2" +
+        "d').getImageData(0,0,640,360).data;\n      const mismatch=a.reduce((n,v,i)=>n" +
+        '+(v!==b[i]),0), visible=a.some(v=>v>0);\n      const labels=[];const ctx=expo' +
+        "rted.getContext('2d');ctx.fillText=(label)=>labels.push(label);\n      drawRe" +
+        'viewKeys(ctx,cues,1.5,output);drawReviewKeys(ctx,cues,2.5,output);\n      roo' +
+        't.unmount();return {mismatch,visible,labels};\n    }',
       resolveDir: process.cwd(),
       loader: 'tsx',
     },

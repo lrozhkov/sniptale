@@ -1,3 +1,4 @@
+import { resolveOrderedVisualPassLayers } from '../../../../features/video/composition/visual-pass-layers';
 import { resolveEffectRuntimeVisualLayers } from '../../../../features/video/composition/draw/effect-runtime';
 import {
   createEffectRuntimeDrawState,
@@ -226,7 +227,7 @@ function drawPreviewUnlockedLayerGroup(params: {
           ),
           effectRuntimeState: resolvePreviewEffectDrawState(params.effectRuntimeStates, pass.time),
           imageBank: params.imageBank,
-          layers: resolveOrderedPreviewPassLayers(params.layers, pass.frame.visualLayers),
+          layers: resolveOrderedVisualPassLayers(params.layers, pass.frame.visualLayers),
           pass: passTarget.drawPass ? { ...pass, alpha: 1 } : pass,
           prepared: { ...groupedPrepared, context },
         });
@@ -238,20 +239,4 @@ function drawPreviewUnlockedLayerGroup(params: {
   } finally {
     passTarget.dispose();
   }
-}
-
-function resolveOrderedPreviewPassLayers(
-  layers: ReturnType<typeof mapVisualLayerToViewportSpace>[],
-  passLayers: ReturnType<typeof mapVisualLayerToViewportSpace>[]
-): ReturnType<typeof mapVisualLayerToViewportSpace>[] {
-  const resolvedLayers: ReturnType<typeof mapVisualLayerToViewportSpace>[] = [];
-  for (const segmentLayer of layers) {
-    const layer = passLayers.find((candidate) => candidate.clipId === segmentLayer.clipId);
-    if (layer) {
-      resolvedLayers.push(
-        segmentLayer.effectActionsOnly ? { ...layer, effectActionsOnly: true } : layer
-      );
-    }
-  }
-  return resolvedLayers;
 }

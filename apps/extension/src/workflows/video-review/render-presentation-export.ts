@@ -1,3 +1,4 @@
+import { reviewFrameDecorations } from './render-export-input';
 import type { AudioSample, Output } from 'mediabunny';
 import type { ReviewFrameExportInput } from './render-export-input';
 import type { ReviewPacketReceipt } from './packet-export';
@@ -255,9 +256,7 @@ function createRenderer(args: Args, prepared: Preparation) {
       ...(args.effectSnapshots ? { effectSnapshots: args.effectSnapshots } : {}),
       fps: prepared.profile.fps,
       effective: prepared.effective,
-      ...(args.comments ? { comments: args.comments } : {}),
-      ...(args.clickCues ? { clickCues: args.clickCues } : {}),
-      ...(args.keyCues ? { keyCues: args.keyCues } : {}),
+      ...reviewFrameDecorations(args),
       fragmentOffset: args.fragmentOffset,
       dimensions: prepared.dimensions,
       readAsset: args.readProjectAsset,

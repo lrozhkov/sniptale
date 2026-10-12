@@ -1,6 +1,6 @@
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { Ellipsis, type LucideIcon } from 'lucide-react';
+import { Ellipsis, Info, type LucideIcon } from 'lucide-react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { translate } from '../../platform/i18n';
 import { ReviewDetails } from './controls';
@@ -114,4 +114,17 @@ export function ReviewInspectorSections({ sections }: { sections: readonly Revie
 /** Each child stays one semantic unit as available inspector space changes. */
 export function ReviewInspectorColumns({ children }: { children: ReactNode }) {
   return <div className="review-inspector-columns">{children}</div>;
+}
+
+export function reviewInformationSections(content: ReactNode): ReviewSection[] {
+  return content
+    ? [
+        {
+          id: 'information',
+          label: translate('gallery.videoReview.actionInformation'),
+          icon: Info,
+          content,
+        },
+      ]
+    : [];
 }

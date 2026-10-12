@@ -275,19 +275,7 @@ export function moveQuickEditZoomRegion(args: {
   timelineDuration: number;
 }): { start: number; end: number } {
   // Dormant placements keep unproven values; only active neighbors bound the window.
-  const selected = args.regions.find((region) => region.id === args.id);
-  const active = args.regions
-    .filter(
-      (region) =>
-        region.id === args.id ||
-        (!region.dormant &&
-          selected &&
-          quickEditFocusType(selected) === 'zoom' &&
-          quickEditFocusType(region) === 'zoom')
-    )
-    .toSorted((a, b) => a.start - b.start);
-  const index = active.findIndex((region) => region.id === args.id);
-  const region = active[index];
+  const { active, index, region } = activeQuickEditZoomWindow(args.regions, args.id);
   if (!region) return { start: args.requestedStart, end: args.requestedStart };
   const length = region.end - region.start;
   const windowStart = index > 0 ? active[index - 1]!.end : 0;
@@ -307,19 +295,7 @@ export function trimQuickEditZoomRegion(args: {
   time: number;
   timelineDuration: number;
 }): { start: number; end: number } {
-  const selected = args.regions.find((region) => region.id === args.id);
-  const active = args.regions
-    .filter(
-      (region) =>
-        region.id === args.id ||
-        (!region.dormant &&
-          selected &&
-          quickEditFocusType(selected) === 'zoom' &&
-          quickEditFocusType(region) === 'zoom')
-    )
-    .toSorted((a, b) => a.start - b.start);
-  const index = active.findIndex((region) => region.id === args.id);
-  const region = active[index];
+  const { active, index, region } = activeQuickEditZoomWindow(args.regions, args.id);
   if (!region) return { start: 0, end: 0 };
   const windowStart = index > 0 ? active[index - 1]!.end : 0;
   const windowEnd = index < active.length - 1 ? active[index + 1]!.start : args.timelineDuration;
@@ -345,4 +321,20 @@ function normalizeMotionBlur(value: NonNullable<QuickEditZoomRegion['motionBlur'
       };
   }
   return result;
+}
+
+function activeQuickEditZoomWindow(regions: readonly QuickEditZoomRegion[], id: string) {
+  const selected = regions.find((region) => region.id === id);
+  const active = regions
+    .filter(
+      (region) =>
+        region.id === id ||
+        (!region.dormant &&
+          selected &&
+          quickEditFocusType(selected) === 'zoom' &&
+          quickEditFocusType(region) === 'zoom')
+    )
+    .toSorted((a, b) => a.start - b.start);
+  const index = active.findIndex((region) => region.id === id);
+  return { active, index, region: active[index] };
 }

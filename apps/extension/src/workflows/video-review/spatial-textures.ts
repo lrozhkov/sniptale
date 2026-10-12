@@ -64,11 +64,7 @@ export function createReviewSpatialTextures(
       if (!texture) throw new Error('Perspective texture is unavailable.');
       textures.push(texture);
       gl.activeTexture(gl.TEXTURE0 + index);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      initializeSpatialTexture(gl, texture);
     }
     const position = gl.getAttribLocation(program, 'position');
     const surface = gl.getUniformLocation(program, 'surface');
@@ -89,11 +85,7 @@ export function createReviewSpatialTextures(
         reservations.get(index)?.release();
         reservations.delete(index);
         textures[index] = replacement;
-        gl.bindTexture(gl.TEXTURE_2D, replacement);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        initializeSpatialTexture(gl, replacement);
       }
       const pixelBytes = index === 0 || !supportsDepth ? 4 : 8;
       reservations.set(index, resources.bytes('spatial-texture', width * height * pixelBytes));
@@ -172,4 +164,15 @@ export function createReviewSpatialTextures(
     dispose();
     throw error;
   }
+}
+
+function initializeSpatialTexture(
+  gl: WebGLRenderingContext | WebGL2RenderingContext,
+  texture: WebGLTexture
+) {
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }

@@ -1,4 +1,4 @@
-import type { AssetReadyJournal } from '../assets/contracts';
+import { createLibraryBinding, libraryBindingPayload } from './library-binding';
 import {
   initDB,
   PROJECT_ASSETS_STORE,
@@ -6,12 +6,7 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { readAssetFile } from '../assets/opfs-store';
-import {
-  cancelAssetPublication,
-  createAssetPublicationJournal,
-  publishReadyJournalWithRetry,
-} from '../assets/publication';
-import { publishProjectAssetJournal } from './asset-publication';
+import { createAssetPublicationJournal } from '../assets/publication';
 import type { ProjectAssetPublicationPayload } from './asset-publication-payload';
 import {
   LibrarySceneBindingError,
@@ -83,53 +78,17 @@ export async function prepareLibrarySceneBinding(
     } catch {
       throw new LibrarySceneBindingError('unavailable');
     }
-    const entry = current.entry ?? {
-      id: projectAssetId,
-      assetId: current.ref.assetId,
-      mimeType: current.ref.mimeType,
-      size: current.ref.size,
-      createdAt: Date.now(),
-      originMediaId: current.mediaId,
-    };
     return createAssetPublicationJournal<ProjectAssetPublicationPayload>({
       domain: 'project-assets',
       assetRefs: [current.ref],
       lifecyclePermit,
       payload: {
-        entry,
-        filename: current.filename,
-        expectedAssetId: current.entry?.assetId ?? null,
-        librarySourceId: current.mediaId,
+        ...libraryBindingPayload(current, projectAssetId),
         requiredReviewResource: { ...requiredReview, acquisition: 'library-binding' },
-        ...(!current.entry ? { publishToLibrary: false } : {}),
       },
     });
   });
-  return createBinding(journal, projectAssetId);
+  return createLibraryBinding(journal, projectAssetId);
 }
 
 /** One protected claim owns its publication retry state. */
-function createBinding(
-  journal: AssetReadyJournal<ProjectAssetPublicationPayload>,
-  projectAssetId: string
-): PreparedLibrarySceneBinding {
-  let published = false;
-  let publishing: Promise<void> | null = null;
-  return {
-    assetId: `project-asset:${projectAssetId}`,
-    async publish() {
-      if (published) return;
-      if (publishing) return publishing;
-      publishing = publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
-      try {
-        await publishing;
-        published = true;
-      } finally {
-        publishing = null;
-      }
-    },
-    async cancel() {
-      if (!published) await cancelAssetPublication(journal);
-    },
-  };
-}

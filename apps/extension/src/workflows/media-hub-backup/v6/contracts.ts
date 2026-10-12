@@ -23,6 +23,29 @@ export const MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER = [
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
+export interface ArchiveRootObjectSource {
+  blob: Blob;
+  ref: MediaHubBackupRootEnvelope['objects'][number];
+}
+
+export interface ArchiveRootPayload {
+  metadata: JsonValue;
+  objects: ArchiveRootObjectSource[];
+}
+
+export interface MediaHubBackupRootInventoryItem {
+  descriptor: ArchiveRootDescriptor;
+  load(signal?: AbortSignal): Promise<ArchiveRootPayload>;
+  summary: {
+    draftCount: number;
+    recordingCount: number;
+    sourceMetadataCount: number;
+    telemetryCount: number;
+    thumbnailCount: number;
+    webSnapshotCount: number;
+  };
+}
+
 export interface MediaHubBackupPrivacyFlags {
   includeSourceMetadata: boolean;
   includeTelemetry: boolean;

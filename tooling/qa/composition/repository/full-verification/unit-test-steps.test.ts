@@ -7,6 +7,7 @@ import {
   recordSuccessfulFullUnitProof,
   resolveReusableFullUnitProof,
 } from '../../../proof/unit/unit-test-proof.mjs';
+import { resolveReusableCoverageProof } from '../../../proof/coverage/coverage-proof.mjs';
 import { runUnitTests } from '../../../proof/unit/verify-unit-tests.mjs';
 
 vi.mock('../../../proof/unit/unit-test-cache.mjs', async (importOriginal) => {
@@ -25,6 +26,10 @@ vi.mock('../../../proof/unit/verify-unit-tests.mjs', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../proof/coverage/coverage-proof.mjs', () => ({
+  resolveReusableCoverageProof: vi.fn(() => ({ matched: false })),
+}));
+
 vi.mock('../../../proof/unit/unit-test-proof.mjs', () => ({
   recordSuccessfulFullUnitProof: vi.fn(),
   resolveReusableFullUnitProof: vi.fn(() => ({
@@ -39,6 +44,8 @@ const mockedResolveReusableFullUnitProof = vi.mocked(resolveReusableFullUnitProo
 const mockedRunUnitTests = vi.mocked(runUnitTests);
 
 beforeEach(() => {
+  vi.mocked(resolveReusableCoverageProof).mockReset();
+  vi.mocked(resolveReusableCoverageProof).mockReturnValue({ matched: false });
   mockedResolveReusableUnitTestPlan.mockReset();
   mockedResolveReusableUnitTestPlan.mockReturnValue({
     matched: false,
@@ -228,4 +235,26 @@ it('runs and seals the complete release suite when no proof is admissible', asyn
   expect(mockedRecordSuccessfulFullUnitProof).toHaveBeenCalledWith(
     expect.objectContaining({ maxWorkers: 2, source: 'full-verify', suite: 'product' })
   );
+});
+
+it('admits full product coverage without relabeling its pool as a new unit execution', async () => {
+  vi.mocked(resolveReusableCoverageProof).mockReturnValue({
+    matched: true,
+    source: 'local proof',
+    proof: { proofDigest: 'a'.repeat(64), fullUnit: { execution: { pool: 'threads' } } },
+  });
+  const steps = await collectUnitTestAndCoverageStepResults({
+    codeFiles: [],
+    targetFiles: [],
+    fullSuiteOverride: true,
+    coverageEnabled: false,
+    releaseMode: false,
+  });
+  expect(steps[0]).toMatchObject({
+    status: 'ok',
+    detail: expect.stringContaining('full product coverage'),
+  });
+  expect(resolveReusableCoverageProof).toHaveBeenCalledWith({ pool: 'threads' });
+  expect(mockedRunUnitTests).not.toHaveBeenCalled();
+  expect(mockedRecordSuccessfulFullUnitProof).not.toHaveBeenCalled();
 });

@@ -1,3 +1,4 @@
+import { bindReviewMediaInput } from './media-input-lifetime';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from 'mediabunny';
 import { cameraContentFrame } from '../../features/video/project/camera/appearance';
 import {
@@ -31,8 +32,7 @@ export async function inspectReviewWebcamFrameDuration(
 ): Promise<number> {
   signal.throwIfAborted();
   const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
-  const abort = () => input.dispose();
-  signal.addEventListener('abort', abort, { once: true });
+  const releaseInput = bindReviewMediaInput(input, signal);
   try {
     const track = await input.getPrimaryVideoTrack();
     if (!track) throw new Error('Camera video track is missing.');
@@ -42,8 +42,7 @@ export async function inspectReviewWebcamFrameDuration(
       throw new Error('Camera frame cadence is invalid.');
     return Math.max(1 / 120, 1 / stats.averagePacketRate);
   } finally {
-    signal.removeEventListener('abort', abort);
-    input.dispose();
+    releaseInput();
   }
 }
 

@@ -1,9 +1,10 @@
+import { ReviewFocusRoundness, ReviewFocusAreaFields } from './focus-area-fields';
 import { reviewSelectFieldClassName, ReviewDetails } from './controls';
 import { translate } from '../../platform/i18n';
 import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { ReviewPreviewNumberRow } from './number-row';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
-import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
+
 import type { QuickEditSpotlight } from '../../features/video/review/advanced/types';
 
 /** Settings for a source-area opening and the scene outside it. */
@@ -13,12 +14,6 @@ export function ReviewSpotlightInspector(props: {
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
 }) {
   const { value, onChange } = props;
-  const fields = [
-    ['x', 'focusAreaX'],
-    ['y', 'focusAreaY'],
-    ['width', 'focusAreaWidth'],
-    ['height', 'focusAreaHeight'],
-  ] as const;
   return (
     <div className="space-y-3">
       <SelectField
@@ -62,55 +57,24 @@ export function ReviewSpotlightInspector(props: {
           onChange={(blur) => onChange({ ...value, blur })}
         />
       )}
-      <ReviewPreviewNumberRow
-        label={translate('gallery.videoReview.focusRoundness')}
-        min={0}
-        max={50}
-        step={1}
-        precision={0}
-        unit="%"
-        value={value.roundness * 100}
+      <ReviewFocusRoundness
+        value={value.roundness}
         onPreview={(roundness) =>
-          props.onPreview?.(
-            roundness === null ? null : { spotlight: { ...value, roundness: roundness / 100 } }
-          )
+          props.onPreview?.(roundness === null ? null : { spotlight: { ...value, roundness } })
         }
-        onChange={(roundness) => onChange({ ...value, roundness: roundness / 100 })}
+        onChange={(roundness) => onChange({ ...value, roundness })}
       />
       <ReviewDetails
         preferenceId="gallery.videoReview.preciseArea"
         label={translate('gallery.videoReview.preciseArea')}
       >
-        {fields.map(([field, label]) => (
-          <ReviewPreviewNumberRow
-            key={field}
-            label={translate(`gallery.videoReview.${label}`)}
-            min={field === 'x' || field === 'y' ? 0 : 1}
-            max={100}
-            step={1}
-            precision={1}
-            unit="%"
-            value={value.area[field] * 100}
-            onPreview={(next) =>
-              props.onPreview?.(
-                next === null
-                  ? null
-                  : {
-                      spotlight: {
-                        ...value,
-                        area: clampQuickEditSpotlightArea({ ...value.area, [field]: next / 100 }),
-                      },
-                    }
-              )
-            }
-            onChange={(next) =>
-              onChange({
-                ...value,
-                area: clampQuickEditSpotlightArea({ ...value.area, [field]: next / 100 }),
-              })
-            }
-          />
-        ))}
+        <ReviewFocusAreaFields
+          area={value.area}
+          onPreview={(area) =>
+            props.onPreview?.(area === null ? null : { spotlight: { ...value, area } })
+          }
+          onChange={(area) => onChange({ ...value, area })}
+        />
       </ReviewDetails>
     </div>
   );

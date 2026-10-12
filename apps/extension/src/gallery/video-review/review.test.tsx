@@ -654,6 +654,7 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
 });
 
 it('reveals the three audio lanes and persists the original audio gate', async () => {
+  vi.useFakeTimers();
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
@@ -673,11 +674,16 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     const mute = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.muteSourceAudio"]'
     )!;
+    expect(mute.disabled).toBe(false);
     await act(async () => mute.click());
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    await act(async () => vi.advanceTimersByTimeAsync(250));
     expect(advancedContentAt(fixture.snapshot).audio.original.muted).toBe(true);
   } finally {
-    await fixture.cleanup();
+    try {
+      await fixture.cleanup();
+    } finally {
+      vi.useRealTimers();
+    }
   }
 });
 

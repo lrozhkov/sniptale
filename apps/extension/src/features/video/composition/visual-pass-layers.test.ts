@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import { createVideoClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
-import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
+import { createEmptyVideoProject } from '../project/factories/creation';
+import { createVideoClip } from '../project/timeline/project-meta.test.helpers';
+import { resolveVideoCompositionFrame } from './timeline/frame';
 import { resolveOrderedVisualPassLayers } from './visual-pass-layers';
 it('preserves actions-only projections through ordered export passes without drawing the original video twice', () => {
   const project = createEmptyVideoProject('Composite');

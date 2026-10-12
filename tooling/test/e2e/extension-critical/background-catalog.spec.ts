@@ -75,7 +75,10 @@ test('all twenty bundled backgrounds decode and SVG raster exports preserve dime
     await page.goto(host.origin);
     const bundle = await build({
       stdin: {
-        contents: `export { BUNDLED_BACKGROUNDS } from './apps/extension/src/composition/persistence/background-presets/bundled'; export { prepareBackgroundImage } from './apps/extension/src/workflows/background-images/intake';`,
+        contents:
+          "export { BUNDLED_BACKGROUNDS } from './apps/extension/src/composition/persis" +
+          "tence/background-presets/bundled'; export { prepareBackgroundImage } from '." +
+          "/apps/extension/src/workflows/background-images/intake';",
         resolveDir: process.cwd(),
       },
       bundle: true,

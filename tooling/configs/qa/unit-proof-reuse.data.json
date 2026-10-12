@@ -9,16 +9,23 @@
     "ciMount": "tooling/ci/proof-host-inputs.mjs",
     "artifactSeal": "tooling/ci/proof-artifact-seal.mjs"
   },
-  "inputRoots": ["apps/extension", "packages"],
-  "testSupportRoots": ["tooling/test/harness", "tooling/test/support"],
-  "runnerRoots": ["tooling/qa"],
+  "inputRoots": [
+    "apps/extension",
+    "packages"
+  ],
+  "testSupportRoots": [
+    "tooling/test/harness",
+    "tooling/test/support"
+  ],
+  "runnerRoots": [
+    "tooling/qa"
+  ],
   "configFiles": [
     "tooling/ci/mediabunny/normalize.mjs",
     "tooling/ci/mediabunny/patch-manifest.json",
     "tooling/ci/mediabunny/patch-payload.json.gz",
     "tooling/ci/mediabunny/source.patch",
     "tooling/ci/mediabunny/LICENSE",
-
     "package.json",
     "package-lock.json",
     "vitest.config.ts",
@@ -27,18 +34,28 @@
     "tooling/test/harness/vitest.setup.ts",
     "tooling/configs/qa/unit-proof-reuse.data.json"
   ],
-  "excludedDirectoryNames": [".git", ".tmp", "build", "dist", "node_modules"],
+  "excludedDirectoryNames": [
+    ".git",
+    ".tmp",
+    "build",
+    "dist",
+    "node_modules"
+  ],
   "consumers": [
     "tooling/qa/composition/repository/full-verification/unit-test-steps.mjs",
     "tooling/qa/wrappers/build.mjs",
     "tooling/ci/container.mjs",
     "tooling/ci/artifacts.mjs",
     "tooling/ci/proof-artifact-seal.mjs",
-    "tooling/ci/proof-host-inputs.mjs"
+    "tooling/ci/proof-host-inputs.mjs",
+    "tooling/qa/proof/coverage/coverage-proof.mjs",
+    "tooling/qa/proof/coverage/audit-coverage-step.mjs",
+    "tooling/qa/composition/checkpoint/focused/full-proof-steps.mjs"
   ],
   "modes": {
     "local": "validated local receipt or full-suite fallback",
-    "candidate": "validated read-only successful-main receipt or full-suite fallback"
+    "candidate": "validated read-only successful-main receipt or full-suite fallback",
+    "checkpoint": "Ambiguous existing focused scope may reuse exact full product coverage with its own full runtime/execution identity and sealed report bytes; current changed/new-file thresholds still apply."
   },
   "digests": [
     "complete sorted input file inventory and contents",
