@@ -1,3 +1,4 @@
+import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -31,7 +32,7 @@ async function importAutoSaveHook() {
 
 async function flushAutoSaveTimers() {
   await act(async () => {
-    vi.advanceTimersByTime(350);
+    vi.advanceTimersByTime(EDITOR_AUTOSAVE_POLICY.delay);
     await Promise.resolve();
     await Promise.resolve();
   });

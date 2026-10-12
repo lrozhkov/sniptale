@@ -1,3 +1,4 @@
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -5,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
-import { useReviewComposer } from './use-session';
+import { useReviewComposer, useReviewSnapshot } from './use-session';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -70,6 +71,7 @@ function setup() {
   } satisfies Parameters<typeof createVideoReviewSession>[1];
   const session = createVideoReviewSession(snapshot, deps);
   function Harness() {
+    useReviewSnapshot(session);
     composer = useReviewComposer(session);
     return null;
   }
@@ -93,7 +95,7 @@ it('warns before closing for a local note draft before it reaches the review ses
   const close = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
   expect(close()).toBe(true);
   act(() => composer.change(annotation, null));
-  expect(session.getSnapshot().dirty).toBe(false);
+  expect(session.getSnapshot().dirty).toBe(true);
   expect(close()).toBe(false);
   await act(async () => composer.flush());
   expect(close()).toBe(true);
@@ -107,7 +109,7 @@ it('coalesces many field changes, restores recovery on reopen, and commits exact
     composer.change(annotation);
   });
   expect(deps.saveVideoWorkspaceDraft).not.toHaveBeenCalled();
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(1);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
   await act(async () => root.render(null));
@@ -215,7 +217,7 @@ it('preserves the next recovery deadline when an automatic write acknowledges ol
     return original(args);
   });
   act(() => composer.change({ ...annotation, text: 'old' }, null));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   act(() => composer.change(annotation));
   await act(async () => {
     release();
@@ -223,7 +225,7 @@ it('preserves the next recovery deadline when an automatic write acknowledges ol
   });
   expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(1);
   expect(composer.dirty).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(2);
   expect(composer.dirty).toBe(false);
 });

@@ -1,8 +1,9 @@
-import { beforeEach, expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
   observeVideoEditorSave,
   publishVideoEditorSaveReadiness,
   waitForVideoEditorSave,
+  registerVideoEditorSaveBarrier,
 } from './save-readiness';
 
 let generation = Symbol();
@@ -24,6 +25,39 @@ beforeEach(() => {
   generation = Symbol();
   version = 0;
   publish({ projectId: 'project-1', saveState: 'saved' });
+});
+
+it('retains the replacement writer when a stale lease cleans up', async () => {
+  const old = registerVideoEditorSaveBarrier(
+    'project-1',
+    Symbol(),
+    vi.fn(async () => undefined)
+  );
+  const flush = vi.fn(async () => undefined);
+  const current = registerVideoEditorSaveBarrier('project-1', generation, flush);
+  try {
+    old();
+    await waitForVideoEditorSave('project-1');
+    expect(flush).toHaveBeenCalledOnce();
+  } finally {
+    current();
+  }
+});
+
+it('rejects a transition whose mounted writer is replaced during its barrier', async () => {
+  let release: () => void = () => undefined;
+  const cleanup = registerVideoEditorSaveBarrier(
+    'project-1',
+    generation,
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      })
+  );
+  const waiting = waitForVideoEditorSave('project-1');
+  cleanup();
+  release();
+  await expect(waiting).rejects.toThrow('open video project changed');
 });
 
 it('returns immediately for the matching saved project', async () => {

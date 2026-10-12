@@ -81,7 +81,12 @@ function groupedStore() {
 it('saves final X before Y after a real maxWait intermediate and restores exact group boundaries', async () => {
   const stored = groupedStore();
   await act(async () => root.render(<GroupHarness />));
-  for (const name of ['A', 'Aa', 'Aaa', 'Aaaa']) {
+  for (
+    let elapsed = 0;
+    elapsed < GUIDE_AUTOSAVE_MAX_WAIT_MS;
+    elapsed += GUIDE_AUTOSAVE_IDLE_MS - 1
+  ) {
+    const name = `A-${elapsed}`;
     await act(async () => {
       groupHistory.update({ ...groupHistory.project!, name }, 'name');
     });

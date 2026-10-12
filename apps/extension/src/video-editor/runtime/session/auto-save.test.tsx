@@ -1,3 +1,4 @@
+import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -67,13 +68,14 @@ function AutoSaveHarness(props: AutoSaveHarnessProps) {
 
 function renderAutoSaveHarness(props: AutoSaveHarnessProps) {
   act(() => {
+    useVideoEditorStore.setState({ project: props.project });
     props.root?.render(<AutoSaveHarness {...props} />);
   });
 }
 
 async function flushAutoSaveTimers() {
   await act(async () => {
-    vi.advanceTimersByTime(350);
+    vi.advanceTimersByTime(EDITOR_AUTOSAVE_POLICY.delay);
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -433,7 +435,7 @@ it('coalesces obsolete snapshots while an admitted save is still pending', async
   expect(saveVideoProject).toHaveBeenLastCalledWith(latest, { expectedWorkspaceRevision: 1 });
 });
 
-it('keeps the newer edit deadline while a project transition waits for the latest version', async () => {
+it('flushes the newest edit immediately while a project transition waits for the latest version', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Deadline');
   const props: AutoSaveHarnessProps = {
@@ -468,18 +470,32 @@ it('keeps the newer edit deadline while a project transition waits for the lates
     vi.advanceTimersByTime(100);
     finish({ ...first, updatedAt: 200 });
   });
-  expect(settled).toBe(false);
-  expect(props.setSaveState).toHaveBeenLastCalledWith('dirty');
-  expect(saveVideoProject).toHaveBeenCalledTimes(1);
-  await act(async () => {
-    vi.advanceTimersByTime(249);
-  });
-  expect(saveVideoProject).toHaveBeenCalledTimes(1);
-  await act(async () => {
-    vi.advanceTimersByTime(1);
-  });
+  await act(async () => barrier);
+  expect(settled).toBe(true);
+  expect(saveVideoProject).toHaveBeenCalledTimes(2);
   expect(saveVideoProject).toHaveBeenLastCalledWith(latest, { expectedWorkspaceRevision: 1 });
   await expect(barrier).resolves.toBeUndefined();
+});
+
+it('captures a current store edit before React observes it, including an explicit paused barrier', async () => {
+  const useVideoEditorAutoSave = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Latest barrier');
+  const props: AutoSaveHarnessProps = {
+    project,
+    projectId: null,
+    root,
+    enabled: false,
+    refreshProjects: vi.fn(async () => undefined),
+    setSaveState: vi.fn(),
+    useVideoEditorAutoSave,
+  };
+  renderAutoSaveHarness(props);
+  const newest = { ...project, name: 'Changed synchronously' };
+  useVideoEditorStore.setState({ project: newest });
+  saveVideoProject.mockResolvedValue(newest);
+  await act(async () => waitForVideoEditorSave(project.id));
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(saveVideoProject).toHaveBeenCalledWith(newest, { expectedWorkspaceRevision: null });
 });
 
 it('does not reuse an old acknowledgement after project A is replaced by B and reopened', async () => {

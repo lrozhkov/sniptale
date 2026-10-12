@@ -44,7 +44,13 @@ export type ReviewSessionPersistence = Pick<
   | 'saveVideoWorkspaceAdvanced'
   | 'saveVideoWorkspaceDraft'
 > &
-  Partial<Pick<typeof persistence, 'saveVideoWorkspaceTyping'>>;
+  Partial<
+    Pick<typeof persistence, 'saveVideoWorkspaceTyping' | 'commitVideoWorkspaceWithProjection'>
+  >;
+
+export type ReviewCommittedMutation =
+  | VideoWorkspaceSnapshot
+  | Awaited<ReturnType<typeof persistence.commitVideoWorkspaceWithProjection>>;
 
 export type ReviewSessionState = {
   snapshot: VideoWorkspaceSnapshot;

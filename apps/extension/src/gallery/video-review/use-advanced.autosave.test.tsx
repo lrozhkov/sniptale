@@ -1,3 +1,4 @@
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -79,7 +80,7 @@ it('shows edits made during a write and preserves the new UI debounce after its 
     return implementation(args);
   });
   act(() => writer.setOverlaysVisible(false));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   act(() => writer.setOverlaysVisible(true));
   expect(writer.advanced.ui.overlaysVisible).toBe(true);
   await act(async () => {
@@ -88,7 +89,7 @@ it('shows edits made during a write and preserves the new UI debounce after its 
   });
   expect(save).toHaveBeenCalledTimes(1);
   expect(writer.pending).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(249));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay - 1));
   expect(save).toHaveBeenCalledTimes(1);
   await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(save).toHaveBeenCalledTimes(2);

@@ -8,18 +8,17 @@ import {
 import { loadEditorExportSettings } from '../../persistence/export-settings';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  assertEditorSessionFileCanBeRead,
-  parseImportedEditorDocument,
-} from '../../document/file-actions/import-session';
-import { readFileAsDataUrl, readFileAsText } from '../../document/file-actions/file-reader';
+import { openEditorImageFromFile, importEditorSessionFromFile } from '../../document/file-actions';
+import { readFileAsDataUrl } from '../../document/file-actions/file-reader';
 import type { ImageEditorController } from '../../controller';
 import { assertEditorRasterImageFileCanBeRead } from '../../document/file-actions/raster-intake';
+import type { EditorDocumentOpenPort } from '../../document/file-actions/ports';
 
 type EditorActionRailController = Pick<
   ImageEditorController,
   'exportDocument' | 'insertImage' | 'loadDocument' | 'openImage' | 'renderToDataUrl'
->;
+> &
+  EditorDocumentOpenPort;
 
 type EditorInspectorActionClient = Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>;
 
@@ -82,10 +81,9 @@ export function createEditorActionRailHandlers(
         return;
       }
 
-      assertEditorRasterImageFileCanBeRead(file);
-      const dataUrl = await readFileAsDataUrl(file);
-      await controller.openImage(dataUrl, file.name);
-      setImageData(dataUrl);
+      await openEditorImageFromFile(controller, file, (dataUrl) => {
+        if (dataUrl !== null) setImageData(dataUrl);
+      });
     },
 
     async insertImage(file: File | undefined) {
@@ -103,11 +101,9 @@ export function createEditorActionRailHandlers(
         return;
       }
 
-      assertEditorSessionFileCanBeRead(file);
-      const text = await readFileAsText(file);
-      const document = parseImportedEditorDocument(text);
-      await controller.loadDocument(document);
-      setImageData(document.sourceImageData);
+      await importEditorSessionFromFile(controller, file, (dataUrl) => {
+        if (dataUrl !== null) setImageData(dataUrl);
+      });
     },
 
     exportSession() {

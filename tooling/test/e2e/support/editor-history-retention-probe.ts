@@ -95,7 +95,8 @@ export async function probe(source: string, historyLength = 1190) {
     writes: { store: string; bytes: number }[];
   }[] = [];
   try {
-    for (let index = 0; index < 5; index++) {
+    // Separate the first legacy compaction from five ordinary warm saves.
+    for (let index = 0; index < 6; index++) {
       writes.length = 0;
       const start = performance.now();
       const result = await commitVideoWorkspace({

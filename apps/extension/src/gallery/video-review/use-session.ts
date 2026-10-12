@@ -1,4 +1,5 @@
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import {
   useCallback,
   useEffect,
@@ -159,7 +160,7 @@ export function useReviewComposer(session: Session) {
             },
           };
         },
-        { delay: 250, maxWait: 1000 }
+        EDITOR_AUTOSAVE_POLICY
       );
     },
     [session]

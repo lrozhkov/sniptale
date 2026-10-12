@@ -108,6 +108,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/contracts/settings-transfer`
 - `apps/extension/src/contracts/video`
 - `apps/extension/src/features/ai`
+- `apps/extension/src/features/autosave`
 - `apps/extension/src/features/browser-frame`
 - `apps/extension/src/features/drawing`
 - `apps/extension/src/features/editor`

@@ -1,5 +1,6 @@
 import { isDiscardedHeaderChange, replayStoredReviewHistory } from './legacy-header-history';
-import { parseVideoWorkspaceTyping } from './typing';
+import { parseVideoWorkspaceTyping, withoutVideoWorkspaceTyping } from './typing';
+import { pruneReviewAnnotationEffectSnapshots } from './asset-refs';
 import {
   parseReviewAnnotationEffectSnapshots,
   readReviewAnnotationEffectDocument,
@@ -9,6 +10,7 @@ import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/rev
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   ReviewHistoryError,
+  createReviewAdvancedContentOperation,
   reviewAdvancedContentBaseline,
 } from '../../../features/video/review/document';
 import { createQuickEditAdvancedContent } from '../../../features/video/review/advanced/defaults';
@@ -148,7 +150,7 @@ function parseWorkspaceDocument(args: {
   return { ...replayed, advanced };
 }
 
-/** Every baseline and before/after payload retains its source even beyond the current cursor. */
+/** Checks baseline and before/after effect bindings; raw registry admission remains separate. */
 function validEffectSnapshotClosure(
   snapshots: readonly ReviewAnnotationEffectSnapshot[],
   advanced: QuickEditAdvancedState,
@@ -311,4 +313,50 @@ export function parseVideoWorkspaceDraft(
     before,
     updatedAt: value['updatedAt'],
   };
+}
+
+/** Prepares an append from the current mutation's fresh admitted values; it owns no durable authority. */
+export function prepareCanonicalVideoWorkspaceAppend(
+  previous: VideoWorkspace,
+  operation: ReviewOperation,
+  merged: readonly ReviewAnnotationEffectSnapshot[] | undefined,
+  document: ReviewDocument
+): VideoWorkspace | null {
+  const history = previous.history.slice(0, previous.cursor);
+  const revision = previous.revision + 1;
+  const updatedAt = Math.max(Date.now(), previous.updatedAt);
+  if (
+    !Number.isSafeInteger(revision) ||
+    !Number.isFinite(updatedAt) ||
+    history.some((retained) => retained.id === operation.id)
+  )
+    return null;
+  try {
+    buildReviewTimeMap(previous.source.duration, document.edits);
+  } catch {
+    return null;
+  }
+  const candidate = pruneReviewAnnotationEffectSnapshots(
+    withoutVideoWorkspaceTyping({
+      ...previous,
+      ...(merged ? { effectSnapshots: [...merged] } : {}),
+      revision,
+      updatedAt,
+      cursor: history.length + 1,
+      history: [...history, operation],
+    })
+  );
+  if (
+    !validEffectSnapshotClosure(
+      candidate.effectSnapshots ?? [],
+      candidate.advanced,
+      operation.target === 'advancedContent' ? [operation] : [],
+      previous.source.duration
+    )
+  )
+    return null;
+  if (operation.target === 'advancedContent')
+    candidate.history[candidate.history.length - 1] =
+      createReviewAdvancedContentOperation(operation) ?? operation;
+  return candidate;
 }

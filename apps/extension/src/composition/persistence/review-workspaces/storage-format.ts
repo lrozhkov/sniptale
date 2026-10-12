@@ -141,27 +141,45 @@ export function workspaceStorageRows(
   historyStart = 0
 ): VideoWorkspaceHistoryRow[] {
   return [
-    {
-      aggregateId: workspace.aggregateId,
-      ordinal: 0,
-      ...(workspace.formatVersion === 2 && workspace.baseline
-        ? {
-            baseline: workspace.baseline,
-            ui: workspace.advanced.ui,
-            ...(workspace.advanced.recoveryV1 === undefined
-              ? {}
-              : { recoveryV1: workspace.advanced.recoveryV1 }),
-          }
-        : { advanced: workspace.advanced }),
-      ...(workspace.effectSnapshots ? { effectSnapshots: workspace.effectSnapshots } : {}),
-    },
-    ...workspace.history.map((operation, index) => ({
-      aggregateId: workspace.aggregateId,
-      ordinal: historyStart + index + 1,
-      operation:
-        operation.target === 'advancedContent'
-          ? (createReviewAdvancedContentOperation(operation) ?? operation)
-          : operation,
-    })),
+    workspaceStorageBaselineRow(workspace),
+    ...workspace.history.map((_operation, index) =>
+      workspaceStorageOperationRow(workspace, index, historyStart)
+    ),
   ];
+}
+
+/** Encodes the complete baseline independently of unchanged immutable history rows. */
+export function workspaceStorageBaselineRow(workspace: VideoWorkspace): VideoWorkspaceHistoryRow {
+  return {
+    aggregateId: workspace.aggregateId,
+    ordinal: 0,
+    ...(workspace.formatVersion === 2 && workspace.baseline
+      ? {
+          baseline: workspace.baseline,
+          ui: workspace.advanced.ui,
+          ...(workspace.advanced.recoveryV1 === undefined
+            ? {}
+            : { recoveryV1: workspace.advanced.recoveryV1 }),
+        }
+      : { advanced: workspace.advanced }),
+    ...(workspace.effectSnapshots ? { effectSnapshots: workspace.effectSnapshots } : {}),
+  };
+}
+
+/** Encodes only a selected row that the admitted delta will actually write. */
+export function workspaceStorageOperationRow(
+  workspace: VideoWorkspace,
+  index: number,
+  historyStart = 0
+): VideoWorkspaceHistoryRow {
+  const operation = workspace.history[index];
+  if (!operation) throw new Error('Missing retained operation row.');
+  return {
+    aggregateId: workspace.aggregateId,
+    ordinal: historyStart + index + 1,
+    operation:
+      operation.target === 'advancedContent'
+        ? (createReviewAdvancedContentOperation(operation) ?? operation)
+        : operation,
+  };
 }

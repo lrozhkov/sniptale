@@ -10,8 +10,7 @@ type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
 >;
 
-const ADVANCED_SAVE_DEBOUNCE_MS = 250;
-const TEXT_TYPING_SAVE_DEBOUNCE_MS = 1000;
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 type ContentMutation = (content: QuickEditAdvancedContent) => QuickEditAdvancedContent;
 type TypingAction = { id: string; target: ReviewTextTypingTarget; continuation: boolean };
 type PendingContent = {
@@ -95,10 +94,7 @@ export function useReviewAdvancedContent(
         if (sent.action) failedCapture.current = captured;
         return captured;
       },
-      {
-        delay: first.action ? TEXT_TYPING_SAVE_DEBOUNCE_MS : ADVANCED_SAVE_DEBOUNCE_MS,
-        ...(first.action ? { maxWait: 5000 } : {}),
-      }
+      EDITOR_AUTOSAVE_POLICY
     );
   }, [session]);
   const flush = useCallback(async (): Promise<void> => {

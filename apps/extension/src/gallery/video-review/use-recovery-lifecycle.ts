@@ -4,12 +4,16 @@ export function useRecoveryLifecycle(flush: () => Promise<void>, mounted: RefObj
   useEffect(() => {
     mounted.current = true;
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') void flush().catch(() => undefined);
+      void flush().catch(() => undefined);
     };
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onVisibility);
+    window.addEventListener('pageshow', onVisibility);
     return () => {
       mounted.current = false;
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onVisibility);
+      window.removeEventListener('pageshow', onVisibility);
       void flush().catch(() => undefined);
     };
   }, [flush, mounted]);

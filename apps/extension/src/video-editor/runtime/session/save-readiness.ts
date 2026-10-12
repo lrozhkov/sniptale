@@ -11,6 +11,21 @@ interface SaveReadinessSnapshot {
 
 let currentSnapshot: SaveReadinessSnapshot | null = null;
 let listeners: Array<(snapshot: SaveReadinessSnapshot) => void> = [];
+let latestBarrier: { projectId: string; generation: symbol; flush: () => Promise<void> } | null =
+  null;
+
+/** Leases the mounted writer's latest-document barrier; stale cleanup cannot detach its successor. */
+export function registerVideoEditorSaveBarrier(
+  projectId: string,
+  generation: symbol,
+  flush: () => Promise<void>
+): () => void {
+  const lease = { projectId, generation, flush };
+  latestBarrier = lease;
+  return () => {
+    if (latestBarrier === lease) latestBarrier = null;
+  };
+}
 
 /** Publishes local edit acknowledgement; workspace revision remains owned by persistence. */
 export function publishVideoEditorSaveReadiness(snapshot: SaveReadinessSnapshot): void {
@@ -22,6 +37,13 @@ export function publishVideoEditorSaveReadiness(snapshot: SaveReadinessSnapshot)
 export async function waitForVideoEditorSave(projectId: string): Promise<void> {
   const current = currentSnapshot;
   if (current?.projectId !== projectId) throw new Error('The open video project changed.');
+  const barrier = latestBarrier;
+  if (barrier?.projectId === projectId && barrier.generation === current.generation) {
+    await barrier.flush();
+    if (currentSnapshot?.generation !== current.generation || latestBarrier !== barrier)
+      throw new Error('The open video project changed.');
+    return;
+  }
   if (current.savedVersion >= current.requestedVersion) return;
   if (current.saveState === 'error' || current.saveState === 'conflict') {
     throw new Error('The video project has unsaved changes.');

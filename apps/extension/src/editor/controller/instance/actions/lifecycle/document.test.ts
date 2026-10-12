@@ -49,6 +49,7 @@ function createAutosaveService(
 ): EditorSessionAutosaveService {
   return {
     activate: vi.fn(),
+    beginHydration: vi.fn(() => ({ finish: vi.fn(), saveNow: vi.fn(async () => undefined) })),
     discardDraft: vi.fn(async () => undefined),
     dispose: vi.fn(),
     flushAutosave: vi.fn(async () => undefined),

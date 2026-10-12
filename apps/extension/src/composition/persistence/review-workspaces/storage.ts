@@ -11,6 +11,8 @@ import {
   materializeWorkspaceStorage,
   workspaceStorageHead,
   workspaceStorageRows,
+  workspaceStorageBaselineRow,
+  workspaceStorageOperationRow,
 } from './storage-format';
 
 /** Physical reads participate in the caller's existing head/history snapshot. */
@@ -129,7 +131,6 @@ async function writeCompleteWorkspaceDelta(
   const nextStart = start + removedPrefix;
   if (!Number.isSafeInteger(nextStart) || removedPrefix < 0)
     throw new Error('Invalid retained ordinal range.');
-  const encoded = workspaceStorageRows(workspace, nextStart);
   let sharedPrefix = 0;
   for (const [index, operation] of workspace.history.entries()) {
     const oldIndex = removedPrefix + index;
@@ -152,19 +153,18 @@ async function writeCompleteWorkspaceDelta(
       await store.delete([workspace.aggregateId, ordinal]);
   }
   const previousBaseline = storage.rows.find((row) => isRecord(row) && row['ordinal'] === 0);
-  if (!storageValueEqual(previousBaseline, encoded[0])) await store.put(encoded[0]);
+  const baseline = workspaceStorageBaselineRow(workspace);
+  if (!storageValueEqual(previousBaseline, baseline)) await store.put(baseline);
   if (mode === 'replace') {
     for (let index = sharedPrefix; index < workspace.history.length; index++) {
-      const row = encoded[index + 1];
-      if (!row) throw new Error('Missing retained replacement row.');
+      const row = workspaceStorageOperationRow(workspace, index, nextStart);
       await store.put(row);
     }
   }
   if (mode === 'append') {
     const newIndex = previous.cursor - removedPrefix;
     if (newIndex >= 0 && newIndex < workspace.history.length) {
-      const row = encoded[newIndex + 1];
-      if (!row) throw new Error('Missing retained append row.');
+      const row = workspaceStorageOperationRow(workspace, newIndex, nextStart);
       await store.put(row);
     }
   }

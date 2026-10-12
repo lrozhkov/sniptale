@@ -4,9 +4,10 @@ import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { saveScenarioProjectRecord } from '../../../composition/persistence/scenario/store/public';
 import type { GuideHistoryCapture } from './history';
+import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 
-export const GUIDE_AUTOSAVE_IDLE_MS = 1500;
-export const GUIDE_AUTOSAVE_MAX_WAIT_MS = 5000;
+export const GUIDE_AUTOSAVE_IDLE_MS = EDITOR_AUTOSAVE_POLICY.delay;
+export const GUIDE_AUTOSAVE_MAX_WAIT_MS = EDITOR_AUTOSAVE_POLICY.maxWait;
 
 type SaveStatus = 'dirty' | 'saving' | 'saved' | 'failed' | 'conflict';
 type AutosaveInput = {
@@ -63,10 +64,21 @@ export function useGuideAutosave(input: AutosaveInput) {
         return;
       event.preventDefault();
       event.returnValue = '';
-      if (state.dirty && state.enabled !== false) void owner.current?.flushLatest();
     };
+    const flush = () => {
+      if (latest.current.enabled !== false) void owner.current?.flushLatest();
+    };
+    const visibility = () => flush();
     window.addEventListener('beforeunload', protect);
-    return () => window.removeEventListener('beforeunload', protect);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('pageshow', flush);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      window.removeEventListener('beforeunload', protect);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('pageshow', flush);
+      document.removeEventListener('visibilitychange', visibility);
+    };
   }, []);
   return {
     save: () => owner.current?.save() ?? Promise.resolve(false),

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from './session';
+import { projectReviewWorkspace } from './session-durable-access';
 import { readFileSync } from 'node:fs';
 import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
@@ -324,6 +325,93 @@ it('includes staged producers in a session barrier and builds history from the a
   expect(fail).not.toHaveBeenCalled();
 });
 
+it('reports an authored field dirty before its timer and preserves it after a failed reload', async () => {
+  const { session, deps } = setup();
+  const before = session.getSnapshot().document.advancedContent;
+  session.stageAutosave(
+    'content',
+    () => ({
+      change: { kind: 'content', content: { ...before, actionsEnabled: false } },
+      acknowledge: vi.fn(),
+      fail: vi.fn(),
+    }),
+    { delay: 1000 }
+  );
+  expect(session.getSnapshot().dirty).toBe(true);
+  expect(session.getSnapshot()).toBe(session.getSnapshot());
+  deps.readVideoWorkspace.mockRejectedValueOnce(new Error('read unavailable'));
+  await expect(session.reload()).rejects.toThrow('read unavailable');
+  expect(session.getSnapshot().dirty).toBe(true);
+  await session.reload();
+  expect(session.getSnapshot().dirty).toBe(false);
+});
+
+it.each(['new-stage', 'cancel-restage', 'ack-next-group'] as const)(
+  'keeps the new authored producer dirty after an acquired old ACK (%s)',
+  async (mode) => {
+    const { session, deps } = setup();
+    const initial = session.getSnapshot().document.advancedContent;
+    const original = deps.commitVideoWorkspace.getMockImplementation()!;
+    let release: () => void = () => undefined;
+    deps.commitVideoWorkspace.mockImplementationOnce(async (args) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return original(args);
+    });
+    let current = { ...initial, actionsEnabled: false };
+    const capture = () => ({
+      change: { kind: 'content' as const, content: current },
+      acknowledge: () => {
+        if (mode === 'ack-next-group' && !current.actionsEnabled) {
+          current = { ...initial, actionsEnabled: true };
+          session.stageAutosave('content', capture, { delay: 1000 });
+        }
+      },
+      fail: vi.fn(),
+    });
+    session.stageAutosave('content', capture, { delay: 1000 });
+    const first = session.flush();
+    await vi.advanceTimersByTimeAsync(0);
+    if (mode !== 'ack-next-group') {
+      if (mode === 'cancel-restage') session.cancelAutosave('content');
+      current = { ...initial, actionsEnabled: true };
+      session.stageAutosave('content', capture, { delay: 1000 });
+    }
+    release();
+    await first;
+    expect(session.getSnapshot().dirty).toBe(true);
+    expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+    await session.flush();
+    expect(session.getSnapshot().dirty).toBe(false);
+    expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
+    expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  }
+);
+
+it('does not make an uncaptured UI-only preference an authored unload warning', async () => {
+  const { session } = setup();
+  const advanced = session.getSnapshot().snapshot.workspace.advanced;
+  session.stageAutosave(
+    'advanced',
+    () => ({
+      change: {
+        kind: 'advanced',
+        advanced: {
+          ...advanced,
+          ui: { ...advanced.ui, overlaysVisible: false },
+        },
+      },
+      acknowledge: vi.fn(),
+      fail: vi.fn(),
+    }),
+    { delay: 1000 }
+  );
+  expect(session.getSnapshot().dirty).toBe(false);
+  await session.flush();
+  expect(session.getSnapshot().dirty).toBe(false);
+});
+
 it('applies paused autosave locally and only explicit Save acknowledges a durable snapshot', async () => {
   const { session, deps } = setup();
   session.setAutosaveEnabled(false);
@@ -404,4 +492,38 @@ it('aborting an annotation queued behind another operation prevents local admiss
   expect(resource.cancel).not.toHaveBeenCalled();
   expect(resource.publish).not.toHaveBeenCalled();
   await session.dispose();
+});
+
+it('publishes only the committed mutation projection and keeps injected adapter ownership', async () => {
+  const { session, deps } = setup();
+  let document: ReturnType<typeof projectReviewWorkspace> | undefined;
+  const projected = vi.fn(async (args: Parameters<typeof deps.commitVideoWorkspace>[0]) => {
+    const snapshot = await deps.commitVideoWorkspace(args);
+    document = projectReviewWorkspace(snapshot);
+    return { snapshot, document };
+  });
+  Object.assign(deps, { commitVideoWorkspaceWithProjection: projected });
+  const content = { ...session.getSnapshot().document.advancedContent, actionsEnabled: false };
+  session.stageAutosave(
+    'content',
+    () => ({
+      change: { kind: 'content', content },
+      acknowledge: vi.fn(),
+      fail: vi.fn(),
+    }),
+    { delay: 250 }
+  );
+  await session.flush();
+  expect(projected).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().document).toBe(document);
+  expect(session.getSnapshot().document).toEqual(
+    projectReviewWorkspace(await deps.readVideoWorkspace())
+  );
+  projected.mockRejectedValueOnce({ code: 'storage' });
+  const operation = session.getSnapshot().snapshot.workspace.history[0]!;
+  await expect(session.commit({ ...operation, id: 'rejected-projection' })).rejects.toMatchObject({
+    code: 'storage',
+  });
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().document).toBe(document);
 });

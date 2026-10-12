@@ -1,4 +1,5 @@
 import { reviewSessionPersistence } from './session-durable-access';
+import { createReviewAutosaveCaptures } from './session-autosave-captures';
 import type {
   AutosaveKey,
   AutosaveCapture,
@@ -9,9 +10,11 @@ import type {
   ReviewFailedTranscript,
   ReviewDurableAttempt,
   ReviewTypingAttempt,
+  ReviewCommittedMutation,
 } from './session-types';
 import {
   failureCode,
+  commitReviewWorkspace,
   createReviewAnnotationPublication,
   reviewPublicationReceiptAccepted,
   reviewWriteIdentity,
@@ -84,7 +87,7 @@ class VideoReviewSession {
     ReviewSpeechReceiptState
   >();
   private readonly listeners = new Set<() => void>();
-  private readonly captures = new Map<AutosaveKey, () => AutosaveCapture>();
+  private readonly captures = createReviewAutosaveCaptures();
   private readonly typingAttempts = new WeakMap<AutosaveCapture, ReviewTypingAttempt>();
 
   constructor(
@@ -112,11 +115,7 @@ class VideoReviewSession {
         const timer = setTimeout(callback, delay);
         return () => clearTimeout(timer);
       },
-      capture: (key) => {
-        const capture = this.captures.get(key);
-        if (!capture) throw new Error('Review autosave buffer is unavailable.');
-        return capture();
-      },
+      capture: (key) => this.captures.capture(key),
       commit: (captured) => this.commitAutosaveCapture(captured),
       classifyFailure: (error) => (failureCode(error) === 'storage' ? 'retry' : 'stop'),
     });
@@ -124,7 +123,7 @@ class VideoReviewSession {
 
   api() {
     return {
-      getSnapshot: () => this.state,
+      getSnapshot: () => this.captures.snapshot(this.state),
       stageAutosave: this.stageAutosave.bind(this),
       flushAutosave: (keys?: Iterable<AutosaveKey>) => this.coordinator.flushCaptured(keys),
       cancelAutosave: this.cancelAutosave.bind(this),
@@ -158,6 +157,7 @@ class VideoReviewSession {
   }
 
   private emit() {
+    this.captures.snapshot(this.state);
     for (const listener of this.listeners) listener();
   }
 
@@ -241,7 +241,7 @@ class VideoReviewSession {
   }
 
   private async transition(
-    action: () => Promise<VideoWorkspaceSnapshot>,
+    action: () => Promise<ReviewCommittedMutation>,
     local?: LocalReviewChange,
     speechSaveKey?: string
   ) {
@@ -272,7 +272,8 @@ class VideoReviewSession {
         return committed;
       }
       const expectedRevision = this.state.snapshot.workspace.revision;
-      const snapshot = await action();
+      const committed = await action();
+      const snapshot = 'snapshot' in committed ? committed.snapshot : committed;
       if (local) this.noteAcknowledgedWrite(snapshot, expectedRevision);
       if (
         !local &&
@@ -285,7 +286,7 @@ class VideoReviewSession {
       this.state = {
         ...this.state,
         snapshot,
-        document: projectReviewWorkspace(snapshot),
+        document: 'snapshot' in committed ? committed.document : projectReviewWorkspace(snapshot),
         dirty: false,
         error: null,
       };
@@ -313,7 +314,7 @@ class VideoReviewSession {
   }
 
   private execute(
-    action: () => Promise<VideoWorkspaceSnapshot>,
+    action: () => Promise<ReviewCommittedMutation>,
     local?: LocalReviewChange,
     speechSaveKey?: string
   ) {
@@ -323,7 +324,7 @@ class VideoReviewSession {
   }
 
   private enqueue(
-    action: () => Promise<VideoWorkspaceSnapshot>,
+    action: () => Promise<ReviewCommittedMutation>,
     local?: LocalReviewChange,
     speechSaveKey?: string
   ) {
@@ -447,7 +448,8 @@ class VideoReviewSession {
         if (!content) throw new Error('Advanced content is invalid.');
         if (change.typing) {
           await this.commitTypingCapture(captured, content, change.typing);
-          captured.acknowledge();
+          this.captures.acknowledge(captured);
+          this.emit();
           return;
         }
         const operation = createReviewAdvancedContentOperation({
@@ -459,7 +461,7 @@ class VideoReviewSession {
         if (operation) {
           await this.execute(
             () =>
-              this.deps.commitVideoWorkspace({
+              commitReviewWorkspace(this.deps, {
                 ...reviewWriteIdentity(this.state.snapshot),
                 operation,
               }),
@@ -495,19 +497,22 @@ class VideoReviewSession {
       captured.fail(error);
       throw error;
     }
-    captured.acknowledge();
+    this.captures.acknowledge(captured);
+    this.emit();
   }
 
   /** Registers a lazy buffer capture; scheduling and admission belong to this session. */
   private stageAutosave(key: AutosaveKey, capture: () => AutosaveCapture, policy: AutosavePolicy) {
     if (this.disposed) return;
-    this.captures.set(key, capture);
+    this.captures.register(key, capture);
     this.coordinator.request(key, policy);
+    this.emit();
   }
 
   private cancelAutosave(key: AutosaveKey) {
     this.coordinator.cancel(key);
-    this.captures.delete(key);
+    this.captures.cancel(key);
+    this.emit();
   }
 
   private setAutosaveEnabled(enabled: boolean) {
@@ -559,7 +564,7 @@ class VideoReviewSession {
       () => {
         if (consumeDraft && !this.state.snapshot.draft)
           throw new Error('Review draft is unavailable.');
-        return this.deps.commitVideoWorkspace({
+        return commitReviewWorkspace(this.deps, {
           ...reviewWriteIdentity(this.state.snapshot),
           operation: captured,
           ...(consumeDraft ? { consumeDraftRevision: this.state.snapshot.draft!.revision } : {}),
@@ -752,10 +757,11 @@ class VideoReviewSession {
 
   private reload() {
     for (const key of this.captures.keys()) this.coordinator.cancel(key);
-    this.captures.clear();
+    this.captures.invalidate();
     return this.enqueue(async () => {
       const snapshot = await this.deps.readVideoWorkspace(this.initial.workspace.aggregateId);
       if (!snapshot) throw new Error('Review session is unavailable.');
+      this.captures.clear();
       this.state = { ...this.state, dirty: false };
       this.failedDurableAttempt = undefined;
       this.failedTranscript = undefined;

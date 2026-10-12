@@ -72,6 +72,7 @@ import { parseReviewOperation, parseReviewSource } from '../../../features/video
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type {
   ReviewDocument,
+  ReviewOperation,
   ReviewHistoryDirection,
   ReviewSource,
 } from '../../../features/video/review/types';
@@ -81,6 +82,7 @@ import {
   type VideoWorkspaceDiagnostic,
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
+  prepareCanonicalVideoWorkspaceAppend,
 } from './parser';
 
 const stores = [
@@ -345,6 +347,18 @@ async function putWorkspace(
         : operation
     ),
   };
+  return writePreparedWorkspace(tx, previous, encoded, storage, mode, physicalDelete, prepared);
+}
+
+async function writePreparedWorkspace(
+  tx: WriteTransaction,
+  previous: VideoWorkspace,
+  encoded: VideoWorkspace,
+  storage: WorkspaceStorageRead,
+  mode: 'append' | 'cursor' | 'replace',
+  physicalDelete: PhysicalDeleteAssetOperation,
+  prepared: ReviewReadySources
+): Promise<VideoWorkspace> {
   const compacted = compactVideoWorkspaceHistory(encoded);
   const next = compacted.workspace;
   if (
@@ -390,8 +404,23 @@ async function putWorkspace(
   return next;
 }
 
-/** Commits one operation; a matching recovery draft is consumed atomically with the history. */
-export async function commitVideoWorkspace(args: {
+function prepareOwnedAppend(
+  admitted: AdmittedWorkspaceSnapshot,
+  operation: ReviewOperation,
+  merged: readonly ReviewAnnotationEffectSnapshot[] | undefined,
+  document: ReviewDocument
+): VideoWorkspace {
+  const candidate = prepareCanonicalVideoWorkspaceAppend(
+    admitted.snapshot.workspace,
+    operation,
+    merged,
+    document
+  );
+  if (!candidate) throw new VideoWorkspaceError('invalid');
+  return candidate;
+}
+
+type CommitVideoWorkspaceArgs = {
   aggregateId: string;
   expectedRevision: number;
   expectedSourceAssetId: string;
@@ -399,7 +428,58 @@ export async function commitVideoWorkspace(args: {
   consumeDraftRevision?: number;
   /** Snapshot registry and authored operation are admitted by the same durable transaction. */
   effectSnapshots?: unknown;
-}): Promise<VideoWorkspaceSnapshot> {
+};
+
+function prepareCommittedOperation(
+  admitted: AdmittedWorkspaceSnapshot,
+  args: CommitVideoWorkspaceArgs,
+  effectSnapshots: readonly ReviewAnnotationEffectSnapshot[] | undefined
+) {
+  const {
+    snapshot: { workspace, draft },
+    document,
+  } = admitted;
+  const parsed = parseReviewOperation(args.operation, workspace.source.duration);
+  if (!parsed) throw new VideoWorkspaceError('invalid');
+  const operation =
+    parsed.target === 'edit'
+      ? {
+          ...parsed,
+          preserveFocusAnchors: true as const,
+          preserveUnderCuts: true as const,
+          preserveVoiceoverAnchors: true as const,
+          normalizeVoiceoverTempo: true as const,
+        }
+      : parsed;
+  if (
+    args.consumeDraftRevision !== undefined &&
+    (!draft ||
+      draft.revision !== args.consumeDraftRevision ||
+      operation.target !== 'annotation' ||
+      JSON.stringify(operation.after) !== JSON.stringify(draft.annotation) ||
+      JSON.stringify(operation.before) !== JSON.stringify(draft.before))
+  )
+    throw new VideoWorkspaceError('conflict');
+  const selected = applyReviewOperation(document, operation, workspace.source);
+  const merged = effectSnapshots
+    ? mergeReviewAnnotationEffectSnapshots(workspace.effectSnapshots ?? [], effectSnapshots)
+    : undefined;
+  if (merged === null) throw new VideoWorkspaceError('invalid');
+  return { operation, selected, merged };
+}
+
+/** Commits one operation; a matching recovery draft is consumed atomically with the history. */
+export async function commitVideoWorkspace(
+  args: CommitVideoWorkspaceArgs
+): Promise<VideoWorkspaceSnapshot> {
+  return (await commitVideoWorkspaceWithProjection(args)).snapshot;
+}
+
+/** Returns the document admitted and changed by this committed mutation, never a cached read. */
+export async function commitVideoWorkspaceWithProjection(args: CommitVideoWorkspaceArgs): Promise<{
+  snapshot: VideoWorkspaceSnapshot;
+  document: ReviewDocument;
+}> {
   const effectSnapshots =
     args.effectSnapshots === undefined
       ? undefined
@@ -413,59 +493,55 @@ export async function commitVideoWorkspace(args: {
   return mutate(
     args.aggregateId,
     async (tx, prepared, physicalDelete) => {
-      const {
-        snapshot: { workspace, draft },
-        document,
-        storage,
-      } = await requireSnapshot(
+      const admitted = await requireSnapshot(
         tx,
         args.aggregateId,
         args.expectedRevision,
         args.expectedSourceAssetId
       );
-      const parsed = parseReviewOperation(args.operation, workspace.source.duration);
-      if (!parsed) throw new VideoWorkspaceError('invalid');
-      const operation =
-        parsed.target === 'edit'
-          ? {
-              ...parsed,
-              preserveFocusAnchors: true as const,
-              preserveUnderCuts: true as const,
-              preserveVoiceoverAnchors: true as const,
-              normalizeVoiceoverTempo: true as const,
-            }
-          : parsed;
-      if (
-        args.consumeDraftRevision !== undefined &&
-        (!draft ||
-          draft.revision !== args.consumeDraftRevision ||
-          operation.target !== 'annotation' ||
-          JSON.stringify(operation.after) !== JSON.stringify(draft.annotation) ||
-          JSON.stringify(operation.before) !== JSON.stringify(draft.before))
-      )
-        throw new VideoWorkspaceError('conflict');
-      applyReviewOperation(document, operation, workspace.source);
-      const merged = effectSnapshots
-        ? mergeReviewAnnotationEffectSnapshots(workspace.effectSnapshots ?? [], effectSnapshots)
-        : undefined;
-      if (merged === null) throw new VideoWorkspaceError('invalid');
-      const next = await putWorkspace(
-        tx,
-        workspace,
-        {
-          ...workspace,
-          ...(merged ? { effectSnapshots: merged } : {}),
-          history: [...workspace.history.slice(0, workspace.cursor), operation],
-          cursor: workspace.cursor + 1,
-        },
+      const {
+        snapshot: { workspace, draft },
         storage,
-        'append',
-        physicalDelete,
-        prepared
+      } = admitted;
+      const { operation, selected, merged } = prepareCommittedOperation(
+        admitted,
+        args,
+        effectSnapshots
       );
+      const next =
+        isRecord(storage.head) && storage.head['formatVersion'] === 3
+          ? await writePreparedWorkspace(
+              tx,
+              workspace,
+              prepareOwnedAppend(admitted, operation, merged, selected),
+              storage,
+              'append',
+              physicalDelete,
+              prepared
+            )
+          : await putWorkspace(
+              tx,
+              workspace,
+              {
+                ...workspace,
+                ...(merged ? { effectSnapshots: merged } : {}),
+                history: [...workspace.history.slice(0, workspace.cursor), operation],
+                cursor: workspace.cursor + 1,
+              },
+              storage,
+              'append',
+              physicalDelete,
+              prepared
+            );
       if (args.consumeDraftRevision !== undefined)
         await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
-      return { workspace: next, draft: args.consumeDraftRevision === undefined ? draft : null };
+      return {
+        snapshot: {
+          workspace: next,
+          draft: args.consumeDraftRevision === undefined ? draft : null,
+        },
+        document: selected,
+      };
     },
     isRecord(args.operation) && args.operation['target'] === 'advancedContent',
     effectSnapshots

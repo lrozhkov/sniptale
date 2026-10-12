@@ -1,6 +1,7 @@
 import {
   saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
+  commitVideoWorkspaceWithProjection,
   moveVideoWorkspaceHistory,
   readVideoWorkspace,
   saveVideoWorkspaceAdvanced,
@@ -14,7 +15,12 @@ import type { ReviewOperation } from '../../features/video/review/types';
 import type { ReviewSpeechPublicationChange } from './speech-publication-state';
 import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
-import type { Failure, ReviewDurableAttempt } from './session-types';
+import type {
+  Failure,
+  ReviewDurableAttempt,
+  ReviewSessionPersistence,
+  ReviewCommittedMutation,
+} from './session-types';
 import {
   collectReviewAssetReferences,
   reviewWorkspaceHasAudioClip,
@@ -28,12 +34,23 @@ import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 export const reviewSessionPersistence = {
   saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
+  commitVideoWorkspaceWithProjection,
   moveVideoWorkspaceHistory,
   readVideoWorkspace,
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
   saveVideoWorkspaceTyping,
 };
+
+/** Uses only the supplied adapter; a legacy injected adapter retains strict post-commit replay. */
+export function commitReviewWorkspace(
+  deps: ReviewSessionPersistence,
+  args: Parameters<typeof commitVideoWorkspace>[0]
+): Promise<ReviewCommittedMutation> {
+  return deps.commitVideoWorkspaceWithProjection
+    ? deps.commitVideoWorkspaceWithProjection(args)
+    : deps.commitVideoWorkspace(args);
+}
 
 /** Read-only persisted history/byte/clip admission; it owns no session state, queue or writes. */
 export function reviewDurableWorkspaceAccess(

@@ -1,3 +1,4 @@
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 // @vitest-environment jsdom
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';
@@ -98,7 +99,7 @@ it('rebuilds writes from reloaded persisted content after a conflict recovery', 
   const { session, deps, saveFromOtherTab } = setup();
   deps.saveVideoWorkspaceAdvanced.mockRejectedValueOnce(new Error('Revision conflict'));
   act(() => advanced.setMode('advanced'));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(1);
   expect(advanced.advanced.ui.mode).toBe('advanced');
 
@@ -126,7 +127,7 @@ it('rebuilds writes from reloaded persisted content after a conflict recovery', 
 
   expect(advanced.advanced.zoom.regions).toHaveLength(1);
   act(() => advanced.setMode('basic'));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
     advanced: QuickEditAdvancedState;
   };
@@ -142,7 +143,7 @@ it('composes two commands staged before the next render (S1)', async () => {
   });
   expect(advanced.advanced.ui.mode).toBe('advanced');
   expect(advanced.advanced.ui.tracks.zoom).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(1);
   const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
     advanced: QuickEditAdvancedState;
@@ -165,7 +166,7 @@ it('stages ui commands through the whole-state writer and content through histor
   );
   expect(advanced.advanced.zoom.enabled).toBe(true);
   expect(advanced.advanced.background.enabled).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   // One collapsed content operation; the whole-state writer stays untouched.
   expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
   const op = deps.commitVideoWorkspace.mock.lastCall?.[0].operation as {
@@ -189,7 +190,7 @@ it('keeps the newest local revision when an older write acknowledges (S2)', asyn
       })
   );
   act(() => advanced.setZoom((zoom) => ({ ...zoom, enabled: true })));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   act(() =>
     advanced.setBackground((background) => ({
       ...background,
@@ -204,7 +205,7 @@ it('keeps the newest local revision when an older write acknowledges (S2)', asyn
     await Promise.resolve();
   });
   expect(advanced.advanced.background.enabled).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
   const op = deps.commitVideoWorkspace.mock.lastCall?.[0].operation as {
     after: { zoom: { enabled: boolean }; background: { enabled: boolean } };
@@ -219,7 +220,7 @@ it('keeps the pending edit after a save failure, rejects flush, and retries (S3)
     .mockRejectedValueOnce(new Error('storage'))
     .mockRejectedValueOnce(new Error('storage'));
   act(() => advanced.setMode('advanced'));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(advanced.saveFailed).toBe(true);
   expect(advanced.advanced.ui.mode).toBe('advanced');
   await expect(advanced.flush()).rejects.toThrow();
@@ -427,7 +428,7 @@ it('persists one bulk click patch through history and keeps failed drafts retrya
       patchReviewClicks(current, ['one', 'two'], { effect: 'ripple' })
     )
   );
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(advanced.saveFailed).toBe(true);
   expect(advanced.advanced.clickAnimations).toHaveLength(2);
   expect(session.getSnapshot().document.advancedContent.clickAnimations).toBeUndefined();
@@ -533,7 +534,7 @@ it('shows watermark and presentation immediately, coalesces rapid edits and retr
   expect(advanced.advanced.presentation?.audioFade).toBe(true);
   expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
   deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('write failed'));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(advanced.saveFailed).toBe(true);
   expect(advanced.advanced.watermark?.text.italic).toBe(true);
   await act(async () => {
@@ -558,7 +559,7 @@ it('retains later presentation settings while an earlier watermark write is in f
   );
   const mark = { ...createQuickEditWatermark('Author'), mode: 'text' as const };
   act(() => advanced.setWatermark(mark));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   act(() => advanced.setPresentation({ ...createNeutralPresentationSettings(), audioFade: true }));
   await act(async () => {
     release();

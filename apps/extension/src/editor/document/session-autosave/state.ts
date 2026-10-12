@@ -15,6 +15,7 @@ export interface ActiveEditorSessionContext {
 export type EditorAutosaveCapture = {
   context: ActiveEditorSessionContext;
   contextGeneration: number;
+  hydrationGeneration: number;
   document: EditorDocument;
   revision: number;
 };
@@ -22,7 +23,9 @@ export type EditorAutosaveCapture = {
 export type EditorSessionAutosaveState = {
   activeContext: ActiveEditorSessionContext | null;
   contextGeneration: number;
+  hydrationGeneration: number;
   enabled: boolean;
+  hydration: { isCurrent: () => boolean } | null;
   hasUnsavedChanges: boolean;
   autosaveRevision: number;
   pendingDocument: EditorDocument | null;
@@ -46,7 +49,9 @@ export function createAutosaveState(): EditorSessionAutosaveState {
   return {
     activeContext: null,
     contextGeneration: 0,
+    hydrationGeneration: 0,
     enabled: true,
+    hydration: null,
     hasUnsavedChanges: false,
     autosaveRevision: 0,
     pendingDocument: null,

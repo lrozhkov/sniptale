@@ -8,7 +8,7 @@ type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
 >;
 
-const ADVANCED_SAVE_DEBOUNCE_MS = 250;
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 type PendingSave = { revision: number; value: QuickEditAdvancedState };
 
 /** UI chrome autosave remains outside user history; rendered content uses the history owner. */
@@ -66,7 +66,7 @@ export function useReviewAdvanced(session: Session) {
             },
           };
         },
-        { delay: ADVANCED_SAVE_DEBOUNCE_MS }
+        EDITOR_AUTOSAVE_POLICY
       );
     },
     [session]

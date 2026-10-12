@@ -1,93 +1,16 @@
 // @vitest-environment jsdom
-
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEditorDocumentFixture } from '../page-session/document.test-support';
-
-vi.setConfig({ testTimeout: 20_000 });
-
-const {
+import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  activate,
+  createDocument,
   commitPresentationMock,
   commitWorkspaceMock,
   createThumbnailMock,
   getWorkspaceMock,
-  loggerErrorMock,
   loggerWarnMock,
   publishLibraryChangedMock,
-} = vi.hoisted(() => ({
-  commitPresentationMock: vi.fn(),
-  commitWorkspaceMock: vi.fn(),
-  createThumbnailMock: vi.fn(async () => new Blob(['thumbnail'], { type: 'image/png' })),
-  getWorkspaceMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  loggerWarnMock: vi.fn(),
-  publishLibraryChangedMock: vi.fn(),
-}));
-
-vi.mock('../../../features/media-hub/events', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../features/media-hub/events')>()),
-  publishMediaHubLibraryChanged: publishLibraryChangedMock,
-}));
-
-vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
-  commitImageWorkspace: commitWorkspaceMock,
-  commitImagePresentation: commitPresentationMock,
-}));
-
-vi.mock('../../../platform/media-utils/image-thumbnail', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/media-utils/image-thumbnail')>()),
-  createImageThumbnailBlob: createThumbnailMock,
-}));
-
-vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
-  createLogger: vi.fn(() => ({
-    child: vi.fn(),
-    debug: vi.fn(),
-    error: loggerErrorMock,
-    info: vi.fn(),
-    log: vi.fn(),
-    warn: loggerWarnMock,
-  })),
-}));
-
-vi.mock('../../../composition/persistence/image-workspaces', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/image-workspaces')>()),
-  recoverAndGetImageWorkspace: getWorkspaceMock,
-}));
-
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.clearAllMocks();
-  commitWorkspaceMock.mockImplementation(async (input) => ({
-    aggregateId: input.aggregateId,
-    documentAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl ?? new Map(),
-    revision: input.expectedRevision + 1,
-  }));
-});
-
-afterEach(async () => {
-  const { useEditorStore } = await import('../../state/useEditorStore');
-  useEditorStore.getState().setSaveState('idle');
-  useEditorStore.getState().setSaveErrorMessage(null);
-  useEditorStore.getState().setSessionId(null);
-  vi.useRealTimers();
-  vi.resetModules();
-});
-
-function activate(autosave: ReturnType<typeof import('./').createEditorSessionAutosaveService>) {
-  autosave.activate({
-    aggregateId: 'image-1',
-    durableRevision: 0,
-    renderPresentation: null,
-    sourceTitle: 'Capture',
-    sourceUrl: 'https://example.test',
-  });
-}
-
-function createDocument(sourceImageData: string) {
-  return { ...createEditorDocumentFixture(), sourceImageData };
-}
+} from './autosave.test-support';
 
 it('coalesces expired uncaptured autosaves behind an acquired workspace write', async () => {
   const { createEditorSessionAutosaveService } = await import('./');
@@ -106,12 +29,12 @@ it('coalesces expired uncaptured autosaves behind an acquired workspace write', 
       })
   );
   autosave.scheduleAutosave(createDocument('first acquired snapshot'));
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   expect(commitWorkspaceMock).toHaveBeenCalledOnce();
   autosave.scheduleAutosave(createDocument('obsolete expired snapshot'));
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   autosave.scheduleAutosave(createDocument('latest expired snapshot'));
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   expect(commitWorkspaceMock).toHaveBeenCalledOnce();
   release();
   await vi.advanceTimersByTimeAsync(0);
@@ -347,10 +270,10 @@ describe('image aggregate autosave', () => {
     autosave.scheduleAutosave(createDocument('first'));
     const { useEditorStore } = await import('../../state/useEditorStore');
     expect(useEditorStore.getState().saveState).toBe('idle');
-    await vi.advanceTimersByTimeAsync(1_500);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay / 2);
     const latest = createDocument('latest');
     autosave.scheduleAutosave(latest);
-    await vi.advanceTimersByTimeAsync(1_999);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay - 1);
     expect(commitWorkspaceMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
 
@@ -444,7 +367,7 @@ describe('image aggregate autosave', () => {
     const autosave = createEditorSessionAutosaveService();
     activate(autosave);
     autosave.scheduleAutosave(createDocument('queued'));
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
     expect(useEditorStore.getState().saveState).toBe('error');
     expect(autosave.getDurableRevision()).toBe(0);
   });
@@ -504,7 +427,7 @@ describe('image aggregate autosave', () => {
     const autosave = createEditorSessionAutosaveService();
     activate(autosave);
     autosave.scheduleAutosave(createDocument('stale'));
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
     expect(autosave.getLastWriteError()).toBeInstanceOf(Error);
 
     autosave.scheduleAutosave(createDocument('must-not-overwrite-copy'));
@@ -554,21 +477,21 @@ describe('image aggregate autosave', () => {
     await vi.advanceTimersByTimeAsync(20_000);
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
     queuePendingAutosave(recoveredChainState, createDocument('after-failure'));
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
     expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
 
     const detachedState = createAutosaveState();
     activateAutosaveContext(detachedState, context);
     queuePendingAutosave(detachedState, createDocument('detached'));
     detachedState.activeContext = null;
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
     expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
 
     const emptyState = createAutosaveState();
     activateAutosaveContext(emptyState, context);
     queuePendingAutosave(emptyState, createDocument('cleared'));
     emptyState.pendingDocument = null;
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
     expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
   });
 });
@@ -618,14 +541,14 @@ it('keeps the save indicator pending when another edit follows an in-flight writ
   const autosave = createEditorSessionAutosaveService();
   activate(autosave);
   autosave.scheduleAutosave(createDocument('first'));
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   expect(commitWorkspaceMock).toHaveBeenCalledOnce();
 
   autosave.scheduleAutosave(createDocument('second'));
   finishFirst({ revision: 1, documentAssetsByRuntimeUrl: new Map<never, never>() });
   await vi.advanceTimersByTimeAsync(0);
   expect(useEditorStore.getState().saveState).toBe('idle');
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   expect(useEditorStore.getState().saveState).toBe('saved');
 });
 
@@ -660,7 +583,7 @@ it('skips an old preview after a newer edit has entered its write', async () => 
   );
 
   autosave.scheduleAutosave(createDocument('second'));
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   finishRender('data:image/png;base64,cHJldmlldw==');
   await vi.advanceTimersByTimeAsync(0);
   expect(createThumbnailMock).not.toHaveBeenCalled();

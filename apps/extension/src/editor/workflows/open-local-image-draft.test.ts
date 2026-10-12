@@ -29,6 +29,8 @@ function createController(
     autosaveService: autosaveService
       ? {
           ...autosaveService,
+          beginHydration: vi.fn(() => ({ finish: vi.fn(), saveNow: vi.fn(async () => undefined) })),
+          persistSnapshot: vi.fn(async () => undefined),
           saveNow: vi.fn(async (serialize: () => unknown) => {
             serialize();
           }),

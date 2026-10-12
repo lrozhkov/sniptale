@@ -7,7 +7,7 @@ import type { EditorDocument } from '../../features/editor/document/types';
 interface LocalImageDraftController extends EditorDocumentOpenPort {
   autosaveService: Pick<
     EditorSessionAutosaveService,
-    'activate' | 'flushAutosave' | 'saveNow'
+    'activate' | 'flushAutosave' | 'saveNow' | 'beginHydration' | 'persistSnapshot'
   > | null;
   exportDocument(): EditorDocument;
   isDocumentReadyForExport(): boolean;
@@ -36,7 +36,7 @@ export function openLocalImageAsEditorDraft(
         await autosaveService.flushAutosave(() => controller.exportDocument());
       }
     },
-    onOpened: async () => {
+    onOpened: async (saveInitial) => {
       const autosaveService = controller.autosaveService;
       if (!autosaveService) return;
       beginEditorPageLocalDraft({
@@ -49,7 +49,7 @@ export function openLocalImageAsEditorDraft(
         sourceTitle: file.name,
       });
       const initialDocument = controller.exportDocument();
-      await autosaveService.saveNow(() => initialDocument);
+      await (saveInitial ?? autosaveService.saveNow)(() => initialDocument);
     },
   });
 }

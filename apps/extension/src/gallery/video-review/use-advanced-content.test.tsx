@@ -1,3 +1,4 @@
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -90,7 +91,7 @@ it('rebases newer buffered mutations onto an acknowledged target and retains the
     return implementation(args);
   });
   act(() => content.commands.setActionsEnabled(false));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   act(() => content.commands.setZoom((zoom) => ({ ...zoom, enabled: true })));
   await act(async () => {
     release();
@@ -119,7 +120,7 @@ it('does not acknowledge a new generation with an acquired pre-reset mutation jo
     return implementation(args);
   });
   act(() => content.commands.setActionsEnabled(false));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   act(() => {
     content.reset();
     content.commands.setZoom((zoom) => ({ ...zoom, enabled: true }));

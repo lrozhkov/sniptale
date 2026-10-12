@@ -9,9 +9,12 @@ import type { VideoEditorLibrariesState } from '../app-model/types';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
 import { replaceVideoEditorUrl } from '../browser-driver';
 import { useVideoEditorSaveRetryGeneration } from './save-retry';
-import { publishVideoEditorSaveReadiness } from './save-readiness';
+import { publishVideoEditorSaveReadiness, registerVideoEditorSaveBarrier } from './save-readiness';
+import { getCurrentVideoEditorProjectSnapshot } from '../controller/store';
+import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 
 const logger = createLogger({ namespace: 'VideoEditorAutoSave' });
+type SaveState = Parameters<VideoEditorSessionActions['setSaveState']>[0];
 type AutosaveInput = {
   project: VideoProject | null;
   recordingId: string | null;
@@ -36,9 +39,10 @@ type CapturedSave = {
   input: AutosaveInput;
   project: VideoProject;
   version: number;
+  explicit: boolean;
 };
 
-/** Coalesces uncaptured project edits while preserving the editor's 350ms idle policy. */
+/** Coalesces uncaptured project edits through the product's document-save policy. */
 export function useVideoEditorAutoSave(
   project: VideoProject | null,
   recordingId: string | null,
@@ -58,8 +62,18 @@ export function useVideoEditorAutoSave(
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', protect);
+    const flush = () => {
+      if (!session.isEnabled()) return;
+      void session.flushLatest().catch(() => undefined);
+    };
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('pageshow', flush);
+    document.addEventListener('visibilitychange', flush);
     return () => {
       window.removeEventListener('beforeunload', protect);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('pageshow', flush);
+      document.removeEventListener('visibilitychange', flush);
       session.dispose();
       owner.current = null;
     };
@@ -84,30 +98,74 @@ export function useVideoEditorAutoSave(
   ]);
 }
 
+function publishAutosaveReadiness(
+  context: ProjectContext | null,
+  input: AutosaveInput | null,
+  saveState: SaveState,
+  updateUi: boolean
+) {
+  if (!context || !input) return;
+  if (updateUi) input.setSaveState(saveState);
+  publishVideoEditorSaveReadiness({
+    projectId: context.project.id,
+    saveState,
+    generation: context.generation,
+    requestedVersion: context.requestedVersion,
+    savedVersion: context.savedVersion,
+  });
+}
+
+function createProjectContext(project: VideoProject | null): ProjectContext | null {
+  return project
+    ? {
+        generation: Symbol(),
+        project,
+        savedProject: project,
+        initialUpdatedAt: project.updatedAt,
+        workspaceRevision: undefined,
+        requestedVersion: 0,
+        savedVersion: 0,
+        conflict: false,
+        revisionSync: null,
+      }
+    : null;
+}
+
+function isProjectContextDirty(context: ProjectContext | null) {
+  const project = getCurrentVideoEditorProjectSnapshot();
+  return Boolean(
+    context &&
+    (project?.id === context.project.id ? project : context.project) !== context.savedProject
+  );
+}
+
+function isSyncedProjectRevision(project: VideoProject, synced: ProjectContext['revisionSync']) {
+  return Boolean(
+    synced &&
+    project.updatedAt === synced.revision &&
+    Object.entries(synced.project).every(
+      ([key, value]) => key === 'updatedAt' || Reflect.get(project, key) === value
+    )
+  );
+}
+
+function scheduleDocumentAutosave(callback: () => void, delay: number) {
+  const timer = window.setTimeout(callback, delay);
+  return () => window.clearTimeout(timer);
+}
+
 function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }) {
   let context: ProjectContext | null = null;
   let input: AutosaveInput | null = null;
   let disposed = false;
-  function publish(
-    saveState: Parameters<VideoEditorSessionActions['setSaveState']>[0],
-    updateUi = true
-  ) {
-    if (!context || !input || disposed) return;
-    if (updateUi) input.setSaveState(saveState);
-    publishVideoEditorSaveReadiness({
-      projectId: context.project.id,
-      saveState,
-      generation: context.generation,
-      requestedVersion: context.requestedVersion,
-      savedVersion: context.savedVersion,
-    });
+  let explicit = false;
+  let releaseBarrier: (() => void) | null = null;
+  function publish(saveState: SaveState, updateUi = true) {
+    if (!disposed) publishAutosaveReadiness(context, input, saveState, updateUi);
   }
   const coordinator = createAutosaveCoordinator<'document', CapturedSave>({
     now: () => Date.now(),
-    schedule: (callback, delay) => {
-      const timer = window.setTimeout(callback, delay);
-      return () => window.clearTimeout(timer);
-    },
+    schedule: scheduleDocumentAutosave,
     capture: () => {
       if (!context || !input) throw new Error('The open video project changed.');
       return {
@@ -115,6 +173,7 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
         input,
         project: context.project,
         version: context.requestedVersion,
+        explicit,
       };
     },
     commit: async (captured) => {
@@ -123,7 +182,7 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
       try {
         const saved = await deps.persist(
           captured,
-          () => !disposed && context === current && Boolean(input?.enabled)
+          () => !disposed && context === current && (captured.explicit || Boolean(input?.enabled))
         );
         if (!saved || disposed || context !== current) return;
         current.workspaceRevision = saved.workspaceRevision;
@@ -153,28 +212,24 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
     classifyFailure: (error) =>
       error instanceof Error && error.name === 'StaleVideoProjectSaveError' ? 'stop' : 'retry',
   });
-  return {
+  const owner = {
     update(next: AutosaveInput) {
       input = next;
       const project = next.project;
       if (!project || context?.project.id !== project.id) {
+        releaseBarrier?.();
+        releaseBarrier = null;
         if (!project) publish('error', false);
         coordinator.cancel('document');
         coordinator.resume();
-        context = project
-          ? {
-              generation: Symbol(),
-              project,
-              savedProject: project,
-              initialUpdatedAt: project.updatedAt,
-              workspaceRevision: undefined,
-              requestedVersion: 0,
-              savedVersion: 0,
-              conflict: false,
-              revisionSync: null,
-            }
-          : null;
+        context = createProjectContext(project);
         publish('saved');
+        if (context)
+          releaseBarrier = registerVideoEditorSaveBarrier(
+            context.project.id,
+            context.generation,
+            () => owner.flushLatest()
+          );
         return;
       }
       if (context.conflict) {
@@ -182,13 +237,7 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
         return;
       }
       const synced = context.revisionSync;
-      if (
-        synced &&
-        project.updatedAt === synced.revision &&
-        Object.entries(synced.project).every(
-          ([key, value]) => key === 'updatedAt' || Reflect.get(project, key) === value
-        )
-      ) {
+      if (isSyncedProjectRevision(project, synced)) {
         context.revisionSync = null;
         context.project = project;
         context.savedProject = project;
@@ -205,16 +254,45 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
         return;
       }
       publish('dirty');
-      if (next.enabled) coordinator.request('document', { delay: 350 });
+      if (next.enabled) coordinator.request('document', EDITOR_AUTOSAVE_POLICY);
       else coordinator.cancel('document');
     },
-    isDirty: () => Boolean(context && context.project !== context.savedProject),
+    isDirty: () => isProjectContextDirty(context),
+    isEnabled: () => Boolean(input?.enabled),
+    async flushLatest(): Promise<void> {
+      const turn = context;
+      if (!turn || !input || disposed) throw new Error('The open video project changed.');
+      while (!disposed && context === turn) {
+        const project = getCurrentVideoEditorProjectSnapshot();
+        if (!project || project.id !== turn.project.id)
+          throw new Error('The open video project changed.');
+        owner.update({ ...input, project });
+        if (turn.conflict) throw new Error('The video project has unsaved changes.');
+        if (turn.project === turn.savedProject) return;
+        const version = turn.requestedVersion;
+        explicit = true;
+        try {
+          coordinator.request('document', EDITOR_AUTOSAVE_POLICY);
+          await coordinator.flushCaptured(['document']);
+        } catch (cause) {
+          throw new Error('The video project could not be saved.', { cause });
+        } finally {
+          explicit = false;
+        }
+        if (disposed || context !== turn || turn.savedVersion < version)
+          throw new Error('The video project could not be saved.');
+      }
+      throw new Error('The open video project changed.');
+    },
     dispose() {
+      releaseBarrier?.();
+      releaseBarrier = null;
       publish('error', false);
       coordinator.dispose();
       disposed = true;
     },
   };
+  return owner;
 }
 
 async function persistVideoProject(

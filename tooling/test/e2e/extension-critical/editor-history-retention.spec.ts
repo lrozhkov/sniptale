@@ -58,7 +58,7 @@ for (const viewport of [
           expect(result.fixtureBytes).toBeGreaterThan(65 * 1024 * 1024);
           expect(result.fixtureBytes).toBeLessThan(80 * 1024 * 1024);
         }
-        expect(result.saves).toHaveLength(5);
+        expect(result.saves).toHaveLength(6);
         expect(result.readback).toMatchObject({
           cuts: 14,
           speeds: 14,

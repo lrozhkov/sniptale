@@ -87,6 +87,56 @@ beforeEach(() => {
   waitForEditorDocumentCanvasMock.mockResolvedValue(undefined);
 });
 
+it.each(['saved', 'missing-export', 'old-barrier-failed', 'load-failed', 'superseded'] as const)(
+  'opens images through the existing autosave loading lease: %s',
+  async (outcome) => {
+    const document = createEditorDocument('previous');
+    const saveNow = vi.fn();
+    const finish = vi.fn();
+    const autosaveService = {
+      flushAutosave: vi.fn(async () => undefined),
+      beginHydration: vi.fn(() => ({ saveNow, finish })),
+      persistSnapshot: vi.fn(async () => undefined),
+    };
+    const controller = {
+      canvas: {},
+      ...(outcome === 'missing-export' ? {} : { exportDocument: vi.fn(() => document) }),
+      autosaveService,
+      loadDocument: vi.fn(async () => undefined),
+      openImage: vi.fn(async () => undefined),
+    };
+    if (outcome === 'old-barrier-failed')
+      autosaveService.flushAutosave.mockRejectedValueOnce(new Error('barrier failed'));
+    if (outcome === 'load-failed')
+      controller.openImage.mockRejectedValueOnce(new Error('load failed'));
+    if (outcome === 'superseded')
+      controller.openImage.mockImplementationOnce(async () => {
+        const { beginEditorDocumentOpenOperation } = await import('./operation');
+        beginEditorDocumentOpenOperation(controller);
+      });
+    fileReaderMocks.readFileAsDataUrl.mockResolvedValueOnce('data:image/png;base64,new');
+    const publish = vi.fn();
+    const opened = editorFileActions.openEditorImageFromFile(
+      controller,
+      new File(['bytes'], 'new.png', { type: 'image/png' }),
+      publish
+    );
+    if (outcome === 'missing-export') await expect(opened).rejects.toThrow('export is unavailable');
+    else if (outcome === 'old-barrier-failed' || outcome === 'load-failed')
+      await expect(opened).rejects.toThrow('failed');
+    else await opened;
+    if (outcome === 'saved') {
+      expect(finish).toHaveBeenCalledWith(true);
+      expect(autosaveService.persistSnapshot).toHaveBeenCalledOnce();
+      expect(publish).toHaveBeenCalledWith('data:image/png;base64,new');
+    } else {
+      expect(publish).not.toHaveBeenCalled();
+      expect(autosaveService.persistSnapshot).not.toHaveBeenCalled();
+      if (outcome === 'load-failed') expect(finish).toHaveBeenCalledWith(false);
+    }
+  }
+);
+
 it('ignores older image-open file reads after a newer image selection starts', async () => {
   const firstRead = createDeferred<string>();
   const secondRead = createDeferred<string>();
