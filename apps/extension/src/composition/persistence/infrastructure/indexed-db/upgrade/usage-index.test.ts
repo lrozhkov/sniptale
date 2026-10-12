@@ -39,6 +39,46 @@ it('propagates failed estimation to the admission owner', async () => {
   );
   expect(close).not.toHaveBeenCalled();
 });
+
+it('skips invalid aliases and charges each native cursor row', async () => {
+  mocks.openDB.mockResolvedValue({
+    transaction: (store: string) => {
+      const values: unknown[] =
+        store === 'project_assets'
+          ? [null, [], { originMediaId: 42 }, { originMediaId: 'origin' }]
+          : [{ borrowedMediaId: false }, { galleryAssetId: 'gallery' }];
+      const cursor = (index: number): unknown =>
+        index < values.length
+          ? { primaryKey: 'row', value: values[index], continue: async () => cursor(index + 1) }
+          : null;
+      return { store: { openCursor: async () => cursor(0) } };
+    },
+  });
+  expect(await migration.estimateAdditionalBytes(await openDB('test'))).toBe(
+    64 * 1024 + (1024 + 4 * 9) + (1024 + 4 * 10)
+  );
+});
+
+it('refuses alias rows with invalid native keys', async () => {
+  mocks.openDB.mockResolvedValue({
+    transaction: () => ({
+      store: {
+        openCursor: async () => ({
+          primaryKey: 42,
+          value: { originMediaId: 'origin' },
+          continue: async () => null,
+        }),
+      },
+    }),
+  });
+  await expect(migration.estimateAdditionalBytes(await openDB('test'))).rejects.toThrow(
+    'Invalid project usage index key'
+  );
+});
+
+it('requires the admission-owned source connection', async () => {
+  await expect(migration.estimateAdditionalBytes()).rejects.toThrow('Source database unavailable');
+});
 it('creates only native indexes, with multiEntry enabled only for derived document keys', () => {
   const created: unknown[] = [];
   const put = vi.fn();

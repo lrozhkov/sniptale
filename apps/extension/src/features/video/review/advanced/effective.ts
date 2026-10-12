@@ -161,6 +161,9 @@ export type QuickEditExportReason =
   | 'click-animations'
   | 'voiceover'
   | 'music'
+  | 'action-audio'
+  | 'action-audio-limit'
+  | 'action-audio-resource'
   | 'original-audio'
   | 'audio-encoder'
   | 'video-encoder'
@@ -186,6 +189,8 @@ export function resolveQuickEditExportPlan(args: {
   audioProcessingAvailable?: boolean;
   /** Actual composed audio presence; undefined defers bookend track discovery to the writer. */
   presentationAudioPresent?: boolean;
+  /** Actual retained main-time cues, resolved from immutable normalized telemetry. */
+  actionAudioPresent?: boolean;
   videoRenderAvailable?: boolean;
   videoCopyBoundaries?: readonly number[];
 }): QuickEditExportPlan {
@@ -214,6 +219,7 @@ export function resolveQuickEditExportPlan(args: {
   }
   if (features.voiceoverApplied && effective.voiceover.length > 0) audio.push('voiceover');
   if (features.musicApplied && effective.music.length > 0) audio.push('music');
+  if (features.actionsApplied && args.actionAudioPresent) audio.push('action-audio');
   if (
     args.advanced.audio.original.muted ||
     args.advanced.audio.original.volume !== 1 ||
@@ -279,6 +285,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     hasPresentationEffects(state) ||
     !!state.keyAnimations?.some((item) => item.enabled) ||
     !!state.clickAnimations?.some((item) => item.effect !== 'off') ||
+    !!state.actionAudio?.some((item) => item.enabled && item.presetId && item.volume > 0) ||
     !!state.canvas ||
     !!state.windowHeader ||
     !!state.webcam?.enabled ||

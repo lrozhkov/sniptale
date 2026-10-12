@@ -1,3 +1,4 @@
+import { annotation, workspace, snapshotDatabase } from './backup-restore.test-support';
 import { workspaceStorageHead, workspaceStorageRows } from './storage-format';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
@@ -20,89 +21,7 @@ import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
 } from '../../../features/video/review/document';
-import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 
-const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
-const workspace: VideoWorkspace = {
-  aggregateId: 'recording:one',
-  formatVersion: 1,
-  sourceAssetId: 'original-local',
-  source: { duration: 2, width: 640, height: 360, size: 6, mimeType: 'video/webm' },
-  revision: 4,
-  cursor: 0,
-  history: [{ id: 'op', at: 2, target: 'annotation', before: null, after: annotation }],
-  advanced: createQuickEditAdvancedState(),
-  createdAt: 1,
-  updatedAt: 3,
-};
-
-it('restores mixed text provenance and source mutes while remapping only immutable assets', async () => {
-  const advanced = createQuickEditAdvancedState();
-  advanced.text = {
-    version: 1,
-    fragments: [
-      {
-        id: 'rewritten',
-        text: 'New script',
-        originalText: 'Old phrases',
-        start: 0,
-        end: 1,
-        timeDomain: 'result',
-        revision: 0,
-        timingRevision: 0,
-        alignment: 'manual',
-        showInVideo: false,
-        derivedFrom: ['first', 'second'],
-        origins: [
-          { kind: 'original', start: 0, end: 1, words: [{ text: 'Old', start: 0, end: 1 }] },
-          { kind: 'voiceover', clipId: 'take', start: 0, end: 1 },
-        ],
-      },
-    ],
-  };
-  advanced.audio.voiceoverSegments = buildReviewTimeMap(workspace.source.duration, []);
-  advanced.audio.voiceover = [
-    {
-      id: 'take',
-      assetId: 'project-asset:voice',
-      timelineStart: 0,
-      duration: 1,
-      sourceOffset: 0,
-      volume: 1,
-      muted: false,
-      fadeIn: 0,
-      fadeOut: 0,
-    },
-  ];
-  advanced.audio.original.mutes = [
-    { id: 'binding', kind: 'take', clipId: 'take' },
-    { id: 'detached', kind: 'range', start: 0.5, end: 1.5, volume: 0.25 },
-  ];
-  const stored = { ...workspace, advanced, history: [], cursor: 0 };
-  const exported = await readVideoReviewForBackup({
-    db: snapshotDatabase(stored, undefined),
-    aggregateId: stored.aggregateId,
-    sourceAssetId: stored.sourceAssetId,
-  });
-  const portable = encodePortableReviewAssetRefs(exported!);
-  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
-  const restored = prepareVideoReviewRestore({
-    review: parsed,
-    sourceAggregateId: stored.aggregateId,
-    targetAggregateId: 'recording:copy',
-    sourceAssetId: 'new-source',
-    assetIdMap: new Map([['voice', 'new-voice']]),
-  });
-  expect(restored.workspace.advanced.audio.original.mutes).toEqual(advanced.audio.original.mutes);
-  expect(restored.workspace.advanced.text).toEqual(advanced.text);
-  expect(restored.workspace.advanced.audio.voiceover[0]).toMatchObject({
-    id: 'take',
-    assetId: 'project-asset:new-voice',
-  });
-  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
-    new Set(['project-asset:new-voice'])
-  );
-});
 const draft = {
   aggregateId: workspace.aggregateId,
   revision: 3,
@@ -234,18 +153,6 @@ it.each(['legacy', 'physical'] as const)(
     expect(review?.workspace.history).toEqual([]);
   }
 );
-
-function snapshotDatabase(raw: unknown, rawDraft: unknown, rows: unknown[] = []) {
-  return {
-    transaction: () => ({
-      objectStore: (store: string) => ({
-        index: () => ({ getAll: async () => rows }),
-        get: async () => (store === 'video_workspaces' ? raw : rawDraft),
-      }),
-      done: Promise.resolve(),
-    }),
-  };
-}
 
 it('roundtrips disabled webcam settings, redo history and recovery through portable asset remapping', async () => {
   const webcam = {

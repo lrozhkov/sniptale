@@ -9,6 +9,59 @@ import { stripReviewAssetReference } from './strip-asset';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 import { parseVideoWorkspace } from './parser';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
+import { createSolidPaint } from '@sniptale/foundation/paint';
+
+it('purges baseline resources and preserves authored content', () => {
+  const workspace = makeWorkspace();
+  const operation = workspace.history[0]!;
+  if (operation.target !== 'advancedContent') throw new Error('Invalid fixture');
+  workspace.advanced = { ...workspace.advanced, ...operation.after };
+  workspace.formatVersion = 2;
+  workspace.baseline = replayReviewHistory(
+    [],
+    0,
+    workspace.source,
+    reviewAdvancedContentBaseline(workspace.advanced)
+  );
+  workspace.baseline.edits = [
+    { id: 'cut', kind: 'cut', start: 2, end: 3, requestedStart: 2, requestedEnd: 3 },
+  ];
+  workspace.baseline.annotations = [
+    { id: 'note', text: 'Keep note', anchor: { kind: 'point', time: 6 } },
+  ];
+  workspace.baseline.canvasComments = [
+    {
+      id: 'comment',
+      text: 'Keep overlay',
+      visible: true,
+      renderToVideo: true,
+      attachment: 'content',
+      position: { x: 0.5, y: 0.5 },
+      style: { fillPaint: createSolidPaint('#123456ff'), textColor: '#ffffffff', radius: 8 },
+    },
+  ];
+  const before = structuredClone(workspace.baseline.advancedContent);
+  const after = structuredClone(before);
+  after.audio.music[0]!.volume = 0.5;
+  workspace.history = [{ id: 'retained-gain', at: 1, target: 'advancedContent', before, after }];
+  expect(parseVideoWorkspace(workspace)).not.toBeNull();
+  const untouched = structuredClone(workspace);
+  const stripped = stripReviewAssetReference(workspace, removed, 2);
+  expect(parseVideoWorkspace(stripped)).not.toBeNull();
+  expect(collectReviewAssetReferences(stripped)).toEqual(new Set([retained]));
+  expect(stripped.baseline).toMatchObject({
+    edits: untouched.baseline!.edits,
+    annotations: untouched.baseline!.annotations,
+    canvasComments: untouched.baseline!.canvasComments,
+  });
+  expect(stripped.baseline!.advancedContent.audio.voiceover).toEqual([]);
+  expect(stripped.history).toHaveLength(1);
+  expect(workspace).toEqual(untouched);
+});
 
 it.each([
   [true, 0],

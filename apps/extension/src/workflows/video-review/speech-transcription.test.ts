@@ -5,6 +5,8 @@ import { parseAudioJobServerMessage } from '../../contracts/ai/audio';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
 import { describe, expect, it, vi } from 'vitest';
 import { reviewSpeechPhrases, transcribeReviewSpeech } from './speech-transcription';
+import { createRecognitionFixture } from './recognition.test-support';
+import type { ReviewSpeechPublicationChange } from './speech-publication-state';
 
 describe('native speech transcription', () => {
   it('keeps provider segment timing and all text when some words have zero duration', () => {
@@ -196,9 +198,43 @@ function speechSession(duration = 2) {
     getSnapshot: () => state,
     flush: async () => undefined,
     saveSpeechTranscript,
+    createSpeechPublicationReceipt: () => ({ id: crypto.randomUUID(), at: Date.now() }),
+    publishSpeechTranscripts: async (changes: readonly ReviewSpeechPublicationChange[]) => {
+      for (const change of changes)
+        await saveSpeechTranscript(change.target.kind, change.expectedAssetId, change.transcript);
+    },
   } as unknown as ReviewSpeechSession;
   return { session, clip, saveSpeechTranscript };
 }
+it.each([2, 75])('publishes %i transcript chunks as one logical Undo transition', async (count) => {
+  const { session, deps } = createRecognitionFixture(count);
+  workflow.plan.mockResolvedValueOnce(
+    Array.from({ length: count }, (_, index) => ({ start: index, end: index + 1 }))
+  );
+  workflow.job.mockReset();
+  workflow.job.mockResolvedValue({ type: 'transcript', result: { text: 'Synthetic phrase.' } });
+  await transcribeReviewSpeech(
+    session,
+    { kind: 'original' },
+    'model',
+    new AbortController().signal,
+    {
+      original: { file: new Blob(['synthetic source']), sourceAssetId: 'source' },
+    }
+  );
+  expect(
+    session.getSnapshot().document.advancedContent.audio.originalSpeech?.transcript?.phrases
+  ).toHaveLength(count);
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await session.history('undo');
+  expect(session.getSnapshot().document.advancedContent.audio.originalSpeech).toBeUndefined();
+  await session.history('redo');
+  expect(
+    session.getSnapshot().document.advancedContent.audio.originalSpeech?.transcript?.phrases
+  ).toHaveLength(count);
+});
+
 it('retains successful chunks and retries only unfinished paid work after provider failure', async () => {
   const { session, clip } = speechSession();
   workflow.job.mockReset();
@@ -217,7 +253,7 @@ it('retains successful chunks and retries only unfinished paid work after provid
       new AbortController().signal
     )
   ).rejects.toThrow('provider-failed');
-  expect(clip.transcript?.phrases.map((p) => p.text)).toEqual(['First']);
+  expect(clip.transcript).toBeUndefined();
   await transcribeReviewSpeech(
     session,
     { kind: 'voiceover', clipId: 'clip' },
@@ -351,6 +387,11 @@ it('recognizes selected original native ranges including cuts even when original
     getSnapshot: () => state,
     flush: async () => undefined,
     saveSpeechTranscript: save,
+    createSpeechPublicationReceipt: () => ({ id: crypto.randomUUID(), at: Date.now() }),
+    publishSpeechTranscripts: async (changes: readonly ReviewSpeechPublicationChange[]) => {
+      for (const change of changes)
+        await save(change.target, change.expectedAssetId, change.transcript);
+    },
   } as unknown as ReviewSpeechSession;
   const file = new Blob(['original']);
   workflow.plan.mockImplementationOnce(async (_source, ranges) => [...ranges]);
@@ -390,3 +431,42 @@ it('recognizes selected original native ranges including cuts even when original
     })
   ).rejects.toThrow('stale');
 });
+
+it.each([false, true])(
+  'retries only the final publication after storage failure, committed=%s',
+  async (committed) => {
+    const { session, deps } = createRecognitionFixture(2);
+    workflow.job.mockReset();
+    workflow.job.mockResolvedValue({ type: 'transcript', result: { text: 'Cached.' } });
+    const commit = deps.commitVideoWorkspace.getMockImplementation()!;
+    deps.commitVideoWorkspace.mockImplementationOnce(async (request) => {
+      if (committed) await commit(request);
+      throw new Error('Save acknowledgement failed');
+    });
+    const options = { original: { file: new Blob(['synthetic']), sourceAssetId: 'source' } };
+    await expect(
+      transcribeReviewSpeech(
+        session,
+        { kind: 'original' },
+        'model',
+        new AbortController().signal,
+        options
+      )
+    ).rejects.toThrow('Save acknowledgement failed');
+    expect(workflow.job).toHaveBeenCalledTimes(2);
+    expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+    await transcribeReviewSpeech(
+      session,
+      { kind: 'original' },
+      'model',
+      new AbortController().signal,
+      options
+    );
+    expect(workflow.job).toHaveBeenCalledTimes(2);
+    expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+    const accepted = session.getSnapshot().snapshot.workspace.history[0]!;
+    for (const [request] of deps.commitVideoWorkspace.mock.calls)
+      expect(request.operation).toMatchObject({ id: accepted.id });
+    expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(committed ? 1 : 2);
+  }
+);

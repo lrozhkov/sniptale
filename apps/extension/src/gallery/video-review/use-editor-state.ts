@@ -9,6 +9,7 @@ import { useMemo, useRef, useState } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+import type { ReviewActionAudioUnavailable } from '../../features/video/review/action-audio';
 import { useReviewBackgroundImport } from './use-review-background';
 import { useReviewComposer, useReviewSnapshot, type LoadedReview } from './use-session';
 import { useReviewExport } from './use-export';
@@ -174,6 +175,10 @@ function useReviewEditorCore(resource: LoadedReview) {
   return {
     ...base,
     ...timeline,
+    performAction: async (action: () => Promise<boolean>) => {
+      await annotationEffects.flush();
+      return await base.performAction(action);
+    },
     webcam,
     watermark,
     presentation,
@@ -252,6 +257,7 @@ function useReviewEditorBase(resource: LoadedReview) {
     void speechGuard.perform(() => transitions.beforeAction(action));
   };
   const setActiveSelection: typeof selectActive = (next) => {
+    advancedState.endTyping();
     void speechGuard.perform(() => selectActive(next));
   };
   const run = (action: () => Promise<unknown>, success?: string) =>
@@ -325,7 +331,18 @@ function useReviewEditorTimeline(
     busy,
     canStart,
   } = base;
-  const onTransportFailure = () => setMessage(translate('gallery.videoReview.playbackFailed'));
+  const onTransportFailure = (reason?: ReviewActionAudioUnavailable['reason']) => {
+    if (reason) video.current?.pause();
+    setMessage(
+      translate(
+        reason === 'voice-limit'
+          ? 'gallery.videoReview.actionAudioLimit'
+          : reason
+            ? 'gallery.videoReview.actionAudioResource'
+            : 'gallery.videoReview.playbackFailed'
+      )
+    );
+  };
   const {
     video,
     time,
@@ -341,12 +358,15 @@ function useReviewEditorTimeline(
     onMediaError,
     recovering,
     seekRevision,
+    actionSoundPreview,
   } = useReviewTransport({
     resource,
     edits: snapshot.document.edits,
     originalAudio: features.originalAudio,
     voiceover: features.voiceover,
     music: features.music,
+    ...(advanced.actionAudio ? { actionAudio: advanced.actionAudio } : {}),
+    actionsApplied: features.actionsApplied,
     onSeek: (next) => {
       if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
     },
@@ -356,6 +376,13 @@ function useReviewEditorTimeline(
     onTransportRecovered: () =>
       setMessage((message) =>
         message === translate('gallery.videoReview.playbackFailed') ? null : message
+      ),
+    onActionAudioRecovered: () =>
+      setMessage((message) =>
+        message === translate('gallery.videoReview.actionAudioResource') ||
+        message === translate('gallery.videoReview.actionAudioLimit')
+          ? null
+          : message
       ),
     onInvalidRange: () => setMessage(translate('gallery.videoReview.emptyPlaybackRange')),
     silent: voiceoverSilent,
@@ -380,6 +407,7 @@ function useReviewEditorTimeline(
     canStart,
   });
   return {
+    actionSoundPreview,
     video,
     time,
     onTime,
@@ -467,6 +495,7 @@ function reviewAdvancedControls(
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setKeyAnimations: advancedState.setKeyAnimations,
+    setActionAudio: advancedState.setActionAudio,
     setActionsEnabled: advancedState.setActionsEnabled,
     setClickAnimations: advancedState.setClickAnimations,
     setBackground: advancedState.setBackground,

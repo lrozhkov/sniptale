@@ -63,6 +63,9 @@ type SelectedPropertiesProps = {
   busy: boolean;
   markers: readonly ReviewTelemetryMarker[];
   onOpenHistory?(): void;
+  onActionAudio?: Parameters<typeof ReviewActionProperties>[0]['onActionAudio'];
+  onActionAudioAudition?: Parameters<typeof ReviewActionProperties>[0]['onAudition'];
+  onStopActionAudioAudition?: (() => void) | undefined;
   onKeyAnimation?(
     ids: readonly string[],
     patch: import('../../features/video/review/advanced/key-animation').ReviewKeyPatch | null
@@ -125,6 +128,10 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
         ) : selection.kind === 'telemetry' ? (
           <ReviewActionProperties
             marker={marker}
+            actionAudio={advanced.actionAudio}
+            onActionAudio={props.onActionAudio}
+            onAudition={props.onActionAudioAudition}
+            onStopAudition={props.onStopActionAudioAudition}
             keyAnimations={advanced.keyAnimations}
             onKeyAnimation={props.onKeyAnimation}
             animations={advanced.clickAnimations}

@@ -4,6 +4,13 @@ import type {
   ReviewSpeechWord,
 } from './speech-transcript';
 
+/** A field edit has one identity independent of idle and max-wait publication ticks. */
+export interface ReviewTextTypingTarget {
+  kind: 'text';
+  fragmentId: string;
+  field: 'text';
+}
+
 /** Provenance is descriptive, not an asset lease or authority to extract audio. */
 export interface ReviewTextOrigin {
   kind: 'original' | 'voiceover';

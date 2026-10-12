@@ -26,7 +26,7 @@ it('adds only an empty indexed unit store before publishing the current scenario
   });
   expect(createIndex).toHaveBeenCalledExactlyOnceWith('projectId', 'projectId');
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 6 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 7 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });

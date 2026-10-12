@@ -121,3 +121,35 @@ it('retains all released rows, history, recovery and immutable bytes across PCM 
   expect(target.indexes).toEqual(source.indexes);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 19 });
 });
+
+it('retains every released row and immutable object across bundled action-sound admission', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 22
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 23
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 20 });
+});
+
+it('admits bounded editor history without rewriting legacy roots, rows or immutable objects', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 23
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 24
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 21,
+    scenarioProjects: 7,
+  });
+});

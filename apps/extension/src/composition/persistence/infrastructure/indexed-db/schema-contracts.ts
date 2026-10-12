@@ -1,3 +1,4 @@
+import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationSource } from './upgrade/types';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
@@ -77,7 +78,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 19,
+    schemaVersion: 21,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -109,7 +110,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 6,
+    schemaVersion: 7,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
@@ -662,6 +663,65 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 19, to: 20 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 22,
+    toDatabaseVersion: 23,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Action audio workspace stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 20, to: 21 },
+      { domainId: 'scenarioProjects', from: 6, to: 7 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 23,
+    toDatabaseVersion: 24,
+    risk: 'additive',
+    stores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
+    ],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+          SCENARIO_PROJECTS_STORE,
+          SCENARIO_PROJECT_HISTORY_STORE,
+          SCENARIO_PROJECT_UNITS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Bounded editor history stores are unavailable.');
+      return undefined;
+    },
+  },
 ];
 
 export function buildDatabaseMigrationPlan(
@@ -711,32 +771,4 @@ export function parseStoredSchemaContracts(value: unknown): readonly StoredSchem
 
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Estimate the one-time native alias indexes before upgrade; derived document keys backfill later. */
-async function estimateUsageIndexBytes(source?: DatabaseMigrationSource): Promise<number> {
-  if (!source) throw new Error('Source database unavailable for usage index estimation.');
-  let bytes = 64 * 1024;
-  for (const name of [PROJECT_ASSETS_STORE, SCENARIO_ASSETS_STORE]) {
-    let cursor = await source.transaction(name, 'readonly').store.openCursor();
-    while (cursor) {
-      bytes += aliasIndexRowBytes(name, cursor.value, cursor.primaryKey);
-      cursor = await cursor.continue();
-    }
-  }
-  return bytes;
-}
-
-function aliasIndexRowBytes(store: string, value: unknown, primaryKey: IDBValidKey): number {
-  if (!isUnknownRecord(value)) return 0;
-  const fields =
-    store === PROJECT_ASSETS_STORE ? ['originMediaId'] : ['borrowedMediaId', 'galleryAssetId'];
-  let bytes = 0;
-  for (const field of fields) {
-    const alias = value[field];
-    if (typeof alias !== 'string') continue;
-    if (typeof primaryKey !== 'string') throw new Error('Invalid project usage index key.');
-    bytes += 1024 + 4 * (alias.length + primaryKey.length);
-  }
-  return bytes;
 }

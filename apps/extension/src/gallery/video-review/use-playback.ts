@@ -135,7 +135,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         video.current.currentTime = start;
         reviseSeek((revision) => revision + 1);
         synchronize(start, true);
-        void video.current.play().catch(props.onFailure);
+        void video.current.play().catch(() => props.onFailure());
       } else setPlaying(false);
     },
     onTime: (value: number) => synchronize(value, playing),
@@ -156,7 +156,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         if (node.currentTime >= props.duration) node.currentTime = 0;
         synchronize(node.currentTime, true);
         if (node.currentTime >= props.duration) return;
-        void node.play().catch(props.onFailure);
+        void node.play().catch(() => props.onFailure());
       } else node.pause();
     },
   };

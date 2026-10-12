@@ -239,6 +239,18 @@ export function stripReviewAssetReference(
   );
   const candidate = {
     ...workspace,
+    ...(workspace.baseline
+      ? {
+          baseline: {
+            ...workspace.baseline,
+            advancedContent: stripContent(
+              workspace.baseline.advancedContent,
+              assetId,
+              removedSnapshots
+            ),
+          },
+        }
+      : {}),
     ...(workspace.effectSnapshots
       ? {
           effectSnapshots: workspace.effectSnapshots.filter(

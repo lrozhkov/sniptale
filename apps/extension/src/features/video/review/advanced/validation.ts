@@ -1,3 +1,4 @@
+import { parseReviewActionAudio } from './action-audio';
 import { parseQuickEditShadow } from './shadow-validation';
 import { parseReviewAnnotationEffects } from '../annotation-effects/validation';
 import { parseReviewOriginalSpeech } from '../original-speech';
@@ -482,6 +483,9 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
 }
 
 function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdvancedContent | null {
+  const actionAudio = parseReviewActionAudio(raw['actionAudio']);
+  if (actionAudio === null || (actionAudio && !supportsAdvancedSchema(raw['schemaVersion'], 17)))
+    return null;
   const text =
     isRecord(raw) && raw['text'] !== undefined ? parseReviewTextDocument(raw['text']) : undefined;
   const captions =
@@ -535,6 +539,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
     ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
+    ...(actionAudio ? { actionAudio } : {}),
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
     ...(webcam ? { webcam } : {}),
@@ -599,7 +604,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].some(
       (known) => known >= firstHistorical && version === known
     )
   );

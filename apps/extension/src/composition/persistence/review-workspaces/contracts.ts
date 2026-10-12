@@ -2,13 +2,26 @@ import type {
   ReviewAnnotation,
   ReviewOperation,
   ReviewSource,
+  ReviewDocument,
 } from '../../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../../features/video/review/advanced/types';
+import type { ReviewTextTypingTarget } from '../../../features/video/review/text-types';
+
+/** One bounded active field group; writeId acknowledges only its latest immutable capture. */
+export interface VideoWorkspaceTyping {
+  actionId: string;
+  target: ReviewTextTypingTarget;
+  operationId: string | null;
+  writeId: string;
+}
 
 /** Durable review history for one library media identity; the document is derived by replay. */
 export interface VideoWorkspace {
   aggregateId: string;
-  formatVersion: 1;
+  formatVersion: 1 | 2;
+  /** Format 2 retains the complete document immediately before the first remaining operation. */
+  baseline?: ReviewDocument;
+  typing?: VideoWorkspaceTyping;
   source: ReviewSource;
   sourceAssetId: string;
   /** Immutable visual sources; history contains only snapshot identities and authored instances. */

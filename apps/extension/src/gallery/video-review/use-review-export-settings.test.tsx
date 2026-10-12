@@ -33,6 +33,7 @@ it('reprobes output dimensions and rejects stale or failed capability results', 
   }
   try {
     await act(async () => root.render(<Harness />));
+    expect(hook.renderSettings).toEqual({ frameRate: 0 });
     expect(hook.index?.outputCodecs?.mp4).toEqual([]);
     expect(probe).toHaveBeenCalledWith('mp4', {
       width: 1920,

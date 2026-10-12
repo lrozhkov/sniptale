@@ -43,8 +43,8 @@ const clip = (): QuickEditAudioClip => ({
 const plan = (voice: QuickEditAudioClip[]) =>
   buildQuickEditAudioPlan({ voiceover: voice, music: [] });
 const schedule = (voice: QuickEditAudioClip[]) =>
-  plan(voice).map(({ assetId, sourceOffset, timelineStart, duration, playbackRate }) => ({
-    assetId,
+  plan(voice).map(({ source, sourceOffset, timelineStart, duration, playbackRate }) => ({
+    assetId: source.kind === 'project' ? source.assetId : null,
     sourceOffset,
     timelineStart,
     duration,

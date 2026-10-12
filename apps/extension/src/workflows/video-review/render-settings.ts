@@ -57,11 +57,42 @@ function outputRate(fps: number): PresentationRate {
 export function resolveReviewOutputProfile(
   index: ReviewMediaIndex,
   advanced: QuickEditAdvancedState,
+  settings?: ReviewRenderSettings,
+  video?: 'render'
+): ReturnType<typeof resolveRenderProfile>;
+export function resolveReviewOutputProfile(
+  index: ReviewMediaIndex,
+  advanced: QuickEditAdvancedState,
+  settings: ReviewRenderSettings | undefined,
+  video: 'copy' | 'render'
+): Omit<ReturnType<typeof resolveRenderProfile>, 'codec'> & {
+  codec: ReviewMediaIndex['videoCodec'] | null;
+};
+export function resolveReviewOutputProfile(
+  index: ReviewMediaIndex,
+  advanced: QuickEditAdvancedState,
+  settings?: ReviewRenderSettings,
+  video: 'copy' | 'render' = 'render'
+) {
+  const profile = resolveRenderProfile(index, advanced, settings);
+  return video === 'copy'
+    ? {
+        ...profile,
+        codec: index.videoCodec,
+        width: index.width ?? profile.width,
+        height: index.height ?? profile.height,
+      }
+    : profile;
+}
+
+function resolveRenderProfile(
+  index: ReviewMediaIndex,
+  advanced: QuickEditAdvancedState,
   settings?: ReviewRenderSettings
 ) {
   if (
     settings &&
-    (!Object.values(VideoQuality).includes(settings.quality) ||
+    ((settings.quality !== undefined && !Object.values(VideoQuality).includes(settings.quality)) ||
       ![0, 24, 30, 60].includes(settings.frameRate) ||
       (settings.frameRateMode !== undefined &&
         settings.frameRateMode !== 'constant' &&

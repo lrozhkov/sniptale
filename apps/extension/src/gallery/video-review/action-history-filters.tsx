@@ -6,6 +6,14 @@ import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { isReviewClick } from '../../features/video/review/click-animation';
 import { isReviewKey } from '../../features/video/review/key-animation';
+import { reviewActionAudioTarget } from '../../features/video/review/action-audio';
+import { reviewActionAudioRefKey } from '../../features/video/review/advanced/action-audio';
+
+/** Disposable checkbox identity stays distinct for recorded action and normalized signal IDs. */
+export function historySelectableKey(marker: ReviewTelemetryMarker): string | null {
+  const target = reviewActionAudioTarget(marker);
+  return target ? reviewActionAudioRefKey(target.ref) : null;
+}
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import type { ReviewKeyAnimation } from '../../features/video/review/advanced/key-animation';
 import { reviewEventLabel, reviewSelectFieldClassName } from './controls';
@@ -46,10 +54,19 @@ function historyFilterState(markers: readonly ReviewTelemetryMarker[], value: Hi
     all ||
     value.type === 'clicks' ||
     scoped.some((marker) => isReviewClick(marker) || isReviewKey(marker));
-  const status = animation ? value.status : 'all';
+  const selectable = all || scoped.some((marker) => historySelectableKey(marker) !== null);
+  const status =
+    value.status === 'selected'
+      ? selectable
+        ? value.status
+        : 'all'
+      : animation
+        ? value.status
+        : 'all';
   const capabilities = {
     target,
     animation,
+    selectable,
     duration:
       status === 'all' &&
       !pointScope &&
@@ -135,9 +152,7 @@ export function queryHistory(
 ) {
   filters = historyFilterState(markers, filters).value;
   const eligible = new Set(
-    markers
-      .filter((marker) => (isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker))
-      .map((marker) => marker.ref.id)
+    markers.map(historySelectableKey).filter((key): key is string => key !== null)
   );
   const ids = selected.filter((id) => eligible.has(id));
   const selectedIds = new Set(ids);
@@ -148,7 +163,9 @@ export function queryHistory(
       : isReviewKey(marker) && !!keyAnimations.get(marker.ref.id)?.enabled;
     const statusMatches =
       filters.status === 'all' ||
-      (filters.status === 'animated' ? animated : selectedIds.has(marker.ref.id));
+      (filters.status === 'animated'
+        ? animated
+        : selectedIds.has(historySelectableKey(marker) ?? ''));
     return (
       statusMatches &&
       matchesRecordedMetadata(marker, { ...filters, element: '', longer: 0 }, needle)
@@ -158,9 +175,7 @@ export function queryHistory(
     matchesRecordedMetadata(marker, filters, needle)
   );
   const matching = new Set(
-    filtered
-      .filter((marker) => (isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker))
-      .map((marker) => marker.ref.id)
+    filtered.map(historySelectableKey).filter((key): key is string => key !== null)
   );
   const checked = ids.filter((id) => matching.has(id)).length;
   return { ids, filtered, matching, checked, elementMarkers };
@@ -330,14 +345,16 @@ function HistoryFilterFields({
           }}
         />
       ) : null}
-      {capabilities.animation ? (
+      {capabilities.animation || capabilities.selectable ? (
         <SelectField
           className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.historyStatus')}
           value={status}
           options={[
             { value: 'all', label: translate('gallery.videoReview.historyAll') },
-            { value: 'animated', label: translate('gallery.videoReview.historyAnimatedOnly') },
+            ...(capabilities.animation
+              ? [{ value: 'animated', label: translate('gallery.videoReview.historyAnimatedOnly') }]
+              : []),
             { value: 'selected', label: translate('gallery.videoReview.historySelectedOnly') },
           ]}
           onChange={(value) => {

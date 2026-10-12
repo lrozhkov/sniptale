@@ -11,7 +11,20 @@ import {
   type WorkspaceStorageRead,
 } from './storage';
 import { usageReferenceKey, USAGE_INDEX_MARKER } from '../media-library/usage-index-keys';
-import { collectReviewAssetReferences, pruneReviewAnnotationEffectSnapshots } from './asset-refs';
+import {
+  compactVideoWorkspaceHistory,
+  retainedWorkspaceReplacementStart,
+} from './history-retention';
+import {
+  parseVideoWorkspaceTypingChange,
+  prepareVideoWorkspaceTyping,
+  withoutVideoWorkspaceTyping,
+} from './typing';
+import {
+  collectReviewAssetReferences,
+  collectExplicitlyRemovedReviewEffectAssets,
+  pruneReviewAnnotationEffectSnapshots,
+} from './asset-refs';
 import {
   parseReviewAnnotationEffectSnapshots,
   mergeReviewAnnotationEffectSnapshots,
@@ -318,13 +331,17 @@ async function putWorkspace(
   prepared: ReviewReadySources = { assets: new Map(), libraryAudioClaims: [] }
 ): Promise<VideoWorkspace> {
   const admitted = parseVideoWorkspace({
-    ...(mode === 'cursor' ? workspace : pruneReviewAnnotationEffectSnapshots(workspace)),
+    ...(mode === 'cursor'
+      ? withoutVideoWorkspaceTyping(workspace)
+      : pruneReviewAnnotationEffectSnapshots(
+          mode === 'append' ? withoutVideoWorkspaceTyping(workspace) : workspace
+        )),
     revision: workspace.revision + 1,
     updatedAt: Math.max(Date.now(), workspace.updatedAt),
   });
   if (!admitted) throw new VideoWorkspaceError('invalid');
   // Re-encode only after full before-state and redo admission; each accepted step keeps its identity.
-  const next = {
+  const encoded = {
     ...admitted,
     history: admitted.history.map((operation) =>
       operation.target === 'advancedContent'
@@ -332,6 +349,8 @@ async function putWorkspace(
         : operation
     ),
   };
+  const compacted = compactVideoWorkspaceHistory(encoded);
+  const next = compacted.workspace;
   if (
     !(await areNewReviewSourcesAvailable(
       next,
@@ -358,16 +377,18 @@ async function putWorkspace(
     workspace: next,
     storage,
     mode,
+    retentionStart:
+      mode === 'replace' ? retainedWorkspaceReplacementStart(previous, next) : compacted.start,
     usageReferenceKeys: indexedWorkspace(next).usageReferenceKeys,
   });
-  if (mode !== 'cursor') {
+  // A full-baseline buffer may already have expired history before reaching this writer.
+  // Automatic expiry cannot revoke bytes still used by a paused or stale editor.
+  if (mode !== 'cursor' && !(mode === 'replace' && admitted.formatVersion === 2)) {
     const retained = collectReviewAssetReferences(next);
     const removed = new Set(
-      (previous.effectSnapshots ?? []).flatMap((snapshot) =>
-        snapshot.assets
-          .filter((asset) => !retained.has(asset.assetId))
-          .map((asset) => asset.assetId.slice('project-asset:'.length))
-      )
+      [...collectExplicitlyRemovedReviewEffectAssets(previous, admitted)]
+        .filter((assetId) => !retained.has(assetId))
+        .map((assetId) => assetId.slice('project-asset:'.length))
     );
     await releaseUnpublishedProjectAssets(tx, removed, physicalDelete);
   }
@@ -453,6 +474,47 @@ export async function commitVideoWorkspace(args: {
     },
     isRecord(args.operation) && args.operation['target'] === 'advancedContent',
     effectSnapshots
+  );
+}
+
+/** Explicit field publication retains its earliest before state under the existing fresh CAS. */
+export async function saveVideoWorkspaceTyping(args: {
+  aggregateId: string;
+  expectedRevision: number;
+  expectedSourceAssetId: string;
+  change: unknown;
+}): Promise<VideoWorkspaceSnapshot> {
+  const change = parseVideoWorkspaceTypingChange(args.change);
+  if (!change) throw new VideoWorkspaceError('invalid');
+  return mutate(
+    args.aggregateId,
+    async (tx, prepared, physicalDelete) => {
+      const { snapshot, document, storage } = await requireSnapshot(
+        tx,
+        args.aggregateId,
+        args.expectedRevision,
+        args.expectedSourceAssetId
+      );
+      let candidate: VideoWorkspace;
+      try {
+        candidate = prepareVideoWorkspaceTyping(snapshot.workspace, document, change);
+      } catch {
+        throw new VideoWorkspaceError('conflict');
+      }
+      return {
+        ...snapshot,
+        workspace: await putWorkspace(
+          tx,
+          snapshot.workspace,
+          candidate,
+          storage,
+          'replace',
+          physicalDelete,
+          prepared
+        ),
+      };
+    },
+    true
   );
 }
 

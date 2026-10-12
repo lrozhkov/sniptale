@@ -3,7 +3,15 @@ import type {
   AudioTranscriptTiming,
   ReviewSpeechTarget,
 } from '../../contracts/ai/audio';
-import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
+import type {
+  ReviewSpeechPhrase,
+  ReviewSpeechTranscript,
+} from '../../features/video/review/speech-transcript';
+import {
+  reviewSpeechPublicationBasis,
+  type ReviewSpeechPublicationChange,
+  type ReviewSpeechPublicationReceipt,
+} from './speech-publication-state';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 import { projectReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import {
@@ -17,7 +25,6 @@ import {
   getReviewSpeechTarget,
   reviewSpeechGeometry,
   reviewSpeechScope,
-  saveReviewSpeechTranscript,
   type ReviewSpeechSession,
 } from './speech-publication';
 
@@ -191,12 +198,19 @@ export function reviewSpeechPhrases(
   return [phrase(result.text.trim(), start, end, 'range')];
 }
 
-const incomplete = new WeakMap<
-  ReviewSpeechSession,
-  { identity: string; completed: Set<string>; chunks: { start: number; end: number }[] }
->();
+interface ReviewTranscriptionProgress {
+  identity: string;
+  transcriptBasis: string;
+  completed: Map<string, ReviewSpeechPhrase[]>;
+  chunks: { start: number; end: number }[];
+  publication?: {
+    changes: ReviewSpeechPublicationChange[];
+    receipt: ReviewSpeechPublicationReceipt;
+  };
+}
+const incomplete = new WeakMap<ReviewSpeechSession, ReviewTranscriptionProgress>();
 
-/** Each accepted chunk is durable; interruption retains completed chunks without another POST. */
+/** Completed chunks remain in this page's job; only the final publication adds an Undo action. */
 export async function transcribeReviewSpeech(
   session: ReviewSpeechSession,
   target: ReviewSpeechTarget,
@@ -207,7 +221,6 @@ export async function transcribeReviewSpeech(
     selection?: { start: number; end: number };
   } = {}
 ): Promise<void> {
-  await session.flush();
   const state = session.getSnapshot();
   const clip = getReviewSpeechTarget(session, target);
   if (
@@ -244,18 +257,35 @@ export async function transcribeReviewSpeech(
         }));
   const geometry = reviewSpeechGeometry(session, target);
   const identity = JSON.stringify([target, modelId, geometry, selection]);
-  const progress =
+  const previous = incomplete.get(session);
+  if (previous?.identity === identity && previous.publication) {
+    signal.throwIfAborted();
+    await session.publishSpeechTranscripts(
+      previous.publication.changes,
+      previous.publication.receipt
+    );
+    incomplete.delete(session);
+    return;
+  }
+  await session.flush();
+  const progress: ReviewTranscriptionProgress =
     incomplete.get(session)?.identity === identity
       ? incomplete.get(session)!
       : {
           identity,
-          completed: new Set<string>(),
+          transcriptBasis: JSON.stringify(clip.transcript ?? null),
+          completed: new Map<string, ReviewSpeechPhrase[]>(),
           chunks: await planReviewSpeechChunks(source, ranges, signal).catch(() => {
             signal.throwIfAborted();
             throw new Error('decode-failed');
           }),
         };
   incomplete.set(session, progress);
+  if (
+    JSON.stringify(getReviewSpeechTarget(session, target).transcript ?? null) !==
+    progress.transcriptBasis
+  )
+    throw new Error('stale');
   const chunks = progress.chunks;
   for (const chunk of chunks) {
     signal.throwIfAborted();
@@ -285,19 +315,39 @@ export async function transcribeReviewSpeech(
       JSON.stringify(current.transcript) !== signature
     )
       throw new Error('stale');
-    const phrases = reviewSpeechPhrases(result.result, chunk.start, chunk.end);
-    const transcript = current.transcript ?? { version: 1 as const, phrases: [], replacements: [] };
-    await saveReviewSpeechTranscript(session, target, {
+    progress.completed.set(chunkKey, reviewSpeechPhrases(result.result, chunk.start, chunk.end));
+  }
+  signal.throwIfAborted();
+  let transcript: ReviewSpeechTranscript = getReviewSpeechTarget(session, target).transcript ?? {
+    version: 1,
+    phrases: [],
+    replacements: [],
+  };
+  for (const chunk of chunks)
+    transcript = {
       ...transcript,
       transcriptionModelId: modelId,
       phrases: [
         ...transcript.phrases.filter(
           (phrase) => phrase.end <= chunk.start || phrase.start >= chunk.end
         ),
-        ...phrases,
+        ...progress.completed.get(JSON.stringify(chunk))!,
       ].sort((a, b) => a.start - b.start),
-    });
-    progress.completed.add(chunkKey);
-  }
+    };
+  const current = session.getSnapshot();
+  progress.publication = {
+    changes: [
+      {
+        target,
+        transcript,
+        ...reviewSpeechPublicationBasis(current.snapshot, current.document, target),
+      },
+    ],
+    receipt: session.createSpeechPublicationReceipt(),
+  };
+  await session.publishSpeechTranscripts(
+    progress.publication.changes,
+    progress.publication.receipt
+  );
   incomplete.delete(session);
 }

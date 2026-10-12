@@ -5,6 +5,74 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import type { ReviewMediaIndex } from './media-index';
 import { configuredReviewExportPlan } from './export-configuration';
 
+it.each(['mp4', 'webm'] as const)(
+  'keeps the UI source profile lossless for %s action audio without a video encoder',
+  (container) => {
+    const args = fixture();
+    args.index.container = container;
+    args.index.videoCodec = container === 'mp4' ? 'hevc' : 'vp8';
+    args.index.audioCodec = null;
+    args.index.outputCodecs = { mp4: [], webm: [] };
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        renderSettings: { frameRate: 0 },
+        actionAudioPresent: true,
+      })
+    ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'process' });
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        renderSettings: { frameRate: 0, quality: 'HIGH' },
+        actionAudioPresent: true,
+      })
+    ).toEqual({ kind: 'unavailable', reasons: ['video-encoder'] });
+  }
+);
+
+it.each([24, 30, 60] as const)(
+  'renders an explicit %sfps request even when the measured source rate matches',
+  (frameRate) => {
+    const args = fixture();
+    args.index.frameRate = frameRate;
+    expect(configuredReviewExportPlan({ ...args, renderSettings: { frameRate } })).toMatchObject({
+      kind: 'ready',
+      video: 'render',
+    });
+  }
+);
+
+it.each(['mp4', 'webm'] as const)(
+  'requires %s audio encoding for action-only sound without changing video copy',
+  (container) => {
+    const args = fixture();
+    args.index.container = container;
+    args.index.audioCodec = null;
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings: undefined, actionAudioPresent: true })
+    ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'process', reasons: ['action-audio'] });
+    args.index.outputAudioCodecs![container] = null;
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings: undefined, actionAudioPresent: true })
+    ).toEqual({ kind: 'unavailable', reasons: ['audio-encoder'] });
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        renderSettings: undefined,
+        actionAudioPresent: true,
+        presentationAudioPresent: false,
+      })
+    ).toEqual({ kind: 'unavailable', reasons: ['audio-encoder'] });
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings: undefined, actionAudioPresent: false })
+    ).toMatchObject({ kind: 'ready', audio: 'copy' });
+    args.advanced.ui.mode = 'basic';
+    expect(configuredReviewExportPlan({ ...args, actionAudioPresent: true })).toMatchObject({
+      audio: 'copy',
+    });
+  }
+);
+
 function fixture() {
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';

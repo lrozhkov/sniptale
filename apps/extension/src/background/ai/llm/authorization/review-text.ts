@@ -4,7 +4,7 @@ import { consumeLlmSessionToken, resolveLlmSessionSenderKey } from '../session-t
 import { readVideoWorkspace } from '../../../../composition/persistence/review-workspaces/store';
 import {
   replayReviewHistory,
-  reviewAdvancedContentBaseline,
+  reviewDocumentBaseline,
 } from '../../../../features/video/review/document';
 import { buildReviewTimeMap } from '../../../../features/video/review/timeline';
 import { projectReviewTextFragment } from '../../../../features/video/review/text-projection';
@@ -54,7 +54,7 @@ export async function assertReviewTextJobScope(
     workspace.history,
     workspace.cursor,
     workspace.source,
-    reviewAdvancedContentBaseline(workspace.advanced)
+    reviewDocumentBaseline(workspace)
   );
   const fragments = document.advancedContent.text?.fragments ?? [];
   const segments = buildReviewTimeMap(workspace.source.duration, document.edits);

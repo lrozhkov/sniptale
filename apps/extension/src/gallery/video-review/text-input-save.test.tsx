@@ -12,6 +12,12 @@ import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { useReviewText } from './use-review-text';
+import { ReviewTextPhrase } from './speech-phrase';
+import {
+  parseVideoWorkspaceTypingChange,
+  prepareVideoWorkspaceTyping,
+} from '../../composition/persistence/review-workspaces/typing';
+import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -44,10 +50,31 @@ function setup(autosave = true) {
   };
   const commit = vi.fn(
     async (
-      args: Parameters<
-        NonNullable<Parameters<typeof createVideoReviewSession>[1]>['commitVideoWorkspace']
-      >[0]
+      args:
+        | Parameters<
+            NonNullable<Parameters<typeof createVideoReviewSession>[1]>['commitVideoWorkspace']
+          >[0]
+        | Parameters<
+            NonNullable<
+              NonNullable<
+                Parameters<typeof createVideoReviewSession>[1]
+              >['saveVideoWorkspaceTyping']
+            >
+          >[0]
     ) => {
+      if ('change' in args) {
+        const change = parseVideoWorkspaceTypingChange(args.change);
+        if (!change) throw new Error('Invalid typing capture');
+        const document = replayReviewHistory(
+          stored.workspace.history,
+          stored.workspace.cursor,
+          stored.workspace.source,
+          reviewDocumentBaseline(stored.workspace)
+        );
+        const candidate = prepareVideoWorkspaceTyping(stored.workspace, document, change);
+        stored = { ...stored, workspace: { ...candidate, revision: candidate.revision + 1 } };
+        return structuredClone(stored);
+      }
       const operation = parseReviewOperation(args.operation, 4);
       if (!operation) throw new Error('invalid operation');
       stored = {
@@ -64,6 +91,7 @@ function setup(autosave = true) {
   );
   const session = createVideoReviewSession(stored, {
     commitVideoWorkspace: commit,
+    saveVideoWorkspaceTyping: commit,
     readVideoWorkspace: vi.fn(async () => structuredClone(stored)),
     saveVideoWorkspaceSnapshot: vi.fn(),
     saveVideoWorkspaceDraft: vi.fn(),
@@ -76,6 +104,7 @@ function setup(autosave = true) {
     editor = useReviewText({
       document: writer.advanced.text,
       setText: writer.setText,
+      endTyping: writer.endTyping,
       sourceDuration: 4,
       edits: session.getSnapshot().document.edits,
       sourceTime: 0,
@@ -84,15 +113,44 @@ function setup(autosave = true) {
       pause: () => undefined,
     });
     return (
-      <textarea
-        value={editor.document.fragments[0]?.text ?? ''}
-        onChange={(event) => editor.change('phrase', { text: event.target.value })}
+      <ReviewTextPhrase
+        fragment={editor.document.fragments[0]!}
+        editor={editor}
+        expanded
+        busy={false}
+        limit={4}
+        onJump={() => undefined}
       />
     );
   }
   act(() => root.render(<Harness />));
   return { session, commit };
 }
+
+it.each(['blur', 'Enter'])('closes the real phrase field group on %s', async (boundary) => {
+  const { session } = setup();
+  const field = host.querySelector('textarea')!;
+  act(() => field.focus());
+  type('First capture');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  act(() => field.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true })));
+  type('Latest first capture');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  act(() => {
+    if (boundary === 'blur') field.blur();
+    else field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  type('Second capture');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  const history = session.getSnapshot().snapshot.workspace.history;
+  expect(history).toHaveLength(2);
+  expect(history[0]?.id).not.toBe(history[1]?.id);
+  expect(history[1]).toMatchObject({
+    before: { text: { fragments: [{ text: 'Latest first capture' }] } },
+    after: { text: { fragments: [{ text: 'Second capture' }] } },
+  });
+});
 
 function type(value: string) {
   const input = host.querySelector('textarea')!;
@@ -137,6 +195,88 @@ it('coalesces normal typing gaps into one idle save without blocking visible inp
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
 });
 
+it('keeps one field-edit action across two acknowledged idle saves', async () => {
+  const { session } = setup();
+  type('First');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  type('Final');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(session.getSnapshot().snapshot.workspace.history[0]).toMatchObject({
+    target: 'advancedContent',
+    before: { text: { fragments: [{ text: '' }] } },
+    after: { text: { fragments: [{ text: 'Final' }] } },
+  });
+});
+
+it('acknowledges a committed write after a lost response without appending again', async () => {
+  const { session, commit } = setup();
+  const persist = commit.getMockImplementation()!;
+  commit.mockImplementationOnce(async (args) => {
+    await persist(args);
+    throw new Error('Lost acknowledgement');
+  });
+  type('Accepted');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(writer.saveFailed).toBe(true);
+  await act(async () => writer.retry());
+  expect(commit).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(writer.saveFailed).toBe(false);
+  type('Next capture');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe(
+    'Next capture'
+  );
+});
+
+it('preserves a newer field capture while recovering the older accepted write', async () => {
+  const { session, commit } = setup();
+  const persist = commit.getMockImplementation()!;
+  commit.mockImplementationOnce(async (args) => {
+    await persist(args);
+    throw new Error('Lost acknowledgement');
+  });
+  type('Accepted');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  type('Newer');
+  expect(editor.document.fragments[0]?.text).toBe('Newer');
+  await act(async () => writer.retry());
+  expect(commit).toHaveBeenCalledTimes(2);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe('Newer');
+});
+
+it('keeps two sealed edits separate when neither has reached its first capture', async () => {
+  const { session } = setup();
+  type('First field session');
+  act(() => writer.endTyping());
+  type('Second field session');
+  await act(async () => writer.flush());
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+  expect(session.getSnapshot().snapshot.workspace.history[1]).toMatchObject({
+    target: 'advancedContent',
+    before: { text: { fragments: [{ text: 'First field session' }] } },
+    after: { text: { fragments: [{ text: 'Second field session' }] } },
+  });
+});
+
+it('max-wait publication preserves the open field group through continuous input', async () => {
+  const { session, commit } = setup();
+  for (let index = 0; index < 12; index++) {
+    type(`Continuous ${index}`);
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+  }
+  expect(commit).toHaveBeenCalled();
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(commit.mock.calls.length).toBeGreaterThan(1);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe(
+    'Continuous 11'
+  );
+});
+
 it.each([true, false])(
   'explicit flush preserves the newest text and autosave=%s',
   async (autosave) => {
@@ -175,6 +315,20 @@ it('keeps the existing delay for non-typing text appearance edits', async () => 
   await act(async () => vi.advanceTimersByTimeAsync(250));
   expect(commit).toHaveBeenCalledOnce();
 });
+
+it.each([true, false])(
+  'retains one local field group across idle acknowledgements with autosave=%s',
+  async (autosave) => {
+    const { session } = setup(autosave);
+    type('One');
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    type('Two');
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+    expect(session.getSnapshot().dirty).toBe(!autosave);
+    expect(session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe('Two');
+  }
+);
 
 it('does not drain new typing early when an older automatic write acknowledges', async () => {
   const { session, commit } = setup();

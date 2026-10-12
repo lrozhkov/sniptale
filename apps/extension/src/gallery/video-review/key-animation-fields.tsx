@@ -27,6 +27,7 @@ export function ReviewKeyFields(props: Parameters<typeof reviewKeySections>[0]) 
 
 export function reviewKeySections(props: {
   information?: ReactNode;
+  extraSections?: Parameters<typeof ReviewInspectorSections>[0]['sections'];
   values: readonly ReviewKeyStyle[];
   onChange(patch: ReviewKeyPatch | null): void;
 }) {
@@ -151,6 +152,7 @@ export function reviewKeySections(props: {
       </>
     )
   );
+  if (props.extraSections) sections.push(...props.extraSections);
   return sections;
 }
 /** Display enablement stays distinct from the preserved keyboard appearance and timing. */

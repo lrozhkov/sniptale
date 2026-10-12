@@ -25,6 +25,7 @@ export interface ReviewTextRewritePreview extends ReviewTextRewriteBasis {
   workspaceId: string;
   proposal?: ReviewTextProposal;
   receipt?: Extract<ReviewOperation, { target: 'advancedContent' }>;
+  receiptBaseRevision?: number;
   receiptMode?: 'replace' | 'variant';
   generatedIds?: string[];
 }
@@ -156,16 +157,14 @@ export async function reviewTextRewriteWasApplied(
   signal.throwIfAborted();
   if (session.getSnapshot().snapshot.workspace.aggregateId !== preview.workspaceId)
     throw new Error('stale');
-  if (!preview.receipt) return false;
-  const accepted = await session.readRetainedReviewOperation(preview.receipt.id);
+  if (!preview.receipt || preview.receiptBaseRevision === undefined) return false;
+  const accepted = await session.recoverDurableOperation(
+    preview.receipt,
+    preview.receiptBaseRevision,
+    { kind: 'text' }
+  );
   signal.throwIfAborted();
-  if (!accepted) return false;
-  if (
-    accepted.target !== 'advancedContent' ||
-    JSON.stringify(accepted.after.text) !== JSON.stringify(preview.receipt.after.text)
-  )
-    throw new Error('stale');
-  return true;
+  return accepted;
 }
 
 export async function applyReviewTextRewritePreview(
@@ -209,5 +208,7 @@ export async function applyReviewTextRewritePreview(
     after: { ...before, text: next.document },
   };
   signal.throwIfAborted();
-  await session.commitDurable(preview.receipt);
+  await session.commitDurable(preview.receipt, (revision) => {
+    preview.receiptBaseRevision = revision;
+  });
 }

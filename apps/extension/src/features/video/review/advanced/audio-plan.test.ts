@@ -6,8 +6,54 @@ import {
   buildQuickEditClipEnvelope,
   planQuickEditClipPlayback,
   type QuickEditAudioPlanEntry,
+  quickEditAudioSourceKey,
+  iterateQuickEditActionAudioPlan,
 } from './audio-plan';
+import { buildReviewActionAudioPlan } from '../action-audio';
 import type { QuickEditAudioClip } from './types';
+
+it('separates project identities from bundled samples even when text IDs match', () => {
+  expect(quickEditAudioSourceKey({ kind: 'project', assetId: 'key-01-v1' })).not.toBe(
+    quickEditAudioSourceKey({ kind: 'bundled', sampleId: 'key-01-v1' })
+  );
+});
+
+it('keeps main-time cue identity and waveform phase across fragment windows', () => {
+  const plan = buildReviewActionAudioPlan({
+    markers: [{ ref: { kind: 'signal', id: 'typing' }, eventType: 'typing', start: 0, end: 10 }],
+    settings: [
+      {
+        ref: { kind: 'signal', id: 'typing' },
+        enabled: true,
+        presetId: 'typing-natural-v1',
+        volume: 0.35,
+        offset: 0,
+      },
+    ],
+    segments: buildReviewTimeMap(10, []),
+    applied: true,
+  });
+  const action = { plan, busGain: 0.5, offset: 2, bounds: { start: 2, end: 4 } };
+  const whole = [...iterateQuickEditActionAudioPlan(action, { start: 0, end: 2 })].flat();
+  const windows = [1, 0].flatMap((start) =>
+    [...iterateQuickEditActionAudioPlan(action, { start, end: start + 1 })].flat()
+  );
+  const keyed = new Map(windows.map((entry) => [entry.clipId, entry]));
+  expect([...keyed.values()].sort((a, b) => a.timelineStart - b.timelineStart)).toEqual(whole);
+  expect(whole.length).toBeGreaterThan(5);
+  expect(
+    whole.every(
+      (entry) =>
+        entry.lane === 'action' && entry.source.kind === 'bundled' && entry.playbackRate === 1
+    )
+  ).toBe(true);
+  expect(
+    whole.every((entry) => entry.timelineStart >= 0 && entry.timelineStart + entry.duration <= 2)
+  ).toBe(true);
+  const first = whole[0]!;
+  expect(first.sourceOffset).toBeGreaterThan(0);
+  expect(first.fadeIn).toBeGreaterThan(0);
+});
 
 const clip = (patch: Partial<QuickEditAudioClip>): QuickEditAudioClip => ({
   id: 'a',
@@ -25,7 +71,7 @@ const clip = (patch: Partial<QuickEditAudioClip>): QuickEditAudioClip => ({
 const entry = (patch: Partial<QuickEditAudioPlanEntry>): QuickEditAudioPlanEntry => ({
   lane: 'music',
   clipId: 'a',
-  assetId: 'project-asset:a',
+  source: { kind: 'project' as const, assetId: 'project-asset:a' },
   timelineStart: 2,
   duration: 4,
   sourceOffset: 0,
@@ -46,7 +92,7 @@ describe('buildQuickEditAudioPlan', () => {
       {
         lane: 'voiceover',
         clipId: 'v',
-        assetId: 'project-asset:a',
+        source: { kind: 'project' as const, assetId: 'project-asset:a' },
         timelineStart: 2,
         duration: 4,
         sourceOffset: 0,
@@ -57,7 +103,7 @@ describe('buildQuickEditAudioPlan', () => {
       {
         lane: 'music',
         clipId: 'm',
-        assetId: 'project-asset:a',
+        source: { kind: 'project' as const, assetId: 'project-asset:a' },
         timelineStart: 2,
         duration: 4,
         sourceOffset: 0,
@@ -256,7 +302,7 @@ it('schedules ordinary projected voiceover with its native offset and rate', () 
     {
       lane: 'voiceover',
       clipId: 'accepted:part',
-      assetId: 'project-asset:accepted',
+      source: { kind: 'project' as const, assetId: 'project-asset:accepted' },
       timelineStart: 3,
       duration: 1,
       sourceOffset: 2,
@@ -298,7 +344,7 @@ it('does not interpret retained clip transcript replacements as another playback
   expect(plan[0]).toMatchObject({
     lane: 'voiceover',
     clipId: source.id,
-    assetId: source.assetId,
+    source: { kind: 'project', assetId: source.assetId },
     duration: source.duration,
   });
   expect(source).toEqual(before);

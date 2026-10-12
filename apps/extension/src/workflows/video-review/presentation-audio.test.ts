@@ -1,3 +1,4 @@
+import { quickEditAudioSourceKey } from '../../features/video/review/advanced/audio-plan';
 import { readFile } from 'node:fs/promises';
 import { ALL_FORMATS, AudioSample, BlobSource, Input, type InputAudioTrack } from 'mediabunny';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
@@ -299,13 +300,15 @@ it('keeps cuts/speeds and clip automation on main-local clocks independent of in
     },
   ]);
   args.main.isOriginalMuted = (segment) => segment.kind === 'speed';
-  const buffers = new Map([['voice', clipBuffer()]]);
+  const buffers = new Map([
+    [quickEditAudioSourceKey({ kind: 'project', assetId: 'voice' }), clipBuffer()],
+  ]);
   args.main.exportAudio = {
     entries: [
       {
         lane: 'voiceover',
         clipId: 'voice',
-        assetId: 'voice',
+        source: { kind: 'project' as const, assetId: 'voice' },
         timelineStart: 0,
         duration: 1.25,
         sourceOffset: 0,
@@ -344,12 +347,12 @@ it('does not mute external clips when original audio is muted and forwards booke
   args.main.exportAudio = {
     originalMuted: true,
     originalVolume: 1,
-    buffers: new Map([['music', buffer]]),
+    buffers: new Map([[quickEditAudioSourceKey({ kind: 'project', assetId: 'music' }), buffer]]),
     entries: [
       {
         lane: 'music',
         clipId: 'clip',
-        assetId: 'music',
+        source: { kind: 'project' as const, assetId: 'music' },
         timelineStart: 0,
         duration: 0.1,
         sourceOffset: 0,
@@ -504,7 +507,7 @@ it('keeps ordinary voiceover and authored source gain in main audio before the s
       {
         lane: 'voiceover',
         clipId: 'accepted',
-        assetId: 'accepted',
+        source: { kind: 'project' as const, assetId: 'accepted' },
         timelineStart: 0,
         duration: 0.1,
         sourceOffset: 0,
@@ -513,7 +516,9 @@ it('keeps ordinary voiceover and authored source gain in main audio before the s
         fadeOut: 0,
       },
     ],
-    buffers: new Map([['accepted', clipBuffer()]]),
+    buffers: new Map([
+      [quickEditAudioSourceKey({ kind: 'project', assetId: 'accepted' }), clipBuffer()],
+    ]),
     originalVolume: 1,
     originalMuted: false,
     originalRanges: [{ id: 'manual', start: 0, end: 0.2, volume: 0.25 }],

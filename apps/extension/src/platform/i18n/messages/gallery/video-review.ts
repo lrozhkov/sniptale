@@ -1,4 +1,6 @@
+import { galleryVideoReviewHistoryMessages } from './video-review-history';
 import { galleryVideoReviewAnimationMessages } from './video-review-animation';
+import { galleryVideoReviewActionAudioMessages } from './video-review-action-audio';
 import { galleryVideoReviewPresentationMessages } from './video-review-presentation';
 import { galleryVideoReviewPreviewMessages } from './video-review-preview';
 import { galleryVideoReviewSceneMessages } from './video-review-scene';
@@ -11,7 +13,9 @@ import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewHistoryMessages,
   ...galleryVideoReviewAnimationMessages,
+  ...galleryVideoReviewActionAudioMessages,
   ...galleryVideoReviewPresentationMessages,
   ...galleryVideoReviewPreviewMessages,
   ...galleryVideoReviewSceneMessages,
@@ -22,30 +26,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   ...galleryVideoReviewSpatialMessages,
   ...galleryVideoReviewKeyMessages,
   clickMilliseconds: { ru: 'мс', en: 'ms' },
-  historyFilters: { ru: 'Фильтры', en: 'Filters' },
-  historyFiltersActive: { ru: 'Фильтры применены', en: 'Filters applied' },
-  historyType: { ru: 'Тип действия', en: 'Action type' },
-  historyElement: { ru: 'Элемент', en: 'Element' },
-  historyLonger: { ru: 'Дольше', en: 'Longer than' },
-  historyStatus: { ru: 'Показывать', en: 'Show' },
-  historySelectedOnly: { ru: 'Только выбранные действия', en: 'Selected actions only' },
-  historyHiddenSelected: { ru: 'скрыто фильтром', en: 'hidden by filter' },
-  historyConfigure: { ru: 'Настроить действия', en: 'Configure actions' },
-  historyBack: { ru: 'К списку', en: 'Back to list' },
-  historySearchClear: { ru: 'Очистить поиск', en: 'Clear search' },
-  historyOpen: { ru: 'Открыть историю действий', en: 'Open action history' },
-  historyEffectsEnabled: { ru: 'Применять анимации действий', en: 'Apply action animations' },
   webcamApply: { ru: 'Показывать камеру в видео', en: 'Show camera in video' },
-  historyAnimatedOnly: { ru: 'Только с анимацией', en: 'Only animated actions' },
-  historySearch: { ru: 'Поиск действий', en: 'Search actions' },
-  historyAll: { ru: 'Все действия', en: 'All actions' },
-  historyClicks: { ru: 'Щелчки', en: 'Clicks' },
-  historyMore: { ru: 'Показать ещё', en: 'Show more' },
-  historyEmpty: { ru: 'Нет подходящих действий', en: 'No matching actions' },
-  historySelect: { ru: 'Выбрать щелчок', en: 'Select click' },
-  historySelectAll: { ru: 'Выбрать найденные щелчки', en: 'Select matching clicks' },
-  historyClear: { ru: 'Снять выделение', en: 'Clear selection' },
-  historySelected: { ru: 'Выбрано', en: 'Selected' },
   clickAnimation: { ru: 'Анимация щелчка', en: 'Click animation' },
   clickEffect: { ru: 'Эффект', en: 'Effect' },
   click_off: { ru: 'Выключено', en: 'Off' },
@@ -592,16 +573,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
   regionTop: { ru: 'Сверху, %', en: 'Top, %' },
   regionWidth: { ru: 'Ширина, %', en: 'Width, %' },
   regionHeight: { ru: 'Высота, %', en: 'Height, %' },
-  historyReset: { ru: 'Сброс истории', en: 'Reset history' },
-  historyStart: { ru: 'К началу истории', en: 'Return to history start' },
-  historyStartDescription: {
-    ru: 'Вернуть начальное состояние этой истории. Ранее сохранённые настройки останутся; изменения можно повторить.',
-    en: 'Return to this history’s initial state. Previously saved settings remain; changes can be redone.',
-  },
-  historyOriginalDescription: {
-    ru: 'Очистить все правки и настройки видео. История будет удалена.',
-    en: 'Clear all video edits and settings. Edit history will be removed.',
-  },
   resetOriginalLocalWarning: {
     ru: 'Автосохранение выключено: сброс действует только в этой сессии, пока вы не включите автосохранение.',
     en: 'Autosave is off: this reset affects only this session until you enable autosave.',

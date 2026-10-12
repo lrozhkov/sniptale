@@ -1,10 +1,25 @@
 import { decodeReviewAudioClipBuffer } from '../../workflows/video-review/audio-clip-source';
+import {
+  createReviewActionAudioSource,
+  admitReviewActionAudioPlan,
+  type ReviewActionAudioSource,
+} from '../../workflows/video-review/action-audio-source';
+import { runtimeInfo } from '@sniptale/platform/browser/runtime';
+import {
+  ReviewActionAudioUnavailable,
+  type ReviewActionAudioPlan,
+} from '../../features/video/review/action-audio';
+import type { ActionSoundSampleId } from '../../features/video/review/action-audio-catalog';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import { renderTempoBuffer } from '../../features/video/audio/tempo-buffer';
-import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import {
   buildQuickEditAudioPlan,
+  quickEditAudioSourceKey,
+  hasQuickEditActionAudio,
+  iterateQuickEditActionAudioPlan,
+  type QuickEditActionAudioSchedule,
   planQuickEditClipPlayback,
   type QuickEditAudioPlanEntry,
   type QuickEditClipSchedule,
@@ -160,9 +175,12 @@ interface ReviewAudioRuntimeProps {
   original: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
+  actionPlan?: ReviewActionAudioPlan;
   resolveAsset(assetId: string): Promise<Blob | null>;
   sessionKey: string;
-  onFailure(): void;
+  onFailure(reason?: ReviewActionAudioUnavailable['reason']): void;
+  onActionAudioRecovered?(): void;
+  createActionSource?: (signal: AbortSignal) => ReviewActionAudioSource<AudioBuffer>;
   createEngine?: (element: HTMLMediaElement | null) => ReviewAudioEngine | null;
 }
 
@@ -218,10 +236,12 @@ export function useReviewEditorAudioRuntime(args: {
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
+  actionPlan?: ReviewActionAudioPlan;
   sessionKey: string;
-  onFailure(): void;
+  onFailure(reason?: ReviewActionAudioUnavailable['reason']): void;
+  onActionAudioRecovered?: (() => void) | undefined;
 }) {
-  useReviewAudioRuntime({
+  return useReviewAudioRuntime({
     video: args.video,
     playing: args.playing,
     silent: args.silent ?? false,
@@ -230,9 +250,11 @@ export function useReviewEditorAudioRuntime(args: {
     original: args.originalAudio,
     voiceover: args.voiceover,
     music: args.music,
+    ...(args.actionPlan ? { actionPlan: args.actionPlan } : {}),
     resolveAsset: resolveReviewAssetBytes,
     sessionKey: args.sessionKey,
     onFailure: args.onFailure,
+    ...(args.onActionAudioRecovered ? { onActionAudioRecovered: args.onActionAudioRecovered } : {}),
   });
 }
 /** One session authority for decoded assets, processed variants, clock and cancellable playback jobs. */
@@ -243,6 +265,13 @@ class ReviewAudioPlaybackSession {
   private generation = 0;
   private preparation: AbortController | null = null;
   private anchor: { outputTime: number; audioNow: number } | null = null;
+  private rollingTimer: ReturnType<typeof setTimeout> | null = null;
+  private actionSource: ReviewActionAudioSource<AudioBuffer> | null = null;
+  private admission: {
+    plan: ReviewActionAudioPlan;
+    result: Awaited<ReturnType<typeof admitReviewActionAudioPlan>>;
+  } | null = null;
+  private auditionActive = false;
   constructor(
     private latest: { current: ReviewAudioRuntimeProps },
     private engines: { get(): ReviewAudioEngine | null; peek(): ReviewAudioEngine | null }
@@ -250,9 +279,61 @@ class ReviewAudioPlaybackSession {
 
   stop() {
     this.generation += 1;
+    this.auditionActive = false;
     this.preparation?.abort();
+    this.clearActionResources();
     this.anchor = null;
     this.engines.peek()?.stopAll();
+  }
+  pausePlayback() {
+    if (!this.auditionActive) this.stop();
+  }
+  cancelAudition() {
+    if (this.auditionActive) this.stop();
+  }
+  audition(plan: ReviewActionAudioPlan, at?: number, duration = 2) {
+    this.stop();
+    const current = this.latest.current;
+    current.video.current?.pause();
+    const engine = this.engines.get();
+    if (!engine) {
+      current.onFailure();
+      return;
+    }
+    const action = { plan, offset: 0, busGain: 1 };
+    const first = iterateQuickEditActionAudioPlan(action, { start: 0, end: plan.duration }).next();
+    const outputTime = at ?? (first.done ? undefined : first.value[0]?.timelineStart) ?? 0;
+    const until = Math.min(plan.duration, outputTime + Math.min(2, duration));
+    if (!hasQuickEditActionAudio(action, { start: outputTime, end: until })) return;
+    this.auditionActive = true;
+    const controller = new AbortController();
+    this.preparation = controller;
+    this.anchor = { outputTime, audioNow: engine.now() };
+    engine.setOriginalGain(0);
+    const job: PlaybackJob = {
+      current: { ...current, actionPlan: plan, outputTime },
+      generation: this.generation,
+      signal: controller.signal,
+      engine,
+      audition: true,
+      until,
+    };
+    void engine
+      .resume()
+      .then(() => this.startActions(job))
+      .catch((error: unknown) => this.fail(job, error));
+  }
+  dispose() {
+    this.stop();
+    this.buffers.clear();
+    this.prepared.clear();
+    this.admission = null;
+  }
+  private clearActionResources() {
+    if (this.rollingTimer !== null) clearTimeout(this.rollingTimer);
+    this.rollingTimer = null;
+    this.actionSource?.dispose();
+    this.actionSource = null;
   }
   needsSeek(outputTime: number) {
     if (!this.latest.current.playing || !this.anchor) return false;
@@ -264,28 +345,32 @@ class ReviewAudioPlaybackSession {
     );
   }
   private async resolveBuffer(entry: QuickEditAudioPlanEntry) {
-    const cached = this.buffers.get(entry.assetId);
+    const key = quickEditAudioSourceKey(entry.source);
+    const cached = this.buffers.get(key);
     if (cached) return cached;
     const pending = (async () => {
       try {
-        const asset = await this.latest.current.resolveAsset(entry.assetId);
+        if (entry.source.kind !== 'project')
+          throw new Error('Bundled source requires action audio admission.');
+        const asset = await this.latest.current.resolveAsset(entry.source.assetId);
         if (!asset) return null;
         return (await this.engines.get()?.decode(await asset.arrayBuffer())) ?? null;
       } catch {
         return null;
       }
     })();
-    this.buffers.set(entry.assetId, pending);
+    this.buffers.set(key, pending);
     void pending.then((buffer) => {
-      if (!buffer && this.buffers.get(entry.assetId) === pending)
-        this.buffers.delete(entry.assetId);
+      if (!buffer && this.buffers.get(key) === pending) this.buffers.delete(key);
     });
     return pending;
   }
   schedule(planKey: string) {
+    this.auditionActive = false;
     const current = this.latest.current;
     const generation = ++this.generation;
     this.preparation?.abort();
+    this.clearActionResources();
     const controller = new AbortController();
     this.preparation = controller;
     const engine = this.engines.get();
@@ -311,24 +396,16 @@ class ReviewAudioPlaybackSession {
     );
     void this.run({ current, generation, signal: controller.signal, engine });
   }
-  private active(job: {
-    current: ReviewAudioRuntimeProps;
-    generation: number;
-    signal: AbortSignal;
-  }) {
+  private active(job: PlaybackJob) {
     return (
       !job.signal.aborted &&
       job.generation === this.generation &&
-      this.latest.current.playing &&
+      !!job.audition === this.auditionActive &&
+      (job.audition || this.latest.current.playing) &&
       this.latest.current.sessionKey === job.current.sessionKey
     );
   }
-  private async run(job: {
-    current: ReviewAudioRuntimeProps;
-    generation: number;
-    signal: AbortSignal;
-    engine: ReviewAudioEngine;
-  }) {
+  private async run(job: PlaybackJob) {
     try {
       await job.engine.resume();
       if (!this.active(job)) return;
@@ -341,7 +418,12 @@ class ReviewAudioPlaybackSession {
         if (!this.active(job)) return;
         if (!buffer) continue;
         const rate = entry.playbackRate ?? 1;
-        const key = JSON.stringify([entry.assetId, entry.sourceOffset, entry.duration, rate]);
+        const key = JSON.stringify([
+          quickEditAudioSourceKey(entry.source),
+          entry.sourceOffset,
+          entry.duration,
+          rate,
+        ]);
         let prepared = rate === 1 ? buffer : this.prepared.get(key);
         if (!prepared) {
           prepared = await job.engine.prepareClip(buffer, entry, job.signal);
@@ -368,17 +450,104 @@ class ReviewAudioPlaybackSession {
             prepared
           );
       }
-    } catch {
-      if (this.active(job)) {
-        job.engine.stopAll();
-        this.latest.current.onFailure();
-      }
+      await this.startActions(job);
+    } catch (error) {
+      this.fail(job, error);
     }
+  }
+  private fail(job: PlaybackJob, error: unknown) {
+    if (!this.active(job)) return;
+    this.stop();
+    job.current.onFailure(error instanceof ReviewActionAudioUnavailable ? error.reason : undefined);
+  }
+  private async startActions(job: PlaybackJob) {
+    const plan = job.current.actionPlan;
+    if (!plan?.descriptors.length || !this.active(job)) return;
+    let admission = this.admission?.plan === plan ? this.admission.result : null;
+    if (!admission) {
+      admission = await admitReviewActionAudioPlan(plan, job.signal);
+      if (!this.active(job)) return;
+      this.admission = { plan, result: admission };
+    }
+    const source =
+      job.current.createActionSource?.(job.signal) ??
+      createReviewActionAudioSource({
+        signal: job.signal,
+        getURL: runtimeInfo.getURL,
+        fetch: (url, init) => fetch(url, init),
+        decode: decodeReviewAudioClipBuffer,
+      });
+    this.actionSource = source;
+    const buffers = new Map<ActionSoundSampleId, ReviewAudioClipBuffer>();
+    for (const sampleId of admission.sampleIds) {
+      const native = await source.read(sampleId);
+      if (!this.active(job)) return;
+      buffers.set(sampleId, new BrowserReviewAudioBuffer(native));
+    }
+    if (!this.active(job)) return;
+    job.current.onActionAudioRecovered?.();
+    const action: QuickEditActionAudioSchedule = {
+      plan,
+      offset: 0,
+      busGain: admission.busGain,
+      ...(job.until !== undefined
+        ? { bounds: { start: job.current.outputTime, end: job.until } }
+        : {}),
+    };
+    const visited = new Map<string, number>();
+    const pump = async () => {
+      if (!this.active(job) || !this.anchor) return;
+      const outputTime = this.anchor.outputTime + job.engine.now() - this.anchor.audioNow;
+      const end = job.until ?? plan.duration;
+      if (outputTime >= end) {
+        if (job.audition) this.stop();
+        return;
+      }
+      for (const [id, end] of visited) if (end <= outputTime) visited.delete(id);
+      for (const batch of iterateQuickEditActionAudioPlan(action, {
+        start: outputTime,
+        end: Math.min(end, outputTime + 2),
+      })) {
+        for (const entry of batch) {
+          if (!this.active(job) || !this.anchor) return;
+          if (visited.has(entry.clipId)) continue;
+          if (entry.source.kind !== 'bundled') throw new Error('Invalid action audio source.');
+          const buffer = buffers.get(entry.source.sampleId);
+          if (!buffer) throw new ReviewActionAudioUnavailable('resource-missing');
+          const now = job.engine.now();
+          const schedule = planQuickEditClipPlayback({
+            entry,
+            audioNow: now,
+            outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
+          });
+          visited.set(entry.clipId, entry.timelineStart + entry.duration);
+          if (schedule) job.engine.scheduleClip(schedule, buffer);
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      if (this.active(job) && outputTime < end)
+        this.rollingTimer = setTimeout(() => {
+          void pump().catch((error: unknown) => this.fail(job, error));
+        }, 250);
+    };
+    await pump();
   }
 }
 
+type PlaybackJob = {
+  current: ReviewAudioRuntimeProps;
+  generation: number;
+  signal: AbortSignal;
+  engine: ReviewAudioEngine;
+  audition?: boolean;
+  until?: number;
+};
+
 export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
-  const planKey = JSON.stringify([props.voiceover, props.music]);
+  const planKey = useMemo(
+    () => JSON.stringify([props.voiceover, props.music, props.actionPlan]),
+    [props.voiceover, props.music, props.actionPlan]
+  );
   const session = useRef<ReviewAudioPlaybackSession | null>(null);
   const latest = useRef(props);
   latest.current = props;
@@ -387,14 +556,17 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     const current = new ReviewAudioPlaybackSession(latest, { peek, get });
     session.current = current;
     return () => {
-      current.stop();
+      current.dispose();
       session.current = null;
     };
   }, [get, peek, props.sessionKey]);
   useEffect(() => {
     if (props.playing) session.current?.schedule(planKey);
-    else session.current?.stop();
+    else session.current?.pausePlayback();
   }, [planKey, props.playing, props.sessionKey, props.seekRevision]);
+  useEffect(() => {
+    session.current?.cancelAudition();
+  }, [planKey, props.seekRevision]);
   useEffect(() => {
     if (session.current?.needsSeek(props.outputTime)) session.current.schedule(planKey);
   }, [props.outputTime, planKey]);
@@ -411,4 +583,11 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
           )
     );
   }, [peek, props.original, props.outputTime, props.silent]);
+  const audition = useCallback(
+    (plan: ReviewActionAudioPlan, at?: number, duration?: number) =>
+      session.current?.audition(plan, at, duration),
+    []
+  );
+  const stopAudition = useCallback(() => session.current?.cancelAudition(), []);
+  return { audition, stopAudition };
 }

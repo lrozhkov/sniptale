@@ -306,7 +306,7 @@ it.each([0.5, 1.25, 2, 4, 16])(
       const entry = {
         lane: 'voiceover' as const,
         clipId: 'voice',
-        assetId: 'voice',
+        source: { kind: 'project' as const, assetId: 'voice' },
         timelineStart: 0,
         sourceOffset: 0.2,
         duration: 2 / rate,

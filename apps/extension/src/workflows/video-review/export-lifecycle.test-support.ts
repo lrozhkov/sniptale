@@ -84,6 +84,12 @@ export function createReviewExportFixture() {
       dispose: vi.fn(),
     })),
     readProjectAsset: vi.fn(async (_assetId: string) => new Blob() as unknown as Blob | null),
+    createActionSource: vi.fn((_signal: AbortSignal) => ({
+      read: vi.fn(async (_sampleId: unknown): Promise<AudioBuffer> => {
+        throw new Error('Unexpected bundled audio in project fixture.');
+      }),
+      dispose: vi.fn(),
+    })),
     writeReviewPackets: vi.fn(async () => ({
       videoPackets: 40,
       audioPackets: 0,

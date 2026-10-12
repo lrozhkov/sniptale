@@ -14,6 +14,70 @@ function initial(): GuideHistory {
   return { present: createGuideProject('Original', 'guide', 1), past: [], future: [], group: null };
 }
 
+it('captures final X before Y when X already published a technical maxWait intermediate', () => {
+  const X = '00000000-0000-4000-8000-000000000001';
+  const Y = '00000000-0000-4000-8000-000000000002';
+  let state = initial();
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...state.present!, name: 'A' },
+    group: 'name',
+    actionId: X,
+  });
+  const intermediate = state.present!;
+  state = reduceGuideHistory(state, {
+    kind: 'publish',
+    source: intermediate,
+    project: { ...intermediate, updatedAt: 2 },
+    actionId: X,
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...state.present!, name: 'AB' },
+    group: 'name',
+    actionId: X,
+  });
+  const finalX = state.present!;
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...finalX, tags: ['Y'] },
+    group: 'tags',
+    actionId: Y,
+  });
+  expect(state).toHaveProperty('closedCaptures', [{ project: finalX, actionId: X }]);
+  expect(state).toHaveProperty('actionId', Y);
+  state = reduceGuideHistory(state, {
+    kind: 'undo',
+    actionId: '00000000-0000-4000-8000-000000000003',
+  });
+  expect(state.present?.name).toBe('AB');
+  expect(state.present?.tags).toEqual([]);
+});
+
+it('keeps a newer closed Redo capture when an older acknowledgement shares its project object', () => {
+  const X = '00000000-0000-4000-8000-000000000001';
+  const U = '00000000-0000-4000-8000-000000000002';
+  const R = '00000000-0000-4000-8000-000000000003';
+  let state = initial();
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...state.present!, name: 'A' },
+    group: 'name',
+    actionId: X,
+  });
+  const source = state.present!;
+  state = reduceGuideHistory(state, { kind: 'undo', actionId: U });
+  state = reduceGuideHistory(state, { kind: 'redo', actionId: R });
+  state = reduceGuideHistory(state, { kind: 'seal' });
+  state = reduceGuideHistory(state, {
+    kind: 'publish',
+    source,
+    project: { ...source, updatedAt: 2 },
+    actionId: X,
+  });
+  expect(state.closedCaptures?.some((capture) => capture.actionId === R)).toBe(true);
+});
+
 it('retains unchanged canonical item references when publishing the current autosave source', () => {
   const draft = createGuideProject('Guide', 'guide', 1);
   draft.items = [createGuideStep('First', 'first'), createGuideStep('Second', 'second')];

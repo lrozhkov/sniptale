@@ -1,11 +1,11 @@
 import { isReviewKey } from '../../features/video/review/key-animation';
+import { historySelectableKey } from './action-history-filters';
 import type { ReviewKeyAnimation } from '../../features/video/review/advanced/key-animation';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Check, Minus, Clock3, Sparkles, X } from 'lucide-react';
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import { isReviewClick } from '../../features/video/review/click-animation';
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import {
   ReviewButton,
@@ -62,7 +62,7 @@ export function ReviewHistoryRow(props: {
       data-selected={props.selected || undefined}
       data-active={props.active || undefined}
     >
-      {(isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker) ? (
+      {historySelectableKey(marker) !== null ? (
         <HistoryCheckbox
           label={`${translate('gallery.videoReview.historySelect')} ${reviewTimeLabel(marker.start)}`}
           checked={props.selected}

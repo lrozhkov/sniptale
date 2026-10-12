@@ -65,6 +65,28 @@ const ref = {
 };
 
 describe('scenario project backup restore adapter', () => {
+  it('closes an imported field group while preserving the restored content and saved versions', async () => {
+    const target = stores();
+    const entry = {
+      ...projectEntry(),
+      lastAcceptedActionId: '00000000-0000-4000-8000-000000000001',
+    };
+    await putScenarioProjectBackupRestore({
+      operation: operation(),
+      root: { assets: [], entry, exportThumbnails: [], exports: [], stepDocuments: [] },
+      stores: target,
+      tx: restoreTransaction(target),
+      strategy: 'duplicate',
+    });
+    expect(target.projects.put).toHaveBeenCalledOnce();
+    expect(vi.mocked(target.projects.put).mock.calls[0]?.[0]).not.toHaveProperty(
+      'lastAcceptedActionId'
+    );
+    expect(vi.mocked(target.projects.put).mock.calls[0]?.[0]).toMatchObject({
+      project: entry.project,
+      workspaceRevision: entry.workspaceRevision,
+    });
+  });
   it('restores a legacy temporary scenario as permanent without changing its content or trash marker', async () => {
     const target = stores();
     const entry = {

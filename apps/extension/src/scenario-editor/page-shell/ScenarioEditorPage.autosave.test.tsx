@@ -202,6 +202,7 @@ it('keeps autosave paused across guide/tour switching and saves latest edits on 
   await settle();
   expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Paused tour title' }), {
     expectedRevision: 1,
+    historyActionId: expect.any(String),
   });
 });
 
@@ -249,6 +250,7 @@ it('opens AI during a pending autosave and sends the latest draft once using the
   expect(io.save).toHaveBeenCalledTimes(2);
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Latest draft' }), {
     expectedRevision: 2,
+    historyActionId: expect.any(String),
   });
   expect(io.request).toHaveBeenCalledOnce();
   expect(io.request).toHaveBeenCalledWith(
@@ -268,6 +270,7 @@ it('flushes a field boundary immediately while keeping continuous input coalesce
   expect(io.save).toHaveBeenCalledOnce();
   expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Completed field' }), {
     expectedRevision: 1,
+    historyActionId: expect.any(String),
   });
 });
 
@@ -299,7 +302,7 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
   expect(io.save).toHaveBeenCalledTimes(2);
   expect(io.save).toHaveBeenLastCalledWith(
     expect.objectContaining({ items: [expect.objectContaining({ title: 'More recent draft' })] }),
-    { expectedRevision: 2 }
+    { expectedRevision: 2, historyActionId: expect.any(String) }
   );
   await clickGuideControl('Undo', host);
   expect(host.querySelector('article .guide-step-title')).toHaveProperty('value', 'Step');

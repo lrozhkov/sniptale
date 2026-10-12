@@ -10,13 +10,20 @@ import {
   type InputAudioTrack,
 } from 'mediabunny';
 import type { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { buildQuickEditClipEnvelope } from '../../features/video/review/advanced/audio-plan';
+import {
+  buildQuickEditClipEnvelope,
+  quickEditAudioSourceKey,
+  iterateQuickEditActionAudioPlan,
+  type QuickEditActionAudioSchedule,
+} from '../../features/video/review/advanced/audio-plan';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
 
 export interface ReviewExportClipPlan {
   /** Fragment-local entries: output time is already shifted into the fragment. */
   entries: readonly QuickEditAudioPlanEntry[];
+  /** Compact globally admitted action cues; never expands a whole typing interval. */
+  action?: QuickEditActionAudioSchedule;
   buffers: ReadonlyMap<string, ReviewAudioClipInput>;
   /** Releases job-owned decoder inputs; supplied AudioBuffer plans have no resources. */
   dispose?(): void;
@@ -199,14 +206,14 @@ async function scheduleClipWindows(
 ) {
   const { frame, count } = args;
   const plan = args.exportAudio;
-  if (!plan || !plan.entries.length) return;
+  if (!plan || (!plan.entries.length && !plan.action)) return;
   const outStart = frame / outputRate;
   const outEnd = (frame + count) / outputRate;
-  for (const entry of plan.entries) {
+  for (const entry of clipWindowEntries(plan, { start: outStart, end: outEnd })) {
     const audibleFrom = Math.max(outStart, entry.timelineStart);
     const audibleTo = Math.min(outEnd, entry.timelineStart + entry.duration);
     if (audibleTo <= audibleFrom) continue;
-    const buffer = plan.buffers.get(entry.assetId);
+    const buffer = plan.buffers.get(quickEditAudioSourceKey(entry.source));
     if (!buffer) {
       continue;
     }
@@ -276,6 +283,12 @@ async function scheduleClipWindows(
       audibleTo - audibleFrom + (rate === 1 ? 0 : 2 * leadSeconds)
     );
   }
+}
+
+function* clipWindowEntries(plan: ReviewExportClipPlan, window: { start: number; end: number }) {
+  yield* plan.entries;
+  if (plan.action)
+    for (const batch of iterateQuickEditActionAudioPlan(plan.action, window)) yield* batch;
 }
 
 /** Use codec sample duration, not muxer timestamps or a fixed assumed Opus frame size. */

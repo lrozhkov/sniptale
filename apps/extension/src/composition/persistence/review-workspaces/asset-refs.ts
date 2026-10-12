@@ -3,6 +3,13 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { QuickEditAdvancedContent } from '../../../features/video/review/advanced/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 
+export {
+  collectReviewAnnotationEffectSnapshotIds,
+  pruneReviewAnnotationEffectSnapshots,
+  collectExplicitlyRemovedReviewEffectAssets,
+  reviewWorkspaceHasAnnotationEffectResource,
+} from './annotation-effect-retention';
+
 const ASSET_PREFIX = 'project-asset:';
 const LANES = ['voiceover', 'music'] as const;
 /** Portable metadata forbids local asset keys; review lane refs travel renamed. */
@@ -124,6 +131,8 @@ export function assertPortableReviewAssetRefs(workspace: unknown): void {
       throw new Error(LOCAL_ASSET_ERROR);
   }
   assertPortableContentRefs(workspace['advanced']);
+  if (isRecord(workspace['baseline']))
+    assertPortableContentRefs(workspace['baseline']['advancedContent']);
   const history = workspace['history'];
   if (!Array.isArray(history)) return;
   for (const operation of history) {
@@ -152,6 +161,14 @@ function mapHistoryContent(
     };
   });
   return { ...value, history };
+}
+
+function mapBaselineContent(
+  value: unknown,
+  transform: (content: Record<string, unknown>) => Record<string, unknown>
+): unknown {
+  if (!isRecord(value) || !isRecord(value['advancedContent'])) return value;
+  return { ...value, advancedContent: transform(value['advancedContent']) };
 }
 
 /** Registry descriptors own their resources separately from authored instance history. */
@@ -193,6 +210,13 @@ export function encodePortableReviewAssetRefs<T>(review: T): T {
             ),
           }),
       advanced: renameContentRefs(advanced, 'assetId', PORTABLE_REF_KEY),
+      ...(review['workspace']['baseline'] === undefined
+        ? {}
+        : {
+            baseline: mapBaselineContent(review['workspace']['baseline'], (content) =>
+              renameContentRefs(content, 'assetId', PORTABLE_REF_KEY)
+            ),
+          }),
       history: (
         mapHistoryContent(review['workspace'], (laneAudio) =>
           renameContentRefs(laneAudio, 'assetId', PORTABLE_REF_KEY)
@@ -218,6 +242,13 @@ export function decodePortableReviewAssetRefs<T>(workspace: T): T {
           ),
         }),
     advanced: renameContentRefs(advanced, PORTABLE_REF_KEY, 'assetId'),
+    ...(workspace['baseline'] === undefined
+      ? {}
+      : {
+          baseline: mapBaselineContent(workspace['baseline'], (content) =>
+            renameContentRefs(content, PORTABLE_REF_KEY, 'assetId')
+          ),
+        }),
     history: (
       mapHistoryContent(workspace, (laneAudio) =>
         renameContentRefs(laneAudio, PORTABLE_REF_KEY, 'assetId')
@@ -373,55 +404,6 @@ export function reviewWorkspaceHasWatermarkImage(
     return false;
   };
   return retainedReviewContentMatches(workspace, matches);
-}
-
-/** Authored source closure includes disabled baseline and both sides of retained redo. */
-export function collectReviewAnnotationEffectSnapshotIds(
-  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>
-): ReadonlySet<string> {
-  const ids = new Set<string>();
-  const collect = (content: QuickEditAdvancedContent) => {
-    for (const instance of content.annotationEffects?.instances ?? []) ids.add(instance.snapshotId);
-  };
-  collect(workspace.advanced);
-  for (const operation of workspace.history) {
-    if (operation.target !== 'advancedContent') continue;
-    collect(operation.before);
-    collect(operation.after);
-  }
-  return ids;
-}
-
-/** Branch/reset prune only registry entries absent from the complete retained history. */
-export function pruneReviewAnnotationEffectSnapshots(workspace: VideoWorkspace): VideoWorkspace {
-  if (!workspace.effectSnapshots) return workspace;
-  const ids = collectReviewAnnotationEffectSnapshotIds(workspace);
-  return {
-    ...workspace,
-    effectSnapshots: workspace.effectSnapshots.filter((value) => ids.has(value.id)),
-  };
-}
-
-/** Exact resource ownership cannot be conferred by an unused immutable source alone. */
-export function reviewWorkspaceHasAnnotationEffectResource(
-  workspace: VideoWorkspace,
-  claim: { sourceAssetId: string; snapshotId: string; resourceId: string; sha256: string },
-  resource: { assetId: string; mimeType: string; byteLength: number }
-): boolean {
-  return (
-    workspace.sourceAssetId === claim.sourceAssetId &&
-    collectReviewAnnotationEffectSnapshotIds(workspace).has(claim.snapshotId) &&
-    !!workspace.effectSnapshots
-      ?.find((value) => value.id === claim.snapshotId)
-      ?.assets.some(
-        (asset) =>
-          asset.id === claim.resourceId &&
-          asset.sha256 === claim.sha256 &&
-          asset.assetId === resource.assetId &&
-          asset.mimeType === resource.mimeType &&
-          asset.byteLength === resource.byteLength
-      )
-  );
 }
 
 /** Collects every project-asset reference the review keeps, including history ops. */
@@ -680,6 +662,10 @@ function remapSnapshot(
 ): VideoWorkspaceSnapshot {
   const advanced = snapshot.workspace.advanced;
   const content = remapContentReferences(advanced, assetIdMap);
+  const baseline = snapshot.workspace.baseline;
+  const baselineContent = baseline
+    ? remapContentReferences(baseline.advancedContent, assetIdMap)
+    : undefined;
   const recovery = advanced.recoveryV1
     ? remapRecoveryReferences(advanced.recoveryV1, assetIdMap)
     : null;
@@ -690,12 +676,21 @@ function remapSnapshot(
       assetId: requireMappedAssetId(assetIdMap, asset.assetId),
     })),
   }));
-  if (content === advanced && recovery === null && !effectSnapshots) return snapshot;
+  if (
+    content === advanced &&
+    recovery === null &&
+    !effectSnapshots &&
+    baselineContent === baseline?.advancedContent
+  )
+    return snapshot;
   return {
     ...snapshot,
     workspace: {
       ...snapshot.workspace,
       ...(effectSnapshots ? { effectSnapshots } : {}),
+      ...(baseline && baselineContent
+        ? { baseline: { ...baseline, advancedContent: baselineContent } }
+        : {}),
       advanced: {
         ...advanced,
         ...content,

@@ -4,9 +4,18 @@ import {
 } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { ScenarioProjectEntry, ScenarioSavedVersion } from './contracts';
+import { selectHistoryRetentionWindow } from '@sniptale/foundation/history/retention';
+import { SCENARIO_SAVED_VERSION_LIMITS } from '../../../features/editor-history/policy';
 
 export const SCENARIO_HISTORY_LIMIT = 50;
 export const SCENARIO_HISTORY_BYTE_LIMIT = 64 * 1024 * 1024;
+/** A page issues an opaque identity; revision CAS remains the mutation authority. */
+export function isScenarioHistoryActionId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(value)
+  );
+}
 const encoder = new TextEncoder();
 function versionSize(
   version: ScenarioSavedVersion,
@@ -108,28 +117,32 @@ export function appendScenarioSavedVersion(
   ownership: 'borrowed' | 'exclusive' = 'borrowed'
 ): ScenarioSavedVersion[] {
   if (!existing) return [];
-  const versions = [
-    ...(existing.history ?? []),
-    {
-      revision: existing.workspaceRevision,
-      savedAt: existing.project.updatedAt,
-      project: existing.project,
-    },
-  ].slice(-SCENARIO_HISTORY_LIMIT);
-  let bytes = 0;
+  return retainScenarioSavedVersions(
+    [
+      ...(existing.history ?? []),
+      {
+        revision: existing.workspaceRevision,
+        savedAt: existing.project.updatedAt,
+        project: existing.project,
+      },
+    ],
+    ownership
+  );
+}
+
+/** Mutation-only compaction follows complete legacy admission; current content is outside this budget. */
+export function retainScenarioSavedVersions(
+  versions: readonly ScenarioSavedVersion[],
+  ownership: 'borrowed' | 'exclusive' = 'borrowed'
+): ScenarioSavedVersion[] {
   const parts = new Map<string, number>();
   const units = ownership === 'exclusive' ? new WeakMap<object, number>() : undefined;
-  let first = versions.length;
-  for (let index = versions.length - 1; index >= 0; index -= 1) {
-    const version = versions[index];
-    if (!version) continue;
-    const size = versionSize(version, parts, units);
-    if (bytes + size > SCENARIO_HISTORY_BYTE_LIMIT) break;
-    bytes += size;
-    first = index;
-  }
-  if (first === versions.length)
-    throw new Error('The saved guide exceeds the history metadata limit.');
-  const retained = versions.slice(first);
+  // One reserved byte plus each element's comma covers the exact JSON array framing.
+  const window = selectHistoryRetentionWindow(
+    versions.map((version) => ({ actions: 1, bytes: versionSize(version, parts, units) + 1 })),
+    versions.length,
+    { ...SCENARIO_SAVED_VERSION_LIMITS, maxBytes: SCENARIO_SAVED_VERSION_LIMITS.maxBytes - 1 }
+  );
+  const retained = versions.slice(window.start, window.end);
   return ownership === 'exclusive' ? retained : structuredClone(retained);
 }

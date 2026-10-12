@@ -37,8 +37,8 @@ it('adds only empty indexed history stores and publishes the current contracts a
     ['projectId', 'projectId'],
   ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
-  expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 18 });
-  expect(puts).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 6 });
+  expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 21 });
+  expect(puts).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 7 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });

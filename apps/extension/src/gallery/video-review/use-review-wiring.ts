@@ -115,6 +115,7 @@ export function useReviewEditorWiring(args: {
     ),
     selection: args.activeSelection,
     setText: args.advancedState.setText,
+    endTyping: args.advancedState.endTyping,
     sourceDuration: args.sourceDuration,
     edits: args.document.edits,
     sourceTime: args.time,

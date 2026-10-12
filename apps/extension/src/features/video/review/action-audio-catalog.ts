@@ -1,0 +1,100 @@
+/** Immutable v1 bytes: new timbres require new identities, never replacement under an existing ID. */
+export const ACTION_SOUND_CATALOG = {
+  'mouse-click-v1': {
+    path: 'action-sounds/v1/mouse-click.wav',
+    version: 1,
+    durationFrames: 7995,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 16034,
+    sha256: 'f369327b39a1f53e66c2209b680fd02969974b67ad5e7727e85161450edb1072',
+  },
+  'mouse-click-02-v1': {
+    path: 'action-sounds/v1/mouse-click-02.wav',
+    version: 1,
+    durationFrames: 6484,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 13012,
+    sha256: 'e518f0b84eb53eed8f0fb7e246a649d180fd5061cc3d884e217114df23ff1a3f',
+  },
+  'mouse-click-03-v1': {
+    path: 'action-sounds/v1/mouse-click-03.wav',
+    version: 1,
+    durationFrames: 7995,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 16034,
+    sha256: '2a5f8a0b5e647cc7c4ccfbac8b2742c6795530a8f59674e3047abfddce4b4919',
+  },
+  'key-01-v1': {
+    path: 'action-sounds/v1/key-01.wav',
+    version: 1,
+    durationFrames: 5689,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 11422,
+    sha256: '9f9555aa06ef5071a7ac421ecc1ca6ceb48933b5d5ec0c30d3311642627ff70a',
+  },
+  'key-02-v1': {
+    path: 'action-sounds/v1/key-02.wav',
+    version: 1,
+    durationFrames: 4851,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 9746,
+    sha256: '636fc3322ace50f38c35111368d3815f388d49086a4f1f5bad4efada97fd9a7b',
+  },
+  'key-03-v1': {
+    path: 'action-sounds/v1/key-03.wav',
+    version: 1,
+    durationFrames: 5556,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 11156,
+    sha256: '3793f13dcf46367b8284d298299f5c9246c7ef02c29b956878c81233013813b8',
+  },
+  'key-04-v1': {
+    path: 'action-sounds/v1/key-04.wav',
+    version: 1,
+    durationFrames: 5248,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 10540,
+    sha256: 'ff3c1389c37ba8ae6d6bd212a511875933e541a1c420f9a7baf3f31387cfb9d1',
+  },
+  'chord-2-down-v1': {
+    path: 'action-sounds/v1/chord-2-down.wav',
+    version: 1,
+    durationFrames: 2646,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 5336,
+    sha256: 'a4cdfd733225b50b8ddedd27a7baaa08282831dd411fee379fdadf9d12e3a562',
+  },
+  'chord-2-up-v1': {
+    path: 'action-sounds/v1/chord-2-up.wav',
+    version: 1,
+    durationFrames: 2426,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 4896,
+    sha256: 'cbe10c1ba9d2a4adc9cb2881fade00314d4092b9b1bff705d841778072463fbe',
+  },
+  'chord-3-third-v1': {
+    path: 'action-sounds/v1/chord-3-third.wav',
+    version: 1,
+    durationFrames: 2205,
+    sampleRate: 44100,
+    mimeType: 'audio/wav',
+    size: 4454,
+    sha256: 'f83ceef7f528ad9cf9df397defcfcfa94c8c33844f2bd3a1f0e8ed86f548230b',
+  },
+} as const;
+
+export type ActionSoundSampleId = keyof typeof ACTION_SOUND_CATALOG;
+
+/** Only bundled technical identities may cross the source-resolver boundary. */
+export function isActionSoundSampleId(value: unknown): value is ActionSoundSampleId {
+  return typeof value === 'string' && Object.hasOwn(ACTION_SOUND_CATALOG, value);
+}

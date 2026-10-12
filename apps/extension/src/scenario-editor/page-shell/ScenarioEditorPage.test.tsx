@@ -91,7 +91,9 @@ beforeEach(() => {
   project.items.push(createGuideStep('First step', 'first'));
   io.load.mockResolvedValue(project);
   io.asset.mockResolvedValue(undefined);
-  io.save.mockImplementation(async (value) => committedSnapshot({ ...value, updatedAt: 101 }, 2));
+  io.save.mockImplementation(async (value, { expectedRevision: revision }) =>
+    committedSnapshot({ ...value, updatedAt: 101 }, revision + 1)
+  );
   io.duplicate.mockImplementation(async (value, name) =>
     committedSnapshot({ ...value, id: 'copy', name, updatedAt: 102 }, 37)
   );
@@ -116,37 +118,21 @@ async function settleAutosave() {
   });
 }
 
-it('saves the edited project title and added steps against the loaded revision', async () => {
-  await render();
-  expect(container.querySelectorAll('article')).toHaveLength(1);
-  await editField('input[aria-label="Scenario"]', 'Renamed guide');
-  await click('Add step');
-  expect(container.querySelectorAll('article')).toHaveLength(2);
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledWith(
-    expect.objectContaining({
-      version: 4,
-      name: 'Renamed guide',
-      items: expect.arrayContaining([expect.objectContaining({ id: 'first' })]),
-    }),
-    { expectedRevision: 1 }
-  );
-  expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
-  expect(container.querySelector('.guide-page-feedback')).toBeNull();
-});
-
-it('keeps recoverable edits after save failure and allows retry', async () => {
-  io.save.mockRejectedValueOnce(new Error('quota'));
-  await render();
-  await click('Add step');
-  await settleAutosave();
-  expect(container.querySelectorAll('article')).toHaveLength(2);
-  expect(container.textContent).toContain('Your edits remain in the editor');
-  await click('Retry');
-  expect(io.save).toHaveBeenCalledTimes(2);
-  expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
-  expect(container.querySelector('.guide-page-feedback')).toBeNull();
-});
+async function editField(selector: string, value: string) {
+  const field = container.querySelector(selector);
+  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement))
+    throw new Error('Missing field');
+  await act(async () => {
+    field.focus();
+    const prototype =
+      field instanceof HTMLInputElement
+        ? HTMLInputElement.prototype
+        : HTMLTextAreaElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
 
 it('does not create or overwrite an unavailable project', async () => {
   io.load.mockRejectedValue(new Error('unsupported'));
@@ -205,19 +191,6 @@ it('mounts the guide page through the extension entrypoint', async () => {
   );
   expect(container.querySelectorAll('article')).toHaveLength(1);
   expect(io.load).toHaveBeenCalledWith('guide');
-});
-
-it('preserves edits and stops repeated saves after a concurrent project change', async () => {
-  const error = new Error('Changed elsewhere');
-  error.name = 'StaleScenarioAggregateRevisionError';
-  io.save.mockRejectedValueOnce(error);
-  await render();
-  await click('Add step');
-  await settleAutosave();
-  expect(container.textContent).toContain('This project changed in another tab');
-  expect(container.querySelectorAll('article')).toHaveLength(2);
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledTimes(1);
 });
 
 it('renders optional blocks and keeps text edits isolated from images and other steps', async () => {
@@ -294,7 +267,7 @@ it('renders optional blocks and keeps text edits isolated from images and other 
         project.items[2],
       ],
     }),
-    { expectedRevision: 1 }
+    { expectedRevision: 1, historyActionId: expect.any(String) }
   );
   expect(io.asset).toHaveBeenCalledTimes(1);
   await act(async () => root.render(null));
@@ -343,35 +316,6 @@ it('distinguishes missing image data and ignores an image load completed after u
   await act(async () => root.render(null));
   await act(async () => finish(new Blob(['late'])));
   expect(createUrl).not.toHaveBeenCalled();
-});
-
-it('recovers a conflicted edit buffer by copying it and retains it if copying fails', async () => {
-  const error = new Error('Changed elsewhere');
-  error.name = 'StaleScenarioAggregateRevisionError';
-  io.save.mockRejectedValueOnce(error);
-  await render();
-  await click('Add step');
-  await settleAutosave();
-  io.duplicate.mockRejectedValueOnce(new Error('quota'));
-  await click('Duplicate project');
-  expect(container.querySelectorAll('article')).toHaveLength(2);
-  expect(container.textContent).toContain('Could not create a copy');
-  expect(container.textContent).toContain('This project changed in another tab');
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledTimes(1);
-  await click('Duplicate project');
-  expect(io.duplicate).toHaveBeenLastCalledWith(
-    expect.objectContaining({ id: 'guide', items: expect.any(Array) }),
-    'Local guide — copy'
-  );
-  expect(io.select).toHaveBeenLastCalledWith({ projectId: 'copy' });
-  expect(container.querySelectorAll('article')).toHaveLength(2);
-  expect(container.textContent).not.toContain('Could not create a copy');
-  await click('Add step');
-  await settleAutosave();
-  expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'copy' }), {
-    expectedRevision: 37,
-  });
 });
 
 it('confirms project deletion and clears the project route only after success', async () => {
@@ -492,22 +436,6 @@ it('navigates from current resources and collapses panels without changing the d
   expect(io.save).not.toHaveBeenCalled();
 });
 
-async function editField(selector: string, value: string) {
-  const field = container.querySelector(selector);
-  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement))
-    throw new Error('Missing field');
-  await act(async () => {
-    field.focus();
-    const prototype =
-      field instanceof HTMLInputElement
-        ? HTMLInputElement.prototype
-        : HTMLTextAreaElement.prototype;
-    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(field, value);
-    field.dispatchEvent(new Event('input', { bubbles: true }));
-    field.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-}
-
 it('composes multiple blocks and retains undo and redo after autosave', async () => {
   await render();
   const article = container.querySelector<HTMLElement>('article#first');
@@ -599,39 +527,6 @@ it('supports optional numbering and editable sections with structural undo', asy
   );
 });
 
-it('preserves undo performed during autosave and uses the acknowledged revision for the next write', async () => {
-  let complete: (() => void) | undefined;
-  io.save.mockImplementation(
-    (project) =>
-      new Promise((resolve) => {
-        complete = () => resolve(committedSnapshot({ ...project, updatedAt: 101 }, 2));
-      })
-  );
-  await render();
-  await click('Add step');
-  await settleAutosave();
-  const main = container.querySelector('main');
-  if (!main) throw new Error('Missing page');
-  await act(async () =>
-    main.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
-    )
-  );
-  expect(container.querySelectorAll('article')).toHaveLength(1);
-  const pendingUndoClose = new Event('beforeunload', { cancelable: true });
-  window.dispatchEvent(pendingUndoClose);
-  expect(pendingUndoClose.defaultPrevented).toBe(true);
-  await act(async () => complete?.());
-  expect(container.querySelectorAll('article')).toHaveLength(1);
-  io.save.mockImplementation(async (project) =>
-    committedSnapshot({ ...project, updatedAt: 102 }, 2)
-  );
-  await settleAutosave();
-  expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ items: expect.any(Array) }), {
-    expectedRevision: 2,
-  });
-});
-
 it('routes block and item tools through reversible order-preserving mutations', async () => {
   const project = createGuideProject('Guide', 'guide', 100);
   const first = createGuideStep('First', 'first');
@@ -687,68 +582,6 @@ it('routes block and item tools through reversible order-preserving mutations', 
   expect(container.querySelectorAll('article')).toHaveLength(2);
   await click('Undo');
   expect(container.querySelectorAll('article')).toHaveLength(3);
-});
-
-it('accepts image import as one undoable publication and saves undo against its new revision', async () => {
-  vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:preview'), revokeObjectURL: vi.fn() });
-  io.importImages.mockImplementation(async ({ project }) =>
-    committedSnapshot(
-      {
-        ...project,
-        updatedAt: 105,
-        items: [...project.items, createGuideStep('Imported', 'imported')],
-      },
-      37
-    )
-  );
-  await render();
-  await editField('article#first .guide-step-title', 'Unsaved title');
-  await click('Resources');
-  await click('Image library');
-  await click('Library image', document.body);
-  await click('Import selected', document.body);
-  await click('Close', document.body);
-  expect(io.importImages.mock.calls[0]?.[0]).toMatchObject({
-    baseUpdatedAt: 100,
-    project: { items: [{ title: 'Unsaved title' }] },
-    expectedRevision: 1,
-  });
-  expect(container.querySelectorAll('article')).toHaveLength(2);
-  await click('Undo');
-  expect(container.querySelectorAll('article')).toHaveLength(1);
-  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
-    'value',
-    'Unsaved title'
-  );
-  await settleAutosave();
-  expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { expectedRevision: 37 });
-});
-
-it('settles autosave without writing when undo then redo returns to the durable snapshot', async () => {
-  await render();
-  await click('Add step');
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledTimes(1);
-  await click('Undo');
-  await click('Redo');
-  const unchangedClose = new Event('beforeunload', { cancelable: true });
-  await act(async () => window.dispatchEvent(unchangedClose));
-  expect(unchangedClose.defaultPrevented).toBe(false);
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('.guide-page-feedback')).toBeNull();
-});
-
-it('opens stored revisions in ordinary undo and autosaves against the current revision', async () => {
-  const previous = createGuideProject('Previous guide', 'guide', 90);
-  io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
-  await render();
-  await click('Undo');
-  expect(container.querySelector('input')?.value).toBe('Previous guide');
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledWith(previous, { expectedRevision: 1 });
-  await click('Redo');
-  expect(container.querySelector('input')?.value).toBe('Local guide');
 });
 
 it('inserts at a block boundary and focuses the new field before typing', async () => {

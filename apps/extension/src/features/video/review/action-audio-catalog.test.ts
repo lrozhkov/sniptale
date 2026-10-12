@@ -1,0 +1,45 @@
+import { readFile, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { expect, it } from 'vitest';
+import { ACTION_SOUND_CATALOG, isActionSoundSampleId } from './action-audio-catalog';
+
+it('pins the minimal shipped v1 WAV subset, native samples and exact byte budget', async () => {
+  const names: string[] = [];
+  let total = 0;
+  for (const [id, sample] of Object.entries(ACTION_SOUND_CATALOG)) {
+    expect(isActionSoundSampleId(id)).toBe(true);
+    const bytes = await readFile(new URL(`../../../../public/${sample.path}`, import.meta.url));
+    expect(bytes.length).toBe(sample.size);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(sample.sha256);
+    expect(bytes.subarray(0, 4).toString()).toBe('RIFF');
+    expect(bytes.subarray(8, 16).toString()).toBe('WAVEfmt ');
+    expect(bytes.readUInt16LE(20)).toBe(1);
+    expect(bytes.readUInt16LE(22)).toBe(1);
+    expect(bytes.readUInt32LE(24)).toBe(sample.sampleRate);
+    expect(bytes.readUInt16LE(34)).toBe(16);
+    expect(bytes.readUInt32LE(40)).toBe(sample.durationFrames * 2);
+    let peak = 0;
+    for (let offset = 44; offset < bytes.length; offset += 2)
+      peak = Math.max(peak, Math.abs(bytes.readInt16LE(offset)) / 32768);
+    // v1 gain variation is <=1.15; 1/maxVoices therefore bounds the action bus peak to .575.
+    expect(peak).toBeLessThanOrEqual(0.5);
+    expect(sample.mimeType).toBe('audio/wav');
+    total += bytes.length;
+    names.push(sample.path.split('/').at(-1)!);
+  }
+  expect(total).toBe(102630);
+  expect(total).toBeLessThanOrEqual(128 * 1024);
+  expect(names).toHaveLength(10);
+  expect(
+    (await readdir(new URL('../../../../public/action-sounds/v1/', import.meta.url))).sort()
+  ).toEqual(names.sort());
+  for (const value of [
+    undefined,
+    null,
+    '../key-01.wav',
+    'https://remote.invalid/key.wav',
+    'typing-loop-v1',
+    'constructor',
+  ])
+    expect(isActionSoundSampleId(value)).toBe(false);
+});

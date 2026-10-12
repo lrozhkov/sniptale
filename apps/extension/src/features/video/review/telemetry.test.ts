@@ -48,6 +48,65 @@ it('keeps cursor samples opt-in and does not synthesize absent telemetry', () =>
   expect(projectReviewTelemetry(input, 10)).toEqual({ markers: [], warnings: 0 });
 });
 
+it('projects only sound families and canonical key counts without copying text or guessing filtered facts', () => {
+  const actionEvents: RecordingActionEvent[] = [
+    {
+      id: 'click',
+      kind: 'CLICK',
+      time: 0,
+      duration: 0.1,
+      point: null,
+      label: 'Click',
+      data: {},
+      preset: 'NONE',
+    },
+    ...['Ctrl+S', 'Ctrl+Shift+S', 'Meta+Ctrl+Alt+Shift+P', 'Ctrl++', 'broken+combo'].map(
+      (combo, index): RecordingActionEvent => ({
+        id: `key-${index}`,
+        kind: 'KEY',
+        time: index + 1,
+        duration: 0.55,
+        point: null,
+        label: combo,
+        data: { combo, key: 'fixture', text: 'Not an audio descriptor' },
+        preset: 'NONE',
+      })
+    ),
+  ];
+  const before = structuredClone(actionEvents);
+  const result = projectReviewTelemetry(
+    {
+      actionEvents,
+      signals: [
+        {
+          id: 'typing',
+          kind: 'typing',
+          startTime: 7,
+          endTime: 11,
+          point: null,
+          data: { text: 'Private', eventCount: 9999 },
+        },
+        { id: 'filtered', kind: 'typing', startTime: 11.5, endTime: 11.6, point: null, data: {} },
+      ],
+      cursorTrack: null,
+    },
+    12
+  );
+  expect(result.markers.map((marker) => marker.audio)).toEqual([
+    { family: 'mouse' },
+    { family: 'keyboard', keyCount: 2 },
+    { family: 'keyboard', keyCount: 3 },
+    { family: 'keyboard', keyCount: 5 },
+    { family: 'keyboard', keyCount: 2 },
+    { family: 'keyboard', keyCount: 1 },
+    { family: 'typing' },
+  ]);
+  expect(JSON.stringify(result.markers.map((marker) => marker.audio))).not.toMatch(
+    /Private|fixture|9999|descriptor/u
+  );
+  expect(actionEvents).toEqual(before);
+});
+
 it('excludes invalid times and hidden cursor samples while preserving source coordinates and references', () => {
   const input: Parameters<typeof projectReviewTelemetry>[0] = {
     actionEvents: [
@@ -121,6 +180,7 @@ it('projects raw capture time even when optional animation and source anchor dif
       {
         ref: { kind: 'action', id: 'raw' },
         eventType: 'CLICK',
+        audio: { family: 'mouse' },
         start: 2,
         end: 2.25,
         target: 'Click',

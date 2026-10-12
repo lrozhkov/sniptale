@@ -17,6 +17,8 @@ export interface SaveScenarioProjectOptions {
   /** Captured owner revision; null admits only a new root. */
   expectedRevision?: number | null;
   storageClass?: import('../../library-lifecycle/contracts').LibraryStorageClass;
+  /** A captured page action may coalesce only under the accompanying exact owner revision. */
+  historyActionId?: string;
 }
 
 /** Publishes through the aggregate owner and returns its exact committed project/revision pair. */
@@ -30,6 +32,7 @@ export async function saveScenarioProject(
       ? {}
       : { expectedRevision: options.expectedRevision }),
     ...(options.storageClass === undefined ? {} : { storageClass: options.storageClass }),
+    ...(options.historyActionId === undefined ? {} : { historyActionId: options.historyActionId }),
   });
   return result;
 }

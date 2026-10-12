@@ -1,4 +1,5 @@
 import { isDiscardedHeaderChange, replayStoredReviewHistory } from './legacy-header-history';
+import { parseVideoWorkspaceTyping } from './typing';
 import {
   parseReviewAnnotationEffectSnapshots,
   readReviewAnnotationEffectDocument,
@@ -16,6 +17,7 @@ import {
   parseReviewAnnotation,
   parseReviewOperation,
   parseReviewSource,
+  parseReviewDocumentBaseline,
 } from '../../../features/video/review/validation';
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type {
@@ -93,6 +95,7 @@ function parseWorkspaceDocument(args: {
   cursor: number;
   source: ReviewSource;
   rawAdvanced: unknown;
+  completeBaseline?: ReviewDocument;
   discardedHeaderChanges: ReadonlySet<number>;
   report: Report;
 }): {
@@ -105,9 +108,18 @@ function parseWorkspaceDocument(args: {
   const baseline = currentAdvanced
     ? reviewAdvancedContentBaseline(currentAdvanced)
     : createQuickEditAdvancedContent();
+  if (
+    args.completeBaseline &&
+    (!currentAdvanced ||
+      JSON.stringify(baseline) !==
+        JSON.stringify(reviewAdvancedContentBaseline(args.completeBaseline.advancedContent)))
+  ) {
+    args.report({ check: 'advanced-state', reason: 'invalid' });
+    return null;
+  }
   let replayed: ReturnType<typeof replayStoredReviewHistory>;
   try {
-    replayed = replayStoredReviewHistory({ ...args, baseline });
+    replayed = replayStoredReviewHistory({ ...args, baseline: args.completeBaseline ?? baseline });
   } catch (error) {
     args.report(replayFailure(error));
     return null;
@@ -172,7 +184,7 @@ function parseWorkspace(
 ): { workspace: VideoWorkspace; document: ReviewDocument } | null {
   if (
     !isRecord(value) ||
-    value['formatVersion'] !== 1 ||
+    (value['formatVersion'] !== 1 && value['formatVersion'] !== 2) ||
     !aggregateId(value['aggregateId']) ||
     !aggregateId(value['sourceAssetId']) ||
     !revision(value['revision']) ||
@@ -191,6 +203,12 @@ function parseWorkspace(
     report({ check: 'source-metadata', reason: 'invalid' });
     return null;
   }
+  const completeBaseline =
+    value['formatVersion'] === 2
+      ? parseReviewDocumentBaseline(value['baseline'], source.duration)
+      : undefined;
+  if (completeBaseline === null || (value['formatVersion'] === 1 && 'baseline' in value))
+    return null;
   const admitted = parseWorkspaceHistory(value['history'], source, report);
   if (!admitted) return null;
   const parsed = parseWorkspaceDocument({
@@ -198,6 +216,7 @@ function parseWorkspace(
     cursor: value['cursor'],
     source,
     rawAdvanced: value['advanced'],
+    ...(completeBaseline ? { completeBaseline } : {}),
     report,
   });
   if (!parsed) return null;
@@ -213,22 +232,26 @@ function parseWorkspace(
     report({ check: 'effect-snapshots', reason: 'invalid' });
     return null;
   }
-  return {
-    workspace: {
-      aggregateId: value['aggregateId'],
-      formatVersion: 1,
-      source,
-      sourceAssetId: value['sourceAssetId'],
-      ...(effectSnapshots ? { effectSnapshots } : {}),
-      revision: value['revision'],
-      history,
-      cursor,
-      advanced,
-      createdAt: value['createdAt'],
-      updatedAt: value['updatedAt'],
-    },
-    document: parsed.document,
+  const workspace: VideoWorkspace = {
+    aggregateId: value['aggregateId'],
+    formatVersion: value['formatVersion'],
+    ...(completeBaseline ? { baseline: completeBaseline } : {}),
+    source,
+    sourceAssetId: value['sourceAssetId'],
+    ...(effectSnapshots ? { effectSnapshots } : {}),
+    revision: value['revision'],
+    history,
+    cursor,
+    advanced,
+    createdAt: value['createdAt'],
+    updatedAt: value['updatedAt'],
   };
+  if (value['typing'] !== undefined) {
+    const typing = parseVideoWorkspaceTyping(value['typing'], workspace, parsed.document);
+    if (!typing) return null;
+    workspace.typing = typing;
+  }
+  return { workspace, document: parsed.document };
 }
 
 /** Admits complete history and its selected document without storage writes; rejected values retain only a bounded diagnostic. */

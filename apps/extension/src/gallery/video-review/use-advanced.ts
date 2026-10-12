@@ -90,6 +90,7 @@ export function useReviewAdvanced(session: Session) {
     actionsEnabled: _baselineActionsEnabled,
     keyAnimations: _baselineKeys,
     clickAnimations: _baselineClicks,
+    actionAudio: _baselineActionAudio,
     canvas: _baselineCanvas,
     windowHeader: _baselineHeader,
     watermark: _baselineWatermark,
@@ -115,9 +116,11 @@ export function useReviewAdvanced(session: Session) {
       setBackgroundGesture(value ? { session, base: content.background, value } : null),
     saveFailed: saveFailed || contentState.saveFailed,
     pending: optimistic !== null || contentState.pending,
+    endTyping: contentState.endTyping,
     retry: () => Promise.all([flush(), contentState.flush()]),
     ...reviewAdvancedUiCommands(stage, () => currentRef.current, contentState.commands),
     flush: async () => {
+      contentState.endTyping();
       await flush();
       await contentState.flush();
     },

@@ -10,7 +10,7 @@ import { AUDIO_JOB_PORT_NAME } from '../../../../apps/extension/src/contracts/ai
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import {
   replayReviewHistory,
-  reviewAdvancedContentBaseline,
+  reviewDocumentBaseline,
 } from '../../../../apps/extension/src/features/video/review/document';
 import { buildReviewTimeMap } from '../../../../apps/extension/src/features/video/review/timeline';
 import { projectReviewVoiceover } from '../../../../apps/extension/src/features/video/review/voiceover-edits';
@@ -245,7 +245,7 @@ async function persistedReviewState(page: Page) {
     workspace.history,
     workspace.cursor,
     workspace.source,
-    reviewAdvancedContentBaseline(workspace.advanced)
+    reviewDocumentBaseline(workspace)
   );
   return { workspace, document };
 }

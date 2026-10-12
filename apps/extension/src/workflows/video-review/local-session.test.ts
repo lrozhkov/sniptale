@@ -3,10 +3,7 @@ import { applyLocalReviewChange, prepareReviewSpeechTranscriptChange } from './l
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
-import {
-  replayReviewHistory,
-  reviewAdvancedContentBaseline,
-} from '../../features/video/review/document';
+import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import {
   anchorReviewVoiceover,
   projectReviewVoiceover,
@@ -17,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
+import { createHistoryRetentionWorkspace } from '../../composition/persistence/review-workspaces/history-retention.test-support';
 
 function initial(): VideoWorkspaceSnapshot {
   return {
@@ -42,13 +40,71 @@ function document(snapshot: VideoWorkspaceSnapshot) {
     workspace.history,
     workspace.cursor,
     workspace.source,
-    reviewAdvancedContentBaseline(workspace.advanced)
+    reviewDocumentBaseline(workspace)
   );
 }
 
 function commit(snapshot: VideoWorkspaceSnapshot, operation: ReviewOperation) {
   return applyLocalReviewChange(snapshot, { kind: 'commit', operation, consumeDraft: false });
 }
+
+it.each([600, 1190])(
+  'bounds the paused local buffer after an admitted legacy history mutation at cursor %i',
+  (cursor) => {
+    const workspace = createHistoryRetentionWorkspace({ fragments: 4, cursor });
+    const opened: VideoWorkspaceSnapshot = { workspace, draft: null };
+    const before = document(opened);
+    const operation: ReviewOperation = {
+      id: 'new-note',
+      at: 2000,
+      target: 'annotation',
+      before: null,
+      after: {
+        id: 'authored-note',
+        text: 'New synthetic note.',
+        anchor: { kind: 'point', time: 4 },
+      },
+    };
+    const updated = commit(opened, operation);
+    expect(updated.workspace.history.length).toBeLessThanOrEqual(50);
+    expect(updated.workspace.revision).toBe(workspace.revision);
+    expect(updated.workspace.formatVersion).toBe(2);
+    expect(document(updated)).toEqual({
+      ...before,
+      annotations: [...before.annotations, operation.after!].sort((a, b) =>
+        a.id.localeCompare(b.id)
+      ),
+    });
+    expect(opened.workspace.history).toHaveLength(1190);
+    const undone = applyLocalReviewChange(updated, { kind: 'history', direction: 'undo' });
+    expect(document(undone)).toEqual(before);
+    const invalid = structuredClone(opened);
+    invalid.workspace.history[0]!.at = -1;
+    expect(() => commit(invalid, operation)).toThrow('Invalid review workspace');
+  }
+);
+
+it('resets a complete retained baseline without carrying old Cuts or content into an empty history', () => {
+  const opened = initial();
+  const baseline = document(opened);
+  const retained: VideoWorkspaceSnapshot = {
+    ...opened,
+    workspace: {
+      ...opened.workspace,
+      formatVersion: 2,
+      baseline: {
+        ...baseline,
+        edits: [
+          { id: 'old-cut', kind: 'cut', start: 2, end: 3, requestedStart: 2, requestedEnd: 3 },
+        ],
+      },
+    },
+  };
+  const reset = applyLocalReviewChange(retained, { kind: 'reset' });
+  expect(reset.workspace).not.toHaveProperty('baseline');
+  expect(reset.workspace.history).toEqual([]);
+  expect(document(reset).edits).toEqual([]);
+});
 
 it('applies locally with Undo/Redo and clears only discarded resources', async () => {
   const opened = initial();

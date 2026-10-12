@@ -56,7 +56,7 @@ vi.mock('../../workflows/video-review/speech-publication', () => ({
   saveReviewSpeechTranscript: mocks.save,
   generateReviewSpeech: mocks.generate,
   cleanupReviewSpeechPreview: mocks.cleanup,
-  applyReviewSpeech: mocks.apply,
+  applyReviewSpeechBatch: mocks.apply,
   reviewSpeechGeometry: () => 'geometry',
 }));
 import { useReviewSpeech } from './use-speech';
@@ -402,10 +402,9 @@ it('applies only explicitly supplied previews and cleans them after publication'
   await act(async () => current.apply(current.previews));
   expect(mocks.apply).toHaveBeenCalledWith(
     expect.anything(),
-    { kind: 'voiceover', clipId: 'clip' },
-    [preview],
+    [{ target: { kind: 'voiceover', clipId: 'clip' }, previews: [preview], originalVolume: 0 }],
     expect.any(AbortSignal),
-    { originalVolume: 0 }
+    { flushAdvanced: expect.any(Function) }
   );
   expect(current.previews).toEqual([]);
   expect(mocks.cleanup).toHaveBeenCalledWith(preview);
@@ -485,11 +484,13 @@ it('keeps a completed foreign-clip preview after cancelling the next selected ph
   expect(mocks.cleanup).not.toHaveBeenCalledWith(previews[1]);
   mocks.apply.mockResolvedValueOnce(undefined);
   await act(async () => current.apply(current.allPreviews));
-  expect(mocks.apply.mock.calls[0]?.[1]).toEqual({ kind: 'voiceover', clipId: 'clip-1' });
+  expect(mocks.apply.mock.calls[0]?.[1]).toEqual([
+    expect.objectContaining({ target: { kind: 'voiceover', clipId: 'clip-1' } }),
+  ]);
   expect(current.allPreviews).toEqual([]);
 });
 
-it('publishes each selected target separately and retains unapplied results after partial failure', async () => {
+it('publishes every selected target together and retains all previews after batch failure', async () => {
   const { Harness } = fixture(2);
   await act(async () => root?.render(<Harness />));
   const previews = batchPreviews();
@@ -501,15 +502,16 @@ it('publishes each selected target separately and retains unapplied results afte
   );
   expect(current.allPreviews).toEqual(previews);
   expect(current.previews).toEqual([previews[0]]);
-  mocks.apply.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('storage-failed'));
+  mocks.apply.mockRejectedValueOnce(new Error('storage-failed'));
   await act(async () => current.apply(current.allPreviews));
-  expect(mocks.apply.mock.calls.map((call) => [call[1], call[2]])).toEqual([
-    [{ kind: 'voiceover', clipId: 'clip' }, [previews[0]]],
-    [{ kind: 'voiceover', clipId: 'clip-1' }, [previews[1]]],
+  expect(mocks.apply).toHaveBeenCalledOnce();
+  expect(mocks.apply.mock.calls[0]?.[1]).toEqual([
+    { target: { kind: 'voiceover', clipId: 'clip' }, previews: [previews[0]], originalVolume: 0 },
+    { target: { kind: 'voiceover', clipId: 'clip-1' }, previews: [previews[1]], originalVolume: 0 },
   ]);
   expect(current.error).toBe('storage-failed');
-  expect(current.allPreviews).toEqual([previews[1]]);
-  expect(mocks.cleanup).toHaveBeenCalledWith(previews[0]);
+  expect(current.allPreviews).toEqual(previews);
+  expect(mocks.cleanup).not.toHaveBeenCalledWith(previews[0]);
   expect(mocks.cleanup).not.toHaveBeenCalledWith(previews[1]);
 });
 

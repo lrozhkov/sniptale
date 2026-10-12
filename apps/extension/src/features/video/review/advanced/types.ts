@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 16;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 17;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -271,6 +271,7 @@ export interface QuickEditAdvancedContent {
   actionsEnabled?: boolean;
   keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('./click-animation').ReviewClickAnimation[];
+  actionAudio?: import('./action-audio').ReviewActionAudioSetting[];
   /** Version travels with each history payload so persisted operations are fixed-point parseable. */
   schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
   zoom: QuickEditZoomState;

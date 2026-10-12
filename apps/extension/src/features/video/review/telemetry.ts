@@ -13,11 +13,18 @@ interface ReviewTelemetryInput {
   cursorTrack: VideoProjectCursorTrack | null;
 }
 
+/** Audio templates consume bounded facts, never recorded wording or event-count guesses. */
+type ReviewActionSoundDescriptor =
+  | { family: 'mouse' }
+  | { family: 'keyboard'; keyCount: number }
+  | { family: 'typing' };
+
 export interface ReviewTelemetryMarker {
   ref: { kind: 'action' | 'signal' | 'cursor'; id: string };
   eventType: string;
   target?: string;
   targetSemantics?: RecordingTargetSemantics;
+  audio?: ReviewActionSoundDescriptor;
   /** Verified normalized source position, never reconstructed from a final viewport. */
   focusPoint?: { x: number; y: number };
   start: number;
@@ -40,7 +47,8 @@ export function projectReviewTelemetry(
     end: number,
     target?: string,
     point?: { x: number; y: number } | null,
-    targetSemantics?: RecordingTargetSemantics
+    targetSemantics?: RecordingTargetSemantics,
+    audio?: ReviewActionSoundDescriptor
   ) => {
     if (
       !Number.isFinite(start) ||
@@ -54,6 +62,7 @@ export function projectReviewTelemetry(
       ref: { kind, id },
       eventType,
       ...(targetSemantics ? { targetSemantics } : {}),
+      ...(audio ? { audio } : {}),
       start,
       end: Math.min(duration, end),
       ...(target ? { target: target.slice(0, 120) } : {}),
@@ -70,7 +79,12 @@ export function projectReviewTelemetry(
       event.time + event.duration,
       event.label || undefined,
       event.recordingPoint,
-      event.kind === 'CLICK' ? resolveRecordingTarget(event.data) : undefined
+      event.kind === 'CLICK' ? resolveRecordingTarget(event.data) : undefined,
+      event.kind === 'CLICK'
+        ? { family: 'mouse' }
+        : event.kind === 'KEY'
+          ? { family: 'keyboard', keyCount: canonicalKeyboardCount(event.data['combo']) }
+          : undefined
     );
   for (const signal of normalizeRecordingSignals(input.signals)) {
     if (signal.kind === 'static-frame' && signal.startTime === signal.endTime) {
@@ -85,7 +99,9 @@ export function projectReviewTelemetry(
       signal.startTime,
       signal.endTime,
       typeof target === 'string' ? target : undefined,
-      signalFocusPoint(signal, actions)
+      signalFocusPoint(signal, actions),
+      undefined,
+      signal.kind === 'typing' ? { family: 'typing' } : undefined
     );
   }
   if (includeCursor)
@@ -93,6 +109,22 @@ export function projectReviewTelemetry(
       if (sample.visible) add('cursor', sample.id, 'cursor', sample.time, sample.time);
   markers.sort((a, b) => a.start - b.start || a.ref.id.localeCompare(b.ref.id));
   return { markers, warnings };
+}
+
+/** Capture's combo has modifier prefixes; '+' itself is one key. Unknown legacy labels use one cue. */
+function canonicalKeyboardCount(value: unknown): number {
+  if (typeof value !== 'string' || !value || value.length > 120) return 1;
+  let rest = value;
+  const modifiers = new Set<string>();
+  for (;;) {
+    const prefix = /^(Meta|Ctrl|Alt|Shift)\+/u.exec(rest);
+    if (!prefix) break;
+    const modifier = prefix[1]!;
+    if (modifiers.has(modifier)) return 1;
+    modifiers.add(modifier);
+    rest = rest.slice(prefix[0].length);
+  }
+  return rest && (rest === '+' || !rest.includes('+')) ? modifiers.size + 1 : 1;
 }
 
 /** Typing may reuse a recent verified click on that exact field; raw CSS points are not video positions. */

@@ -13,7 +13,6 @@ export function useReviewExportSettings(
   advanced: QuickEditAdvancedState
 ) {
   const [renderSettings, setRenderSettings] = useState<ReviewRenderSettings>({
-    quality: 'HIGH',
     frameRate: 0,
   });
   const [probe, setProbe] = useState<{

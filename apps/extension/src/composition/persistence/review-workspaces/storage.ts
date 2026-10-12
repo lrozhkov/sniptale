@@ -1,4 +1,4 @@
-import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
+import { sameReviewWorkspaceValue as storageValueEqual } from './history-retention';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
@@ -98,15 +98,6 @@ export async function replaceWorkspaceStorage(
     .put(workspaceStorageHead(workspace, usageReferenceKeys));
 }
 
-function storageValueEqual(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right)) return true;
-  if (Array.isArray(left) && Array.isArray(right))
-    return sameHistoryArray(left, right, storageValueEqual);
-  if (!isRecord(left) || !isRecord(right) || Array.isArray(left) || Array.isArray(right))
-    return false;
-  return sameHistoryRecord(left, right, storageValueEqual);
-}
-
 function unchangedStoredHistory(storage: WorkspaceStorageRead, previous: VideoWorkspace) {
   const { head, logical } = storage;
   return (
@@ -120,6 +111,69 @@ function unchangedStoredHistory(storage: WorkspaceStorageRead, previous: VideoWo
   );
 }
 
+async function writeCompleteWorkspaceDelta(
+  tx: WorkspaceStorageWriteTransaction,
+  args: Parameters<typeof writeWorkspaceStorage>[1]
+): Promise<boolean> {
+  const { storage, previous, workspace, mode, usageReferenceKeys } = args;
+  if (
+    !isRecord(storage.head) ||
+    storage.head['formatVersion'] !== 3 ||
+    workspace.formatVersion !== 2 ||
+    (mode === 'replace' && args.retentionStart === undefined)
+  )
+    return false;
+  const start = storage.head['historyStart'];
+  if (typeof start !== 'number' || !Number.isSafeInteger(start) || start < 0) return false;
+  const removedPrefix = args.retentionStart ?? 0;
+  const nextStart = start + removedPrefix;
+  if (!Number.isSafeInteger(nextStart) || removedPrefix < 0)
+    throw new Error('Invalid retained ordinal range.');
+  const encoded = workspaceStorageRows(workspace, nextStart);
+  let sharedPrefix = 0;
+  for (const [index, operation] of workspace.history.entries()) {
+    const oldIndex = removedPrefix + index;
+    if (mode === 'replace') {
+      if (!storageValueEqual(operation, previous.history[oldIndex])) break;
+      sharedPrefix++;
+      continue;
+    }
+    if (mode === 'append' && oldIndex === previous.cursor) continue;
+    if (!storageValueEqual(operation, previous.history[oldIndex])) return false;
+  }
+  const store = tx.objectStore(VIDEO_WORKSPACE_HISTORY_STORE);
+  const end = nextStart + workspace.history.length;
+  for (let ordinal = start + 1; ordinal <= start + previous.history.length; ordinal++) {
+    if (
+      ordinal <= nextStart ||
+      ordinal > end ||
+      (mode === 'replace' && ordinal > nextStart + sharedPrefix)
+    )
+      await store.delete([workspace.aggregateId, ordinal]);
+  }
+  const previousBaseline = storage.rows.find((row) => isRecord(row) && row['ordinal'] === 0);
+  if (!storageValueEqual(previousBaseline, encoded[0])) await store.put(encoded[0]);
+  if (mode === 'replace') {
+    for (let index = sharedPrefix; index < workspace.history.length; index++) {
+      const row = encoded[index + 1];
+      if (!row) throw new Error('Missing retained replacement row.');
+      await store.put(row);
+    }
+  }
+  if (mode === 'append') {
+    const newIndex = previous.cursor - removedPrefix;
+    if (newIndex >= 0 && newIndex < workspace.history.length) {
+      const row = encoded[newIndex + 1];
+      if (!row) throw new Error('Missing retained append row.');
+      await store.put(row);
+    }
+  }
+  await tx
+    .objectStore(VIDEO_WORKSPACES_STORE)
+    .put(workspaceStorageHead(workspace, usageReferenceKeys, nextStart));
+  return true;
+}
+
 /** Applies an owner-selected delta only after complete before/candidate/redo admission. */
 export async function writeWorkspaceStorage(
   tx: WorkspaceStorageWriteTransaction,
@@ -129,6 +183,7 @@ export async function writeWorkspaceStorage(
     workspace: VideoWorkspace;
     usageReferenceKeys: string[];
     mode: 'append' | 'cursor' | 'replace';
+    retentionStart?: number | undefined;
   }
 ): Promise<void> {
   const { storage, previous, workspace, usageReferenceKeys, mode } = args;
@@ -144,6 +199,7 @@ export async function writeWorkspaceStorage(
         throw new Error('Immutable workspace effect snapshot changed.');
     }
   }
+  if (await writeCompleteWorkspaceDelta(tx, args)) return;
   const retained = mode === 'append' ? previous.cursor : previous.history.length;
   const unchanged =
     unchangedStoredHistory(storage, previous) &&

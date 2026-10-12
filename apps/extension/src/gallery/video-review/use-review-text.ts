@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
 import {
   addReviewTextFragment,
   createReviewTextDocument,
@@ -76,8 +77,9 @@ export function useReviewText(args: {
   selection?: ReviewSelection;
   setText(
     update: (current: ReviewTextDocument | undefined) => ReviewTextDocument | undefined,
-    typing?: boolean
+    typing?: ReviewTextTypingTarget
   ): void;
+  endTyping?(): void;
   sourceDuration: number;
   edits: readonly ReviewEdit[];
   sourceTime: number;
@@ -97,7 +99,7 @@ export function useReviewText(args: {
   const document = args.document ?? createReviewTextDocument();
   const mutate = (
     operation: (current: ReviewTextDocument) => ReviewTextEditResult,
-    typing = false
+    typing?: ReviewTextTypingTarget
   ) => {
     let failure: typeof error = null;
     args.setText((current) => {
@@ -130,6 +132,8 @@ export function useReviewText(args: {
         return editReviewTextFragment(current, id, patch);
       },
       patch.text !== undefined && Object.keys(patch).length === 1
+        ? { kind: 'text', fragmentId: id, field: 'text' }
+        : undefined
     );
   const add = (select = true) =>
     guard(() => {
@@ -164,6 +168,7 @@ export function useReviewText(args: {
     error,
     createdId,
     change,
+    endTyping: () => args.endTyping?.(),
     add,
     projection,
     sourceInterval,

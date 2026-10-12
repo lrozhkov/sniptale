@@ -9,6 +9,7 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createVideoReviewSession } from './session';
 import {
   applyReviewRecognition,
+  reviewRecognitionWasApplied,
   prepareReviewRecognition,
   runReviewRecognition,
 } from './recognition';
@@ -387,6 +388,32 @@ describe('recognition continuity and placement', () => {
 });
 
 describe('recognition Save and disposable proposal acceptance', () => {
+  it('applies 75 recognized fragments once and preserves whole-result Undo/Redo and repeat identity', async () => {
+    const { session, deps } = fixture(10);
+    const job = await prepare(session);
+    remote.job.mockResolvedValue({
+      type: 'transcript',
+      result: words(
+        Array.from({ length: 75 }, (_, index) => [
+          `Synthetic${index}.`,
+          (index * 10) / 75,
+          ((index + 0.8) * 10) / 75,
+        ])
+      ),
+    });
+    const proposal = await runReviewRecognition(session, job, signal());
+    expect(proposal.document.fragments).toHaveLength(75);
+    await applyReviewRecognition(session, proposal, signal());
+    expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+    expect(session.getSnapshot().document.advancedContent.text?.fragments).toHaveLength(75);
+    await applyReviewRecognition(session, proposal, signal());
+    expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+    await session.history('undo');
+    expect(session.getSnapshot().document.advancedContent.text?.fragments ?? []).toHaveLength(0);
+    await session.history('redo');
+    expect(session.getSnapshot().document.advancedContent.text?.fragments).toHaveLength(75);
+    expect(remote.job).toHaveBeenCalledOnce();
+  });
   it('saves the whole intended buffer once before POST, without creating transcript history', async () => {
     const { session, deps } = fixture();
     await session.saveAdvanced({
@@ -573,6 +600,27 @@ describe('recognition Save and disposable proposal acceptance', () => {
 });
 
 describe('recognition durable receipt recovery', () => {
+  it('treats a receipt absent from a pruned durable window as expired evidence, never as uncommitted', async () => {
+    const { session, deps } = fixture();
+    const proposal = await runReviewRecognition(session, await prepare(session), signal());
+    await applyReviewRecognition(session, proposal, signal());
+    const state = session.getSnapshot();
+    deps.readVideoWorkspace.mockResolvedValueOnce({
+      workspace: {
+        ...state.snapshot.workspace,
+        formatVersion: 2,
+        baseline: state.document,
+        advanced: { ...state.document.advancedContent, ui: state.snapshot.workspace.advanced.ui },
+        history: [],
+        cursor: 0,
+        revision: state.snapshot.workspace.revision + 50,
+      },
+      draft: null,
+    });
+    await expect(reviewRecognitionWasApplied(session, proposal, signal())).rejects.toThrow('stale');
+    expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+    expect(remote.job).toHaveBeenCalledTimes(3);
+  });
   it('reuses an ambiguous accepted operation receipt without POST, duplicate history or reload', async () => {
     const { session, deps } = fixture();
     const proposal = await runReviewRecognition(session, await prepare(session), signal());

@@ -7,7 +7,7 @@ import { matchesReviewTextScope } from '../../../features/video/review/text-docu
 import { getProjectAsset } from '../../../composition/persistence/projects';
 import {
   replayReviewHistory,
-  reviewAdvancedContentBaseline,
+  reviewDocumentBaseline,
 } from '../../../features/video/review/document';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 import { projectReviewVoiceover } from '../../../features/video/review/voiceover-edits';
@@ -47,7 +47,7 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
     workspace.history,
     workspace.cursor,
     workspace.source,
-    reviewAdvancedContentBaseline(workspace.advanced)
+    reviewDocumentBaseline(workspace)
   );
   const scope = request.scope;
   if (!isAudioSourceJobScope(scope)) {

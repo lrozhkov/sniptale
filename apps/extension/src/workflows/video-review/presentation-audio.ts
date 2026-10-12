@@ -6,6 +6,10 @@ import {
 import type { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createReviewAudioClipRenderer } from './audio-clip-render';
 import { renderReviewAudio, type ReviewExportClipPlan } from './audio-render';
+import {
+  quickEditAudioSourceKey,
+  iterateQuickEditActionAudioPlan,
+} from '../../features/video/review/advanced/audio-plan';
 
 type MainSegment = ReturnType<typeof buildReviewTimeMap>[number];
 type Placement = PresentationSequencePlan['segments'][number];
@@ -44,13 +48,20 @@ type AudioPart = {
 };
 
 function hasClips(part: AudioPart): boolean {
-  return !!part.exportAudio?.entries.some(
-    (entry) =>
-      entry.volume > 0 &&
-      entry.timelineStart < part.segment.resultEnd &&
-      entry.timelineStart + entry.duration > part.segment.resultStart &&
-      part.exportAudio?.buffers.has(entry.assetId)
-  );
+  const plan = part.exportAudio;
+  if (!plan) return false;
+  const audible = (entry: ReviewExportClipPlan['entries'][number]) =>
+    entry.volume > 0 &&
+    entry.timelineStart < part.segment.resultEnd &&
+    entry.timelineStart + entry.duration > part.segment.resultStart &&
+    plan.buffers.has(quickEditAudioSourceKey(entry.source));
+  if (plan.action)
+    for (const batch of iterateQuickEditActionAudioPlan(plan.action, {
+      start: part.segment.resultStart,
+      end: part.segment.resultEnd,
+    }))
+      if (batch.some(audible)) return true;
+  return plan.entries.some(audible);
 }
 
 function hasOriginal(part: AudioPart): boolean {

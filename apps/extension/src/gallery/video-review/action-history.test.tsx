@@ -5,6 +5,33 @@ import { expect, it, vi } from 'vitest';
 import { ReviewActionHistory } from './action-history';
 import { ReviewClickOverlay } from './click-animation-overlay';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
+import { reviewActionAudioRefKey } from '../../features/video/review/advanced/action-audio';
+
+it('selects point-free clicks and typing independently when their opaque IDs match', async () => {
+  const { queryHistory } = await import('./action-history-filters');
+  const markers = [
+    { ref: { kind: 'action' as const, id: 'same' }, eventType: 'CLICK', start: 1, end: 1 },
+    { ref: { kind: 'signal' as const, id: 'same' }, eventType: 'typing', start: 2, end: 5 },
+    { ref: { kind: 'signal' as const, id: 'idle' }, eventType: 'cursor-idle', start: 2, end: 5 },
+  ];
+  const selected = [reviewActionAudioRefKey({ kind: 'signal', id: 'same' })];
+  const filters = { query: '', type: 'all', targetType: 'all', status: 'all', longer: 0 };
+  const result = queryHistory(markers, new Map(), filters, selected, new Map());
+  expect(result.ids).toEqual(selected);
+  expect(result.matching).toEqual(
+    new Set([reviewActionAudioRefKey({ kind: 'action', id: 'same' }), ...selected])
+  );
+  expect(result.checked).toBe(1);
+  expect(
+    queryHistory(
+      markers,
+      new Map(),
+      { ...filters, type: 'typing', status: 'selected' },
+      selected,
+      new Map()
+    ).filtered
+  ).toEqual([markers[1]]);
+});
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -194,7 +221,7 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     change('historyLonger', '5');
     expect(host.querySelectorAll('li')).toHaveLength(1);
     expect(host.querySelector('li')!.textContent).toContain('Search field');
-    expect(host.querySelector('li input')).toBeNull();
+    expect(host.querySelector('li input[type="checkbox"]')).not.toBeNull();
     act(() => host.querySelector<HTMLButtonElement>('li button')!.click());
     expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ eventType: 'typing' }));
   } finally {

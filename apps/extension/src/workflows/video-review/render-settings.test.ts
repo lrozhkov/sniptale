@@ -21,6 +21,17 @@ const index: ReviewMediaIndex = {
   outputCodecs: { mp4: ['avc', 'hevc', 'vp9'], webm: ['vp9', 'vp8'] },
 };
 
+it('reports the copied source codec rather than an encoder fallback', () => {
+  expect(
+    resolveReviewOutputProfile(
+      { ...index, videoCodec: 'hevc', outputCodecs: { mp4: [], webm: [] } },
+      createQuickEditAdvancedState(),
+      { frameRate: 0 },
+      'copy'
+    )
+  ).toMatchObject({ codec: 'hevc', format: 'mp4', width: 1904, height: 984 });
+});
+
 describe('calibrated quick-edit export profile', () => {
   it.each(Object.values(VideoQuality))(
     'uses the editor %s quality ladder without a sparse-source cap',

@@ -16,7 +16,7 @@ import {
 
 /** Portable review includes all history and field recovery, but no local OPFS identity. */
 export interface PortableVideoReview {
-  workspace: Omit<VideoWorkspace, 'sourceAssetId'>;
+  workspace: Omit<VideoWorkspace, 'sourceAssetId' | 'typing'>;
   draft: VideoWorkspaceDraft | null;
 }
 
@@ -30,7 +30,12 @@ function parsePortableVideoReviewShape(
   aggregateId: string,
   allowLocalAssetIds: boolean
 ): PortableVideoReview {
-  if (!isRecord(value) || !isRecord(value['workspace']) || 'sourceAssetId' in value['workspace']) {
+  if (
+    !isRecord(value) ||
+    !isRecord(value['workspace']) ||
+    'sourceAssetId' in value['workspace'] ||
+    'typing' in value['workspace']
+  ) {
     throw new Error('Portable video review is invalid.');
   }
   if (!allowLocalAssetIds) assertPortableReviewAssetRefs(value['workspace']);
@@ -81,7 +86,7 @@ export async function readVideoReviewForBackup(args: {
   if (!workspace || workspace.sourceAssetId !== args.sourceAssetId) {
     throw new Error('Video review source is missing or changed.');
   }
-  const { sourceAssetId: _localId, ...portable } = workspace;
+  const { sourceAssetId: _localId, typing: _typing, ...portable } = workspace;
   return parsePortableVideoReviewShape(
     { workspace: portable, draft: rawDraft === undefined ? null : rawDraft },
     args.aggregateId,

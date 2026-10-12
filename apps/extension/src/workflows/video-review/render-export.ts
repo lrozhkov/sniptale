@@ -323,7 +323,7 @@ interface ReviewRenderPreparation {
   codec: ReviewOutputCodec;
   container: 'mp4' | 'webm';
   resolution: VideoResolutionPreset;
-  quality: ReviewRenderSettings['quality'];
+  quality: NonNullable<ReviewRenderSettings['quality']>;
   fps: number;
   windows: ReviewFrameWindow[];
   effective: ReturnType<typeof resolveQuickEditEffectiveState>;

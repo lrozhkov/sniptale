@@ -11,6 +11,12 @@ import { createQuickEditAdvancedContent } from '../../../features/video/review/a
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
+import { withReviewWorkspaceUsage } from './usage-index-keys';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
+import { workspaceStorageHead, workspaceStorageRows } from '../review-workspaces/storage-format';
 
 it('atomically removes placements, library metadata and the last physical owner', async () => {
   const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
@@ -97,9 +103,15 @@ it('fails closed on an invalid project row without deleting the file', async () 
   expect(harness.complete).not.toHaveBeenCalled();
 });
 
-it.each(['music', 'voiceover'] as const)(
-  'removes an auxiliary quick-edit %s reference and retains its workspace',
-  async (lane) => {
+it.each([
+  ['music', 1, false],
+  ['voiceover', 1, false],
+  ['music', 2, false],
+  ['voiceover', 2, false],
+  ['music', 2, true],
+] as const)(
+  'purges auxiliary %s in format %i, invalid baseline=%s',
+  async (lane, formatVersion, invalidBaseline) => {
     const advanced = createQuickEditAdvancedState();
     advanced.audio[lane].push({
       id: 'music',
@@ -139,9 +151,55 @@ it.each(['music', 'voiceover'] as const)(
         ],
       ])
     );
+    if (formatVersion === 2) {
+      const previous = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+      if (!previous) throw new Error('Invalid review fixture');
+      const workspace = {
+        ...previous,
+        formatVersion: 2 as const,
+        baseline: replayReviewHistory(
+          [],
+          0,
+          previous.source,
+          reviewAdvancedContentBaseline(previous.advanced)
+        ),
+      };
+      rows
+        .get('video_workspaces')!
+        .set(
+          workspace.aggregateId,
+          workspaceStorageHead(workspace, withReviewWorkspaceUsage(workspace).usageReferenceKeys)
+        );
+      const historyRows = workspaceStorageRows(workspace);
+      if (invalidBaseline) {
+        const baselineRow = historyRows.find((row) => 'baseline' in row);
+        if (!baselineRow || !('baseline' in baselineRow)) throw new Error('Missing baseline');
+        baselineRow.baseline.edits = [
+          { id: 'invalid-cut', kind: 'cut', start: 2, end: 1, requestedStart: 2, requestedEnd: 1 },
+        ];
+      }
+      rows.set(
+        'video_workspace_history',
+        new Map(historyRows.map((row) => [JSON.stringify([row.aggregateId, row.ordinal]), row]))
+      );
+    }
     const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
       typeof createVideoProjectEntryWithMediaClip
     >;
+    if (invalidBaseline) {
+      const snapshot = structuredClone(rows);
+      await expect(
+        deleteMediaAssetWithProjectCascade(mediaId, [
+          { id: project.id, kind: 'video', name: project.project.name, primary: false },
+          { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
+        ])
+      ).rejects.toMatchObject({ reason: 'invalid-graph' });
+      expect([...rows].map(([name, store]) => [name, [...store]])).toEqual(
+        [...snapshot].map(([name, store]) => [name, [...store]])
+      );
+      expect(harness.complete).not.toHaveBeenCalled();
+      return;
+    }
     await deleteMediaAssetWithProjectCascade(mediaId, [
       { id: project.id, kind: 'video', name: project.project.name, primary: false },
       { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },

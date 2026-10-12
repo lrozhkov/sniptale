@@ -1,4 +1,18 @@
-import { openReviewAudioClipSource, type ReviewAudioClipInput } from './audio-clip-source';
+import {
+  openReviewAudioClipSource,
+  decodeReviewAudioClipBuffer,
+  type ReviewAudioClipInput,
+} from './audio-clip-source';
+import { runtimeInfo } from '@sniptale/platform/browser/runtime';
+import {
+  createReviewActionAudioSource,
+  admitReviewActionAudioPlan,
+  type ReviewActionAudioSource,
+} from './action-audio-source';
+import {
+  buildReviewActionAudioPlan,
+  ReviewActionAudioUnavailable,
+} from '../../features/video/review/action-audio';
 import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
@@ -21,15 +35,17 @@ import {
 } from '../../composition/persistence/assets';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
-import {
-  replayReviewHistory,
-  reviewAdvancedContentBaseline,
-} from '../../features/video/review/document';
+import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewAnchor } from '../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
-import { buildQuickEditAudioPlan } from '../../features/video/review/advanced/audio-plan';
+import {
+  buildQuickEditAudioPlan,
+  quickEditAudioSourceKey,
+  hasQuickEditActionAudio,
+  type QuickEditActionAudioSchedule,
+} from '../../features/video/review/advanced/audio-plan';
 import type { ReviewExportClipPlan } from './audio-render';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import {
@@ -68,6 +84,13 @@ const persistence = {
   writeReviewFrames,
   readProjectAsset: resolveReviewAssetBytes,
   openAudioSource: openReviewAudioClipSource,
+  createActionSource: (signal: AbortSignal) =>
+    createReviewActionAudioSource({
+      signal,
+      getURL: runtimeInfo.getURL,
+      fetch: (url, init) => fetch(url, init),
+      decode: decodeReviewAudioClipBuffer,
+    }),
 };
 
 /** Output time of a source position inside the full edit map. */
@@ -97,8 +120,15 @@ export async function buildReviewExportClipPlan(
     readProjectAsset: (assetId: string) => Promise<Blob | null>;
     /** Main-output interval required by an unpublished preview; null excludes all main clips. */
     window?: { start: number; end: number } | null;
+    action?: Omit<QuickEditActionAudioSchedule, 'busGain'>;
   },
-  deps = { openAudioSource: openReviewAudioClipSource }
+  deps: {
+    openAudioSource: typeof openReviewAudioClipSource;
+    createActionSource?: (signal: AbortSignal) => ReviewActionAudioSource<AudioBuffer>;
+  } = {
+    openAudioSource: openReviewAudioClipSource,
+    createActionSource: persistence.createActionSource,
+  }
 ): Promise<ReviewExportClipPlan> {
   const effective = resolveQuickEditEffectiveState(args.advanced);
   const entries = buildQuickEditAudioPlan(effective)
@@ -115,19 +145,37 @@ export async function buildReviewExportClipPlan(
           entry.timelineStart + entry.duration > args.window.start)
     );
   const buffers = new Map<string, ReviewAudioClipInput>();
+  let action: QuickEditActionAudioSchedule | undefined;
+  let actionSource: ReviewActionAudioSource<AudioBuffer> | undefined;
   let disposed = false;
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    actionSource?.dispose();
     for (const source of buffers.values()) if ('dispose' in source) source.dispose();
   };
   try {
-    for (const assetId of new Set(entries.map((entry) => entry.assetId))) {
+    if (args.action && args.window !== null) {
+      const admission = await admitReviewActionAudioPlan(args.action.plan, args.signal);
+      action = { ...args.action, busGain: admission.busGain };
+      actionSource = (deps.createActionSource ?? persistence.createActionSource)(args.signal);
+      for (const sampleId of admission.sampleIds) {
+        const buffer = await actionSource.read(sampleId);
+        args.signal.throwIfAborted();
+        buffers.set(quickEditAudioSourceKey({ kind: 'bundled', sampleId }), buffer);
+      }
+    }
+    for (const source of new Map(
+      entries.map((entry) => [quickEditAudioSourceKey(entry.source), entry.source])
+    ).values()) {
+      if (source.kind !== 'project')
+        throw new Error('Bundled source requires action audio admission.');
+      const assetId = source.assetId;
       const blob = await args.readProjectAsset(assetId);
       args.signal.throwIfAborted();
       if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
       try {
-        buffers.set(assetId, await deps.openAudioSource(blob, args.signal));
+        buffers.set(quickEditAudioSourceKey(source), await deps.openAudioSource(blob, args.signal));
       } catch {
         throw new QuickEditExportUnavailable(['asset-missing']);
       }
@@ -137,12 +185,18 @@ export async function buildReviewExportClipPlan(
       dispose,
       entries,
       buffers,
+      ...(action ? { action } : {}),
       originalVolume: args.advanced.audio.original.volume,
       ...(effective.originalAudio.ranges ? { originalRanges: effective.originalAudio.ranges } : {}),
       originalMuted: args.advanced.audio.original.muted,
     };
   } catch (error) {
     dispose();
+    args.signal.throwIfAborted();
+    if (error instanceof ReviewActionAudioUnavailable)
+      throw new QuickEditExportUnavailable([
+        error.reason === 'voice-limit' ? 'action-audio-limit' : 'action-audio-resource',
+      ]);
     throw error;
   }
 }
@@ -217,7 +271,7 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     workspace.history,
     workspace.cursor,
     workspace.source,
-    reviewAdvancedContentBaseline(workspace.advanced)
+    reviewDocumentBaseline(workspace)
   );
   // Content flows through history ops; ui chrome stays with the whole-state record.
   const advanced = {
@@ -238,14 +292,30 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
   const includeBookends = !fragment;
   const edits = fragment?.edits ?? document.edits;
   const renderSettings = advanced.ui.mode === 'advanced' ? args.renderSettings : undefined;
-  const outputProfile = resolveReviewOutputProfile(
-    {
-      ...index,
-      width: index.width ?? workspace.source.width,
-      height: index.height ?? workspace.source.height,
+  const fullMap = buildReviewTimeMap(index.duration, document.edits);
+  const actionPlan = buildReviewActionAudioPlan({
+    markers: original.telemetry
+      ? projectReviewTelemetry(original.telemetry, index.duration).markers
+      : [],
+    settings: advanced.actionAudio ?? [],
+    segments: fullMap,
+    applied: resolveQuickEditEffectiveFeatures(advanced).actionsApplied,
+  });
+  const fragmentOffset = fragment ? reviewOutputTimeAt(fullMap, fragment.start) : 0;
+  const action = {
+    plan: actionPlan,
+    offset: fragmentOffset,
+    bounds: {
+      start: fragmentOffset,
+      end: fragment ? reviewOutputTimeAt(fullMap, fragment.end) : actionPlan.duration,
     },
-    advanced,
-    renderSettings
+  };
+  const actionAudioPresent = hasQuickEditActionAudio(
+    { ...action, busGain: 1 },
+    {
+      start: 0,
+      end: action.bounds.end - action.bounds.start,
+    }
   );
   const plan = configuredReviewExportPlan({
     includeBookends,
@@ -254,11 +324,19 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     document: { ...document, edits },
     advanced,
     videoCopyBoundaries: index.boundaries,
+    actionAudioPresent,
   });
   if (plan.kind === 'unavailable') throw new QuickEditExportUnavailable(plan.reasons);
-  const fragmentOffset = fragment
-    ? reviewOutputTimeAt(buildReviewTimeMap(index.duration, document.edits), fragment.start)
-    : 0;
+  const outputProfile = resolveReviewOutputProfile(
+    {
+      ...index,
+      width: index.width ?? workspace.source.width,
+      height: index.height ?? workspace.source.height,
+    },
+    advanced,
+    renderSettings,
+    plan.video
+  );
   return {
     workspace,
     original,
@@ -271,6 +349,7 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     outputProfile,
     plan,
     fragmentOffset,
+    action: actionAudioPresent ? action : undefined,
   };
 }
 
@@ -290,8 +369,9 @@ export async function exportReviewedVideo(args: ReviewExportInput, deps = persis
           fragmentOffset,
           signal,
           readProjectAsset: deps.readProjectAsset,
+          ...(prepared.action ? { action: prepared.action } : {}),
         },
-        { openAudioSource: deps.openAudioSource }
+        { openAudioSource: deps.openAudioSource, createActionSource: deps.createActionSource }
       );
     }
     return await writePreparedReviewExport(args, prepared, exportAudio, deps);

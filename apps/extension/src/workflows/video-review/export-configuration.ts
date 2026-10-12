@@ -49,14 +49,29 @@ export function configuredReviewExportPlan(
   const plan = resolveQuickEditExportPlan({
     ...args,
     advanced,
-    ...(index?.audioCodec || presentationAudioPresent === true
+    ...(index?.audioCodec ||
+    presentationAudioPresent === true ||
+    (resolveQuickEditEffectiveState(advanced).actionsApplied && args.actionAudioPresent)
       ? { audioProcessingAvailable: !!audioCodec }
       : {}),
     ...(presentationAudioPresent === undefined ? {} : { presentationAudioPresent }),
     videoRenderAvailable: videoAvailable,
   });
   if (plan.kind === 'unavailable') return plan;
-  if (!settings) return plan;
+  const profileRequiresRender = !!(
+    settings &&
+    index &&
+    output &&
+    (settings.quality !== undefined ||
+      output.format !== index.container ||
+      (settings.codec !== undefined && settings.codec !== index.videoCodec) ||
+      (settings.resolution !== undefined &&
+        settings.resolution !== 'SOURCE' &&
+        (output.width !== (index.width ?? 1920) || output.height !== (index.height ?? 1080))) ||
+      settings.frameRate !== 0 ||
+      settings.frameRateMode === 'adaptive')
+  );
+  if (!profileRequiresRender) return plan;
   if (!videoAvailable) return { kind: 'unavailable', reasons: ['video-encoder'] };
   const transcodeAudio = output?.format === 'webm' && index?.audioCodec === 'aac';
   if (transcodeAudio && !audioCodec) return { kind: 'unavailable', reasons: ['audio-encoder'] };
@@ -68,7 +83,13 @@ function composedAudioPresence(
   args: Parameters<typeof configuredReviewExportPlan>[0]
 ): boolean | undefined {
   const effective = resolveQuickEditEffectiveState(args.advanced);
-  if (args.index?.audioCodec || effective.voiceover.length || effective.music.length) return true;
+  if (
+    args.index?.audioCodec ||
+    effective.voiceover.length ||
+    effective.music.length ||
+    (effective.actionsApplied && args.actionAudioPresent)
+  )
+    return true;
   if (!effective.presentation) return undefined;
   const settings = effective.presentation;
   const possibleBookendAudio =

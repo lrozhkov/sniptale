@@ -1,5 +1,7 @@
+import { DB_VERSION } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { betaV21Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v21';
+import { betaV23Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v23';
 import { handleDatabaseUpgrade } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core';
 import {
   CURRENT_SCHEMA_CONTRACTS,
@@ -20,24 +22,25 @@ async function snapshot(db: IDBPDatabase) {
 }
 
 /** Uses an isolated native database and immutable fixture objects, never the user's library. */
-export async function probe() {
+export async function probe(sourceVersion: 21 | 23 = 21) {
+  const released = sourceVersion === 23 ? betaV23Fixture : betaV21Fixture;
   const root = await navigator.storage.getDirectory();
   const objects = await root.getDirectoryHandle(name, { create: true });
   const originalPut = IDBObjectStore.prototype.put;
   let current: IDBPDatabase | undefined;
   try {
-    current = await openDB(name, 21, {
+    current = await openDB(name, sourceVersion, {
       upgrade(db, old, next, tx) {
         handleDatabaseUpgrade(db, old, next, tx);
       },
     });
     const seed = current.transaction(Array.from(current.objectStoreNames), 'readwrite');
-    for (const [store, rows] of Object.entries(betaV21Fixture.records))
+    for (const [store, rows] of Object.entries(released.records))
       for (const row of rows) await seed.objectStore(store).put(row);
-    for (const [domainId, schemaVersion] of Object.entries(betaV21Fixture.domainVersions))
+    for (const [domainId, schemaVersion] of Object.entries(released.domainVersions))
       await seed.objectStore(contracts).put({ domainId, schemaVersion });
     await seed.done;
-    for (const object of betaV21Fixture.opfsObjects) {
+    for (const object of released.opfsObjects) {
       const stream = await (
         await objects.getFileHandle(object.assetId, { create: true })
       ).createWritable();
@@ -59,7 +62,7 @@ export async function probe() {
     };
     let interruption = '';
     try {
-      current = await openDB(name, 22, {
+      current = await openDB(name, DB_VERSION, {
         upgrade(db, old, next, tx) {
           handleDatabaseUpgrade(db, old, next, tx);
         },
@@ -69,11 +72,12 @@ export async function probe() {
     }
     IDBObjectStore.prototype.put = originalPut;
     current?.close();
-    current = await openDB(name, 21);
+    current = await openDB(name, sourceVersion);
     const rolledBack =
-      current.version === 21 && JSON.stringify(await snapshot(current)) === JSON.stringify(before);
+      current.version === sourceVersion &&
+      JSON.stringify(await snapshot(current)) === JSON.stringify(before);
     current.close();
-    current = await openDB(name, 22, {
+    current = await openDB(name, DB_VERSION, {
       upgrade(db, old, next, tx) {
         handleDatabaseUpgrade(db, old, next, tx);
       },
@@ -84,11 +88,11 @@ export async function probe() {
       .every(([store, rows]) => JSON.stringify(after[store]) === JSON.stringify(rows));
     const retainedObjects = (
       await Promise.all(
-        betaV21Fixture.opfsObjects.map(async (object) =>
+        released.opfsObjects.map(async (object) =>
           (await (await objects.getFileHandle(object.assetId)).getFile()).text()
         )
       )
-    ).every((text, index) => text === betaV21Fixture.opfsObjects[index]?.text);
+    ).every((text, index) => text === released.opfsObjects[index]?.text);
     const admitted = parseStoredSchemaContracts(after[contracts]) !== null;
     const expectedContracts = CURRENT_SCHEMA_CONTRACTS.every((expected) =>
       after[contracts]?.some(
@@ -104,13 +108,18 @@ export async function probe() {
     current.close();
     current = undefined;
     let oldWriter = '';
-    try {
-      current = await openDB(name, 21);
-    } catch (cause) {
-      oldWriter = cause instanceof DOMException ? cause.name : 'unexpected';
+    for (let version = sourceVersion; version < DB_VERSION; version++) {
+      try {
+        current = await openDB(name, version);
+        current.close();
+        throw new Error(`Old writer ${version} unexpectedly opened the new schema.`);
+      } catch (cause) {
+        oldWriter = cause instanceof DOMException ? cause.name : 'unexpected';
+        if (oldWriter !== 'VersionError') throw cause;
+      }
     }
     current?.close();
-    current = await openDB(name, 22);
+    current = await openDB(name, DB_VERSION);
     const reopenedUnchanged = JSON.stringify(await snapshot(current)) === JSON.stringify(after);
     return {
       interruption,

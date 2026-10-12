@@ -23,6 +23,7 @@ import {
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import type { ScenarioProjectEntry, ScenarioProjectSnapshot } from './contracts';
 import { createScenarioProjectEntry } from './projects/entry';
+import { isScenarioHistoryActionId } from './history-model';
 import { parseScenarioProjectEntry } from './read-guards';
 import { parseScenarioAssetEntry } from './read-guards';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.guards';
@@ -97,6 +98,8 @@ interface CommitScenarioAggregateMutationOptions {
   expectedUpdatedAt?: number | null;
   storageClass?: LibraryStorageClass;
   publicationUpdatedAt?: number;
+  /** Page-only grouped metadata writes never cross a child-publication journal. */
+  historyActionId?: string;
 }
 
 interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
@@ -211,6 +214,18 @@ export async function commitScenarioAggregateMutation(
   project: GuideProject,
   options: CommitScenarioAggregateMutationOptions = {}
 ): Promise<ScenarioAggregateMutationResult> {
+  if (
+    options.historyActionId !== undefined &&
+    (!isScenarioHistoryActionId(options.historyActionId) ||
+      typeof options.expectedRevision !== 'number' ||
+      !Number.isSafeInteger(options.expectedRevision) ||
+      options.expectedRevision < 0 ||
+      options.children)
+  )
+    return rejectScenarioMutationBeforeHandoff(
+      options.children,
+      new Error('Invalid scenario history action admission.')
+    );
   const parsed = parseGuideProject(project);
   if (parsed.status !== 'ok') {
     return rejectScenarioMutationBeforeHandoff(
@@ -408,6 +423,9 @@ function createScenarioAggregateEntry(args: {
     project: args.project,
     // Both callers privately admit a fresh storage snapshot before constructing this entry.
     historyOwnership: 'exclusive',
+    ...(args.options.historyActionId === undefined
+      ? {}
+      : { historyActionId: args.options.historyActionId }),
     ...(args.options.storageClass === undefined ? {} : { storageClass: args.options.storageClass }),
     ...(args.options.publicationUpdatedAt === undefined
       ? {}

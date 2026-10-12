@@ -114,6 +114,7 @@ it('loads saved action history using the recording identity and exposes its sour
     {
       ref: { kind: 'action', id: 'click' },
       eventType: 'CLICK',
+      audio: { family: 'mouse' },
       start: 2,
       end: 2.2,
       targetSemantics: { kind: 'unknown', source: 'unknown' },

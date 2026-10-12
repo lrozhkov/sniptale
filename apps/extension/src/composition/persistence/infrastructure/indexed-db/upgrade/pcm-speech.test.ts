@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { DB_VERSION, SCHEMA_CONTRACTS_STORE } from '../core.stores';
 import { betaV21Fixture } from '../fixtures/beta-v21';
+import { betaV22Fixture } from '../fixtures/beta-v22';
+import { betaV23Fixture } from '../fixtures/beta-v23';
 import {
   buildDatabaseMigrationPlan,
   CURRENT_SCHEMA_CONTRACTS,
@@ -9,16 +11,19 @@ import {
 import { handleDatabaseUpgrade } from './core';
 
 /** Versionchange adapter models rollback of a late schema publication failure. */
-function upgradeFixture(failAt = Infinity) {
-  const names = new Set<string>(betaV21Fixture.stores);
+function upgradeFixture(
+  failAt = Infinity,
+  released: typeof betaV21Fixture | typeof betaV22Fixture | typeof betaV23Fixture = betaV21Fixture
+) {
+  const names = new Set<string>(released.stores);
   const durable = structuredClone({
-    records: betaV21Fixture.records,
-    objects: betaV21Fixture.opfsObjects,
+    records: released.records,
+    objects: released.opfsObjects,
   });
   let committed = new Map<string, unknown>(
     CURRENT_SCHEMA_CONTRACTS.map(({ domainId }) => [
       domainId,
-      { domainId, schemaVersion: betaV21Fixture.domainVersions[domainId] },
+      { domainId, schemaVersion: released.domainVersions[domainId] },
     ])
   );
   let pending = structuredClone(committed);
@@ -75,6 +80,65 @@ function upgradeFixture(failAt = Infinity) {
     },
   };
 }
+
+it.each([Infinity, 3])(
+  'admits action audio from physical 22 without row rewrites after publication interruption %s',
+  (failAt) => {
+    const fixture = upgradeFixture(failAt, betaV22Fixture);
+    const before = structuredClone(fixture.durable);
+    const oldContracts = fixture.contracts();
+    const plan = buildDatabaseMigrationPlan(22, 23)!;
+    expect(plan).toHaveLength(1);
+    expect(plan[0]).toMatchObject({
+      risk: 'additive',
+      backupCoverage: 'none',
+      domainVersions: [{ domainId: 'mediaLibrary', from: 19, to: 20 }],
+    });
+    if (failAt !== Infinity) {
+      expect(() => handleDatabaseUpgrade(fixture.db, 22, 23, fixture.tx)).toThrow('Interrupted');
+      expect(fixture.contracts()).toEqual(oldContracts);
+      expect(fixture.durable).toEqual(before);
+      fixture.retry();
+    }
+    handleDatabaseUpgrade(fixture.db, 22, 23, fixture.tx);
+    fixture.commit();
+    expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(fixture.durable).toEqual(before);
+    expect(fixture.db.createObjectStore).not.toHaveBeenCalled();
+    expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
+  }
+);
+
+it.each([Infinity, 3])(
+  'admits complete baseline and grouped history from23 with atomic schema publication %s',
+  (failAt) => {
+    const fixture = upgradeFixture(failAt, betaV23Fixture);
+    const before = structuredClone(fixture.durable);
+    const oldContracts = fixture.contracts();
+    expect(buildDatabaseMigrationPlan(23, 24)).toMatchObject([
+      {
+        risk: 'additive',
+        backupCoverage: 'none',
+        domainVersions: [
+          { domainId: 'mediaLibrary', from: 20, to: 21 },
+          { domainId: 'scenarioProjects', from: 6, to: 7 },
+        ],
+      },
+    ]);
+    if (failAt !== Infinity) {
+      expect(() => handleDatabaseUpgrade(fixture.db, 23, 24, fixture.tx)).toThrow('Interrupted');
+      expect(fixture.contracts()).toEqual(oldContracts);
+      expect(fixture.durable).toEqual(before);
+      fixture.retry();
+    }
+    handleDatabaseUpgrade(fixture.db, 23, 24, fixture.tx);
+    fixture.commit();
+    expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(fixture.durable).toEqual(before);
+    expect(fixture.db.createObjectStore).not.toHaveBeenCalled();
+    expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
+  }
+);
 
 it('admits PCM speech content with one additive step and leaves rows and object bytes untouched', async () => {
   const fixture = upgradeFixture();
@@ -157,7 +221,10 @@ it.each([
 
 it('requires the exact PCM speech domain contract at the current physical version', () => {
   expect(parseStoredSchemaContracts(CURRENT_SCHEMA_CONTRACTS)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  for (const schemaVersion of [18, 20]) {
+  const current = CURRENT_SCHEMA_CONTRACTS.find(
+    (contract) => contract.domainId === 'mediaLibrary'
+  )!.schemaVersion;
+  for (const schemaVersion of [current - 1, current + 1]) {
     const incompatible = CURRENT_SCHEMA_CONTRACTS.map((contract) =>
       contract.domainId === 'mediaLibrary' ? { ...contract, schemaVersion } : contract
     );

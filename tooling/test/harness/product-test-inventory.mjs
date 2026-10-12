@@ -68,6 +68,10 @@ export const JSDOM_VM_THREADS_COMPATIBILITY_FILES = [
     reason: 'validates host-realm structured-cloned project records',
   },
   {
+    file: 'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage-history.test.tsx',
+    reason: 'validates host-realm structured-cloned project records in the split history suite',
+  },
+  {
     file: 'apps/extension/src/scenario-editor/page-shell/ai-parameter-preview.test.tsx',
     reason: 'validates host-realm structured-cloned project records',
   },
@@ -149,6 +153,14 @@ export const NODE_VM_THREADS_COMPATIBILITY_FILES = [
   {
     file: 'apps/extension/src/composition/persistence/review-workspaces/store-performance.test.ts',
     reason: 'validates host-realm structured-cloned records; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts',
+    reason: 'asserts host-realm structured-cloned Map identity; exact threads proof passes',
+  },
+  {
+    file: 'apps/extension/src/composition/persistence/review-workspaces/store-typing.test.ts',
+    reason: 'asserts host-realm structured-cloned Map identity; exact threads proof passes',
   },
   {
     file: 'apps/extension/src/composition/persistence/review-workspaces/store-annotation-retention.test.ts',

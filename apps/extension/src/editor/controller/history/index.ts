@@ -1,6 +1,7 @@
 import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 
 const HISTORY_BINARY_INLINE_LIMIT = 4_096;
 const HISTORY_BINARY_TOKEN_PREFIX = 'sniptale-history-asset:';
@@ -20,6 +21,8 @@ type EditorHistoryAssets = {
   byToken: Map<string, string>;
   tokensBySnapshot: Map<string, Set<string>>;
   nextId: number;
+  bytesByToken: Map<string, number>;
+  bytesBySnapshot: Map<string, number>;
 };
 
 const historyAssets = new WeakMap<SnapshotHistory<string>, EditorHistoryAssets>();
@@ -46,6 +49,7 @@ function encodeBinary(
   const token = `${HISTORY_BINARY_TOKEN_PREFIX}${assets.nextId++}`;
   assets.byUrl.set(value, token);
   assets.byToken.set(token, value);
+  assets.bytesByToken.set(token, new TextEncoder().encode(value).byteLength);
   tokens.add(token);
   return token;
 }
@@ -115,7 +119,10 @@ function pruneEditorHistoryAssets(
 ): void {
   const retainedSnapshots = new Set(history.getSnapshots());
   for (const snapshot of assets.tokensBySnapshot.keys()) {
-    if (!retainedSnapshots.has(snapshot)) assets.tokensBySnapshot.delete(snapshot);
+    if (!retainedSnapshots.has(snapshot)) {
+      assets.tokensBySnapshot.delete(snapshot);
+      assets.bytesBySnapshot.delete(snapshot);
+    }
   }
   const retained = new Set<string>();
   for (const tokens of assets.tokensBySnapshot.values()) {
@@ -124,6 +131,7 @@ function pruneEditorHistoryAssets(
   for (const [token, url] of assets.byToken) {
     if (retained.has(token)) continue;
     assets.byToken.delete(token);
+    assets.bytesByToken.delete(token);
     assets.byUrl.delete(url);
   }
 }
@@ -134,11 +142,27 @@ export function createEditorSnapshotHistory(document: EditorDocument): SnapshotH
     byToken: new Map(),
     tokensBySnapshot: new Map(),
     nextId: 0,
+    bytesByToken: new Map(),
+    bytesBySnapshot: new Map(),
   };
   const tokens = new Set<string>();
   const snapshot = encodeEditorSnapshot(document, assets, tokens);
-  const history = new SnapshotHistory<string>(snapshot);
   assets.tokensBySnapshot.set(snapshot, tokens);
+  assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
+  const history = new SnapshotHistory<string>(snapshot, {
+    limit: EDITOR_HISTORY_LIMITS.maxActions + 1,
+    maxBytes: EDITOR_HISTORY_LIMITS.maxBytes,
+    measureBytes: (snapshots) => {
+      let bytes = 0;
+      const retained = new Set<string>();
+      for (const value of snapshots) {
+        bytes += assets.bytesBySnapshot.get(value) ?? new TextEncoder().encode(value).byteLength;
+        for (const token of assets.tokensBySnapshot.get(value) ?? []) retained.add(token);
+      }
+      for (const token of retained) bytes += assets.bytesByToken.get(token) ?? 0;
+      return bytes;
+    },
+  });
   historyAssets.set(history, assets);
   return history;
 }
@@ -155,7 +179,9 @@ export function resetEditorSnapshotHistory(
   history.reset(snapshot);
   if (assets) {
     assets.tokensBySnapshot.clear();
+    assets.bytesBySnapshot.clear();
     assets.tokensBySnapshot.set(snapshot, tokens);
+    assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
   }
   if (assets) pruneEditorHistoryAssets(history, assets);
 }
@@ -238,8 +264,9 @@ export function pushEditorSnapshotHistory(options: {
   const snapshot = assets
     ? encodeEditorSnapshot(options.exportDocument(), assets, tokens)
     : JSON.stringify(options.exportDocument());
-  options.history.push(snapshot);
   if (assets) assets.tokensBySnapshot.set(snapshot, tokens);
+  if (assets) assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
+  options.history.push(snapshot);
   if (assets) pruneEditorHistoryAssets(options.history, assets);
   return true;
 }

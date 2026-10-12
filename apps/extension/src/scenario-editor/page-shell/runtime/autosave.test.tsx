@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { act, StrictMode } from 'react';
+import { act, StrictMode, useEffect, useState } from 'react';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
-import { reduceGuideHistory } from './history';
+import { reduceGuideHistory, useGuideHistory } from './history';
+import { createScenarioProjectEntry } from '../../../composition/persistence/scenario/projects/entry';
+import type { ScenarioProjectEntry } from '../../../composition/persistence/scenario/contracts';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../../features/scenario/project/public';
@@ -19,6 +21,184 @@ function Harness() {
   autosave = useGuideAutosave(input);
   return null;
 }
+
+let groupHistory: ReturnType<typeof useGuideHistory>;
+let groupAutosave: ReturnType<typeof useGuideAutosave>;
+function GroupHarness() {
+  const [status, setStatus] = useState<'dirty' | 'saving' | 'saved' | 'failed' | 'conflict'>(
+    'saved'
+  );
+  groupHistory = useGuideHistory({
+    canEdit: () => true,
+    onEdit: () => setStatus('dirty'),
+    onFailure: () => setStatus('failed'),
+  });
+  const { reset } = groupHistory;
+  useEffect(() => {
+    reset(input.saved.current!.project);
+  }, [reset]);
+  groupAutosave = useGuideAutosave({
+    ...input,
+    project: groupHistory.project,
+    actionId: groupHistory.actionId,
+    closedCaptures: groupHistory.closedCaptures,
+    onSealEdit: groupHistory.sealEdit,
+    dirty: status === 'dirty',
+    conflict: status === 'conflict',
+    onStatus: setStatus,
+    onPublish: groupHistory.publish,
+  });
+  return null;
+}
+
+function groupedStore() {
+  const project = input.saved.current!.project;
+  let entry: ScenarioProjectEntry = {
+    id: project.id,
+    project,
+    workspaceRevision: 1,
+    createdAt: 1,
+    updatedAt: project.updatedAt,
+  };
+  save.mockImplementation(
+    async (
+      source: typeof project,
+      options: { expectedRevision: number; historyActionId?: string }
+    ) => {
+      expect(options.expectedRevision).toBe(entry.workspaceRevision);
+      entry = createScenarioProjectEntry({
+        existing: entry,
+        project: source,
+        ...(options.historyActionId ? { historyActionId: options.historyActionId } : {}),
+        updatedAt: entry.updatedAt + 1,
+      });
+      return { project: entry.project, workspaceRevision: entry.workspaceRevision };
+    }
+  );
+  return () => entry;
+}
+
+it('saves final X before Y after a real maxWait intermediate and restores exact group boundaries', async () => {
+  const stored = groupedStore();
+  await act(async () => root.render(<GroupHarness />));
+  for (const name of ['A', 'Aa', 'Aaa', 'Aaaa']) {
+    await act(async () => {
+      groupHistory.update({ ...groupHistory.project!, name }, 'name');
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS - 1));
+  }
+  expect(save).toHaveBeenCalledOnce();
+  const firstAction = save.mock.calls[0]![1].historyActionId;
+  expect(firstAction).toEqual(expect.any(String));
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, name: 'Final X' }, 'name');
+  });
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, tags: ['Y'] }, 'tags');
+  });
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  expect(stored().history?.map((version) => version.project.name)).toEqual(['Guide', 'Final X']);
+  expect(stored().history?.at(-1)?.project.tags).toEqual([]);
+  expect(stored().project.tags).toEqual(['Y']);
+  expect(save.mock.calls.map((call) => call[1].historyActionId)).toEqual([
+    firstAction,
+    firstAction,
+    expect.any(String),
+  ]);
+  expect(save.mock.calls[2]![1].historyActionId).not.toBe(firstAction);
+});
+
+it('keeps two closed groups page-local with autosave OFF and serves them in order on explicit Save', async () => {
+  input = { ...input, enabled: false };
+  const stored = groupedStore();
+  await act(async () => root.render(<GroupHarness />));
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, name: 'Final X' }, 'name');
+  });
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, tags: ['Y'] }, 'tags');
+  });
+  await act(async () => vi.advanceTimersByTimeAsync(2 * GUIDE_AUTOSAVE_MAX_WAIT_MS));
+  expect(save).not.toHaveBeenCalled();
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  expect(stored().history?.map((version) => version.project.name)).toEqual(['Guide', 'Final X']);
+  expect(stored().project.tags).toEqual(['Y']);
+});
+
+it('closes a manual Save group before await and preserves a newer field action while its write is held', async () => {
+  input = { ...input, enabled: false };
+  const stored = groupedStore();
+  const commit = save.getMockImplementation()!;
+  let release: () => void = () => undefined;
+  save.mockImplementationOnce(
+    (source, options) =>
+      new Promise((resolve, reject) => {
+        release = () => {
+          void commit(source, options).then(resolve, reject);
+        };
+      })
+  );
+  await act(async () => root.render(<GroupHarness />));
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, name: 'A' }, 'name');
+  });
+  const firstId = groupHistory.actionId;
+  let saved: Promise<boolean> | undefined;
+  await act(async () => {
+    saved = groupAutosave.save();
+  });
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, name: 'AB' }, 'name');
+  });
+  const newerId = groupHistory.actionId;
+  expect(newerId).not.toBe(firstId);
+  await act(async () => {
+    release();
+    expect(await saved).toBe(true);
+  });
+  expect(groupHistory.project?.name).toBe('AB');
+  expect(groupHistory.actionId).toBe(newerId);
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  expect(save.mock.calls.map((call) => call[1].historyActionId)).toEqual([firstId, newerId]);
+  expect(stored().history?.map((version) => version.project.name)).toEqual(['Guide', 'A']);
+});
+
+it('keeps an ordinary latest barrier inside the same group while manual Save closes it', async () => {
+  const stored = groupedStore();
+  await act(async () => root.render(<GroupHarness />));
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, name: 'A' }, 'name');
+  });
+  const id = groupHistory.actionId;
+  await act(async () => {
+    expect(await groupAutosave.flushLatest()).toMatchObject({ name: 'A' });
+  });
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, name: 'AB' }, 'name');
+  });
+  expect(groupHistory.actionId).toBe(id);
+  await act(async () => {
+    expect(await groupAutosave.flushLatest()).toMatchObject({ name: 'AB' });
+  });
+  expect(stored().history?.map((version) => version.project.name)).toEqual(['Guide']);
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  await act(async () => {
+    groupHistory.update({ ...groupHistory.project!, name: 'ABC' }, 'name');
+  });
+  expect(groupHistory.actionId).not.toBe(id);
+  await act(async () => {
+    expect(await groupAutosave.save()).toBe(true);
+  });
+  expect(stored().history?.map((version) => version.project.name)).toEqual(['Guide', 'AB']);
+});
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -519,4 +699,26 @@ it('preserves array ordering as a real edit when flushing', async () => {
     items: [{ id: 'second' }, { id: 'first' }],
   });
   expect(save).toHaveBeenCalledOnce();
+});
+
+it('acknowledges closed captures before React publishes the next render', async () => {
+  const base = input.saved.current!.project;
+  const x = { ...base, name: 'Closed X' };
+  const y = { ...x, tags: ['Y'] };
+  let writes = 0;
+  save.mockImplementation(async (project) => {
+    if (++writes > 2) throw new Error('Closed capture repeated');
+    return { project: { ...project, updatedAt: 100 + writes }, workspaceRevision: 1 + writes };
+  });
+  input = {
+    ...input,
+    project: y,
+    actionId: '22222222-2222-4222-8222-222222222222',
+    dirty: true,
+    closedCaptures: [{ project: x, actionId: '11111111-1111-4111-8111-111111111111' }],
+    onPublish: vi.fn(),
+  };
+  act(() => root.render(<Harness />));
+  await expect(autosave.flushLatest()).resolves.toMatchObject({ name: 'Closed X', tags: ['Y'] });
+  expect(save).toHaveBeenCalledTimes(2);
 });

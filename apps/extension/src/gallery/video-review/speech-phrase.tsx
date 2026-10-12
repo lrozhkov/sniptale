@@ -106,7 +106,7 @@ export function ReviewTextPhrase(props: {
   next?: ReviewTextFragment | undefined;
   editor: Pick<
     ReturnType<typeof useReviewText>,
-    'change' | 'split' | 'merge' | 'remove' | 'playhead' | 'captions'
+    'change' | 'split' | 'merge' | 'remove' | 'playhead' | 'captions' | 'endTyping'
   >;
   expanded: boolean;
   selected?: boolean;
@@ -163,6 +163,10 @@ export function ReviewTextPhrase(props: {
             value={fragment.text}
             disabled={props.busy}
             onChange={(event) => props.editor.change(fragment.id, { text: event.target.value })}
+            onBlur={() => props.editor.endTyping()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') props.editor.endTyping();
+            }}
             onSelect={() => setCaret(textarea.current?.selectionStart ?? 0)}
           />
           <div className="flex items-center gap-1">

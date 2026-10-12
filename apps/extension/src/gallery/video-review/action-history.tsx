@@ -1,5 +1,17 @@
 import { ReviewInspectorSections } from './inspector-sections';
-import { HistoryFilters, queryHistory, type HistoryFilterValues } from './action-history-filters';
+import {
+  HistoryFilters,
+  queryHistory,
+  historySelectableKey,
+  type HistoryFilterValues,
+} from './action-history-filters';
+import { reviewActionAudioTarget } from '../../features/video/review/action-audio';
+import type {
+  ReviewActionAudioTarget,
+  ReviewActionAudioSetting,
+  ReviewActionAudioPatch,
+} from '../../features/video/review/advanced/action-audio';
+import { ReviewActionAudioFields, reviewActionAudioSection } from './action-audio-fields';
 import { isReviewKey } from '../../features/video/review/key-animation';
 import {
   REVIEW_KEY_DEFAULT,
@@ -27,6 +39,13 @@ type ReviewActionHistoryProps = {
   markers: readonly ReviewTelemetryMarker[];
   animations: readonly ReviewClickAnimation[];
   keyAnimations?: readonly ReviewKeyAnimation[];
+  actionAudio?: readonly ReviewActionAudioSetting[];
+  onAudioChange?(
+    targets: readonly ReviewActionAudioTarget[],
+    patch: ReviewActionAudioPatch | null
+  ): void;
+  onAudition?: Parameters<typeof ReviewActionAudioFields>[0]['onAudition'];
+  onStopAudition?: (() => void) | undefined;
   onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
   activeRef?: ReviewTelemetryMarker['ref'] | undefined;
   busy: boolean;
@@ -64,9 +83,10 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
     selected,
     keySettings
   );
-  const keyIdentities = new Set(props.markers.filter(isReviewKey).map((marker) => marker.ref.id));
-  const keyIds = ids.filter((id) => keyIdentities.has(id));
-  const clickIds = ids.filter((id) => !keyIds.includes(id));
+  const { selectedKeys, keyIds, clickIds, audioTargets } = historyPresentationTargets(
+    props.markers,
+    ids
+  );
   const hidden = ids.length - checked;
   const changeView = (next: boolean) => {
     const scroll = list.current;
@@ -100,6 +120,7 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
             keyIds={keyIds}
             settings={settings}
             keySettings={keySettings}
+            audioTargets={audioTargets}
             {...props}
           />
         </div>
@@ -151,19 +172,19 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
                   marker={marker}
                   keyStyle={isReviewKey(marker) ? keySettings.get(marker.ref.id) : undefined}
                   style={isReviewClick(marker) ? settings.get(marker.ref.id) : undefined}
-                  selected={ids.includes(marker.ref.id)}
+                  selected={selectedKeys.has(historySelectableKey(marker) ?? '')}
                   active={
                     props.activeRef?.kind === marker.ref.kind &&
                     props.activeRef.id === marker.ref.id
                   }
                   onSelect={() => props.onSelect(marker)}
-                  onCheck={(value) =>
+                  onCheck={(value) => {
+                    const key = historySelectableKey(marker);
+                    if (key === null) return;
                     setSelected((current) =>
-                      value
-                        ? [...new Set([...current, marker.ref.id])]
-                        : current.filter((id) => id !== marker.ref.id)
-                    )
-                  }
+                      value ? [...new Set([...current, key])] : current.filter((id) => id !== key)
+                    );
+                  }}
                 />
               ))}
             </ol>
@@ -179,6 +200,24 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
       )}
     </fieldset>
   );
+}
+
+function historyPresentationTargets(
+  markers: readonly ReviewTelemetryMarker[],
+  ids: readonly string[]
+) {
+  const selectedKeys = new Set(ids);
+  const selected = markers.filter((marker) => selectedKeys.has(historySelectableKey(marker) ?? ''));
+  return {
+    selectedKeys,
+    keyIds: selected.filter(isReviewKey).map((marker) => marker.ref.id),
+    clickIds: selected
+      .filter((marker) => isReviewClick(marker) && marker.focusPoint)
+      .map((marker) => marker.ref.id),
+    audioTargets: selected
+      .map(reviewActionAudioTarget)
+      .filter((target): target is ReviewActionAudioTarget => target !== null),
+  };
 }
 
 /** Batch scope and return navigation stay visible independently of animation field groups. */
@@ -226,6 +265,15 @@ function HistoryAnimationFields(props: {
   keyIds: readonly string[];
   settings: ReadonlyMap<string, ReviewClickAnimation>;
   keyAnimations?: readonly ReviewKeyAnimation[];
+  audioTargets: readonly ReviewActionAudioTarget[];
+  actionAudio?: readonly ReviewActionAudioSetting[];
+  busy: boolean;
+  onAudioChange?(
+    targets: readonly ReviewActionAudioTarget[],
+    patch: ReviewActionAudioPatch | null
+  ): void;
+  onAudition?: Parameters<typeof ReviewActionAudioFields>[0]['onAudition'];
+  onStopAudition?: (() => void) | undefined;
   onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
   onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
 }) {
@@ -258,12 +306,30 @@ function HistoryAnimationFields(props: {
         ? `${translate('gallery.videoReview.historyKeys')} · ${section.label}`
         : section.label,
     })),
+    ...(props.onAudioChange && props.audioTargets.length
+      ? [
+          reviewActionAudioSection(
+            <ReviewActionAudioFields
+              targets={props.audioTargets}
+              settings={props.actionAudio ?? []}
+              busy={props.busy}
+              onChange={props.onAudioChange}
+              onAudition={props.onAudition}
+              onStopAudition={props.onStopAudition}
+            />
+          ),
+        ]
+      : []),
   ];
   return (
     <div
       className="min-w-0"
       data-ui={
-        clickIds.length ? 'gallery.videoReview.clickFields' : 'gallery.videoReview.keyFields'
+        clickIds.length
+          ? 'gallery.videoReview.clickFields'
+          : props.keyIds.length
+            ? 'gallery.videoReview.keyFields'
+            : 'gallery.videoReview.historyAudioFields'
       }
     >
       <ReviewInspectorSections sections={sections} />

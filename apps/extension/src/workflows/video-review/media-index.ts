@@ -18,7 +18,8 @@ export interface ReviewRenderSettings {
   format?: 'mp4' | 'webm';
   codec?: ReviewOutputCodec;
   resolution?: VideoResolutionPreset;
-  quality: VideoQuality;
+  /** Missing quality preserves source packets when no other choice requires rendering. */
+  quality?: VideoQuality;
   frameRate: 0 | 24 | 30 | 60;
   frameRateMode?: 'constant' | 'adaptive';
 }

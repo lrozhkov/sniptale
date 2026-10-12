@@ -17,7 +17,7 @@ it('preserves bitwise streaming parity for late windows in a 170-second native-r
     clip: {
       lane: 'voiceover',
       clipId: 'voice',
-      assetId: 'voice',
+      source: { kind: 'project' as const, assetId: 'voice' },
       timelineStart: 0,
       sourceOffset: 70.25,
       duration: 5,

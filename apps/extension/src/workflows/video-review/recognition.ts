@@ -59,6 +59,7 @@ export interface ReviewRecognitionProposal {
   job: ReviewRecognitionJob;
   document: ReviewTextDocument;
   receipt?: Extract<ReviewOperation, { target: 'advancedContent' }>;
+  receiptBaseRevision?: number;
 }
 
 function textBasis(session: ReviewSpeechSession) {
@@ -284,7 +285,7 @@ export async function runReviewRecognition(
   return { job, document };
 }
 
-/** Reads the exact accepted receipt without saving, replaying or discarding the editor's buffer. */
+/** Canonical recovery precedes any flush and preserves unrelated uncommitted editor actions. */
 export async function reviewRecognitionWasApplied(
   session: ReviewSpeechSession,
   proposal: ReviewRecognitionProposal,
@@ -293,16 +294,14 @@ export async function reviewRecognitionWasApplied(
   signal.throwIfAborted();
   if (session.getSnapshot().snapshot.workspace.aggregateId !== proposal.job.workspaceId)
     throw new Error('stale');
-  if (!proposal.receipt) return false;
-  const accepted = await session.readRetainedReviewOperation(proposal.receipt.id);
+  if (!proposal.receipt || proposal.receiptBaseRevision === undefined) return false;
+  const accepted = await session.recoverDurableOperation(
+    proposal.receipt,
+    proposal.receiptBaseRevision,
+    { kind: 'text' }
+  );
   signal.throwIfAborted();
-  if (!accepted) return false;
-  if (
-    accepted.target !== 'advancedContent' ||
-    JSON.stringify(accepted.after.text) !== JSON.stringify(proposal.receipt.after.text)
-  )
-    throw new Error('stale');
-  return true;
+  return accepted;
 }
 
 /** One explicit durable history operation; retrying its acknowledgement never repeats recognition. */
@@ -319,7 +318,7 @@ export async function applyReviewRecognition(
   if (await reviewRecognitionWasApplied(session, proposal, signal)) return;
   assertRecognitionBasis(session, job);
   const before = structuredClone(session.getSnapshot().document.advancedContent);
-  // Canonical authority confirmed absence above. Keep this operation's accepted text intent,
+  // Canonical authority confirmed absence at this receipt's attempted revision above. Keep its accepted text intent,
   // and refresh only unrelated content so a buffered gain edit cannot trap a failed Apply.
   if (proposal.receipt) {
     const text = proposal.receipt.after.text;
@@ -347,5 +346,7 @@ export async function applyReviewRecognition(
       after: { ...before, text },
     };
   }
-  await session.commitDurable(proposal.receipt);
+  await session.commitDurable(proposal.receipt, (revision) => {
+    proposal.receiptBaseRevision = revision;
+  });
 }

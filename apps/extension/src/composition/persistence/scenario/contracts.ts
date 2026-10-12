@@ -25,6 +25,8 @@ export interface ScenarioProjectEntry {
   /** Owner-issued revision of the committed aggregate. */
   workspaceRevision: number;
   history?: ScenarioSavedVersion[];
+  /** Last accepted page action; only an exact revision CAS can continue this saved-version group. */
+  lastAcceptedActionId?: string;
 }
 
 export interface ScenarioAssetEntry {

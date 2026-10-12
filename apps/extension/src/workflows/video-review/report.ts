@@ -1,10 +1,7 @@
 import type { ReviewExportReceipt } from './export-lifecycle';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
-import {
-  replayReviewHistory,
-  reviewAdvancedContentBaseline,
-} from '../../features/video/review/document';
+import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import { buildReviewTimeMap, mapReviewAnchor } from '../../features/video/review/timeline';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 import { projectVideoRegion } from '../../features/video/review/geometry';
@@ -118,7 +115,7 @@ export function createVideoReviewReport(args: {
     workspace.history,
     workspace.cursor,
     workspace.source,
-    reviewAdvancedContentBaseline(workspace.advanced)
+    reviewDocumentBaseline(workspace)
   );
   const map = buildReviewTimeMap(workspace.source.duration, document.edits);
   const annotations = document.annotations.map((annotation) => {

@@ -4,7 +4,11 @@ import {
   replayReviewHistory,
   ReviewHistoryError,
 } from '../../../features/video/review/document';
-import type { ReviewOperation, ReviewSource } from '../../../features/video/review/types';
+import type {
+  ReviewOperation,
+  ReviewSource,
+  ReviewDocument,
+} from '../../../features/video/review/types';
 import type { QuickEditAdvancedContent } from '../../../features/video/review/advanced/types';
 
 /** Successful content admission drops only the known text-only header; never infer from malformed data. */
@@ -27,7 +31,7 @@ export function replayStoredReviewHistory(args: {
   discardedHeaderChanges: ReadonlySet<number>;
   cursor: number;
   source: ReviewSource;
-  baseline: QuickEditAdvancedContent;
+  baseline: QuickEditAdvancedContent | ReviewDocument;
 }) {
   let current = replayReviewHistory([], 0, args.source, args.baseline);
   let document = current;

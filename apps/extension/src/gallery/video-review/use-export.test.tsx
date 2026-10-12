@@ -88,6 +88,35 @@ function setup(
     },
   };
 }
+it('keeps the actual UI default source profile and restores it after an explicit quality choice', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+  }, true);
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    expect(fixture.hook.renderSettings).toEqual({ frameRate: 0 });
+    expect(fixture.hook.sourceVideoAvailable).toBe(true);
+    expect(fixture.hook.plan()).toMatchObject({ kind: 'ready', video: 'copy' });
+    const quality = fixture.host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.exportQuality')}"]`
+    )!;
+    expect(quality.textContent).toContain(translate('gallery.videoReview.exportSourceVideo'));
+    await act(async () => fixture.hook.setRenderSettings({ frameRate: 0, quality: 'HIGH' }));
+    expect(fixture.hook.plan()).toMatchObject({ kind: 'ready', video: 'render' });
+    expect(fixture.hook.sourceVideoAvailable).toBe(true);
+    await act(async () => quality.click());
+    const source = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+      (button) => button.textContent === translate('gallery.videoReview.exportSourceVideo')
+    )!;
+    expect(source.disabled).toBe(false);
+    await act(async () => source.click());
+    expect(fixture.hook.renderSettings).toEqual({ frameRate: 0 });
+    expect(fixture.hook.plan()).toMatchObject({ kind: 'ready', video: 'copy' });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
 it('serializes the export button, honors cancellation, and leaves no false success', async () => {
   const fixture = setup();
   let reject!: (error: Error) => void;

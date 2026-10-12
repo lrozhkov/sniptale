@@ -1,3 +1,4 @@
+import { quickEditAudioSourceKey } from '../../features/video/review/advanced/audio-plan';
 import { readFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { expect, it, vi } from 'vitest';
@@ -325,7 +326,7 @@ it('exports zero-fade external clips at constant gain through their end', async 
     const entry = {
       lane: 'music' as const,
       clipId: 'm',
-      assetId: 'project-asset:m',
+      source: { kind: 'project' as const, assetId: 'project-asset:m' },
       timelineStart: 0.5,
       duration: 0.5,
       sourceOffset: 0,
@@ -342,7 +343,10 @@ it('exports zero-fade external clips at constant gain through their end', async 
       {
         entries: [entry],
         buffers: new Map<string, AudioBuffer>([
-          ['project-asset:m', clipBuffer as unknown as AudioBuffer],
+          [
+            quickEditAudioSourceKey({ kind: 'project', assetId: 'project-asset:m' }),
+            clipBuffer as unknown as AudioBuffer,
+          ],
         ]),
         originalVolume: 2,
         originalMuted: false,
@@ -381,7 +385,7 @@ it('exports a voiceover slice with the same asset rate and fade phase as preview
           {
             lane: 'voiceover',
             clipId: 'v:slice',
-            assetId: 'voice',
+            source: { kind: 'project' as const, assetId: 'voice' },
             timelineStart: 0,
             duration: 1,
             sourceOffset: 1,
@@ -392,7 +396,12 @@ it('exports a voiceover slice with the same asset rate and fade phase as preview
             fadePhase: { offset: 1, duration: 4 },
           },
         ],
-        buffers: new Map([['voice', buffer as unknown as AudioBuffer]]),
+        buffers: new Map([
+          [
+            quickEditAudioSourceKey({ kind: 'project', assetId: 'voice' }),
+            buffer as unknown as AudioBuffer,
+          ],
+        ]),
         originalVolume: 1,
         originalMuted: false,
       }
@@ -418,7 +427,7 @@ it('keeps external speech PCM continuous across separate video-segment renders',
     const entry = {
       lane: 'voiceover' as const,
       clipId: 'voice',
-      assetId: 'voice',
+      source: { kind: 'project' as const, assetId: 'voice' },
       timelineStart: 0,
       sourceOffset: 0.37,
       duration: 1.75,
@@ -429,7 +438,7 @@ it('keeps external speech PCM continuous across separate video-segment renders',
     };
     const plan = {
       entries: [entry],
-      buffers: new Map([['voice', buffer]]),
+      buffers: new Map([[quickEditAudioSourceKey({ kind: 'project', assetId: 'voice' }), buffer]]),
       originalVolume: 1,
       originalMuted: true,
     };
@@ -651,7 +660,7 @@ it('retains native resampler context around streamed normal-speed clip windows',
           {
             lane: 'music',
             clipId: 'm',
-            assetId: 'a',
+            source: { kind: 'project' as const, assetId: 'a' },
             timelineStart: 0,
             sourceOffset: 2,
             duration: 5,
@@ -661,7 +670,10 @@ it('retains native resampler context around streamed normal-speed clip windows',
           },
         ],
         buffers: new Map([
-          ['a', { sampleRate: 44100, numberOfChannels: 1, length: 44100 * 10, read, dispose() {} }],
+          [
+            quickEditAudioSourceKey({ kind: 'project', assetId: 'a' }),
+            { sampleRate: 44100, numberOfChannels: 1, length: 44100 * 10, read, dispose() {} },
+          ],
         ]),
         originalVolume: 1,
         originalMuted: true,
@@ -728,7 +740,7 @@ it.each([...[0.5, 1, 2, 4].map((rate) => ({ rate, overlay: true })), { rate: 1, 
             {
               lane: 'voiceover',
               clipId: 'accepted',
-              assetId: 'accepted',
+              source: { kind: 'project' as const, assetId: 'accepted' },
               timelineStart: 0,
               duration: 0.4 / rate,
               sourceOffset: 0,
@@ -739,8 +751,8 @@ it.each([...[0.5, 1, 2, 4].map((rate) => ({ rate, overlay: true })), { rate: 1, 
             },
           ],
           buffers: new Map([
-            ['accepted', voiceover],
-            ['music', voiceover],
+            [quickEditAudioSourceKey({ kind: 'project', assetId: 'accepted' }), voiceover],
+            [quickEditAudioSourceKey({ kind: 'project', assetId: 'music' }), voiceover],
           ]),
           originalVolume: overlay ? 2 : 1,
           originalMuted: false,

@@ -3,9 +3,11 @@ import { resolve } from 'node:path';
 import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
+import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import type { ReviewOperation } from '../../../features/video/review/types';
 import { createReviewWorkspaceStoreFixture } from './store.test-support';
-import { parseVideoWorkspace } from './parser';
+import { inspectVideoWorkspace, parseVideoWorkspace } from './parser';
+import { applyLocalReviewChange } from '../../../workflows/video-review/local-session';
 import { workspaceStorageHead, workspaceStorageRows } from './storage-format';
 
 const harness = vi.hoisted(() => ({ database: vi.fn(), failure: false }));
@@ -258,3 +260,72 @@ it('keeps committed authored changes and a replay intent when physical deletion 
     expect.objectContaining({ kind: 'physical-delete', assetIds: ['adopted-bytes'] }),
   ]);
 });
+
+it.each(['append', 'paused-save'])(
+  'retains expired effect bytes after automatic history rollover via %s',
+  async (mode) => {
+    const adopted = await installAdoptedAnnotation();
+    const applied = adopted.history[0]!;
+    if (applied.target !== 'advancedContent') throw new Error('Unexpected adopted operation');
+    const history: ReviewOperation[] = [
+      applied,
+      { ...applied, id: 'remove-adopted', before: applied.after, after: applied.before },
+    ];
+    let volume = applied.before.audio.original.volume;
+    for (let i = 0; i < 48; i++) {
+      const after = i % 2 ? 0.2 : 0.3;
+      history.push({
+        id: `retained-gain-${i}`,
+        at: i + 2,
+        target: 'sourceAudio',
+        before: { muted: false, volume },
+        after: { muted: false, volume: after },
+      });
+      volume = after;
+    }
+    const parsed = parseVideoWorkspace({ ...adopted, history, cursor: history.length });
+    if (!parsed) throw new Error('Invalid rollover fixture');
+    let workspace: VideoWorkspace = parsed;
+    rows.get('video_workspaces')!.set(id, workspaceStorageHead(workspace, []));
+    rows.get('video_workspace_history')!.clear();
+    for (const row of workspaceStorageRows(workspace))
+      rows.get('video_workspace_history')!.set(JSON.stringify([id, row.ordinal]), row);
+    for (let i = 0; i < 3; i++) {
+      const current = inspectVideoWorkspace(workspace).document!;
+      const change: ReviewOperation = {
+        id: `rollover-gain-${i}`,
+        at: 100 + i,
+        target: 'sourceAudio',
+        before: { ...current.advancedContent.audio.original },
+        after: { muted: false, volume: i % 2 ? 0.5 : 0.6 },
+      };
+      const saved: VideoWorkspaceSnapshot =
+        mode === 'append'
+          ? await commitVideoWorkspace({
+              aggregateId: id,
+              expectedRevision: workspace.revision,
+              expectedSourceAssetId: workspace.sourceAssetId,
+              operation: change,
+            })
+          : await saveVideoWorkspaceSnapshot({
+              aggregateId: id,
+              expectedRevision: workspace.revision,
+              expectedSourceAssetId: workspace.sourceAssetId,
+              expectedDraftRevision: null,
+              ...applyLocalReviewChange(
+                { workspace, draft: null },
+                { kind: 'commit', operation: change, consumeDraft: false }
+              ),
+            });
+      workspace = saved.workspace;
+    }
+    expect(workspace.history).toHaveLength(50);
+    expect(workspace.effectSnapshots).toEqual([]);
+    expect(rows.get('project_assets')!.has('adopted')).toBe(true);
+    expect(rows.get('asset_refs')!.has('adopted-bytes')).toBe(true);
+    expect(
+      rows.get('asset_owners')!.has(JSON.stringify(['project-asset', 'adopted', 'body']))
+    ).toBe(true);
+    expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
+  }
+);

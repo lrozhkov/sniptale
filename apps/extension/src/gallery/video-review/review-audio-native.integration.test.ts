@@ -61,7 +61,7 @@ it('decodes real44100Hz WAV windows and preserves native-grid tempo parity', asy
     const clip = {
       lane: 'music' as const,
       clipId: 'm',
-      assetId: 'wav',
+      source: { kind: 'project' as const, assetId: 'wav' },
       timelineStart: 0,
       sourceOffset: 0.2,
       duration: 2,

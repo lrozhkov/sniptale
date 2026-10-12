@@ -19,7 +19,8 @@
     "./utils/hotkey-key-maps": "./src/utils/hotkey-key-maps.ts",
     "./utils/preset-path": "./src/utils/preset-path.ts",
     "./utils/screenshot-filename": "./src/utils/screenshot-filename.ts",
-    "./history/equal": "./src/history/equal.ts"
+    "./history/equal": "./src/history/equal.ts",
+    "./history/retention": "./src/history/retention.ts"
   },
   "devDependencies": {
     "vitest": "5.0.3"

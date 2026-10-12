@@ -14,7 +14,7 @@ function entry(rate: number, duration = 1.3): QuickEditAudioPlanEntry {
   return {
     lane: 'voiceover',
     clipId: 'voice',
-    assetId: 'voice',
+    source: { kind: 'project' as const, assetId: 'voice' },
     timelineStart: 0,
     sourceOffset: 0.37,
     duration,

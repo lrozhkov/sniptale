@@ -2,14 +2,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  useReviewAudioRuntime,
-  type ReviewAudioClipBuffer,
-  type ReviewAudioEngine,
-} from './use-review-audio-runtime';
+import type { ReviewAudioClipBuffer } from './use-review-audio-runtime';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
+import { FakeEngine, renderRuntime } from './review-audio-runtime.test-support';
 
 const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   id: 'a',
@@ -23,42 +19,6 @@ const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   fadeOut: 0,
   ...patch,
 });
-
-class FakeEngine implements ReviewAudioEngine {
-  scheduled: Array<{ schedule: unknown; buffer: unknown }> = [];
-  stops = 0;
-  gains: number[] = [];
-  currentTime = 100;
-  failResume = false;
-  dispose = vi.fn(() => this.stopAll());
-  readonly decoded = { duration: 10 } satisfies ReviewAudioClipBuffer;
-  async resume() {
-    if (this.failResume) throw new Error('autoplay failed');
-  }
-  now() {
-    return this.currentTime;
-  }
-  async decode() {
-    return this.decoded;
-  }
-  async prepareClip(
-    _buffer: ReviewAudioClipBuffer,
-    _entry: QuickEditAudioPlanEntry,
-    _signal: AbortSignal
-  ) {
-    return this.decoded;
-  }
-  scheduleClip(schedule: unknown, buffer: unknown) {
-    this.scheduled.push({ schedule, buffer });
-    return { stop: () => undefined };
-  }
-  setOriginalGain(volume: number) {
-    this.gains.push(volume);
-  }
-  stopAll() {
-    this.stops += 1;
-  }
-}
 
 it('keeps music alive through a source Cut jump and reschedules only a real output seek', async () => {
   const map = createReviewTimeMap(12, [
@@ -139,8 +99,6 @@ it.each(['pause', 'seek'] as const)(
   }
 );
 
-type RuntimeArgs = Parameters<typeof useReviewAudioRuntime>[0];
-
 let root: Root;
 let host: HTMLDivElement;
 
@@ -156,27 +114,6 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
-
-function renderRuntime(args: Partial<RuntimeArgs>) {
-  const base: RuntimeArgs = {
-    video: { current: document.createElement('video') },
-    playing: false,
-    outputTime: 0,
-    original: { muted: false, volume: 1 },
-    voiceover: [],
-    music: [],
-    resolveAsset: async () => null,
-    sessionKey: 'session-1',
-    onFailure: () => undefined,
-    createEngine: () => null,
-    ...args,
-  };
-  const Harness = (patch: Partial<RuntimeArgs>) => {
-    useReviewAudioRuntime({ ...base, ...patch });
-    return null;
-  };
-  return { Harness };
-}
 
 it('schedules a running external clip from the current output time', async () => {
   const engine = new FakeEngine();

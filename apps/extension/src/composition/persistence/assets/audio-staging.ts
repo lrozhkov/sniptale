@@ -3,7 +3,7 @@ import { readLibrarySceneSource } from '../projects/library-scene-source';
 import { readVideoWorkspace } from '../review-workspaces/store';
 import {
   replayReviewHistory,
-  reviewAdvancedContentBaseline,
+  reviewDocumentBaseline,
 } from '../../../features/video/review/document';
 import {
   AUDIO_OUTPUT_MAX_BYTES,
@@ -81,7 +81,7 @@ async function assertScopeExists(scope: AudioJobScope): Promise<void> {
     workspace.history,
     workspace.cursor,
     workspace.source,
-    reviewAdvancedContentBaseline(workspace.advanced)
+    reviewDocumentBaseline(workspace)
   );
   if (!isAudioSourceJobScope(scope)) {
     const fragment = document.advancedContent.text?.fragments.find(

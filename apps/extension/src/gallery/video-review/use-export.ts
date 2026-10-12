@@ -1,5 +1,8 @@
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { buildReviewTimeMap, mapReviewAnchor } from '../../features/video/review/timeline';
+import { buildReviewActionAudioPlan } from '../../features/video/review/action-audio';
+import { projectReviewTelemetry } from '../../features/video/review/telemetry';
+import { hasQuickEditActionAudio } from '../../features/video/review/advanced/audio-plan';
 import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { useReviewSizeEstimate } from './use-size-estimate';
@@ -19,6 +22,7 @@ import {
 import {
   type QuickEditExportPlan,
   type QuickEditExportReason,
+  resolveQuickEditEffectiveFeatures,
 } from '../../features/video/review/advanced/effective';
 import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
@@ -196,24 +200,21 @@ function reviewPresentationDuration(
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
   const { sourceIndex, indexing } = useReviewSourceIndex(resource.file);
-  const state = resource.session.getSnapshot();
-  const presentation = state.document.advancedContent.presentation;
+  const { document, snapshot } = resource.session.getSnapshot();
+  const advanced = { ui: snapshot.workspace.advanced.ui, ...document.advancedContent };
+  const presentation = document.advancedContent.presentation;
   const hasBookends =
-    state.snapshot.workspace.advanced.ui.mode === 'advanced' &&
+    advanced.ui.mode === 'advanced' &&
     !!presentation &&
     (presentation.intro.mode !== 'none' || presentation.outro.mode !== 'none');
   const { index, renderSettings, setRenderSettings, checkingCodecs } = useReviewExportSettings(
     sourceIndex,
-    {
-      ui: state.snapshot.workspace.advanced.ui,
-      ...state.document.advancedContent,
-    }
+    advanced
   );
-  const advanced = { ui: state.snapshot.workspace.advanced.ui, ...state.document.advancedContent };
   const presentationDuration = reviewPresentationDuration(
     index,
     advanced,
-    state.document.edits,
+    document.edits,
     renderSettings
   );
   const { phase, progress, timeEstimate, changePhase, setProgress, setTimeEstimate } =
@@ -232,12 +233,13 @@ export function useReviewExport(resource: LoadedReview) {
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
     reviewExportPlan(resource, index, renderSettings, selection);
+  const choices = reviewExportChoices(resource, index, renderSettings);
   const sizeEstimate = useReviewSizeEstimate({
     resource,
     index,
     renderSettings,
     context,
-    enabled: !checkingCodecs && phase === 'idle' && plan().kind !== 'unavailable',
+    enabled: !checkingCodecs && phase === 'idle' && choices.rendering,
   });
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
@@ -323,6 +325,7 @@ export function useReviewExport(resource: LoadedReview) {
     completion: feedback.completion,
     dismissCompletion,
     plan,
+    sourceVideoAvailable: choices.sourceVideoAvailable,
     renderSettings,
     setRenderSettings,
     start,
@@ -344,6 +347,22 @@ export function useReviewExport(resource: LoadedReview) {
         onCopy: () => feedback.showCompletion({ destination: 'download', mediaId: null }),
       });
     },
+  };
+}
+
+/** Source preservation and size-probe intent follow the same committed export plan. */
+function reviewExportChoices(
+  resource: LoadedReview,
+  index: ReviewMediaIndex | null,
+  settings: ReviewRenderSettings
+) {
+  const current = reviewExportPlan(resource, index, settings);
+  const { quality: _quality, ...sourceSettings } = settings;
+  const source =
+    settings.quality === undefined ? current : reviewExportPlan(resource, index, sourceSettings);
+  return {
+    sourceVideoAvailable: source.kind === 'ready' && source.video === 'copy',
+    rendering: current.kind === 'ready' && current.video === 'render',
   };
 }
 
@@ -372,15 +391,33 @@ function reviewExportPlan(
           edits: state.document.edits,
         })
       : null;
+  const advanced = { ui: state.snapshot.workspace.advanced.ui, ...state.document.advancedContent };
+  const fullMap = buildReviewTimeMap(resource.source.duration, state.document.edits);
+  const actionPlan = buildReviewActionAudioPlan({
+    markers: resource.telemetry
+      ? projectReviewTelemetry(resource.telemetry, resource.source.duration).markers
+      : [],
+    settings: advanced.actionAudio ?? [],
+    segments: fullMap,
+    applied: resolveQuickEditEffectiveFeatures(advanced).actionsApplied,
+  });
+  const ranges = fragment
+    ? mapReviewAnchor({ kind: 'range', start: fragment.start, end: fragment.end }, fullMap).ranges
+    : null;
+  const actionAudioPresent = hasQuickEditActionAudio(
+    { plan: actionPlan, offset: 0, busGain: 1 },
+    {
+      start: ranges?.[0]?.start ?? (fragment ? actionPlan.duration : 0),
+      end: ranges?.at(-1)?.end ?? actionPlan.duration,
+    }
+  );
   return configuredReviewExportPlan({
     includeBookends: !selection,
     index,
     renderSettings,
     document: fragment ? { ...state.document, edits: fragment.edits } : state.document,
-    advanced: {
-      ui: state.snapshot.workspace.advanced.ui,
-      ...state.document.advancedContent,
-    },
+    advanced,
+    actionAudioPresent,
     ...(index ? { videoCopyBoundaries: index.boundaries } : {}),
   });
 }

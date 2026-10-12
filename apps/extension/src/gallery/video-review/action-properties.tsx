@@ -1,4 +1,11 @@
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
+import { ReviewActionAudioFields, reviewActionAudioSection } from './action-audio-fields';
+import { reviewActionAudioTarget } from '../../features/video/review/action-audio';
+import type {
+  ReviewActionAudioSetting,
+  ReviewActionAudioTarget,
+  ReviewActionAudioPatch,
+} from '../../features/video/review/advanced/action-audio';
 import { isReviewKey } from '../../features/video/review/key-animation';
 import {
   REVIEW_KEY_DEFAULT,
@@ -34,6 +41,12 @@ export function ReviewActionProperties(props: {
   marker: ReviewTelemetryMarker | undefined;
   plan: Plan | null;
   busy: boolean;
+  actionAudio?: readonly ReviewActionAudioSetting[] | undefined;
+  onActionAudio?:
+    | ((targets: readonly ReviewActionAudioTarget[], patch: ReviewActionAudioPatch | null) => void)
+    | undefined;
+  onAudition?: Parameters<typeof ReviewActionAudioFields>[0]['onAudition'];
+  onStopAudition?: (() => void) | undefined;
   keyAnimations?: readonly ReviewKeyAnimation[] | undefined;
   onKeyAnimation?: ((ids: readonly string[], patch: ReviewKeyPatch | null) => void) | undefined;
   animations?: readonly ReviewClickAnimation[] | undefined;
@@ -46,6 +59,22 @@ export function ReviewActionProperties(props: {
 }) {
   const { marker, plan } = props;
   if (!marker || !plan) return null;
+  const target = reviewActionAudioTarget(marker);
+  const audioSections =
+    target && props.onActionAudio
+      ? [
+          reviewActionAudioSection(
+            <ReviewActionAudioFields
+              targets={[target]}
+              settings={props.actionAudio ?? []}
+              busy={props.busy}
+              onChange={props.onActionAudio}
+              onAudition={plan.removed ? undefined : props.onAudition}
+              onStopAudition={props.onStopAudition}
+            />
+          ),
+        ]
+      : [];
   return (
     <div className="space-y-3 text-xs" data-ui="gallery.videoReview.actionProperties">
       {props.onOpenHistory ? (
@@ -60,6 +89,7 @@ export function ReviewActionProperties(props: {
       ) : null}
       {isReviewClick(marker) && marker.focusPoint ? (
         <ReviewClickFields
+          extraSections={audioSections}
           information={<RecordedInformation marker={marker} />}
           values={[
             props.animations?.find((item) => item.id === marker.ref.id) ?? REVIEW_CLICK_DEFAULT,
@@ -68,6 +98,7 @@ export function ReviewActionProperties(props: {
         />
       ) : isReviewKey(marker) ? (
         <ReviewKeyFields
+          extraSections={audioSections}
           information={<RecordedInformation marker={marker} />}
           values={[
             props.keyAnimations?.find((item) => item.id === marker.ref.id) ?? REVIEW_KEY_DEFAULT,
@@ -90,6 +121,7 @@ export function ReviewActionProperties(props: {
                 </>
               ),
             },
+            ...audioSections,
             ...(!isReviewClick(marker) && marker.end > marker.start && !plan.removed
               ? [
                   reviewInspectorActions(

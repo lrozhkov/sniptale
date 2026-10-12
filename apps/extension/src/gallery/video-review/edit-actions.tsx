@@ -49,6 +49,9 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   comments: 'gallery.videoReview.exportBlockerComments',
   voiceover: 'gallery.videoReview.exportBlockerVoiceover',
   music: 'gallery.videoReview.exportBlockerMusic',
+  'action-audio': 'gallery.videoReview.actionAudio',
+  'action-audio-limit': 'gallery.videoReview.actionAudioLimit',
+  'action-audio-resource': 'gallery.videoReview.actionAudioResource',
   'original-audio': 'gallery.videoReview.exportBlockerOriginalAudio',
   'audio-encoder': 'gallery.videoReview.exportBlockerAudioEncoder',
   'video-encoder': 'gallery.videoReview.exportBlockerVideoEncoder',
@@ -209,7 +212,9 @@ export function ReviewEditActions(props: {
   const running = props.phase !== 'idle';
   const completion = !running && !props.failed ? props.completion : null;
   const displayedProgress = completion || props.phase === 'publishing' ? 100 : props.progress;
-  const blocked = !!props.advancedBlockers?.length;
+  const hasBlockers = !!props.advancedBlockers?.length;
+  // A local loading failure may be retried explicitly; the writer revalidates before publication.
+  const blocked = !!props.advancedBlockers?.some((reason) => reason !== 'action-audio-resource');
   const actionDivider = props.settings
     ? 'border-t border-[var(--sniptale-color-border-soft)] pt-2'
     : '';
@@ -318,7 +323,7 @@ export function ReviewEditActions(props: {
           {translate('gallery.videoReview.speedAudioUnavailable')}
         </p>
       ) : null}
-      {blocked ? (
+      {hasBlockers ? (
         <p role="status" className="text-xs">
           {translate('gallery.videoReview.exportAdvancedUnavailable')}{' '}
           {props.advancedBlockers!.map((blocker) => translate(REASON_LABEL[blocker])).join(' · ')}
@@ -396,7 +401,17 @@ export function ReviewRenderOptions({
   if (!exporter.index || !exporter.renderSettings) return null;
   const settings = exporter.renderSettings;
   const format = settings.format ?? exporter.index.container;
-  const codecs = reviewOutputCodecs(exporter.index, format);
+  const encodedCodecs = reviewOutputCodecs(exporter.index, format);
+  const sourceCodec = exporter.index.videoCodec;
+  const codecs =
+    exporter.sourceVideoAvailable &&
+    settings.quality === undefined &&
+    format === exporter.index.container &&
+    !encodedCodecs.some((codec) => codec === sourceCodec)
+      ? [sourceCodec, ...encodedCodecs]
+      : encodedCodecs;
+  const currentPlan = exporter.plan();
+  const copying = currentPlan.kind === 'ready' && currentPlan.video === 'copy';
   return (
     <div className="min-w-0 max-w-full text-xs" data-ui="gallery.videoReview.exportSettings">
       <fieldset disabled={busy} className="review-inspector-columns pb-2">
@@ -409,9 +424,16 @@ export function ReviewRenderOptions({
             options={(['mp4', 'webm'] as const).map((value) => ({
               value,
               label: value === 'mp4' ? 'MP4' : 'WebM',
-              disabled: reviewOutputCodecs(exporter.index!, value).length === 0,
+              disabled:
+                value !== exporter.index!.container &&
+                reviewOutputCodecs(exporter.index!, value).length === 0,
             }))}
             onChange={(format) => {
+              if (format === exporter.index!.container && settings.quality === undefined) {
+                const { codec: _previous, ...sourceSettings } = settings;
+                exporter.setRenderSettings({ ...sourceSettings, format });
+                return;
+              }
               const codec = reviewOutputCodecs(exporter.index!, format)[0];
               if (codec) exporter.setRenderSettings({ ...settings, format, codec });
             }}
@@ -420,13 +442,18 @@ export function ReviewRenderOptions({
             className={reviewSelectFieldClassName}
             label={translate('gallery.videoReview.exportCodec')}
             disabled={busy}
-            value={settings.codec ?? codecs[0] ?? ''}
+            value={settings.codec ?? (copying ? sourceCodec : codecs[0]) ?? ''}
             options={codecs.map((codec) => ({
               value: codec,
               label:
                 codec === 'avc' ? 'H.264' : codec === 'hevc' ? 'H.265 / HEVC' : codec.toUpperCase(),
             }))}
-            onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
+            onChange={(codec) => {
+              if (codec === 'av1') {
+                const { codec: _previous, ...sourceSettings } = settings;
+                exporter.setRenderSettings(sourceSettings);
+              } else exporter.setRenderSettings({ ...settings, codec });
+            }}
           />
         </div>
         <div className="min-w-0 space-y-2">
@@ -475,18 +502,28 @@ export function ReviewRenderOptions({
               }}
             />
           </div>
-          <SelectField<VideoQuality>
+          <SelectField<VideoQuality | 'source'>
             className={reviewSelectFieldClassName}
             label={translate('gallery.videoReview.exportQuality')}
             disabled={busy}
-            value={settings.quality}
+            value={settings.quality ?? (copying ? 'source' : 'HIGH')}
             options={[
+              {
+                value: 'source',
+                label: translate('gallery.videoReview.exportSourceVideo'),
+                disabled: !exporter.sourceVideoAvailable,
+              },
               { value: 'LOW', label: translate('videoEditor.exportDialog.qualityLow') },
               { value: 'MEDIUM', label: translate('videoEditor.exportDialog.qualityMedium') },
               { value: 'HIGH', label: translate('videoEditor.exportDialog.qualityHigh') },
               { value: 'ULTRA', label: translate('videoEditor.exportDialog.qualityUltra') },
             ]}
-            onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
+            onChange={(quality) => {
+              if (quality === 'source') {
+                const { quality: _previous, ...sourceSettings } = settings;
+                exporter.setRenderSettings(sourceSettings);
+              } else exporter.setRenderSettings({ ...settings, quality });
+            }}
           />
         </div>
       </fieldset>

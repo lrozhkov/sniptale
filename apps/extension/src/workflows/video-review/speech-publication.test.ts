@@ -50,6 +50,12 @@ function fixture() {
     commitDurable,
     saveSpeechTranscript: commitDurable,
     hasDurableSpeechAsset,
+    createSpeechPublicationReceipt: () => ({ id: crypto.randomUUID(), at: Date.now() }),
+    publishSpeechTranscripts: commitDurable,
+    recoverSpeechPublication: async () => {
+      await hasDurableSpeechAsset();
+      return false;
+    },
   } as unknown as ReviewSpeechSession;
   const preview: ReviewSpeechPreview = {
     blob: new Blob(['audio'], { type: 'audio/wav' }),
@@ -290,13 +296,21 @@ it('applies original speech once with exact private claims and no manual gain mu
     },
     document: { edits: [], advancedContent: advanced },
   };
-  const save = vi.fn(async () => undefined);
+  const save = vi.fn(async (..._args: unknown[]) => undefined);
   const retained = vi.fn(async () => true);
   const session = {
     getSnapshot: () => state,
     flush: async () => undefined,
     saveSpeechTranscript: save,
     hasDurableSpeechAsset: retained,
+    createSpeechPublicationReceipt: () => ({ id: crypto.randomUUID(), at: Date.now() }),
+    publishSpeechTranscripts: async (
+      changes: readonly import('./speech-publication-state').ReviewSpeechPublicationChange[]
+    ) => {
+      for (const change of changes)
+        await save(change.target, change.expectedAssetId, change.transcript);
+    },
+    recoverSpeechPublication: async () => false,
   } as unknown as ReviewSpeechSession;
   preview.scope.target = { kind: 'original' };
   preview.geometry = reviewSpeechGeometry(session, { kind: 'original' });

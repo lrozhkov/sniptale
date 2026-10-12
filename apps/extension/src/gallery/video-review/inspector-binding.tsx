@@ -3,7 +3,12 @@ import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-e
 import { ReviewOriginalSpeechPanel } from './speech-panel';
 import { ReviewTextDocumentPanel } from './text-panel';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
-import { changeRecordedClicks, changeRecordedKeys } from './action-presentation';
+import {
+  changeRecordedClicks,
+  changeRecordedKeys,
+  changeRecordedActionAudio,
+  auditionRecordedActionAudio,
+} from './action-presentation';
 import { ReviewActionHistory } from './action-history';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { ReviewIntervalMap } from './interval-timing';
@@ -72,6 +77,9 @@ type InspectorState = Pick<
   | 'presentation'
   | 'timeline'
   | 'setKeyAnimations'
+  | 'setActionAudio'
+  | 'performAction'
+  | 'actionSoundPreview'
   | 'setClickAnimations'
   | 'setBackground'
   | 'previewBackground'
@@ -345,6 +353,12 @@ function ReviewRecordedHistory({
       markers={state.projected.markers}
       activeRef={state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined}
       keyAnimations={state.advanced.keyAnimations ?? []}
+      actionAudio={state.advanced.actionAudio ?? []}
+      onAudioChange={(targets, patch) => {
+        void changeRecordedActionAudio(state, targets, patch);
+      }}
+      onAudition={(target, style) => auditionRecordedActionAudio(state, target, style)}
+      onStopAudition={state.actionSoundPreview.stopAudition}
       onKeyChange={(ids, patch) => changeRecordedKeys(state, ids, patch)}
       animations={state.advanced.clickAnimations ?? []}
       busy={state.busy || state.editing.exporter.phase !== 'idle'}
@@ -593,6 +607,11 @@ function ReviewSelectionBinding({
       zoom={state.zoom}
       busy={state.busy}
       onKeyAnimation={(ids, patch) => changeRecordedKeys(state, ids, patch)}
+      onActionAudio={(targets, patch) => {
+        void changeRecordedActionAudio(state, targets, patch);
+      }}
+      onActionAudioAudition={(target, style) => auditionRecordedActionAudio(state, target, style)}
+      onStopActionAudioAudition={state.actionSoundPreview.stopAudition}
       onClickAnimation={(ids, patch) => changeRecordedClicks(state, ids, patch)}
       {...(onBackToHistory ? { onOpenHistory: onBackToHistory } : {})}
       markers={state.projected.markers}

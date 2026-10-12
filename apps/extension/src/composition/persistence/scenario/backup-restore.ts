@@ -281,8 +281,9 @@ export async function putScenarioProjectBackupRestore(args: {
     });
   const lifecycle =
     args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
+  const { lastAcceptedActionId: _closedAction, ...restoredEntry } = args.root.entry;
   await args.stores.projects.put({
-    ...args.root.entry,
+    ...restoredEntry,
     lifecycle: promoteLibraryLifecycle(lifecycle, Date.now()),
   });
   await publishScenarioAssets(args.root, args.stores);

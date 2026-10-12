@@ -3,6 +3,7 @@ import { parsePaint } from '@sniptale/foundation/paint';
 import { isReviewSpeedRate } from './speed';
 import { CANVAS_COMMENT_LIMITS } from './comments';
 import { loadQuickEditAdvancedContentState } from './advanced/validation';
+import { buildReviewTimeMap } from './timeline';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type {
   CanvasComment,
@@ -12,6 +13,7 @@ import type {
   ReviewOperation,
   ReviewRegion,
   ReviewSource,
+  ReviewDocument,
 } from './types';
 
 const finite = (value: unknown): value is number =>
@@ -20,6 +22,66 @@ const time = (value: unknown, duration: number): value is number =>
   finite(value) && value >= 0 && value <= duration;
 const identity = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0 && value.length <= 256 && value.trim() === value;
+
+/** Admits every field of a retained document baseline; no corrupt prefix is discarded. */
+export function parseReviewDocumentBaseline(
+  value: unknown,
+  duration: number
+): ReviewDocument | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some(
+      (key) => !['annotations', 'edits', 'canvasComments', 'advancedContent'].includes(key)
+    )
+  )
+    return null;
+  const annotations = value['annotations'];
+  const edits = value['edits'];
+  const canvasComments = value['canvasComments'];
+  if (!Array.isArray(annotations) || !Array.isArray(edits) || !Array.isArray(canvasComments))
+    return null;
+  const advancedContent = loadQuickEditAdvancedContentState(value['advancedContent']);
+  if (!advancedContent) return null;
+  const annotationValues: ReviewAnnotation[] = [];
+  const editValues: ReviewEdit[] = [];
+  const commentValues: CanvasComment[] = [];
+  for (const raw of annotations) {
+    const parsed = parseReviewAnnotation(raw, duration);
+    if (!parsed) return null;
+    annotationValues.push(parsed);
+  }
+  for (const raw of edits) {
+    const parsed = parseEdit(raw, duration);
+    if (!parsed) return null;
+    editValues.push(parsed);
+  }
+  for (const raw of canvasComments) {
+    const parsed = parseCanvasComment(raw, duration);
+    if (!parsed) return null;
+    commentValues.push(parsed);
+  }
+  try {
+    buildReviewTimeMap(duration, editValues);
+  } catch {
+    return null;
+  }
+  if (
+    editValues
+      .filter((edit) => edit.kind === 'cut')
+      .reduce((sum, edit) => sum + edit.end - edit.start, 0) >= duration
+  )
+    return null;
+  for (const items of [annotationValues, editValues, commentValues]) {
+    if (new Set(items.map((item) => item.id)).size !== items.length) return null;
+    items.sort((left, right) => left.id.localeCompare(right.id));
+  }
+  return {
+    annotations: annotationValues,
+    edits: editValues,
+    canvasComments: commentValues,
+    advancedContent,
+  };
+}
 
 function isVideoMimeType(value: unknown): value is string {
   if (typeof value !== 'string' || value.includes('\r') || value.includes('\n')) return false;

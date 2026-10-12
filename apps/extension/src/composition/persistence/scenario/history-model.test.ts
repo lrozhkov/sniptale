@@ -16,6 +16,7 @@ import {
 } from './history-model';
 import type { ScenarioProjectEntry } from './contracts';
 import { guideItemSchemas } from '@sniptale/runtime-contracts/scenario/guide-parser';
+import { SCENARIO_SAVED_VERSION_LIMITS } from '../../../features/editor-history/policy';
 function entry(revision: number): ScenarioProjectEntry {
   const project = createGuideProject(`Version ${revision}`, 'guide', 1);
   project.updatedAt = revision + 1;
@@ -28,6 +29,107 @@ function entry(revision: number): ScenarioProjectEntry {
   };
 }
 afterEach(() => vi.restoreAllMocks());
+
+it('read-admits all fifty legacy versions before narrowing the next mutation to twenty', () => {
+  const legacy = entry(50);
+  legacy.history = Array.from({ length: 50 }, (_, revision) => ({
+    revision,
+    savedAt: revision + 1,
+    project: entry(revision).project,
+  }));
+  const admitted = parseScenarioProjectEntry(legacy)!;
+  expect(admitted.history).toHaveLength(SCENARIO_HISTORY_LIMIT);
+  const next = createScenarioProjectEntry({
+    existing: admitted,
+    project: { ...admitted.project, name: 'Current' },
+    updatedAt: 52,
+  });
+  expect(next.history).toHaveLength(20);
+  expect(next.history?.[0]?.revision).toBe(31);
+  expect(next.history?.at(-1)?.revision).toBe(50);
+  expect(legacy.history).toHaveLength(50);
+});
+
+it('preserves the earliest previous snapshot across saves of one owner-issued action', () => {
+  const original = entry(1);
+  const historyActionId = '00000000-0000-4000-8000-000000000001';
+  const first = createScenarioProjectEntry({
+    existing: original,
+    project: { ...original.project, name: 'A' },
+    historyActionId,
+    updatedAt: 3,
+  });
+  const final = createScenarioProjectEntry({
+    existing: first,
+    project: { ...first.project, name: 'AB' },
+    historyActionId,
+    updatedAt: 4,
+  });
+  expect(final.workspaceRevision).toBe(3);
+  expect(final.history).toEqual([{ revision: 1, savedAt: 2, project: original.project }]);
+  const command = createScenarioProjectEntry({
+    existing: final,
+    project: { ...final.project, name: 'Command' },
+    updatedAt: 5,
+  });
+  expect(command).not.toHaveProperty('lastAcceptedActionId');
+  const resumed = createScenarioProjectEntry({
+    existing: command,
+    project: { ...command.project, name: 'ABC' },
+    historyActionId,
+    updatedAt: 6,
+  });
+  expect(resumed.history?.at(-1)?.project.name).toBe('Command');
+});
+
+it('compacts preserved legacy versions and detaches borrowed roots without retaining an external action marker', () => {
+  const previous = entry(50);
+  previous.history = Array.from({ length: 50 }, (_, revision) => ({
+    revision,
+    savedAt: revision + 1,
+    project: entry(revision).project,
+  }));
+  previous.lastAcceptedActionId = '00000000-0000-4000-8000-000000000001';
+  const preserved = createScenarioProjectEntry({
+    existing: previous,
+    project: { ...previous.project, name: 'Normalization' },
+    historyPolicy: 'preserve',
+    updatedAt: 52,
+  });
+  expect(preserved.history).toHaveLength(20);
+  expect(preserved).not.toHaveProperty('lastAcceptedActionId');
+  expect(preserved.history?.[0]?.revision).toBe(30);
+  expect(preserved.history?.[0]?.project).not.toBe(previous.history[30]?.project);
+  const continued = createScenarioProjectEntry({
+    existing: previous,
+    project: { ...previous.project, name: 'Same action' },
+    historyActionId: previous.lastAcceptedActionId,
+    updatedAt: 52,
+  });
+  expect(continued.history).toHaveLength(20);
+  expect(continued.history?.at(-1)?.revision).toBe(49);
+  expect(previous.history).toHaveLength(50);
+  const invalid = structuredClone(previous);
+  invalid.history![0]!.project.id = 'foreign';
+  expect(parseScenarioProjectEntry(invalid, 'exclusive')).toBeNull();
+});
+
+it('saves current when the newest previous version exceeds its separate sixteen-MiB budget', () => {
+  const measured = new Uint8Array();
+  Object.defineProperty(measured, 'byteLength', {
+    value: SCENARIO_SAVED_VERSION_LIMITS.maxBytes + 1,
+  });
+  vi.spyOn(TextEncoder.prototype, 'encode').mockReturnValue(measured);
+  const previous = entry(1);
+  const current = createScenarioProjectEntry({
+    existing: previous,
+    project: { ...previous.project, name: 'Current survives' },
+    updatedAt: 3,
+  });
+  expect(current.history ?? []).toEqual([]);
+  expect(current.project.name).toBe('Current survives');
+  expect(current.workspaceRevision).toBe(2);
+});
 it('admits shared Guide units once only inside a freshly owned history batch', () => {
   const source = unicodeEntry(true, false, false);
   const versions = Array.from({ length: 50 }, (_, index) => ({
@@ -87,7 +189,7 @@ it('retains committed content as a detached previous version and increments the 
     createScenarioProjectEntry({ existing: undefined, project: previous.project }).history
   ).toBeUndefined();
 });
-it('keeps the latest fifty previous versions in ascending owner revision order', () => {
+it('keeps the latest twenty previous versions in ascending owner revision order', () => {
   let current = entry(0);
   for (let index = 1; index <= 55; index += 1)
     current = createScenarioProjectEntry({
@@ -95,8 +197,8 @@ it('keeps the latest fifty previous versions in ascending owner revision order',
       project: { ...current.project, name: `Version ${index}` },
       updatedAt: index + 1,
     });
-  expect(current.history).toHaveLength(SCENARIO_HISTORY_LIMIT);
-  expect(current.history?.[0]?.revision).toBe(5);
+  expect(current.history).toHaveLength(SCENARIO_SAVED_VERSION_LIMITS.maxActions);
+  expect(current.history?.[0]?.revision).toBe(35);
   expect(current.history?.at(-1)?.revision).toBe(54);
   expect(parseScenarioProjectEntry(current)?.history).toEqual(current.history);
 });
@@ -121,7 +223,7 @@ it('enforces the metadata byte budget on append and on untrusted reads', () => {
   const measured = new Uint8Array();
   Object.defineProperty(measured, 'byteLength', { value: SCENARIO_HISTORY_BYTE_LIMIT + 1 });
   vi.spyOn(TextEncoder.prototype, 'encode').mockReturnValue(measured);
-  expect(() => appendScenarioSavedVersion(entry(1))).toThrow('limit');
+  expect(appendScenarioSavedVersion(entry(1))).toEqual([]);
   expect(
     parseScenarioSavedVersions(
       [{ revision: 1, savedAt: 2, project: entry(1).project }],
@@ -232,12 +334,14 @@ it.each(byteCases)(
     );
     const encode = vi.spyOn(TextEncoder.prototype, 'encode');
     let firstRoot = true;
+    let measuredBudget = SCENARIO_HISTORY_BYTE_LIMIT;
+    let framingBytes = 0;
     encode.mockImplementation(function (this: TextEncoder, value) {
       const bytes = original.call(this, value);
       if (firstRoot && value?.includes('"project":{')) {
         firstRoot = false;
         Object.defineProperty(bytes, 'byteLength', {
-          value: bytes.byteLength + SCENARIO_HISTORY_BYTE_LIMIT - fullBytes + delta,
+          value: bytes.byteLength + measuredBudget - fullBytes - framingBytes + delta,
         });
       }
       return bytes;
@@ -245,11 +349,10 @@ it.each(byteCases)(
     const parsed = parseScenarioSavedVersions(versions, previous.id, 2, 3, ownership);
     expect(parsed).toEqual(delta === 0 ? versions : null);
     firstRoot = true;
-    if (delta === 1 && !history)
-      expect(() => appendScenarioSavedVersion(previous, ownership)).toThrow('limit');
-    else
-      expect(appendScenarioSavedVersion(previous, ownership)).toEqual(
-        delta === 0 ? versions : [version]
-      );
+    measuredBudget = SCENARIO_SAVED_VERSION_LIMITS.maxBytes;
+    framingBytes = versions.length + 1;
+    expect(appendScenarioSavedVersion(previous, ownership)).toEqual(
+      delta === 0 ? versions : history ? [version] : []
+    );
   }
 );

@@ -49,6 +49,7 @@ it('joins every editor buffer for either recognition source and guards related-t
   const props = {
     resource: { filename: 'video', file: new Blob(), source: {}, session: {} },
     state: {
+      actionSoundPreview: { audition: vi.fn(), stopAudition: vi.fn() },
       advanced,
       activeSelection: { kind: 'audio', id: 'clip', lane: 'voiceover' },
       selection: { kind: 'none' },

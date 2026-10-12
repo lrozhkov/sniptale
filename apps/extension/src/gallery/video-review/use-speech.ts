@@ -9,7 +9,7 @@ import type { AIModelSelectionBootstrapPayload } from '../../contracts/messaging
 import { requestAIModelSelectionBootstrap } from '../../workflows/ai-settings/query';
 import { transcribeReviewSpeech } from '../../workflows/video-review/speech-transcription';
 import {
-  applyReviewSpeech,
+  applyReviewSpeechBatch,
   getReviewSpeechTarget,
   reviewSpeechGeometry,
   type ReviewSpeechPreview,
@@ -119,7 +119,7 @@ export function useReviewSpeech(args: ReviewSpeechAccess) {
     };
   }, []);
   const { hasPending, ...editing } = editor;
-  const command = (action: (signal: AbortSignal) => Promise<void>) => {
+  const command = (action: (signal: AbortSignal) => Promise<void>, flushAdvanced = true) => {
     if (controller.current) return;
     args.beforeAction(() => {
       if (!mounted.current || controller.current || hasPending()) return;
@@ -130,7 +130,7 @@ export function useReviewSpeech(args: ReviewSpeechAccess) {
       setError(null);
       void (async () => {
         try {
-          await latestArgs.current.flushAdvanced();
+          if (flushAdvanced) await latestArgs.current.flushAdvanced();
           active.signal.throwIfAborted();
           await action(active.signal);
         } catch (cause) {
@@ -193,25 +193,15 @@ export function useReviewSpeech(args: ReviewSpeechAccess) {
     },
     setModelId,
     recognize: (selected = false) =>
-      command(async (signal) => {
-        if (
-          !modelId ||
-          args.sourceAudioAvailable === false ||
-          (args.target.kind === 'original' &&
-            (selected ? timing.selectionDuration : timing.recognitionDuration) <= 0)
-        )
-          throw new Error('invalid');
-        await transcribeReviewSpeech(args.session, args.target, modelId, signal, {
-          ...(args.original ? { original: args.original } : {}),
-          ...(selected && args.selection ? { selection: args.selection } : {}),
-        });
-      }),
+      command((signal) => recognizeReviewSpeechSelection(args, modelId, selected, timing, signal)),
     generate,
     generateQueue,
     apply: (items: readonly ReviewSpeechPreview[]) =>
       command(async (signal) => {
-        await applySpeechGroups(args.session, items, signal, originalVolume, audio.remove);
-      }),
+        await applySpeechGroups(args.session, items, signal, originalVolume, audio.remove, () =>
+          latestArgs.current.flushAdvanced()
+        );
+      }, false),
     cancel: () => {
       controller.current?.abort();
       setError('canceled');
@@ -219,14 +209,16 @@ export function useReviewSpeech(args: ReviewSpeechAccess) {
   };
 }
 
-/** Each successful target publication releases only its own staged previews. */
+/** All targets share one metadata action; previews leave only after every required publication. */
 async function applySpeechGroups(
   session: ReviewSpeechSession,
   items: readonly ReviewSpeechPreview[],
   signal: AbortSignal,
   originalVolume: number,
-  remove: (items: readonly ReviewSpeechPreview[]) => void
+  remove: (items: readonly ReviewSpeechPreview[]) => void,
+  flushAdvanced: () => Promise<void>
 ) {
+  if (!items.length) return;
   const pending = new Map<
     string,
     { target: ReviewSpeechTarget; previews: ReviewSpeechPreview[] }
@@ -237,13 +229,13 @@ async function applySpeechGroups(
     group.previews.push(item);
     pending.set(key, group);
   }
-  for (const group of pending.values()) {
-    signal.throwIfAborted();
-    await applyReviewSpeech(session, group.target, group.previews, signal, {
-      originalVolume,
-    });
-    remove(group.previews);
-  }
+  await applyReviewSpeechBatch(
+    session,
+    [...pending.values()].map((group) => ({ ...group, originalVolume })),
+    signal,
+    { flushAdvanced }
+  );
+  remove(items);
 }
 
 /** Snapshot enumeration is shared by batch presentation and preview admission. */
@@ -401,4 +393,25 @@ function originalSpeechTiming(
     recognitionDuration: recognitionDuration(),
     selectionDuration: recognitionDuration(selection),
   };
+}
+
+/** Validates the selected source interval before the existing transcription workflow. */
+async function recognizeReviewSpeechSelection(
+  args: ReviewSpeechAccess,
+  modelId: string,
+  selected: boolean,
+  timing: ReturnType<typeof reviewSpeechTiming>,
+  signal: AbortSignal
+): Promise<void> {
+  if (
+    !modelId ||
+    args.sourceAudioAvailable === false ||
+    (args.target.kind === 'original' &&
+      (selected ? timing.selectionDuration : timing.recognitionDuration) <= 0)
+  )
+    throw new Error('invalid');
+  await transcribeReviewSpeech(args.session, args.target, modelId, signal, {
+    ...(args.original ? { original: args.original } : {}),
+    ...(selected && args.selection ? { selection: args.selection } : {}),
+  });
 }

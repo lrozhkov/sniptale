@@ -75,6 +75,7 @@ it('shows inherited/local style compactly and never stales retained voice by app
           limit={10}
           onJump={vi.fn()}
           editor={{
+            endTyping: vi.fn(),
             captions: scene,
             playhead: () => 0,
             split: vi.fn(),

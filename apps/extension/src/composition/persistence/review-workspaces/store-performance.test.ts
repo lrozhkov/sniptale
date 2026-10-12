@@ -6,6 +6,7 @@ import {
   createReviewAdvancedContentOperation,
   replayReviewHistory,
   reviewAdvancedContentBaseline,
+  reviewDocumentBaseline,
 } from '../../../features/video/review/document';
 import type { ReviewOperation } from '../../../features/video/review/types';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
@@ -202,13 +203,16 @@ it.each([
   expect(observed.reads).toBe(1);
   expect(observed.writes).toBe(1);
   expect(operation.target).toBe('sourceAudio');
-  expect(observed.replay.mock.calls.filter(([history]) => history.length > 0)).toHaveLength(0);
-  expect(observed.replay).toHaveBeenCalledTimes(2);
+  const removed = Math.max(0, previous.cursor + 1 - 50);
+  const prefixReplays = observed.replay.mock.calls.filter(([history]) => history.length > 0);
+  expect(prefixReplays).toHaveLength(removed > 0 ? 1 : 0);
+  if (removed > 0) expect(prefixReplays[0]?.[1]).toBe(removed);
+  expect(observed.replay).toHaveBeenCalledTimes(2 + (removed > 0 ? 1 : 0));
   expect(
-    result.workspace.history.slice(0, previous.cursor).map(({ id, at }) => ({ id, at }))
-  ).toEqual(previous.history.map(({ id, at }) => ({ id, at })));
+    result.workspace.history.slice(0, previous.cursor - removed).map(({ id, at }) => ({ id, at }))
+  ).toEqual(previous.history.slice(removed).map(({ id, at }) => ({ id, at })));
   assertSameRetainedProjections(previous, result.workspace);
-  expect(result.workspace.cursor).toBe(previous.cursor + 1);
+  expect(result.workspace.cursor).toBe(previous.cursor + 1 - removed);
   expect(result.workspace.revision).toBe(2);
   expect(Object.keys(result).sort()).toEqual(['draft', 'workspace']);
   const persisted = await readVideoWorkspace(id);
@@ -235,20 +239,17 @@ it('still rejects corrupt unapplied redo before any write', async () => {
 });
 
 function assertSameRetainedProjections(previous: VideoWorkspace, next: VideoWorkspace) {
+  const start = previous.history.findIndex((operation) => operation.id === next.history[0]?.id);
+  expect(start).toBeGreaterThanOrEqual(0);
   let original = replayReviewHistory(
-    [],
-    0,
+    previous.history,
+    start,
     previous.source,
-    reviewAdvancedContentBaseline(previous.advanced)
+    reviewDocumentBaseline(previous)
   );
-  let compact = replayReviewHistory(
-    [],
-    0,
-    next.source,
-    reviewAdvancedContentBaseline(next.advanced)
-  );
+  let compact = replayReviewHistory([], 0, next.source, reviewDocumentBaseline(next));
   expect(compact).toEqual(original);
-  for (const [index, operation] of previous.history.entries()) {
+  for (const [index, operation] of previous.history.slice(start).entries()) {
     original = applyReviewOperation(original, operation, previous.source);
     const replacement = next.history[index];
     if (!replacement) throw new Error('Missing retained history step');
@@ -258,7 +259,7 @@ function assertSameRetainedProjections(previous: VideoWorkspace, next: VideoWork
   expect(collectReviewAssetReferences(next)).toEqual(collectReviewAssetReferences(previous));
 }
 
-it('bounds retained gain-only legacy history on a successful owner save without trimming steps', async () => {
+it('bounds legacy gain history while preserving its baseline and projections', async () => {
   const previous = workspace(80, 200);
   const unchanged = structuredClone(previous);
   replaceLegacyWorkspaceFixture(rows, id, previous);
@@ -277,13 +278,13 @@ it('bounds retained gain-only legacy history on a successful owner save without 
       ])
     ).byteLength
   ).toBeLessThan(100_000);
-  expect(result.workspace.history).toHaveLength(81);
-  expect(result.workspace.history[0]?.target).toBe('advancedContent');
-  expect(
-    result.workspace.history.slice(1).every((operation) => operation.target === 'sourceAudio')
-  ).toBe(true);
-  expect(result.workspace.history.slice(0, 80).map(({ id, at }) => ({ id, at }))).toEqual(
-    previous.history.map(({ id, at }) => ({ id, at }))
+  expect(result.workspace.history).toHaveLength(50);
+  expect(result.workspace.baseline?.advancedContent.text?.fragments).toHaveLength(200);
+  expect(result.workspace.history.every((operation) => operation.target === 'sourceAudio')).toBe(
+    true
+  );
+  expect(result.workspace.history.slice(0, 49).map(({ id, at }) => ({ id, at }))).toEqual(
+    previous.history.slice(31).map(({ id, at }) => ({ id, at }))
   );
   assertSameRetainedProjections(previous, result.workspace);
   expect(previous).toEqual(unchanged);

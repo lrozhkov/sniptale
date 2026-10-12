@@ -229,6 +229,34 @@ it('offers independent initial downloads and shows actionable processing failure
     act(() => root.render(<ReviewEditActions {...props} advancedBlockers={['presentation']} />));
     expect(host.textContent).toContain(translate('gallery.videoReview.presentation'));
     expect(host.textContent).not.toContain('gallery.videoReview.presentation');
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          available
+          hasEdits
+          advancedBlockers={['action-audio-resource']}
+        />
+      )
+    );
+    expect(
+      host.querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('gallery.videoReview.exportVideo')}"]`
+      )?.disabled
+    ).toBe(false);
+    expect(download().disabled).toBe(false);
+    expect(host.querySelector('[role="status"]')?.textContent).toContain(
+      translate('gallery.videoReview.actionAudioResource')
+    );
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          advancedBlockers={['action-audio-resource', 'asset-missing']}
+        />
+      )
+    );
+    expect(download().disabled).toBe(true);
     act(() => root.render(<ReviewEditActions {...props} />));
     act(() => download().click());
     expect(props.onDownload).toHaveBeenCalledOnce();
@@ -331,6 +359,7 @@ it('applies export frame rate and quality options without adding section divider
   const root = createRoot(host);
   const exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'] = {
     hasBookends: false,
+    sourceVideoAvailable: false,
     presentationDuration: null,
     index: {
       duration: 12,
@@ -391,7 +420,9 @@ it('applies export frame rate and quality options without adding section divider
       frameRateMode: 'adaptive',
     });
     await act(async () => quality!.click());
-    await act(async () => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
+    );
     expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
       frameRate: 0,
       quality: 'LOW',

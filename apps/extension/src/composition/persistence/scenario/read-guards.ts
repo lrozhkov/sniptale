@@ -1,4 +1,4 @@
-import { parseScenarioSavedVersions } from './history-model';
+import { parseScenarioSavedVersions, isScenarioHistoryActionId } from './history-model';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type {
   PendingScenarioAssetEntry,
@@ -237,7 +237,11 @@ export function parseScenarioProjectEntry(
     ownership
   );
   if (!history) return null;
+  const lastAcceptedActionId = value['lastAcceptedActionId'];
+  if (lastAcceptedActionId !== undefined && !isScenarioHistoryActionId(lastAcceptedActionId))
+    return null;
   return {
+    ...(lastAcceptedActionId === undefined ? {} : { lastAcceptedActionId }),
     ...(history.length ? { history } : {}),
     createdAt: value['createdAt'],
     id: value['id'],

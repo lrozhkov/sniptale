@@ -42,6 +42,7 @@ export function reviewAdvancedContentBaseline(state: {
   actionsEnabled?: boolean;
   keyAnimations?: QuickEditAdvancedContent['keyAnimations'];
   clickAnimations?: QuickEditAdvancedContent['clickAnimations'];
+  actionAudio?: QuickEditAdvancedContent['actionAudio'];
   canvas?: QuickEditAdvancedContent['canvas'];
   windowHeader?: QuickEditAdvancedContent['windowHeader'];
   webcam?: QuickEditAdvancedContent['webcam'];
@@ -59,6 +60,7 @@ export function reviewAdvancedContentBaseline(state: {
     ...(state.actionsEnabled === undefined ? {} : { actionsEnabled: state.actionsEnabled }),
     ...(state.keyAnimations ? { keyAnimations: state.keyAnimations } : {}),
     ...(state.clickAnimations ? { clickAnimations: state.clickAnimations } : {}),
+    ...(state.actionAudio ? { actionAudio: state.actionAudio } : {}),
     ...(state.canvas ? { canvas: state.canvas } : {}),
     ...(state.windowHeader ? { windowHeader: state.windowHeader } : {}),
     ...(state.webcam ? { webcam: state.webcam } : {}),
@@ -246,17 +248,20 @@ export function replayReviewHistory(
   history: readonly ReviewOperation[],
   cursor: number,
   source: ReviewSource,
-  advancedBaseline?: QuickEditAdvancedContent
+  advancedBaseline?: QuickEditAdvancedContent | ReviewDocument
 ): ReviewDocument {
   if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > history.length) {
     throw new ReviewHistoryError('cursor-invalid');
   }
-  let document: ReviewDocument = {
-    annotations: [],
-    edits: [],
-    canvasComments: [],
-    advancedContent: advancedBaseline ?? createQuickEditAdvancedContent(),
-  };
+  let document: ReviewDocument =
+    advancedBaseline && 'edits' in advancedBaseline
+      ? advancedBaseline
+      : {
+          annotations: [],
+          edits: [],
+          canvasComments: [],
+          advancedContent: advancedBaseline ?? createQuickEditAdvancedContent(),
+        };
   for (const [index, operation] of history.slice(0, cursor).entries()) {
     try {
       document = applyReviewOperation(document, operation, source);
@@ -269,4 +274,12 @@ export function replayReviewHistory(
     }
   }
   return document;
+}
+
+/** Complete retained baseline, with the existing advanced-only seed for supported legacy input. */
+export function reviewDocumentBaseline(workspace: {
+  baseline?: ReviewDocument;
+  advanced: QuickEditAdvancedContent;
+}): ReviewDocument | QuickEditAdvancedContent {
+  return workspace.baseline ?? reviewAdvancedContentBaseline(workspace.advanced);
 }

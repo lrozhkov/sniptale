@@ -8,6 +8,10 @@ import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvancedContent } from './use-advanced-content';
 import { useReviewSnapshot } from './use-session';
+import {
+  patchReviewActionAudio,
+  type ReviewActionAudioTarget,
+} from '../../features/video/review/advanced/action-audio';
 
 let root: Root;
 let content: ReturnType<typeof useReviewAdvancedContent>;
@@ -129,4 +133,40 @@ it('does not acknowledge a new generation with an acquired pre-reset mutation jo
   await act(async () => content.flush());
   expect(commit).toHaveBeenCalledTimes(2);
   expect(content.pending).toBe(false);
+});
+
+it('writes one action-sound batch, preserves unrelated content and rejects no-op reset history', async () => {
+  const { session, commit } = setup();
+  const targets: ReviewActionAudioTarget[] = [
+    { ref: { kind: 'action', id: 'same' }, family: 'mouse' },
+    { ref: { kind: 'signal', id: 'same' }, family: 'typing' },
+  ];
+  await act(async () =>
+    content.commands.setActionAudio((current) =>
+      patchReviewActionAudio(current, targets, { enabled: true })
+    )
+  );
+  await act(async () => content.flush());
+  expect(commit).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(content.content.actionAudio).toHaveLength(2);
+  expect(content.content.audio).toEqual(createQuickEditAdvancedState().audio);
+  await act(async () =>
+    content.commands.setActionAudio((current) =>
+      patchReviewActionAudio(current, targets, { enabled: true })
+    )
+  );
+  await act(async () => content.flush());
+  expect(commit).toHaveBeenCalledOnce();
+  await act(async () =>
+    content.commands.setActionAudio((current) => patchReviewActionAudio(current, targets, null))
+  );
+  await act(async () => content.flush());
+  expect(commit).toHaveBeenCalledTimes(2);
+  expect(content.content).not.toHaveProperty('actionAudio');
+  await act(async () =>
+    content.commands.setActionAudio((current) => patchReviewActionAudio(current, targets, null))
+  );
+  await act(async () => content.flush());
+  expect(commit).toHaveBeenCalledTimes(2);
 });

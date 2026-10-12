@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { saveScenarioProjectRecord } from '../../../composition/persistence/scenario/store/public';
+import type { GuideHistoryCapture } from './history';
 
 export const GUIDE_AUTOSAVE_IDLE_MS = 1500;
 export const GUIDE_AUTOSAVE_MAX_WAIT_MS = 5000;
@@ -10,6 +11,9 @@ export const GUIDE_AUTOSAVE_MAX_WAIT_MS = 5000;
 type SaveStatus = 'dirty' | 'saving' | 'saved' | 'failed' | 'conflict';
 type AutosaveInput = {
   project: GuideProject | null;
+  actionId?: string | undefined;
+  closedCaptures?: readonly GuideHistoryCapture[];
+  onSealEdit?(): void;
   dirty: boolean;
   enabled?: boolean;
   conflict: boolean;
@@ -19,12 +23,13 @@ type AutosaveInput = {
   autosaving: { current: boolean };
   generation: { current: number };
   onStatus: (status: SaveStatus) => void;
-  onPublish: (project: GuideProject, source: GuideProject) => void;
+  onPublish: (project: GuideProject, source: GuideProject, actionId?: string) => void;
 };
 type Session = {
   generation: number;
   projectId: string | undefined;
   acknowledgement?: { source: GuideProject; committed: ScenarioProjectSnapshot };
+  acknowledgedActions: WeakMap<GuideProject, Set<string>>;
   conflict: boolean;
 };
 type Capture = { session: Session; args: AutosaveInput };
@@ -89,7 +94,7 @@ function createGuideAutosave(latest: () => AutosaveInput) {
       const timer = window.setTimeout(callback, delay);
       return () => window.clearTimeout(timer);
     },
-    capture: () => ({ session: getSession(), args: latest() }),
+    capture: () => captureLatest(),
     commit: async (capture) => {
       if (capture.args.enabled === false || !current(capture.session)) return;
       await execute(capture);
@@ -109,25 +114,37 @@ function createGuideAutosave(latest: () => AutosaveInput) {
         generation: args.generation.current,
         projectId: args.project?.id,
         conflict: false,
+        acknowledgedActions: new WeakMap(),
       };
       observed = undefined;
     }
     return session;
   }
   function execute(capture: Capture): Promise<boolean> {
-    const operation = persistGuideDraft(
-      capture,
-      () => current(capture.session),
-      () => latest().project
-    ).finally(() => {
+    const operation = persistCapture(capture).finally(() => {
       if (pending === operation) pending = null;
     });
     pending = operation;
     return operation;
   }
-  function save(): Promise<boolean> {
-    if (pending) return pending.catch(() => false);
-    const capture = { session: getSession(), args: latest() };
+  function captureLatest(): Capture {
+    const args = latest();
+    return {
+      session: getSession(),
+      args: {
+        ...args,
+        ...(args.closedCaptures ? { closedCaptures: [...args.closedCaptures] } : {}),
+      },
+    };
+  }
+  function persistCapture(capture: Capture): Promise<boolean> {
+    return persistGuideCaptures(
+      capture,
+      () => current(capture.session),
+      () => latest().project
+    );
+  }
+  function saveCaptured(capture = captureLatest()): Promise<boolean> {
     coordinator.cancel('document');
     return coordinator
       .runOrdered(() => execute(capture))
@@ -159,7 +176,11 @@ function createGuideAutosave(latest: () => AutosaveInput) {
           maxWait: GUIDE_AUTOSAVE_MAX_WAIT_MS,
         });
     },
-    save,
+    save() {
+      const capture = captureLatest();
+      capture.args.onSealEdit?.();
+      return saveCaptured(capture);
+    },
     async flushLatest(): Promise<GuideProject | null> {
       const turn = getSession();
       try {
@@ -174,13 +195,16 @@ function createGuideAutosave(latest: () => AutosaveInput) {
           if (!source || !base || source.id !== base.project.id || args.conflict || turn.conflict)
             return null;
           if (
-            (source === turn.acknowledgement?.source && base === turn.acknowledgement.committed) ||
-            guideDraftContent(source) === guideDraftContent(base.project)
+            !(args.closedCaptures ?? []).some(
+              (group) => !guideActionAcknowledged(turn, group.project, group.actionId)
+            ) &&
+            ((source === turn.acknowledgement?.source && base === turn.acknowledgement.committed) ||
+              guideDraftContent(source) === guideDraftContent(base.project))
           ) {
             args.onStatus('saved');
             return base.project;
           }
-          if (!(await save())) return null;
+          if (!(await saveCaptured())) return null;
         }
       } catch {
         return null;
@@ -194,11 +218,51 @@ function createGuideAutosave(latest: () => AutosaveInput) {
   };
 }
 
+function guideActionAcknowledged(turn: Session, project: GuideProject, actionId: string): boolean {
+  return turn.acknowledgedActions.get(project)?.has(actionId) === true;
+}
+
+function acknowledgeGuideAction(turn: Session, project: GuideProject, actionId?: string): void {
+  if (!actionId) return;
+  const ids = turn.acknowledgedActions.get(project) ?? new Set<string>();
+  ids.add(actionId);
+  turn.acknowledgedActions.set(project, ids);
+}
+
+/** Drains closed user actions without waiting for React to remove their rendered captures. */
+async function persistGuideCaptures(
+  capture: Capture,
+  isCurrent: () => boolean,
+  currentProject: () => GuideProject | null
+): Promise<boolean> {
+  const closed = capture.args.closedCaptures ?? [];
+  const closedIsCurrent =
+    closed.at(-1)?.actionId === capture.args.actionId && capture.args.actionId !== undefined;
+  for (const [index, group] of closed.entries()) {
+    if (guideActionAcknowledged(capture.session, group.project, group.actionId)) continue;
+    if (
+      !(await persistGuideDraft(
+        {
+          session: capture.session,
+          args: { ...capture.args, project: group.project, actionId: group.actionId },
+        },
+        isCurrent,
+        currentProject,
+        closedIsCurrent && index === closed.length - 1
+      ))
+    )
+      return false;
+  }
+  if (closedIsCurrent) return true;
+  return persistGuideDraft(capture, isCurrent, currentProject);
+}
+
 /** Owns one admitted scenario write, its committed revision and admission cleanup. */
 function persistGuideDraft(
   { session: turn, args }: Capture,
   isCurrent: () => boolean,
-  currentProject: () => GuideProject | null
+  currentProject: () => GuideProject | null,
+  isFinalCapture = true
 ): Promise<boolean> {
   const source = args.project;
   const base = args.saved.current;
@@ -213,19 +277,33 @@ function persistGuideDraft(
   )
     return Promise.reject(new Error('Scenario save admission is unavailable.'));
   if (source === base.project || guideDraftContent(source) === guideDraftContent(base.project)) {
-    args.onStatus('saved');
+    acknowledgeGuideAction(turn, source, args.actionId);
+    if (args.actionId) args.onPublish(base.project, source, args.actionId);
+    args.onStatus(isFinalCapture ? 'saved' : 'saving');
     return Promise.resolve(true);
   }
   args.busy.current = true;
   args.autosaving.current = true;
   args.onStatus('saving');
-  return saveScenarioProjectRecord(source, { expectedRevision: base.workspaceRevision })
+  return saveScenarioProjectRecord(source, {
+    expectedRevision: base.workspaceRevision,
+    ...(args.actionId ? { historyActionId: args.actionId } : {}),
+  })
     .then((committed) => {
       if (!isCurrent()) return false;
       turn.acknowledgement = { source, committed };
+      acknowledgeGuideAction(turn, source, args.actionId);
       args.saved.current = committed;
-      args.onPublish(committed.project, source);
-      args.onStatus(currentProject() === source ? 'saved' : 'dirty');
+      if (args.actionId) args.onPublish(committed.project, source, args.actionId);
+      else args.onPublish(committed.project, source);
+      const current = currentProject();
+      args.onStatus(
+        !isFinalCapture
+          ? 'saving'
+          : current === source || (current && isTimestampRebase(source, current))
+            ? 'saved'
+            : 'dirty'
+      );
       return true;
     })
     .catch((error: unknown) => {

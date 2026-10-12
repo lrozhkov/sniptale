@@ -7,6 +7,13 @@ import type { VideoWorkspaceSnapshot } from '../../composition/persistence/revie
 import { pruneReviewAnnotationEffectSnapshots } from '../../composition/persistence/review-workspaces/asset-refs';
 import { mergeReviewAnnotationEffectSnapshots } from '../../features/video/review/annotation-effects/validation';
 import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
+import { compactVideoWorkspaceHistory } from '../../composition/persistence/review-workspaces/history-retention';
+import {
+  prepareVideoWorkspaceTyping,
+  withoutVideoWorkspaceTyping,
+  type VideoWorkspaceTypingChange,
+} from '../../composition/persistence/review-workspaces/typing';
+import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import {
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
@@ -20,6 +27,7 @@ import type {
 /** Page-local operations use the same canonical snapshot validation as durable recovery. */
 export type LocalReviewChange =
   | { kind: 'reset' }
+  | { kind: 'typing'; change: VideoWorkspaceTypingChange }
   | { kind: 'advanced'; advanced: unknown }
   | { kind: 'draft'; annotation: ReviewAnnotation | null; before: ReviewAnnotation | null }
   | {
@@ -83,13 +91,23 @@ export function applyLocalReviewChange(
 ): VideoWorkspaceSnapshot {
   let { workspace, draft } = snapshot;
   if (change.kind === 'reset') {
+    const { baseline: _baseline, ...withoutBaseline } = withoutVideoWorkspaceTyping(workspace);
     workspace = {
-      ...workspace,
+      ...withoutBaseline,
+      formatVersion: 1,
       history: [],
       cursor: 0,
       advanced: { ...createQuickEditAdvancedState(), ui: workspace.advanced.ui },
     };
     draft = null;
+  } else if (change.kind === 'typing') {
+    const document = replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewDocumentBaseline(workspace)
+    );
+    workspace = prepareVideoWorkspaceTyping(workspace, document, change.change);
   } else if (change.kind === 'advanced') {
     const next = parseVideoWorkspace({ ...workspace, advanced: change.advanced });
     if (!next) throw new Error('Invalid review state');
@@ -111,7 +129,7 @@ export function applyLocalReviewChange(
     if (change.annotation !== null && !draft) throw new Error('Invalid review draft');
   } else if (change.kind === 'history') {
     workspace = {
-      ...workspace,
+      ...withoutVideoWorkspaceTyping(workspace),
       cursor:
         change.direction === 'start'
           ? 0
@@ -155,7 +173,7 @@ export function applyLocalReviewChange(
           }
         : change.operation;
     workspace = {
-      ...workspace,
+      ...withoutVideoWorkspaceTyping(workspace),
       ...(merged ? { effectSnapshots: merged } : {}),
       history: [...workspace.history.slice(0, workspace.cursor), operation],
       cursor: workspace.cursor + 1,
@@ -166,5 +184,5 @@ export function applyLocalReviewChange(
     change.kind === 'history' ? workspace : pruneReviewAnnotationEffectSnapshots(workspace)
   );
   if (!parsed) throw new Error('Invalid review workspace');
-  return { workspace: parsed, draft };
+  return { workspace: compactVideoWorkspaceHistory(parsed).workspace, draft };
 }

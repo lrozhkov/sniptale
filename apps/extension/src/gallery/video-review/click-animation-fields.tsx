@@ -65,6 +65,7 @@ export function ReviewClickFields(props: Parameters<typeof reviewClickSections>[
 
 export function reviewClickSections(props: {
   information?: ReactNode;
+  extraSections?: Parameters<typeof ReviewInspectorSections>[0]['sections'];
   values: readonly ReviewClickStyle[];
   onChange(patch: Partial<ReviewClickStyle> | null): void;
 }) {
@@ -177,6 +178,7 @@ export function reviewClickSections(props: {
       </>
     )
   );
+  if (props.extraSections) sections.push(...props.extraSections);
   return sections;
 }
 

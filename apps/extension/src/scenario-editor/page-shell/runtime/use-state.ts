@@ -87,14 +87,16 @@ export function useGuidePageState() {
   const saved = useRef<ScenarioProjectSnapshot | null>(null);
   const busy = useRef(false);
   const autosaving = useRef(false);
-  const { project, reset, commit, publish, ...editing } = useGuideHistory({
-    canEdit: () => (!busy.current || autosaving.current) && status !== 'loading',
-    onEdit: () => {
-      setActionError(null);
-      setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
-    },
-    onFailure: () => setActionError('structure'),
-  });
+  const { project, reset, commit, publish, actionId, closedCaptures, ...editing } = useGuideHistory(
+    {
+      canEdit: () => (!busy.current || autosaving.current) && status !== 'loading',
+      onEdit: () => {
+        setActionError(null);
+        setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
+      },
+      onFailure: () => setActionError('structure'),
+    }
+  );
   const { clearSelection, ...selection } = useGuideSelection(project);
   const generation = useRef(0);
   const requestedId = useRef(readScenarioEditorProjectId(window.location.search));
@@ -119,20 +121,17 @@ export function useGuidePageState() {
         return;
       }
       if (turn !== generation.current) return;
-      const history = await getScenarioSavedVersions(requestedId.current);
-      const [current, ...previous] = history?.versions ?? [];
-      const loaded = current?.project ?? null;
+      const { loaded, savedSnapshot, previousProjects } = await readGuideHistoryProjection(
+        requestedId.current
+      );
       if (turn !== generation.current) return;
       if (!loaded && retained.project) {
         rejectLoad();
         return;
       }
       setActionError(null);
-      saved.current =
-        history && current
-          ? { project: current.project, workspaceRevision: history.currentRevision }
-          : null;
-      reset(loaded, previous.map((version) => version.project).reverse());
+      saved.current = savedSnapshot;
+      reset(loaded, previousProjects);
       setStatus(loaded ? 'ready' : 'missing');
     } catch {
       rejectLoad();
@@ -166,6 +165,9 @@ export function useGuidePageState() {
   };
   const autosave = useGuideAutosave({
     project,
+    actionId,
+    closedCaptures,
+    onSealEdit: editing.sealEdit,
     enabled: autosaveEnabled,
     dirty: status === 'dirty',
     conflict: status === 'conflict',
@@ -509,4 +511,18 @@ function createGuideCommitDispatcher({
   }
 
   return commitChange;
+}
+
+/** Reads the canonical saved versions without changing the page's generation or load policy. */
+async function readGuideHistoryProjection(id: string) {
+  const history = await getScenarioSavedVersions(id);
+  const [current, ...previous] = history?.versions ?? [];
+  return {
+    loaded: current?.project ?? null,
+    savedSnapshot:
+      history && current
+        ? { project: current.project, workspaceRevision: history.currentRevision }
+        : null,
+    previousProjects: previous.map((version) => version.project).reverse(),
+  };
 }
