@@ -1,8 +1,12 @@
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
+import type { IDBPTransaction } from 'idb';
 import {
   parseProjectAssetPayload,
   type ProjectAssetPublicationOptions,
+  type ProjectAssetPublicationPayload,
+  type KnownLibrarySourceClaim,
 } from './asset-publication-payload';
+import { admitKnownLibraryPublication } from './known-library-source';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 export type {
@@ -24,6 +28,7 @@ import {
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
+  STORE_NAME,
 } from '../infrastructure/indexed-db/core';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
 import {
@@ -44,6 +49,7 @@ import {
   recoverStandaloneAssetPublications,
   type AssetPublicationAdapter,
   type AssetReadyJournal,
+  type AssetRef,
 } from '../assets';
 import {
   buildProjectAssetMediaEntry,
@@ -100,6 +106,7 @@ async function publishProjectMediaAsset(args: {
   expectedAssetId?: string | null;
   publishToLibrary?: boolean;
   requiredReviewAnnotationEffect?: ProjectAssetPublicationOptions['requiredReviewAnnotationEffect'];
+  expectedLibrarySource?: ProjectAssetPublicationPayload['expectedLibrarySource'];
   journal: AssetReadyJournal;
   ownerKind: string;
   storeName: typeof PROJECT_ASSETS_STORE | typeof PROJECT_EXPORTS_STORE;
@@ -123,10 +130,22 @@ async function publishProjectMediaAsset(args: {
         SCENARIO_ASSETS_STORE,
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_HISTORY_STORE,
+        ...(args.expectedLibrarySource ? [STORE_NAME, PROJECT_EXPORTS_STORE] : []),
       ],
       'readwrite'
     );
     const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+    if (args.expectedLibrarySource) {
+      try {
+        const entry = parseProjectAssetEntry(args.entry);
+        if (!entry) throw new Error('Invalid private acquisition metadata.');
+        await publishKnownLibraryAsset(tx, entry, ref, args.expectedLibrarySource);
+        await tx.done;
+        return;
+      } catch (error) {
+        await abortIndexedDbMutation(tx, error);
+      }
+    }
     if (
       args.publishToLibrary === false &&
       (await mediaStore.get(`project-asset:${args.entry.id}`)) !== undefined
@@ -221,6 +240,31 @@ async function publishProjectMediaAsset(args: {
   }
 }
 
+/** Specialized accepted-receipt transition shares its caller's commit/abort authority. */
+async function publishKnownLibraryAsset(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  entry: StoredProjectAssetEntry,
+  ref: AssetRef,
+  claim: KnownLibrarySourceClaim
+) {
+  if ((await tx.objectStore(MEDIA_LIBRARY_STORE).get(`project-asset:${entry.id}`)) !== undefined)
+    throw new SupersededAssetPublicationError();
+  const admission = await admitKnownLibraryPublication({
+    claim,
+    entry,
+    ref,
+    read: (store, key) => tx.objectStore(store).get(key),
+  });
+  if (admission === 'replay') return;
+  await tx.objectStore(ASSET_OWNERS_STORE).put({
+    assetId: ref.assetId,
+    ownerId: entry.id,
+    ownerKind: PROJECT_ASSET_OWNER_KIND,
+    role: PROJECT_MEDIA_ASSET_ROLE,
+  });
+  await tx.objectStore(PROJECT_ASSETS_STORE).put(entry);
+}
+
 export async function publishProjectAssetJournal(
   journal: AssetReadyJournal,
   lifecyclePermit?: DurableAssetLifecyclePermit
@@ -238,6 +282,9 @@ export async function publishProjectAssetJournal(
       ? {}
       : { publishToLibrary: payload.publishToLibrary }),
     journal,
+    ...(payload.expectedLibrarySource
+      ? { expectedLibrarySource: payload.expectedLibrarySource }
+      : {}),
     ...(payload.requiredReviewAnnotationEffect
       ? { requiredReviewAnnotationEffect: payload.requiredReviewAnnotationEffect }
       : {}),
@@ -253,6 +300,7 @@ async function recoverProjectAssetJournal(
 ): Promise<void | 'defer'> {
   const payload = parseProjectAssetPayload(journal.payload);
   if (!payload) throw new Error('Invalid project asset publication payload.');
+  if (payload.expectedLibrarySource) return publishProjectAssetJournal(journal, lifecyclePermit);
   if (payload.publishToLibrary === false && payload.entry.originMediaId) {
     const rawOrigin: unknown = await runWithIndexedDbMutation((db) =>
       db.get(MEDIA_LIBRARY_STORE, payload.entry.originMediaId!)

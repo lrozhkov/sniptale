@@ -35,6 +35,54 @@ export interface ProjectAssetPublicationPayload extends ProjectAssetPublicationO
   librarySourceId?: string;
   expectedAssetId?: string | null;
   requiredReview?: { aggregateId: string; clipId: string };
+  /** Exact selected source for a new private Montage child, without another binary import. */
+  expectedLibrarySource?: KnownLibrarySourceClaim;
+}
+
+export interface KnownLibrarySourceClaim {
+  mediaId: string;
+  source:
+    | { kind: 'recording'; recordingId: string }
+    | { kind: 'project-export'; exportId: string; projectId: string };
+}
+
+function parseKnownLibrarySourceClaim(value: unknown): KnownLibrarySourceClaim | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !['mediaId', 'source'].includes(key)) ||
+    typeof value['mediaId'] !== 'string' ||
+    !value['mediaId'] ||
+    !isRecord(value['source'])
+  )
+    return null;
+  const source = value['source'];
+  if (
+    source['kind'] === 'recording' &&
+    Object.keys(source).every((key) => ['kind', 'recordingId'].includes(key)) &&
+    typeof source['recordingId'] === 'string' &&
+    source['recordingId']
+  )
+    return {
+      mediaId: value['mediaId'],
+      source: { kind: 'recording', recordingId: source['recordingId'] },
+    };
+  if (
+    source['kind'] === 'project-export' &&
+    Object.keys(source).every((key) => ['kind', 'exportId', 'projectId'].includes(key)) &&
+    typeof source['exportId'] === 'string' &&
+    source['exportId'] &&
+    typeof source['projectId'] === 'string' &&
+    source['projectId']
+  )
+    return {
+      mediaId: value['mediaId'],
+      source: {
+        kind: 'project-export',
+        exportId: source['exportId'],
+        projectId: source['projectId'],
+      },
+    };
+  return null;
 }
 
 /** Shared compatibility rule for prepared writes and recovered scene-resource claims. */
@@ -143,6 +191,23 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
     } else if (value['publishToLibrary'] === false || value['expectedAssetId'] !== entry.assetId)
       return null;
   }
+  const expectedLibrarySource =
+    value['expectedLibrarySource'] === undefined
+      ? undefined
+      : parseKnownLibrarySourceClaim(value['expectedLibrarySource']);
+  if (
+    expectedLibrarySource === null ||
+    (expectedLibrarySource &&
+      (value['expectedAssetId'] !== null ||
+        value['publishToLibrary'] !== false ||
+        entry.originMediaId !== expectedLibrarySource.mediaId ||
+        librarySourceId !== undefined ||
+        requiredReview !== undefined ||
+        requiredReviewSpeech !== undefined ||
+        requiredReviewResource !== undefined ||
+        requiredReviewAnnotationEffect !== undefined))
+  )
+    return null;
   return {
     entry,
     filename: value['filename'],
@@ -157,6 +222,7 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
     ...(requiredReviewAnnotationEffect ? { requiredReviewAnnotationEffect } : {}),
     ...(requiredReviewResource ? { requiredReviewResource } : {}),
     ...(typeof librarySourceId === 'string' ? { librarySourceId } : {}),
+    ...(expectedLibrarySource ? { expectedLibrarySource } : {}),
   };
 }
 

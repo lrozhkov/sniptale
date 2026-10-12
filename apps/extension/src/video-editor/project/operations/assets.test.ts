@@ -14,6 +14,13 @@ const loadAudioMetadataMock = vi.fn();
 const loadImageMetadataMock = vi.fn();
 const loadVideoMetadataMock = vi.fn();
 const projectAssetId = '00000000-0000-4000-8000-000000000001';
+const readLibraryProjectBindingSourceMock = vi.fn();
+const prepareLibraryProjectBindingMock = vi.fn();
+const publishLibraryProjectBindingMock = vi.fn();
+vi.mock('../../../composition/persistence/projects/library-project-binding', () => ({
+  readLibraryProjectBindingSource: readLibraryProjectBindingSourceMock,
+  prepareLibraryProjectBinding: prepareLibraryProjectBindingMock,
+}));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/projects/index')>()),
@@ -368,14 +375,21 @@ describe('library import failure handling', () => {
     const project = createEmptyVideoProject();
     getMediaLibraryEntryMock.mockResolvedValue({
       kind: 'export',
+      mimeType: 'video/webm',
       source: { kind: 'project-export' },
       filename: 'export.webm',
     });
-    getMediaAssetBlobMock.mockResolvedValue(new Blob(['invalid'], { type: 'video/webm' }));
+    readLibraryProjectBindingSourceMock.mockResolvedValue({
+      file: new File(['invalid'], 'export.webm', { type: 'video/webm' }),
+      filename: 'export.webm',
+    });
     await expect(ensureLibraryMediaAssets(project, 'export')).rejects.toThrow();
     expectNoImportSideEffects();
-    getMediaAssetBlobMock.mockResolvedValue(createWebmFile());
-    saveProjectAssetSafelyMock.mockRejectedValueOnce(new Error('Storage full'));
+    readLibraryProjectBindingSourceMock.mockResolvedValue({
+      file: createWebmFile(),
+      filename: 'export.webm',
+    });
+    publishLibraryProjectBindingMock.mockRejectedValueOnce(new Error('Storage full'));
     await expect(ensureLibraryMediaAssets(project, 'export')).rejects.toThrow('Storage full');
     expect(project.assets).toHaveLength(0);
   });
@@ -407,6 +421,8 @@ function useDistinctAssetIds() {
 
 function setupProjectAssetHelpersTest() {
   vi.clearAllMocks();
+  publishLibraryProjectBindingMock.mockResolvedValue(undefined);
+  prepareLibraryProjectBindingMock.mockResolvedValue({ publish: publishLibraryProjectBindingMock });
   vi.spyOn(crypto, 'randomUUID').mockReturnValue(projectAssetId);
   loadImageMetadataMock.mockResolvedValue({
     width: 320,
@@ -680,7 +696,7 @@ it('imports an original screenshot when no derived presentation has been generat
   expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
 });
 
-it('imports a microphone recording as audio without acquiring a video or webcam asset', async () => {
+it('shares a microphone recording as audio without copying its immutable object', async () => {
   const { ensureLibraryMediaAssets } = await import('./assets');
   const file = createMp3File();
   getMediaLibraryEntryMock.mockResolvedValue({
@@ -690,6 +706,11 @@ it('imports a microphone recording as audio without acquiring a video or webcam 
     source: { kind: 'recording', recordingId: 'mic-1' },
   });
   getMediaAssetBlobMock.mockResolvedValue(file);
+  readLibraryProjectBindingSourceMock.mockResolvedValue({
+    mediaId: 'microphone',
+    file,
+    filename: file.name,
+  });
   getRecordingMock.mockImplementation(async (id: string) =>
     id === 'mic-1' ? { file, filename: file.name } : undefined
   );
@@ -703,9 +724,60 @@ it('imports a microphone recording as audio without acquiring a video or webcam 
   expect(loadAudioMetadataMock).toHaveBeenCalledWith(expect.any(File));
   expect(loadVideoMetadataMock).not.toHaveBeenCalled();
   expect(getRecordingMock).not.toHaveBeenCalled();
-  expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+  expect(saveProjectAssetSafelyMock).not.toHaveBeenCalled();
+  expect(prepareLibraryProjectBindingMock).toHaveBeenCalledOnce();
+  expect(publishLibraryProjectBindingMock).toHaveBeenCalledOnce();
   if (!asset) throw new Error('Missing microphone asset');
   project.assets.push(asset);
   expect(await ensureLibraryMediaAssets(project, 'microphone')).toEqual([asset]);
-  expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+  expect(saveProjectAssetSafelyMock).not.toHaveBeenCalled();
+  expect(prepareLibraryProjectBindingMock).toHaveBeenCalledOnce();
+});
+
+it.each(['video', 'audio'])(
+  'shares a known %s export through distinct private project identities',
+  async (kind) => {
+    useDistinctAssetIds();
+    const file = kind === 'audio' ? createMp3File() : createWebmFile();
+    getMediaLibraryEntryMock.mockResolvedValue({
+      id: 'export',
+      kind: 'export',
+      mimeType: file.type,
+      source: { kind: 'project-export', exportId: 'one', projectId: 'origin' },
+    });
+    readLibraryProjectBindingSourceMock.mockResolvedValue({
+      mediaId: 'export',
+      file,
+      filename: file.name,
+    });
+    const { ensureLibraryMediaAssets } = await import('./assets');
+    const [one] = await ensureLibraryMediaAssets(createEmptyVideoProject(), 'export');
+    const [two] = await ensureLibraryMediaAssets(createEmptyVideoProject(), 'export');
+    expect(one?.type).toBe(
+      kind === 'audio' ? VideoProjectAssetType.AUDIO : VideoProjectAssetType.VIDEO
+    );
+    expect(one?.source).not.toEqual(two?.source);
+    expect(prepareLibraryProjectBindingMock).toHaveBeenCalledTimes(2);
+    expect(saveProjectAssetSafelyMock).not.toHaveBeenCalled();
+    expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+  }
+);
+
+it('creates no ready claim when decoding a known recording fails', async () => {
+  getMediaLibraryEntryMock.mockResolvedValue({
+    id: 'microphone',
+    kind: 'audio',
+    source: { kind: 'recording', recordingId: 'mic' },
+  });
+  readLibraryProjectBindingSourceMock.mockResolvedValue({
+    file: createMp3File(),
+    filename: 'voice.mp3',
+  });
+  loadAudioMetadataMock.mockRejectedValueOnce(new Error('decode failed'));
+  const { ensureLibraryMediaAssets } = await import('./assets');
+  await expect(ensureLibraryMediaAssets(createEmptyVideoProject(), 'microphone')).rejects.toThrow(
+    'decode failed'
+  );
+  expect(prepareLibraryProjectBindingMock).not.toHaveBeenCalled();
+  expect(saveProjectAssetSafelyMock).not.toHaveBeenCalled();
 });

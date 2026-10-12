@@ -3,7 +3,7 @@ import { betaV24Fixture } from '../fixtures/beta-v24';
 import { DB_VERSION } from '../core.stores';
 import { handleDatabaseUpgrade } from './core';
 
-it('advances only the deletion journal contract without rewriting existing authority', () => {
+it('advances private source and known-source journal contracts without rewriting authority', () => {
   const put = vi.fn();
   const tx = {
     abort: vi.fn(),
@@ -17,7 +17,7 @@ it('advances only the deletion journal contract without rewriting existing autho
     deleteObjectStore: vi.fn(),
   };
   handleDatabaseUpgrade(db, 24, DB_VERSION, tx);
-  expect(put).toHaveBeenCalledWith({ domainId: 'assetGraph', schemaVersion: 2 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'assetGraph', schemaVersion: 3 });
   expect(db.createObjectStore).not.toHaveBeenCalled();
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
