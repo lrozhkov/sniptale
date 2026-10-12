@@ -1,12 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
-import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { readFile } from 'node:fs/promises';
 import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
+import { createInlineWorkerBundlePlugin } from '../support/inline-worker-bundle';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
@@ -307,36 +307,7 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     });
     const bundle = await build({
       entryPoints: ['tooling/test/e2e/support/quick-review-annotation-portable-probe.ts'],
-      plugins: [
-        {
-          name: 'native-vite-inline-worker',
-          setup(plugin) {
-            plugin.onResolve({ filter: /\?worker&inline$/ }, (args) => ({
-              path: resolve(args.resolveDir, args.path.replace(/\?worker&inline$/, '')),
-              namespace: 'native-inline-worker',
-            }));
-            plugin.onLoad({ filter: /.*/, namespace: 'native-inline-worker' }, async (args) => {
-              const worker = await build({
-                entryPoints: [args.path],
-                bundle: true,
-                format: 'iife',
-                platform: 'browser',
-                write: false,
-              });
-              return {
-                loader: 'js',
-                contents: `const source = ${JSON.stringify(worker.outputFiles[0]!.text)};
-              export default class InlineWorker {
-                constructor(options) {
-                  const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-                  try { return new Worker(url, options); } finally { URL.revokeObjectURL(url); }
-                }
-              }`,
-              };
-            });
-          },
-        },
-      ],
+      plugins: [createInlineWorkerBundlePlugin()],
       bundle: true,
       format: 'esm',
       platform: 'browser',

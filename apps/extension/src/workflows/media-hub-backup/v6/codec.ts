@@ -20,7 +20,9 @@ import {
   assertV6ObjectPath,
   MEDIA_HUB_BACKUP_LAYOUT,
   MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  MEDIA_HUB_BACKUP_SHARED_LAYOUT,
 } from './layout';
+import { parseBackupSharedObjects } from './shared-objects';
 import { parsePortableGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 
 const PORTABLE_URL_PATTERN = /^(?:data|blob):/i;
@@ -247,20 +249,24 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
     value['format'] === MEDIA_HUB_BACKUP_FORMAT &&
     value['version'] === MEDIA_HUB_BACKUP_VERSION &&
     value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT &&
-    value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
+    value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT &&
+    value['layout'] !== MEDIA_HUB_BACKUP_SHARED_LAYOUT
   ) {
     throw new Error('Unsupported media backup v6 layout. Create a new backup with this version.');
   }
   assertExactKeys(
     value,
     ['archiveId', 'catalogs', 'exportedAt', 'format', 'layout', 'privacy', 'totals', 'version'],
-    ['galleryViews']
+    value['layout'] === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+      ? ['galleryViews', 'sharedObjects']
+      : ['galleryViews']
   );
   if (
     value['format'] !== MEDIA_HUB_BACKUP_FORMAT ||
     value['version'] !== MEDIA_HUB_BACKUP_VERSION ||
     (value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT &&
-      value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT)
+      value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT &&
+      value['layout'] !== MEDIA_HUB_BACKUP_SHARED_LAYOUT)
   ) {
     throw new Error('Unsupported media backup format.');
   }
@@ -268,6 +274,12 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
     throw new Error('Media backup manifest totals are invalid.');
   }
   const totals = value['totals'];
+  if (
+    value['layout'] === MEDIA_HUB_BACKUP_SHARED_LAYOUT &&
+    (parseSafeInteger(totals['objects'], 'total objects') > MAX_MEDIA_ARCHIVE_ENTRIES ||
+      parseSafeInteger(totals['bytes'], 'total bytes') > MAX_MEDIA_ARCHIVE_INFLATED_BYTES)
+  )
+    throw new Error('Media backup logical inventory exceeds its resource profile.');
   assertExactKeys(totals, ['bytes', 'objects', 'roots', 'rootsByProfile']);
   if (!isPlainRecord(totals['rootsByProfile']))
     throw new Error('Media backup profile totals are invalid.');
@@ -295,6 +307,9 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
       ? {}
       : { galleryViews: parsePortableGallerySavedViews(value['galleryViews']) }),
     layout: value['layout'],
+    ...(value['layout'] === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+      ? { sharedObjects: parseBackupSharedObjects(value['sharedObjects']) }
+      : {}),
     privacy: parsePrivacyFlags(value['privacy']),
     totals: {
       bytes: parseSafeInteger(totals['bytes'], 'total bytes'),

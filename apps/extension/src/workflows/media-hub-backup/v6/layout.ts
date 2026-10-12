@@ -5,9 +5,11 @@ import {
 
 export const MEDIA_HUB_BACKUP_LAYOUT = 'library-folders-v1';
 export const MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT = 'library-folders-v2';
+export const MEDIA_HUB_BACKUP_SHARED_LAYOUT = 'library-folders-v3';
 export type MediaHubBackupLayout =
   | typeof MEDIA_HUB_BACKUP_LAYOUT
-  | typeof MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT;
+  | typeof MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT;
 export const MANIFEST_PATH = '_sniptale/manifest.json';
 export const CATALOG_ROOT = '_sniptale/catalog';
 export const METADATA_ROOT = '_sniptale/metadata';

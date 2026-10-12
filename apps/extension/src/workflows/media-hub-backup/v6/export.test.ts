@@ -7,73 +7,119 @@ import { createQuickEditAdvancedState } from '../../../features/video/review/adv
 import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
 import { MAX_ROOT_METADATA_BYTES } from './contracts';
 import { assertMetadataJson } from './codec';
+import { parseBackupRootEnvelope } from './shared-object-envelope';
+import { decodeBackupMetadata } from './metadata-transport';
 
 const favicon =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
 
-it('roundtrips supported authored review headers and text through the v2 archive', async () => {
-  const item = root('123456');
-  item.descriptor.rootId = 'recording:one';
-  item.descriptor.metadataPath = '_sniptale/metadata/media/recording%3Aone.json';
-  const metadata = {
-    entry: {
-      id: 'recording:one',
-      kind: 'recording',
-      filename: 'one.webm',
-      originalFilename: 'one.webm',
-      source: { kind: 'recording', recordingId: 'one' },
-      mimeType: 'video/webm',
-      createdAt: 1,
-      updatedAt: 1,
-      duration: 2,
-      size: 6,
-      width: 640,
-      height: 360,
-      sourceUrl: null,
-      sourceTitle: null,
-      sourceFavicon: null,
-      tags: [],
-    },
-    originalObjectId: 'object-000001',
-    recording: {
-      entry: { id: 'one', filename: 'one.webm', createdAt: 1, mimeType: 'video/webm', size: 6 },
-    },
-    videoReview: {
-      workspace: {
-        aggregateId: 'recording:one',
-        formatVersion: 1,
-        source: { duration: 2, width: 640, height: 360, size: 6, mimeType: 'video/webm' },
-        revision: 1,
-        cursor: 0,
-        history: [],
-        advanced: {
-          ...createQuickEditAdvancedState(),
-          windowHeader: {
-            ...DEFAULT_WINDOW_HEADER,
-            faviconEnabled: true,
-            faviconSource: 'file',
-            faviconDataUrl: favicon,
-            title: 'Qk ordinary title',
-          },
-        },
+it.each(['library-folders-v2', 'library-folders-v3'] as const)(
+  'roundtrips authored headers through %s',
+  async (layout) => {
+    const item = root('123456');
+    item.descriptor.rootId = 'recording:one';
+    item.descriptor.metadataPath = '_sniptale/metadata/media/recording%3Aone.json';
+    const metadata = {
+      entry: {
+        id: 'recording:one',
+        kind: 'recording',
+        filename: 'one.webm',
+        originalFilename: 'one.webm',
+        source: { kind: 'recording', recordingId: 'one' },
+        mimeType: 'video/webm',
         createdAt: 1,
         updatedAt: 1,
+        duration: 2,
+        size: 6,
+        width: 640,
+        height: 360,
+        sourceUrl: null,
+        sourceTitle: null,
+        sourceFavicon: null,
+        tags: [],
       },
-      draft: null,
-    },
-  };
-  const original = await item.load();
-  const portable: unknown = metadata;
-  assertMetadataJson(portable);
-  const plan = buildMediaHubBackupExportPlanV6({
-    layout: 'library-folders-v2',
-    roots: [{ ...item, load: async () => ({ metadata: portable, objects: original.objects }) }],
-    privacy: { includeSourceMetadata: true, includeTelemetry: false, includeWebSnapshots: false },
-  });
-  const sink = createArchiveMemorySink();
-  await exportMediaHubBackupV6({ plan, sink: sink.sink });
-  expect((await inspectMediaHubBackupV6(sink.blob())).manifest.layout).toBe('library-folders-v2');
-});
+      originalObjectId: 'object-000001',
+      recording: {
+        entry: { id: 'one', filename: 'one.webm', createdAt: 1, mimeType: 'video/webm', size: 6 },
+      },
+      videoReview: {
+        workspace: {
+          aggregateId: 'recording:one',
+          formatVersion: 1,
+          source: { duration: 2, width: 640, height: 360, size: 6, mimeType: 'video/webm' },
+          revision: 1,
+          cursor: 0,
+          history: [],
+          advanced: {
+            ...createQuickEditAdvancedState(),
+            windowHeader: {
+              ...DEFAULT_WINDOW_HEADER,
+              faviconEnabled: true,
+              faviconSource: 'file',
+              faviconDataUrl: favicon,
+              title: 'Qk ordinary title',
+            },
+          },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        draft: null,
+      },
+    };
+    const original = await item.load();
+    const objects = original.objects.map((object) => ({
+      blob: new Blob([object.blob], { type: 'video/webm' }),
+      ref: { ...object.ref, mimeType: 'video/webm' },
+    }));
+    const second = structuredClone(metadata);
+    second.entry.id = 'recording:two';
+    second.entry.source.recordingId = 'two';
+    second.recording.entry.id = 'two';
+    second.videoReview.workspace.aggregateId = 'recording:two';
+    assertMetadataJson(second);
+    const portable: unknown = metadata;
+    assertMetadataJson(portable);
+    const plan = buildMediaHubBackupExportPlanV6({
+      layout,
+      roots: [
+        { ...item, load: async () => ({ metadata: portable, objects }) },
+        {
+          ...item,
+          descriptor: {
+            ...item.descriptor,
+            rootId: 'recording:two',
+            metadataPath: '_sniptale/metadata/media/recording%3Atwo.json',
+          },
+          load: async () => ({
+            metadata: second,
+            objects: objects.map((object) => ({
+              ...object,
+              ref: { ...object.ref, path: 'Recordings/two.webm' },
+            })),
+          }),
+        },
+      ],
+      privacy: { includeSourceMetadata: true, includeTelemetry: false, includeWebSnapshots: false },
+    });
+    const sink = createArchiveMemorySink();
+    await exportMediaHubBackupV6({ plan, sink: sink.sink });
+    const inspected = await inspectMediaHubBackupV6(sink.blob());
+    expect(inspected.manifest.layout).toBe(layout);
+    if (layout === 'library-folders-v3') expect(inspected.manifest.sharedObjects).toHaveLength(1);
+    const reader = await openArchiveReader(sink.blob());
+    try {
+      for (const descriptor of inspected.descriptors) {
+        const value: unknown = JSON.parse(await reader.entry(descriptor.metadataPath)!.text());
+        const { envelope } = parseBackupRootEnvelope(value, inspected.manifest);
+        const decoded = await decodeBackupMetadata(reader, envelope);
+        expect(JSON.stringify(decoded.envelope.metadata)).toContain(favicon);
+        expect(JSON.stringify(decoded.envelope.metadata)).toContain('Qk ordinary title');
+      }
+    } finally {
+      await reader.close();
+    }
+  }
+);
 
 it('refuses oversized v1 root JSON before finalizing a successful backup', async () => {
   const item = root();
@@ -394,4 +440,30 @@ describe('media backup v6 export planning', () => {
       'video-project',
     ]);
   });
+});
+
+it('compresses declared JSON transport while leaving the readable original available', async () => {
+  const item = root('original');
+  const payload = await item.load();
+  const metadata = {
+    ...payload.metadata,
+    entry: { ...payload.metadata.entry, sourceTitle: 'caption '.repeat(1000) },
+  };
+  const authored = { ...payload, metadata };
+  const plan = buildMediaHubBackupExportPlanV6({
+    layout: 'library-folders-v2',
+    roots: [{ ...item, load: async () => authored }],
+    privacy: { includeSourceMetadata: true, includeTelemetry: false, includeWebSnapshots: false },
+  });
+  const sink = createArchiveMemorySink();
+  await exportMediaHubBackupV6({ plan, sink: sink.sink });
+  const reader = await openArchiveReader(sink.blob());
+  try {
+    const json = reader.entries().find((entry) => entry.path.endsWith('/root.json'));
+    expect(json).toBeDefined();
+    expect(json!.compressedSize).toBeLessThan(json!.size / 2);
+    expect(await reader.entry('Screenshots/capture.png')!.text()).toBe('original');
+  } finally {
+    await reader.close();
+  }
 });

@@ -27,10 +27,13 @@ import {
   MANIFEST_PATH,
   MEDIA_HUB_BACKUP_LAYOUT,
   MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  MEDIA_HUB_BACKUP_SHARED_LAYOUT,
   type MediaHubBackupLayout,
 } from './layout';
 import { encodeBackupMetadata } from './metadata-transport';
 import { assertBackupByteBudget } from './errors';
+import { prepareSharedBackupExport } from './shared-object-export';
+import { parseSharedRootEnvelope } from './shared-object-envelope';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export type {
@@ -183,7 +186,10 @@ export async function exportMediaHubBackupV6(args: {
     throwIfAborted(args.signal);
     progress.currentFilename = MANIFEST_PATH;
     report();
-    if (args.plan.manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT) {
+    if (
+      args.plan.manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT ||
+      args.plan.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+    ) {
       const roots: MediaHubBackupRootInventoryItem[] = [];
       let expandedBytes = 0;
       for (const [index, item] of args.plan.roots.entries()) {
@@ -195,6 +201,11 @@ export async function exportMediaHubBackupV6(args: {
       }
       args = { ...args, plan: buildMediaHubBackupExportPlanV6({ ...args.plan.manifest, roots }) };
     }
+    const shared =
+      args.plan.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+        ? await prepareSharedBackupExport(args.plan.roots, args.signal)
+        : null;
+    if (shared) args.plan.manifest = { ...args.plan.manifest, sharedObjects: shared.sharedObjects };
     const manifestText = JSON.stringify(args.plan.manifest);
     assertBackupByteBudget(
       new TextEncoder().encode(manifestText).byteLength,
@@ -209,14 +220,18 @@ export async function exportMediaHubBackupV6(args: {
       report();
       await writer.addText(catalog.descriptor.path, catalog.text, signalOptions(args.signal));
     }
-    for (const item of args.plan.roots) {
+    for (const [index, item] of args.plan.roots.entries()) {
       throwIfAborted(args.signal);
       const payload = await item.load(args.signal);
-      const envelope = parseRootEnvelope({
-        descriptor: item.descriptor,
-        metadata: payload.metadata,
-        objects: payload.objects.map((object) => object.ref),
-      });
+      const prepared = shared?.roots[index];
+      const envelope =
+        prepared?.metadata ??
+        parseRootEnvelope({
+          descriptor: item.descriptor,
+          metadata: payload.metadata,
+          objects: payload.objects.map((object) => object.ref),
+        });
+      if (prepared) parseSharedRootEnvelope(envelope, shared!.sharedObjects);
       progress.currentFilename = item.descriptor.metadataPath;
       report();
       const metadataText = JSON.stringify(envelope);
@@ -226,14 +241,17 @@ export async function exportMediaHubBackupV6(args: {
         'encode'
       );
       await writer.addText(item.descriptor.metadataPath, metadataText, signalOptions(args.signal));
-      for (const object of payload.objects) {
+      for (const object of prepared?.objects ?? payload.objects) {
         throwIfAborted(args.signal);
         if (object.blob.size !== object.ref.size) {
           throw new Error(`Media backup object source size changed: ${object.ref.path}.`);
         }
         progress.currentFilename = object.ref.filename;
         report();
-        await writer.addBlob(object.ref.path, object.blob, signalOptions(args.signal));
+        await writer.addBlob(object.ref.path, object.blob, {
+          ...signalOptions(args.signal),
+          compress: object.ref.mimeType.toLowerCase() === 'application/json',
+        });
         progress.bytesRead += object.blob.size;
         report();
       }

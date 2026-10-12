@@ -13,7 +13,7 @@ import { buildMediaRootInventory } from './media';
 import { buildScenarioProjectRootInventory } from './scenario-projects';
 import { buildVideoProjectRootInventory } from './video-projects';
 import { resolveBackupDependencySelection } from './scenario-dependencies';
-import { MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT } from '../layout';
+import { MEDIA_HUB_BACKUP_SHARED_LAYOUT } from '../layout';
 
 export async function buildMediaHubBackupExportPlanFromLibraryV6(
   options: MediaHubBackupExportOptions
@@ -78,7 +78,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     );
   }
   return buildMediaHubBackupExportPlanV6({
-    layout: MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+    layout: MEDIA_HUB_BACKUP_SHARED_LAYOUT,
     ...(options.scope === 'all' ? { galleryViews: await listGallerySavedViews() } : {}),
     privacy: {
       includeSourceMetadata: options.includeSourceMetadata,

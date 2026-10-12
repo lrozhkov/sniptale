@@ -108,6 +108,8 @@ export interface MediaHubBackupManifestV6 {
   format: typeof MEDIA_HUB_BACKUP_FORMAT;
   galleryViews?: GallerySavedView[];
   layout: MediaHubBackupLayout;
+  /** V3 physical entries anchored by a direct root reference; no alias chains. */
+  sharedObjects?: MediaHubBackupSharedObject[];
   privacy: MediaHubBackupPrivacyFlags;
   totals: {
     bytes: number;
@@ -121,6 +123,18 @@ export interface MediaHubBackupManifestV6 {
     };
   };
   version: typeof MEDIA_HUB_BACKUP_VERSION;
+}
+
+export interface MediaHubBackupSharedObject {
+  id: string;
+  path: string;
+  sha256: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface MediaHubBackupSharedReference extends Omit<ArchiveObjectRef, 'path'> {
+  sharedObjectId: string;
 }
 
 export interface MediaHubBackupRootEnvelope {

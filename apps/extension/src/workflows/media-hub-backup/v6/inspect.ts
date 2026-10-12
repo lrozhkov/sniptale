@@ -6,18 +6,21 @@ import {
   type ArchiveRootDescriptor,
 } from '../../../composition/archive-transfer';
 import { createArchiveFingerprint, parseCatalog } from './catalog';
-import { parseBoundedJson, parseManifestV6, parseRootEnvelope } from './codec';
+import { parseBoundedJson, parseManifestV6 } from './codec';
+import { parseBackupRootEnvelope } from './shared-object-envelope';
+import { verifyBackupSharedObjects } from './shared-objects';
 import {
   MAX_CATALOG_SHARD_BYTES,
   MAX_ROOT_METADATA_BYTES,
   type MediaHubBackupManifestV6,
 } from './contracts';
 import { assertV6MetadataPath, MANIFEST_PATH } from './layout';
-import { MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT, type MediaHubBackupLayout } from './layout';
+import { MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT, MEDIA_HUB_BACKUP_SHARED_LAYOUT } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertBackupByteBudget } from './errors';
 import { MAX_EXPANDED_ARCHIVE_METADATA_BYTES } from './contracts';
 import { assertArchiveRootMetadataIdentity } from './root-codecs/root-identity';
+import { assertArchiveRootObjectInventory } from './root-codecs/object-inventory';
 
 export interface InspectedMediaHubBackupV6 {
   descriptors: ArchiveRootDescriptor[];
@@ -79,6 +82,8 @@ function centralDirectoryIdentity(entries: readonly ArchiveEntryInfo[]) {
 }
 
 interface InspectionAccumulator {
+  directObjects: Map<string, { mimeType: string; size: number }>;
+  sharedIds: Set<string>;
   expandedBytes: number;
   catalogTexts: string[];
   declaredPaths: Set<string>;
@@ -94,6 +99,8 @@ interface InspectionAccumulator {
 
 function createInspectionAccumulator(): InspectionAccumulator {
   return {
+    directObjects: new Map(),
+    sharedIds: new Set(),
     expandedBytes: 0,
     catalogTexts: [],
     canonicalRootKeys: new Set(),
@@ -125,7 +132,7 @@ function addProfileRoot(
 }
 
 async function inspectRoot(args: {
-  layout: MediaHubBackupLayout;
+  manifest: MediaHubBackupManifestV6;
   catalog: MediaHubBackupManifestV6['catalogs'][number];
   descriptor: ArchiveRootDescriptor;
   reader: ArchiveReader;
@@ -147,30 +154,42 @@ async function inspectRoot(args: {
   if (!metadataEntry) {
     throw new Error(`Media backup root metadata is missing: ${args.descriptor.metadataPath}.`);
   }
-  const envelope = parseRootEnvelope(
-    parseBoundedJson(await metadataEntry.text(MAX_ROOT_METADATA_BYTES), MAX_ROOT_METADATA_BYTES)
+  const admitted = parseBackupRootEnvelope(
+    parseBoundedJson(await metadataEntry.text(MAX_ROOT_METADATA_BYTES), MAX_ROOT_METADATA_BYTES),
+    args.manifest
   );
+  const { envelope } = admitted;
   if (!sameDescriptor(envelope.descriptor, args.descriptor)) {
     throw new Error('Media backup catalog and root metadata descriptors do not match.');
   }
   const decoded =
-    args.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
+    args.manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT ||
+    args.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT
       ? await decodeBackupMetadata(args.reader, envelope)
       : { envelope, expandedBytes: 0 };
   args.state.expandedBytes += decoded.expandedBytes;
   assertBackupByteBudget(args.state.expandedBytes, MAX_EXPANDED_ARCHIVE_METADATA_BYTES, 'read');
   assertArchiveRootMetadataIdentity(args.descriptor, decoded.envelope.metadata);
+  if (args.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT)
+    await assertArchiveRootObjectInventory(
+      decoded.envelope,
+      args.reader,
+      args.manifest.sharedObjects ?? []
+    );
   for (const object of envelope.objects) {
-    if (args.state.declaredPaths.has(object.path)) {
-      throw new Error('Media backup object path is duplicated.');
-    }
     const objectEntry = args.reader.entry(object.path);
     if (!objectEntry) throw new Error(`Media backup object is missing: ${object.path}.`);
     if (objectEntry.size !== object.size) {
       throw new Error(`Media backup object size does not match: ${object.path}.`);
     }
-    args.state.declaredPaths.add(object.path);
   }
+  for (const object of admitted.directObjects) {
+    if (args.state.declaredPaths.has(object.path))
+      throw new Error('Media backup object path is duplicated.');
+    args.state.declaredPaths.add(object.path);
+    args.state.directObjects.set(object.path, object);
+  }
+  for (const id of admitted.sharedIds) args.state.sharedIds.add(id);
   args.state.canonicalRootKeys.add(canonicalKey);
   args.state.declaredPaths.add(args.descriptor.metadataPath);
   args.state.rootDescriptors.push(args.descriptor);
@@ -183,7 +202,7 @@ async function inspectRoot(args: {
 }
 
 async function inspectCatalog(args: {
-  layout: MediaHubBackupLayout;
+  manifest: MediaHubBackupManifestV6;
   catalog: MediaHubBackupManifestV6['catalogs'][number];
   reader: ArchiveReader;
   state: InspectionAccumulator;
@@ -251,10 +270,21 @@ export async function inspectMediaHubBackupV6(file: Blob): Promise<InspectedMedi
     const manifest = parseManifestV6(parseBoundedJson(manifestText));
     const state = createInspectionAccumulator();
     for (const catalog of manifest.catalogs) {
-      await inspectCatalog({ catalog, reader, state, layout: manifest.layout });
+      await inspectCatalog({ catalog, reader, state, manifest });
     }
     assertManifestTotals(manifest, state);
     assertExactDeclaredEntries(reader, state);
+    for (const object of manifest.sharedObjects ?? []) {
+      const anchor = state.directObjects.get(object.path);
+      if (
+        !state.sharedIds.has(object.id) ||
+        !anchor ||
+        anchor.size !== object.size ||
+        anchor.mimeType.toLowerCase() !== object.mimeType
+      )
+        throw new Error('Media backup shared object is unused or has no matching direct anchor.');
+    }
+    await verifyBackupSharedObjects(reader, manifest.sharedObjects ?? []);
     return {
       descriptors: state.rootDescriptors,
       fingerprint: await createArchiveFingerprint({
