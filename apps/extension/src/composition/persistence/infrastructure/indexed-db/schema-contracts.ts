@@ -91,7 +91,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 1,
+    schemaVersion: 2,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_OWNERS_STORE, dataClass: 'durable-authority' },
@@ -719,6 +719,23 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         ].every((name) => db.objectStoreNames.contains(name))
       )
         throw new Error('Bounded editor history stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'assetGraph', from: 1, to: 2 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 24,
+    toDatabaseVersion: 25,
+    risk: 'additive',
+    stores: [ASSET_OPERATIONS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (!db.objectStoreNames.contains(ASSET_OPERATIONS_STORE))
+        throw new Error('Private source retirement outbox is unavailable.');
       return undefined;
     },
   },

@@ -23,6 +23,14 @@ import { withReviewWorkspaceUsage } from '../../../../apps/extension/src/composi
 import { ASSET_ROOT_DIRECTORY_NAME } from '../../../../apps/extension/src/composition/persistence/assets/opfs-store';
 import { getProjectAsset } from '../../../../apps/extension/src/composition/persistence/projects';
 import { createVideoReviewSession } from '../../../../apps/extension/src/workflows/video-review/session';
+import { initDB } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core';
+import { parsePhysicalDeleteAssetOperation } from '../../../../apps/extension/src/composition/persistence/assets/guards';
+import { completePhysicalDeleteOperations } from '../../../../apps/extension/src/composition/persistence/assets/operations';
+import {
+  acquireAssetResourceSession,
+  type AssetResourceSession,
+} from '../../../../apps/extension/src/composition/persistence/assets/resource-sessions';
+import { parseMediaLibraryEntry } from '../../../../apps/extension/src/composition/persistence/media-library/read-guards';
 import { historyRetentionEffectSnapshot } from './editor-history-retention-probe';
 
 const aggregateId = 'recording:beta-v1-recording';
@@ -31,6 +39,7 @@ const assetId = 'native-history-effect-object';
 const svg =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><circle cx="120" cy="120" r="80" fill="#123456"/></svg>';
 let reader: ReturnType<typeof createVideoReviewSession> | undefined;
+let readerLease: AssetResourceSession | undefined;
 
 /** Isolated native source fixture includes real OPFS bytes and their exact canonical binding. */
 export async function seed(source: string) {
@@ -156,6 +165,7 @@ export async function seed(source: string) {
 
 /** Uses the actual local Undo owner; the other page mutates its durable graph independently. */
 export async function holdReader() {
+  readerLease = await acquireAssetResourceSession();
   const snapshot = await readVideoWorkspace(aggregateId);
   if (!snapshot) throw new Error('Missing native resource workspace');
   reader = createVideoReviewSession(snapshot);
@@ -208,4 +218,53 @@ export async function readReaderSource() {
 export async function releaseReader() {
   await reader?.dispose();
   reader = undefined;
+  await readerLease?.release();
+  readerLease = undefined;
+}
+
+/** Replay uses the production delete owner after the last stale reader has drained. */
+export async function replay() {
+  const db = await initDB();
+  const operations = (await db.getAll('asset_operations')).flatMap((raw: unknown) => {
+    const operation = parsePhysicalDeleteAssetOperation(raw);
+    return operation ? [operation] : [];
+  });
+  await completePhysicalDeleteOperations(operations);
+  return readReaderSource();
+}
+
+/** Observe physical absence separately from logical source availability. */
+export async function inspectRetirement() {
+  const db = await initDB();
+  const root = await navigator.storage.getDirectory();
+  const objects = await (
+    await root.getDirectoryHandle(ASSET_ROOT_DIRECTORY_NAME)
+  ).getDirectoryHandle('objects');
+  let bytes = 0;
+  try {
+    bytes = (await (await objects.getFileHandle(assetId)).getFile()).size;
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+  }
+  return {
+    bytes,
+    source: (await db.get('project_assets', projectAssetId)) !== undefined,
+    ref: (await db.get('asset_refs', assetId)) !== undefined,
+    owner: (await db.get('asset_owners', ['project-asset', projectAssetId, 'body'])) !== undefined,
+    intents: (await db.getAll('asset_operations')).length,
+  };
+}
+
+/** A separately published card preserves source identity even when its own name differs. */
+export async function publishIndependentCard() {
+  const media = parseMediaLibraryEntry({
+    ...betaV1Fixture.records.media_library[0],
+    id: 'independent-effect-card',
+    source: { kind: 'project-asset', projectAssetId },
+    kind: 'image',
+    mimeType: 'image/svg+xml',
+    size: new TextEncoder().encode(svg).byteLength,
+  });
+  if (!media) throw new Error('Invalid independent native card');
+  await (await initDB()).put('media_library', media);
 }

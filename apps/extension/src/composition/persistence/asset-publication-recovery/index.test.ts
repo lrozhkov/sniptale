@@ -773,3 +773,21 @@ it('preserves intent when object enumeration fails instead of assuming absence',
   expect(harness.get('asset_operations', operation.operationId)).toEqual(operation);
   expect(mocks.deleteObject).not.toHaveBeenCalled();
 });
+
+it('retains logical-only intent when objects are absent and authority is ambiguous', async () => {
+  const operation: PhysicalDeleteAssetOperation = {
+    assetIds: [],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'logical-pending',
+    status: 'pending',
+    updatedAt: 1,
+    privateSources: [{ projectAssetId: 'private', expectedAssetId: 'bytes' }],
+  };
+  const harness = createDbHarness([operation]);
+  harness.put('image_workspaces', 'unrelated-invalid', { invalid: true });
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  await recoverPendingAssetPublications();
+  expect(harness.get('asset_operations', operation.operationId)).toEqual(operation);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});

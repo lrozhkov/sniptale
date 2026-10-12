@@ -140,7 +140,7 @@ async function installAdoptedAnnotation() {
   return workspace;
 }
 
-it('releases adopted private annotation resources atomically when Undo is followed by branching', async () => {
+it('journals causal private annotation retirement atomically when Undo is followed by branching', async () => {
   const adopted = await installAdoptedAnnotation();
   const undone = await moveVideoWorkspaceHistory({
     aggregateId: id,
@@ -158,14 +158,18 @@ it('releases adopted private annotation resources atomically when Undo is follow
     operation,
   });
   expect(branch.workspace.effectSnapshots).toEqual([]);
-  expect(rows.get('project_assets')!.has('adopted')).toBe(false);
-  expect(rows.get('asset_refs')!.has('adopted-bytes')).toBe(false);
+  expect(rows.get('project_assets')!.has('adopted')).toBe(true);
+  expect(rows.get('asset_refs')!.has('adopted-bytes')).toBe(true);
   expect(rows.get('asset_owners')!.has(JSON.stringify(['project-asset', 'adopted', 'body']))).toBe(
-    false
+    true
   );
   const intents = [...rows.get('asset_operations')!.values()];
   expect(intents).toHaveLength(1);
-  expect(intents[0]).toMatchObject({ kind: 'physical-delete', assetIds: ['adopted-bytes'] });
+  expect(intents[0]).toMatchObject({
+    kind: 'physical-delete',
+    assetIds: [],
+    privateSources: [{ projectAssetId: 'adopted', expectedAssetId: 'adopted-bytes' }],
+  });
   expect(completePhysicalDeleteOperation).toHaveBeenCalledWith(intents[0], undefined);
 });
 
@@ -194,7 +198,7 @@ it.each(['redo-consumer', 'published', 'ambiguous'])(
     expect(rows.get('project_assets')!.has('adopted')).toBe(true);
     expect(rows.get('asset_refs')!.has('adopted-bytes')).toBe(true);
     expect(rows.get('asset_owners')!.size).toBe(1);
-    expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
+    expect(completePhysicalDeleteOperation).toHaveBeenCalledOnce();
   }
 );
 
@@ -233,7 +237,7 @@ it('journals private annotation release when the paused buffer replaces all reta
     draft: null,
   });
   expect(saved.workspace.effectSnapshots).toEqual([]);
-  expect(rows.get('project_assets')!.has('adopted')).toBe(false);
+  expect(rows.get('project_assets')!.has('adopted')).toBe(true);
   expect(completePhysicalDeleteOperation).toHaveBeenCalledOnce();
 });
 
@@ -255,9 +259,13 @@ it('keeps committed authored changes and a replay intent when physical deletion 
     operation,
   });
   expect(saved.workspace.history).toEqual([operation]);
-  expect(rows.get('project_assets')!.has('adopted')).toBe(false);
+  expect(rows.get('project_assets')!.has('adopted')).toBe(true);
   expect([...rows.get('asset_operations')!.values()]).toEqual([
-    expect.objectContaining({ kind: 'physical-delete', assetIds: ['adopted-bytes'] }),
+    expect.objectContaining({
+      kind: 'physical-delete',
+      assetIds: [],
+      privateSources: [{ projectAssetId: 'adopted', expectedAssetId: 'adopted-bytes' }],
+    }),
   ]);
 });
 
@@ -326,6 +334,6 @@ it.each(['append', 'paused-save'])(
     expect(
       rows.get('asset_owners')!.has(JSON.stringify(['project-asset', 'adopted', 'body']))
     ).toBe(true);
-    expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
+    expect(completePhysicalDeleteOperation).toHaveBeenCalledOnce();
   }
 );

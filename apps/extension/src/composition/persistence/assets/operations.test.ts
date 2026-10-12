@@ -391,6 +391,26 @@ it('does not scan for an empty replay batch', async () => {
   expect(db.delete).not.toHaveBeenCalled();
 });
 
+it('keeps busy logical-only retirement without scanning Library during an editor save', async () => {
+  const { db } = installMutationHarness();
+  const request = vi.fn(
+    async (name: string, _options: unknown, action: (lock: unknown) => Promise<unknown>) =>
+      action(name === 'sniptale:assets:resource-readers' ? null : {})
+  );
+  vi.stubGlobal('navigator', { locks: { request } });
+  try {
+    await completePhysicalDeleteOperation({
+      ...buildPhysicalDeleteOperation([]),
+      privateSources: [{ projectAssetId: 'held', expectedAssetId: 'bytes' }],
+    });
+    expect(db.getAll).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it('keeps projected targets pending while completing unrelated intents in the same batch', async () => {
   const { db } = installMutationHarness();
   db.getAll.mockImplementation(async (store: string) =>

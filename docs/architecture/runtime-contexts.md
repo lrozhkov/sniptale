@@ -26,6 +26,8 @@ Screenshot area selection with a countdown keeps the page interactive during the
 
 Extension and editing page runtimes own their page shells and page-local workflows. The changing inventory is projected in [generated project facts](../engineering/project-facts.md) from the [machine runtime registry](../../tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json). Durable state remains in named persistence owners. Apply the [video-editor layering rules](video-editor-layering.md) inside the video-editor runtime.
 
+Private source retirement uses a shared native asset-resource reader gate. Gallery acquires it before source/workspace admission and releases it after ordered session disposal drains. Standalone Montage and Image, including embedded Image, admit their mounted page children only after acquiring a reader. Scenario editing sessions and complete backup reads additionally hold the same gate through their existing project/resource adapters. Gallery export holds a separate reader through preparation and output settlement. Offscreen project export acquires before consuming persisted input and transfers the reader to its detached job until final cleanup; bounded pending export inputs protect the preceding handoff. Causal maintenance requests an exclusive gate with `ifAvailable` and never waits on mounted readers. Browser termination releases native leases; canceled beforeunload does not release them. These leases protect source identity and bytes, and introduce no second document authority.
+
 ## Offscreen
 
 `apps/extension/src/offscreen/offscreen.ts` owns delegated media capture, recording, viewport, export, clipboard image delivery, and voice-input work. `apps/extension/src/background/offscreen-document` owns document lifecycle.

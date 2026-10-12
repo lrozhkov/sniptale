@@ -21,6 +21,8 @@ import { collectDurableAssetSnapshot } from './retention-authority';
 import { readyJournalClaimsAsset } from './retention-claims';
 export { collectBackupRollbackAssetIds, readyJournalClaimsAsset } from './retention-claims';
 import { mergeArchiveRestoreChildIdMap } from './restore-child-ids';
+import { releaseExpiredPrivateSources } from './private-source-retention';
+import { tryAssetResourceCleanup } from './resource-sessions';
 
 const maintenanceLog = createMaintenanceLog();
 
@@ -63,15 +65,32 @@ export async function completePhysicalDeleteOperations(
   if (!operations.length) return;
   await initDB();
   await runWithDurableAssetLifecycleLock(async () => {
-    const authority = await readPhysicalDeleteAuthority();
+    let authority: Awaited<ReturnType<typeof readPhysicalDeleteAuthority>> | undefined;
     for (const operation of operations) {
-      const unowned = operation.assetIds.filter((id) => authority(id) === 'unowned');
-      const retained = operation.assetIds.filter(
-        (id) => !['unowned', 'adopted'].includes(authority(id))
+      let admitted = operation;
+      if (operation.privateSources?.length) {
+        admitted =
+          (await tryAssetResourceCleanup(async () => {
+            const snapshot = await collectDurableAssetSnapshot();
+            const journals = await listReadyJournals();
+            return releaseExpiredPrivateSources(operation, snapshot, journals);
+          })) ?? operation;
+        // Logical mutation invalidates a previous projection; a busy reader needs no graph scan.
+        authority = undefined;
+      }
+      if (!admitted.assetIds.length) {
+        if (!admitted.privateSources?.length) await finishPhysicalDelete(admitted, [], false);
+        continue;
+      }
+      authority ??= await readPhysicalDeleteAuthority();
+      const currentAuthority = authority;
+      const unowned = admitted.assetIds.filter((id) => currentAuthority(id) === 'unowned');
+      const retained = admitted.assetIds.filter(
+        (id) => !['unowned', 'adopted'].includes(currentAuthority(id))
       );
-      const deferred = retained.length > 0;
-      reportRetainedAssets(operation.assetIds, authority);
-      await finishPhysicalDelete(operation, unowned, deferred);
+      const deferred = retained.length > 0 || Boolean(admitted.privateSources?.length);
+      reportRetainedAssets(admitted.assetIds, currentAuthority);
+      await finishPhysicalDelete(admitted, unowned, deferred);
     }
   }, lifecyclePermit);
 }

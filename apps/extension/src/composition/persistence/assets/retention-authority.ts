@@ -1,5 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import type { MediaLibraryEntry } from '../media-library/contracts';
 import {
   parseAssetOwner,
   parseAssetRef,
@@ -45,6 +46,7 @@ export async function collectDurableAssetSnapshot(
   owners: AssetOwner[];
   operationIds: Set<string>;
   protectedRollbackAssetIds: Set<string>;
+  publishedProjectAssetIds: Set<string>;
   refs: AssetRef[];
 }> {
   if (!db)
@@ -65,6 +67,7 @@ export async function collectDurableAssetSnapshot(
   let authorityValid = refsResult.valid && ownersResult.valid && operationsResult.valid;
   const expectedOwners: AssetOwner[] = [];
   const embeddedBinaryMetadata: string[] = [];
+  const publishedProjectAssetIds = new Set<string>();
   const owned = async <T>(
     store: string,
     parse: (raw: unknown) => T | null,
@@ -140,18 +143,11 @@ export async function collectDurableAssetSnapshot(
       role: 'screenshot',
     },
   ]);
-  await owned(MEDIA_LIBRARY_STORE, parseMediaLibraryEntry, (entry) =>
-    entry.source.kind === 'stored-asset'
-      ? [
-          {
-            assetId: entry.source.assetId,
-            ownerId: entry.id,
-            ownerKind: 'media-library',
-            role: 'source',
-          },
-        ]
-      : []
-  );
+  await owned(MEDIA_LIBRARY_STORE, parseMediaLibraryEntry, (entry) => {
+    if (entry.source.kind === 'project-asset')
+      publishedProjectAssetIds.add(entry.source.projectAssetId);
+    return projectMediaOwners(entry);
+  });
   return {
     authorityValid,
     archiveSessions: operationsResult.archiveSessions,
@@ -166,8 +162,22 @@ export async function collectDurableAssetSnapshot(
     protectedRollbackAssetIds: new Set(
       operationsResult.backupOperations.flatMap(collectBackupRollbackAssetIds)
     ),
+    publishedProjectAssetIds,
     refs: refsResult.entries,
   };
+}
+
+function projectMediaOwners(entry: MediaLibraryEntry): AssetOwner[] {
+  return entry.source.kind === 'stored-asset'
+    ? [
+        {
+          assetId: entry.source.assetId,
+          ownerId: entry.id,
+          ownerKind: 'media-library',
+          role: 'source',
+        },
+      ]
+    : [];
 }
 
 /** Release parsed canvases/manifests immediately; yield between bounded groups of rows. */

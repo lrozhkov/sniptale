@@ -138,8 +138,10 @@ export async function saveVideoProject(
         tx,
         operation: physicalDelete,
         projectAssetIds: removedProjectAssetIds,
+        deferForReaders: true,
       });
-      if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
+      if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
+        await assetOperationStore.put(physicalDelete);
       await tx.done;
       publishMediaHubLibraryChanged(existing ? 'update' : 'create', [
         `video-project:${candidate.id}`,
@@ -155,7 +157,8 @@ export async function saveVideoProject(
       throw error;
     }
   });
-  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
+  if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
+    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
   return saved;
 }
 

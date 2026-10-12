@@ -246,8 +246,39 @@ export function parsePhysicalDeleteAssetOperation(
     return null;
   }
   const assetIds = value['assetIds'].filter(isString);
+  const privateSources = value['privateSources'];
+  if (
+    privateSources !== undefined &&
+    (!Array.isArray(privateSources) ||
+      !privateSources.every(
+        (source: unknown) =>
+          isRecord(source) &&
+          isString(source['projectAssetId']) &&
+          source['projectAssetId'].length > 0 &&
+          isString(source['expectedAssetId']) &&
+          source['expectedAssetId'].length > 0 &&
+          Object.keys(source).every((key) => ['projectAssetId', 'expectedAssetId'].includes(key))
+      ))
+  )
+    return null;
   return {
     assetIds,
+    ...(Array.isArray(privateSources)
+      ? {
+          privateSources: privateSources.flatMap((source: unknown) =>
+            isRecord(source) &&
+            isString(source['projectAssetId']) &&
+            isString(source['expectedAssetId'])
+              ? [
+                  {
+                    projectAssetId: source['projectAssetId'],
+                    expectedAssetId: source['expectedAssetId'],
+                  },
+                ]
+              : []
+          ),
+        }
+      : {}),
     createdAt: value['createdAt'],
     kind: 'physical-delete',
     operationId: value['operationId'],

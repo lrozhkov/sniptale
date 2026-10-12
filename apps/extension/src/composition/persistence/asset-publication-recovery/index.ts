@@ -370,7 +370,8 @@ async function replayPendingPhysicalDeletes(
     const pending: PhysicalDeleteAssetOperation[] = [];
     for (const operation of physicalDeletes) {
       const assetIds = operation.assetIds.filter((id) => objects.has(id));
-      if (assetIds.length) pending.push({ ...operation, assetIds });
+      if (assetIds.length || operation.privateSources?.length)
+        pending.push({ ...operation, assetIds });
       else {
         await deleteOperation(operation.operationId);
         void maintenanceLog.append({

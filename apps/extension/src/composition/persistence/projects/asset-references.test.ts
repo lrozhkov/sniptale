@@ -4,6 +4,42 @@ import { deleteProjectAssetsUnreferencedByOtherProjects } from './asset-referenc
 import { buildPhysicalDeleteOperation } from '../assets';
 import { createProjectAssetEntry, createVideoProjectEntry } from './index.test-support';
 
+it('defers an ordinary save release until mounted Undo readers have drained', async () => {
+  const remove = vi.fn();
+  const asset = createProjectAssetEntry({ id: 'private', assetId: 'held-bytes' });
+  const tables: Record<string, unknown> = {
+    media_library: { get: async () => undefined, delete: remove },
+    project_assets: { get: async () => asset, delete: remove },
+    video_projects: { getAll: async () => [] },
+    scenario_assets: { getAll: async () => [] },
+    video_workspaces: { getAll: async () => [], get: async () => undefined, delete: remove },
+    video_workspace_history: {
+      getAll: async () => [],
+      index: () => ({ getAll: async () => [], getAllKeys: async () => [] }),
+    },
+    image_workspaces: { get: async () => undefined, delete: remove },
+    aggregate_presentations: { delete: remove },
+    thumbnails: { delete: remove },
+    video_workspace_drafts: { delete: remove },
+    asset_owners: { delete: remove, index: () => ({ count: async () => 0 }) },
+    asset_refs: { delete: remove },
+  };
+  const operation = buildPhysicalDeleteOperation([]);
+  await deleteProjectAssetsUnreferencedByOtherProjects({
+    tx: { objectStore: (name: string) => tables[name] } as Parameters<
+      typeof deleteProjectAssetsUnreferencedByOtherProjects
+    >[0]['tx'],
+    operation,
+    projectAssetIds: ['private'],
+    deferForReaders: true,
+  });
+  expect(remove).not.toHaveBeenCalled();
+  expect(operation).toMatchObject({
+    assetIds: [],
+    privateSources: [{ projectAssetId: 'private', expectedAssetId: 'held-bytes' }],
+  });
+});
+
 it.each(['unknown-video', 'scenario', 'review'] as const)(
   'retains a private resource used by an external %s consumer',
   async (kind) => {

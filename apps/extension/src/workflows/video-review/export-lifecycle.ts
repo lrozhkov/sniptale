@@ -60,6 +60,7 @@ import { writeReviewFrames } from './render-export';
 import type { ReviewMediaIndex } from './media-index';
 import { encodeReviewProvenance } from '../../features/video/review/provenance';
 import { QuickEditExportUnavailable } from './export-unavailable';
+import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 
 export { QuickEditExportUnavailable };
 
@@ -357,6 +358,10 @@ type PreparedReviewExport = Awaited<ReturnType<typeof prepareReviewExport>>;
 
 /** Owns acquired external audio through preparation, staging and final publication. */
 export async function exportReviewedVideo(args: ReviewExportInput, deps = persistence) {
+  return runWithAssetResourceRead(() => exportWithRetainedResources(args, deps));
+}
+
+async function exportWithRetainedResources(args: ReviewExportInput, deps: typeof persistence) {
   const prepared = await prepareReviewExport(args, deps);
   const { plan, advanced, fragmentOffset } = prepared;
   const { signal } = args;

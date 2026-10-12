@@ -1,5 +1,6 @@
 ﻿import { renderPageShell } from '../ui/page-bootstrap';
 import { App } from './shell/app';
+import { EditorResourceAdmission } from '../composition/editor-resource-admission';
 import { initTracer } from '@sniptale/platform/observability/message-tracer';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
@@ -14,7 +15,11 @@ import './styles/timeline-items.css';
 initTracer('video-editor');
 
 renderPageShell({
-  element: <App />,
+  element: (
+    <EditorResourceAdmission>
+      <App />
+    </EditorResourceAdmission>
+  ),
   namespace: 'VideoEditorEntrypoint',
   strictMode: true,
 });

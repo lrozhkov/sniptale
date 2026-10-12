@@ -1,5 +1,6 @@
 import { renderPageShell } from '../ui/page-bootstrap';
 import { EditorPage } from './shell/page';
+import { EditorResourceAdmission } from '../composition/editor-resource-admission';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';
@@ -16,6 +17,10 @@ import { initTracer } from '@sniptale/platform/observability/message-tracer';
 initTracer('editor');
 
 renderPageShell({
-  element: <EditorPage />,
+  element: (
+    <EditorResourceAdmission>
+      <EditorPage />
+    </EditorResourceAdmission>
+  ),
   namespace: 'EditorEntrypoint',
 });

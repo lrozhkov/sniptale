@@ -1,9 +1,9 @@
-import { releaseUnpublishedProjectAssets } from '../media-library/delete-cascade.sources';
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
   type PhysicalDeleteAssetOperation,
 } from '../assets';
+import { enqueuePrivateSourceRetirement } from '../assets/private-source-retention';
 import {
   readWorkspaceStorage,
   replaceWorkspaceStorage,
@@ -20,11 +20,7 @@ import {
   prepareVideoWorkspaceTyping,
   withoutVideoWorkspaceTyping,
 } from './typing';
-import {
-  collectReviewAssetReferences,
-  collectExplicitlyRemovedReviewEffectAssets,
-  pruneReviewAnnotationEffectSnapshots,
-} from './asset-refs';
+import { collectReviewAssetReferences, pruneReviewAnnotationEffectSnapshots } from './asset-refs';
 import {
   parseReviewAnnotationEffectSnapshots,
   mergeReviewAnnotationEffectSnapshots,
@@ -215,7 +211,7 @@ async function mutate<T>(
         if (!media || !media.mimeType.startsWith('video/'))
           throw new VideoWorkspaceError('missing-media');
         const result = await operation(tx, prepared, physicalDelete);
-        if (physicalDelete.assetIds.length)
+        if (physicalDelete.assetIds.length || physicalDelete.privateSources?.length)
           await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
         await tx.done;
         return result;
@@ -230,7 +226,7 @@ async function mutate<T>(
       }
     });
     // Authored content is already committed; a physical failure retains its durable replay intent.
-    if (physicalDelete.assetIds.length)
+    if (physicalDelete.assetIds.length || physicalDelete.privateSources?.length)
       await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit).catch(() => undefined);
     return committed;
   };
@@ -381,16 +377,15 @@ async function putWorkspace(
       mode === 'replace' ? retainedWorkspaceReplacementStart(previous, next) : compacted.start,
     usageReferenceKeys: indexedWorkspace(next).usageReferenceKeys,
   });
-  // A full-baseline buffer may already have expired history before reaching this writer.
-  // Automatic expiry cannot revoke bytes still used by a paused or stale editor.
-  if (mode !== 'cursor' && !(mode === 'replace' && admitted.formatVersion === 2)) {
+  if (mode !== 'cursor') {
     const retained = collectReviewAssetReferences(next);
-    const removed = new Set(
-      [...collectExplicitlyRemovedReviewEffectAssets(previous, admitted)]
-        .filter((assetId) => !retained.has(assetId))
-        .map((assetId) => assetId.slice('project-asset:'.length))
+    await enqueuePrivateSourceRetirement(
+      tx,
+      [...collectReviewAssetReferences(previous)]
+        .filter((reference) => !retained.has(reference))
+        .map((reference) => reference.slice('project-asset:'.length)),
+      physicalDelete
     );
-    await releaseUnpublishedProjectAssets(tx, removed, physicalDelete);
   }
   return next;
 }

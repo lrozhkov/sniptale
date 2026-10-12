@@ -17,6 +17,7 @@ function requireLocks(): LockManager | null {
 export async function acquireScenarioResourceSession(id: string): Promise<ScenarioResourceSession> {
   const locks = requireLocks();
   if (!locks) return { release: async () => undefined };
+  const assets = await acquireAssetResourceSession();
   let release!: () => void;
   let acquired!: () => void;
   let rejected!: (error: unknown) => void;
@@ -32,11 +33,17 @@ export async function acquireScenarioResourceSession(id: string): Promise<Scenar
     await held;
   });
   void lifetime.catch(rejected);
-  await ready;
+  try {
+    await ready;
+  } catch (error) {
+    await assets.release();
+    throw error;
+  }
   return {
     release: async () => {
       release();
       await lifetime;
+      await assets.release();
     },
   };
 }
@@ -44,7 +51,9 @@ export async function acquireScenarioResourceSession(id: string): Promise<Scenar
 /** Protect inventory and physical file reads through the entire backup write/abort lifetime. */
 export function runWithScenarioResourceRead<T>(operation: () => Promise<T>): Promise<T> {
   const locks = requireLocks();
-  return locks ? locks.request(RESOURCE_GATE, { mode: 'shared' }, operation) : operation();
+  return runWithAssetResourceRead(() =>
+    locks ? locks.request(RESOURCE_GATE, { mode: 'shared' }, operation) : operation()
+  );
 }
 
 /** Maintenance never waits for an editor or export and never deletes without cross-tab admission. */
@@ -65,3 +74,4 @@ export async function tryScenarioResourceCleanup<T>(
     gate ? acquire(0) : undefined
   );
 }
+import { acquireAssetResourceSession, runWithAssetResourceRead } from '../assets/resource-sessions';

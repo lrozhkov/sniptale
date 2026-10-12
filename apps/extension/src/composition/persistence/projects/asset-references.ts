@@ -6,6 +6,7 @@ import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseVideoProjectEntry } from './read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { PhysicalDeleteAssetOperation } from '../assets';
+import { enqueuePrivateSourceRetirement } from '../assets/private-source-retention';
 import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
@@ -40,6 +41,8 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
   tx: Parameters<typeof releaseUnpublishedProjectAssets>[0];
   operation: PhysicalDeleteAssetOperation;
   projectAssetIds: string[];
+  /** Ordinary saves may detach current placements still retained by mounted Undo. */
+  deferForReaders?: boolean;
 }): Promise<string[]> {
   for (const projectAssetId of args.projectAssetIds) {
     const mediaId = createProjectAssetMediaId(projectAssetId);
@@ -52,6 +55,10 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
         lifecycle: promoteLibraryLifecycle(media.lifecycle, Date.now()),
       });
     }
+  }
+  if (args.deferForReaders) {
+    await enqueuePrivateSourceRetirement(args.tx, args.projectAssetIds, args.operation);
+    return [];
   }
   return releaseUnpublishedProjectAssets(args.tx, new Set(args.projectAssetIds), args.operation);
 }

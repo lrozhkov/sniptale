@@ -57,6 +57,19 @@ it('reports the fixed invalid store while retaining fail-closed deletion authori
   expect(JSON.stringify(mocks.debug.mock.calls)).not.toContain('private-recording-id');
 });
 
+it('projects published project source identities independently of Library card naming', async () => {
+  const media = createMediaLibraryEntry({
+    id: 'independent-card',
+    source: { kind: 'project-asset', projectAssetId: 'shared-source' },
+  });
+  mocks.db.mockResolvedValue({
+    getAll: async (store: string) => (store === 'media_library' ? [media] : []),
+  });
+  const snapshot = await collectDurableAssetSnapshot();
+  expect(snapshot.authorityValid).toBe(true);
+  expect([...snapshot.publishedProjectAssetIds]).toEqual(['shared-source']);
+});
+
 it.each(['asset_refs', 'asset_owners', 'asset_operations'])(
   'reports invalid %s without exposing the rejected row',
   async (invalidStore) => {

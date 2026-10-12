@@ -337,7 +337,7 @@ async function installNestedResourceGraph(failRelease = false) {
       return table(name).set(
         name === 'video_workspace_history'
           ? JSON.stringify([value['aggregateId'], value['ordinal']])
-          : String(value['id'] ?? value['aggregateId']),
+          : String(value['id'] ?? value['aggregateId'] ?? value['operationId']),
         value
       );
     },
@@ -374,7 +374,7 @@ async function installNestedResourceGraph(failRelease = false) {
 }
 
 it.each(['save', 'delete', 'asset', 'asset-shared', 'asset-published-shared'] as const)(
-  'reclaims nested private review resources on parent %s',
+  'preserves live Undo or reclaims nested resources on confirmed parent %s',
   async (operation) => {
     const { saveVideoProject, deleteVideoProject, deleteProjectAsset } = await import('./index');
     const { parent, table } = await installNestedResourceGraph();
@@ -398,6 +398,18 @@ it.each(['save', 'delete', 'asset', 'asset-shared', 'asset-published-shared'] as
     else if (operation === 'save')
       await saveVideoProject({ ...parent.project, assets: [], clips: [] });
     else await deleteProjectAsset('parent');
+    if (operation === 'save') {
+      expect(table('project_assets').size).toBe(2);
+      expect(table('video_workspaces').size).toBe(1);
+      expect([...table('asset_operations').values()]).toEqual([
+        expect.objectContaining({
+          assetIds: [],
+          privateSources: [{ projectAssetId: 'parent', expectedAssetId: 'parent-bytes' }],
+        }),
+      ]);
+      expect(deleteMocks.completePhysicalDeleteOperationMock).toHaveBeenCalledOnce();
+      return;
+    }
     if (operation === 'asset-shared') {
       expect(table('project_assets').size).toBe(2);
       expect(table('video_workspaces').size).toBe(1);

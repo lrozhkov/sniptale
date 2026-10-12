@@ -11,6 +11,10 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadVideoReviewSource, VideoReviewLoadError } from '../../workflows/video-review/source';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewAnnotation } from '../../features/video/review/types';
+import {
+  acquireAssetResourceSession,
+  type AssetResourceSession,
+} from '../../composition/persistence/assets/resource-sessions';
 
 const logger = createLogger({ namespace: 'gallery:video-review' });
 
@@ -29,12 +33,28 @@ export function useLoadedReview(aggregateId: string) {
     const controller = new AbortController();
     let url: string | null = null;
     let ownedSession: Session | null = null;
+    let reader: AssetResourceSession | null = null;
+    const release = async () => {
+      try {
+        await ownedSession?.dispose();
+      } finally {
+        await reader?.release();
+        reader = null;
+      }
+    };
     setResource(null);
     setFailed(null);
     let loadedSource = false;
-    void loadVideoReviewSource(aggregateId, controller.signal)
+    void (async () => {
+      reader = await acquireAssetResourceSession();
+      if (controller.signal.aborted) {
+        await release();
+        return null;
+      }
+      return loadVideoReviewSource(aggregateId, controller.signal);
+    })()
       .then((loaded) => {
-        if (controller.signal.aborted) return;
+        if (!loaded || controller.signal.aborted) return;
         loadedSource = true;
         const session = createVideoReviewSession(loaded.snapshot);
         ownedSession = session;
@@ -42,6 +62,7 @@ export function useLoadedReview(aggregateId: string) {
         setResource({ ...loaded, url, session });
       })
       .catch((error: unknown) => {
+        void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
         if (controller.signal.aborted) return;
         const failure =
           error instanceof VideoReviewLoadError
@@ -56,10 +77,7 @@ export function useLoadedReview(aggregateId: string) {
       });
     return () => {
       controller.abort();
-      if (ownedSession)
-        void ownedSession
-          .dispose()
-          .catch(() => logger.warn('video-review-resource-cleanup-deferred'));
+      if (reader) void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
       if (url) URL.revokeObjectURL(url);
     };
   }, [aggregateId, attempt]);
