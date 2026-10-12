@@ -1,12 +1,13 @@
-import type { ArrayBufferTarget } from 'mp4-muxer';
+import type { BufferTarget } from 'mediabunny';
 
 import type { SupportedMp4AudioEncoder, SupportedMp4VideoEncoder } from '../../codecs/types';
 import type { renderOfflineAudioMix } from '../../offline-audio/mix/render/orchestrate';
 
 export interface Mp4MuxerLike {
-  addAudioChunk(chunk: unknown, meta: unknown): void;
-  addVideoChunk(chunk: unknown, meta: unknown): void;
-  finalize(): void;
+  addAudioChunk(chunk: EncodedAudioChunk, meta?: EncodedAudioChunkMetadata): Promise<void>;
+  addVideoChunk(chunk: EncodedVideoChunk, meta?: EncodedVideoChunkMetadata): Promise<void>;
+  finalize(): Promise<void>;
+  cancel(): Promise<void>;
 }
 
 export type Mp4Pipeline = {
@@ -14,7 +15,7 @@ export type Mp4Pipeline = {
   fallbackNotes: string[];
   mixedAudio: Awaited<ReturnType<typeof renderOfflineAudioMix>>;
   muxer: Mp4MuxerLike;
-  target: ArrayBufferTarget;
+  target: BufferTarget;
   videoProfile: SupportedMp4VideoEncoder;
 };
 

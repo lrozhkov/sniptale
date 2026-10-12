@@ -47,5 +47,6 @@ export async function runMp4EncodingPipeline(args: {
     jobId: args.job.jobId,
     pipeline: args.pipeline,
     throwIfPipelineFailed: args.throwIfPipelineFailed,
+    ...(args.signal === undefined ? {} : { signal: args.signal }),
   });
 }

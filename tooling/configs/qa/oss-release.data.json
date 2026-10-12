@@ -152,11 +152,6 @@
       "source": "LICENSES/dependencies/mediabunny-1.61.3.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/mp4-muxer-5.2.2.txt",
-      "sha256": "75c54aae7ef6ad652f684f9dd3b71e4dcef86ccebd88cf441ceed7f5eec037c5",
-      "source": "LICENSES/dependencies/mp4-muxer-5.2.2.txt"
-    },
-    {
       "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
       "sha256": "a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539",
       "source": "LICENSES/dependencies/pako-1.0.11.txt"
@@ -243,12 +238,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "e0fed980aa094c73aa720a09fc1c51f8fa939d3e61ae44f3252a6618cc9bf436",
+      "sha256": "1c9658318dfaf8be81310a6a1996d73cc77127c489c03727ea942afcbd6ddf72",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "70188962da6b5ae9b27af207ae252e962a015a1d49faa544178ebfff0dd1ae79",
+      "sha256": "b68a80c570eea8de4f44ed76faf43d3e6ef606ebb1e02df81f8db27febd87acf",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

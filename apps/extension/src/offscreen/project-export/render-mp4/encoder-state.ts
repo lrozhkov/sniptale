@@ -1,5 +1,5 @@
 import { translate } from '../../../platform/i18n';
-import { normalizeError } from '../codecs';
+import { closeEncoderQuietly, normalizeError } from '../codecs';
 import type { Mp4Pipeline } from './pipeline/index';
 
 export function createMp4EncoderState(pipeline: Mp4Pipeline) {
@@ -18,7 +18,9 @@ export function createMp4EncoderState(pipeline: Mp4Pipeline) {
   const videoEncoder = new VideoEncoder({
     output: (chunk, meta) => {
       try {
-        pipeline.muxer.addVideoChunk(chunk, meta);
+        void Promise.resolve(pipeline.muxer.addVideoChunk(chunk, meta)).catch((error: unknown) =>
+          rememberPipelineError(error, translate('offscreenExport.mp4VideoChunkRejected'))
+        );
       } catch (error) {
         rememberPipelineError(error, translate('offscreenExport.mp4VideoChunkRejected'));
       }
@@ -27,13 +29,16 @@ export function createMp4EncoderState(pipeline: Mp4Pipeline) {
       rememberPipelineError(error, translate('offscreenExport.mp4VideoEncoderFailed'));
     },
   });
-  videoEncoder.configure(pipeline.videoProfile.config);
-
-  const audioEncoder = pipeline.audioProfile
-    ? createMp4AudioEncoder(pipeline, rememberPipelineError)
-    : null;
-
-  return { videoEncoder, audioEncoder, throwIfPipelineFailed };
+  try {
+    videoEncoder.configure(pipeline.videoProfile.config);
+    const audioEncoder = pipeline.audioProfile
+      ? createMp4AudioEncoder(pipeline, rememberPipelineError)
+      : null;
+    return { videoEncoder, audioEncoder, throwIfPipelineFailed };
+  } catch (error) {
+    closeEncoderQuietly(videoEncoder);
+    throw error;
+  }
 }
 
 function createMp4AudioEncoder(
@@ -43,7 +48,9 @@ function createMp4AudioEncoder(
   const audioEncoder = new AudioEncoder({
     output: (chunk, meta) => {
       try {
-        pipeline.muxer.addAudioChunk(chunk, meta);
+        void Promise.resolve(pipeline.muxer.addAudioChunk(chunk, meta)).catch((error: unknown) =>
+          rememberPipelineError(error, translate('offscreenExport.mp4AudioChunkRejected'))
+        );
       } catch (error) {
         rememberPipelineError(error, translate('offscreenExport.mp4AudioChunkRejected'));
       }
@@ -52,6 +59,11 @@ function createMp4AudioEncoder(
       rememberPipelineError(error, translate('offscreenExport.mp4AudioEncoderFailed'));
     },
   });
-  audioEncoder.configure(pipeline.audioProfile!.config);
-  return audioEncoder;
+  try {
+    audioEncoder.configure(pipeline.audioProfile!.config);
+    return audioEncoder;
+  } catch (error) {
+    closeEncoderQuietly(audioEncoder);
+    throw error;
+  }
 }

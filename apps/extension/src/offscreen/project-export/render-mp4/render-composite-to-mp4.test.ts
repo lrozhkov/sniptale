@@ -55,6 +55,7 @@ beforeEach(() => {
   announceMp4PipelineStartMock.mockResolvedValue(undefined);
   createMp4PipelineMock.mockResolvedValue({
     fallbackNotes: ['VP9 fallback'],
+    muxer: { cancel: vi.fn().mockResolvedValue(undefined) },
   });
   createMp4EncoderStateMock.mockReturnValue({
     audioEncoder: { id: 'audio' },
@@ -94,7 +95,10 @@ it('creates the pipeline with the job signal, announces startup, and closes enco
     context,
     job,
     loadedImages,
-    pipeline: { fallbackNotes: ['VP9 fallback'] },
+    pipeline: {
+      fallbackNotes: ['VP9 fallback'],
+      muxer: expect.objectContaining({ cancel: expect.any(Function) }),
+    },
     project,
     settings,
     signal,
@@ -127,5 +131,56 @@ it('normalizes failures, logs only failure-kind errors, and rethrows the normali
 
   expect(normalizeMp4ExportErrorMock).toHaveBeenCalledWith(expect.any(Error), false);
   expect(loggerErrorMock).toHaveBeenCalledWith('MP4 encode failed', expect.any(Error));
+  expect(closeEncoderQuietlyMock).toHaveBeenCalledTimes(2);
+});
+
+it.each(['announcement', 'encoder configuration'] as const)(
+  'releases output after failed %s before rendering starts',
+  async (stage) => {
+    const failure = new Error('startup failed');
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    createMp4PipelineMock.mockResolvedValueOnce({ fallbackNotes: [], muxer: { cancel } });
+    if (stage === 'announcement') announceMp4PipelineStartMock.mockRejectedValueOnce(failure);
+    else
+      createMp4EncoderStateMock.mockImplementationOnce(() => {
+        throw failure;
+      });
+    normalizeMp4ExportErrorMock.mockReturnValueOnce({ kind: 'failure', error: failure });
+    await expect(
+      renderCompositeToMp4(
+        { cancelled: false, jobId: 'startup' } as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as HTMLCanvasElement,
+        {} as CanvasRenderingContext2D
+      )
+    ).rejects.toBe(failure);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(runMp4EncodingPipelineMock).not.toHaveBeenCalled();
+  }
+);
+
+it('rejects a late completed Blob after cancellation and retains the original error if cleanup fails', async () => {
+  const job = { cancelled: false, jobId: 'late-cancel' };
+  const cancel = vi.fn().mockRejectedValue(new Error('cleanup failed'));
+  createMp4PipelineMock.mockResolvedValueOnce({ fallbackNotes: [], muxer: { cancel } });
+  runMp4EncodingPipelineMock.mockImplementationOnce(async () => {
+    job.cancelled = true;
+    return new Blob(['late']);
+  });
+  const cancellation = new Error('PROJECT_EXPORT_CANCELLED');
+  normalizeMp4ExportErrorMock.mockReturnValueOnce({ kind: 'cancelled', error: cancellation });
+  await expect(
+    renderCompositeToMp4(
+      job as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as HTMLCanvasElement,
+      {} as CanvasRenderingContext2D
+    )
+  ).rejects.toBe(cancellation);
+  expect(cancel).toHaveBeenCalledOnce();
   expect(closeEncoderQuietlyMock).toHaveBeenCalledTimes(2);
 });

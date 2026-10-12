@@ -136,7 +136,7 @@ beforeEach(() => {
   createMp4PipelineMock.mockResolvedValue({
     fallbackNotes: [],
     mixedAudio: null,
-    muxer: { finalize: vi.fn() },
+    muxer: { finalize: vi.fn(), cancel: vi.fn().mockResolvedValue(undefined) },
     target: { buffer: new ArrayBuffer(16) },
   });
   createMp4EncoderStateMock.mockReturnValue({

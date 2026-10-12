@@ -14,15 +14,6 @@ const {
   renderOfflineAudioMixMock: vi.fn(),
 }));
 
-vi.mock('mp4-muxer', () => ({
-  ArrayBufferTarget: class {
-    buffer = new ArrayBuffer(16);
-  },
-  Muxer: class {
-    constructor(public options: unknown) {}
-  },
-}));
-
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({
     warn: loggerWarnMock,

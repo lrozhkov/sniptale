@@ -282,18 +282,6 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
   - [LICENSES/dependencies/mediabunny-1.61.3-modified/README.md](LICENSES/dependencies/mediabunny-1.61.3-modified/README.md) (SHA-256: 847ce2b0f9f2f5ac2cd17fc14dfbadf4a0b2f75343f9000c9f58048189854447)
 - Original package integrity: sha512-kUqLKVXQVwHR62GkOJxYosAmXERJbqnXBgJDTtRlxHEYviVkMg/Evhl9XN6kedqS5LP1tV4kFKyzY/V4a4ofow==
 
-### `mp4-muxer` 5.2.2
-
-- Installed path: `node_modules/mp4-muxer`
-- Declared license expression: `MIT`
-- Selected license: `MIT`
-- License source class: `installed-file`
-- License source: `node_modules/mp4-muxer/LICENSE`
-- License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/mp4-muxer-5.2.2.txt`](LICENSES/dependencies/mp4-muxer-5.2.2.txt)
-- License text SHA-256: `75c54aae7ef6ad652f684f9dd3b71e4dcef86ccebd88cf441ceed7f5eec037c5`
-- Repository/source: https://github.com/Vanilagy/mp4-muxer.git
-
 ### `pako` 1.0.11
 
 - Installed path: `node_modules/pako`

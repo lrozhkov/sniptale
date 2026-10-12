@@ -71,3 +71,29 @@ it('omits the signal field when pipeline creation has no abort signal', async ()
     settings,
   });
 });
+
+it('does not acquire output after profile preparation was cancelled', async () => {
+  const { buildMp4MuxerMock } = installCreateMp4PipelineMocks();
+  const abort = new AbortController();
+  abort.abort();
+  const { createMp4Pipeline } = await import('./build');
+  await expect(createMp4Pipeline({} as never, {} as never, abort.signal)).rejects.toThrow(
+    'CANCELLED'
+  );
+  expect(buildMp4MuxerMock).not.toHaveBeenCalled();
+});
+
+it('releases output if cancellation arrives during startup', async () => {
+  const { buildMp4MuxerMock } = installCreateMp4PipelineMocks();
+  const abort = new AbortController();
+  const cancel = vi.fn().mockResolvedValue(undefined);
+  buildMp4MuxerMock.mockImplementationOnce(async () => {
+    abort.abort();
+    return { muxer: { cancel }, target: {} };
+  });
+  const { createMp4Pipeline } = await import('./build');
+  await expect(createMp4Pipeline({} as never, {} as never, abort.signal)).rejects.toThrow(
+    'CANCELLED'
+  );
+  expect(cancel).toHaveBeenCalledOnce();
+});
