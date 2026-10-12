@@ -81,6 +81,16 @@ vi.mock('./use-speech', () => ({
 vi.mock('./speech-profile', () => ({
   SpeechProfileFields: ({ speech }: ComponentProps<typeof SpeechProfileFields>) => (
     <div>
+      {(['mp3', 'wav', 'pcm'] as const).map((responseFormat) => (
+        <button
+          key={responseFormat}
+          onClick={() => {
+            if (speech.profile) speech.changeProfile({ ...speech.profile, responseFormat });
+          }}
+        >
+          {responseFormat}
+        </button>
+      ))}
       <button
         onClick={() => {
           if (speech.profile) speech.changeProfile({ ...speech.profile, modelId: 'model2' });
@@ -242,6 +252,55 @@ it('generates after consent and preparation, keeps a preview, and only applies o
   expect(mocks.apply).toHaveBeenCalledOnce();
   expect(mocks.apply.mock.calls[0]?.[3]).toMatchObject({ muteSource: false });
   expect(host.textContent).toContain('gallery.videoReview.textVoiceAccepted');
+});
+
+it.each([
+  ['pcm', 'wav'],
+  ['wav', 'pcm'],
+] as const)(
+  'invalidates an unaccepted %s preview on %s selection without automatic generation',
+  async (from, to) => {
+    mocks.generate.mockImplementation(async (_session, id, profile) => ({
+      ...preview(id),
+      textSnapshot: { ...preview(id).textSnapshot, profile },
+    }));
+    await render();
+    await click(from);
+    await start();
+    await approve();
+    await click(from);
+    expect(host.querySelectorAll('audio')).toHaveLength(1);
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    await click(to);
+    expect(host.querySelectorAll('audio')).toHaveLength(0);
+    expect(host.querySelector('[aria-label="gallery.videoReview.speechApply"]')).toBeNull();
+    expect(mocks.cleanup).toHaveBeenCalledOnce();
+    expect(mocks.generate).toHaveBeenCalledOnce();
+    await start();
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+    expect(mocks.generate.mock.calls[1]?.[2].responseFormat).toBe(to);
+  }
+);
+
+it('preserves an accepted PCM neighbor while discarding only a pending batch take', async () => {
+  mocks.generate.mockImplementation(async (_session, id, profile) => ({
+    ...preview(id),
+    textSnapshot: { ...preview(id).textSnapshot, profile },
+  }));
+  await render(['first', 'second']);
+  await click('pcm');
+  await start();
+  await approve();
+  await click('gallery.videoReview.speechApply');
+  await click('wav');
+  expect(host.querySelectorAll('audio')).toHaveLength(1);
+  expect(host.querySelector('audio')?.getAttribute('src')).toBe('blob:first');
+  expect(mocks.cleanup).toHaveBeenCalledOnce();
+  expect(mocks.cleanup.mock.calls[0]?.[1].clipId).toBe('clip-second');
+  expect(mocks.apply.mock.calls[0]?.[1].textSnapshot.profile.responseFormat).toBe('pcm');
+  await start();
+  expect(mocks.generate).toHaveBeenCalledTimes(3);
+  expect(mocks.generate.mock.calls[2]?.[1]).toBe('second');
 });
 
 it('keeps source attenuation off and unavailable for silent/unknown media, and captures it only at Apply', async () => {

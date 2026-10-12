@@ -8,7 +8,10 @@ import {
   type ReviewLocalTextVoiceSelection,
 } from '../../workflows/video-review/text-voice-local';
 import { cleanupReviewTextTakePreview } from '../../workflows/video-review/text-take';
-import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
+import {
+  reviewSpeechTextSignature,
+  type ReviewSpeechProfile,
+} from '../../features/video/review/speech-transcript';
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
 import {
   applyReviewTextVoice,
@@ -190,6 +193,20 @@ export function useReviewTextVoiceOperation(props: Options) {
     clearError: attempt.clearError,
     cancel: attempt.cancel,
     discard: attempt.discard,
+    changeProfile: (profile: ReviewSpeechProfile) => {
+      const accepted = new Set(state.accepted);
+      const stale = state.previews.filter((preview) => {
+        const snapshot = preview.textSnapshot;
+        return (
+          snapshot.kind === 'ai' &&
+          !accepted.has(preview.clipId) &&
+          (!snapshot.profile ||
+            reviewSpeechTextSignature(snapshot.text, snapshot.profile) !==
+              reviewSpeechTextSignature(snapshot.text, profile))
+        );
+      });
+      if (stale.length) attempt.discard(stale);
+    },
     prepareLocal: (selection: ReviewLocalTextVoiceSelection) =>
       command(
         async (signal) => {

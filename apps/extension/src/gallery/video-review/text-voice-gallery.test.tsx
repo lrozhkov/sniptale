@@ -205,6 +205,18 @@ async function render() {
     return (
       <>
         <ReviewTextVoiceGallery operation={operation} />
+        <button
+          aria-label="change-profile"
+          onClick={() =>
+            operation.changeProfile({
+              modelId: 'voice',
+              voiceId: 'voice',
+              responseFormat: 'pcm',
+            })
+          }
+        >
+          Change profile
+        </button>
         <span>{operation.previews.length}</span>
       </>
     );
@@ -268,6 +280,16 @@ it('uploads through the same drawer and keeps it open for an explicit failed pre
     expect.objectContaining({ selection: { kind: 'file', file } })
   );
   expect(document.querySelector('dialog')).toBeNull();
+});
+
+it('retains a local Gallery preview when AI parameters change', async () => {
+  await render();
+  await click('gallery.videoReview.musicAdd: Speech.wav');
+  await click('change-profile');
+  expect(host.querySelector('span')?.textContent).toBe('1');
+  expect(io.cleanup).not.toHaveBeenCalled();
+  expect(io.prepare).toHaveBeenCalledOnce();
+  expect(io.apply).not.toHaveBeenCalled();
 });
 
 it('fences delayed audition after close and cancels a pending choice without accepting its late preview', async () => {

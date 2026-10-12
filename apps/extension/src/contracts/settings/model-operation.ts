@@ -14,7 +14,7 @@ export interface AITranscriptionModelParameters {
 
 export interface AISpeechModelParameters {
   voiceId: string;
-  responseFormat: 'mp3' | 'wav';
+  responseFormat: 'mp3' | 'wav' | 'pcm';
   speed?: number;
   instructions?: string;
 }
@@ -89,7 +89,9 @@ function isSpeech(value: unknown): value is AISpeechModelParameters {
     typeof value['voiceId'] === 'string' &&
     value['voiceId'].trim().length > 0 &&
     value['voiceId'].length <= 200 &&
-    (value['responseFormat'] === 'mp3' || value['responseFormat'] === 'wav') &&
+    (value['responseFormat'] === 'mp3' ||
+      value['responseFormat'] === 'wav' ||
+      value['responseFormat'] === 'pcm') &&
     (value['speed'] === undefined ||
       (typeof value['speed'] === 'number' &&
         Number.isFinite(value['speed']) &&

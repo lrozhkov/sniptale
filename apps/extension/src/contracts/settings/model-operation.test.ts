@@ -113,3 +113,12 @@ describe('AI model operation configuration', () => {
     expect(isValidAIModelOperationConfiguration(value)).toBe(false);
   });
 });
+
+it('admits explicitly selected PCM synthesis without model-name inference', () => {
+  expect(
+    isValidAIModelOperationConfiguration({
+      operation: 'speech',
+      audio: { speech: { voiceId: 'Leda', responseFormat: 'pcm' } },
+    })
+  ).toBe(true);
+});

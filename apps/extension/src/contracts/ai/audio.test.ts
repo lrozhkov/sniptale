@@ -103,6 +103,17 @@ it('admits asset-free text synthesis and refuses text transcription, mixed clock
   };
   expect(parseAudioJobScope(textScope)).toEqual(textScope);
   expect(parseAudioJobClientMessage(start)).toMatchObject({ scope: textScope });
+  for (const responseFormat of ['mp3', 'wav', 'pcm']) {
+    const message = { ...start, profile: { ...start.profile, responseFormat } };
+    expect(parseAudioJobClientMessage(message)).toEqual(message);
+  }
+  expect(
+    parseAudioJobServerMessage({
+      type: 'audio',
+      requestId: 'r',
+      staged: { id: '12345678-1234-4234-8234-123456789abc', mimeType: 'audio/wav', size: 36044 },
+    })
+  ).not.toBeNull();
   expect(parseAudioJobClientMessage({ ...start, approvedProviderId: undefined })).toBeNull();
   expect(parseAudioJobClientMessage({ ...start, approvedProviderId: '' })).toBeNull();
   expect(

@@ -77,7 +77,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 18,
+    schemaVersion: 19,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -636,6 +636,29 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         ].every((name) => db.objectStoreNames.contains(name))
       )
         throw new Error('Annotation effect workspace stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 18, to: 19 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 21,
+    toDatabaseVersion: 22,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('PCM speech workspace stores are unavailable.');
       return undefined;
     },
   },

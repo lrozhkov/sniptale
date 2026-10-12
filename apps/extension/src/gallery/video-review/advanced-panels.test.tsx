@@ -8,6 +8,10 @@ import { act, useContext, useState } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import {
+  setImmediate as settleHostTurn,
+  setTimeout as settleTimerTurn,
+} from 'node:timers/promises';
 import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
 import { ReviewZoomInspector } from './zoom-inspector';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -31,7 +35,12 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(async () => {
+    root.unmount();
+    // React/jsdom host callbacks must finish before Vitest removes this window.
+    await settleTimerTurn(0);
+    await settleHostTurn();
+  });
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -137,8 +146,8 @@ it('edits the background paint and the selected zoom region through the panel ca
     '[aria-label="gallery.videoReview.zoomFocusX"]'
   )!;
   expect(focusX.value).toBe('50');
-  setInputValue(focusX, '20');
   await act(async () => {
+    setInputValue(focusX, '20');
     focusX.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
   });
   expect(focusX.value).toBe('20');

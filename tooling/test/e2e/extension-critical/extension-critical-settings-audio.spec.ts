@@ -60,6 +60,16 @@ for (const viewport of [
     await dialog
       .getByLabel(label('settings.aiProviders.modelAudioInstructions'), { exact: true })
       .fill('Calm delivery');
+    const format = dialog.getByLabel(label('settings.aiProviders.modelAudioFormat'), {
+      exact: true,
+    });
+    await format.scrollIntoViewIfNeeded();
+    await format.press('Enter');
+    await page
+      .getByRole('option', { name: label('settings.aiProviders.modelAudioPcm'), exact: true })
+      .press('Enter');
+    await expect(format).toBeFocused();
+    await expect(format).toContainText(label('settings.aiProviders.modelAudioPcm'));
     const submit = dialog.getByRole('button', { name: /^(Add|Добавить)$/u });
     await submit.scrollIntoViewIfNeeded();
     await expect(submit).toBeInViewport();

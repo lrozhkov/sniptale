@@ -24,6 +24,7 @@ export const settingsAiProvidersModelMessages = defineMessageSource({
   modelAudioLanguage: { ru: 'Язык (код ISO)', en: 'Language (ISO code)' },
   modelAudioAuto: { ru: 'Автоматически', en: 'Automatic' },
   modelAudioFormat: { ru: 'Формат ответа', en: 'Response format' },
+  modelAudioPcm: { ru: 'PCM · 24 кГц, моно', en: 'PCM · 24 kHz, mono' },
   modelAudioTimestamps: { ru: 'Временные метки', en: 'Timestamps' },
   modelAudioTimestampsNone: { ru: 'Без меток', en: 'None' },
   modelAudioTimestampsSegment: { ru: 'Сегменты', en: 'Segments' },

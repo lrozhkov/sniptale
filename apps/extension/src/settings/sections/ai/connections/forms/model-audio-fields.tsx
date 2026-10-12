@@ -214,9 +214,10 @@ function SpeechFields(props: Props) {
           options={[
             { value: 'mp3', label: 'MP3' },
             { value: 'wav', label: 'WAV' },
+            { value: 'pcm', label: translate('settings.aiProviders.modelAudioPcm') },
           ]}
           onChange={(value) => {
-            if (value === 'mp3' || value === 'wav')
+            if (value === 'mp3' || value === 'wav' || value === 'pcm')
               change({ ...parameters, responseFormat: value });
           }}
         />

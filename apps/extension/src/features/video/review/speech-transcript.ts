@@ -22,7 +22,7 @@ export interface ReviewSpeechPhrase {
 export interface ReviewSpeechProfile {
   modelId: string;
   voiceId: string;
-  responseFormat: 'mp3' | 'wav';
+  responseFormat: 'mp3' | 'wav' | 'pcm';
   speed?: number;
   instructions?: string;
 }

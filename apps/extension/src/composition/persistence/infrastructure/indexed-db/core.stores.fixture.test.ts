@@ -107,3 +107,17 @@ it('retains released rows and immutable bytes across annotation contract admissi
   expect(target.indexes).toEqual(source.indexes);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 18 });
 });
+
+it('retains all released rows, history, recovery and immutable bytes across PCM profile admission', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 21
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 22
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 19 });
+});

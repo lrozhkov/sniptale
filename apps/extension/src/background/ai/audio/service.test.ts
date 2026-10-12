@@ -337,3 +337,45 @@ it.each([
   expect(post).toHaveBeenCalledOnce();
   await connection.disconnect();
 });
+
+it('publishes PCM only as a WAV staging handle through the real request implementation', async () => {
+  const pcmRequest: AudioJobStart = {
+    ...request,
+    profile: { ...request.profile, responseFormat: 'pcm' },
+  };
+  const fetchMock = vi.fn<typeof fetch>(
+    async () =>
+      new Response(new Uint8Array([0, 128, 255, 127]), {
+        headers: { 'Content-Type': 'audio/pcm' },
+      })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const write = vi.fn(async ({ blob }: { blob: Blob }) => {
+    expect(blob.type).toBe('audio/wav');
+    expect(new TextDecoder().decode(await blob.slice(0, 4).arrayBuffer())).toBe('RIFF');
+    return {
+      id: '12345678-1234-4234-8234-123456789abc',
+      mimeType: 'audio/wav' as const,
+      size: blob.size,
+    };
+  });
+  const service = createAudioJobService({
+    authorize: vi.fn(async () => undefined),
+    resolveModel: vi.fn(async () => ({ ...config, speech: pcmRequest.profile })),
+    write,
+  });
+  const messages: AudioJobServerMessage[] = [];
+  const connection = service.connect((message) => messages.push(message));
+  connection.receive(pcmRequest);
+  await vi.waitFor(() =>
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: 'audio',
+        staged: expect.objectContaining({ mimeType: 'audio/wav', size: 48 }),
+      })
+    )
+  );
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(write).toHaveBeenCalledOnce();
+  await connection.disconnect();
+});

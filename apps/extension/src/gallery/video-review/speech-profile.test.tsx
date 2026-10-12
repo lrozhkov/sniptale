@@ -105,6 +105,26 @@ it('uses the configured selector for either operation and preserves explicit voi
       voice.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(change).toHaveBeenLastCalledWith({ ...speech.profile, voiceId: 'new voice' });
+    speech.profile = { ...speech.profile, voiceId: 'new voice', instructions: 'Keep the voice' };
+    for (const responseFormat of ['pcm', 'wav', 'mp3'] as const) {
+      await render('speech');
+      const format = host.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('gallery.videoReview.speechFormat')}"]`
+      );
+      if (!format) throw new Error('Missing format field');
+      await act(async () => format.click());
+      const label =
+        responseFormat === 'pcm'
+          ? translate('settings.aiProviders.modelAudioPcm')
+          : responseFormat.toUpperCase();
+      const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+        (node) => node.textContent === label
+      );
+      if (!option) throw new Error('Missing format option');
+      await act(async () => option.click());
+      expect(change).toHaveBeenLastCalledWith({ ...speech.profile, responseFormat });
+      speech.profile = { ...speech.profile, responseFormat };
+    }
     await act(async () =>
       root.render(<SpeechTranscriptionModelField speech={{ ...speech, modelId: 'model' }} />)
     );

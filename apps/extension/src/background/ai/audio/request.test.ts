@@ -1,6 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { requestAudio } from './request';
-import { AUDIO_INPUT_MAX_BYTES, type AudioJobStart } from '../../../contracts/ai/audio';
+import {
+  AUDIO_INPUT_MAX_BYTES,
+  AUDIO_OUTPUT_MAX_BYTES,
+  type AudioJobStart,
+} from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
 
 const scope = {
@@ -40,6 +44,11 @@ const transcriptionConfig: AudioModelConfig = {
   transcription: { responseFormat: 'json', timestampGranularity: 'none' },
 };
 const input = new File(['bytes'], 'audio.wav', { type: 'audio/wav' });
+const pcmRequest: AudioJobStart = {
+  ...speech,
+  profile: { ...speech.profile, responseFormat: 'pcm' },
+};
+const pcmConfig: AudioModelConfig = { ...speechConfig, speech: pcmRequest.profile };
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -363,4 +372,158 @@ it('preserves every audio byte across base64 block boundaries without extra POST
   const payload = JSON.parse(new TextDecoder().decode(post.mock.calls[0]![1]!.body as ArrayBuffer));
   const encoded = payload.messages[1].content[1].input_audio.data;
   expect(Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))).toEqual(bytes);
+});
+
+it('sends explicit PCM once and wraps the exact 24 kHz mono payload in WAV', async () => {
+  const pcm = new Uint8Array(48_000);
+  pcm.set([0, 128, 255, 127, 0, 0]);
+  const fetchMock = vi.fn<typeof fetch>(
+    async () =>
+      new Response(pcm, {
+        headers: {
+          'Content-Type': 'Audio/PCM; rate=24000; channels=1',
+          'Content-Length': String(pcm.length),
+        },
+      })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const request: AudioJobStart = {
+    ...speech,
+    profile: { ...speech.profile, responseFormat: 'pcm' },
+  };
+  const result = await run(request, { ...speechConfig, speech: request.profile });
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).response_format).toBe('pcm');
+  expect(result.kind).toBe('audio');
+  if (result.kind !== 'audio') throw new Error('Expected WAV');
+  expect(result.blob.type).toBe('audio/wav');
+  expect(result.blob.size).toBe(48_044);
+  const bytes = new Uint8Array(await result.blob.arrayBuffer());
+  expect(bytes.subarray(44)).toEqual(pcm);
+  expect(new DataView(bytes.buffer).getUint32(24, true)).toBe(24_000);
+});
+
+it.each([
+  '',
+  'application/json',
+  'audio/wav',
+  'audio/L16',
+  'application/octet-stream',
+  'audio/pcm; rate=48000',
+  'audio/pcm; channels=2',
+])('refuses unsupported PCM MIME %s and cancels the response without retry', async (mime) => {
+  const cancel = vi.fn();
+  const response = new Response(new ReadableStream({ cancel }), {
+    headers: mime ? { 'Content-Type': mime } : {},
+  });
+  const fetchMock = vi.fn<typeof fetch>(async () => response);
+  vi.stubGlobal('fetch', fetchMock);
+  await expect(run(pcmRequest, pcmConfig)).rejects.toThrow('invalid-response');
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(fetchMock).toHaveBeenCalledOnce();
+});
+it.each([0, 1, 3])('rejects empty or incomplete PCM of %s bytes', async (length) => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>(
+      async () =>
+        new Response(new Uint8Array(length), {
+          headers: { 'Content-Type': 'audio/pcm' },
+        })
+    )
+  );
+  await expect(run(pcmRequest, pcmConfig)).rejects.toThrow('invalid-response');
+});
+it('accepts odd transport chunks when the aggregate sample stream is complete', async () => {
+  const pcm = new Uint8Array([0, 128, 255, 127, 0, 0]);
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(pcm.slice(0, 1));
+      controller.enqueue(pcm.slice(1, 4));
+      controller.enqueue(pcm.slice(4));
+      controller.close();
+    },
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>(
+      async () =>
+        new Response(body, {
+          headers: { 'Content-Type': 'audio/pcm' },
+        })
+    )
+  );
+  const result = await run(pcmRequest, pcmConfig);
+  if (result.kind !== 'audio') throw new Error('Expected WAV');
+  expect(new Uint8Array(await result.blob.slice(44).arrayBuffer())).toEqual(pcm);
+});
+it.each([false, true])(
+  'counts the WAV header in the real output budget, Content-Length=%s',
+  async (declared) => {
+    const length = AUDIO_OUTPUT_MAX_BYTES - 44;
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response(new Uint8Array(length), {
+          headers: {
+            'Content-Type': 'audio/pcm',
+            ...(declared ? { 'Content-Length': String(length) } : {}),
+          },
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await run(pcmRequest, pcmConfig);
+    if (result.kind !== 'audio') throw new Error('Expected WAV');
+    expect(result.blob.size).toBe(AUDIO_OUTPUT_MAX_BYTES);
+  }
+);
+it.each([false, true])(
+  'rejects one sample beyond the output budget, Content-Length=%s',
+  async (declared) => {
+    const length = AUDIO_OUTPUT_MAX_BYTES - 44 + 2;
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(length));
+      },
+      cancel,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(
+        async () =>
+          new Response(body, {
+            headers: {
+              'Content-Type': 'audio/pcm',
+              ...(declared ? { 'Content-Length': String(length) } : {}),
+            },
+          })
+      )
+    );
+    await expect(run(pcmRequest, pcmConfig)).rejects.toThrow('too-large');
+    expect(cancel).toHaveBeenCalledOnce();
+  }
+);
+it('does not return WAV when cancellation arrives while PCM is being read', async () => {
+  const abort = new AbortController();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array([0, 0]));
+    },
+    pull(controller) {
+      abort.abort();
+      controller.close();
+    },
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>(
+      async () =>
+        new Response(body, {
+          headers: { 'Content-Type': 'audio/pcm' },
+        })
+    )
+  );
+  await expect(
+    requestAudio({ request: pcmRequest, config: pcmConfig, signal: abort.signal, onReceiving() {} })
+  ).rejects.toThrow();
 });

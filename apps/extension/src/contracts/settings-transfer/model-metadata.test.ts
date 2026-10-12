@@ -34,6 +34,14 @@ it('round trips legacy and configured audio models without sharing nested parame
       },
     },
   ];
+  models.push({
+    id: 'pcm',
+    providerId: 'p',
+    modelCode: 'generic-tts',
+    displayName: 'PCM speech',
+    operation: 'speech',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'pcm' } },
+  });
   for (const model of models) {
     const exported = selectSettingsTransferModelMetadata(model);
     const restored = parseSettingsTransferModelMetadata(JSON.parse(JSON.stringify(exported)));

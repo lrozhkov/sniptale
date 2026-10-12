@@ -236,7 +236,10 @@ function TextVoiceParameters(props: {
           modelId: settings.modelId,
           setModelId: settings.setModelId,
           profile: settings.profile,
-          changeProfile: settings.setProfile,
+          changeProfile: (profile) => {
+            operation.changeProfile(profile);
+            settings.setProfile(profile);
+          },
         }}
         operation="speech"
       />

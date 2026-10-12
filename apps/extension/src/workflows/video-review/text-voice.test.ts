@@ -482,3 +482,28 @@ it('refuses a failed durable history Save before a new paid request instead of c
   expect(mocks.job).not.toHaveBeenCalled();
   expect(session.getSnapshot().error).toBe('storage');
 });
+
+it('keeps PCM in the take profile while publishing an ordinary WAV filename and natural duration', async () => {
+  const { session } = fixture();
+  const pcm = { ...profile, responseFormat: 'pcm' as const };
+  decodedDuration = 0.75;
+  mocks.job.mockResolvedValueOnce({
+    type: 'audio',
+    staged: { id: '12345678-1234-4234-8234-123456789abc', mimeType: 'audio/wav', size: 36_044 },
+  });
+  mocks.read.mockResolvedValueOnce(new Blob([new Uint8Array(36_044)], { type: 'audio/wav' }));
+  const preview = await generateReviewTextVoice(session, 'text', pcm, signal(), 'provider');
+  const asset = { id: 'pcm-take', protect: vi.fn(), publish: vi.fn(), cancel: vi.fn() };
+  mocks.prepare.mockResolvedValueOnce(asset);
+  await applyReviewTextVoice(session, preview, signal());
+  expect(mocks.prepare.mock.calls[0]?.[0]).toBeInstanceOf(File);
+  expect(mocks.prepare.mock.calls[0]?.[1]).toBe('audio/wav');
+  expect(mocks.prepare.mock.calls[0]?.[2]).toBe(`${preview.clipId}.wav`);
+  const clip = session.getSnapshot().document.advancedContent.audio.voiceover[0]!;
+  expect(clip).toMatchObject({ duration: 0.75, textSnapshot: { profile: pcm } });
+  await session.history('undo');
+  expect(session.getSnapshot().document.advancedContent.audio.voiceover).toHaveLength(0);
+  await session.history('redo');
+  expect(session.getSnapshot().document.advancedContent.audio.voiceover[0]).toEqual(clip);
+  await cleanupReviewTextVoicePreview(session, preview);
+});

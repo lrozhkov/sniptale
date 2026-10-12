@@ -496,9 +496,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     text === null ||
     captions === null ||
     annotationEffects === null ||
-    (annotationEffects &&
-      isRecord(raw) &&
-      raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION)
+    (annotationEffects && !supportsAdvancedSchema(raw['schemaVersion'], 15))
   )
     return null;
   if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
@@ -601,7 +599,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].some(
       (known) => known >= firstHistorical && version === known
     )
   );

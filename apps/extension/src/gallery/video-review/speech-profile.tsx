@@ -93,9 +93,11 @@ export function SpeechProfileFields({
                     options={[
                       { value: 'mp3', label: 'MP3' },
                       { value: 'wav', label: 'WAV' },
+                      { value: 'pcm', label: translate('settings.aiProviders.modelAudioPcm') },
                     ]}
                     onChange={(value) => {
-                      if (value === 'mp3' || value === 'wav') change({ responseFormat: value });
+                      if (value === 'mp3' || value === 'wav' || value === 'pcm')
+                        change({ responseFormat: value });
                     }}
                   />
                 </ProductField>

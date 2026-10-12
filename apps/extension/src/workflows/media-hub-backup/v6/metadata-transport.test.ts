@@ -6,7 +6,11 @@ import {
 import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
-import { replayReviewHistory } from '../../../features/video/review/document';
+import { encodePortableReviewAssetRefs } from '../../../composition/persistence/review-workspaces/asset-refs';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
 import { prepareVideoReviewRestore } from '../../../composition/persistence/review-workspaces/backup-restore';
 import { createVideoProjectEntryWithMediaClip } from '../../../composition/persistence/projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
@@ -390,5 +394,121 @@ it('rejects duplicate, foreign and wrong-MIME transport references before stagin
   await expect(decodeBackupMetadata(reader, base)).rejects.toMatchObject({
     reason: 'resource-invalid',
     resourceRole: 'favicon',
+  });
+});
+
+it('round trips PCM profiles and retained WAV take refs through ZIP metadata, redo and restore remapping', async () => {
+  const metadata = recordingMetadata();
+  const profile = { modelId: 'pcm-model', voiceId: 'voice', responseFormat: 'pcm' as const };
+  const before = reviewAdvancedContentBaseline(metadata.videoReview.workspace.advanced);
+  const clip = {
+    id: 'voice',
+    assetId: 'project-asset:voice',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    textSnapshot: {
+      kind: 'ai' as const,
+      textId: 'text',
+      revision: 0,
+      timingRevision: 0,
+      text: 'PCM fixture',
+      start: 0,
+      end: 1,
+      timeDomain: 'result' as const,
+      profile,
+    },
+  };
+  const after = { ...before, audio: { ...before.audio, voiceover: [clip] } };
+  const review = encodePortableReviewAssetRefs({
+    ...metadata.videoReview,
+    workspace: {
+      ...metadata.videoReview.workspace,
+      history: [{ id: 'pcm-apply', at: 1, target: 'advancedContent', before, after }],
+      cursor: 0,
+    },
+  });
+  const wav = new Blob(
+    [
+      Uint8Array.from(
+        Buffer.from(
+          '52494646a4bb000057415645666d74201000000001000100c05d000080bb0000020010006461746180bb0000',
+          'hex'
+        )
+      ),
+      new Uint8Array(48_000),
+    ],
+    { type: 'audio/wav' }
+  );
+  const portable = {
+    ...metadata,
+    videoReview: review,
+    reviewAssets: [
+      {
+        entry: { id: 'voice', mimeType: 'audio/wav', createdAt: 1, size: wav.size },
+        filename: 'voice.wav',
+        objectId: 'voice',
+      },
+    ],
+  };
+  const item = inventory(portable);
+  const load = item.load;
+  item.descriptor = {
+    ...item.descriptor,
+    objectCount: 2,
+    totalBytes: item.descriptor.totalBytes + wav.size,
+  };
+  item.load = async () => {
+    const loaded = await load();
+    return {
+      ...loaded,
+      objects: [
+        ...loaded.objects,
+        {
+          blob: wav,
+          ref: {
+            objectId: 'voice',
+            path: 'Recordings/voice.wav',
+            filename: 'voice.wav',
+            mimeType: wav.type,
+            size: wav.size,
+          },
+        },
+      ],
+    };
+  };
+  const { envelope } = await roundtrip(item);
+  const parsed = parsePortableMediaMetadata(envelope.metadata);
+  expect(parsed.reviewAssets?.[0]).toMatchObject({
+    filename: 'voice.wav',
+    entry: { mimeType: 'audio/wav' },
+  });
+  const restored = prepareVideoReviewRestore({
+    review: parsed.videoReview!,
+    sourceAggregateId: 'recording:one',
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'restored-source',
+    assetIdMap: new Map([['voice', 'restored-voice']]),
+  });
+  const undo = replayReviewHistory(
+    restored.workspace.history,
+    0,
+    restored.workspace.source,
+    reviewAdvancedContentBaseline(restored.workspace.advanced)
+  );
+  const redo = replayReviewHistory(
+    restored.workspace.history,
+    1,
+    restored.workspace.source,
+    reviewAdvancedContentBaseline(restored.workspace.advanced)
+  );
+  expect(undo.advancedContent.audio.voiceover).toHaveLength(0);
+  expect(redo.advancedContent.audio.voiceover[0]).toMatchObject({
+    assetId: 'project-asset:restored-voice',
+    textSnapshot: { profile },
   });
 });

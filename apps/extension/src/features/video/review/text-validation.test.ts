@@ -11,6 +11,7 @@ import {
   createReviewTextDocument,
 } from './text-document';
 import { parseReviewTextDocument, parseReviewVoiceTextSnapshot } from './text-validation';
+import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from './advanced/types';
 import type { ReviewSource } from './types';
 
 function textDocument() {
@@ -142,9 +143,14 @@ it('keeps immutable voice snapshots without requiring a surviving fragment and v
 it('opens the previous alpha project without inventing authored text', () => {
   const previous = { ...createQuickEditAdvancedState(), schemaVersion: 11 };
   const loaded = loadQuickEditAdvancedState(previous);
-  expect(loaded?.schemaVersion).toBe(15);
+  expect(loaded?.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
   expect(loaded?.text).toBeUndefined();
   expect(loaded?.captions).toBeUndefined();
   expect(loaded?.audio).toEqual(previous.audio);
-  expect(loadQuickEditAdvancedState({ ...previous, schemaVersion: 16 })).toBeNull();
+  expect(
+    loadQuickEditAdvancedState({
+      ...previous,
+      schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION + 1,
+    })
+  ).toBeNull();
 });

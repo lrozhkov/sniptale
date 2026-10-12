@@ -7,6 +7,7 @@ import {
 import type { AudioModelConfig } from './model-config';
 import { parseAudioTranscriptResponse } from './response';
 import { encodeChatTranscription, parseChatTranscription } from './chat-transcription';
+import { isSupportedPcmContentType, PCM_WAV_HEADER_BYTES, wrapPcmWav } from './pcm-wav';
 
 interface AudioRequest {
   request: AudioJobStart;
@@ -158,6 +159,21 @@ async function decodeTranscription(response: Response, args: AudioRequest) {
 }
 
 async function decodeResponse(response: Response, args: AudioRequest) {
+  if (args.request.operation === 'speech' && args.config.speech?.responseFormat === 'pcm') {
+    if (!isSupportedPcmContentType(response.headers.get('Content-Type'))) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error('invalid-response');
+    }
+    const pcm = await readBounded(
+      response,
+      AUDIO_OUTPUT_MAX_BYTES - PCM_WAV_HEADER_BYTES,
+      args.signal
+    );
+    args.signal.throwIfAborted();
+    const blob = wrapPcmWav(pcm);
+    args.signal.throwIfAborted();
+    return { kind: 'audio' as const, blob };
+  }
   const mime = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase();
   const expected =
     args.request.operation === 'transcription'

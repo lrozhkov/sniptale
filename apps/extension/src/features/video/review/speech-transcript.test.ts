@@ -9,7 +9,7 @@ import {
   type ReviewSpeechTranscript,
   type ReviewSpeechReplacement,
 } from './speech-transcript';
-import { parseReviewSpeechTranscript } from './speech-validation';
+import { parseReviewSpeechProfile, parseReviewSpeechTranscript } from './speech-validation';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from './advanced/types';
 import { createQuickEditAdvancedState } from './advanced/defaults';
 import {
@@ -234,4 +234,39 @@ describe('speech durable codec', () => {
       })
     ).toBeNull();
   });
+});
+
+it('preserves PCM profiles and distinguishes them from WAV request signatures', () => {
+  const pcm = { ...profile, responseFormat: 'pcm' as const };
+  expect(parseReviewSpeechProfile(pcm)).toEqual(pcm);
+  expect(reviewSpeechTextSignature('same text', pcm)).not.toBe(
+    reviewSpeechTextSignature('same text', { ...profile, responseFormat: 'wav' })
+  );
+});
+
+it('retains schema15 annotations while admitting current PCM speech snapshots', () => {
+  const content = reviewAdvancedContentBaseline(createQuickEditAdvancedState());
+  const legacy = {
+    ...content,
+    schemaVersion: 15,
+    annotationEffects: { enabled: true, instances: [] },
+  };
+  const before = JSON.stringify(legacy);
+  expect(loadQuickEditAdvancedContentState(legacy)).toMatchObject({
+    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+    annotationEffects: legacy.annotationEffects,
+  });
+  expect(JSON.stringify(legacy)).toBe(before);
+  const pcmProfile = { ...profile, responseFormat: 'pcm' as const };
+  const speech = {
+    ...transcript(),
+    profile: pcmProfile,
+    replacements: [
+      replacement({
+        profile: pcmProfile,
+        textSignature: reviewSpeechTextSignature('Edited phrase', pcmProfile),
+      }),
+    ],
+  };
+  expect(parseReviewSpeechTranscript(JSON.parse(JSON.stringify(speech)))).toEqual(speech);
 });

@@ -25,7 +25,9 @@ export function parseReviewSpeechProfile(value: unknown): ReviewSpeechProfile | 
     typeof value['voiceId'] !== 'string' ||
     !value['voiceId'].trim() ||
     value['voiceId'].length > 200 ||
-    (value['responseFormat'] !== 'mp3' && value['responseFormat'] !== 'wav') ||
+    (value['responseFormat'] !== 'mp3' &&
+      value['responseFormat'] !== 'wav' &&
+      value['responseFormat'] !== 'pcm') ||
     (value['speed'] !== undefined &&
       (typeof value['speed'] !== 'number' ||
         !Number.isFinite(value['speed']) ||

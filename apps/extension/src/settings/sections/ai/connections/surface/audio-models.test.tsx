@@ -205,6 +205,23 @@ it('switches speech purpose, edits optional parameters and restores the legacy t
     })
   );
   expect(updateModel.mock.lastCall?.[0]).not.toHaveProperty('systemPrompt');
+  await choose(
+    'settings.aiProviders.modelAudioFormat',
+    translate('settings.aiProviders.modelAudioPcm')
+  );
+  await save();
+  expect(updateModel).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      audio: {
+        speech: {
+          voiceId: 'custom-voice',
+          responseFormat: 'pcm',
+          speed: 1.5,
+          instructions: 'Speak clearly',
+        },
+      },
+    })
+  );
   await fill('settings.aiProviders.modelAudioSpeed', '');
   await fill('settings.aiProviders.modelAudioInstructions', '');
   await choose('settings.aiProviders.modelAudioFormat', 'MP3');
