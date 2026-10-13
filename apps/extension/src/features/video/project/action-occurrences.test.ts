@@ -120,3 +120,31 @@ it('preserves continuous run membership at a rate boundary and separates fresh i
     true,
   ]);
 });
+
+it('retains one sustained gesture continuation per observed retained run without moving its down anchor', () => {
+  const project = createProject([
+    fragment('tail', 2, 0),
+    fragment('next', 3, 1),
+    fragment('repeat', 2, 6, 2),
+  ]);
+  const held = { ...fact('held', 1), data: { gestureType: 'hold', downTime: 1, upTime: 4 } };
+  project.actionEvents = [held, fact('point-only', 1)];
+  const occurrences = resolveVideoProjectActionOccurrences(project);
+  expect(occurrences.map(({ eventId, clipId, time }) => ({ eventId, clipId, time }))).toEqual([
+    { eventId: 'held', clipId: 'tail', time: -1 },
+    { eventId: 'held', clipId: 'repeat', time: 5 },
+  ]);
+  expect(occurrences[0]!.playbackRun?.clipIds).toEqual(['tail', 'next']);
+  expect(occurrences.every(({ event }) => event === held)).toBe(true);
+  expect(held.anchor).toMatchObject({ sourceTime: 1 });
+});
+
+it('does not infer a retained gesture continuation when its observed endpoint is unknown', () => {
+  const project = createProject([fragment('tail', 2, 0)]);
+  project.actionEvents = [{ ...fact('held', 1), data: { gestureType: 'hold', downTime: 1 } }];
+  expect(resolveVideoProjectActionOccurrences(project)).toEqual([]);
+  project.actionEvents[0]!.data['lastObservedTime'] = 2.5;
+  expect(resolveVideoProjectActionOccurrences(project)).toMatchObject([
+    { eventId: 'held', clipId: 'tail', time: -1 },
+  ]);
+});

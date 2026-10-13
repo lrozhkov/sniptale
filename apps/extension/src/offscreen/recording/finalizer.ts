@@ -9,7 +9,6 @@ import {
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { beginRecordingFinalization, finishRecordingFinalization } from './finalization-replay';
-import { persistStaticFrameSignals } from './signals/static-frame';
 import { resolveVideoRecordingArtifact } from '../../platform/media-utils/video-recording';
 import { stageAndPublishPostRecordResult } from './post-record-publication';
 import type {
@@ -173,7 +172,6 @@ export async function finalizeRecording(
       artifactCount: input.artifacts.length,
       recordingId: input.primaryRecordingId,
     });
-    void persistStaticFrameSignals(input.primaryRecordingId);
     if (shouldNotifySaved) await publishVideoSavedToIdb(input.primaryRecordingId);
     if (shouldNotifyStopped) {
       notifyRecordingStoppedBestEffort('recording-finalized', input.primaryRecordingId);

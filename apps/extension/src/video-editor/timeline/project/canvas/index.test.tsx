@@ -269,7 +269,7 @@ it('renders the history lane with and without a telemetry sidecar', () => {
   expect(
     container?.querySelector<HTMLElement>('[data-ui="video-editor.timeline.history-row"]')?.style
       .height
-  ).toBe('56px');
+  ).toBe('80px');
 });
 
 it('counts one history row in playhead height independently of authored action count', () => {
@@ -290,7 +290,7 @@ it('counts one history row in playhead height independently of authored action c
   render(false);
   const collapsedHeight = height();
   render(true);
-  expect(height()).toBe(collapsedHeight + 56);
+  expect(height()).toBe(collapsedHeight + 80);
   project.actionEvents = [
     {
       id: 'click',
@@ -305,7 +305,7 @@ it('counts one history row in playhead height independently of authored action c
     },
   ];
   render(true);
-  expect(height()).toBe(collapsedHeight + 56);
+  expect(height()).toBe(collapsedHeight + 80);
   expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(0);
   render(false);
   expect(height()).toBe(collapsedHeight);

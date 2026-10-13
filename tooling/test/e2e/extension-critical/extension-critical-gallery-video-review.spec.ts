@@ -9,6 +9,7 @@ import {
 } from '../support/quick-editor-media-fixture';
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createHash } from 'node:crypto';
+import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
@@ -224,6 +225,13 @@ for (const variant of [
       const report = await readFile(await (await reportDownload).path(), 'utf8');
       expect(report).toContain('Interval with region');
       expect(report).toContain('"region"');
+      const payload = JSON.parse(report.split('```json\n')[1]!.split('\n```')[0]!);
+      expect(payload).toMatchObject({
+        schemaVersion: 'sniptale.video-review.v2',
+        reportKind: 'summary',
+      });
+      expect(payload.telemetry.cursorTrack).not.toHaveProperty('samples');
+      expect(Buffer.byteLength(report)).toBeLessThan(128 * 1024);
       await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.preview.surface"] video')).toHaveJSProperty(
         'controls',
@@ -1680,10 +1688,7 @@ for (const variant of [
           .first()
       ).toHaveCSS('font-size', '10px');
 
-      await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCSS(
-        'background-color',
-        'rgba(0, 0, 0, 0)'
-      );
+      await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
       await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
         'aria-pressed',
         'false'
@@ -4114,3 +4119,107 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
     }
   });
 }
+
+test('Gallery downloads a compact summary while retaining a dense recorded trajectory', async ({
+  page,
+}) => {
+  const host = await startHostServer();
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(
+      page,
+      'review-vp8-opus.webm',
+      { width: 160, height: 90, duration: 12 },
+      false,
+      true
+    );
+    await page.evaluate(async (trackTemplate) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        const transaction = database.transaction('recording_telemetry', 'readwrite');
+        const done = new Promise<void>((resolve, reject) => {
+          transaction.oncomplete = () => resolve();
+          transaction.onabort = () => reject(transaction.error);
+        });
+        const store = transaction.objectStore('recording_telemetry');
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const entry = request.result[0];
+          entry.cursorTrack = {
+            ...trackTemplate,
+            samples: Array.from({ length: 64688 }, (_, index) => ({
+              id: `dense-cursor-${index}`,
+              time: (index * 12) / 64688,
+              x: index % 160,
+              y: index % 90,
+              visible: true,
+            })),
+          };
+          store.put(entry);
+        };
+        await done;
+      } finally {
+        database.close();
+      }
+    }, createVideoProjectCursorTrack('embedded-fallback'));
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const download = page.waitForEvent('download');
+    await page
+      .getByRole('button', {
+        name: translate('gallery.videoReview.downloadReport', 'en'),
+        exact: true,
+      })
+      .click();
+    const report = await readFile(await (await download).path(), 'utf8');
+    const payload = JSON.parse(report.split('```json\n')[1]!.split('\n```')[0]!);
+    expect(payload).toMatchObject({
+      schemaVersion: 'sniptale.video-review.v2',
+      reportKind: 'summary',
+      telemetry: {
+        cursorTrack: {
+          availability: 'present',
+          representation: 'summary',
+          sampleCount: 64688,
+          includedSampleCount: 0,
+          omittedReason: 'summary-report',
+        },
+      },
+    });
+    expect(report).not.toContain('dense-cursor-');
+    expect(Buffer.byteLength(report)).toBeLessThan(128 * 1024);
+    expect(report).toContain('The trajectory is omitted from this report.');
+    const retained = await page.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        return await new Promise<number>((resolve, reject) => {
+          const request = database
+            .transaction('recording_telemetry')
+            .objectStore('recording_telemetry')
+            .getAll();
+          request.onsuccess = () => resolve(request.result[0].cursorTrack.samples.length);
+          request.onerror = () => reject(request.error);
+        });
+      } finally {
+        database.close();
+      }
+    });
+    expect(retained).toBe(64688);
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

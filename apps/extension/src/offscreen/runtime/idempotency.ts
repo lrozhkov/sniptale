@@ -109,6 +109,10 @@ const idempotencyPolicyByType = {
     idempotent: true,
     reason: 'recording stop is scoped to the active recording generation',
   },
+  [VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING]: {
+    idempotent: false,
+    reason: 'each monotonic timing exchange needs fresh readings',
+  },
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: {
     idempotent: true,
     reason: 'pause is scoped to the active recording generation',

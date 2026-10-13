@@ -151,7 +151,7 @@ export function reviewAnnotationBodyGeometry(
   };
 }
 
-/** Preserve the representable visible body and every independent fixed anchor on attachment switch. */
+/** Preserve exact bodies or locally flatten perspective, keeping every independent anchor exact. */
 export function convertReviewAnnotationAttachment(
   instance: ReviewAnnotationEffect,
   attachment: ReviewAnnotationEffect['attachment'],
@@ -171,7 +171,14 @@ export function convertReviewAnnotationAttachment(
       y: anchor.y * from.height,
     });
     if (!point) return null;
-    anchors[id] = { x: point.x / to.width, y: point.y / to.height };
+    const normalized = { x: point.x / to.width, y: point.y / to.height };
+    if (
+      ![normalized.x, normalized.y].every(
+        (value) => Number.isFinite(value) && value >= -16 && value <= 16
+      )
+    )
+      return null;
+    anchors[id] = normalized;
   }
   return { ...instance, attachment, transform, ...(instance.anchors ? { anchors } : {}) };
 }

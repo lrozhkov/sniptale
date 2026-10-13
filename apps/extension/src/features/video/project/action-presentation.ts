@@ -67,7 +67,14 @@ export function resolveVideoProjectActionPresentations(
   return resolveVideoProjectActionOccurrences(project).map((occurrence) => {
     const row = resolveEvent(project, defaults, occurrence);
     const event = occurrence.event;
-    if (row.enabled && event.kind === 'CLICK') {
+    if (
+      row.enabled &&
+      event.kind === 'CLICK' &&
+      !(
+        typeof event.data['gestureType'] === 'string' &&
+        ['hold', 'drag', 'selection', 'native-drag'].includes(event.data['gestureType'])
+      )
+    ) {
       const key = occurrence.playbackRun?.id ?? 'project';
       const leader = leaders.get(key);
       if (
@@ -148,6 +155,12 @@ function resolveReason(
 ): VideoProjectActionPresentationReason | null {
   if (!defaults.enabled) return 'track-disabled';
   if (event.presentation?.enabled === false) return 'event-disabled';
+  if (
+    event.kind === 'CLICK' &&
+    event.data['gestureType'] === 'click' &&
+    event.data['completion'] !== 'released'
+  )
+    return 'unsupported';
   if (event.kind === 'SCROLL' || preset === 'SCROLL_EMPHASIS') return 'unsupported';
   if (event.kind === 'KEY') {
     if (event.presentation?.preset === 'NONE') return 'preset-none';

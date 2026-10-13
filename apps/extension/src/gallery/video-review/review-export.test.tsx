@@ -3,7 +3,10 @@ import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import * as zoomPreviewSource from './use-zoom-preview-source';
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
 
 const integration = vi.hoisted(() => ({
   load: vi.fn(),
@@ -43,6 +46,11 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (original
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<
+      typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspaceWithProjection
+    >[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));

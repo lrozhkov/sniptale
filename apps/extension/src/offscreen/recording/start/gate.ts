@@ -1,9 +1,13 @@
 // policyStateId: video-capture-surface-sessions - one gate binds preparation and activation to a recording generation.
+import {
+  normalizeRecordingFrameClockLease,
+  type RecordingFrameClockLease,
+} from '../../../contracts/video/recording-frame-clock';
 type StartBinding = { generation: number; recordingId: string; streamInstanceId: string };
 type Gate = StartBinding & {
-  promise: Promise<void>;
+  promise: Promise<RecordingFrameClockLease | null>;
   reject: (reason: unknown) => void;
-  resolve: () => void;
+  resolve: (lease: RecordingFrameClockLease | null) => void;
   timeout: ReturnType<typeof setTimeout>;
   reserved: boolean;
   consumed: boolean;
@@ -21,9 +25,9 @@ function matches(left: StartBinding, right: StartBinding): boolean {
 }
 
 function createGate(binding: StartBinding, delayMs: number, reserved: boolean): Gate {
-  let resolve!: () => void;
+  let resolve!: (lease: RecordingFrameClockLease | null) => void;
   let reject!: (reason: unknown) => void;
-  const promise = new Promise<void>((yes, no) => {
+  const promise = new Promise<RecordingFrameClockLease | null>((yes, no) => {
     resolve = yes;
     reject = no;
   });
@@ -46,12 +50,18 @@ function createGate(binding: StartBinding, delayMs: number, reserved: boolean): 
 }
 
 /** Reserve activation authority before data preparation; an early BEGIN is retained for this binding only. */
-export function reserveRecordingBegin(binding: StartBinding, timeoutMs: number): Promise<void> {
+export function reserveRecordingBegin(
+  binding: StartBinding,
+  timeoutMs: number
+): Promise<RecordingFrameClockLease | null> {
   if (pending) throw new Error('Another recording start gate is active');
   return createGate(binding, timeoutMs, true).promise;
 }
 
-export function waitForRecordingBegin(binding: StartBinding, activationDelayMs = 0): Promise<void> {
+export function waitForRecordingBegin(
+  binding: StartBinding,
+  activationDelayMs = 0
+): Promise<RecordingFrameClockLease | null> {
   if (pending) {
     if (pending.reserved && !pending.consumed && matches(pending, binding)) {
       const gate = pending;
@@ -70,14 +80,14 @@ export function assertRecordingBegin(binding: StartBinding): void {
     throw new Error('Stale or mismatched recording start binding');
 }
 
-export function allowRecordingBegin(binding: StartBinding): void {
+export function allowRecordingBegin(binding: StartBinding, advisoryLease?: unknown): void {
   assertRecordingBegin(binding);
   if (!pending) return;
   const gate = pending;
   gate.allowed = true;
   clearTimeout(gate.timeout);
   if (gate.consumed) pending = null;
-  gate.resolve();
+  gate.resolve(normalizeRecordingFrameClockLease(advisoryLease, binding));
 }
 
 export function cancelRecordingBegin(reason = 'Recording start was cancelled'): void {

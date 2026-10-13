@@ -1,3 +1,5 @@
+import { ReviewSceneVideo, ReviewRegionOverlay } from './stage-video';
+import { ReviewCursorPathOverlay } from './cursor-path-overlay';
 import {
   ReviewAnnotationOverlay,
   type ReviewAnnotationEditing,
@@ -21,7 +23,7 @@ import {
 } from './stage-geometry';
 import { ReviewWatermarkOverlay } from './watermark-overlay';
 import { ReviewKeyOverlay } from './key-animation-overlay';
-import { ReviewBackgroundBlurPreview } from './background-blur-preview';
+import { ReviewStageBackground } from './background-blur-preview';
 import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
@@ -32,10 +34,8 @@ import type { ReviewClickCue } from '../../features/video/review/click-animation
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { ReviewBorderOverlay } from './border-overlay';
 import { ReviewWebcamOverlay, type ReviewWebcamStageBinding } from './webcam-overlay';
-import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
 import { useReviewWindowHeader } from './use-window-header';
 import {
-  ReviewCutTransitionPreview,
   ReviewCutBlackout,
   type ReviewCutPreviewBinding,
   type ReviewCutPreviewRaster,
@@ -48,7 +48,6 @@ import {
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { translate } from '../../platform/i18n';
 import { projectVideoRegion } from '../../features/video/review/geometry';
 import type {
   CanvasComment,
@@ -85,6 +84,7 @@ type ReviewStageCommentBinding = {
 };
 
 type ReviewStageProps = {
+  cursorPath?: Omit<Parameters<typeof ReviewCursorPathOverlay>[0], 'width' | 'height'> | undefined;
   annotationEditing?: ReviewAnnotationEditing | undefined;
   onAnnotationGeometry?: ReviewAnnotationEditing['editor']['setGeometry'] | undefined;
   captions?: Parameters<typeof useStagePresentation>[0]['captions'];
@@ -198,11 +198,7 @@ export function ReviewStage(props: ReviewStageProps) {
     borders,
     overlayClip,
   } = useReviewStageGeometry(props, host);
-  const reportAnnotationGeometry =
-    props.onAnnotationGeometry ?? props.annotationEditing?.editor.setGeometry;
-  useEffect(() => {
-    reportAnnotationGeometry?.(annotationGeometry);
-  }, [annotationGeometry, reportAnnotationGeometry]);
+  useAnnotationGeometryReport(props, annotationGeometry);
   const { presentation, beginInteraction } = useStagePresentation(
     props,
     publication,
@@ -241,41 +237,17 @@ export function ReviewStage(props: ReviewStageProps) {
         onPointerUp={plane.onPointerUp}
         onPointerCancel={plane.onPointerCancel}
       >
-        {!manual ? (
-          <ReviewStageBackground props={props} motion={motion} paint={backgroundPaint} />
-        ) : null}
-        <ReviewSceneVideo
+        <ReviewStageFrame
+          props={props}
+          geometry={{ sceneLayout, size, backgroundPaint, spotlight, overlayClip }}
           manual={manual}
-          url={props.url}
-          cutPreview={props.cutPreview}
-          onCutRaster={setCutRaster}
-          video={props.video}
-          {...(props.scene ? { scene: props.scene } : {})}
-          layout={sceneLayout}
           header={header}
-          previewScale={size.width / Math.max(1, props.scene?.canvas?.width ?? props.source.width)}
-          drawing={props.drawing}
+          motion={motion}
+          projection={projection}
           projected={projected}
-          onReady={props.onReady}
-          onTime={props.onTime}
-          onPlaying={props.onPlaying}
-          onEnded={props.onEnded}
-          onError={props.onError}
-        />
-        {!manual ? (
-          <ReviewStageNativeEffects
-            props={props}
-            geometry={{ sceneLayout, size, spotlight, overlayClip }}
-            headerImage={header.image}
-            projection={projection}
-            getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
-          />
-        ) : null}
-        <div
-          ref={publication}
-          data-ui="gallery.videoReview.manualPreview"
-          className="pointer-events-none absolute inset-0"
-          style={{ display: manual ? undefined : 'none' }}
+          publication={publication}
+          onCutRaster={setCutRaster}
+          getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
         />
         {manual && projected && !sceneLayout?.spatial ? (
           <ReviewRegionOverlay
@@ -286,6 +258,7 @@ export function ReviewStage(props: ReviewStageProps) {
         ) : null}
         <ReviewStageContent
           manual={manual}
+          headerImage={header.image}
           onCommentPreview={presentation.onCommentPreview}
           getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
           props={props}
@@ -371,6 +344,80 @@ function ReviewStageOuterFade({
   );
 }
 
+/** Native and published base pixels share geometry before sharp content and editing overlays. */
+function ReviewStageFrame({
+  props,
+  geometry,
+  manual,
+  header,
+  motion,
+  projection,
+  projected,
+  publication,
+  onCutRaster,
+  getFrame,
+}: {
+  props: ReviewStageProps;
+  geometry: Pick<
+    ReturnType<typeof useReviewStageGeometry>,
+    'sceneLayout' | 'size' | 'backgroundPaint' | 'spotlight' | 'overlayClip'
+  >;
+  manual: boolean;
+  header: ReturnType<typeof useReviewWindowHeader>;
+  motion: ReturnType<typeof useStageInteractionGeometry>['motion'];
+  projection: ReturnType<typeof useStageInteractionGeometry>['projection'];
+  projected: ReturnType<typeof useStageInteractionGeometry>['projected'];
+  publication: RefObject<HTMLDivElement | null>;
+  onCutRaster(value: ReviewCutPreviewRaster): void;
+  getFrame(): CanvasImageSource | null;
+}) {
+  const { sceneLayout, size, backgroundPaint, spotlight, overlayClip } = geometry;
+  return (
+    <>
+      {!manual ? (
+        <ReviewStageBackground
+          {...reviewBackgroundPlaneProps(props)}
+          motion={motion}
+          paint={backgroundPaint}
+        />
+      ) : null}
+      <ReviewSceneVideo
+        manual={manual}
+        url={props.url}
+        cutPreview={props.cutPreview}
+        onCutRaster={onCutRaster}
+        video={props.video}
+        {...(props.scene ? { scene: props.scene } : {})}
+        layout={sceneLayout}
+        header={header}
+        previewScale={size.width / Math.max(1, props.scene?.canvas?.width ?? props.source.width)}
+        drawing={props.drawing}
+        projected={projected}
+        onReady={props.onReady}
+        onTime={props.onTime}
+        onPlaying={props.onPlaying}
+        onEnded={props.onEnded}
+        onError={props.onError}
+      />
+      {!manual ? (
+        <ReviewStageNativeEffects
+          props={props}
+          geometry={{ sceneLayout, size, spotlight, overlayClip }}
+          headerImage={header.image}
+          projection={projection}
+          getFrame={getFrame}
+        />
+      ) : null}
+      <div
+        ref={publication}
+        data-ui="gallery.videoReview.manualPreview"
+        className="pointer-events-none absolute inset-0"
+        style={{ display: manual ? undefined : 'none' }}
+      />
+    </>
+  );
+}
+
 /** Native-only optical effects consume the same frame and clip as the scene. */
 function ReviewStageNativeEffects({
   props,
@@ -417,6 +464,7 @@ function ReviewStageNativeEffects({
 /** Sharp content overlays and interaction targets share one projected plane. */
 function ReviewStageContent({
   manual,
+  headerImage,
   onCommentPreview,
   getFrame,
   props,
@@ -425,6 +473,7 @@ function ReviewStageContent({
   projected,
 }: {
   manual: boolean;
+  headerImage: ReturnType<typeof useReviewWindowHeader>['image'];
   onCommentPreview: ReturnType<typeof useStagePresentation>['presentation']['onCommentPreview'];
   getFrame(): CanvasImageSource | null;
   props: ReviewStageProps;
@@ -467,6 +516,8 @@ function ReviewStageContent({
           output={size}
           video={clickRaster?.video}
           sourceWidth={props.source.width}
+          headerImage={headerImage}
+          window={clickRaster?.window}
           clip={clickRaster?.clip}
           transform={clickRaster?.transform}
         />
@@ -490,6 +541,24 @@ function ReviewStageContent({
           selectedId={props.zoom?.region.id}
           video={computeQuickEditWindowTransform(sceneLayout)}
         />
+      ) : null}
+      {props.cursorPath && sceneLayout && !projection ? (
+        <div
+          className="pointer-events-none absolute"
+          style={{
+            left: sceneLayout.videoTransform.x,
+            top: sceneLayout.videoTransform.y,
+            width: sceneLayout.videoTransform.width,
+            height: sceneLayout.videoTransform.height,
+          }}
+        >
+          <ReviewCursorPathOverlay
+            {...props.cursorPath}
+            width={props.source.width}
+            height={props.source.height}
+            displayWidth={sceneLayout.videoTransform.width}
+          />
+        </div>
       ) : null}
       {props.zoom && zoomLayout ? (
         <ReviewStageFocusControl
@@ -542,266 +611,23 @@ function ReviewStageComments(props: {
   );
 }
 
-/** One composition-space video: fitted inside the padded content rect, cropped by the clip. */
-function ReviewSceneVideo(props: {
-  manual: boolean;
-  cutPreview?: ReviewCutPreviewBinding | undefined;
-  onCutRaster?: ((raster: ReviewCutPreviewRaster) => void) | undefined;
-  url: string;
-  video: RefObject<HTMLVideoElement | null>;
-  scene?: {
-    background: QuickEditBackgroundSettings;
-    canvas?: { width: number; height: number } | undefined;
-    windowHeader?:
-      | import('../../features/video/review/advanced/types').QuickEditWindowHeader
-      | undefined;
-    camera: QuickEditCameraTransform;
+function reviewBackgroundPlaneProps(props: ReviewStageProps) {
+  return {
+    background: props.scene?.background,
+    sceneSize: props.scene
+      ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
+      : props.source,
+    imageUrl: props.backgroundImageUrl,
   };
-  layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
-  previewScale: number;
-  header: ReturnType<typeof useReviewWindowHeader>;
-  drawing: boolean;
-  projected: ReviewRegion | null;
-  onReady(): void;
-  onTime(time: number): void;
-  onPlaying(value: boolean): void;
-  onEnded?: (() => void) | undefined;
-  onError(): void;
-}) {
-  const clip = props.scene?.background.enabled ? props.scene.background.layout : null;
-  const motion =
-    props.layout && props.scene
-      ? computeQuickEditSceneCamera(props.layout, props.scene.background)
-      : null;
-  const shadow = resolveQuickEditShadow(
-    props.scene?.background ?? { enabled: false },
-    props.previewScale * (motion?.scale ?? 1)
-  );
-  const videoClip = motion?.windowClip ?? props.layout?.windowRect;
-  const translation = props.layout
-    ? {
-        x: props.layout.videoTransform.x - (videoClip?.x ?? 0),
-        y: props.layout.videoTransform.y - (videoClip?.y ?? 0),
-      }
-    : { x: 0, y: 0 };
-  const scale = props.scene?.camera.scale ?? 1;
-  const videoTransform = `translate3d(${translation.x}px, ${translation.y}px, 0) scale(${scale})`;
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        opacity: props.manual ? 0 : undefined,
-        pointerEvents: props.manual ? 'none' : undefined,
-        left: videoClip?.x ?? 0,
-        top: videoClip?.y ?? 0,
-        width: videoClip?.width ?? undefined,
-        height: videoClip?.height ?? undefined,
-        overflow: 'hidden',
-        boxShadow: shadow
-          ? `0 0 ${shadow.blur}px color-mix(in srgb, ${shadow.color} ${shadow.opacity * 100}%, transparent)`
-          : undefined,
-        borderRadius: clip
-          ? clip.cornerRadius * props.previewScale * (motion?.scale ?? 1)
-          : undefined,
-      }}
-    >
-      <ReviewWindowHeader header={props.header} layout={props.layout} transform={videoTransform} />
-      <video
-        ref={props.video}
-        src={props.url}
-        controls={false}
-        playsInline
-        preload="metadata"
-        className="pointer-events-none"
-        style={
-          props.layout
-            ? {
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: props.layout.videoRect.width,
-                height: props.layout.videoRect.height,
-                transformOrigin: '0 0',
-                transform: videoTransform,
-                maxWidth: 'none',
-                // Scene geometry already fits the source; native contain can leave a raster seam.
-                objectFit: 'fill',
-                pointerEvents: 'none',
-              }
-            : {
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                pointerEvents: 'none',
-              }
-        }
-        onLoadedMetadata={props.onReady}
-        onTimeUpdate={(event) => props.onTime(event.currentTarget.currentTime)}
-        onPlay={() => props.onPlaying(true)}
-        onPause={() => props.onPlaying(false)}
-        onEnded={() => (props.onEnded ? props.onEnded() : props.onPlaying(false))}
-        onError={props.onError}
-      />
-      {!props.manual && props.cutPreview && props.layout ? (
-        <ReviewCutTransitionPreview
-          binding={props.cutPreview}
-          onRaster={props.onCutRaster}
-          video={props.video}
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: props.layout.videoRect.width,
-            height: props.layout.videoRect.height,
-            transformOrigin: '0 0',
-            transform: videoTransform,
-            maxWidth: 'none',
-          }}
-        />
-      ) : null}
-      {props.projected ? (
-        <ReviewRegionOverlay
-          drawing={props.drawing}
-          offset={props.layout ? { x: videoClip?.x ?? 0, y: videoClip?.y ?? 0 } : { x: 0, y: 0 }}
-          projected={props.projected}
-        />
-      ) : null}
-    </div>
-  );
 }
 
-/** Artwork and its opaque join ride the same transform as the native video. */
-function ReviewWindowHeader({
-  header,
-  layout,
-  transform,
-}: {
-  header: ReturnType<typeof useReviewWindowHeader>;
-  layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
-  transform: string;
-}) {
-  if (!header.image || !layout) return null;
-  const common = {
-    position: 'absolute' as const,
-    left: 0,
-    top: 0,
-    width: layout.videoRect.width,
-    transformOrigin: '0 0',
-    pointerEvents: 'none' as const,
-  };
-  return (
-    <>
-      {/* Back both sides of the join; independently antialiased textures can otherwise expose the scene. */}
-      <div
-        style={{
-          ...common,
-          height: 2,
-          background: header.joinColor,
-          transform: `${transform} translateY(-1px)`,
-        }}
-      />
-      <img
-        alt=""
-        src={header.url ?? undefined}
-        draggable={false}
-        style={{
-          ...common,
-          height: layout.videoRect.y - layout.windowRect.y,
-          // Layout-sized zooming rounds each edge separately and rerasterizes the SVG each frame.
-          transform: `${transform} translateY(-100%)`,
-          maxWidth: 'none',
-        }}
-      />
-    </>
-  );
-}
-
-function ReviewRegionOverlay(props: {
-  drawing: boolean;
-  offset: { x: number; y: number };
-  projected: ReviewRegion;
-}) {
-  return (
-    <div
-      aria-label={translate('gallery.videoReview.selectedRegion')}
-      className={`${props.drawing ? 'cursor-move' : 'pointer-events-none'}
-          absolute border-2 border-[var(--sniptale-color-accent)]
-          bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]`}
-      style={{
-        left: props.projected.x - props.offset.x,
-        top: props.projected.y - props.offset.y,
-        width: props.projected.width,
-        height: props.projected.height,
-      }}
-    >
-      {props.drawing
-        ? (['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
-            <span
-              key={corner}
-              data-region-corner={corner}
-              className={[
-                'absolute h-2.5 w-2.5 rounded-sm border border-[var(--sniptale-color-accent)]',
-                'bg-[var(--sniptale-color-surface-panel)]',
-              ].join(' ')}
-              style={{
-                left: corner.endsWith('w') ? -5 : undefined,
-                right: corner.endsWith('e') ? -5 : undefined,
-                top: corner.startsWith('n') ? -5 : undefined,
-                bottom: corner.startsWith('s') ? -5 : undefined,
-                cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize',
-              }}
-            />
-          ))
-        : null}
-    </div>
-  );
-}
-
-/** Background moves as its own scene plane, below all content overlays. */
-function ReviewStageBackground({
-  props,
-  motion,
-  paint,
-}: {
-  props: ReviewStageProps;
-  motion: { x: number; y: number; backgroundScale: number };
-  paint: string | null;
-}) {
-  const background = props.scene?.background;
-  const blurred =
-    background?.enabled && background.type !== 'solid' && (background.layout.blur ?? 0) > 0;
-  const sceneSize = props.scene
-    ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
-    : props.source;
-  return (
-    <div
-      data-ui="gallery.videoReview.backgroundPlane"
-      className="pointer-events-none absolute inset-0"
-      style={{
-        background: paint ?? undefined,
-        transformOrigin: '0 0',
-        transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.backgroundScale})`,
-      }}
-    >
-      {blurred ? (
-        <ReviewBackgroundBlurPreview
-          background={background}
-          imageUrl={props.backgroundImageUrl}
-          width={sceneSize.width}
-          height={sceneSize.height}
-        />
-      ) : props.backgroundImageUrl &&
-        props.scene?.background.enabled &&
-        props.scene.background.type === 'image' ? (
-        <img
-          src={props.backgroundImageUrl}
-          alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          style={{ objectFit: props.scene.background.imageFit }}
-        />
-      ) : null}
-    </div>
-  );
+function useAnnotationGeometryReport(
+  props: ReviewStageProps,
+  annotationGeometry: ReturnType<typeof useReviewStageGeometry>['annotationGeometry']
+) {
+  const reportAnnotationGeometry =
+    props.onAnnotationGeometry ?? props.annotationEditing?.editor.setGeometry;
+  useEffect(() => {
+    reportAnnotationGeometry?.(annotationGeometry);
+  }, [annotationGeometry, reportAnnotationGeometry]);
 }

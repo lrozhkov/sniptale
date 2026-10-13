@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
+import type { commitVideoWorkspaceWithProjection } from '../../composition/persistence/review-workspaces/store';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -41,6 +45,9 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<typeof commitVideoWorkspaceWithProjection>[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
@@ -75,7 +82,7 @@ vi.mock('../shared/download', async (importOriginal) => ({
 
 async function dragRange(
   host: HTMLElement,
-  options: { lane?: 'zoomLane' | 'original'; start?: number; end?: number } = {}
+  options: { lane?: 'zoomLane' | 'original' | 'ruler'; start?: number; end?: number } = {}
 ) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
@@ -91,8 +98,13 @@ async function dragRange(
     options.lane === 'original'
       ? host.querySelector<HTMLElement>('[data-original-audio-lane]')
       : null;
-  if (original)
-    Object.assign(original, {
+  const ruler =
+    !options.lane || options.lane === 'ruler'
+      ? host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.ruler"]')
+      : null;
+  const local = original ?? ruler;
+  if (local)
+    Object.assign(local, {
       setPointerCapture: vi.fn(),
       hasPointerCapture: () => true,
       releasePointerCapture: vi.fn(),
@@ -105,12 +117,28 @@ async function dragRange(
   ] as const)
     await act(async () =>
       (
-        original ??
+        local ??
         (type === 'pointerdown'
           ? host.querySelector(`[data-ui="gallery.videoReview.${options.lane ?? 'sourceLane'}"]`)!
           : plane)
       ).dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
     );
+}
+
+/** History controls act on accepted content, after the product autosave acknowledgement. */
+async function waitForContentCommit(
+  fixture: ReturnType<typeof createEditorFixture>,
+  cursor: number
+) {
+  await act(async () => {
+    await vi.waitFor(
+      () => {
+        expect(fixture.snapshot.workspace.cursor).toBe(cursor);
+        expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('advancedContent');
+      },
+      { timeout: 2_500 }
+    );
+  });
 }
 
 it('creates a source-audio mute from a range, opens properties and restores it through undo/redo', async () => {
@@ -133,7 +161,7 @@ it('creates a source-audio mute from a range, opens properties and restores it t
     expect(fixture.button('zoomTrack').getAttribute('aria-pressed')).toBe('true');
     await dragRange(fixture.host);
     await fixture.click('originalAudioRange');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await waitForContentCommit(fixture, 1);
     expect(
       fixture.host.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
     ).toHaveLength(1);
@@ -187,7 +215,7 @@ it('draws a source-audio volume edit with an independent toolbar default', async
     await fixture.click('advancedEditing');
     await fixture.click('originalAudioRange');
     await dragRange(fixture.host, { lane: 'original' });
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await waitForContentCommit(fixture, 1);
     const item = fixture.host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.originalAudioRange"]'
     );
@@ -301,6 +329,8 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    // First entry saves zoom enablement independently of the later focus gesture.
+    await waitForContentCommit(fixture, 2);
     await fixture.click('focusRangeTool');
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('false');
@@ -350,7 +380,7 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
     expect(
       inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
     ).toContain('1.0 – 2.0');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 350)));
+    await waitForContentCommit(fixture, 3);
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'advancedContent',
       after: { zoom: { regions: [expect.objectContaining({ start: 0.5, end: 1.5 })] } },

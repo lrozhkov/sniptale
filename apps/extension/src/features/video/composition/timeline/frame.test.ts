@@ -269,10 +269,27 @@ it('applies cursor interpolation easing and resolves camera focus from motion re
       regionId: 'motion-1',
       scale: 2,
       viewportX: 0,
-      viewportY: 45,
+
       motionBlurAmount: 0,
     })
   );
+  expect(frame.camera).toEqual(resolveVideoCompositionFrame(project, 4.5).camera);
+  const cursor = frame.cursor!;
+  expect(cursor.x).toBeGreaterThanOrEqual(frame.camera.viewportX);
+  expect(cursor.x).toBeLessThanOrEqual(frame.camera.viewportX + frame.camera.viewportWidth);
+  expect(cursor.y).toBeGreaterThanOrEqual(frame.camera.viewportY);
+  expect(cursor.y).toBeLessThanOrEqual(frame.camera.viewportY + frame.camera.viewportHeight);
+  expect(project.cursorTrack.samples).toEqual([
+    {
+      id: 'cursor-1',
+      interpolation: VideoTemporalEasing.EASE_OUT,
+      time: 4,
+      visible: true,
+      x: 100,
+      y: 150,
+    },
+    { id: 'cursor-2', time: 5, visible: true, x: 200, y: 250 },
+  ]);
 });
 
 it('uses a visual preset override for cursor emphasis without changing the authored action kind', () => {

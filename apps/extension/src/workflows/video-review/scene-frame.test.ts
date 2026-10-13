@@ -3,7 +3,7 @@ import { drawReviewSceneFrame } from './scene-frame';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 
-it.each(['none', 'publish', 'background'] as const)(
+it.each(['none', 'publish', 'background', 'overlay'] as const)(
   'forwards managed backing to real header/exposure helpers and releases on failure=%s',
   (fail) => {
     const makeContext = () =>
@@ -51,6 +51,12 @@ it.each(['none', 'publish', 'background'] as const)(
       vi.mocked(target.drawImage).mockImplementationOnce(() => {
         throw new Error('publish failed');
       });
+    const overlays = vi.fn((raster: { image: CanvasImageSource } | null) => {
+      expect(raster?.image).toBe(leases[0]!.canvas);
+      expect(leases[0]!.release).not.toHaveBeenCalled();
+      expect(raster).not.toHaveProperty('release');
+      if (fail === 'overlay') throw new Error('overlay failed');
+    });
     const draw = () =>
       drawReviewSceneFrame(target, {
         canvas: size,
@@ -69,6 +75,7 @@ it.each(['none', 'publish', 'background'] as const)(
               }
             : undefined,
         windowRasterBacking: size,
+        drawOverlays: overlays,
         motionBlur: [
           { camera, alpha: 0.25 },
           { camera, alpha: 0.75 },
@@ -85,6 +92,7 @@ it.each(['none', 'publish', 'background'] as const)(
       canvas.mock.calls.every(([, backing]) => backing.width === 640 && backing.height === 378)
     ).toBe(true);
     expect(leases.map((lease) => lease.release.mock.calls.length)).toEqual([1, 1, 1]);
+    expect(overlays).toHaveBeenCalledTimes(fail === 'none' || fail === 'overlay' ? 1 : 0);
     if (fail === 'background') return;
     expect(leases[2]!.context.drawImage).toHaveBeenCalledWith(
       leases[0]!.canvas,
@@ -244,3 +252,82 @@ it('zooms the joined header and video inside a fixed frame with one raster lease
   expect(plane.context.clip).not.toHaveBeenCalled();
   expect([...leases.values()].map((lease) => lease.release.mock.calls.length)).toEqual([1, 1, 1]);
 });
+
+it.each(['success', 'sample-failure', 'projection-failure'] as const)(
+  'keeps padded plane coordinates and balanced exposure state on %s',
+  (failure) => {
+    const output = { width: 641, height: 401 };
+    const background = {
+      enabled: true,
+      type: 'solid',
+      color: '#ffffffff',
+      zoomBehavior: 'fixed',
+      layout: { padding: 4, cornerRadius: 12, shadow: { intensity: 80, color: '#000000ff' } },
+    } as const;
+    const spatial = {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 1,
+      windowMotion: 1,
+      lockBackground: true,
+      focus: [],
+    };
+    const camera = { scale: 2, centerX: 0.4, centerY: 0.5, spatial };
+    const layout = computeQuickEditSceneLayout({ source: output, output, background, camera });
+    const makeContext = () => ({
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      scale: vi.fn(),
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      roundRect: vi.fn(),
+      clip: vi.fn(),
+      fill: vi.fn(),
+      globalAlpha: 1,
+    });
+    const contexts = new Map<string, ReturnType<typeof makeContext>>();
+    const surface = vi.fn((kind: string, width: number, height: number) => {
+      const context = makeContext();
+      contexts.set(kind, context);
+      return {
+        canvas: { width, height } as HTMLCanvasElement,
+        context: context as unknown as CanvasRenderingContext2D,
+      };
+    });
+    const target = makeContext();
+    const draw = vi.fn(() => {
+      if (failure === 'projection-failure') throw new Error('projection');
+    });
+    const sample = vi.fn(() => {
+      if (failure === 'sample-failure') throw new Error('sample');
+    });
+    const paint = () =>
+      drawReviewSceneFrame(target as unknown as CanvasRenderingContext2D, {
+        canvas: output,
+        layout,
+        background,
+        image: null,
+        sceneScale: 0.5,
+        sample: { draw: sample },
+        spatialRenderer: { surface, draw, dispose: vi.fn() },
+        motionBlur: [
+          { camera, alpha: 0.5 },
+          { camera, alpha: 0.5 },
+        ],
+      });
+    if (failure === 'success') paint();
+    else expect(paint).toThrow();
+    const plane = surface.mock.calls.find(([kind]) => kind === 'plane')!;
+    // Base padding + 120px shadow envelope, with the two-pixel filter margin; camera scale is excluded.
+    expect(plane.slice(1)).toEqual([873, 637]);
+    expect(contexts.get('plane')!.translate).toHaveBeenCalledWith(116, 118);
+    for (const context of contexts.values())
+      expect(context.restore.mock.calls.length).toBe(context.save.mock.calls.length);
+    if (failure === 'sample-failure') expect(draw).not.toHaveBeenCalled();
+    if (failure !== 'success') expect(target.drawImage).not.toHaveBeenCalled();
+    if (failure === 'success') expect(draw).toHaveBeenCalledTimes(2);
+  }
+);

@@ -95,12 +95,16 @@ export function normalizeRecordingCursorTrackToProjectSpace(
   return {
     ...cursorTrack,
     samples: cursorTrack.samples.map((sample) => {
+      if (isRecordingPoint(sample.recordingPoint))
+        return {
+          ...sample,
+          x: sample.recordingPoint.x * params.projectWidth,
+          y: sample.recordingPoint.y * params.projectHeight,
+        };
+      if (sample.recordingPoint === null || params.captureMode === 'TAB_CROP')
+        return { ...sample, visible: false };
       const point = normalizePoint({ x: sample.x, y: sample.y }, params);
-      return {
-        ...sample,
-        x: point.x,
-        y: point.y,
-      };
+      return { ...sample, x: point.x, y: point.y };
     }),
   };
 }

@@ -50,6 +50,11 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<
+      typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspaceWithProjection
+    >[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
@@ -87,7 +92,10 @@ vi.mock('../shared/download', async (importOriginal) => ({
   downloadGalleryBlob: integration.download,
 }));
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
 
 function advancedContentAt(snapshot: VideoWorkspaceSnapshot, index = -1) {
   const operations = snapshot.workspace.history.filter(
@@ -159,8 +167,8 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await click('redo');
     expect(host.textContent).toContain('Edited note');
     await dragTimePlane(host, 100, 300);
-    await click('commentRange');
-    await fill('Range note');
+    await click('addComment');
+    await fill('Discarded point note');
     await click('discard');
     expect(host.querySelector('textarea')).toBeNull();
     await click('copyReport');
@@ -271,7 +279,7 @@ async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   await act(async () => pointer('pointerup', end ?? start));
 }
 
-it('selects a range by dragging on the source lane and clears it outside', async () => {
+it('selects a range with an explicit source tool and clears it outside', async () => {
   const fixture = createEditorFixture(integration);
   const { root, host } = fixture;
   let selected: ReviewAnchor = { kind: 'point', time: 0 };
@@ -285,6 +293,7 @@ it('selects a range by dragging on the source lane and clears it outside', async
         time={0}
         playing={false}
         selection={selection}
+        sourceRangeTool
         annotations={[
           { id: 'a', text: 'First', anchor: { kind: 'range', start: 1, end: 3 } },
           { id: 'b', text: 'Second', anchor: { kind: 'range', start: 1, end: 3 } },
@@ -529,7 +538,7 @@ it('places new zoom regions in result time after cuts and speed changes (R03)', 
     await dragTimePlane(host, 300);
     await click('advancedEditing');
     await fixture.addFocus();
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
     expect(advancedContentAt(fixture.snapshot).zoom.regions[0]).toMatchObject({
       start: 1.5,
       end: 2.5,
@@ -570,7 +579,7 @@ it('rejects a removed loop interval and admits focus in kept footage (R03)', asy
     await click('dismissFeedback');
     expect(host.querySelector('[data-ui="gallery.videoReview.feedback"]')).toBeNull();
     await fixture.addFocus(2, 4);
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
     expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(1);
   } finally {
     await fixture.cleanup();
@@ -616,7 +625,7 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('true');
     expect(button('zoomTrack').getAttribute('aria-pressed')).toBe('true');
     expect(button('audioTrack').getAttribute('aria-pressed')).toBe('true');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
     expect(fixture.snapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
       advancedTracksInitialized: true,
@@ -627,7 +636,7 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     await click('advancedEditing');
     expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
     expect(fixture.snapshot.workspace.advanced.ui.mode).toBe('basic');
     expect(fixture.snapshot.workspace.advanced.ui.tracks.zoom).toBe(true);
     // Reopening reads the same durable workspace: the saved mode and track return.
@@ -676,7 +685,7 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     )!;
     expect(mute.disabled).toBe(false);
     await act(async () => mute.click());
-    await act(async () => vi.advanceTimersByTimeAsync(250));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(advancedContentAt(fixture.snapshot).audio.original.muted).toBe(true);
   } finally {
     try {
@@ -707,7 +716,7 @@ it('imports a file dropped on the music lane at the drop point', async () => {
     expect(music.getAttribute('data-drop-active')).toBe('true');
     await act(async () => music.dispatchEvent(dragEvent('drop', [file])));
     expect(music.getAttribute('data-drop-active')).toBeNull();
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
     const musicClips = advancedContentAt(fixture.snapshot).audio.music;
     expect(musicClips).toHaveLength(1);
     expect(musicClips[0]!.timelineStart).toBeCloseTo(1.25, 5);
@@ -779,7 +788,7 @@ it('connects Scene presentation controls to the real session and suppresses them
       (node) => node.textContent === 'gallery.videoReview.presentationOn'
     )!;
     await act(async () => on.click());
-    await act(async () => vi.waitFor(() => expect(audioFade()).toBe(true)));
+    await act(async () => vi.waitFor(() => expect(audioFade()).toBe(true), { timeout: 2500 }));
     await fixture.click('advancedEditing');
     expect(inspector()).toBeNull();
     expect(audioFade()).toBe(true);

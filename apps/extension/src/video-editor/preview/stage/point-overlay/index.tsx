@@ -1,3 +1,4 @@
+import { PreviewCursorPathOverlay } from './cursor-path';
 import type React from 'react';
 
 import { translate } from '../../../../platform/i18n';
@@ -78,11 +79,12 @@ export function PreviewStagePointOverlay(params: PointOverlayParams) {
   const placementHint = getPlacementHint(params.placementMode);
   const stage = params.stageRef.current;
   if ((!canRenderSelectedPoint(params) || !stage) && !placementHint) {
-    return null;
+    return <PreviewCursorPathOverlay {...params} />;
   }
 
   return (
     <>
+      <PreviewCursorPathOverlay {...params} />
       {placementHint ? <div className={POINT_HINT_CLASS_NAME}>{placementHint}</div> : null}
       {point && stage ? (
         <PointHandle

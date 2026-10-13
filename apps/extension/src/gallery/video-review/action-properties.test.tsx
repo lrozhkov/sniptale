@@ -22,6 +22,44 @@ const plan = planReviewActionEdits({
   snapToKeyframes: false,
 });
 
+it('offers press feedback rather than a fabricated click ripple for an incomplete observed prefix', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionProperties
+          marker={{
+            ...marker,
+            focusPoint: { x: 0.1, y: 0.2 },
+            gesture: { id: 'click', type: 'click', button: 0, downTime: 1, completion: 'lost' },
+          }}
+          plan={plan}
+          busy={false}
+          onEdit={vi.fn()}
+          onFocus={vi.fn()}
+        />
+      )
+    );
+    const control = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.clickEffect')}"]`
+    )!;
+    act(() => control.click());
+    expect(
+      Array.from(document.querySelectorAll('[role="option"]'), (option) => option.textContent)
+    ).toEqual([
+      translate('gallery.videoReview.click_off'),
+      translate('gallery.videoReview.click_press'),
+    ]);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it('shows recorded target metadata as text and tolerates a disappearing selection', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');

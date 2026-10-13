@@ -2,7 +2,6 @@ import type { ReviewTelemetryMarker } from './telemetry';
 
 /** Readable hit target and count floor for both points and overflow groups. */
 export const REVIEW_ACTION_MIN_POINT_WIDTH_PX = 32;
-const CURSOR_BUCKET_DENSITY = 120;
 
 interface ReviewActionLaneItem {
   marker: ReviewTelemetryMarker;
@@ -17,8 +16,7 @@ interface ReviewActionLaneLayout {
   laneCount: number;
 }
 
-/** Pack screen-space targets into at most three rows; the third row groups overflow.
- * Members retain source identity so coarse-scale aggregation never loses actions. */
+/** Semantic history rows are permanent; collisions cluster only within their family. */
 export function layoutReviewActionLanes(
   markers: readonly ReviewTelemetryMarker[],
   viewport: { duration: number; width: number; zoom: number }
@@ -34,16 +32,12 @@ export function layoutReviewActionLanes(
     throw new Error('Action lane viewport is invalid.');
   const planeWidth = viewport.width * viewport.zoom;
   const items: ReviewActionLaneItem[] = [];
-  const lanes: ReviewActionLaneItem[] = [];
-  const cursorBuckets = new Set<number>();
+  const lanes = new Map<number, ReviewActionLaneItem>();
   const sorted = [...markers].sort((a, b) => a.start - b.start || a.ref.id.localeCompare(b.ref.id));
   for (const marker of sorted) {
     const natural = (marker.end - marker.start) * (planeWidth / viewport.duration);
-    if (marker.ref.kind === 'cursor') {
-      const bucket = Math.floor((marker.start / viewport.duration) * CURSOR_BUCKET_DENSITY);
-      if (cursorBuckets.has(bucket)) continue;
-      cursorBuckets.add(bucket);
-    }
+    const lane = reviewActionLane(marker);
+    if (lane === null) continue;
     const width = Math.min(planeWidth, Math.max(natural, REVIEW_ACTION_MIN_POINT_WIDTH_PX));
     const left = Math.max(
       0,
@@ -52,21 +46,39 @@ export function layoutReviewActionLanes(
     const item: ReviewActionLaneItem = {
       marker,
       members: [marker],
-      lane: 0,
+      lane,
       left,
       width,
     };
-    let lane = lanes.findIndex((last) => left + 1e-7 >= last.left + last.width);
-    if (lane === -1 && lanes.length < 3) lane = lanes.length;
-    if (lane === -1) {
-      const group = lanes[2]!;
-      group.members.push(marker);
-      group.width = Math.max(group.left + group.width, left + width) - group.left;
+    const previous = lanes.get(lane);
+    if (previous && left + 1e-7 < previous.left + previous.width) {
+      previous.members.push(marker);
+      previous.width = Math.max(previous.left + previous.width, left + width) - previous.left;
     } else {
-      item.lane = lane;
-      lanes[lane] = item;
+      lanes.set(lane, item);
       items.push(item);
     }
   }
-  return { items, laneCount: lanes.length };
+  return { items, laneCount: 3 };
+}
+
+/** Shared semantic classification for Gallery and standalone history adapters. */
+export function reviewActionLane(
+  marker: Pick<ReviewTelemetryMarker, 'eventType' | 'ref'>
+): 0 | 1 | 2 | null {
+  if (marker.eventType === 'static-frame') return null;
+  if (
+    marker.eventType === 'KEY' ||
+    marker.eventType === 'KEY_HOLD' ||
+    marker.eventType === 'KEY_MODIFIERS' ||
+    marker.eventType === 'typing'
+  )
+    return 0;
+  if (
+    marker.ref.kind === 'cursor' ||
+    marker.eventType === 'cursor-idle' ||
+    marker.eventType === 'cursor-gap'
+  )
+    return 2;
+  return 1;
 }

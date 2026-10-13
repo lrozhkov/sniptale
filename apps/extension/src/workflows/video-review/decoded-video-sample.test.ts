@@ -160,3 +160,31 @@ it('preserves missing frame results for the export owner to report', async () =>
   expect((await sink.samplesAtTimestamps([1]).next()).value).toBeNull();
   expect(copy).not.toHaveBeenCalled();
 });
+
+it.each(['getSample', 'samples', 'samplesAtTimestamps'] as const)(
+  'classifies an actual %s decoder rejection and preserves its cause',
+  async (method) => {
+    const cause = new Error('private decoder details');
+    const sink = createReviewDecodedSampleSink(
+      {
+        getSample: async () => {
+          throw cause;
+        },
+        async *samples() {
+          yield await Promise.reject(cause);
+        },
+        async *samplesAtTimestamps() {
+          yield await Promise.reject(cause);
+        },
+      },
+      new AbortController().signal
+    );
+    const operation =
+      method === 'getSample'
+        ? sink.getSample(1)
+        : method === 'samples'
+          ? sink.samples(0, 2).next()
+          : sink.samplesAtTimestamps([1]).next();
+    await expect(operation).rejects.toMatchObject({ stage: 'decode', cause });
+  }
+);

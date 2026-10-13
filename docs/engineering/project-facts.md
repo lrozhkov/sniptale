@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.0` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `26` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `27` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -136,6 +136,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/color-selector`
 - `apps/extension/src/ui/command-palette`
 - `apps/extension/src/ui/compact-inspector-controls`
+- `apps/extension/src/ui/cursor-focus-timeline-keys.test.tsx`
+- `apps/extension/src/ui/cursor-focus-timeline-keys.tsx`
 - `apps/extension/src/ui/document-autosave-labels.ts`
 - `apps/extension/src/ui/drawing-tools`
 - `apps/extension/src/ui/editor-start`
@@ -211,6 +213,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `background` → `apps/extension/src/background`
 - `content` → `apps/extension/src/content`
 - `camera-recorder` → `apps/extension/src/camera-recorder`
+- `recording-clock` → `apps/extension/src/recording-clock`
 - `popup` → `apps/extension/src/popup`
 - `settings` → `apps/extension/src/settings`
 - `gallery` → `apps/extension/src/gallery`

@@ -2,10 +2,18 @@ import type { RecordingTelemetrySnapshot } from '../../../contracts/messaging/co
 import { tickCursorIdleTelemetry } from './signals';
 import { createTelemetryListeners } from './events';
 import type { TelemetryState } from './types';
+import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
 
 export function createInitialState(): TelemetryState {
   return {
+    recordingId: null,
+    frameClock: undefined,
     captureSegment: 0,
+    observationAvailable: true,
+    confirmedMediaTimeSeconds: 0,
+    clockUnavailable: false,
+    gestures: new Map(),
+    keyboard: { held: new Map(), modifiers: null, target: null, times: [], repeats: [] },
     accumulatedDurationMs: 0,
     actionEvents: [],
     cursorIdleSignal: null,
@@ -64,6 +72,18 @@ export function removeListeners(state: TelemetryState): void {
   document.removeEventListener('pointermove', state.listeners.pointerMove, true);
   document.removeEventListener('pointerrawupdate', state.listeners.pointerMove, true);
   document.removeEventListener('pointerdown', state.listeners.pointerDown, true);
+  document.removeEventListener('pointerup', state.listeners.pointerUp, true);
+  document.removeEventListener('pointercancel', state.listeners.pointerCancel, true);
+  document.removeEventListener('mousedown', state.listeners.mouseDown, true);
+  document.removeEventListener('mouseup', state.listeners.mouseUp, true);
+  document.removeEventListener('pointerout', state.listeners.pointerLeave, true);
+  document.removeEventListener('dragstart', state.listeners.dragStart, true);
+  document.removeEventListener('dragend', state.listeners.dragEnd, true);
+  document.removeEventListener('drop', state.listeners.drop, true);
+  document.removeEventListener('selectionchange', state.listeners.selectionChange, true);
+  document.removeEventListener('wheel', state.listeners.wheel, true);
+  document.removeEventListener('keyup', state.listeners.keyUp, true);
+  window.removeEventListener('blur', state.listeners.blur, true);
   document.removeEventListener('click', state.listeners.click, true);
   document.removeEventListener('keydown', state.listeners.keyDown, true);
   document.removeEventListener('input', state.listeners.input, true);
@@ -76,21 +96,34 @@ export function removeListeners(state: TelemetryState): void {
 export function resetTelemetryState(
   state: TelemetryState,
   recordingId: string | null,
-  offsetSeconds = 0
+  offsetSeconds = 0,
+  frameClock?: RecordingFrameClockAnchor | null
 ): void {
   state.captureSegment = 0;
-  state.accumulatedDurationMs = Math.max(0, offsetSeconds * 1000);
+  state.recordingId = recordingId;
+  state.frameClock =
+    frameClock === undefined || frameClock === null ? frameClock : { ...frameClock };
+  state.observationAvailable = true;
+  state.confirmedMediaTimeSeconds = frameClock?.mediaTimeSeconds ?? 0;
+  state.clockUnavailable = recordingId !== null && frameClock === null;
+  state.gestures.clear();
+  state.keyboard = { held: new Map(), modifiers: null, target: null, times: [], repeats: [] };
+  state.accumulatedDurationMs = frameClock
+    ? frameClock.mediaTimeSeconds * 1000
+    : Math.max(0, offsetSeconds * 1000);
   state.actionEvents = [];
   state.cursorIdleSignal = null;
   state.cursorTrack = null;
   state.idleTimerId = null;
-  state.isEnabled = recordingId !== null;
-  state.isPaused = false;
+  state.isEnabled = recordingId !== null && frameClock !== null;
+  state.isPaused = state.clockUnavailable || frameClock?.phase === 'paused';
   state.lastKnownPointerPosition = null;
   state.lastSampleTimeMs = -1;
   state.pointerStationaryPosition = null;
   state.pointerStationaryStartedAtMs = null;
-  state.segmentStartedAtTimestamp = performance.now();
+  state.segmentStartedAtTimestamp = frameClock
+    ? frameClock.captureEpochMs - performance.timeOrigin
+    : performance.now();
   state.signals = [];
   state.typingSignal = null;
   state.typingTarget = null;
@@ -103,6 +136,18 @@ export function attachListeners(state: TelemetryState): void {
   state.listeners = createTelemetryListeners(state);
   document.addEventListener(state.pointerMoveEventName, state.listeners.pointerMove, true);
   document.addEventListener('pointerdown', state.listeners.pointerDown, true);
+  document.addEventListener('pointerup', state.listeners.pointerUp, true);
+  document.addEventListener('pointercancel', state.listeners.pointerCancel, true);
+  document.addEventListener('mousedown', state.listeners.mouseDown, true);
+  document.addEventListener('mouseup', state.listeners.mouseUp, true);
+  document.addEventListener('pointerout', state.listeners.pointerLeave, true);
+  document.addEventListener('dragstart', state.listeners.dragStart, true);
+  document.addEventListener('dragend', state.listeners.dragEnd, true);
+  document.addEventListener('drop', state.listeners.drop, true);
+  document.addEventListener('selectionchange', state.listeners.selectionChange, true);
+  document.addEventListener('wheel', state.listeners.wheel, true);
+  document.addEventListener('keyup', state.listeners.keyUp, true);
+  window.addEventListener('blur', state.listeners.blur, true);
   document.addEventListener('click', state.listeners.click, true);
   document.addEventListener('keydown', state.listeners.keyDown, true);
   document.addEventListener('input', state.listeners.input, true);

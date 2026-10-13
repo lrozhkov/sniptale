@@ -295,7 +295,7 @@ it('one pass shortens both typing and pauses while preserving the immutable sour
   getTelemetry.mockResolvedValue({
     ...telemetry(),
     signals: [
-      { id: 'input', kind: 'typing', startTime: 1, endTime: 3, point: null, data: {} },
+      { id: 'input', kind: 'typing', startTime: 1, endTime: 4, point: null, data: {} },
       { id: 'idle', kind: 'cursor-idle', startTime: 0, endTime: 8, point: null, data: {} },
     ],
   });

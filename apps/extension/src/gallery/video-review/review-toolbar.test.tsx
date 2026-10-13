@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewTimelineToolbar, ReviewTrackControls } from './review-toolbar';
+import {
+  ReviewTimelineToolbar,
+  ReviewTrackControls,
+  type ReviewAnnotationTool,
+} from './review-toolbar';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { translate } from '../../platform/i18n';
 
@@ -13,6 +17,19 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
   const root = createRoot(host);
   const advanced = createQuickEditAdvancedState();
   const toggle = vi.fn();
+  const tool: ReviewAnnotationTool = {
+    active: true,
+    onToggle: toggle,
+    value: 'title',
+    options: [{ value: 'title', label: 'Title' }],
+    phase: 'ready',
+    pending: false,
+    failure: null,
+    retryable: true,
+    onChoose: vi.fn(),
+    onReload: vi.fn(),
+    onRetry: vi.fn(),
+  };
   let admitted: (() => void) | undefined;
   const render = async (mode: 'basic' | 'advanced', busy = false) => {
     advanced.ui.mode = mode;
@@ -24,7 +41,7 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
           composerBusy={false}
           selection={{ kind: 'point', time: 0 }}
           edits={[]}
-          annotationTool={{ active: true, onToggle: toggle }}
+          annotationTool={tool}
           beforeAction={(action) => {
             admitted = action;
           }}
@@ -57,7 +74,17 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
     await render('advanced');
     const trigger = button()!;
     expect(trigger.getAttribute('aria-pressed')).toBe('true');
-    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(trigger.getAttribute('aria-haspopup')).toBeNull();
+    expect(
+      host.querySelector(
+        `[aria-label="${translate('gallery.videoReview.annotationEffectsChoose')}"]`
+      )
+    ).not.toBeNull();
+    expect(
+      host
+        .querySelector(`[aria-label="${translate('gallery.videoReview.pointerTool')}"]`)
+        ?.getAttribute('aria-pressed')
+    ).not.toBe('true');
     await act(async () => trigger.click());
     expect(toggle).not.toHaveBeenCalled();
     act(() => admitted?.());
@@ -66,6 +93,58 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
     expect(button()?.disabled).toBe(true);
     await act(async () => button()?.click());
     expect(toggle).toHaveBeenCalledTimes(1);
+    const selector = () =>
+      host.querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('gallery.videoReview.annotationEffectsChoose')}"]`
+      )!;
+    tool.phase = 'loading';
+    tool.options = [];
+    await render('advanced');
+    expect(selector().disabled).toBe(true);
+    expect(selector().textContent).toContain(
+      translate('gallery.videoReview.annotationEffectsLoading')
+    );
+    tool.phase = 'failed';
+    await render('advanced');
+    expect(selector().textContent).toContain(
+      translate('gallery.videoReview.annotationEffectsCatalogFailed')
+    );
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>(
+          `[aria-label="${translate('gallery.videoReview.retry')}"]`
+        )!
+        .click()
+    );
+    expect(tool.onReload).toHaveBeenCalledOnce();
+    tool.phase = 'ready';
+    tool.options = [];
+    await render('advanced');
+    expect(selector().disabled).toBe(true);
+    expect(selector().textContent).toContain(
+      translate('gallery.videoReview.annotationEffectsCatalogEmpty')
+    );
+    tool.options = [{ value: 'title', label: 'Title' }];
+    tool.pending = true;
+    await render('advanced');
+    expect(selector().disabled).toBe(true);
+    expect(button()?.disabled).toBe(true);
+    expect(host.querySelector('[role="status"]')?.textContent).toBe(
+      translate('gallery.videoReview.annotationEffectsAdding')
+    );
+    tool.pending = false;
+    tool.failure = translate('gallery.videoReview.annotationEffectsUnsupported');
+    tool.retryable = false;
+    await render('advanced');
+    expect(host.querySelector('[role="alert"] button')).toBeNull();
+    expect(selector().disabled).toBe(false);
+    tool.failure = translate('gallery.videoReview.annotationEffectsAddFailed');
+    tool.retryable = true;
+    await render('advanced');
+    await act(async () => host.querySelector<HTMLButtonElement>('[role="alert"] button')!.click());
+    expect(tool.onRetry).not.toHaveBeenCalled();
+    act(() => admitted?.());
+    expect(tool.onRetry).toHaveBeenCalledOnce();
   } finally {
     await act(async () => root.unmount());
     host.remove();

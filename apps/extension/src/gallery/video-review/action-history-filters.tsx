@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+import { reviewActionLane } from '../../features/video/review/action-lanes';
 import { isReviewClick } from '../../features/video/review/click-animation';
 import { isReviewKey } from '../../features/video/review/key-animation';
 import { reviewActionAudioTarget } from '../../features/video/review/action-audio';
@@ -16,7 +17,7 @@ export function historySelectableKey(marker: ReviewTelemetryMarker): string | nu
 }
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import type { ReviewKeyAnimation } from '../../features/video/review/advanced/key-animation';
-import { reviewEventLabel, reviewSelectFieldClassName } from './controls';
+import { reviewEventLabel, reviewMouseButtonLabel, reviewSelectFieldClassName } from './controls';
 
 export interface HistoryFilterValues {
   query: string;
@@ -25,31 +26,28 @@ export interface HistoryFilterValues {
   type: string;
   status: string;
   longer: number;
+  button?: string;
 }
 
 /** Event capabilities normalize hidden criteria in both presentation and actual queries. */
 function historyFilterState(markers: readonly ReviewTelemetryMarker[], value: HistoryFilterValues) {
-  const matching = markers.filter(
-    (marker) =>
-      value.type === 'all' ||
-      (value.type === 'clicks' ? isReviewClick(marker) : marker.eventType === value.type)
-  );
+  markers = markers.filter((marker) => reviewActionLane(marker) !== null);
+  const matching = markers.filter((marker) => matchesHistoryType(marker, value.type));
   const all = value.type === 'all';
-  const target = all || value.type === 'clicks' || matching.some(isReviewClick);
+  const target = all || value.type === 'clicks' || matching.some(historyHasTarget);
   const targetType = target ? value.targetType : 'all';
   const targets = matching.filter(
     (marker) =>
       targetType === 'all' ||
-      (isReviewClick(marker) && (marker.targetSemantics?.kind ?? 'unknown') === targetType)
+      (historyHasTarget(marker) && (marker.targetSemantics?.kind ?? 'unknown') === targetType)
   );
   const element =
-    target && targets.some((marker) => isReviewClick(marker) && marker.target === value.element)
+    target && targets.some((marker) => historyHasTarget(marker) && marker.target === value.element)
       ? (value.element ?? '')
       : '';
   const scoped = element
-    ? targets.filter((marker) => isReviewClick(marker) && marker.target === element)
+    ? targets.filter((marker) => historyHasTarget(marker) && marker.target === element)
     : targets;
-  const pointScope = targetType !== 'all' || !!element || value.type === 'clicks';
   const animation =
     all ||
     value.type === 'clicks' ||
@@ -65,13 +63,16 @@ function historyFilterState(markers: readonly ReviewTelemetryMarker[], value: Hi
         : 'all';
   const capabilities = {
     target,
+    button: matching.some((marker) => marker.mouseButton !== undefined),
     animation,
     selectable,
     duration:
       status === 'all' &&
-      !pointScope &&
       scoped.some(
-        (marker) => !isReviewClick(marker) && !isReviewKey(marker) && marker.end > marker.start
+        (marker) =>
+          (!isReviewClick(marker) || !!marker.gesture) &&
+          !isReviewKey(marker) &&
+          marker.end > marker.start
       ),
   };
   return {
@@ -79,6 +80,7 @@ function historyFilterState(markers: readonly ReviewTelemetryMarker[], value: Hi
     value: {
       ...value,
       targetType,
+      button: capabilities.button ? (value.button ?? 'all') : 'all',
       element,
       status,
       longer: capabilities.duration ? value.longer : 0,
@@ -105,7 +107,12 @@ export function HistoryFilters({
   const normalized = historyFilterState(markers, value).value;
   const { query, type, status, longer, targetType, element } = normalized;
   const active =
-    !!element || targetType !== 'all' || type !== 'all' || status !== 'all' || longer > 0;
+    !!element ||
+    targetType !== 'all' ||
+    type !== 'all' ||
+    status !== 'all' ||
+    longer > 0 ||
+    normalized.button !== 'all';
   return (
     <>
       <div className="flex items-center gap-1">
@@ -150,6 +157,7 @@ export function queryHistory(
   selected: readonly string[],
   keyAnimations: ReadonlyMap<string, ReviewKeyAnimation>
 ) {
+  markers = markers.filter((marker) => reviewActionLane(marker) !== null);
   filters = historyFilterState(markers, filters).value;
   const eligible = new Set(
     markers.map(historySelectableKey).filter((key): key is string => key !== null)
@@ -188,19 +196,33 @@ function matchesRecordedMetadata(
 ) {
   const targetMatches =
     filters.targetType === 'all' ||
-    (isReviewClick(marker) && (marker.targetSemantics?.kind ?? 'unknown') === filters.targetType);
+    (historyHasTarget(marker) &&
+      (marker.targetSemantics?.kind ?? 'unknown') === filters.targetType);
   return (
-    (filters.type === 'all' ||
-      (filters.type === 'clicks' ? isReviewClick(marker) : marker.eventType === filters.type)) &&
+    matchesHistoryType(marker, filters.type) &&
+    ((filters.button ?? 'all') === 'all' || String(marker.mouseButton) === filters.button) &&
     targetMatches &&
-    (!filters.element || (isReviewClick(marker) && marker.target === filters.element)) &&
+    (!filters.element || (historyHasTarget(marker) && marker.target === filters.element)) &&
     (!filters.longer || marker.end - marker.start > filters.longer) &&
     historySearchText(marker).includes(needle)
   );
 }
 
+function historyHasTarget(marker: ReviewTelemetryMarker) {
+  return isReviewClick(marker) || marker.gesture !== undefined;
+}
+
+function matchesHistoryType(marker: ReviewTelemetryMarker, type: string) {
+  if (type === 'all') return true;
+  if (type === 'clicks') return marker.eventType === 'CLICK' || marker.eventType === 'DOUBLE_CLICK';
+  if (type === 'keyboard') return reviewActionLane(marker) === 0;
+  if (type === 'mouse') return reviewActionLane(marker) === 1;
+  if (type === 'cursor-family') return reviewActionLane(marker) === 2;
+  return marker.eventType === type;
+}
+
 function historySearchText(marker: ReviewTelemetryMarker): string {
-  const targetLabel = isReviewClick(marker)
+  const targetLabel = historyHasTarget(marker)
     ? translate(`gallery.videoReview.target_${marker.targetSemantics?.kind ?? 'unknown'}`)
     : '';
   const searchable =
@@ -270,7 +292,7 @@ function HistoryFilterFields({
   const elements = Array.from(
     new Set([
       ...elementMarkers
-        .filter(isReviewClick)
+        .filter(historyHasTarget)
         .flatMap((marker) => (marker.target ? [marker.target] : [])),
       ...(element ? [element] : []),
     ])
@@ -284,9 +306,14 @@ function HistoryFilterFields({
         options={[
           { value: 'all', label: translate('gallery.videoReview.historyAll') },
           { value: 'clicks', label: translate('gallery.videoReview.historyClicks') },
+          { value: 'keyboard', label: translate('gallery.videoReview.historyKeyboard') },
+          { value: 'mouse', label: translate('gallery.videoReview.historyMouse') },
+          { value: 'cursor-family', label: translate('gallery.videoReview.historyCursor') },
           ...Array.from(
             new Set(
-              markers.filter((marker) => !isReviewClick(marker)).map((marker) => marker.eventType)
+              markers
+                .filter((marker) => reviewActionLane(marker) !== null && !isReviewClick(marker))
+                .map((marker) => marker.eventType)
             )
           ).map((value) => ({ value, label: reviewEventLabel(value) })),
         ]}
@@ -294,6 +321,29 @@ function HistoryFilterFields({
           onChange({ type: value });
         }}
       />
+      {capabilities.button ? (
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.historyButton')}
+          value={value.button ?? 'all'}
+          options={[
+            { value: 'all', label: translate('gallery.videoReview.historyAll') },
+            ...Array.from(
+              new Set(
+                markers.flatMap((marker) =>
+                  marker.mouseButton === undefined ? [] : [marker.mouseButton]
+                )
+              )
+            )
+              .sort((a, b) => a - b)
+              .map((button) => ({
+                value: String(button),
+                label: reviewMouseButtonLabel(button),
+              })),
+          ]}
+          onChange={(button) => onChange({ button })}
+        />
+      ) : null}
       {capabilities.target ? (
         <SelectField
           className={reviewSelectFieldClassName}
@@ -304,7 +354,7 @@ function HistoryFilterFields({
             ...Array.from(
               new Set(
                 markers
-                  .filter(isReviewClick)
+                  .filter(historyHasTarget)
                   .map((marker) => marker.targetSemantics?.kind ?? 'unknown')
               )
             ).map((kind) => ({

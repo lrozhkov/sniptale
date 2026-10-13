@@ -1,3 +1,6 @@
+import { isReviewKey } from './key-animation';
+import { iterateRecordingKeyboardRhythm } from '../project/keyboard-rhythm';
+import type { RecordingKeyboardRhythmBlock } from '../project/types/interaction';
 import { ACTION_SOUND_CATALOG, type ActionSoundSampleId } from './action-audio-catalog';
 import { actionAudioSeed, iterateActionTypingWindow } from './action-audio-generator';
 import {
@@ -23,7 +26,14 @@ type DescriptorBase = {
 };
 type SampleDescriptor = DescriptorBase & { kind: 'sample'; sampleId: ActionSoundSampleId };
 type TypingDescriptor = DescriptorBase & { kind: 'typing'; seed: number };
-type Descriptor = SampleDescriptor | TypingDescriptor;
+type RecordedDescriptor = DescriptorBase & {
+  kind: 'recorded';
+  block: RecordingKeyboardRhythmBlock;
+  run: KeptRun;
+  offset: number;
+  queryBounds: Bounds;
+};
+type Descriptor = SampleDescriptor | TypingDescriptor | RecordedDescriptor;
 
 /** Compact main-time descriptions; generator state and PCM never enter saved workspace content. */
 export interface ReviewActionAudioPlan {
@@ -58,18 +68,30 @@ export class ReviewActionAudioUnavailable extends Error {
 export function reviewActionAudioTarget(
   marker: ReviewTelemetryMarker
 ): ReviewActionAudioTarget | null {
-  if (marker.ref.kind === 'cursor') return null;
+  if (marker.ref.kind === 'cursor' || marker.privacy === 'protected' || marker.keyboardHold)
+    return null;
   const family =
     marker.ref.kind === 'action'
-      ? marker.eventType === 'CLICK' || marker.eventType === 'DOUBLE_CLICK'
+      ? marker.audio?.family === 'mouse' ||
+        marker.gesture ||
+        marker.eventType === 'CLICK' ||
+        marker.eventType === 'DOUBLE_CLICK'
         ? 'mouse'
-        : marker.eventType === 'KEY'
+        : isReviewKey(marker)
           ? 'keyboard'
           : null
       : marker.eventType === 'typing'
         ? 'typing'
         : null;
-  return family ? { ref: { kind: marker.ref.kind, id: marker.ref.id }, family } : null;
+  return family
+    ? {
+        ref: { kind: marker.ref.kind, id: marker.ref.id },
+        family,
+        ...(marker.observed || marker.gesture || marker.keyboardAttack || marker.keyboardRhythm
+          ? { recorded: true }
+          : {}),
+      }
+    : null;
 }
 
 type KeptRun = {
@@ -156,12 +178,18 @@ export function buildReviewActionAudioPlan(args: {
       reviewActionAudioPresetFamily(setting.presetId) !== target.family
     )
       continue;
-    if (target.family === 'typing') {
+    if (setting.presetId === 'typing-recorded-v2') {
+      for (const descriptor of recordedDescriptors(marker, setting, target.ref, runs))
+        descriptors.push(descriptor);
+    } else if (target.family === 'typing') {
       for (const descriptor of typingDescriptors(marker, setting, target.ref, runs))
         descriptors.push(descriptor);
     } else {
       for (const descriptor of sampleDescriptors(marker, setting, target.ref, runs))
         descriptors.push(descriptor);
+      if (setting.presetId === 'keyboard-recorded-v2' && setting.includeRepeats)
+        for (const descriptor of recordedDescriptors(marker, setting, target.ref, runs))
+          descriptors.push(descriptor);
     }
   }
   return { duration, descriptors };
@@ -200,6 +228,82 @@ function* sampleDescriptors(
   ref: ReviewActionAudioRef,
   runs: readonly KeptRun[]
 ): Generator<SampleDescriptor> {
+  if (
+    setting.presetId === 'mouse-classic-paired-v2' ||
+    setting.presetId === 'mouse-soft-paired-v2' ||
+    setting.presetId === 'keyboard-recorded-v2'
+  ) {
+    yield* pairedSampleDescriptors(marker, setting, ref, runs);
+  } else yield* illustrativeSampleDescriptors(marker, setting, ref, runs);
+}
+
+function pairedAudioPhases(
+  marker: ReviewTelemetryMarker,
+  setting: ReviewActionAudioSetting,
+  ref: ReviewActionAudioRef
+) {
+  const gesture = marker.gesture;
+  const soft = setting.presetId === 'mouse-soft-paired-v2';
+  const phases: { id: string; time: number; sampleId: ActionSoundSampleId; gain: number }[] = [];
+  if (setting.presetId === 'keyboard-recorded-v2') {
+    if (marker.keyboardAttack)
+      phases.push({
+        id: marker.keyboardAttack.id,
+        time: marker.keyboardAttack.time,
+        sampleId:
+          KEY_SAMPLES[
+            actionAudioSeed(ref, 'keyboard-recorded-v2', marker.keyboardAttack.id) %
+              KEY_SAMPLES.length
+          ]!,
+        gain: 1,
+      });
+  } else if (gesture) {
+    if (setting.downEnabled !== false)
+      phases.push({
+        id: `${gesture.id}:down`,
+        time: gesture.downTime,
+        sampleId: soft ? 'mouse-soft-down-v2' : 'mouse-classic-down-v2',
+        gain: setting.downGain ?? 1,
+      });
+    if (gesture.upTime !== undefined && setting.upEnabled !== false)
+      phases.push({
+        id: `${gesture.id}:up`,
+        time: gesture.upTime,
+        sampleId: soft ? 'mouse-soft-up-v2' : 'mouse-classic-up-v2',
+        gain: setting.upGain ?? 1,
+      });
+  }
+  return phases;
+}
+
+function* pairedSampleDescriptors(
+  marker: ReviewTelemetryMarker,
+  setting: ReviewActionAudioSetting,
+  ref: ReviewActionAudioRef,
+  runs: readonly KeptRun[]
+): Generator<SampleDescriptor> {
+  const phases = pairedAudioPhases(marker, setting, ref);
+  for (const phase of phases) {
+    const run = runs.find((part) => phase.time >= part.sourceStart && phase.time < part.sourceEnd);
+    if (!run || phase.gain <= 0) continue;
+    yield {
+      kind: 'sample',
+      ref: { ...ref },
+      id: JSON.stringify([ref.kind, ref.id, setting.presetId, phase.id]),
+      phaseStart: resultTime(run, phase.time) + setting.offset,
+      bounds: { start: run.start, end: run.end },
+      sampleId: phase.sampleId,
+      volume: setting.volume * phase.gain,
+    };
+  }
+}
+
+function* illustrativeSampleDescriptors(
+  marker: ReviewTelemetryMarker,
+  setting: ReviewActionAudioSetting,
+  ref: ReviewActionAudioRef,
+  runs: readonly KeptRun[]
+): Generator<SampleDescriptor> {
   const run = runs.find((run) => marker.start >= run.sourceStart && marker.start < run.sourceEnd);
   if (!run) return;
   const anchor = resultTime(run, marker.start) + setting.offset;
@@ -220,6 +324,51 @@ function* sampleDescriptors(
       sampleId: phase.sampleId,
       volume: setting.volume * phase.gain,
     };
+  }
+}
+
+function* recordedDescriptors(
+  marker: ReviewTelemetryMarker,
+  setting: ReviewActionAudioSetting,
+  ref: ReviewActionAudioRef,
+  runs: readonly KeptRun[]
+): Generator<RecordedDescriptor> {
+  const blocks = [
+    ...(marker.keyboardRhythm ?? []),
+    ...(setting.includeRepeats ? (marker.keyboardRepeats ?? []) : []),
+  ];
+  for (const block of blocks) {
+    const elapsed =
+      block.encoding === 'delta'
+        ? block.ticks.reduce((sum, tick) => sum + tick, 0)
+        : block.ticks.reduce(
+            (sum, tick, index) => (index % 2 === 0 ? sum + tick * block.ticks[index + 1]! : sum),
+            0
+          );
+    const blockEnd = block.startTime + elapsed / 1000;
+    for (const run of runs) {
+      if (block.startTime >= run.sourceEnd || blockEnd < run.sourceStart) continue;
+      const first = resultTime(run, Math.max(run.sourceStart, block.startTime)) + setting.offset;
+      const last = resultTime(run, Math.min(run.sourceEnd, blockEnd)) + setting.offset;
+      const queryBounds = {
+        start: first,
+        end:
+          last +
+          Math.max(...KEY_SAMPLES.map((id) => ACTION_SOUND_CATALOG[id].durationFrames / 44100)),
+      };
+      yield {
+        kind: 'recorded',
+        block,
+        run,
+        queryBounds,
+        offset: setting.offset,
+        ref: { ...ref },
+        id: JSON.stringify([ref.kind, ref.id, setting.presetId, block.id]),
+        phaseStart: 0,
+        bounds: { start: run.start, end: run.end },
+        volume: setting.volume,
+      };
+    }
   }
 }
 
@@ -254,6 +403,27 @@ function* descriptorCues(descriptor: Descriptor, window: Bounds): Generator<Revi
   if (descriptor.kind === 'sample') {
     const cue = clipCue(descriptor, descriptor.id, descriptor.sampleId, descriptor.phaseStart);
     if (cue && cue.start < window.end && cue.end > window.start) yield cue;
+    return;
+  }
+  if (descriptor.kind === 'recorded') {
+    const run = descriptor.run;
+    if (descriptor.queryBounds.end <= window.start || descriptor.queryBounds.start >= window.end)
+      return;
+    for (const attack of iterateRecordingKeyboardRhythm(
+      descriptor.block,
+      run.sourceStart,
+      run.sourceEnd
+    )) {
+      if (attack.time >= run.sourceEnd) continue;
+      const time = resultTime(run, attack.time) + descriptor.offset;
+      if (time >= window.end) break;
+      const sampleId =
+        KEY_SAMPLES[
+          actionAudioSeed(descriptor.ref, 'typing-recorded-v2', attack.id) % KEY_SAMPLES.length
+        ]!;
+      const cue = clipCue(descriptor, JSON.stringify([descriptor.id, attack.id]), sampleId, time);
+      if (cue && cue.start < window.end && cue.end > window.start) yield cue;
+    }
     return;
   }
   for (const event of iterateActionTypingWindow(

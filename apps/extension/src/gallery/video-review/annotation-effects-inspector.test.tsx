@@ -135,12 +135,17 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
     expect(host.textContent).toContain(
       resolveEffectLocaleText(value.document.label, getCurrentLocale())
     );
-    for (const control of value.document.controls)
+    for (const control of value.document.controls) {
       expect(
         host.querySelector(
           `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]`
         )
       ).not.toBeNull();
+      if (control.kind === 'number' && !control.options?.length)
+        expect(
+          input(`${resolveEffectLocaleText(control.label, getCurrentLocale())} range`)
+        ).not.toBeNull();
+    }
     const expected = new Set(
       value.document.controls.map((control) => `sdk:${control.group ?? 'parameters'}`)
     );
@@ -179,7 +184,7 @@ it('applies an SDK visual preset without changing text, geometry or fixed anchor
     trigger.click();
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   });
-  const option = document.body.querySelector<HTMLButtonElement>('[role="option"]');
+  const option = document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')[1];
   if (!option) throw new Error('Missing preset option');
   await act(async () => option.click());
   const patch = vi.mocked(value.editor.change).mock.lastCall?.[1];
@@ -252,12 +257,12 @@ it('shows unavailable immutable source and disables pending controls without rep
   );
 });
 
-it('disables unsupported attachment conversion and restores it when the shear is removed', async () => {
+it('disables reflected attachment conversion and restores it when valid geometry returns', async () => {
   const value = fixture('title');
   value.editor.geometry = {
     ...geometry,
-    contentToViewport: [2, 0.5, 0, 0, 2, 0, 0, 0, 1],
-    viewportToContent: [0.5, -0.125, 0, 0, 0.5, 0, 0, 0, 1],
+    contentToViewport: [-2, 0.5, 0, 0, 2, 0, 0, 0, 1],
+    viewportToContent: [-0.5, 0.125, 0, 0, 0.5, 0, 0, 0, 1],
   };
   render(value);
   expect(host.textContent).toContain(
@@ -340,3 +345,107 @@ it.each(['save', 'edit', 'acquisition'] as const)(
     expect(value.editor.flush).not.toHaveBeenCalled();
   }
 );
+
+it('offers bounded scrub tracks in displayed units without changing authored values', () => {
+  const value = fixture('callout');
+  value.instance.transform.x = 5;
+  render(value);
+  const x = input(`${translate('gallery.videoReview.annotationX')} range`);
+  expect([x.min, x.max, x.value]).toEqual(['-100', '500', '500']);
+  const width = input(`${translate('gallery.videoReview.annotationWidth')} range`);
+  expect([width.min, width.max, width.value]).toEqual(['0.01', '200', '40']);
+  const start = input(`${translate('gallery.videoReview.annotationStart')} range`);
+  expect([start.min, start.max, start.value]).toEqual(['0', '3.999', '0']);
+  const handle = value.document.objectLayout!.handles![0]!;
+  const control = value.document.controls.find((item) => item.id === handle.xControl)!;
+  const anchor = input(`${resolveEffectLocaleText(control.label, getCurrentLocale())} range`);
+  expect(Number(anchor.min)).toBe(
+    Math.min(-value.document.objectLayout!.width, Number(anchor.value))
+  );
+  expect(Number(anchor.max)).toBe(2 * value.document.objectLayout!.width);
+  expect(value.editor.beginGesture).not.toHaveBeenCalled();
+  expect(value.editor.change).not.toHaveBeenCalled();
+});
+
+it.each(['pointerup', 'pointercancel', 'Escape'] as const)(
+  'keeps scrub proposals in one annotation draft and handles %s',
+  (ending) => {
+    const value = fixture('callout');
+    value.instance.transform.x = 5;
+    render(value);
+    const node = input(`${translate('gallery.videoReview.annotationX')} range`);
+    act(() => node.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    type(node, '420');
+    value.instance.transform.x = 4.2;
+    render(value);
+    type(node, '410');
+    expect(node.max).toBe('500');
+    expect(value.editor.beginGesture).toHaveBeenCalledOnce();
+    expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
+      transform: { ...value.instance.transform, x: 4.1 },
+    });
+    expect(value.editor.commitGesture).not.toHaveBeenCalled();
+    if (ending === 'Escape') {
+      act(() => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+      act(() => node.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true })));
+    } else act(() => node.dispatchEvent(new MouseEvent(ending, { bubbles: true })));
+    if (ending === 'pointerup') expect(value.editor.commitGesture).toHaveBeenCalledOnce();
+    else {
+      expect(value.editor.cancelGesture).toHaveBeenCalledOnce();
+      expect(value.editor.commitGesture).not.toHaveBeenCalled();
+    }
+  }
+);
+
+it('derives the preset label from accepted controls across rerender and reopening the menu', async () => {
+  const value = fixture('callout');
+  const preset = value.document.controlPresets![0]!;
+  value.instance.controls = { ...value.instance.controls, ...preset.values };
+  render(value);
+  const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.getAttribute('aria-label') === translate('gallery.videoReview.annotationPresets')
+  )!;
+  expect(trigger.textContent).toContain(resolveEffectLocaleText(preset.label, getCurrentLocale()));
+  value.instance.controls['title'] = 'Changed text';
+  value.instance.transform.x = 0.2;
+  render(value);
+  expect(trigger.textContent).toContain(resolveEffectLocaleText(preset.label, getCurrentLocale()));
+  await act(async () => {
+    trigger.click();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+  expect(
+    document.body.querySelector('[role="option"][aria-selected="true"]')?.textContent
+  ).toContain(resolveEffectLocaleText(preset.label, getCurrentLocale()));
+  expect(value.editor.change).not.toHaveBeenCalled();
+});
+
+it('preserves admitted unbounded SDK fields without inventing a range', () => {
+  const value = fixture('callout');
+  const document = structuredClone(value.document);
+  const control = document.controls.find((item) => item.id === 'font');
+  if (!control || control.kind !== 'number') throw new Error('Missing numeric fixture');
+  delete control.min;
+  delete control.max;
+  render(value, JSON.stringify(document));
+  const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+  expect(input(label)).not.toBeNull();
+  expect(host.querySelector(`input[aria-label="${label} range"]`)).toBeNull();
+  expect(value.editor.beginGesture).not.toHaveBeenCalled();
+});
+
+it('keeps bound anchors and scale dimensions disabled without geometry, while plain SDK fields retain scrub', () => {
+  const value = fixture('callout');
+  value.editor.geometry = null;
+  render(value);
+  expect(input(translate('gallery.videoReview.annotationWidth')).disabled).toBe(true);
+  const handle = value.document.objectLayout!.handles![0]!;
+  const bound = value.document.controls.find((item) => item.id === handle.xControl)!;
+  expect(input(resolveEffectLocaleText(bound.label, getCurrentLocale())).disabled).toBe(true);
+  const font = value.document.controls.find((item) => item.id === 'font')!;
+  expect(input(`${resolveEffectLocaleText(font.label, getCurrentLocale())} range`).disabled).toBe(
+    false
+  );
+  render(value, value.source, true);
+  expect(host.querySelectorAll('input[type="range"]')).toHaveLength(0);
+});

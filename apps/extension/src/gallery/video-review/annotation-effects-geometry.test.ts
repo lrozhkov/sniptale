@@ -31,6 +31,7 @@ import {
   reviewAnnotationBodyGeometry,
   convertReviewAnnotationAttachment,
   changeReviewAnnotationBoundControl,
+  previewReviewAnnotationDrag,
 } from './annotation-effects-geometry';
 
 const source = { width: 640, height: 360 };
@@ -171,7 +172,7 @@ it('preserves a rotated visible box and external fixed anchors through affine at
   expect(reviewAnnotationBodyGeometry(moved, document, geometry)?.handles).toEqual(before.handles);
 });
 
-it('retains perspective gestures, rejects unrepresentable attachment and recovers after tilt removal', () => {
+it('retains perspective gestures and admits local attachment flattening before and after tilt removal', () => {
   const region = {
     ...createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 2, endMax: 4 }),
     transform: camera,
@@ -186,7 +187,7 @@ it('retains perspective gestures, rejects unrepresentable attachment and recover
   const document = builtin('callout');
   const original = instance(document);
   expect(reviewAnnotationBodyGeometry(original, document, tilted)).not.toBeNull();
-  expect(convertReviewAnnotationAttachment(original, 'viewport', tilted)).toBeNull();
+  expect(convertReviewAnnotationAttachment(original, 'viewport', tilted)).not.toBeNull();
   const flat = createReviewAnnotationGeometry({
     source,
     output,
@@ -249,3 +250,93 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
     ).toEqual([]);
   }
 );
+
+it('projects independent anchors exactly in both directions while locally flattening the body', () => {
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 2, endMax: 4 }),
+    transform: camera,
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: -45 },
+  };
+  const geometry = createReviewAnnotationGeometry({
+    source,
+    output,
+    camera: quickEditSpatialTargetCamera(region),
+    background: { enabled: false },
+  })!;
+  const original = instance();
+  const changed = convertReviewAnnotationAttachment(original, 'viewport', geometry)!;
+  expect(changed).toMatchObject({
+    id: original.id,
+    snapshotId: original.snapshotId,
+    controls: original.controls,
+    start: original.start,
+    end: original.end,
+  });
+  for (const [id, anchor] of Object.entries(original.anchors!)) {
+    const expected = projectQuickEditPoint(geometry.contentToViewport, {
+      x: anchor.x * source.width,
+      y: anchor.y * source.height,
+    })!;
+    closePoint(
+      { x: changed.anchors![id]!.x * output.width, y: changed.anchors![id]!.y * output.height },
+      expected
+    );
+  }
+  const restored = convertReviewAnnotationAttachment(changed, 'content', geometry)!;
+  for (const [id, anchor] of Object.entries(original.anchors!))
+    closePoint(restored.anchors![id], anchor);
+});
+
+it('refuses an independently mapped anchor outside the persisted bounds without changing the source', () => {
+  const geometry = createReviewAnnotationGeometry({
+    source,
+    output,
+    camera,
+    background: { enabled: false },
+  })!;
+  geometry.contentToViewport = [40, 0, 0, 0, 40, 0, 0, 0, 1];
+  const original = instance();
+  for (const id of Object.keys(original.anchors!)) original.anchors![id] = { x: 0.9, y: 0.9 };
+  const before = structuredClone(original);
+  expect(convertReviewAnnotationAttachment(original, 'viewport', geometry)).toBeNull();
+  expect(original).toEqual(before);
+});
+
+it('keeps a rotated resize opposite corner fixed and rotates around the body center', () => {
+  const document = builtin('frame');
+  const original = instance(document);
+  const geometry = createReviewAnnotationGeometry({
+    source,
+    output,
+    camera,
+    background: { enabled: false },
+  })!;
+  const before = reviewAnnotationBodyGeometry(original, document, geometry)!;
+  const start = { x: 320, y: 180 };
+  const resize = previewReviewAnnotationDrag({
+    instance: original,
+    document,
+    geometry,
+    start,
+    point: { x: start.x + 20, y: start.y + 10 },
+    kind: 'resize',
+  })!;
+  const after = reviewAnnotationBodyGeometry({ ...original, ...resize }, document, geometry)!;
+  closePoint(after.corners[0], before.corners[0]!);
+  expect(after.box.width).toBeGreaterThan(before.box.width);
+  const center = {
+    x: (transform.x + transform.width / 2) * source.width,
+    y: (transform.y + transform.height / 2) * source.height,
+  };
+  const rotated = previewReviewAnnotationDrag({
+    instance: original,
+    document,
+    geometry,
+    start: { x: center.x + 20, y: center.y },
+    point: { x: center.x, y: center.y + 20 },
+    kind: 'rotate',
+  })!;
+  expect(rotated.transform?.rotation).toBeCloseTo(transform.rotation + Math.PI / 2, 8);
+  expect(rotated.transform).toMatchObject({ x: transform.x, y: transform.y });
+  expect(original.transform).toEqual(transform);
+});

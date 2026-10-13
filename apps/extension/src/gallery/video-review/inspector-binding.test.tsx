@@ -2,17 +2,33 @@
 import { act, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import type { ReviewActionHistory } from './action-history';
 import type { ReviewOriginalSpeechPanel } from './speech-panel';
 import type { ReviewSelectedProperties } from './selected-properties';
 import { ReviewInspectorBinding } from './inspector-binding';
+import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
+import { translate } from '../../platform/i18n';
 
 vi.mock('./inspector', () => ({
-  ReviewInspector: (props: { speech: ReactNode; children: ReactNode }) => (
+  ReviewInspector: (props: {
+    speech: ReactNode;
+    actionHistory: ReactNode;
+    children: ReactNode;
+  }) => (
     <div>
       {props.speech}
+      {props.actionHistory}
       {props.children}
     </div>
+  ),
+}));
+vi.mock('./action-history', () => ({
+  ReviewActionHistory: (props: ComponentProps<typeof ReviewActionHistory>) => (
+    <button disabled={!props.markers.length} onClick={() => props.onSelect(props.markers[0]!)}>
+      Choose recorded event
+    </button>
   ),
 }));
 vi.mock('./speech-panel', () => ({
@@ -30,6 +46,14 @@ vi.mock('./selected-properties', () => ({
       <button onClick={() => void props.flushAdvanced?.()}>Flush clip buffers</button>
       <button onClick={() => props.onSelectText?.('related')}>Open related text</button>
       <button onClick={() => props.onSelectText?.('missing')}>Open missing text</button>
+      <button onClick={() => props.onPreviewFrame?.(2)}>Preview source frame</button>
+      <button
+        onClick={() =>
+          props.onFocus(createQuickEditZoomRegion({ id: 'history-focus', at: 1, duration: 2 }))
+        }
+      >
+        Focus recorded interval
+      </button>
     </>
   ),
   ReviewSelectedTextProperties: () => null,
@@ -53,7 +77,9 @@ it('joins every editor buffer for either recognition source and guards related-t
       advanced,
       activeSelection: { kind: 'audio', id: 'clip', lane: 'voiceover' },
       selection: { kind: 'none' },
-      projected: { markers: [] },
+      projected: {
+        markers: [{ ref: { kind: 'action', id: 'recorded' }, type: 'CLICK', start: 1, end: 1.2 }],
+      },
       snapshot: {
         snapshot: { workspace: { advanced, sourceAssetId: 'source' } },
         document: { annotations: [], edits: [] },
@@ -62,7 +88,10 @@ it('joins every editor buffer for either recognition source and guards related-t
         document: { fragments: [{ id: 'related' }] },
         sourceInterval: () => ({ start: 9, end: 10 }),
       },
-      timeline: { sceneOutputTime: 0, timeMap: { getSegments: () => [] } },
+      timeline: {
+        sceneOutputTime: 0,
+        timeMap: { getSegments: () => [], timelineToSource: (time: number) => time * 2 },
+      },
       composer: {
         flush: async () => {
           order.push('notes');
@@ -78,7 +107,10 @@ it('joins every editor buffer for either recognition source and guards related-t
         if (allowed) action();
       },
       editing: { exporter: { phase: 'idle', index: null } },
-      zoom: {},
+      zoom: { addRegion: vi.fn(() => 'focus'), setSelection: vi.fn() },
+      canStart: () => true,
+      setMode: vi.fn(),
+      setTrackVisibility: vi.fn(),
       features: {},
     },
     canvasComments: {
@@ -87,7 +119,7 @@ it('joins every editor buffer for either recognition source and guards related-t
       },
     },
     audio: { assets: new Map() },
-    navigation: {},
+    navigation: { setSection: vi.fn() },
   } as unknown as ComponentProps<typeof ReviewInspectorBinding>;
   const click = (label: string) =>
     act(async () => {
@@ -113,6 +145,79 @@ it('joins every editor buffer for either recognition source and guards related-t
     expect(select).toHaveBeenCalledWith({ kind: 'text', id: 'related' });
     await click('Seek source phrase');
     expect(seek).toHaveBeenLastCalledWith(3, false);
+    await click('Preview source frame');
+    expect(seek).toHaveBeenLastCalledWith(2, false);
+    await click('Focus recorded interval');
+    expect(props.state.zoom.setSelection).toHaveBeenCalledWith('focus');
+    expect(props.state.setTrackVisibility).toHaveBeenCalledWith('zoom', true);
+    expect(props.state.setMode).toHaveBeenCalledWith('advanced');
+    expect(seek).toHaveBeenLastCalledWith(4, false);
+    allowed = false;
+    const selections = select.mock.calls.length;
+    await click('Choose recorded event');
+    expect(select).toHaveBeenCalledTimes(selections);
+    allowed = true;
+    await click('Choose recorded event');
+    expect(select).toHaveBeenLastCalledWith({
+      kind: 'telemetry',
+      ref: { kind: 'action', id: 'recorded' },
+    });
+    expect(props.navigation.setSection).toHaveBeenCalledWith('selected');
+    expect(seek).toHaveBeenLastCalledWith(1, false);
+
+    const path: CursorFocusPath = {
+      version: 1,
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      mode: 'fixed',
+      gapPolicy: 'hold',
+      segments: [
+        {
+          id: 'segment',
+          binding: { kind: 'project' },
+          start: 0,
+          end: 4,
+          keys: [
+            { id: 'key', time: 1, x: 0.25, y: 0.25, anchor: 'manual', interpolation: 'smooth' },
+          ],
+        },
+      ],
+    };
+    const changePath = vi.fn(),
+      selectKey = vi.fn();
+    const cursorProps: ComponentProps<typeof ReviewInspectorBinding> = {
+      ...props,
+      resource: { ...props.resource, source: { ...props.resource.source, duration: 4 } },
+      state: {
+        ...props.state,
+        activeSelection: { kind: 'cursor-focus', id: 'key', time: 1 },
+        time: 1,
+        busy: false,
+        playing: false,
+        cursorFocusPath: path,
+        setCursorFocusPath: changePath,
+        selectCursorFocusKey: selectKey,
+      },
+    };
+    await act(async () => root.render(<ReviewInspectorBinding {...cursorProps} />));
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>(
+          `[aria-label="${translate('videoEditor.sidebar.cursorFocusAdd')}"]`
+        )!
+        .click()
+    );
+    expect(changePath).toHaveBeenCalledOnce();
+    expect(selectKey).toHaveBeenCalledWith(expect.any(String), 1);
+    expect(changePath.mock.lastCall![0].segments[0].keys).toHaveLength(2);
+    await act(async () =>
+      root.render(
+        <ReviewInspectorBinding {...cursorProps} state={{ ...cursorProps.state, playing: true }} />
+      )
+    );
+    expect(
+      host.querySelector<HTMLFieldSetElement>('[data-ui="cursorFocusPath.inspector"]')!.disabled
+    ).toBe(true);
   } finally {
     await act(async () => root.unmount());
     host.remove();

@@ -19,6 +19,7 @@ interface ReviewReportLabels {
   telemetry: string;
   excluded: string;
   empty: string;
+  cursorSummary(count: number): string;
 }
 
 function microseconds(value: number): number {
@@ -39,6 +40,30 @@ function fenced(value: string, language = '') {
   for (const match of value.matchAll(/`+/g)) length = Math.max(length, match[0].length + 1);
   const fence = '`'.repeat(length);
   return `${fence}${language}\n${value}\n${fence}`;
+}
+
+type ReviewReportCursorSummary =
+  | { availability: 'unavailable' }
+  | {
+      availability: 'present';
+      representation: 'summary';
+      captureMode: NonNullable<RecordingTelemetryEntry['cursorTrack']>['captureMode'];
+      sampleCount: number;
+      includedSampleCount: 0;
+      omittedReason: 'summary-report';
+    };
+
+function cursorSummary(track: RecordingTelemetryEntry['cursorTrack']): ReviewReportCursorSummary {
+  return track
+    ? {
+        availability: 'present',
+        representation: 'summary',
+        captureMode: track.captureMode,
+        sampleCount: track.samples.length,
+        includedSampleCount: 0,
+        omittedReason: 'summary-report',
+      }
+    : { availability: 'unavailable' };
 }
 
 function telemetryData(telemetry: RecordingTelemetryEntry | null) {
@@ -80,24 +105,7 @@ function telemetryData(telemetry: RecordingTelemetryEntry | null) {
       startUs: microseconds(startTime),
       endUs: microseconds(endTime),
     })),
-    cursorTrack: telemetry.cursorTrack
-      ? {
-          ...telemetry.cursorTrack,
-          samples: telemetry.cursorTrack.samples.map(({ time, sourceAnchor, ...sample }) => ({
-            ...sample,
-            timeUs: microseconds(time),
-            ...(sourceAnchor
-              ? {
-                  sourceAnchor: {
-                    ...sourceAnchor,
-                    sourceTime: undefined,
-                    sourceTimeUs: microseconds(sourceAnchor.sourceTime),
-                  },
-                }
-              : {}),
-          })),
-        }
-      : null,
+    cursorTrack: cursorSummary(telemetry.cursorTrack),
   };
 }
 
@@ -142,7 +150,8 @@ export function createVideoReviewReport(args: {
     };
   });
   const payload = {
-    schemaVersion: 'sniptale.video-review.v1',
+    schemaVersion: 'sniptale.video-review.v2',
+    reportKind: 'summary',
     timeUnit: 'us',
     revision: workspace.revision,
     editsState: args.exportReceipt?.revision === workspace.revision ? 'exported' : 'intent',
@@ -212,7 +221,10 @@ export function createVideoReviewReport(args: {
       ].join(''),
     });
   if (args.telemetry)
-    for (const marker of projectReviewTelemetry(args.telemetry, workspace.source.duration).markers)
+    for (const marker of projectReviewTelemetry(
+      { ...args.telemetry, cursorTrack: null },
+      workspace.source.duration
+    ).markers)
       entries.push({ time: marker.start, label: args.labels.telemetry, text: marker.eventType });
   entries.sort((a, b) => a.time - b.time);
   return [
@@ -227,6 +239,9 @@ export function createVideoReviewReport(args: {
           )
           .join('\n\n')
       : args.labels.empty,
+    ...(args.telemetry?.cursorTrack
+      ? [args.labels.cursorSummary(args.telemetry.cursorTrack.samples.length)]
+      : []),
     `## ${args.labels.machineData}`,
     fenced(JSON.stringify(payload, null, 2), 'json'),
     '',

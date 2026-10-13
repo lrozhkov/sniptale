@@ -12,6 +12,7 @@ import {
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
   VIDEO_PROJECTS_STORE,
+  RECORDING_TELEMETRY_STORE,
 } from './core.stores.ts';
 
 // The beta baseline has no predecessor. Every future database version must append a complete,
@@ -587,6 +588,41 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     validate(db) {
       if (!db.objectStoreNames.contains(ASSET_OPERATIONS_STORE))
         throw new Error('Known-source publication recovery is unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'recordings', from: 1, to: 2 },
+      { domainId: 'mediaLibrary', from: 21, to: 22 },
+      { domainId: 'videoProjects', from: 3, to: 4 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 26,
+    toDatabaseVersion: 27,
+    risk: 'additive',
+    stores: [
+      RECORDING_TELEMETRY_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      VIDEO_PROJECTS_STORE,
+    ],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          RECORDING_TELEMETRY_STORE,
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+          VIDEO_PROJECTS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Interaction authoring stores are unavailable.');
       return undefined;
     },
   },

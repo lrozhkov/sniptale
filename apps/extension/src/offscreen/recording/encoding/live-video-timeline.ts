@@ -86,7 +86,7 @@ export class LiveVideoTimeline {
     return timing;
   }
 
-  restart(timestamp: number): void {
+  restart(timestamp: number): number {
     if (!Number.isFinite(timestamp)) throw new Error('Live video timestamp must be finite.');
     if (this.pendingTick !== null) {
       throw new Error('Live video timeline cannot restart with a pending sample.');
@@ -100,6 +100,7 @@ export class LiveVideoTimeline {
     this.pendingTick = this.toFrameTick(timestamp + this.sourceTimestampOffset);
     this.pendingSourceTimestamp = timestamp + this.sourceTimestampOffset;
     this.nextEligibleTimestamp = this.toTimestamp(this.pendingTick + 1);
+    return this.toTimestamp(this.pendingTick);
   }
 
   private toFrameTick(timestamp: number): number {

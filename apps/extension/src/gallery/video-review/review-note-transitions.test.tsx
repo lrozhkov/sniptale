@@ -44,6 +44,11 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<
+      typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspaceWithProjection
+    >[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
@@ -81,7 +86,10 @@ vi.mock('../shared/download', async (importOriginal) => ({
   downloadGalleryBlob: integration.download,
 }));
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
 
 it('saves a new note before editing an existing one and preserves the chosen edit', async () => {
   const fixture = createEditorFixture(integration);

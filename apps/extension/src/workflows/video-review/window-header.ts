@@ -6,6 +6,48 @@ import { windowHeaderGeometry } from '../../features/browser-frame/header';
 import { composeWindowHeaderSvg } from '../../features/browser-frame/appearance';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 
+/** Magnify retains native source density before sampling the joined original. */
+export function reviewWindowRasterBacking(args: {
+  windowRect: QuickEditRect;
+  sourceWidth: number;
+  magnify: boolean;
+}) {
+  const width = Math.max(
+    1,
+    Math.ceil(args.windowRect.width),
+    args.magnify ? Math.ceil(args.sourceWidth) : 0
+  );
+  return {
+    width,
+    height: Math.max(
+      1,
+      Math.ceil(
+        args.magnify
+          ? (args.windowRect.height * width) / args.windowRect.width
+          : args.windowRect.height
+      )
+    ),
+  };
+}
+
+/** The synchronous consumer borrows the original image, never its disposal authority. */
+export type ReviewWindowRaster = Readonly<
+  Pick<ReturnType<typeof createReviewWindowRaster>, 'image' | 'width' | 'height'>
+>;
+
+/** Base scene and sharp effects share one source lease, including exceptional exits. */
+export function withReviewWindowRaster(
+  args: Parameters<typeof createReviewWindowRaster>[0],
+  consume: (raster: ReviewWindowRaster) => void
+): void {
+  const raster = createReviewWindowRaster(args);
+  try {
+    consume({ image: raster.image, width: raster.width, height: raster.height });
+  } finally {
+    raster.release();
+  }
+}
+
 /** Local artwork only: title and address are escaped by the shared compositor, with no remote resources. */
 export function reviewWindowHeaderUrl(
   header: QuickEditWindowHeader,

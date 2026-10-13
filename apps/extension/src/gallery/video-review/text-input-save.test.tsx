@@ -309,10 +309,10 @@ it('retains a failed idle save and retries the current text once', async () => {
   );
 });
 
-it('keeps the existing delay for non-typing text appearance edits', async () => {
+it('uses the shared autosave delay for non-typing text appearance edits', async () => {
   const { commit } = setup();
   act(() => editor.change('phrase', { showInVideo: false }));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(commit).toHaveBeenCalledOnce();
 });
 
@@ -342,7 +342,7 @@ it('does not drain new typing early when an older automatic write acknowledges',
     return persist(args);
   });
   act(() => editor.change('phrase', { showInVideo: false }));
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(commit).toHaveBeenCalledOnce();
   type('New typing');
   await act(async () => release());

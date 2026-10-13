@@ -10,6 +10,7 @@ import {
   quickEditSpatialTargetCamera,
 } from '../../features/video/review/advanced/spatial';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
+import { computeQuickEditWindowTransform } from '../../features/video/review/advanced/scene';
 import {
   projectQuickEditPoint,
   quickEditPlaneProjection,
@@ -207,6 +208,11 @@ it('keeps flat click clipping unchanged and removes spatial mapping after its en
     video: observed.sceneLayout!.videoTransform,
     clip: observed.overlayClip,
     transform: undefined,
+    window: {
+      videoRect: observed.sceneLayout!.videoRect,
+      windowRect: observed.sceneLayout!.windowRect,
+      transform: computeQuickEditWindowTransform(observed.sceneLayout!),
+    },
   });
   await render({ source });
   expect(observed.overlayClip).toBeUndefined();

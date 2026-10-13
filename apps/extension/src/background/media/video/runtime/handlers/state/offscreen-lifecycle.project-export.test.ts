@@ -341,3 +341,25 @@ it('relays the advisory time snapshot without persisting it in the export ledger
     progress: 25,
   });
 });
+
+it('does not publish progress into a completed job or forward its stale state', async () => {
+  const ledger = {
+    status: 'completed',
+    jobId: 'job-1',
+    projectId: 'project-1',
+    ownerDocumentId: 'editor-doc-1',
+    ownerSenderUrl: 'chrome-extension://id/editor.html',
+  };
+  loadActiveProjectExportJobLedgerEntryMock.mockResolvedValueOnce(ledger);
+  handleProjectExportLifecycleMessage(
+    {
+      type: VideoMessageType.PROJECT_EXPORT_PROGRESS,
+      jobId: 'job-1',
+      status: { phase: 'RENDERING', progress: 80, message: 'Rendering' },
+    },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(upsertLedgerMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});

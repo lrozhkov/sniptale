@@ -1,3 +1,21 @@
+import { useVideoEditorStore } from '../../state/store';
+import { createVideoProjectFromRecording } from '../../../features/video/project/factories/creation';
+import { normalizeVideoProjectCursorSkin } from '../../../features/video/project/cursor';
+import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
+import { hydrateVideoProject } from '../../../features/video/project/hydration';
+import {
+  deriveProjectCursorFocusPath,
+  resolveProjectCursorFocus,
+} from '../../../features/video/project/cursor-focus-path/projection';
+import {
+  insertCursorFocusKey,
+  updateCursorFocusKey,
+  authoredCursorFocusPath,
+} from '../../../features/video/project/cursor-focus-path/authoring';
+import {
+  splitProjectClipsAtTimeWithResult,
+  duplicateProjectClipsWithResult,
+} from './clip-timeline/split';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import {
@@ -169,4 +187,145 @@ it('inserts between existing samples and updates the inserted project-time segme
     }),
     expect.objectContaining({ id: 'sample-2' }),
   ]);
+});
+
+function sourceFocusFixture() {
+  return createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'focus.webm',
+    width: 100,
+    height: 100,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+    cursorTrack: {
+      captureMode: 'embedded-fallback',
+      skin: normalizeVideoProjectCursorSkin(undefined),
+      samples: (
+        [
+          ['start', 0, 10, 10, true, 0],
+          ['middle', 1, 40, 50, true, 0],
+          ['loss', 2, 40, 50, false, 0],
+          ['return', 3, 80, 80, true, 1],
+        ] as const
+      ).map(([id, time, x, y, visible, captureSegment]) => ({
+        id,
+        time,
+        x,
+        y,
+        visible,
+        captureSegment,
+        observation: visible ? ('observed' as const) : ('outside' as const),
+        recordingPoint: visible ? { x: x / 100, y: y / 100 } : null,
+      })),
+    },
+  });
+}
+it('source-time focus survives split/speed and duplicate gets its own binding and edits', () => {
+  const project = sourceFocusFixture();
+  const original = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  let authored = applyVideoProjectMutationPatch(project, {
+    cursorFocusPath: authoredCursorFocusPath(deriveProjectCursorFocusPath(project)),
+  });
+  const path = deriveProjectCursorFocusPath(project);
+  authored = applyVideoProjectMutationPatch(authored, {
+    cursorFocusPath: authoredCursorFocusPath(
+      insertCursorFocusKey(path, path.segments[0]!.id, { id: 'manual', time: 0.5, x: 0.25, y: 0.6 })
+    ),
+  });
+  const split = splitProjectClipsAtTimeWithResult(authored, original.id, 0.75)!;
+  expect(resolveProjectCursorFocus(split.project, 0.5)).toMatchObject({ x: 25, y: 60 });
+  const fast = applyVideoProjectMutationPatch(split.project, {
+    clips: split.project.clips.map((clip) =>
+      clip.id === original.id && clip.type === 'VIDEO'
+        ? { ...clip, playbackRate: 2, duration: clip.duration / 2 }
+        : clip
+    ),
+  });
+  expect(resolveProjectCursorFocus(fast, 0.25)).toMatchObject({ x: 25, y: 60 });
+  const duplicate = duplicateProjectClipsWithResult(authored, original.id)!;
+  expect(duplicate.project.cursorFocusPath!.segments).toHaveLength(2);
+  const instances = new Set(
+    duplicate.project.cursorFocusPath!.segments.flatMap((segment) =>
+      segment.binding.kind === 'recording-source' ? [segment.binding.sourceInstanceId] : []
+    )
+  );
+  expect(instances.size).toBe(2);
+  expect(duplicate.project.cursorTrack!.samples.length).toBe(
+    project.cursorTrack!.samples.length * 2
+  );
+  expect(
+    duplicate.project
+      .cursorFocusPath!.segments.flatMap((segment) => segment.keys)
+      .filter((key) => key.id === 'manual')
+  ).toHaveLength(1);
+  const duplicateClip = duplicate.project.clips.find(
+    (clip) => clip.id === duplicate.duplicateClipId
+  )!;
+  const duplicateManual = duplicate.project
+    .cursorFocusPath!.segments.flatMap((segment) => segment.keys)
+    .find((key) => key.anchor === 'manual' && key.id !== 'manual')!;
+  const separatelyAuthored = applyVideoProjectMutationPatch(duplicate.project, {
+    cursorFocusPath: updateCursorFocusKey(duplicate.project.cursorFocusPath!, duplicateManual.id, {
+      x: 0.9,
+    }),
+  });
+  expect(resolveProjectCursorFocus(separatelyAuthored, 0.5)).toMatchObject({ x: 25, y: 60 });
+  expect(
+    resolveProjectCursorFocus(separatelyAuthored, duplicateClip.startTime + 0.5)
+  ).toMatchObject({ x: 90, y: 60 });
+});
+
+it('keeps original source focus after deleting a split head; duplicate edits stay independent', () => {
+  const initial = useVideoEditorStore.getState();
+  try {
+    const project = sourceFocusFixture();
+    const original = project.clips.find((clip) => clip.type === 'VIDEO')!;
+    const derived = deriveProjectCursorFocusPath(project);
+    const authored = applyVideoProjectMutationPatch(project, {
+      cursorFocusPath: authoredCursorFocusPath(
+        insertCursorFocusKey(derived, derived.segments[1]!.id, {
+          id: 'tail-focus',
+          time: 3.5,
+          x: 0.6,
+          y: 0.7,
+        })
+      ),
+    });
+    useVideoEditorStore.getState().setProject(authored);
+    useVideoEditorStore.getState().duplicateClip(original.id);
+    let snapshot = useVideoEditorStore.getState().project!;
+    const duplicate = snapshot.clips.find(
+      (clip) => clip.type === 'VIDEO' && clip.id !== original.id
+    )!;
+    const duplicateKey = snapshot
+      .cursorFocusPath!.segments.flatMap((segment) => segment.keys)
+      .find((key) => key.anchor === 'manual' && key.id !== 'tail-focus')!;
+    useVideoEditorStore.getState().updateProject((current) =>
+      applyVideoProjectMutationPatch(current, {
+        cursorFocusPath: updateCursorFocusKey(current.cursorFocusPath!, duplicateKey.id, {
+          x: 0.9,
+        }),
+      })
+    );
+    useVideoEditorStore.getState().splitClipAt(original.id, 2);
+    snapshot = useVideoEditorStore.getState().project!;
+    const returnBefore = snapshot.cursorTrack!.samples.find((sample) => sample.id === 'return')!;
+    expect(returnBefore.sourceAnchor).toBeDefined();
+    useVideoEditorStore.getState().deleteClip(original.id);
+    const retained = useVideoEditorStore.getState().project!;
+    expect(resolveProjectCursorFocus(retained, 3)).toMatchObject({ x: 80, y: 80 });
+    expect(resolveProjectCursorFocus(retained, 3.5)).toMatchObject({ x: 60, y: 70 });
+    expect(resolveProjectCursorFocus(retained, duplicate.startTime + 3.5)).toMatchObject({
+      x: 90,
+      y: 70,
+    });
+    expect(retained.cursorTrack!.samples.find((sample) => sample.id === 'return')).toEqual(
+      returnBefore
+    );
+    const reopened = hydrateVideoProject(structuredClone(retained));
+    expect(resolveProjectCursorFocus(reopened, 3.5)).toMatchObject({ x: 60, y: 70 });
+  } finally {
+    useVideoEditorStore.setState(initial, true);
+  }
 });

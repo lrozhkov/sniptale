@@ -20,8 +20,8 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   annotationContentAttachment: { ru: 'К содержимому', en: 'Content' },
   annotationViewportAttachment: { ru: 'К экрану', en: 'Viewport' },
   annotationAttachmentUnavailable: {
-    ru: 'Изменение привязки недоступно при текущем ракурсе',
-    en: 'Attachment change unavailable at this perspective',
+    ru: 'Изменение привязки недоступно для этой геометрии',
+    en: 'Attachment change unavailable for this geometry',
   },
   annotationLayout: { ru: 'Режим размещения', en: 'Layout mode' },
   annotationFullScene: { ru: 'Полная сцена', en: 'Full scene' },
@@ -31,6 +31,7 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   annotationHeight: { ru: 'Высота', en: 'Height' },
   annotationRotation: { ru: 'Поворот', en: 'Rotation' },
   annotationPresets: { ru: 'Варианты оформления', en: 'Visual presets' },
+  annotationCustomPreset: { ru: 'Пользовательский', en: 'Custom' },
   annotationDuplicate: { ru: 'Дублировать', en: 'Duplicate' },
   annotationName: { ru: 'Аннотация', en: 'Annotation' },
   annotationEditFailed: {

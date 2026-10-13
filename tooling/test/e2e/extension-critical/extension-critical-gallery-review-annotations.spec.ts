@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 import { writeFile } from 'node:fs/promises';
@@ -35,10 +35,13 @@ async function drawInterval(page: Page, lane: Locator, start: number, end: numbe
     let top = Math.max(0, bounds.top),
       bottom = Math.min(innerHeight, bounds.bottom);
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-      if (!/auto|scroll|hidden|clip/.test(getComputedStyle(parent).overflowY)) continue;
+      const style = getComputedStyle(parent);
+      if (style.display === 'contents' || !/auto|scroll|hidden|clip/.test(style.overflowY))
+        continue;
       const clip = parent.getBoundingClientRect();
       top = Math.max(top, clip.top);
       bottom = Math.min(bottom, clip.bottom);
+      if (style.position === 'fixed') break;
     }
     if (bottom - top < 2) throw new Error('Annotation lane has no visible hit area');
     return (top + bottom) / 2;
@@ -186,6 +189,7 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     await open();
     await button('gallery.videoReview.advancedEditing').click();
     await expect.poll(async () => (await workspace())?.advanced.ui.mode).toBe('advanced');
+    await expect.poll(async () => (await persistedReviewContent(page))?.zoom.enabled).toBe(true);
     const durableBeforeAdd = JSON.stringify(await workspace());
     const toggleAutosave = async (enabled: boolean) => {
       await dialog.locator('[data-ui="autosave-control"] button').first().click();
@@ -199,29 +203,27 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     };
     await toggleAutosave(false);
     await button('gallery.videoReview.annotationEffectsAdd').click();
+    const typeSelector = button('gallery.videoReview.annotationEffectsChoose');
+    await typeSelector.click();
+    await page.getByRole('option', { name: title, exact: true }).click();
+    expect(JSON.stringify(await workspace())).toBe(durableBeforeAdd);
     await drawInterval(
       page,
       dialog.locator('[data-ui="gallery.videoReview.annotationEffectsLane"]'),
       1,
       7
     );
-    await page
-      .locator('[data-ui="gallery.videoReview.annotationEffectsPicker"]')
-      .getByRole('button', { name: title, exact: true })
-      .click();
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(1);
     expect(JSON.stringify(await workspace())).toBe(durableBeforeAdd);
-    await button('gallery.videoReview.annotationEffectsAdd').click();
+    await typeSelector.click();
+    await page.getByRole('option', { name: templates[0].ru, exact: true }).click();
+    expect(JSON.stringify(await workspace())).toBe(durableBeforeAdd);
     await drawInterval(
       page,
       dialog.locator('[data-ui="gallery.videoReview.annotationEffectsLane"]'),
       1,
       7
     );
-    await page
-      .locator('[data-ui="gallery.videoReview.annotationEffectsPicker"]')
-      .getByRole('button', { name: templates[0].ru, exact: true })
-      .click();
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(2);
     await button('gallery.videoReview.undo').click();
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(1);
@@ -371,6 +373,103 @@ async function resizeInspector(page: Page, dialog: Locator, width: number) {
     .toBe(width);
 }
 
+async function verifyAnnotationControls(
+  page: Page,
+  dialog: Locator,
+  locale: 'ru' | 'en',
+  info: TestInfo
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const inspector = dialog.locator('[data-ui="gallery.videoReview.annotationInspector"]');
+  const workspace = () => readNativeReviewWorkspace(page, 'recording:beta-v1-recording');
+  const field = inspector.getByRole('textbox', {
+    name: label('gallery.videoReview.annotationX'),
+    exact: true,
+  });
+  const slider = inspector.getByRole('slider', {
+    name: `${label('gallery.videoReview.annotationX')} range`,
+    exact: true,
+  });
+  const reveal = async () => {
+    await field.scrollIntoViewIfNeeded();
+    await field
+      .locator('xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"]')
+      .hover();
+    await expect(slider).toBeVisible();
+    await slider.focus();
+  };
+  const before = (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x;
+  const cursor = (await workspace())!.cursor;
+  await reveal();
+  await page.keyboard.down('ArrowRight');
+  await page.keyboard.down('ArrowRight');
+  const next = (Math.floor(before * 100 + 1e-10) + 2) / 100;
+  await expect(field).toHaveValue(String(next * 100));
+  await page.screenshot({ path: info.outputPath('annotation-scrub-focused.png'), fullPage: false });
+  expect((await workspace())!.cursor).toBe(cursor);
+  await page.keyboard.up('ArrowRight');
+  await expect
+    .poll(
+      async () => (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x
+    )
+    .toBe(next);
+  expect((await workspace())!.cursor).toBe(cursor + 1);
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
+    .click();
+  await expect
+    .poll(
+      async () => (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x
+    )
+    .toBe(before);
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.redo'), exact: true })
+    .click();
+  await expect
+    .poll(
+      async () => (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x
+    )
+    .toBe(next);
+  await reveal();
+  await page.keyboard.down('ArrowRight');
+  await slider.press('Escape');
+  await page.keyboard.up('ArrowRight');
+  expect((await workspace())!.cursor).toBe(cursor + 1);
+  await expect
+    .poll(
+      async () => (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x
+    )
+    .toBe(next);
+  const preset = inspector
+    .locator('[data-ui="shared.ui.compact-inspector.select-field"]')
+    .getByRole('button', {
+      name: label('gallery.videoReview.annotationPresets'),
+      exact: true,
+    });
+  const previousLabel = await preset.textContent();
+  await preset.click();
+  const chosen = page.getByRole('option').nth(2);
+  const selectedLabel = await chosen.textContent();
+  await chosen.click();
+  await expect(preset).toHaveText(selectedLabel!);
+  await expect.poll(async () => (await workspace())!.cursor).toBe(cursor + 2);
+  await preset.click();
+  await expect(page.getByRole('option', { selected: true })).toHaveText(selectedLabel!);
+  await page.screenshot({
+    path: info.outputPath('annotation-preset-selected.png'),
+    fullPage: false,
+  });
+  await preset.press('Escape');
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
+    .click();
+  await expect(preset).toHaveText(previousLabel!);
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.redo'), exact: true })
+    .click();
+  await expect(preset).toHaveText(selectedLabel!);
+}
+
 for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'light' },
   { width: 1920, height: 900, locale: 'en', theme: 'dark' },
@@ -389,7 +488,6 @@ for (const variant of [
       dialog.getByRole('button', { name: label(key), exact: true });
     const lane = dialog.locator('[data-ui="gallery.videoReview.annotationEffectsLane"]');
     const plates = lane.locator('[data-annotation-effect-id]');
-    const picker = page.locator('[data-ui="gallery.videoReview.annotationEffectsPicker"]');
     const workspace = () => readNativeReviewWorkspace(page, 'recording:beta-v1-recording');
     try {
       await applyHarnessBootstrap(page, {
@@ -412,20 +510,44 @@ for (const variant of [
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
+      await expect.poll(async () => (await persistedReviewContent(page))?.zoom.enabled).toBe(true);
       for (const [index, template] of templates.entries()) {
-        await button('gallery.videoReview.annotationEffectsAdd').click();
-        await drawInterval(page, lane, 1, 7);
-        await expect(picker).toBeVisible();
-        await expect(
-          picker.getByRole('button', { name: template[variant.locale], exact: true })
-        ).toBeEnabled();
+        const toggle = button('gallery.videoReview.annotationEffectsAdd');
+        if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+        const selector = button('gallery.videoReview.annotationEffectsChoose');
+        const before = (await workspace())!.cursor;
+        await selector.click();
+        const choice = page.getByRole('option', { name: template[variant.locale], exact: true });
+        await expect(choice).toBeEnabled();
         if (index === 0)
           await page.screenshot({
-            path: info.outputPath('annotation-picker.png'),
+            path: info.outputPath('annotation-type-before-draw.png'),
             fullPage: false,
           });
-        await picker.getByRole('button', { name: template[variant.locale], exact: true }).click();
-        await expect(picker).toHaveCount(0);
+        await choice.click();
+        expect((await workspace())!.cursor).toBe(before);
+        await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+        await expect(button('gallery.videoReview.pointerTool')).toHaveAttribute(
+          'aria-pressed',
+          'false'
+        );
+        if (index === 0) {
+          await lane.focus();
+          await page.keyboard.press('v');
+          await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+          await expect(selector).toHaveCount(0);
+          await expect(button('gallery.videoReview.pointerTool')).toHaveAttribute(
+            'aria-pressed',
+            'true'
+          );
+          expect((await workspace())!.cursor).toBe(before);
+          await toggle.click();
+          await expect(selector).toHaveText(label('gallery.videoReview.annotationEffectsChoose'));
+          await selector.click();
+          await page.getByRole('option', { name: template[variant.locale], exact: true }).click();
+        }
+        await drawInterval(page, lane, 1, 7);
+        await expect(selector).toHaveText(template[variant.locale]);
         await expect(plates).toHaveCount(index + 1);
         await expect(
           dialog.locator('[data-ui="gallery.videoReview.annotationInspector"]')
@@ -436,6 +558,11 @@ for (const variant of [
           )
           .toBe(index + 1);
       }
+      await button('gallery.videoReview.pointerTool').click();
+      await expect(button('gallery.videoReview.annotationEffectsAdd')).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
       const saved = await workspace();
       expect(saved?.effectSnapshots).toHaveLength(6);
       const content = await persistedReviewContent(page);
@@ -493,6 +620,7 @@ for (const variant of [
       await expect(name).toHaveValue(original);
       await button('gallery.videoReview.redo').click();
       await expect(name).toHaveValue('Accepted native field');
+      await verifyAnnotationControls(page, dialog, variant.locale, info);
       if (variant.width === 1920) {
         const initialWidth = await dialog
           .locator('.review-inspector-scroll')

@@ -13,6 +13,12 @@ import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review
 
 /** Caller-owned inputs shared by ordinary and presentation frame export. */
 export interface ReviewFrameExportInput {
+  cursorFacts?: {
+    facts:
+      | import('../../features/video/review/advanced/cursor-focus-path').ReviewCursorFacts
+      | null;
+    source: { width: number; height: number; duration: number };
+  };
   keyCues?: readonly ReviewKeyCue[] | undefined;
   clickCues?: readonly ReviewClickCue[];
   renderSettings?: ReviewRenderSettings | undefined;

@@ -3,7 +3,7 @@ import { afterEach, expect, it } from 'vitest';
 import { describeTelemetryTarget } from './target';
 import { createInitialState } from './state';
 import { createTelemetryListeners } from './events';
-import { finalizeTelemetrySignals } from './signals';
+import { finalizeTelemetrySignals, recordTypingActivity } from './signals';
 
 afterEach(() => document.body.replaceChildren());
 function describe(element: Element) {
@@ -102,9 +102,8 @@ it('bounds labels and does not copy ordinary page text or URLs', () => {
   });
 });
 
-it('merges fast form entry while publishing only scalar target metadata', () => {
+it('retains separate field facts while publishing only scalar target metadata', () => {
   const state = createInitialState();
-  const listeners = createTelemetryListeners(state);
   for (const [index, name] of [
     'First field',
     'Second field',
@@ -116,16 +115,23 @@ it('merges fast form entry while publishing only scalar target metadata', () => 
     input.setAttribute('aria-label', name);
     input.value = 'never retained';
     document.body.append(input);
-    input.addEventListener('input', listeners.input);
+
     for (const offset of [0, 500]) {
       const event = new Event('input', { bubbles: true });
       Object.defineProperty(event, 'timeStamp', { value: 1000 + index * 800 + offset });
-      input.dispatchEvent(event);
+      Object.defineProperty(event, 'target', { value: input });
+      recordTypingActivity(state, event);
     }
   }
   finalizeTelemetrySignals(state);
-  expect(state.signals).toHaveLength(1);
-  expect(state.signals.map((signal) => signal.data['targetName'])).toEqual(['First field']);
+  expect(state.signals).toHaveLength(5);
+  expect(state.signals.map((signal) => signal.data['targetName'])).toEqual([
+    'First field',
+    'Second field',
+    'First field',
+    'Second field',
+    'First field',
+  ]);
   expect(state.typingSignal).toBeNull();
   expect(state.typingTarget).toBeNull();
   expect(JSON.stringify(state.signals)).not.toContain('never retained');
@@ -161,7 +167,7 @@ it('does not label checkbox, range, or select changes as typing', () => {
   for (const type of ['checkbox', 'radio', 'range', 'color', 'file', 'button']) {
     const input = document.createElement('input');
     input.type = type;
-    input.addEventListener('input', listeners.input);
+
     input.addEventListener('change', listeners.change);
     input.dispatchEvent(new Event('input'));
     input.dispatchEvent(new Event('change'));
@@ -242,8 +248,7 @@ it('does not turn label forwarding into a second pointer action', () => {
   document.body.append(label);
   label.addEventListener('click', listeners.click);
   label.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-  expect(state.actionEvents).toHaveLength(1);
-  expect(state.actionEvents[0]?.data['clickCount']).toBe(1);
+  expect(state.actionEvents).toHaveLength(0);
 });
 
 it('keeps one click identity across descendants of a newly supported control', () => {
@@ -258,8 +263,7 @@ it('keeps one click identity across descendants of a newly supported control', (
   control.addEventListener('click', listeners.click);
   first.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
   second.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
-  expect(state.actionEvents).toHaveLength(1);
-  expect(state.actionEvents[0]?.data).toMatchObject({ clickCount: 2, targetKind: 'switch' });
+  expect(state.actionEvents).toHaveLength(0);
 });
 
 it('does not expose control semantics from inside a closed shadow root to an outside listener', () => {

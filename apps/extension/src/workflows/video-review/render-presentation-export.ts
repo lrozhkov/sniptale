@@ -37,6 +37,7 @@ import { createPresentationAudioEncoder } from './processed-audio-encoder';
 import { createReviewMediaOutput } from './media-output';
 import { planReviewExportTime } from './time-estimate-plan';
 import { QuickEditExportUnavailable } from './export-unavailable';
+import { reviewExportPhase, cleanupReviewExportFailure } from './export-diagnostics';
 
 interface PresentationExportPreview {
   window: import('../../features/video/review/presentation-preview').PresentationPreviewWindow;
@@ -50,7 +51,7 @@ type Preparation = Awaited<ReturnType<typeof prepare>>;
 
 async function prepare(args: Args, preview?: PresentationExportPreview) {
   args.signal.throwIfAborted();
-  const effective = resolveQuickEditEffectiveState(args.advanced);
+  const effective = resolveQuickEditEffectiveState(args.advanced, args.cursorFacts);
   if (!effective.presentation) throw new Error('Presentation export is not active');
   const profile = resolveReviewOutputProfile(args.index, args.advanced, args.renderSettings);
   if (!profile.dimensionsSupported) throw new QuickEditExportUnavailable(['canvas-size']);
@@ -308,7 +309,7 @@ function createAudioDrain(
   return async (until: number) => {
     while (state.audio && encoder && audioEnd < until) {
       signal.throwIfAborted();
-      const next = await state.audio.next();
+      const next = await reviewExportPhase(signal, 'audio-prepare', () => state.audio!.next());
       if (next.done) {
         state.audio = null;
         break;
@@ -317,11 +318,11 @@ function createAudioDrain(
         const clone = next.value.clone();
         try {
           clone.setTimestamp(next.value.timestamp - preview.window.audioStart / 48_000);
-          await encoder.add(clone);
+          await reviewExportPhase(signal, 'encode', () => encoder.add(clone));
         } finally {
           clone.close();
         }
-      } else await encoder.add(next.value);
+      } else await reviewExportPhase(signal, 'encode', () => encoder.add(next.value));
       audioEnd =
         next.value.timestamp +
         next.value.numberOfFrames / next.value.sampleRate -
@@ -335,7 +336,7 @@ export async function writeReviewPresentationFrames(
   args: Args,
   preview?: PresentationExportPreview
 ): Promise<ReviewPacketReceipt> {
-  const prepared = await prepare(args, preview);
+  const prepared = await reviewExportPhase(args.signal, 'prepare', () => prepare(args, preview));
   const receipt: ReviewPacketReceipt = {
     videoPackets: 0,
     audioPackets: 0,
@@ -357,7 +358,9 @@ export async function writeReviewPresentationFrames(
     current?.dispose();
   };
   try {
-    renderer = await createRenderer(args, prepared);
+    renderer = await reviewExportPhase(args.signal, 'compose', () =>
+      createRenderer(args, prepared)
+    );
     const onProgress = preview ? args.onProgress : progress(args, prepared);
     if (args.frameProbe) {
       receipt.videoPackets = await renderPresentationVideo({
@@ -373,62 +376,71 @@ export async function writeReviewPresentationFrames(
     const audioArgs = audioInput(args, prepared, renderer);
     if (preview)
       audioArgs.window = { start: preview.window.audioStart, end: preview.window.audioEnd };
-    const sound = await probePresentationAudio(audioArgs, prepared.profile.format);
+    const sound = await reviewExportPhase(args.signal, 'audio-prepare', () =>
+      probePresentationAudio(audioArgs, prepared.profile.format)
+    );
     if (sound.audible && !sound.codec) throw new QuickEditExportUnavailable(['audio-encoder']);
-    if (sound.codec) {
-      encoder = createPresentationAudioEncoder({
-        codec: sound.codec,
-        frameCount: preview
-          ? preview.window.audioEnd - preview.window.audioStart
-          : prepared.plan.segments.at(-1)!.audioEnd,
-        signal: args.signal,
-        onPacket: () => {
-          receipt.audioPackets++;
-        },
-      });
+    const codec = sound.codec;
+    if (codec) {
+      encoder = await reviewExportPhase(args.signal, 'encode', () =>
+        createPresentationAudioEncoder({
+          codec,
+          frameCount: preview
+            ? preview.window.audioEnd - preview.window.audioStart
+            : prepared.plan.segments.at(-1)!.audioEnd,
+          signal: args.signal,
+          onPacket: () => {
+            receipt.audioPackets++;
+          },
+        })
+      );
       audioState.audio = renderPresentationAudio(audioArgs);
       receipt.audioReencoded = true;
       receipt.outputAudioCodec = sound.codec;
       receipt.audioRanges = preview ? [] : audioRanges(prepared.plan, prepared.segments);
     }
     const metadata = preview ? undefined : provenance(args, prepared, !!encoder);
-    const tracks = createMux(args, prepared, encoder, metadata);
+    const tracks = await reviewExportPhase(args.signal, 'encode', () =>
+      createMux(args, prepared, encoder, metadata)
+    );
     output = tracks.output;
     if (tracks.video.kind !== 'sample')
       throw new Error('Presentation video output configuration changed');
     const video = tracks.video.source;
-    await output.start();
+    await reviewExportPhase(args.signal, 'encode', () => output!.start());
     const drainAudio = createAudioDrain(audioState, encoder, args.signal, preview);
-    receipt.videoPackets = await renderPresentationVideo({
-      plan: prepared.plan,
-      renderer,
-      signal: args.signal,
-      adaptive: !preview && args.renderSettings?.frameRateMode === 'adaptive',
-      ...(preview ? { window: preview.window } : {}),
-      ...(onProgress ? { onProgress } : {}),
-      output: {
-        async add(sample) {
-          // At most one <=1s PCM window leads the emitted video sample; native queues stay bounded.
-          await drainAudio(sample.timestamp + sample.duration);
-          args.signal.throwIfAborted();
-          await video.add(sample);
+    const composedRenderer = renderer;
+    receipt.videoPackets = await reviewExportPhase(args.signal, 'compose', () =>
+      renderPresentationVideo({
+        plan: prepared.plan,
+        renderer: composedRenderer,
+        signal: args.signal,
+        adaptive: !preview && args.renderSettings?.frameRateMode === 'adaptive',
+        ...(preview ? { window: preview.window } : {}),
+        ...(onProgress ? { onProgress } : {}),
+        output: {
+          async add(sample) {
+            // At most one <=1s PCM window leads the emitted video sample; native queues stay bounded.
+            await drainAudio(sample.timestamp + sample.duration);
+            args.signal.throwIfAborted();
+            await reviewExportPhase(args.signal, 'encode', () => video.add(sample));
+          },
         },
-      },
-    });
+      })
+    );
     await drainAudio(receipt.resultDuration);
     await audioState.audio?.return(undefined);
     audioState.audio = null;
-    await encoder?.finish();
+    await reviewExportPhase(args.signal, 'encode', () => encoder?.finish());
     video.close();
     args.signal.throwIfAborted();
-    await output.finalize();
+    await reviewExportPhase(args.signal, 'mux-finalize', () => output!.finalize());
     args.signal.throwIfAborted();
     args.onProgress?.(1);
     return receipt;
   } catch (error) {
     disposeEncoder();
-    await output?.cancel().catch(() => undefined);
-    throw error;
+    return await cleanupReviewExportFailure(error, () => output?.cancel());
   } finally {
     try {
       await audioState.audio?.return(undefined);

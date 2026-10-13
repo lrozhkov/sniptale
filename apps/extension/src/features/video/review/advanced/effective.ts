@@ -1,3 +1,9 @@
+import { windowHeaderGeometry } from '../../../browser-frame/header';
+import {
+  deriveReviewCursorFocusPath,
+  resolveReviewCursorFocusPath,
+  type ReviewCursorFacts,
+} from './cursor-focus-path';
 import { resolvePresentationSettings } from './presentation';
 import { resolveOriginalSourceAudio } from './original-audio-mutes';
 import { projectReviewVoiceover } from '../voiceover-edits';
@@ -99,7 +105,11 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
 
 /** Derives the applied configuration without mutating the stored document. */
 export function resolveQuickEditEffectiveState(
-  state: QuickEditAdvancedState
+  state: QuickEditAdvancedState,
+  cursorFacts?: {
+    facts: ReviewCursorFacts | null;
+    source: { width: number; height: number; duration: number };
+  }
 ): QuickEditEffectiveState {
   const advanced = state.ui.mode === 'advanced';
   const features = resolveQuickEditEffectiveFeatures(state);
@@ -108,6 +118,40 @@ export function resolveQuickEditEffectiveState(
     zoomRegions: projectReviewFocus(
       features.zoomApplied ? state.zoom.regions : [],
       state.audio.voiceoverSegments
+    ).map((region) =>
+      state.cursorFocusPath?.mode === 'follow'
+        ? {
+            ...region,
+            cursorFocus: {
+              path: cursorFacts
+                ? resolveReviewCursorFocusPath(
+                    cursorFacts.facts,
+                    cursorFacts.source,
+                    state.cursorFocusPath
+                  )
+                : state.cursorFocusPath,
+              ...(cursorFacts && state.windowHeader
+                ? {
+                    sourceFrame: {
+                      headerHeight: windowHeaderGeometry(state.windowHeader, cursorFacts.source)
+                        .height,
+                      height: cursorFacts.source.height,
+                    },
+                  }
+                : {}),
+              ...(cursorFacts
+                ? {
+                    observed: deriveReviewCursorFocusPath(
+                      cursorFacts.facts,
+                      cursorFacts.source,
+                      true
+                    ),
+                  }
+                : {}),
+              ...(state.audio.voiceoverSegments ? { timeMap: state.audio.voiceoverSegments } : {}),
+            },
+          }
+        : region
     ),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,

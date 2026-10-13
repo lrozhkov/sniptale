@@ -77,3 +77,53 @@ it('preserves the shadow contract when resolving scaled export layout', async ()
   expect(output.scale).toBeCloseTo(2 / 3);
   expect(output.background.enabled && output.background.layout.shadow).toEqual(shadow);
 });
+
+it('pads the original scene for the full scaled shadow envelope with asymmetric integer bounds', async () => {
+  const { reviewSpatialSourceRect } = await import('./scene-shadow');
+  const output = { width: 641, height: 401 };
+  const window = { x: -3.25, y: 12.5, width: 620.5, height: 360.25 };
+  const background = {
+    enabled: true,
+    type: 'solid',
+    color: '#ffffffff',
+    layout: { padding: 4, cornerRadius: 12, shadow: { intensity: 80, color: '#000000ff' } },
+  } as const;
+  expect(reviewSpatialSourceRect({ output, window, background, sceneScale: 0.5 })).toEqual({
+    x: -126,
+    y: -110,
+    width: 866,
+    height: 605,
+  });
+  expect(
+    reviewSpatialSourceRect({ output, window, background: { enabled: false }, sceneScale: 8 })
+  ).toEqual({ x: 0, y: 0, ...output });
+  expect(
+    reviewSpatialSourceRect({
+      output,
+      window,
+      background: {
+        ...background,
+        layout: { ...background.layout, shadow: { ...background.layout.shadow, intensity: 0 } },
+      },
+    })
+  ).toEqual({ x: 0, y: 0, ...output });
+});
+
+it('reads no-shadow dimensions from canvas-style inherited accessors', async () => {
+  const { reviewSpatialSourceRect } = await import('./scene-shadow');
+  class CanvasSize {
+    get width() {
+      return 641;
+    }
+    get height() {
+      return 401;
+    }
+  }
+  expect(
+    reviewSpatialSourceRect({
+      output: new CanvasSize(),
+      window: { x: 4, y: 4, width: 633, height: 393 },
+      background: { enabled: false },
+    })
+  ).toEqual({ x: 0, y: 0, width: 641, height: 401 });
+});

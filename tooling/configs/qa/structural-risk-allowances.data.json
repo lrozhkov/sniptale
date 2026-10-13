@@ -333,17 +333,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/gallery/video-review/annotation-effects-picker.tsx",
-      "symbol": "ReviewAnnotationEffectsPicker",
-      "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when anchored portal placement/dismissal/focus lifetime or externally supplied catalog/acquisition authority changes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "bca397d28160c98766374c1f5bb07b533bd839e98e8db99175bdc7a6a02c28c0",
-      "signatureHash": "053e2815ae9b9aa1fa174b644e1369e3dd86fe4b19508a5e8286992bc12e13c3",
-      "reason": "tool-noise: One anchored portaled dialog owns placement, ancestor/viewport listeners, outside dismissal, keyboard trap and focus restoration for supplied catalog choices. Catalog reads belong to useReviewAnnotationCatalog and acquisition to the injected command. The detached UI uses existing theme-safe/popover primitives. Its effect creates and removes one listener lifetime, while JSX lists choices and recovery; there is no second request or persistence owner. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/annotation-effects-track.tsx",
       "symbol": "ReviewAnnotationEffectsTrack",
       "owner": "extension:gallery:video-review",

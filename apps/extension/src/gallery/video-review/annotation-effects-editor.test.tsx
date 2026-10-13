@@ -12,6 +12,9 @@ import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { useReviewSnapshot } from './use-session';
 import { useReviewAnnotationEffects } from './annotation-effects-editor';
+import { ReviewAnnotationInspector } from './annotation-effects-inspector';
+import { translate } from '../../platform/i18n';
+import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import {
   ReviewAnnotationAcquisitionError,
   type applyReviewAnnotationCatalogDocument,
@@ -43,12 +46,13 @@ const instance: ReviewAnnotationEffect = {
   order: 0,
 };
 let root: Root;
+let host: HTMLDivElement;
 let editor: ReturnType<typeof useReviewAnnotationEffects>;
 let advanced: ReturnType<typeof useReviewAdvanced>;
 let session: ReturnType<typeof createVideoReviewSession>;
 let blocked = false;
 let holdFlush: (() => Promise<void>) | null = null;
-function setup() {
+function setup(inspect = false) {
   const initial = createQuickEditAdvancedState();
   initial.ui.mode = 'advanced';
   initial.annotationEffects = { enabled: true, instances: [structuredClone(instance)] };
@@ -125,7 +129,15 @@ function setup() {
       },
       acquire
     );
-    return null;
+    return inspect ? (
+      <ReviewAnnotationInspector
+        editor={editor}
+        id="first"
+        source={source}
+        duration={4}
+        busy={false}
+      />
+    ) : null;
   }
   act(() => root.render(<Harness />));
   const choice = {
@@ -162,11 +174,14 @@ beforeEach(() => {
   vi.useFakeTimers();
   blocked = false;
   holdFlush = null;
-  root = createRoot(document.createElement('div'));
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
   await session.dispose();
+  host.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -477,4 +492,236 @@ it('retries the retained live field before clearing a completed edit failure', a
     ]
   ).toBe('Recovered field');
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+});
+
+it('commits actual inspector scrub once, restores through Undo/Redo and cancels without history', async () => {
+  const { save } = setup(true);
+  const range = () =>
+    host.querySelector<HTMLInputElement>(
+      `input[aria-label="${translate('gallery.videoReview.annotationX')} range"]`
+    )!;
+  expect(range()).not.toBeNull();
+  const pointer = (kind: string) => range().dispatchEvent(new MouseEvent(kind, { bubbles: true }));
+  const propose = (value: string) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range(), value);
+    range().dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  act(() => {
+    pointer('pointerdown');
+    propose('25');
+    propose('30');
+  });
+  expect(editor.previewLane?.instances[0]?.transform.x).toBe(0.3);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+  await settle(() => pointer('pointerup'));
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await act(async () => session.history('undo'));
+  expect(range().value).toBe('20');
+  await act(async () => session.history('redo'));
+  expect(range().value).toBe('30');
+  act(() => {
+    pointer('pointerdown');
+    propose('40');
+    pointer('pointercancel');
+  });
+  expect(range().value).toBe('30');
+  expect(editor.gestureId).toBeNull();
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await settle(() => {
+    pointer('pointerdown');
+    pointer('pointerup');
+  });
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(save).not.toHaveBeenCalled();
+});
+
+it('derives preset presentation through canonical history, rejected edits and persisted reopen', async () => {
+  const { save, render } = setup(true);
+  const document = readReviewAnnotationEffectDocument(source)!;
+  const preset = document.controlPresets![1]!;
+  const label = () =>
+    host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('gallery.videoReview.annotationPresets')}"]`
+    )!.textContent;
+  const before = label();
+  await settle(() => editor.change('first', { controls: { ...preset.values } }));
+  const accepted = label();
+  expect(accepted).not.toBe(before);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await act(async () => session.history('undo'));
+  expect(label()).toBe(before);
+  await act(async () => session.history('redo'));
+  expect(label()).toBe(accepted);
+  await settle(() => editor.change('first', { controls: { unknown: 1 } }));
+  expect(editor.failure).toBe('invalid');
+  expect(label()).toBe(accepted);
+  await act(async () => session.saveBuffered());
+  const stored = save.mock.lastCall![0].workspace;
+  const reopened = createVideoReviewSession({
+    workspace: parseVideoWorkspace(stored)!,
+    draft: null,
+  });
+  expect(
+    reopened.getSnapshot().document.advancedContent.annotationEffects?.instances[0]?.controls
+  ).toEqual(preset.values);
+  const previous = session;
+  await act(async () => {
+    session = reopened;
+    render();
+  });
+  expect(label()).toBe(accepted);
+  await previous.dispose();
+});
+
+it('switches attachment in real perspective geometry as one history edit and restores exact state', async () => {
+  const { save, render } = setup(true);
+  const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
+  const { quickEditSpatialTargetCamera, DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+    await import('../../features/video/review/advanced/spatial');
+  const { createQuickEditZoomRegion } = await import('../../features/video/review/advanced/zoom');
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'tilt', at: 0, duration: 4 }),
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: -45 },
+  };
+  const geometry = createReviewAnnotationGeometry({
+    source: { width: 640, height: 360 },
+    output: { width: 1280, height: 720 },
+    camera: quickEditSpatialTargetCamera(region),
+    background: { enabled: false },
+  })!;
+  act(() => editor.setGeometry(geometry));
+  const before = structuredClone(
+    session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!
+  );
+  const trigger = host.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('gallery.videoReview.annotationAttachment')}"]`
+  )!;
+  await act(async () => {
+    trigger.click();
+    await vi.advanceTimersByTimeAsync(16);
+  });
+  const option = [...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (node) =>
+      node.textContent?.includes(translate('gallery.videoReview.annotationViewportAttachment'))
+  )!;
+  expect(option.disabled).toBe(false);
+  await settle(() => option.click());
+  const after = session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!;
+  expect(after.attachment).toBe('viewport');
+  expect(after).toMatchObject({
+    id: before.id,
+    snapshotId: before.snapshotId,
+    start: before.start,
+    end: before.end,
+    controls: before.controls,
+    order: before.order,
+  });
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await act(async () => session.history('undo'));
+  expect(session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]).toEqual(
+    before
+  );
+  await act(async () => session.history('redo'));
+  expect(session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]).toEqual(
+    after
+  );
+  await act(async () => {
+    trigger.click();
+    await vi.advanceTimersByTimeAsync(16);
+  });
+  const contentOption = [
+    ...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+  ].find((node) =>
+    node.textContent?.includes(translate('gallery.videoReview.annotationContentAttachment'))
+  )!;
+  expect(contentOption.disabled).toBe(false);
+  await settle(() => contentOption.click());
+  const back = session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!;
+  expect(back.attachment).toBe('content');
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+  await act(async () => session.history('undo'));
+  expect(session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]).toEqual(
+    after
+  );
+  await act(async () => session.history('redo'));
+  expect(session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]).toEqual(
+    back
+  );
+  await act(async () => session.saveBuffered());
+  const stored = save.mock.lastCall![0].workspace;
+  const reopened = createVideoReviewSession({
+    workspace: parseVideoWorkspace(stored)!,
+    draft: null,
+  });
+  expect(reopened.getSnapshot().document.advancedContent.annotationEffects!.instances[0]).toEqual(
+    back
+  );
+  const previous = session;
+  await act(async () => {
+    session = reopened;
+    render();
+  });
+  expect(
+    host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('gallery.videoReview.annotationAttachment')}"]`
+    )!.textContent
+  ).toContain(translate('gallery.videoReview.annotationContentAttachment'));
+  await previous.dispose();
+});
+
+it('retains picked alpha through actual Apply, canonical Undo/Redo and persisted reopen', async () => {
+  const { save } = setup(true);
+  const { parseColor } = await import('@sniptale/foundation/color');
+  const { getCurrentLocale } = await import('../../platform/i18n');
+  const { resolveEffectLocaleText } = await import('@sniptale/runtime-contracts/effect-v1');
+  const definition = readReviewAnnotationEffectDocument(source)!;
+  const control = definition.controls.find((item) => item.id === 'ink')!;
+  const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+  const row = [
+    ...host.querySelectorAll<HTMLElement>('[data-ui="shared.ui.compact-inspector.color-field"]'),
+  ].find((node) => node.querySelector(`[title="${label}"]`))!;
+  await act(async () => {
+    row
+      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.trigger"] button')!
+      .click();
+    await vi.advanceTimersByTimeAsync(16);
+  });
+  const input = document.body.querySelector<HTMLInputElement>(
+    `input[aria-label="${translate('shared.ui.colorSelectorHex')}"]`
+  )!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      '#4488cc80'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const apply = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === translate('shared.ui.colorSelectorApply')
+  )!;
+  await settle(() => apply.click());
+  const after = session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!;
+  const ink = after.controls['ink'];
+  if (typeof ink !== 'string') throw new Error('Accepted ink is absent');
+  expect(parseColor(ink)).toMatchObject({ red: 68, green: 136, blue: 204 });
+  expect(parseColor(ink)!.alpha).toBeCloseTo(128 / 255, 2);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await act(async () => session.history('undo'));
+  expect(
+    session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!.controls
+  ).toEqual({});
+  await act(async () => session.history('redo'));
+  expect(session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]).toEqual(
+    after
+  );
+  await act(async () => session.saveBuffered());
+  const reopened = createVideoReviewSession({
+    workspace: parseVideoWorkspace(save.mock.lastCall![0].workspace)!,
+    draft: null,
+  });
+  expect(reopened.getSnapshot().document.advancedContent.annotationEffects!.instances[0]).toEqual(
+    after
+  );
+  await reopened.dispose();
 });

@@ -23,6 +23,8 @@ import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'reac
 import { ArrowLeft } from 'lucide-react';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
+import { reviewHistoryCaptureStatus, reviewHistoryCaptureLabel } from './action-history-coverage';
 import { isReviewClick } from '../../features/video/review/click-animation';
 import {
   REVIEW_CLICK_DEFAULT,
@@ -36,6 +38,7 @@ import './action-history.css';
 
 /** Search and selection belong to this inspector, independently of recorded project facts. */
 type ReviewActionHistoryProps = {
+  captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
   markers: readonly ReviewTelemetryMarker[];
   animations: readonly ReviewClickAnimation[];
   keyAnimations?: readonly ReviewKeyAnimation[];
@@ -161,9 +164,10 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
             data-ui="gallery.videoReview.historyResults"
           >
             {!filtered.length ? (
-              <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
-                {translate('gallery.videoReview.historyEmpty')}
-              </p>
+              <HistoryEmptyState
+                searched={props.markers.length > 0}
+                capabilities={props.captureCapabilities}
+              />
             ) : null}
             <ol className="space-y-1">
               {filtered.slice(0, count).map((marker) => (
@@ -260,6 +264,7 @@ function HistoryBatchHeader({
 
 /** Selected click and key settings remain separate even in a mixed batch. */
 function HistoryAnimationFields(props: {
+  markers: readonly ReviewTelemetryMarker[];
   keySettings: ReadonlyMap<string, ReviewKeyAnimation>;
   clickIds: readonly string[];
   keyIds: readonly string[];
@@ -278,9 +283,19 @@ function HistoryAnimationFields(props: {
   onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
 }) {
   const { clickIds, settings } = props;
+  const selectedClicks = props.markers.filter(
+    (marker) => marker.ref.kind === 'action' && clickIds.includes(marker.ref.id)
+  );
   const clickSections = clickIds.length
     ? reviewClickSections({
         values: clickIds.map((id) => settings.get(id) ?? REVIEW_CLICK_DEFAULT),
+        gesture:
+          selectedClicks.length === clickIds.length &&
+          selectedClicks.every(
+            (marker) =>
+              !!marker.gesture &&
+              (marker.gesture.type !== 'click' || marker.gesture.completion !== 'released')
+          ),
         onChange: (patch) => props.onChange(clickIds, patch),
       })
     : [];
@@ -334,5 +349,40 @@ function HistoryAnimationFields(props: {
     >
       <ReviewInspectorSections sections={sections} />
     </div>
+  );
+}
+
+/** Empty search results and missing capture coverage communicate different facts. */
+function HistoryEmptyState(props: {
+  searched: boolean;
+  capabilities: RecordingTelemetryCapabilities | null | undefined;
+}) {
+  return (
+    <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+      {props.searched ? (
+        translate('gallery.videoReview.historyEmpty')
+      ) : (
+        <span className="flex flex-col" data-ui="gallery.videoReview.historyCoverage">
+          {(['keyboard', 'mouse', 'cursor'] as const).map((family) => {
+            const status = reviewHistoryCaptureStatus(props.capabilities, family);
+            const label =
+              family === 'keyboard'
+                ? 'gallery.videoReview.historyKeyboard'
+                : family === 'mouse'
+                  ? 'gallery.videoReview.historyMouse'
+                  : 'gallery.videoReview.historyCursor';
+            return (
+              <span
+                key={family}
+                data-history-coverage-family={family}
+                data-history-coverage={status}
+              >
+                {translate(label)} · {translate(reviewHistoryCaptureLabel(status))}
+              </span>
+            );
+          })}
+        </span>
+      )}
+    </p>
   );
 }

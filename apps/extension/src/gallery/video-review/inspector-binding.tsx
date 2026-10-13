@@ -1,3 +1,4 @@
+import { ReviewCursorPathEditor, ReviewCursorPathSettings } from './cursor-path-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-export';
 import { ReviewOriginalSpeechPanel } from './speech-panel';
@@ -42,6 +43,9 @@ type InspectorState = Pick<
   | 'advancedPending'
   | 'advancedFailed'
   | 'retryAdvanced'
+  | 'setCursorFocusPath'
+  | 'cursorFocusPath'
+  | 'selectCursorFocusKey'
   | 'setMode'
   | 'setTrackVisibility'
   | 'backgroundImport'
@@ -212,23 +216,11 @@ export function ReviewInspectorBinding({
           editing: state.editing,
         })}
         selectionPreferenceScope={state.activeSelection.kind}
-        selectionHasSections={
-          state.activeSelection.kind === 'original-audio' ||
-          state.activeSelection.kind === 'telemetry' ||
-          (state.advanced.ui.mode === 'advanced' &&
-            [
-              'zoom',
-              'canvas-comment',
-              'audio',
-              'webcam',
-              'webcam-position',
-              'annotation-effect',
-            ].includes(state.activeSelection.kind))
-        }
+        selectionHasSections={hasSelectionSections(state)}
         scene={
-          <ReviewScenePropertiesBinding
+          <ReviewSceneBinding
             state={state}
-            source={resource.source}
+            resource={resource}
             audio={audio}
             onJoinPreview={onJoinPreview}
           />
@@ -350,6 +342,7 @@ function ReviewRecordedHistory({
 }) {
   return (
     <ReviewActionHistory
+      captureCapabilities={state.projected.captureCapabilities}
       markers={state.projected.markers}
       activeRef={state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined}
       keyAnimations={state.advanced.keyAnimations ?? []}
@@ -554,6 +547,18 @@ function ReviewSelectionBinding({
   onBackToHistory?: (() => void) | undefined;
 }) {
   const video = state.video;
+  if (state.activeSelection.kind === 'cursor-focus')
+    return (
+      <ReviewCursorPathEditor
+        path={state.cursorFocusPath}
+        time={state.time}
+        duration={resource.source.duration}
+        onSelect={state.selectCursorFocusKey}
+        selectedKeyId={state.activeSelection.id}
+        disabled={state.busy || state.playing || state.editing.exporter.phase !== 'idle'}
+        onChange={state.setCursorFocusPath}
+      />
+    );
   if (state.activeSelection.kind === 'annotation-effect') {
     const selection = state.activeSelection;
     const instance = state.annotationEffects.lane?.instances.find(
@@ -691,4 +696,47 @@ async function flushReviewTextVoiceBuffers(
   await state.composer.flush();
   await state.flushAdvanced();
   await canvasComments.flushTexts();
+}
+
+function hasSelectionSections(state: InspectorState): boolean {
+  return (
+    state.activeSelection.kind === 'cursor-focus' ||
+    state.activeSelection.kind === 'original-audio' ||
+    state.activeSelection.kind === 'telemetry' ||
+    (state.advanced.ui.mode === 'advanced' &&
+      [
+        'zoom',
+        'canvas-comment',
+        'audio',
+        'webcam',
+        'webcam-position',
+        'annotation-effect',
+      ].includes(state.activeSelection.kind))
+  );
+}
+function ReviewSceneBinding({
+  state,
+  resource,
+  audio,
+  onJoinPreview,
+}: Pick<
+  Parameters<typeof ReviewInspectorBinding>[0],
+  'state' | 'resource' | 'audio' | 'onJoinPreview'
+>) {
+  const { busy, editing } = state;
+  return (
+    <>
+      <ReviewCursorPathSettings
+        path={state.cursorFocusPath}
+        disabled={busy || state.playing || editing.exporter.phase !== 'idle'}
+        onChange={state.setCursorFocusPath}
+      />
+      <ReviewScenePropertiesBinding
+        state={state}
+        source={resource.source}
+        audio={audio}
+        onJoinPreview={onJoinPreview}
+      />
+    </>
+  );
 }

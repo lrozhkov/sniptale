@@ -9,6 +9,7 @@ import { betaV16Fixture } from './fixtures/beta-v16';
 import { betaV17Fixture } from './fixtures/beta-v17';
 import {
   CURRENT_SCHEMA_CONTRACTS,
+  DATABASE_MIGRATIONS,
   PERSISTENCE_DOMAIN_REGISTRY,
   buildDatabaseMigrationPlan,
   parseStoredSchemaContracts,
@@ -45,7 +46,7 @@ describe('beta persistence domain registry', () => {
     expect(
       parseStoredSchemaContracts(
         CURRENT_SCHEMA_CONTRACTS.map((contract, index) =>
-          index === 0 ? { ...contract, schemaVersion: 2 } : contract
+          index === 0 ? { ...contract, schemaVersion: contract.schemaVersion + 1 } : contract
         )
       )
     ).toBeNull();
@@ -339,4 +340,46 @@ it('annotation admission is metadata-only and aborts before publishing contracts
   expect(tx.abort).toHaveBeenCalledOnce();
   expect(tx.objectStore).not.toHaveBeenCalled();
   expect(put).not.toHaveBeenCalled();
+});
+
+it('admits interaction authoring and rhythm without rewriting released media or document rows', async () => {
+  const step = DATABASE_MIGRATIONS.find((migration) => migration.fromDatabaseVersion === 26);
+  expect(step).toBeDefined();
+  if (!step) return;
+  const released = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 26
+  )!;
+  const names = new Set<string>(released.stores);
+  const mutateRows = vi.fn();
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: vi.fn(() => ({ createIndex: vi.fn(), put: mutateRows })),
+    deleteObjectStore: vi.fn(),
+  };
+  const transaction = {
+    abort: vi.fn(),
+    objectStore: vi.fn(() => ({
+      put: mutateRows,
+      clear: mutateRows,
+      delete: mutateRows,
+      getAll: vi.fn(),
+    })),
+  };
+  expect(step.risk).toBe('additive');
+  expect(step.migrate(db, transaction)).toBeUndefined();
+  expect(step.validate(db, transaction)).toBeUndefined();
+  expect(transaction.objectStore).not.toHaveBeenCalled();
+  expect(mutateRows).not.toHaveBeenCalled();
+  expect(await step.estimateAdditionalBytes()).toBeGreaterThanOrEqual(64 * 1024);
+  expect(step.domainVersions.map(({ domainId }) => domainId).sort()).toEqual([
+    'mediaLibrary',
+    'recordings',
+    'videoProjects',
+  ]);
+  const olderContracts = Object.entries(released.domainVersions).map(
+    ([domainId, schemaVersion]) => ({ domainId, schemaVersion })
+  );
+  expect(parseStoredSchemaContracts(olderContracts)).toBeNull();
+  names.delete('recording_telemetry');
+  expect(() => step.validate(db, transaction)).toThrow('unavailable');
 });

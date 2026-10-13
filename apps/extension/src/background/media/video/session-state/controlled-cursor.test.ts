@@ -9,6 +9,7 @@ import {
 
 import {
   appendControlledCursorTelemetry,
+  mergeTelemetrySnapshots,
   beginControlledCursorNavigation,
   clearControlledCursorNavigationPending,
   getControlledCursorDisplaySurface,
@@ -26,6 +27,8 @@ import {
   setControlledCursorNavigationPending,
   setControlledCursorOffsetSeconds,
   setControlledCursorVerifiedMode,
+  setRecordingFrameClock,
+  getRecordingFrameClock,
 } from './controlled-cursor';
 
 beforeEach(() => {
@@ -243,4 +246,104 @@ it('preserves same-geometry navigation proof and never recovers after a changed 
   expect(getControlledCursorTelemetry()).toMatchObject({
     viewportObservation: { initial, stable: false },
   });
+});
+
+it('retains detached source metadata, cadence and projected geometry through snapshot lifecycle', () => {
+  const snapshot = {
+    viewport: null,
+    viewportObservation: null,
+    provenance: {
+      source: 'browser' as const,
+      normalizationVersion: 1 as const,
+      timeUnit: 'seconds' as const,
+      coordinateSpace: 'client-css' as const,
+    },
+    capabilities: {
+      version: 1 as const,
+      pointer: 'available' as const,
+      keyboard: 'available' as const,
+      wheel: 'available' as const,
+      coverage: 'document' as const,
+    },
+    cursorTrack: createCursorTrack('#fff', 1, true),
+    actionEvents: [],
+    signals: [
+      {
+        id: 'keyboard',
+        kind: 'typing' as const,
+        startTime: 1,
+        endTime: 1.1,
+        point: null,
+        recordingPoint: { x: 0.2, y: 0.3 },
+        data: {},
+        keyboardRhythm: [
+          {
+            version: 1 as const,
+            id: 'block',
+            startTime: 1,
+            quantumMs: 1 as const,
+            count: 2,
+            encoding: 'delta' as const,
+            ticks: [0, 100],
+          },
+        ],
+      },
+    ],
+  };
+  appendControlledCursorTelemetry(snapshot);
+  const first = getControlledCursorTelemetry();
+  expect(first?.provenance).toEqual(snapshot.provenance);
+  expect(first?.capabilities).toEqual(snapshot.capabilities);
+  snapshot.signals[0]!.keyboardRhythm[0]!.ticks[1] = 999;
+  snapshot.signals[0]!.recordingPoint.x = 0.9;
+  expect(first?.signals[0]?.keyboardRhythm?.[0]?.ticks).toEqual([0, 100]);
+  expect(first?.signals[0]?.recordingPoint).toEqual({ x: 0.2, y: 0.3 });
+  first!.signals[0]!.keyboardRhythm![0]!.ticks[1] = 999;
+  expect(getControlledCursorTelemetry()?.signals[0]?.keyboardRhythm?.[0]?.ticks).toEqual([0, 100]);
+});
+
+it('keeps unknown legacy observation support unknown when merging with a capable browser document', () => {
+  const legacy = { viewport: null, cursorTrack: null, actionEvents: [], signals: [] };
+  const browser = {
+    ...legacy,
+    capabilities: {
+      version: 1 as const,
+      pointer: 'available' as const,
+      keyboard: 'available' as const,
+      wheel: 'available' as const,
+      coverage: 'document' as const,
+    },
+  };
+  expect(mergeTelemetrySnapshots(legacy, browser).capabilities).toEqual({
+    version: 1,
+    pointer: 'unknown',
+    keyboard: 'unknown',
+    wheel: 'unknown',
+    coverage: 'unknown',
+  });
+});
+it('keeps source-clock revision and identity authority isolated from caller mutations', () => {
+  expect(getRecordingFrameClock()).toBeNull();
+  const first = {
+    recordingId: 'recording',
+    streamInstanceId: 'native',
+    generation: 2,
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: 1000,
+    mediaTimeSeconds: 0,
+  };
+  expect(setRecordingFrameClock(first)).toBe(true);
+  first.mediaTimeSeconds = 99;
+  const returned = getRecordingFrameClock()!;
+  expect(returned.mediaTimeSeconds).toBe(0);
+  Reflect.set(returned, 'mediaTimeSeconds', 88);
+  expect(getRecordingFrameClock()!.mediaTimeSeconds).toBe(0);
+  expect(setRecordingFrameClock({ ...first, revision: 1 })).toBe(false);
+  expect(setRecordingFrameClock({ ...first, revision: 2, streamInstanceId: 'other' })).toBe(false);
+  expect(setRecordingFrameClock({ ...first, revision: 2, generation: 3 })).toBe(false);
+  expect(setRecordingFrameClock({ ...first, revision: 2, mediaTimeSeconds: 1 })).toBe(true);
+  expect(getRecordingFrameClock()!.revision).toBe(2);
+  resetControlledCursorCaptureState();
+  expect(getRecordingFrameClock()).toBeNull();
 });

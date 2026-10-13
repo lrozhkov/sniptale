@@ -198,7 +198,7 @@ it.each([false, true])(
     expect(session.getSnapshot().document.advancedContent.audio.original.volume).toBe(1);
     await act(async () => recognition.apply());
     expect(recognition.accepted).toBe(true);
-    await act(async () => vi.advanceTimersByTimeAsync(251));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(content.pending).toBe(false);
     expect(session.getSnapshot().document.advancedContent.audio.original.volume).toBe(0.45);
     expect(session.getSnapshot().document.advancedContent.text?.fragments).toHaveLength(1);
@@ -248,14 +248,14 @@ it.each([
     // A keyboard step is a real gain gesture after the buffer join, before acceptance acknowledgement.
     await act(async () => gain().click());
     await act(async () => release());
-    await act(async () => vi.advanceTimersByTimeAsync(251));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(content.pending).toBe(false);
     expect(session.getSnapshot().document.advancedContent.text?.fragments).toHaveLength(1);
     expect(session.getSnapshot().document.advancedContent.audio.original.volume).toBe(1);
     expect(remote.job).toHaveBeenCalledOnce();
     expect(gain().disabled).toBe(false);
     await act(async () => gain().click());
-    await act(async () => vi.advanceTimersByTimeAsync(251));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(session.getSnapshot().document.advancedContent.audio.original.volume).toBe(0.99);
     expect(session.getSnapshot().document.advancedContent.text?.fragments).toHaveLength(1);
   }

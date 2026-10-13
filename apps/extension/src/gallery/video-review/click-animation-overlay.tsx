@@ -4,6 +4,10 @@ import {
   evaluateReviewClicks,
   type ReviewClickCue,
 } from '../../features/video/review/click-animation';
+import {
+  withReviewWindowRaster,
+  reviewWindowRasterBacking,
+} from '../../workflows/video-review/window-header';
 
 /** Live canvas shares the exact phase evaluator and painter with rendered exports. */
 export function ReviewClickOverlay(props: {
@@ -12,6 +16,14 @@ export function ReviewClickOverlay(props: {
   output: { width: number; height: number };
   video: Parameters<typeof drawReviewClicks>[2] | undefined;
   sourceWidth: number;
+  headerImage?: CanvasImageSource | null | undefined;
+  window?:
+    | {
+        videoRect: Parameters<typeof drawReviewClicks>[2];
+        windowRect: Parameters<typeof drawReviewClicks>[2];
+        transform?: Parameters<typeof drawReviewClicks>[2];
+      }
+    | undefined;
   transform?: { scale: number; x: number; y: number } | undefined;
   getFrame?(): CanvasImageSource | null;
   clip: Parameters<typeof drawReviewClicks>[4] | undefined;
@@ -27,18 +39,49 @@ export function ReviewClickOverlay(props: {
       const candidate = getFrame?.();
       const frame =
         candidate instanceof HTMLVideoElement && candidate.readyState < 2 ? null : candidate;
-      drawReviewClicks(
-        context,
-        frames,
-        props.video!,
-        props.sourceWidth,
-        props.clip!,
-        frame
-          ? {
-              draw: (target, x, y, width, height) => target.drawImage(frame, x, y, width, height),
-            }
-          : undefined
-      );
+      const draw = (source?: Parameters<typeof drawReviewClicks>[5]) =>
+        drawReviewClicks(context, frames, props.video!, props.sourceWidth, props.clip!, source);
+      const magnify = frames.some((click) => (click.lens?.scale ?? 1) > 1);
+      if (frame && props.headerImage && props.window && magnify) {
+        const window = props.window;
+        withReviewWindowRaster(
+          {
+            header: props.headerImage,
+            videoRect: window.videoRect,
+            windowRect: window.windowRect,
+            backing: reviewWindowRasterBacking({
+              windowRect: window.windowRect,
+              sourceWidth: props.sourceWidth,
+              magnify,
+            }),
+            draw: (target, x, y, width, height) => target.drawImage(frame, x, y, width, height),
+          },
+          (raster) =>
+            draw({
+              rect: window.transform ?? window.windowRect,
+              draw: (target, x, y, width, height) =>
+                target.drawImage(
+                  raster.image,
+                  0,
+                  0,
+                  raster.width,
+                  raster.height,
+                  x,
+                  y,
+                  width,
+                  height
+                ),
+            })
+        );
+      } else
+        draw(
+          frame
+            ? {
+                rect: props.video!,
+                draw: (target, x, y, width, height) => target.drawImage(frame, x, y, width, height),
+              }
+            : undefined
+        );
     };
     paint();
     const source = getFrame?.();
@@ -50,7 +93,16 @@ export function ReviewClickOverlay(props: {
     return () => {
       for (const event of events) source.removeEventListener(event, paint);
     };
-  }, [frames, props.output, props.video, props.sourceWidth, props.clip, getFrame]);
+  }, [
+    frames,
+    props.output,
+    props.video,
+    props.sourceWidth,
+    props.clip,
+    props.headerImage,
+    props.window,
+    getFrame,
+  ]);
   return frames.length && props.video && props.clip ? (
     <canvas
       ref={canvas}

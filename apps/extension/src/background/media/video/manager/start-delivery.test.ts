@@ -5,6 +5,13 @@ const mocks = vi.hoisted(() => ({
   beginPreparedRecording: vi.fn(),
   scheduleWatchdog: vi.fn(),
   enableHistory: vi.fn(),
+  createClock: vi.fn(),
+  closeClock: vi.fn(),
+}));
+
+vi.mock('./frame-clock-companion', () => ({
+  createRecordingFrameClockCompanion: mocks.createClock,
+  closeRecordingFrameClockCompanions: mocks.closeClock,
 }));
 
 vi.mock('../runtime/manager/controlled-cursor/messages', async (importOriginal) => ({
@@ -33,9 +40,11 @@ beforeEach(() => {
   mocks.beginPreparedRecording.mockResolvedValue(undefined);
   mocks.activateLease.mockResolvedValue({ controlToken: 'active-token' });
   mocks.enableHistory.mockResolvedValue(undefined);
+  mocks.createClock.mockResolvedValue(null);
+  mocks.closeClock.mockResolvedValue(undefined);
 });
 
-it('starts ordinary tab action history at recorder begin, after preflight and countdown', async () => {
+it('delivers optional native clock admission at BEGIN without a receipt-time history reset', async () => {
   await finalizeAcceptedRecordingStart(
     'recording-1',
     {
@@ -47,10 +56,18 @@ it('starts ordinary tab action history at recorder begin, after preflight and co
     },
     'stream-1'
   );
-  expect(mocks.enableHistory).toHaveBeenCalledWith(7, 'recording-1', 0);
-  expect(mocks.beginPreparedRecording.mock.invocationCallOrder[0]).toBeLessThan(
-    mocks.enableHistory.mock.invocationCallOrder[0]!
-  );
+  expect(mocks.createClock).toHaveBeenCalledWith({
+    generation: 3,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-1',
+  });
+  expect(mocks.beginPreparedRecording).toHaveBeenCalledWith({
+    generation: 3,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-1',
+    frameClockLease: null,
+  });
+  expect(mocks.enableHistory).not.toHaveBeenCalled();
 });
 
 it('keeps an accepted video recording when optional action history is unavailable', async () => {
@@ -112,7 +129,7 @@ it('leaves identity-bound cleanup to the start owner when activation persistence
     )
   ).rejects.toThrow('activation persistence failed');
 
-  expect(mocks.enableHistory).toHaveBeenCalledWith(7, 'recording-1', 0);
+  expect(mocks.enableHistory).not.toHaveBeenCalled();
   expect(mocks.scheduleWatchdog).not.toHaveBeenCalled();
 });
 
@@ -136,4 +153,40 @@ it('activates a prepared multi-source recording without a redundant begin comman
     recordingId: 'recording-1',
     streamInstanceId: 'stream-1',
   });
+});
+
+it('passes a fresh exact clock lease unchanged through bound BEGIN and cleans failed delivery', async () => {
+  const { RECORDING_FRAME_CLOCK_PURPOSE } =
+    await import('../../../../contracts/video/recording-frame-clock');
+  const lease = {
+    recordingId: 'recording-1',
+    generation: 3,
+    streamInstanceId: 'stream-1',
+    purpose: RECORDING_FRAME_CLOCK_PURPOSE,
+    nonce: 'ba289176-c099-44d5-8f18-174e05565080',
+    expiresAtEpochMs: Date.now() + 10000,
+  };
+  mocks.createClock.mockResolvedValue(lease);
+  mocks.beginPreparedRecording.mockRejectedValueOnce(new Error('BEGIN transport failed'));
+  await expect(
+    finalizeAcceptedRecordingStart(
+      'recording-1',
+      {
+        captureMode: CaptureMode.TAB,
+        generation: 3,
+        tabId: 7,
+        settings: {},
+        viewportPresetId: null,
+      },
+      'stream-1'
+    )
+  ).rejects.toThrow('BEGIN transport failed');
+  expect(mocks.beginPreparedRecording).toHaveBeenCalledWith({
+    generation: 3,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-1',
+    frameClockLease: lease,
+  });
+  expect(mocks.closeClock).toHaveBeenCalledExactlyOnceWith('recording-1');
+  expect(mocks.activateLease).not.toHaveBeenCalled();
 });

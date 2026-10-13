@@ -40,16 +40,18 @@ export async function runStorageStartupPhase<T>(
   operation: () => Promise<T>
 ): Promise<T> {
   const start = performance.now();
-  const report = (status: 'pending' | 'completed' | 'failed') => {
-    const durationMs = Math.min(86_400_000, Math.max(0, Math.round(performance.now() - start)));
-    logger.debug(
-      `Slow storage startup phase: ${phase} ${status} ${durationMs}ms`,
-      sanitizeDiagnosticData({
-        phase,
-        status,
-        durationMs,
-      })
-    );
+  const report = (status: 'pending' | 'completed' | 'failed', final = false) => {
+    try {
+      const elapsed = performance.now() - start;
+      if (final && elapsed < SLOW_PHASE_MS) return;
+      const durationMs = Math.min(86_400_000, Math.max(0, Math.round(elapsed)));
+      logger.debug(
+        `Slow storage startup phase: ${phase} ${status} ${durationMs}ms`,
+        sanitizeDiagnosticData({ phase, status, durationMs })
+      );
+    } catch {
+      // Advisory diagnostics cannot replace storage results or emit secondary errors.
+    }
   };
   const timer = setTimeout(() => report('pending'), SLOW_PHASE_MS);
   let status: 'completed' | 'failed' = 'failed';
@@ -59,6 +61,6 @@ export async function runStorageStartupPhase<T>(
     return result;
   } finally {
     clearTimeout(timer);
-    if (performance.now() - start >= SLOW_PHASE_MS) report(status);
+    report(status, true);
   }
 }

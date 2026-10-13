@@ -1,8 +1,3 @@
-import {
-  RecordingTelemetrySignalKind,
-  type RecordingTelemetrySignal,
-} from '../../../features/video/project/types/interaction';
-
 export type TimeRange = {
   endTime: number;
   startTime: number;
@@ -23,29 +18,4 @@ export function mergeTimeRanges(ranges: readonly TimeRange[], gapSeconds: number
   }
 
   return merged;
-}
-
-export function buildStableSignalIntersections(
-  signals: readonly RecordingTelemetrySignal[],
-  applyShoulder: (range: TimeRange) => TimeRange = (range) => range
-): TimeRange[] {
-  const idleSignals = signals.filter(
-    (signal) => signal.kind === RecordingTelemetrySignalKind.CURSOR_IDLE
-  );
-  const staticSignals = signals.filter(
-    (signal) => signal.kind === RecordingTelemetrySignalKind.STATIC_FRAME
-  );
-  const ranges: TimeRange[] = [];
-
-  for (const idleSignal of idleSignals) {
-    for (const staticSignal of staticSignals) {
-      const startTime = Math.max(idleSignal.startTime, staticSignal.startTime);
-      const endTime = Math.min(idleSignal.endTime, staticSignal.endTime);
-      if (endTime > startTime) {
-        ranges.push(applyShoulder({ startTime, endTime }));
-      }
-    }
-  }
-
-  return ranges;
 }

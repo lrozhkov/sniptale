@@ -1,5 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createEffectAudioBufferCache } from '../../../../../../../features/video/composition/effect-runtime';
+import { createVideoProjectFromRecording } from '../../../../../../../features/video/project/factories/creation';
+const { mixActionAudio } = vi.hoisted(() => ({ mixActionAudio: vi.fn() }));
+vi.mock('../../../../action-audio', () => ({ mixProjectActionAudio: mixActionAudio }));
 
 class FakeOfflineAudioContext {
   destination = { id: 'destination' };
@@ -147,4 +150,50 @@ it('waits for tempo preparation before rendering and propagates preparation fail
   reject(new Error('cancelled tempo preparation'));
   await expect(pending).rejects.toThrow('cancelled tempo preparation');
   expect(offlineContext.startRendering).not.toHaveBeenCalled();
+});
+it('awaits physical action PCM before publishing and refuses a failed action mix', async () => {
+  const { executeOfflineAudioMixRender } = await import('./execute');
+  const { args, renderedBuffer, buildOfflineAudioMixResult } =
+    createExecuteOfflineAudioMixRenderArgs();
+  const project = createVideoProjectFromRecording({
+    recordingId: 'rec',
+    filename: 'rec.webm',
+    width: 100,
+    height: 100,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 10,
+    recordingSignals: [
+      { id: 'typing', kind: 'typing', startTime: 0, endTime: 1, point: null, data: {} },
+    ],
+  });
+  let resolve!: () => void;
+  mixActionAudio.mockImplementationOnce(
+    () =>
+      new Promise<void>((done) => {
+        resolve = done;
+      })
+  );
+  const signal = new AbortController().signal,
+    actionRange = { start: 0.5, end: 1.5 };
+  const pending = executeOfflineAudioMixRender({
+    ...args,
+    project,
+    signal,
+    actionRange,
+    clipsWithAudio: [],
+  });
+  await vi.waitFor(() =>
+    expect(mixActionAudio).toHaveBeenCalledWith(renderedBuffer, project, signal, actionRange)
+  );
+  expect(buildOfflineAudioMixResult).not.toHaveBeenCalled();
+  resolve();
+  await expect(pending).resolves.toMatchObject({ buffer: renderedBuffer });
+  expect(buildOfflineAudioMixResult).toHaveBeenCalledOnce();
+  buildOfflineAudioMixResult.mockClear();
+  mixActionAudio.mockRejectedValueOnce(new Error('physical action decode refused'));
+  await expect(
+    executeOfflineAudioMixRender({ ...args, project, clipsWithAudio: [] })
+  ).rejects.toThrow('physical action decode refused');
+  expect(buildOfflineAudioMixResult).not.toHaveBeenCalled();
 });

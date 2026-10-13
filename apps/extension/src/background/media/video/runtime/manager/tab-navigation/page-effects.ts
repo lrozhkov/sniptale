@@ -79,6 +79,10 @@ export async function suspendTabNavigationPageEffects(
   effects: TabNavigationPageEffects,
   binding: TabNavigationEffectBinding
 ): Promise<void> {
+  // Collect the outgoing document before optional cleanup can outlive navigation.
+  if (effects.controlledCursor || effects.telemetry) {
+    await suspendControlledCursorEffects(binding);
+  }
   if (effects.contentSurface) {
     const current = getVideoRecordingSurfaceLeaseSnapshot();
     if (current?.tabId === binding.tabId) {
@@ -97,9 +101,6 @@ export async function suspendTabNavigationPageEffects(
     // offscreen cleanup must be retried later. Toolbar restoration must not be
     // coupled to retirement of an optional camera peer.
     await beginVideoRecordingSurfaceRebind(binding.tabId, { isCurrent: binding.isCurrent });
-  }
-  if (effects.controlledCursor || effects.telemetry) {
-    await suspendControlledCursorEffects(binding);
   }
 }
 

@@ -54,3 +54,48 @@ export function ReviewBackgroundBlurPreview(props: {
     />
   );
 }
+
+/** Background moves as its own scene plane, below all content overlays. */
+export function ReviewStageBackground({
+  background,
+  sceneSize,
+  imageUrl,
+  motion,
+  paint,
+}: {
+  background: QuickEditBackgroundSettings | undefined;
+  sceneSize: { width: number; height: number };
+  imageUrl: string | undefined;
+  motion: { x: number; y: number; backgroundScale: number };
+  paint: string | null;
+}) {
+  const blurred =
+    background?.enabled && background.type !== 'solid' && (background.layout.blur ?? 0) > 0;
+  return (
+    <div
+      data-ui="gallery.videoReview.backgroundPlane"
+      className="pointer-events-none absolute inset-0"
+      style={{
+        background: paint ?? undefined,
+        transformOrigin: '0 0',
+        transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.backgroundScale})`,
+      }}
+    >
+      {blurred ? (
+        <ReviewBackgroundBlurPreview
+          background={background}
+          imageUrl={imageUrl}
+          width={sceneSize.width}
+          height={sceneSize.height}
+        />
+      ) : imageUrl && background?.enabled && background.type === 'image' ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ objectFit: background.imageFit }}
+        />
+      ) : null}
+    </div>
+  );
+}

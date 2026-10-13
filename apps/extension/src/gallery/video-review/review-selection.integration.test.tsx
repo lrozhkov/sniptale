@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
+import type { commitVideoWorkspaceWithProjection } from '../../composition/persistence/review-workspaces/store';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -41,6 +45,9 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<typeof commitVideoWorkspaceWithProjection>[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
@@ -149,8 +156,11 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
       clip.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 0, button: 0 }))
     );
     await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'Delete' })));
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
-    expect([musicCount(), cutCount()]).toEqual([0, 1]);
+    await act(async () => {
+      await vi.waitFor(() => expect([musicCount(), cutCount()]).toEqual([0, 1]), {
+        timeout: 2_500,
+      });
+    });
     await click('undo');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
     expect([musicCount(), cutCount()]).toEqual([1, 1]);

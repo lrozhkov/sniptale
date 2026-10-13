@@ -115,6 +115,16 @@ export const JSDOM_VM_THREADS_COMPATIBILITY_FILES = [
 
 export const NODE_VM_THREADS_COMPATIBILITY_FILES = [
   {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/object-inventory.test.ts',
+    reason:
+      'header-transport validates host-realm structured-cloned metadata; exact threads and forks proofs pass; remove when vmThreads clones retain the calling realm',
+  },
+  {
+    file: 'apps/extension/src/workflows/media-hub-backup/v6/shared-object-export.test.ts',
+    reason:
+      'header-transport validates host-realm structured-cloned metadata; exact threads and forks proofs pass; remove when vmThreads clones retain the calling realm',
+  },
+  {
     file: 'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.review-assets.test.ts',
     reason: 'validates host-realm structured-cloned records; exact threads proof passes',
   },

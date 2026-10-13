@@ -15,6 +15,8 @@ export {
   getControlledCursorOffsetSeconds,
   getControlledCursorVerifiedMode,
   getControlledCursorTelemetry,
+  getRecordingFrameClock,
+  setRecordingFrameClock,
   isControlledCursorAutoPaused,
   isControlledCursorCaptureEnabled,
   isControlledCursorNavigationPending,

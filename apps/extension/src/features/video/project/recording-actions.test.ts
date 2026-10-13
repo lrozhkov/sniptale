@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 import type { RecordingActionEvent, RecordingTelemetrySignal } from './types';
-import { normalizeRecordingActions, normalizeRecordingSignals } from './recording-actions';
+import {
+  normalizeRecordingActions,
+  normalizeRecordingSignals,
+  deriveLongRecordingTypingSignals,
+} from './recording-actions';
 
 const typing = (id: string, startTime: number, endTime: number): RecordingTelemetrySignal => ({
   id,
@@ -28,13 +32,13 @@ it('merges short form inputs before the three-second threshold, preserving exact
     typing('c', 4, 6.999),
     typing('d', 8, 11),
   ];
-  const result = normalizeRecordingSignals(input);
+  const result = deriveLongRecordingTypingSignals(input);
   expect(result.map((s) => [s.id, s.startTime, s.endTime])).toEqual([
     ['a', 0, 3],
     ['d', 8, 11],
   ]);
   expect(result[0]!.data['eventCount']).toBe(4);
-  expect(normalizeRecordingSignals(result)).toEqual(result);
+  expect(deriveLongRecordingTypingSignals(result)).toEqual(result);
   expect(input[0]!.endTime).toBe(1);
 });
 
@@ -42,7 +46,7 @@ it('never joins input across a capture pause or includes nontext changes', () =>
   const first = { ...typing('a', 0, 3), data: { captureSegment: 0 } };
   const second = { ...typing('b', 3.1, 6.1), data: { captureSegment: 1 } };
   const checkbox = { ...typing('check', 10, 15), data: { targetType: 'checkbox' } };
-  expect(normalizeRecordingSignals([first, second, checkbox])).toEqual([first, second]);
+  expect(deriveLongRecordingTypingSignals([first, second, checkbox])).toEqual([first, second]);
 });
 
 it('suppresses sub-500ms same-target repeats but retains distinct and unknown targets', () => {
@@ -70,15 +74,30 @@ it('retains a double-click as one captured action with its click count', () => {
 
 it('drops sub-500ms fragments before grouping, including bridges between real inputs', () => {
   const noise = Array.from({ length: 8 }, (_, i) => typing(`noise-${i}`, i * 0.6, i * 0.6 + 0.4));
-  expect(normalizeRecordingSignals(noise)).toEqual([]);
+  expect(deriveLongRecordingTypingSignals(noise)).toEqual([]);
   expect(
-    normalizeRecordingSignals([
+    deriveLongRecordingTypingSignals([
       typing('real-a', 0, 1.5),
       typing('noise', 2, 2.4),
       typing('real-b', 3, 4.5),
     ])
   ).toEqual([]);
   expect(
-    normalizeRecordingSignals([typing('a', 0, 0.5), typing('b', 1, 3), typing('noise', 3.5, 3.9)])
+    deriveLongRecordingTypingSignals([
+      typing('a', 0, 0.5),
+      typing('b', 1, 3),
+      typing('noise', 3.5, 3.9),
+    ])
   ).toMatchObject([{ id: 'a', startTime: 0, endTime: 3, data: { eventCount: 4 } }]);
+});
+
+it('retains short raw inputs and independent observed gestures while keeping long typing derived', () => {
+  const inputs = [typing('short', 1, 1), typing('brief', 2, 2.1)];
+  expect(normalizeRecordingSignals(inputs)).toEqual(inputs);
+  const actions = [
+    click('one', 0),
+    { ...click('two', 0.1), data: { gestureId: 'second', targetId: 'button' } },
+  ];
+  expect(normalizeRecordingActions(actions)).toEqual(actions);
+  expect(deriveLongRecordingTypingSignals(inputs)).toEqual([]);
 });

@@ -252,6 +252,7 @@ export function buildOffscreenCommandResponse(
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
       return invalidCompletion(type);
   }
 }

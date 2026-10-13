@@ -35,3 +35,7 @@ Keep sandbox CSP free of `unsafe-eval`. Reject `Function`, `eval`, external Work
 For contract changes, update the schema, validator, importer, and locked corpus. Prove admitted JSON and ZIP imports plus each changed rejection boundary. Include catalog atomicity, quota and rollback, project integrity, backup restore, effect kinds, chaining, timing, audio, preview and export parity, and cleanup when the changed behavior reaches those paths.
 
 For sandbox entry changes, update manifest and build topology, CSP, and artifact-security proof. Do not add compatibility, executable assets, dynamic-code exceptions, or a second preview or export runtime.
+
+## Annotation attachment conversion
+
+Attachment changes first preserve an exactly representable rotated rectangle. Perspective or shear uses a local flatten: project the body center, retain the Jacobian's local X direction and axis lengths, and project each fixed anchor independently. The target body loses projective deformation; four-corner equality and two-switch reversibility are not promised. Existing bounds and rejection of singular, behind-camera or reflected geometry still apply. One existing history transaction stores attachment, transform and anchors; Undo/Redo restores the full accepted state exactly without changing timing, controls or immutable effect identity.

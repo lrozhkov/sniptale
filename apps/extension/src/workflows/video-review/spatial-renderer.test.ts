@@ -16,6 +16,8 @@ function graphics() {
     COMPILE_STATUS: 3,
     LINK_STATUS: 4,
     MAX_TEXTURE_SIZE: 5,
+    MAX_RENDERBUFFER_SIZE: 6,
+    MAX_VIEWPORT_DIMS: 7,
     NO_ERROR: 0,
     FRAMEBUFFER_COMPLETE: 17,
     FRAMEBUFFER: 18,
@@ -56,7 +58,9 @@ function graphics() {
     texParameteri: vi.fn(),
     pixelStorei: vi.fn(),
     getUniformLocation: vi.fn((_program: unknown, name: string) => name),
-    getParameter: vi.fn(() => 4096),
+    getParameter: vi.fn<(name: number) => unknown>((name: number) =>
+      name === 7 ? new Int32Array([4096, 4096]) : 4096
+    ),
     isContextLost: vi.fn(() => false),
     viewport: vi.fn(),
     clearColor: vi.fn(),
@@ -74,6 +78,11 @@ function graphics() {
       return name === 'OES_texture_half_float' ? { HALF_FLOAT_OES: 36193 } : {};
     }),
   };
+  Object.defineProperties(gl, {
+    drawingBufferWidth: { configurable: true, get: () => gpu().width },
+    drawingBufferHeight: { configurable: true, get: () => gpu().height },
+  });
+  const gpu = () => getContext.mock.contexts[0] as HTMLCanvasElement;
   const loseContext = vi.fn();
   const context = { clearRect: vi.fn(), drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
   const getContext = vi
@@ -110,10 +119,26 @@ it('reuses surfaces, projects premultiplied pixels, keeps sharp overlays unblurr
   const renderer = createReviewSpatialRenderer(lost);
   const plane = renderer.surface('plane', 320, 180);
   expect(renderer.surface('plane', 320, 180).canvas).toBe(plane.canvas);
-  renderer.draw(context, plane.canvas, rect, rect, frame);
+  renderer.draw(context, {
+    source: plane.canvas,
+    sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+    output: { width: plane.canvas.width, height: plane.canvas.height },
+    base: rect,
+    target: rect,
+    frame: frame,
+    sharp: false,
+  });
   expect(gl.uniform4f).toHaveBeenCalledWith('focusA', 0.5, 0.5, 0.2, 0.2);
   expect(context.drawImage).toHaveBeenCalledWith(gpu(), 0, 0);
-  renderer.draw(context, plane.canvas, rect, rect, frame, true);
+  renderer.draw(context, {
+    source: plane.canvas,
+    sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+    output: { width: plane.canvas.width, height: plane.canvas.height },
+    base: rect,
+    target: rect,
+    frame: frame,
+    sharp: true,
+  });
   expect(gl.uniform4f).toHaveBeenCalledWith('focusA', 0.5, 0.5, 1, 0);
   gpu().dispatchEvent(new Event('webglcontextlost'));
   expect(lost).toHaveBeenCalledTimes(1);
@@ -124,7 +149,17 @@ it('reuses surfaces, projects premultiplied pixels, keeps sharp overlays unblurr
   expect(loseContext).toHaveBeenCalledTimes(1);
   expect(gl.deleteTexture).toHaveBeenCalledTimes(8);
   expect(plane.canvas.width).toBe(1);
-  expect(() => renderer.draw(context, plane.canvas, rect, rect, frame)).toThrow('context was lost');
+  expect(() =>
+    renderer.draw(context, {
+      source: plane.canvas,
+      sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+      output: { width: plane.canvas.width, height: plane.canvas.height },
+      base: rect,
+      target: rect,
+      frame: frame,
+      sharp: false,
+    })
+  ).toThrow('context was lost');
 });
 
 it('rejects unsupported sizes and lost/failed contexts instead of drawing an untransformed frame', () => {
@@ -133,11 +168,41 @@ it('rejects unsupported sizes and lost/failed contexts instead of drawing an unt
   const renderer = createReviewSpatialRenderer();
   const source = renderer.surface('plane', 320, 180).canvas;
   gl.getParameter.mockReturnValueOnce(100);
-  expect(() => renderer.draw(context, source, rect, rect, frame)).toThrow('output size');
+  expect(() =>
+    renderer.draw(context, {
+      source: source,
+      sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+      output: { width: source.width, height: source.height },
+      base: rect,
+      target: rect,
+      frame: frame,
+      sharp: false,
+    })
+  ).toThrow('output size');
   gl.isContextLost.mockReturnValueOnce(true);
-  expect(() => renderer.draw(context, source, rect, rect, frame)).toThrow('context was lost');
+  expect(() =>
+    renderer.draw(context, {
+      source: source,
+      sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+      output: { width: source.width, height: source.height },
+      base: rect,
+      target: rect,
+      frame: frame,
+      sharp: false,
+    })
+  ).toThrow('context was lost');
   gl.getError.mockReturnValueOnce(1);
-  expect(() => renderer.draw(context, source, rect, rect, frame)).toThrow('rendering failed');
+  expect(() =>
+    renderer.draw(context, {
+      source: source,
+      sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+      output: { width: source.width, height: source.height },
+      base: rect,
+      target: rect,
+      frame: frame,
+      sharp: false,
+    })
+  ).toThrow('rendering failed');
   expect(context.drawImage).not.toHaveBeenCalled();
   renderer.dispose();
 });
@@ -188,13 +253,29 @@ it('restores the main render state after a filter framebuffer failure and can re
   const renderer = createReviewSpatialRenderer();
   const source = renderer.surface('plane', 320, 180).canvas;
   gl.checkFramebufferStatus.mockReturnValueOnce(0);
-  expect(() => renderer.draw(context, source, rect, rect, frame)).toThrow(
-    'framebuffer is incomplete'
-  );
+  expect(() =>
+    renderer.draw(context, {
+      source: source,
+      sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+      output: { width: source.width, height: source.height },
+      base: rect,
+      target: rect,
+      frame: frame,
+      sharp: false,
+    })
+  ).toThrow('framebuffer is incomplete');
   expect(gl.bindFramebuffer).toHaveBeenLastCalledWith(gl.FRAMEBUFFER, null);
   expect(gl.useProgram).toHaveBeenLastCalledWith(gl.createProgram.mock.results[0]!.value);
   expect(gl.viewport).toHaveBeenLastCalledWith(0, 0, 320, 180);
-  renderer.draw(context, source, rect, rect, frame);
+  renderer.draw(context, {
+    source: source,
+    sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+    output: { width: source.width, height: source.height },
+    base: rect,
+    target: rect,
+    frame: frame,
+    sharp: false,
+  });
   renderer.dispose();
 });
 
@@ -218,11 +299,35 @@ it('keeps perspective available without float targets but rejects inaccurate dep
   gl.getExtension.mockReturnValue(null);
   const renderer = createReviewSpatialRenderer();
   const source = renderer.surface('plane', 320, 180).canvas;
-  renderer.draw(context, source, rect, rect, { ...frame, focus: [] });
-  renderer.draw(context, source, rect, rect, frame, true);
-  expect(() => renderer.draw(context, source, rect, rect, frame)).toThrow(
-    'Depth renderer precision'
-  );
+  renderer.draw(context, {
+    source: source,
+    sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+    output: { width: source.width, height: source.height },
+    base: rect,
+    target: rect,
+    frame: { ...frame, focus: [] },
+    sharp: false,
+  });
+  renderer.draw(context, {
+    source: source,
+    sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+    output: { width: source.width, height: source.height },
+    base: rect,
+    target: rect,
+    frame: frame,
+    sharp: true,
+  });
+  expect(() =>
+    renderer.draw(context, {
+      source: source,
+      sourceRect: { x: 0, y: 0, width: source.width, height: source.height },
+      output: { width: source.width, height: source.height },
+      base: rect,
+      target: rect,
+      frame: frame,
+      sharp: false,
+    })
+  ).toThrow('Depth renderer precision');
   renderer.dispose();
 });
 
@@ -289,7 +394,15 @@ it('retains named canvas slots and releases managed GL reservations on context l
   expect(renderer.surface('plane', 10, 10).canvas).toBe(plane.canvas);
   const overlay = renderer.surface('overlay', 10, 10);
   expect(overlay.canvas).not.toBe(plane.canvas);
-  renderer.draw(context, plane.canvas, rect, rect, frame);
+  renderer.draw(context, {
+    source: plane.canvas,
+    sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+    output: { width: plane.canvas.width, height: plane.canvas.height },
+    base: rect,
+    target: rect,
+    frame: frame,
+    sharp: false,
+  });
   expect(resources.counters.managedBytes).toBeGreaterThan(800);
   gpu().dispatchEvent(new Event('webglcontextlost'));
   expect(lost).toHaveBeenCalledOnce();
@@ -304,13 +417,13 @@ it('retains named canvas slots and releases managed GL reservations on context l
 
 it('releases an old surface before resizing and can evict it at exact capacity', () => {
   graphics();
-  const resources = resourceSession(168 + 64 + 400);
+  const resources = resourceSession(132 + 64 + 400);
   const renderer = createReviewSpatialRenderer(undefined, resources);
   const first = renderer.surface('plane', 10, 10);
   const next = renderer.surface('plane', 5, 20);
   expect(first.canvas.width).toBe(0);
   expect(next.canvas.width).toBe(5);
-  expect(resources.counters.peakManagedBytes).toBe(632);
+  expect(resources.counters.peakManagedBytes).toBe(596);
   renderer.dispose();
   resources.dispose();
   expect(resources.counters.managedBytes).toBe(0);
@@ -324,12 +437,20 @@ it('cleans managed constructor and drawing-buffer admission failures', () => {
   );
   expect(tooSmall.counters.managedBytes).toBe(0);
   expect(loseContext).toHaveBeenCalledOnce();
-  const resources = resourceSession(168 + 64 + 400);
+  const resources = resourceSession(132 + 64 + 400);
   const renderer = createReviewSpatialRenderer(undefined, resources);
   const plane = renderer.surface('plane', 10, 10);
-  expect(() => renderer.draw(context, plane.canvas, rect, rect, frame)).toThrow(
-    'resource allocation failed'
-  );
+  expect(() =>
+    renderer.draw(context, {
+      source: plane.canvas,
+      sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+      output: { width: plane.canvas.width, height: plane.canvas.height },
+      base: rect,
+      target: rect,
+      frame: frame,
+      sharp: false,
+    })
+  ).toThrow('resource allocation failed');
   expect(resources.counters.managedBytes).toBe(400);
   renderer.dispose();
   resources.dispose();
@@ -357,3 +478,64 @@ it('retains linear filtering and edge clamping when a reserved texture is replac
   expect(gl.deleteTexture).toHaveBeenCalled();
   textures.dispose();
 });
+
+it('projects an asymmetric padded source into the unchanged output viewport', () => {
+  const { gl, context, gpu } = graphics();
+  const renderer = createReviewSpatialRenderer();
+  const plane = renderer.surface('plane', 511, 303);
+  renderer.draw(context, {
+    source: plane.canvas,
+    sourceRect: { x: -91, y: -43, width: 511, height: 303 },
+    output: { width: 321, height: 181 },
+    base: rect,
+    target: rect,
+    frame,
+    sharp: false,
+  });
+  expect(gpu()).toMatchObject({ width: 321, height: 181 });
+  expect(gl.uniform4f).toHaveBeenCalledWith('sourceRect', -91, -43, 511, 303);
+  expect(gl.uniform2f).toHaveBeenCalledWith('outputSize', 321, 181);
+  expect(gl.uniformMatrix3fv.mock.calls.some(([name]) => name === 'projection')).toBe(false);
+  renderer.dispose();
+});
+
+it.each(['viewport', 'framebuffer', 'accepted-buffer', 'source-rect', 'unsafe-bytes'] as const)(
+  'refuses %s before texture upload or partial publication',
+  (failure) => {
+    const { gl, context } = graphics();
+    const resources = resourceSession();
+    const renderer = createReviewSpatialRenderer(undefined, resources);
+    const source = renderer.surface('plane', 321, 181).canvas;
+    const request = {
+      source,
+      sourceRect: { x: -12, y: -20, width: 321, height: 181 },
+      output: { width: 301, height: 161 },
+      base: rect,
+      target: rect,
+      frame,
+    };
+    if (failure === 'viewport')
+      gl.getParameter.mockImplementation((name) =>
+        name === gl.MAX_VIEWPORT_DIMS ? new Int32Array([300, 161]) : 4096
+      );
+    if (failure === 'framebuffer')
+      gl.getParameter.mockImplementation((name) =>
+        name === gl.MAX_VIEWPORT_DIMS
+          ? new Int32Array([4096, 4096])
+          : name === gl.MAX_RENDERBUFFER_SIZE
+            ? 160
+            : 4096
+      );
+    if (failure === 'accepted-buffer')
+      Object.defineProperty(gl, 'drawingBufferWidth', { get: () => 300 });
+    if (failure === 'source-rect') request.sourceRect.width++;
+    if (failure === 'unsafe-bytes') request.output.width = Number.MAX_SAFE_INTEGER;
+    expect(() => renderer.draw(context, request)).toThrow('output size');
+    expect(gl.texImage2D).not.toHaveBeenCalled();
+    expect(context.drawImage).not.toHaveBeenCalled();
+    expect(resources.counters.managedBytes).toBe(321 * 181 * 4);
+    renderer.dispose();
+    resources.dispose();
+    expect(resources.counters.managedBytes).toBe(0);
+  }
+);

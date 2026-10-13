@@ -1,3 +1,12 @@
+import {
+  resolveProjectCursorFocusPath,
+  addProjectCursorFocusKey,
+} from '../../../features/video/project/cursor-focus-path/projection';
+import {
+  deleteCursorFocusKey,
+  updateCursorFocusKey,
+  authoredCursorFocusPath,
+} from '../../../features/video/project/cursor-focus-path/authoring';
 import { clampNumber } from '../../../features/video/project/hydration';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { normalizeVideoProjectCursorSkin } from '../../../features/video/project/cursor';
@@ -81,6 +90,13 @@ export function createCursorSampleInserter(set: VideoEditorStoreSet) {
           return project;
         }
 
+        if (project.cursorFocusPath || project.source.kind === 'recording') {
+          return applyVideoProjectMutationPatch(project, {
+            cursorFocusPath: authoredCursorFocusPath(
+              addProjectCursorFocusKey(project, time, crypto.randomUUID())
+            ),
+          });
+        }
         const sortedSamples = [...cursorTrack.samples].sort(
           (left, right) => left.time - right.time
         );
@@ -96,10 +112,24 @@ export function createCursorSampleInserter(set: VideoEditorStoreSet) {
 export function createCursorSampleDeleter(set: VideoEditorStoreSet) {
   return (sampleId: string) =>
     set((state) => {
-      if (!state.project?.cursorTrack) {
+      if (!state.project) {
         return {};
       }
 
+      if (state.project.cursorFocusPath || state.project.source.kind === 'recording') {
+        return applyProjectUpdate(state, (project) => {
+          const path = resolveProjectCursorFocusPath(project);
+          const key = path.segments
+            .flatMap((segment) => segment.keys)
+            .find((item) => item.id === sampleId);
+          return key?.anchor === 'manual'
+            ? applyVideoProjectMutationPatch(project, {
+                cursorFocusPath: authoredCursorFocusPath(deleteCursorFocusKey(path, sampleId)),
+              })
+            : project;
+        });
+      }
+      if (!state.project.cursorTrack) return {};
       const nextSamples = state.project.cursorTrack.samples.filter(
         (sample) => sample.id !== sampleId
       );
@@ -133,7 +163,17 @@ export function createCursorVisibilityUpdater(set: VideoEditorStoreSet) {
             ? {
                 ...project.cursorTrack,
                 samples: project.cursorTrack.samples.map((sample) =>
-                  sample.id === sampleId ? { ...sample, visible } : sample
+                  sample.id === sampleId
+                    ? project.source.kind === 'recording' || sample.sourceAnchor
+                      ? {
+                          ...sample,
+                          skinOverride: normalizeVideoProjectCursorSkin({
+                            ...(sample.skinOverride ?? project.cursorTrack?.skin),
+                            hidden: !visible,
+                          }),
+                        }
+                      : { ...sample, visible }
+                    : sample
                 ),
               }
             : project.cursorTrack,
@@ -150,14 +190,29 @@ export function createCursorInterpolationUpdater(set: VideoEditorStoreSet) {
     set((state) =>
       applyProjectUpdate(state, (project) =>
         applyVideoProjectMutationPatch(project, {
-          cursorTrack: project.cursorTrack
+          ...(project.cursorFocusPath || project.source.kind === 'recording'
             ? {
-                ...project.cursorTrack,
-                samples: project.cursorTrack.samples.map((sample) =>
-                  sample.id === sampleId ? { ...sample, interpolation } : sample
+                cursorFocusPath: authoredCursorFocusPath(
+                  updateCursorFocusKey(resolveProjectCursorFocusPath(project, sampleId), sampleId, {
+                    interpolation:
+                      interpolation === 'INSTANT'
+                        ? 'hold'
+                        : interpolation === 'LINEAR'
+                          ? 'linear'
+                          : 'smooth',
+                  })
                 ),
               }
-            : project.cursorTrack,
+            : {
+                cursorTrack: project.cursorTrack
+                  ? {
+                      ...project.cursorTrack,
+                      samples: project.cursorTrack.samples.map((sample) =>
+                        sample.id === sampleId ? { ...sample, interpolation } : sample
+                      ),
+                    }
+                  : project.cursorTrack,
+              }),
         })
       )
     );

@@ -65,11 +65,13 @@ export function ReviewClickFields(props: Parameters<typeof reviewClickSections>[
 
 export function reviewClickSections(props: {
   information?: ReactNode;
+  gesture?: boolean;
   extraSections?: Parameters<typeof ReviewInspectorSections>[0]['sections'];
   values: readonly ReviewClickStyle[];
   onChange(patch: Partial<ReviewClickStyle> | null): void;
 }) {
-  const { magnify, common, color } = clickFieldValues(props.values);
+  const { magnify: inferredMagnify, common, color } = clickFieldValues(props.values);
+  const magnify = !props.gesture && inferredMagnify;
   const number = (
     key: keyof typeof CLICK_BOUNDS,
     label: Parameters<typeof translate>[0],
@@ -93,32 +95,7 @@ export function reviewClickSections(props: {
     id: 'animation',
     label: translate('gallery.videoReview.clickEffect'),
     icon: MousePointer2,
-    content: (
-      <>
-        <SelectField
-          className={reviewSelectFieldClassName}
-          label={translate('gallery.videoReview.clickEffect')}
-          value={common('effect') ?? ''}
-
-          options={(['off', 'ripple', 'press', 'glow', 'magnify'] as const).map((value) => ({
-            value,
-            label: translate(`gallery.videoReview.click_${value}`),
-          }))}
-          onChange={(effect: ReviewClickStyle['effect']) =>
-            props.onChange(
-              effect === 'magnify'
-                ? { effect, radius: 100, before: 0.45, after: 0.6, easing: 'ease-in-out' }
-                : { effect }
-            )
-          }
-        />
-        {common('effect') === null ? (
-          <p className="text-right text-xs italic text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.videoReview.clickMixed')}
-          </p>
-        ) : null}
-      </>
-    ),
+    content: <ClickAnimation props={props} common={common} />,
   });
   if (common('effect') !== 'off')
     sections.push(
@@ -131,9 +108,13 @@ export function reviewClickSections(props: {
             magnify={magnify}
             color={color}
             lensShape={common('lensShape')}
-            stroke={props.values.some(
-              (value) => value.effect === 'ripple' || value.effect === 'magnify'
-            )}
+            stroke={
+              props.gesture
+                ? common('gestureAppearance') === 'path' || common('gestureAppearance') === 'area'
+                : props.values.some(
+                    (value) => value.effect === 'ripple' || value.effect === 'magnify'
+                  )
+            }
             number={number}
             onChange={props.onChange}
           />
@@ -179,7 +160,9 @@ export function reviewClickSections(props: {
     )
   );
   if (props.extraSections) sections.push(...props.extraSections);
-  return sections;
+  return props.gesture
+    ? sections.filter((section) => section.id !== 'timing' && section.id !== 'position')
+    : sections;
 }
 
 /** Temporal fields retain their source-time units and per-property commit behavior. */
@@ -351,6 +334,98 @@ function ClickSettingNumber(props: {
         onCommitValue={(next) => props.onChange({ [key]: next / factor })}
       />
       {value === null || value === undefined ? (
+        <p className="text-right text-xs italic text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.clickMixed')}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function ClickAnimation({
+  props,
+  common,
+}: {
+  props: Parameters<typeof reviewClickSections>[0];
+  common: ReturnType<typeof clickFieldValues>['common'];
+}) {
+  return (
+    <>
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.clickEffect')}
+        value={
+          props.gesture && common('effect') !== null
+            ? common('effect') === 'off'
+              ? 'off'
+              : 'press'
+            : (common('effect') ?? '')
+        }
+
+        options={(props.gesture
+          ? (['off', 'press'] as const)
+          : (['off', 'ripple', 'press', 'glow', 'magnify'] as const)
+        ).map((value) => ({
+          value,
+          label: translate(`gallery.videoReview.click_${value}`),
+        }))}
+        onChange={(effect: ReviewClickStyle['effect']) =>
+          props.onChange(
+            effect === 'magnify'
+              ? { effect, radius: 100, before: 0.45, after: 0.6, easing: 'ease-in-out' }
+              : { effect }
+          )
+        }
+      />
+      {props.gesture ? (
+        <>
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('gallery.videoReview.gestureAppearance')}
+            value={common('gestureAppearance') ?? 'halo'}
+            options={(['halo', 'path', 'area'] as const).map((value) => ({
+              value,
+              label: translate(`gallery.videoReview.gesture_${value}`),
+            }))}
+            onChange={(gestureAppearance: NonNullable<ReviewClickStyle['gestureAppearance']>) =>
+              props.onChange({ gestureAppearance })
+            }
+          />
+          {props.values.length === 1 && common('gestureAppearance') === 'area'
+            ? (['x', 'y', 'width', 'height'] as const).map((key) => (
+                <ClickNumberRow
+                  key={key}
+                  label={translate(`gallery.videoReview.gestureArea_${key}`)}
+                  value={(props.values[0]?.gestureArea?.[key] ?? 0) * 100}
+                  min={key === 'width' || key === 'height' ? 0.1 : 0}
+                  max={
+                    (1 -
+                      (props.values[0]?.gestureArea?.[
+                        key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y'
+                      ] ?? (key === 'x' || key === 'y' ? 0.5 : 0.25))) *
+                    100
+                  }
+                  step={0.1}
+                  precision={1}
+                  unit="%"
+                  onCommitValue={(value) =>
+                    props.onChange({
+                      gestureArea: {
+                        x: 0.25,
+                        y: 0.25,
+                        width: 0.5,
+                        height: 0.5,
+                        ...props.values[0]?.gestureArea,
+                        [key]: value / 100,
+                      },
+                    })
+                  }
+                />
+              ))
+            : null}
+        </>
+      ) : null}
+      {common('effect') === null ? (
         <p className="text-right text-xs italic text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.clickMixed')}
         </p>

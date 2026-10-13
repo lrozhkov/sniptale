@@ -61,6 +61,11 @@ import type { ReviewMediaIndex } from './media-index';
 import { encodeReviewProvenance } from '../../features/video/review/provenance';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
+import {
+  createReviewExportDiagnostics,
+  cleanupReviewExportFailure,
+  type ReviewExportDiagnostics,
+} from './export-diagnostics';
 
 export { QuickEditExportUnavailable };
 
@@ -192,13 +197,13 @@ export async function buildReviewExportClipPlan(
       originalMuted: args.advanced.audio.original.muted,
     };
   } catch (error) {
-    dispose();
-    args.signal.throwIfAborted();
-    if (error instanceof ReviewActionAudioUnavailable)
-      throw new QuickEditExportUnavailable([
-        error.reason === 'voice-limit' ? 'action-audio-limit' : 'action-audio-resource',
-      ]);
-    throw error;
+    const primary =
+      error instanceof ReviewActionAudioUnavailable
+        ? new QuickEditExportUnavailable([
+            error.reason === 'voice-limit' ? 'action-audio-limit' : 'action-audio-resource',
+          ])
+        : error;
+    return await cleanupReviewExportFailure(primary, dispose);
   }
 }
 
@@ -250,6 +255,7 @@ type ReviewExportInput = {
   index: ReviewMediaIndex;
   signal: AbortSignal;
   destination?: 'gallery' | 'download';
+  diagnostics?: ReviewExportDiagnostics;
   selection?: Extract<ReviewAnchor, { kind: 'range' }>;
   onProgress?(fraction: number): void;
   onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
@@ -358,38 +364,72 @@ type PreparedReviewExport = Awaited<ReturnType<typeof prepareReviewExport>>;
 
 /** Owns acquired external audio through preparation, staging and final publication. */
 export async function exportReviewedVideo(args: ReviewExportInput, deps = persistence) {
-  return runWithAssetResourceRead(() => exportWithRetainedResources(args, deps));
+  const diagnostics =
+    args.diagnostics ??
+    createReviewExportDiagnostics({
+      destination: args.destination ?? 'gallery',
+      signal: args.signal,
+    });
+  try {
+    return await runWithAssetResourceRead(() =>
+      exportWithRetainedResources(args, deps, diagnostics)
+    );
+  } catch (error) {
+    diagnostics.reportFailure(error);
+    throw error;
+  }
 }
 
-async function exportWithRetainedResources(args: ReviewExportInput, deps: typeof persistence) {
-  const prepared = await prepareReviewExport(args, deps);
+async function exportWithRetainedResources(
+  args: ReviewExportInput,
+  deps: typeof persistence,
+  diagnostics: ReviewExportDiagnostics
+) {
+  const prepared = await diagnostics.phase('prepare', () => prepareReviewExport(args, deps));
   const { plan, advanced, fragmentOffset } = prepared;
+  diagnostics.setRoute(
+    plan.video === 'copy'
+      ? 'copy'
+      : resolveQuickEditEffectiveState(advanced).presentation
+        ? 'presentation'
+        : 'render'
+  );
+  diagnostics.setMetrics({
+    width: prepared.outputProfile.width,
+    height: prepared.outputProfile.height,
+  });
   const { signal } = args;
   let exportAudio: ReviewExportClipPlan | undefined;
+  let result: Awaited<ReturnType<typeof writePreparedReviewExport>>;
   try {
     if (plan.audio === 'process') {
-      exportAudio = await buildReviewExportClipPlan(
-        {
-          advanced,
-          fragmentOffset,
-          signal,
-          readProjectAsset: deps.readProjectAsset,
-          ...(prepared.action ? { action: prepared.action } : {}),
-        },
-        { openAudioSource: deps.openAudioSource, createActionSource: deps.createActionSource }
+      exportAudio = await diagnostics.phase('audio-prepare', () =>
+        buildReviewExportClipPlan(
+          {
+            advanced,
+            fragmentOffset,
+            signal,
+            readProjectAsset: deps.readProjectAsset,
+            ...(prepared.action ? { action: prepared.action } : {}),
+          },
+          { openAudioSource: deps.openAudioSource, createActionSource: deps.createActionSource }
+        )
       );
     }
-    return await writePreparedReviewExport(args, prepared, exportAudio, deps);
-  } finally {
-    exportAudio?.dispose?.();
+    result = await writePreparedReviewExport(args, prepared, exportAudio, deps, diagnostics);
+  } catch (error) {
+    return await cleanupReviewExportFailure(error, () => exportAudio?.dispose?.());
   }
+  await diagnostics.phase('cleanup', () => exportAudio?.dispose?.());
+  return result;
 }
 
 async function writePreparedReviewExport(
   args: ReviewExportInput,
   prepared: PreparedReviewExport,
   exportAudio: ReviewExportClipPlan | undefined,
-  deps: typeof persistence
+  deps: typeof persistence,
+  diagnostics: ReviewExportDiagnostics
 ) {
   const { signal, index } = args;
   const { workspace, original, advanced, fragment, edits, renderSettings, outputProfile, plan } =
@@ -414,21 +454,27 @@ async function writePreparedReviewExport(
   const suffix = fragment
     ? `fragment-${fragment.start.toFixed(3)}-${fragment.end.toFixed(3)}`
     : 'edited';
-  const filename = await createOutputFilename({
-    category: 'recordings',
-    type: 'video-review',
-    title: original.filename.replace(/\.[^.]+$/, ''),
-    extension: outputProfile.format,
-    suffix,
-  });
-  await deps.assertAssetWriteAdmission(original.file.size + 1024 * 1024);
+  const filename = await diagnostics.phase('prepare', () =>
+    createOutputFilename({
+      category: 'recordings',
+      type: 'video-review',
+      title: original.filename.replace(/\.[^.]+$/, ''),
+      extension: outputProfile.format,
+      suffix,
+    })
+  );
+  await diagnostics.phase('prepare', () =>
+    deps.assertAssetWriteAdmission(original.file.size + 1024 * 1024)
+  );
   signal.throwIfAborted();
   // Cold database admission reserves the exclusive transition gate; it must settle
   // before the export writer holds a shared transition lease through publication.
-  await deps.initDB();
-  const writer = await deps.createSeekableAssetObjectWriter({
-    mimeType: `video/${outputProfile.format}`,
-  });
+  await diagnostics.phase('prepare', () => deps.initDB());
+  const writer = await diagnostics.phase('prepare', () =>
+    deps.createSeekableAssetObjectWriter({
+      mimeType: `video/${outputProfile.format}`,
+    })
+  );
   const timing = createReviewExportTiming(
     outputProfile,
     index,
@@ -440,17 +486,26 @@ async function writePreparedReviewExport(
   );
   let publishing = false;
   try {
-    const packetReceipt = await renderPreparedReviewExport(
-      args,
-      prepared,
-      { writer, timing, provenance, exportAudio },
-      deps
+    const packetReceipt = await diagnostics.phase(
+      plan.video === 'copy' ? 'encode' : 'compose',
+      () =>
+        renderPreparedReviewExport(
+          args,
+          prepared,
+          { writer, timing, provenance, exportAudio },
+          deps
+        )
     );
+    if (plan.video === 'render')
+      diagnostics.setMetrics({ completedFrames: packetReceipt.videoPackets });
     signal.throwIfAborted();
     timing.finish();
     args.onTimeEstimate?.(null);
-    const stagedAsset = await writer.finalize();
-    const file = await deps.readAssetFile(stagedAsset.ref, filename);
+    const stagedAsset = await diagnostics.phase('staging-finalize', () => writer.finalize());
+    diagnostics.setMetrics({ bytes: stagedAsset.ref.size });
+    const file = await diagnostics.phase('staging-read', () =>
+      deps.readAssetFile(stagedAsset.ref, filename)
+    );
     signal.throwIfAborted();
     if (args.destination === 'download') {
       const receipt: ReviewExportReceipt = {
@@ -460,26 +515,41 @@ async function writePreparedReviewExport(
         filename,
         createdAt,
       };
-      return { file, receipt, release: () => writer.abort() };
+      return {
+        file,
+        receipt,
+        release: async () => {
+          try {
+            await diagnostics.phase('download-release', () => writer.abort());
+          } catch (error) {
+            diagnostics.reportFailure(error, 'download-release', 'download-release-failed');
+            throw error;
+          }
+        },
+      };
     }
     args.onPublishing?.();
     publishing = true;
     const outputSize = plan.video === 'render' ? outputProfile : workspace.source;
-    await deps.saveRecordingsBatchSafely([
-      {
-        id,
-        filename,
-        preparedAsset: stagedAsset,
-        ...reviewRecordingMetadata(original),
-        mediaMetadata: {
-          kind: 'video',
-          width: outputSize.width,
-          height: outputSize.height,
-          duration: packetReceipt.resultDuration,
+    await diagnostics.phase('publish', () =>
+      deps.saveRecordingsBatchSafely([
+        {
+          id,
+          filename,
+          preparedAsset: stagedAsset,
+          ...reviewRecordingMetadata(original),
+          mediaMetadata: {
+            kind: 'video',
+            width: outputSize.width,
+            height: outputSize.height,
+            duration: packetReceipt.resultDuration,
+          },
         },
-      },
-    ]);
-    await deps.releaseAssetReadyProtection([writer.assetId]);
+      ])
+    );
+    await diagnostics.phase('release-protection', () =>
+      deps.releaseAssetReadyProtection([writer.assetId])
+    );
     const receipt: ReviewExportReceipt = {
       ...packetReceipt,
       revision: workspace.revision,
@@ -489,18 +559,11 @@ async function writePreparedReviewExport(
     };
     return { file, receipt };
   } catch (error) {
-    try {
+    return await cleanupReviewExportFailure(error, async () => {
       // Publication owns any ready journal from this point; abort must not delete referenced media.
       if (publishing) await deps.releaseAssetReadyProtection([writer.assetId]);
       else await writer.abort();
-    } catch (cleanup) {
-      throw new AggregateError(
-        [error, cleanup],
-        'Export failed and staging cleanup needs recovery.',
-        { cause: cleanup }
-      );
-    }
-    throw error;
+    });
   } finally {
     args.onTimeEstimate?.(null);
   }
@@ -537,6 +600,7 @@ async function renderPreparedReviewExport(
         index,
         edits,
         advanced,
+        cursorFacts: { facts: original.telemetry, source: original.source },
         captionTimeMap: buildReviewTimeMap(index.duration, document.edits),
         ...(prepared.workspace.effectSnapshots
           ? { effectSnapshots: prepared.workspace.effectSnapshots }

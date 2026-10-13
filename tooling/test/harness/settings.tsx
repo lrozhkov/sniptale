@@ -24,10 +24,36 @@ declare global {
     __sniptaleEventHistoryHarness: {
       populate(): Promise<{ readCreatedDatabase: boolean; archives: number }>;
       erase(): Promise<boolean>;
+      exportFailure(): Promise<{ matches: number }>;
     };
   }
 }
 window.__sniptaleEventHistoryHarness = {
+  async exportFailure() {
+    const { createReviewExportDiagnostics } =
+      await import('../../../apps/extension/src/workflows/video-review/export-diagnostics');
+    const { installDiagnosticLogObserver } =
+      await import('@sniptale/platform/observability/logger');
+    const { createRuntimeLog } =
+      await import('../../../apps/extension/src/composition/persistence/diagnostics/runtime-log');
+    const log = createRuntimeLog();
+    const stop = installDiagnosticLogObserver((event) => log.append(event, 'settings'));
+    const diagnostics = createReviewExportDiagnostics({ destination: 'download', route: 'render' });
+    try {
+      try {
+        await diagnostics.phase('mux-finalize', () => {
+          throw new Error('private-file.webm https://private.example/token user content');
+        });
+      } catch (error) {
+        diagnostics.reportFailure(error);
+      }
+      await log.settled();
+      const entries = await log.read();
+      return { matches: entries.filter((entry) => entry.source === 'ReviewExport').length };
+    } finally {
+      stop();
+    }
+  },
   async populate() {
     const { createEventHistoryDatabase } =
       await import('../../../apps/extension/src/composition/persistence/diagnostics/event-history-database');

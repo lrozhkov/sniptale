@@ -59,7 +59,7 @@ interface StoredSchemaContract {
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
     domainId: 'recordings',
-    schemaVersion: 1,
+    schemaVersion: 2,
     stores: [
       { storeName: STORE_NAME, dataClass: 'durable-authority' },
       { storeName: RECORDING_TELEMETRY_STORE, dataClass: 'durable-authority' },
@@ -67,7 +67,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 21,
+    schemaVersion: 22,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -89,7 +89,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 3,
+    schemaVersion: 4,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_ASSETS_STORE, dataClass: 'durable-authority' },

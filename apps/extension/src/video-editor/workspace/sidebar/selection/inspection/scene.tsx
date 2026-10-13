@@ -1,3 +1,4 @@
+import { InspectCursorPathSettings } from './cursor-path';
 import { GridSettingsPanel } from '../../settings';
 import { translate } from '../../../../../platform/i18n';
 import { getProjectSceneBackground } from '../../../../../features/video/project/scene/background';
@@ -77,6 +78,12 @@ function createSceneGroups(
           onRememberRecentColor={props.onRememberRecentColor}
         />
       ) : null,
+    },
+    {
+      id: 'cursor-path',
+      semantic: 'tracking' as const,
+      label: translate('videoEditor.sidebar.cursorFocusPathTitle'),
+      content: <InspectCursorPathSettings project={props.project} />,
     },
     createSceneObjectTracksGroup(props, objectTracks),
   ] as const;

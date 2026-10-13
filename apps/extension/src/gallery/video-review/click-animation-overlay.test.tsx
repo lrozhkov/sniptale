@@ -64,6 +64,7 @@ it('paints the raster-local click and repaints its lens after paused video decod
     rect: vi.fn(),
     fill: vi.fn(),
     drawImage: vi.fn(),
+    setTransform: vi.fn(),
   };
   const context = vi
     .spyOn(HTMLCanvasElement.prototype, 'getContext')
@@ -111,6 +112,48 @@ it('paints the raster-local click and repaints its lens after paused video decod
       expect.any(Number),
       expect.any(Number)
     );
+    const header = document.createElement('canvas');
+    header.width = 160;
+    const window = {
+      videoRect: props.video,
+      windowRect: { x: 100, y: 10, width: 600, height: 380 },
+    };
+    paint.drawImage.mockClear();
+    await act(async () =>
+      root.render(
+        <ReviewClickOverlay
+          {...props}
+          cues={[lens[0]!, lens[0]!]}
+          getFrame={() => video}
+          headerImage={header}
+          window={window}
+        />
+      )
+    );
+    const originals = paint.drawImage.mock.calls.filter(([source]) => source === video);
+    const headers = paint.drawImage.mock.calls.filter(([source]) => source === header);
+    const lenses = paint.drawImage.mock.calls.filter(
+      ([source]) => source !== video && source !== header
+    );
+    expect(originals).toHaveLength(1);
+    expect(headers).toHaveLength(1);
+    expect(lenses).toHaveLength(2);
+    expect(lenses[0]![0]).toBe(lenses[1]![0]);
+    paint.drawImage.mockClear();
+    video.dispatchEvent(new Event('timeupdate'));
+    expect(paint.drawImage.mock.calls.filter(([source]) => source === video)).toHaveLength(1);
+    paint.drawImage.mockClear();
+    await act(async () =>
+      root.render(
+        <ReviewClickOverlay
+          {...props}
+          getFrame={() => video}
+          headerImage={header}
+          window={window}
+        />
+      )
+    );
+    expect(paint.drawImage).not.toHaveBeenCalled();
     await act(async () => root.render(<ReviewClickOverlay {...props} cues={[]} />));
     paint.drawImage.mockClear();
     video.dispatchEvent(new Event('seeked'));

@@ -15,26 +15,28 @@ const open = vi.fn();
 function Fixture({
   domain = 'result',
   busy = false,
+  compact = false,
+  fragmentCount = 1,
 }: {
   domain?: 'source' | 'result';
   busy?: boolean;
+  compact?: boolean;
+  fragmentCount?: number;
 }) {
   const document = useRef<ReviewTextDocument>({
     version: 1,
-    fragments: [
-      {
-        id: 'text',
-        text: 'Hello',
-        originalText: '',
-        start: 1,
-        end: 2,
-        timeDomain: domain,
-        revision: 0,
-        timingRevision: 0,
-        alignment: 'manual',
-        showInVideo: true,
-      },
-    ],
+    fragments: Array.from({ length: fragmentCount }, (_, index) => ({
+      id: index ? 'overlap' : 'text',
+      text: 'Hello',
+      originalText: '',
+      start: 1,
+      end: 2,
+      timeDomain: domain,
+      revision: 0,
+      timingRevision: 0,
+      alignment: 'manual',
+      showInVideo: true,
+    })),
   });
   const [, refresh] = useState(0);
   current = document.current;
@@ -66,6 +68,7 @@ function Fixture({
     <ReviewTextTrack
       editor={editor}
       busy={busy}
+      compact={compact}
       selectedId="text"
       onSelect={select}
       onOpenDocument={open}
@@ -101,6 +104,34 @@ function prepare() {
   });
   return block;
 }
+
+it.each([false, true])(
+  'matches annotation row geometry for compact=%s without document writes',
+  (compact) => {
+    const step = compact ? 28 : 36;
+    for (const fragmentCount of [0, 1, 2]) {
+      act(() =>
+        root.render(<Fixture key={fragmentCount} compact={compact} fragmentCount={fragmentCount} />)
+      );
+      const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.textTrack"]')!;
+      expect(lane.style.height).toBe(`${Math.max(1, fragmentCount) * step - 4}px`);
+      expect(lane.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+      expect(lane.className).not.toContain('my-1');
+      const blocks = lane.querySelectorAll<HTMLElement>('[data-text-id]');
+      expect(blocks).toHaveLength(fragmentCount);
+      const tops = [...blocks].map((block) => parseFloat(block.style.top)).sort((a, b) => a - b);
+      expect(tops).toEqual(Array.from({ length: fragmentCount }, (_, index) => index * step + 2));
+      for (const block of blocks) {
+        expect(block.style.height).toBe(`${step - 8}px`);
+      }
+      const before = structuredClone(current);
+      act(() =>
+        root.render(<Fixture key={fragmentCount} compact={compact} fragmentCount={fragmentCount} />)
+      );
+      expect(current).toEqual(before);
+    }
+  }
+);
 async function pointer(target: Element, type: string, x: number) {
   await act(async () => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });

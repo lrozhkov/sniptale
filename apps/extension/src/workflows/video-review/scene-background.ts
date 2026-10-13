@@ -66,6 +66,12 @@ export function createReviewBackgroundPainter(resources: RenderResources) {
     cached = null;
   };
   return {
+    /** Geometry only; the painter retains exclusive ownership of its cache lease. */
+    get retainedCacheSize() {
+      return cached
+        ? { width: cached.lease.canvas.width, height: cached.lease.canvas.height }
+        : null;
+    },
     draw(context: CanvasRenderingContext2D, args: BackgroundPaint) {
       if (disposed) throw new Error('Background painter is disposed.');
       const { background, image, width, height } = args;

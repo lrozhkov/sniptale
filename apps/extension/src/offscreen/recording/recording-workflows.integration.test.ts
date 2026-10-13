@@ -32,7 +32,6 @@ vi.mock('../../composition/persistence/recordings/completion-outbox', async (imp
   removeVideoRecordingCompletionOutbox: vi.fn().mockResolvedValue(true),
   updateVideoRecordingCompletionOutbox: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./signals/static-frame', () => ({ persistStaticFrameSignals: vi.fn() }));
 vi.mock('./multi-source/messages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./multi-source/messages')>()),
   notifyMultiSourceSaved: notifySavedMock,

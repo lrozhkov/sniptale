@@ -129,6 +129,7 @@ export type ReviewOperation = { id: string; at: number } & (
  * through the same owner, so a stale edit never hides behind a newer selection.
  */
 export type ReviewSelection =
+  | { kind: 'cursor-focus'; id: string; time: number }
   | { kind: 'none' }
   | { kind: 'webcam' }
   | { kind: 'webcam-position'; id: string }

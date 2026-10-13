@@ -1,5 +1,5 @@
-import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 // @vitest-environment jsdom
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

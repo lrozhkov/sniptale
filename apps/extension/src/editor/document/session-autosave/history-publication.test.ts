@@ -1,5 +1,5 @@
-import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 // @vitest-environment jsdom
+import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../page-session/document.test-support';
 import { createEditorSessionAutosaveService } from './';

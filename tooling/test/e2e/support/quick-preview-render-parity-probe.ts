@@ -20,6 +20,8 @@ import {
 import {
   paintReviewCutTransition,
   paintReviewCutBlackout,
+  paintReviewCutDissolve,
+  reviewCutTransitionSides,
 } from '../../../../apps/extension/src/workflows/video-review/cut-transition-frames';
 import {
   computeQuickEditSceneLayout,
@@ -240,10 +242,16 @@ function transition(
 }
 
 /** Independent export ordering; no call to the prepared renderer or its request builder. */
-async function reference(scene: Scene, frame: Frame, backing = size) {
+async function reference(
+  scene: Scene,
+  frame: Frame,
+  backing = size,
+  finalDecorations = true,
+  transparent = false
+) {
   const output = canvas(backing),
-    context = output.getContext('2d', { alpha: false })!;
-  const camera = evaluateQuickEditCameraAtTime(scene.zoomRegions, time);
+    context = output.getContext('2d', { alpha: transparent })!;
+  const camera = evaluateQuickEditCameraAtTime(scene.zoomRegions, frame.resultTime);
   const layout = computeQuickEditSceneLayout({
     output,
     source: size,
@@ -337,29 +345,72 @@ async function reference(scene: Scene, frame: Frame, backing = size) {
         }),
   };
   try {
-    drawReviewSceneFrame(context, {
-      ...drawScene,
-      spatialRenderer: spatial,
-      motionBlur: quickEditMotionBlurCameras(scene.zoomRegions, time),
-      deferComments: true,
-      windowRasterBacking: {
-        width: Math.max(1, Math.ceil(layout.windowRect.width)),
-        height: Math.max(1, Math.ceil(layout.windowRect.height)),
-      },
-    });
-    drawReviewSceneOverlays({
-      scene: drawScene,
-      renderer: spatial,
-      context,
-      canvas: output,
-      spotlightScratch: null,
-      regions: scene.zoomRegions,
-      globalResultTime: time,
-      cameraScale: camera.scale,
-      sourceWidth: size.width,
-      clicks: scene.clicks,
-    });
-    if (scene.webcam && frame.camera)
+    if (frame.transition?.blend.plan.type === 'dissolve') {
+      const { blend, frames, resultOffset } = frame.transition;
+      const sides = reviewCutTransitionSides(
+        blend,
+        frames,
+        frame.source,
+        frame.resultTime,
+        resultOffset
+      );
+      const endpoints = await Promise.all(
+        sides.map((side, index) =>
+          reference(
+            scene,
+            {
+              ...frame,
+              resultTime: side.resultTime,
+              sourceTime: side.sample.timestamp,
+              source: { ...side.sample, backing: size },
+              transition: undefined,
+            },
+            backing,
+            false,
+            index === 1
+          )
+        )
+      );
+      const scratch = canvas(backing),
+        scratchContext = scratch.getContext('2d')!;
+      try {
+        paintReviewCutDissolve(
+          context,
+          { canvas: scratch, context: scratchContext },
+          blend.incoming,
+          (target, _surface, index) => target.drawImage(endpoints[index]!, 0, 0),
+          output
+        );
+      } finally {
+        for (const endpoint of endpoints) endpoint.width = endpoint.height = 0;
+        scratch.width = scratch.height = 0;
+      }
+    } else
+      drawReviewSceneFrame(context, {
+        ...drawScene,
+        spatialRenderer: spatial,
+        motionBlur: quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime),
+        deferComments: true,
+        windowRasterBacking: {
+          width: Math.max(1, Math.ceil(layout.windowRect.width)),
+          height: Math.max(1, Math.ceil(layout.windowRect.height)),
+        },
+        drawOverlays: (windowRaster) =>
+          drawReviewSceneOverlays({
+            scene: drawScene,
+            renderer: spatial,
+            context,
+            canvas: output,
+            spotlightScratch: null,
+            regions: scene.zoomRegions,
+            globalResultTime: frame.resultTime,
+            cameraScale: camera.scale,
+            sourceWidth: size.width,
+            clicks: scene.clicks,
+            windowRaster,
+          }),
+      });
+    if (finalDecorations && scene.webcam && frame.camera)
       drawReviewWebcam(
         context,
         output,
@@ -369,12 +420,14 @@ async function reference(scene: Scene, frame: Frame, backing = size) {
         frame.camera.drawable,
         frame.camera.crop
       );
-    context.save();
-    context.scale(scale, backing.height / size.height);
-    drawReviewKeys(context, scene.keys, time, size);
-    watermark.draw(context);
-    context.restore();
-    paintReviewCutBlackout(context, output, frame.transition?.blend ?? null);
+    if (finalDecorations) {
+      context.save();
+      context.scale(scale, backing.height / size.height);
+      drawReviewKeys(context, scene.keys, frame.resultTime, size);
+      watermark.draw(context);
+      context.restore();
+      paintReviewCutBlackout(context, output, frame.transition?.blend ?? null);
+    }
     return output;
   } finally {
     header?.close();
@@ -436,7 +489,7 @@ export async function probe() {
       new AbortController().signal
     );
     const expected = await reference(scene, frame),
-      actual = renderer.render(prepared, frame);
+      actual = await renderer.render(prepared, frame);
     const parity = compare(actual.canvas, expected);
     show(cut ?? 'all layers', expected, actual.canvas);
     const witnesses: Record<string, number> = {};
@@ -626,7 +679,7 @@ async function advancedCases(source: ReturnType<typeof samples>) {
       camera: { ...frame.camera!, drawable: drawable(cameraLease.canvas) },
     };
     const expected = await reference(scene, frame, backing),
-      actual = renderer.render(prepared, admittedFrame);
+      actual = await renderer.render(prepared, admittedFrame);
     const parity = compare(actual.canvas, expected);
     const name =
       backing.width === size.width ? 'spatial-motion-webcam' : 'reduced-spatial-canonical-text';

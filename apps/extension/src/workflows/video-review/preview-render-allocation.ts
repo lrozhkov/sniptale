@@ -16,6 +16,9 @@ import {
 } from '../../features/video/review/comments';
 import { reviewSpotlightNeedsClip } from './render-spotlight';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
+import { evaluateReviewClicks } from '../../features/video/review/click-animation';
+import { reviewWindowRasterBacking } from './window-header';
+import { reviewSpatialSourceRect } from './scene-shadow';
 
 interface Size {
   width: number;
@@ -57,8 +60,9 @@ export interface PreviewRenderAllocationInput {
   scene: {
     transitionRaster: Size | null;
     windowRaster: Size | null;
+    clickLens?: boolean;
     motionPass: Size | null;
-    spatial: null | { backing: Size; halfFloat: boolean };
+    spatial: null | { output: Size; plane: Size; halfFloat: boolean };
     spotlight: null | { backing: Size; frameCount: number; blurRadius: number; fastPath: boolean };
     border: Size | null;
     denseCommentGradient: Size | null;
@@ -122,14 +126,17 @@ function gradient(size: Size | null): Allocation[] {
 }
 function spatial(value: PreviewRenderAllocationInput['scene']['spatial']): Allocation[] {
   if (!value) return [];
-  const { backing, halfFloat } = value;
-  const result = ['plane', 'exposure', 'overlay'].map((role) => canvas(`spatial-${role}`, backing));
+  const { output, plane, halfFloat } = value;
+  const result = [
+    canvas('spatial-plane', plane),
+    ...['exposure', 'overlay'].map((role) => canvas(`spatial-${role}`, output)),
+  ];
   result.push(
-    bytes('spatial-drawing-buffer', pixels(backing) * 4),
-    bytes('spatial-vertex-and-matrices', 168),
+    bytes('spatial-drawing-buffer', pixels(output) * 4),
+    bytes('spatial-vertex-and-matrices', 132),
     bytes('spatial-level-sizes', 64)
   );
-  let { width, height } = backing;
+  let { width, height } = plane;
   for (let level = 0; level < 8; level++) {
     result.push(
       bytes(
@@ -288,10 +295,11 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
   const phases = [
     ...preparation(input, front),
     phase('scene', [...normal, ...window, ...motion]),
-    phase('spotlight-coverage', [...normal, ...masks.coverage]),
-    phase('spotlight-composite', [...normal, ...masks.composite]),
+    phase('spotlight-coverage', [...normal, ...window, ...masks.coverage]),
+    phase('spotlight-composite', [...normal, ...window, ...masks.composite]),
     phase('border', [
       ...normal,
+      ...window,
       ...optionalCanvas('border-layer', input.scene.border),
       ...optionalCanvas('border-mask', input.scene.border),
     ]),
@@ -307,6 +315,7 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
       ...gradient(input.scene.denseBackgroundGradient),
     ]),
   ];
+  if (input.scene.clickLens) phases.push(phase('click-lens', [...normal, ...window]));
   if (input.background) {
     const background = input.background;
     const rebuilding = [
@@ -492,7 +501,18 @@ function focusAllocation(
       (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
   );
   return {
-    spatial: spatialRetained ? { backing, halfFloat: input.spatialHalfFloat ?? true } : null,
+    spatial: spatialRetained
+      ? {
+          output: backing,
+          plane: reviewSpatialSourceRect({
+            output: backing,
+            window: layout.windowRect,
+            background,
+            sceneScale,
+          }),
+          halfFloat: input.spatialHalfFloat ?? true,
+        }
+      : null,
     spatialFormatPending: spatialRetained && input.spatialHalfFloat === undefined,
     spotlight: spotlights.length
       ? {
@@ -553,6 +573,9 @@ export function resolvePreviewRenderAllocation(
   const background = backgroundAllocation(input, geometry);
   const commentUpperBound = commentGradientUpperBound(input, camera.scale, !!layout.spatial);
   const transition = input.transitionBytes;
+  const clickLens = evaluateReviewClicks(scene.clicks, input.resultTime).some(
+    (click) => (click.lens?.scale ?? 1) > 1
+  );
   return {
     publication: { backing, previousFront: input.previousFront },
     admission: {
@@ -573,11 +596,13 @@ export function resolvePreviewRenderAllocation(
     scene: {
       transitionRaster: transition ? input.sourceBacking : null,
       windowRaster: input.assets.headerBitmap
-        ? {
-            width: Math.max(1, Math.ceil(layout.windowRect.width)),
-            height: Math.max(1, Math.ceil(layout.windowRect.height)),
-          }
+        ? reviewWindowRasterBacking({
+            windowRect: layout.windowRect,
+            sourceWidth: scene.source.width,
+            magnify: clickLens,
+          })
         : null,
+      clickLens,
       motionPass:
         !layout.spatial &&
         !input.cameraTransform &&

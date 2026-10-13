@@ -5,13 +5,11 @@ import type {
 } from '../../composition/persistence/recordings/staging';
 import { createPreparedRecordingAssetForTest } from '../../composition/persistence/recordings/staging/test-support';
 
-const { loadSettingsMock, persistStaticFrameSignalsMock, saveBatchMock, sendRuntimeMessageMock } =
-  vi.hoisted(() => ({
-    loadSettingsMock: vi.fn(),
-    persistStaticFrameSignalsMock: vi.fn(),
-    saveBatchMock: vi.fn(),
-    sendRuntimeMessageMock: vi.fn(),
-  }));
+const { loadSettingsMock, saveBatchMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
+  loadSettingsMock: vi.fn(),
+  saveBatchMock: vi.fn(),
+  sendRuntimeMessageMock: vi.fn(),
+}));
 
 vi.mock('../../composition/persistence/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/settings')>()),
@@ -34,10 +32,6 @@ vi.mock('../../composition/persistence/recordings/completion-outbox', async (imp
   >()),
   readVideoRecordingCompletionOutbox: vi.fn(async () => saveBatchMock.mock.lastCall?.[1]),
   removeVideoRecordingCompletionOutbox: vi.fn().mockResolvedValue(true),
-}));
-
-vi.mock('./signals/static-frame', () => ({
-  persistStaticFrameSignals: persistStaticFrameSignalsMock,
 }));
 
 import { finalizeRecording } from './finalizer';
@@ -139,7 +133,6 @@ describe('recording finalizer', () => {
       expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
         vi.mocked(staging.delete).mock.invocationCallOrder[0]!
       );
-      expect(persistStaticFrameSignalsMock).toHaveBeenCalledWith(primary.artifactId);
     }
   );
 

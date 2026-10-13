@@ -11,13 +11,37 @@ function createPointerLikeEvent(clientX: number, clientY: number): MouseEvent {
   return new MouseEvent(eventName, { bubbles: true, clientX, clientY });
 }
 
+function sendTrusted(event: Event): void {
+  const match = vi
+    .mocked(document.addEventListener)
+    .mock.calls.toReversed()
+    .find(([type]) => type === event.type);
+  const listener = match?.[1];
+  if (
+    typeof listener !== 'function' ||
+    vi.mocked(document.removeEventListener).mock.calls.some(([, removed]) => removed === listener)
+  )
+    return;
+  const delivered = new Proxy(event, {
+    get(target, key) {
+      if (key === 'isTrusted') return true;
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  listener.call(document, delivered);
+}
+
 beforeEach(() => {
+  vi.spyOn(document, 'addEventListener');
+  vi.spyOn(document, 'removeEventListener');
   vi.useFakeTimers();
   let counter = 0;
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => `id-${++counter}`) });
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   document.getElementById('sniptale-controlled-cursor-overlay')?.remove();
@@ -29,16 +53,17 @@ it('records cursor samples and click actions across enable pause resume and disa
   const controller = createVideoTelemetryController();
 
   controller.enable('recording-1');
-  document.dispatchEvent(createPointerLikeEvent(40, 60));
-  document.dispatchEvent(
-    new MouseEvent('click', { bubbles: true, detail: 1, clientX: 40, clientY: 60 })
+  sendTrusted(createPointerLikeEvent(40, 60));
+  sendTrusted(
+    new MouseEvent('pointerdown', { bubbles: true, detail: 1, clientX: 40, clientY: 60 })
   );
+  sendTrusted(new MouseEvent('pointerup', { clientX: 40, clientY: 60 }));
   controller.pause();
   vi.advanceTimersByTime(24);
-  document.dispatchEvent(createPointerLikeEvent(90, 120));
+  sendTrusted(createPointerLikeEvent(90, 120));
   controller.resume();
   vi.advanceTimersByTime(24);
-  document.dispatchEvent(createPointerLikeEvent(120, 160));
+  sendTrusted(createPointerLikeEvent(120, 160));
 
   const snapshot = controller.disable();
 
@@ -93,14 +118,12 @@ it('throttles high-frequency pointer samples while preserving click capture', ()
   const controller = createVideoTelemetryController();
 
   controller.enable('recording-3');
-  document.dispatchEvent(createPointerLikeEvent(10, 10));
+  sendTrusted(createPointerLikeEvent(10, 10));
   vi.advanceTimersByTime(10);
-  document.dispatchEvent(createPointerLikeEvent(11, 11));
+  sendTrusted(createPointerLikeEvent(11, 11));
   vi.advanceTimersByTime(10);
-  document.dispatchEvent(createPointerLikeEvent(12, 12));
-  document.dispatchEvent(
-    new MouseEvent('click', { bubbles: true, detail: 1, clientX: 12, clientY: 12 })
-  );
+  sendTrusted(createPointerLikeEvent(12, 12));
+  sendTrusted(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 12, clientY: 12 }));
 
   const snapshot = controller.disable();
 
@@ -111,8 +134,8 @@ it('throttles high-frequency pointer samples while preserving click capture', ()
 it('returns stable initial viewport proof for an unchanged recording', () => {
   const controller = createVideoTelemetryController();
   controller.enable('static-recording');
-  document.dispatchEvent(
-    new MouseEvent('click', { bubbles: true, detail: 1, clientX: 40, clientY: 60 })
+  sendTrusted(
+    new MouseEvent('pointerdown', { bubbles: true, detail: 1, clientX: 40, clientY: 60 })
   );
   expect(controller.disable()).toMatchObject({
     viewportObservation: {
@@ -148,7 +171,7 @@ it('captures keyboard commands once and excludes paused time across resume and s
   const key = (value: string, time: number) => {
     const event = new KeyboardEvent('keydown', { key: value, bubbles: true });
     Object.defineProperty(event, 'timeStamp', { value: time });
-    document.dispatchEvent(event);
+    sendTrusted(event);
   };
   try {
     key('F1', 1100);
@@ -185,7 +208,7 @@ it('does not turn a recording pause into cursor idle activity after resume', () 
     controller.enable('idle-pause');
     const event = createPointerLikeEvent(40, 60);
     Object.defineProperty(event, 'timeStamp', { value: 1100 });
-    document.dispatchEvent(event);
+    sendTrusted(event);
     now = 1200;
     controller.pause();
     now = 10000;
@@ -198,4 +221,294 @@ it('does not turn a recording pause into cursor idle activity after resume', () 
     controller.disable();
     clock.mockRestore();
   }
+});
+
+it('uses original native frame epoch rather than delayed enable or resume receipt', () => {
+  const controller = createVideoTelemetryController();
+  const source = {
+    recordingId: 'clock-recording',
+    generation: 1,
+    streamInstanceId: 'native-source',
+  };
+  const initial = {
+    ...source,
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: performance.timeOrigin + 1000,
+    mediaTimeSeconds: 0,
+  };
+  controller.enable(source.recordingId, 0, initial);
+  const down = new MouseEvent('pointerdown', { clientX: 40, clientY: 60 });
+  Object.defineProperty(down, 'timeStamp', { value: 1250 });
+  sendTrusted(down);
+  const up = new MouseEvent('pointerup', { clientX: 40, clientY: 60 });
+  Object.defineProperty(up, 'timeStamp', { value: 1260 });
+  sendTrusted(up);
+  controller.pause({
+    ...initial,
+    revision: 2,
+    phase: 'paused',
+    captureEpochMs: performance.timeOrigin + 1300,
+    mediaTimeSeconds: 0.3,
+  });
+  vi.advanceTimersByTime(8000);
+  controller.resume({
+    ...initial,
+    revision: 3,
+    captureEpochMs: performance.timeOrigin + 6000,
+    mediaTimeSeconds: 2 / 30,
+  });
+  const resumedDown = new MouseEvent('pointerdown', { clientX: 100, clientY: 120 });
+  Object.defineProperty(resumedDown, 'timeStamp', { value: 6250 });
+  sendTrusted(resumedDown);
+  const actions = controller.disable()?.actionEvents ?? [];
+  expect(actions[0]?.time).toBeCloseTo(0.25, 6);
+  expect(actions[1]?.time).toBeCloseTo(2 / 30 + 0.25, 6);
+});
+
+it('retains a pre-pause down as incomplete and excludes late release/movement and later onsets', () => {
+  const controller = createVideoTelemetryController();
+  const anchor = {
+    recordingId: 'clock-prefix',
+    generation: 1,
+    streamInstanceId: 'source',
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: performance.timeOrigin + 1000,
+    mediaTimeSeconds: 0,
+  };
+  controller.enable(anchor.recordingId, 0, anchor);
+  const deliver = (type: string, stamp: number, x: number) => {
+    const event = new MouseEvent(type, { clientX: x, clientY: 60 });
+    Object.defineProperty(event, 'timeStamp', { value: stamp });
+    sendTrusted(event);
+  };
+  deliver('pointerdown', 1250, 40);
+  deliver('pointermove', 1500, 300);
+  deliver('pointerup', 1510, 300);
+  deliver('pointerdown', 1540, 400);
+  deliver('pointerup', 1550, 400);
+  controller.pause({
+    ...anchor,
+    revision: 2,
+    phase: 'paused',
+    captureEpochMs: performance.timeOrigin + 1300,
+    mediaTimeSeconds: 0.3,
+  });
+  const snapshot = controller.disable();
+  expect(snapshot?.actionEvents).toHaveLength(1);
+  expect(snapshot?.actionEvents[0]).toMatchObject({
+    time: 0.25,
+    point: { x: 40, y: 60 },
+    preset: 'CLICK_PRESS',
+    data: { gestureType: 'click', completion: 'lost', lastObservedTime: 0.25 },
+  });
+  expect(snapshot?.actionEvents[0]?.data).not.toHaveProperty('upTime');
+  expect(snapshot?.actionEvents[0]?.data).not.toHaveProperty('maxExcursionCssPx');
+  expect(snapshot?.cursorTrack?.samples.every((sample) => sample.time <= 0.3)).toBe(true);
+});
+
+it('maps a replaced document origin to the same source epoch and ignores stale phase anchors', () => {
+  const origin = performance.timeOrigin;
+  const anchor = {
+    recordingId: 'clock-navigation',
+    generation: 1,
+    streamInstanceId: 'source',
+    revision: 3,
+    phase: 'active' as const,
+    captureEpochMs: origin + 1000,
+    mediaTimeSeconds: 2 / 30,
+  };
+  const controller = createVideoTelemetryController();
+  vi.stubGlobal('performance', { timeOrigin: origin + 500, now: () => 9000 });
+  controller.enable(anchor.recordingId, 999, anchor);
+  controller.pause({
+    ...anchor,
+    revision: 2,
+    phase: 'paused',
+    captureEpochMs: origin + 1300,
+    mediaTimeSeconds: 0.3,
+  });
+  const event = new MouseEvent('pointerdown', { clientX: 40, clientY: 60 });
+  Object.defineProperty(event, 'timeStamp', { value: 750 });
+  sendTrusted(event);
+  expect(controller.disable()?.actionEvents[0]?.time).toBeCloseTo(2 / 30 + 0.25, 6);
+});
+
+it('refuses synchronized history when an exact clock is unavailable instead of using a numeric offset', () => {
+  const controller = createVideoTelemetryController();
+  controller.enable('clock-unavailable', 999, null);
+  expect(controller.isEnabled()).toBe(false);
+  sendTrusted(new MouseEvent('pointerdown', { clientX: 40, clientY: 60 }));
+  expect(controller.disable()).toBeNull();
+});
+
+it('recovers an initially unavailable observation only from a valid resumed recording anchor', () => {
+  const controller = createVideoTelemetryController();
+  const anchor = {
+    recordingId: 'initial-clock-gap',
+    generation: 1,
+    streamInstanceId: 'source',
+    revision: 3,
+    phase: 'active' as const,
+    captureEpochMs: performance.timeOrigin + 3000,
+    mediaTimeSeconds: 0.4,
+  };
+  controller.enable(anchor.recordingId, 999, null);
+  expect(controller.isEnabled()).toBe(false);
+  expect(vi.getTimerCount()).toBe(0);
+  controller.resume({ ...anchor, recordingId: 'foreign' });
+  expect(controller.isEnabled()).toBe(false);
+  controller.resume({ ...anchor, phase: 'paused' });
+  expect(controller.isEnabled()).toBe(false);
+  controller.resume(anchor);
+  expect(controller.isEnabled()).toBe(true);
+  for (const [type, stamp] of [
+    ['pointerdown', 3250],
+    ['pointerup', 3260],
+  ] as const) {
+    const event = new MouseEvent(type, { clientX: 40, clientY: 60 });
+    Object.defineProperty(event, 'timeStamp', { value: stamp });
+    sendTrusted(event);
+  }
+  const snapshot = controller.disable();
+  expect(snapshot?.actionEvents).toHaveLength(1);
+  expect(snapshot?.actionEvents[0]?.time).toBeCloseTo(0.65, 6);
+  expect(snapshot?.actionEvents[0]?.data['pressDuration']).toBeCloseTo(0.01, 6);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('fails closed after a missed native pause instead of retaining excluded facts or duplicated observers', () => {
+  const controller = createVideoTelemetryController();
+  const anchor = {
+    recordingId: 'missed-pause',
+    generation: 1,
+    streamInstanceId: 'source',
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: performance.timeOrigin + 1000,
+    mediaTimeSeconds: 0,
+  };
+  controller.enable(anchor.recordingId, 0, anchor);
+  const deliver = (stamp: number) => {
+    const event = new KeyboardEvent('keydown', { key: 'k', code: 'KeyK', ctrlKey: true });
+    Object.defineProperty(event, 'timeStamp', { value: stamp });
+    sendTrusted(event);
+  };
+  deliver(1250);
+  // Native pause revision2 was not delivered to this content document.
+  deliver(2500);
+  controller.resume({
+    ...anchor,
+    revision: 3,
+    captureEpochMs: performance.timeOrigin + 3000,
+    mediaTimeSeconds: 0.4,
+  });
+  expect(controller.isEnabled()).toBe(false);
+  deliver(3250);
+  expect(controller.disable()).toBeNull();
+  expect(vi.getTimerCount()).toBe(0);
+  for (const [type, listener, options] of vi.mocked(document.addEventListener).mock.calls)
+    expect(vi.mocked(document.removeEventListener).mock.calls).toContainEqual([
+      type,
+      listener,
+      options,
+    ]);
+});
+
+it.each(['pause', 'resume'] as const)(
+  'releases every listener and interval when %s loses its exact clock',
+  (phase) => {
+    const controller = createVideoTelemetryController();
+    const anchor = {
+      recordingId: 'clock-lost',
+      generation: 1,
+      streamInstanceId: 'source',
+      revision: 1,
+      phase: 'active' as const,
+      captureEpochMs: performance.timeOrigin + 1000,
+      mediaTimeSeconds: 0,
+    };
+    controller.enable(anchor.recordingId, 0, anchor);
+    controller[phase](null);
+    expect(controller.isEnabled()).toBe(false);
+    expect(controller.disable()).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  }
+);
+
+it('retains the confirmed prefix when a later clock measurement becomes unavailable', () => {
+  const controller = createVideoTelemetryController();
+  const anchor = {
+    recordingId: 'prefix-retention',
+    generation: 1,
+    streamInstanceId: 'source',
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: performance.timeOrigin + 1000,
+    mediaTimeSeconds: 0,
+  };
+  const deliver = (stamp: number, key: string) => {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      code: `Key${key.toUpperCase()}`,
+      ctrlKey: true,
+    });
+    Object.defineProperty(event, 'timeStamp', { value: stamp });
+    sendTrusted(event);
+  };
+  controller.enable(anchor.recordingId, 0, anchor);
+  deliver(1250, 'k');
+  controller.pause({
+    ...anchor,
+    phase: 'paused',
+    revision: 2,
+    captureEpochMs: performance.timeOrigin + 1400,
+    mediaTimeSeconds: 0.4,
+  });
+  controller.resume({
+    ...anchor,
+    revision: 3,
+    captureEpochMs: performance.timeOrigin + 3000,
+    mediaTimeSeconds: 0.4,
+  });
+  deliver(3250, 'j');
+  controller.resume(null);
+  const snapshot = controller.disable();
+  expect(snapshot?.actionEvents.map((event) => event.time)).toEqual([0.25]);
+  expect(vi.getTimerCount()).toBe(0);
+});
+it('uses a delivered native previous boundary to recover a missed pause without erasing an earlier event', () => {
+  const controller = createVideoTelemetryController();
+  const anchor = {
+    recordingId: 'missing-phase-recovery',
+    generation: 1,
+    streamInstanceId: 'source',
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: performance.timeOrigin + 1000,
+    mediaTimeSeconds: 0,
+  };
+  const deliver = (stamp: number, key: string) => {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      code: `Key${key.toUpperCase()}`,
+      ctrlKey: true,
+    });
+    Object.defineProperty(event, 'timeStamp', { value: stamp });
+    sendTrusted(event);
+  };
+  controller.enable(anchor.recordingId, 0, anchor);
+  deliver(1250, 'k');
+  deliver(2500, 'j');
+  controller.resume({
+    ...anchor,
+    revision: 3,
+    captureEpochMs: performance.timeOrigin + 3000,
+    mediaTimeSeconds: 0.4,
+    previousMediaTimeSeconds: 0.4,
+  });
+  deliver(3250, 'l');
+  expect(controller.disable()?.actionEvents.map((event) => event.time)).toEqual([0.25, 0.65]);
+  expect(vi.getTimerCount()).toBe(0);
 });

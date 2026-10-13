@@ -20,6 +20,7 @@ type TextTrackProps = {
   editor: ReturnType<typeof useReviewText>;
   selectedId?: string | undefined;
   busy: boolean;
+  compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   onSelect(id: string): void;
   onOpenDocument(): void;
@@ -37,6 +38,7 @@ export function ReviewTextTrack(props: TextTrackProps) {
   }));
   const rows = packReviewTextRows(ranges);
   const rowCount = Math.max(1, ...Array.from(rows.values(), (row) => row + 1));
+  const step = props.compact ? 28 : 36;
   const duration = Math.max(0.01, props.editor.projection.duration);
   return (
     <ReviewTrackRow
@@ -65,9 +67,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
     >
       <div
         data-ui="gallery.videoReview.textTrack"
-        className="relative my-1"
-        style={{ height: rowCount * 32 }}
-        onPointerDown={(event) => event.stopPropagation()}
+        className="relative mt-1 rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: rowCount * step - 4 }}
       >
         {fragments.map((fragment) => {
           const range = props.editor.sourceInterval(fragment);
@@ -85,12 +86,12 @@ export function ReviewTextTrack(props: TextTrackProps) {
               data-text-id={fragment.id}
               data-dragging={gesture.draggingId === fragment.id ? 'true' : undefined}
               className={[
-                'absolute min-w-px touch-none select-none overflow-hidden rounded border px-2 text-left text-[11px]',
+                'absolute min-w-px touch-none select-none overflow-hidden rounded border px-3 text-left text-[11px]',
                 reviewTimelineItemTone(props.selectedId === fragment.id),
               ].join(' ')}
               style={{
-                top: (rows.get(fragment.id) ?? 0) * 32,
-                height: 28,
+                top: (rows.get(fragment.id) ?? 0) * step + 2,
+                height: step - 8,
                 left: `${(range.start / duration) * 100}%`,
                 width: `${(Math.max(0, range.end - range.start) / duration) * 100}%`,
               }}
@@ -104,8 +105,10 @@ export function ReviewTextTrack(props: TextTrackProps) {
               onPointerUp={gesture.finish}
               onPointerCancel={gesture.cancel}
             >
-              <span className="block truncate leading-7">
-                {fragment.text || translate('gallery.videoReview.speechText')}
+              <span className="flex h-full items-center">
+                <span className="block min-w-0 truncate">
+                  {fragment.text || translate('gallery.videoReview.speechText')}
+                </span>
               </span>
               {(['start', 'end'] as const).map((edge) => (
                 <span

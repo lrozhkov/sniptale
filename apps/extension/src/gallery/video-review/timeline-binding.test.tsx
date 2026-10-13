@@ -50,6 +50,8 @@ vi.mock('./timeline', () => ({
     <>
       {props.tools}
       {props.annotationEffectsTrack}
+      {props.zoomTrack}
+      {props.audioTrack}
     </>
   ),
 }));
@@ -155,6 +157,7 @@ function BindingHarness({
           : state.annotationEffects
       }
       annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
+      annotationToolCancellation={state.annotationToolCancellation}
       effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
       selectedAnnotationEffectId={
         state.activeSelection.kind === 'annotation-effect' ? state.activeSelection.id : null
@@ -197,7 +200,7 @@ function BindingHarness({
   );
 }
 
-it('adds from selection or free-lane placement only after choosing a catalog entry', async () => {
+it('chooses an ephemeral source-qualified type before drawing without writing the selected range', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
@@ -215,23 +218,17 @@ it('adds from selection or free-lane placement only after choosing a catalog ent
   document.body.append(dialog);
   const root = createRoot(host);
   const loaded = resource('addition-source');
+  const replacement = resource('replacement-source');
   const add = vi.fn<ReturnType<typeof useReviewEditorState>['annotationEffects']['add']>();
   let current: ReturnType<typeof useReviewEditorState> | undefined;
   const trigger = () =>
     host.querySelector<HTMLButtonElement>(
       `[aria-label="${translate('gallery.videoReview.annotationEffectsAdd')}"]`
     )!;
-  const choice = () =>
-    [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent === catalogFixture.label[getCurrentLocale()]
+  const selector = () =>
+    host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.annotationEffectsChoose')}"]`
     )!;
-  const dismiss = async () => {
-    await act(async () =>
-      dialog
-        .querySelector('[role="dialog"]')
-        ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
-    );
-  };
   try {
     await act(async () =>
       root.render(
@@ -244,29 +241,26 @@ it('adds from selection or free-lane placement only after choosing a catalog ent
         />
       )
     );
-    vi.spyOn(trigger(), 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 32, 32));
     await act(async () => current?.setSelection({ kind: 'range', start: 2, end: 3 }));
     await act(async () => trigger().click());
     expect(
       dialog.querySelector('[data-ui="gallery.videoReview.annotationEffectsPicker"]')
-    ).not.toBeNull();
+    ).toBeNull();
+    expect(selector()).not.toBeNull();
+    expect(
+      host
+        .querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')
+        ?.getAttribute('tabindex')
+    ).toBeNull();
     expect(add).not.toHaveBeenCalled();
-    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+    await act(async () => selector().click());
+    const choice = [...dialog.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (node) => node.textContent === catalogFixture.label[getCurrentLocale()]
+    )!;
+    expect(choice).not.toBeNull();
+    await act(async () => choice.click());
+    expect(add).not.toHaveBeenCalled();
     expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
-    await act(async () => choice().click());
-    expect(add).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        catalog: catalogFixture,
-        documentId: 'title',
-        start: 2,
-        end: 3,
-        plane: { width: 640, height: 360 },
-      })
-    );
-    await dismiss();
-    expect(document.activeElement).toBe(trigger());
-    await act(async () => current?.setSelection({ kind: 'point', time: 0 }));
-    await act(async () => trigger().click());
     expect(trigger().getAttribute('aria-pressed')).toBe('true');
     const lane = host.querySelector<HTMLDivElement>(
       '[data-ui="gallery.videoReview.annotationEffectsLane"]'
@@ -292,9 +286,78 @@ it('adds from selection or free-lane placement only after choosing a catalog ent
       await act(async () => lane.dispatchEvent(event));
     }
     expect(add).toHaveBeenCalledTimes(1);
-    await act(async () => choice().click());
-    expect(add).toHaveBeenLastCalledWith(expect.objectContaining({ start: 1, end: 3 }));
+    expect(add).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        catalog: catalogFixture,
+        documentId: 'title',
+        start: 1,
+        end: 3,
+        plane: { width: 640, height: 360 },
+      })
+    );
+    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
     expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+
+    for (const [type, x] of [
+      ['pointerdown', 100],
+      ['pointermove', 300],
+      ['pointerup', 300],
+    ] as const) {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      await act(async () => lane.dispatchEvent(event));
+    }
+    expect(add).toHaveBeenCalledTimes(2);
+    for (const [type, x] of [
+      ['pointerdown', 100],
+      ['pointermove', 250],
+    ] as const) {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      await act(async () => lane.dispatchEvent(event));
+    }
+    expect(captured).toBe(true);
+    lane.focus();
+    await act(async () =>
+      lane.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'v', code: 'KeyV', bubbles: true, cancelable: true })
+      )
+    );
+    expect(trigger().getAttribute('aria-pressed')).toBe('false');
+    expect(selector()).toBeNull();
+    expect(captured).toBe(false);
+    await act(async () =>
+      lane.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 250, button: 0 }))
+    );
+    expect(add).toHaveBeenCalledTimes(2);
+    await act(async () => trigger().click());
+    expect(selector().textContent).toContain(
+      translate('gallery.videoReview.annotationEffectsChoose')
+    );
+    await act(async () => selector().click());
+    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+    const oldHash = catalogFixture.sourceSha256;
+    catalogFixture.sourceSha256 = 'updated-catalog';
+    await act(async () =>
+      root.render(
+        <BindingHarness
+          loaded={loaded}
+          onAdd={add}
+          onState={(state) => {
+            current = state;
+          }}
+        />
+      )
+    );
+    expect(selector().textContent).toContain(
+      translate('gallery.videoReview.annotationEffectsChoose')
+    );
+    expect(
+      host
+        .querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')
+        ?.getAttribute('tabindex')
+    ).toBeNull();
+    catalogFixture.sourceSha256 = oldHash;
     await act(async () =>
       root.render(
         <BindingHarness
@@ -312,12 +375,34 @@ it('adds from selection or free-lane placement only after choosing a catalog ent
       translate('gallery.videoReview.annotationEffectsUnsupported')
     );
     expect(failure?.querySelector('button')).toBeNull();
-    expect(choice().disabled).toBe(false);
+    expect(selector().disabled).toBe(false);
     expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
-    await dismiss();
+    await act(async () => selector().click());
+    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+    await act(async () =>
+      root.render(
+        <BindingHarness
+          loaded={replacement}
+          onAdd={add}
+          onState={(state) => {
+            current = state;
+          }}
+        />
+      )
+    );
+    expect(selector()).toBeNull();
+    expect(trigger().getAttribute('aria-pressed')).toBe('false');
+    expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+    expect(replacement.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+    await act(async () => trigger().click());
+    await act(async () =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(trigger().getAttribute('aria-pressed')).toBe('false');
   } finally {
     await act(async () => root.unmount());
     await loaded.session.dispose();
+    await replacement.session.dispose();
     dialog.remove();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -529,6 +614,63 @@ it('flushes the actual annotation field before the editor Save action or selecti
   } finally {
     await act(async () => root.unmount());
     await loaded.session.dispose();
+    vi.unstubAllGlobals();
+  }
+});
+it('mounted result-time lanes keep zoom changes behind the existing action admission', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const host = document.createElement('div'),
+    root = createRoot(host),
+    loaded = resource('lane-source');
+  let current: ReturnType<typeof useReviewEditorState> | undefined,
+    allowed = false;
+  const render = () =>
+    act(async () =>
+      root.render(
+        <BindingHarness
+          loaded={loaded}
+          beforeAction={(action) => {
+            if (allowed) action();
+          }}
+          onState={(state) => {
+            current = state;
+          }}
+        />
+      )
+    );
+  const toggle = () =>
+    host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.zoomEnabled')}"]`
+    )!;
+  try {
+    await render();
+    await act(async () => current!.setTrackVisibility('zoom', true));
+    expect(host.querySelector('[data-ui="gallery.videoReview.audioLane"]')).not.toBeNull();
+    const original = current!.advanced.zoom.enabled;
+    await act(async () => toggle().click());
+    expect(current!.advanced.zoom.enabled).toBe(original);
+    allowed = true;
+    await act(async () => toggle().click());
+    expect(current!.advanced.zoom.enabled).toBe(!original);
+    await act(async () => current!.addCursorFocusKey(1));
+    expect(current!.activeSelection).toMatchObject({ kind: 'cursor-focus', time: 1 });
+    const key = current!.cursorFocusKeys[0]!;
+    expect(key).toMatchObject({ time: 1, anchor: 'manual' });
+    await act(async () => current!.selectCursorFocusKey(key.id, 1));
+    expect(current!.activeSelection).toMatchObject({ kind: 'cursor-focus', id: key.id, time: 1 });
+    expect(current!.selection).toEqual({ kind: 'point', time: 1 });
+  } finally {
+    await act(async () => root.unmount());
+    loaded.session.dispose();
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

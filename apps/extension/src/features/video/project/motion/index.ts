@@ -168,14 +168,17 @@ export function resolveMotionOverlayZoomMode(
 }
 
 export function createVideoProjectMotionRegion(
-  project: Pick<VideoProject, 'height' | 'width'>,
+  project: Pick<VideoProject, 'height' | 'width' | 'cursorFocusPath'>,
   startTime: number
 ): VideoProjectMotionRegion {
   return {
     duration: 2.8,
     easing: VideoTemporalEasing.EASE_IN_OUT,
     focusArea: null,
-    focusMode: VideoMotionFocusMode.MANUAL,
+    focusMode:
+      project.cursorFocusPath?.mode === 'follow'
+        ? VideoMotionFocusMode.CURSOR
+        : VideoMotionFocusMode.MANUAL,
     focusPoint: getProjectCenter(project),
     id: crypto.randomUUID(),
     motionBlurAmount: 0,

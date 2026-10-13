@@ -1,3 +1,7 @@
+import {
+  isRecordingClockTiming,
+  isRecordingFrameClockBinding,
+} from '../../../../video/recording-frame-clock';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   createGuardParser,
@@ -309,13 +313,17 @@ export const runtimeVideoSessionMessageContracts = {
   [VideoMessageType.GET_RECORDING_STATE]: {
     parseRequest: createGuardParser(
       'runtime GET_RECORDING_STATE message',
-      createMessageGuard({ type: VideoMessageType.GET_RECORDING_STATE })
+      createMessageGuard({
+        type: VideoMessageType.GET_RECORDING_STATE,
+        optional: { recordingClock: isRecordingFrameClockBinding },
+      })
     ),
     parseResponse: createGuardParser(
       'runtime GET_RECORDING_STATE response',
       createRuntimeResponseGuard({
         optional: {
           recordingHealth: isRecordingStateHealth,
+          clockTiming: (value) => value === null || isRecordingClockTiming(value),
           controlToken: isString,
           postRecordResult: isVideoPostRecordResult,
           recordingId: isString,

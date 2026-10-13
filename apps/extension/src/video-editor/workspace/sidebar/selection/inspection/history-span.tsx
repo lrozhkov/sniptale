@@ -1,3 +1,4 @@
+import { ActionFeedbackFields } from '../effect-controls/action-feedback-fields';
 import { InspectorDetails } from '../shared/details';
 import { useState } from 'react';
 import { InspectorActionButton } from '../shared/actions';
@@ -102,6 +103,15 @@ export function InspectHistorySpanPanel(props: Props) {
           </span>
         ) : null}
       </p>
+      {source?.clip.sourceInstanceId ? (
+        <ActionFeedbackFields
+          project={props.project}
+          recordingId={props.target.recordingId}
+          sourceInstanceId={source.clip.sourceInstanceId}
+          target={{ ref: { kind: 'signal', id: props.target.signalId }, family: 'typing' }}
+          disabled={unavailable}
+        />
+      ) : null}
       <SelectInput
         label={translate('videoEditor.sidebar.typingTargetRate')}
         value={String(rate)}

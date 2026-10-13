@@ -8,6 +8,7 @@ import {
   requestDesktopMedia,
 } from '../recording/setup/desktop-media';
 import {
+  getRecordingClockTiming,
   pauseRecording,
   resumeRecording,
   startRecording,
@@ -118,6 +119,7 @@ export function resolveOffscreenErrorPhase(
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
@@ -167,6 +169,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
       return 'deferred-ack';
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
       return 'manual';
@@ -276,13 +279,19 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
       disposeMultiSourceDesktopMedia();
       return;
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
+      sendResponse?.({
+        success: true,
+        clockTiming: getRecordingClockTiming(resolveRecordingSourceBinding(message)),
+      });
+      return;
     case VideoMessageType.OFFSCREEN_START_RECORDING:
       await startRecording(buildStartRecordingArgs(message), prepareOffscreenRecordingData);
       return;
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
       assertRecordingBegin(message);
       try {
-        allowRecordingBegin(message);
+        allowRecordingBegin(message, message.frameClockLease);
       } catch (error) {
         cancelRecordingBegin(error instanceof Error ? error.message : String(error));
         throw error;

@@ -1,7 +1,10 @@
+import { ProjectCursorFocusKeys } from './cursor-focus-keys';
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import { buildTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
 import { useContext } from 'react';
 import { TIMELINE_CURSOR_ROW_HEIGHT } from './history-layout';
 import { projectTimelineInterval, type TimelineProjection } from '../interaction-state/projection';
-import { buildVideoCompositionCursorSegments } from '../../../../features/video/composition/timeline/lanes';
+import { buildHistoryCursorRuns } from '../../../../features/video/review/cursor-history';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { buildCursorSegmentMeta } from './meta';
@@ -20,11 +23,13 @@ import type {
 } from '../types';
 
 const CURSOR_VISIBLE_SEGMENT_CLASS_NAME = [
+  'pointer-events-auto !rounded-sm',
   'border-[color:var(--sniptale-color-border-soft)]',
   'bg-[color:var(--sniptale-color-surface-input)]',
 ].join(' ');
 
 const CURSOR_HIDDEN_SEGMENT_CLASS_NAME = [
+  'pointer-events-auto !rounded-sm',
   'border-[color:var(--sniptale-color-border-soft)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_86%,transparent)]',
   'opacity-60',
@@ -39,11 +44,12 @@ interface CursorInteractionTarget {
   start: number;
 }
 
-type CursorSegment = ReturnType<typeof buildVideoCompositionCursorSegments>[number];
+type CursorSegment = ReturnType<typeof buildHistoryCursorRuns>[number];
 type CursorSegmentMetaMap = ReturnType<typeof buildCursorSegmentMeta>;
 
 export function ProjectTimelineCursorLane(props: {
   embedded?: boolean;
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
   project: VideoProject;
@@ -52,28 +58,58 @@ export function ProjectTimelineCursorLane(props: {
 }) {
   const draft = useContext(TimelineEffectDraftContext);
   const displayProject = resolveCursorDisplayProject(props.project, draft?.cursorSampleTimes);
-  const segments = buildVideoCompositionCursorSegments(displayProject);
+  const dwellRanges = (props.recordingTelemetry ?? []).flatMap((entry) =>
+    buildTimelineTelemetryLaneData(displayProject, entry.recordingId, entry).spans.filter(
+      (span) => span.kind === 'cursor-idle'
+    )
+  );
+  const segments = buildHistoryCursorRuns(
+    displayProject.cursorTrack,
+    displayProject.duration,
+    dwellRanges
+  );
   const cursorMetaById = buildCursorSegmentMeta(displayProject, segments);
 
+  const unavailable =
+    (props.recordingTelemetry?.length ?? 0) > 0 &&
+    props.recordingTelemetry!.every((entry) => entry.capabilities?.pointer === 'unavailable');
+  const known =
+    (props.recordingTelemetry?.length ?? 0) > 0 &&
+    props.recordingTelemetry!.every((entry) => entry.capabilities?.pointer === 'available');
+  const emptyLabel = translate(
+    unavailable
+      ? 'videoEditor.timeline.historyCursorUnavailable'
+      : known
+        ? 'videoEditor.timeline.historyCursorEmpty'
+        : 'videoEditor.timeline.historyCursorUnknown'
+  );
   const content = (
     <>
-      {segments.length === 0 ? <ProjectTimelineEffectLaneEmptyLabel /> : null}
-      {segments.map((segment) => (
-        <ProjectTimelineCursorSegment
-          key={segment.id}
-          cursorMetaById={cursorMetaById}
-          onBeginEffectInteraction={props.onBeginEffectInteraction}
-          pixelsPerSecond={props.pixelsPerSecond}
-          projection={props.projection}
-          segment={segment}
-          selectedEffectSelection={props.selectedEffectSelection}
-        />
-      ))}
+      {segments.length === 0 ? <ProjectTimelineEffectLaneEmptyLabel label={emptyLabel} /> : null}
+      <ProjectCursorFocusKeys
+        project={props.project}
+        pixelsPerSecond={props.pixelsPerSecond}
+        {...(props.projection ? { projection: props.projection } : {})}
+      >
+        <div className="pointer-events-none absolute inset-0 z-10">
+          {segments.map((segment) => (
+            <ProjectTimelineCursorSegment
+              key={segment.id}
+              cursorMetaById={cursorMetaById}
+              onBeginEffectInteraction={props.onBeginEffectInteraction}
+              pixelsPerSecond={props.pixelsPerSecond}
+              projection={props.projection}
+              segment={segment}
+              selectedEffectSelection={props.selectedEffectSelection}
+            />
+          ))}
+        </div>
+      </ProjectCursorFocusKeys>
     </>
   );
   return props.embedded ? (
     <div
-      className="relative border-t border-[var(--sniptale-color-border-subtle)]"
+      className="relative"
       style={{ height: TIMELINE_CURSOR_ROW_HEIGHT }}
       data-ui="video-editor.timeline.history-cursor-row"
     >
@@ -94,7 +130,8 @@ function ProjectTimelineCursorSegment(props: {
 }) {
   return (
     <ProjectTimelineEffectSegment
-      height={18}
+      height={20}
+      top={2}
       segmentId={props.segment.id}
       className={
         props.segment.visible ? CURSOR_VISIBLE_SEGMENT_CLASS_NAME : CURSOR_HIDDEN_SEGMENT_CLASS_NAME
@@ -104,7 +141,13 @@ function ProjectTimelineCursorSegment(props: {
         'cursor',
         props.segment.id
       )}
-      label={translate('videoEditor.timeline.cursorLane')}
+      label={translate(
+        props.segment.kind === 'cursor-gap'
+          ? 'videoEditor.timeline.historyCursorGap'
+          : props.segment.kind === 'cursor-idle'
+            ? 'videoEditor.timeline.historyCursorDwell'
+            : 'videoEditor.timeline.historyCursorMove'
+      )}
       hideLabel
       leadingIcon={<span className="[&_svg]:h-3 [&_svg]:w-3">{getCursorLaneIcon()}</span>}
       startTime={props.segment.start}

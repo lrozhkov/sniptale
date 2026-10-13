@@ -1,3 +1,4 @@
+import { resolveProjectCursorFocusSamples } from '../../../features/video/project/cursor-focus-path/projection';
 import { useMemo } from 'react';
 import { getProjectTransitionById } from '../../../features/video/project/transition/project';
 import type {
@@ -44,7 +45,13 @@ function useSelectedCursorSample(project: VideoProject | null, selection: VideoE
   return useMemo(
     () =>
       selection.kind === VideoEditorSelectionKind.CURSOR_SEGMENT
-        ? (project?.cursorTrack?.samples.find((sample) => sample.id === selection.sampleId) ?? null)
+        ? project
+          ? (resolveProjectCursorFocusSamples(project, true).find(
+              (sample) => sample.id === selection.sampleId
+            ) ??
+            project.cursorTrack?.samples.find((sample) => sample.id === selection.sampleId) ??
+            null)
+          : null
         : null,
     [project, selection]
   );

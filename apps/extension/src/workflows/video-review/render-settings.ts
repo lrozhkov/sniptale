@@ -1,3 +1,10 @@
+import type { VideoSample } from 'mediabunny';
+import type { ReviewFrameExportInput } from './render-export-input';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import type { ReviewEdit } from '../../features/video/review/types';
+import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
+import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-schedule';
+import { QuickEditExportUnavailable } from './export-unavailable';
 import { resolveVideoExportDimensions } from '../../features/video/project/export/output-dimensions';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { parseQuickEditCanvas } from '../../features/video/review/advanced/canvas';
@@ -180,5 +187,55 @@ export function resolveReviewSceneOutput(
     background,
     scale,
     supported: !settings.windowHeader || parseQuickEditCanvas(output) !== null,
+  };
+}
+
+export interface ReviewRenderPreparation {
+  codec: ReviewOutputCodec;
+  container: 'mp4' | 'webm';
+  resolution: VideoResolutionPreset;
+  quality: NonNullable<ReviewRenderSettings['quality']>;
+  fps: number;
+  windows: ReviewFrameWindow[];
+  effective: ReturnType<typeof resolveQuickEditEffectiveState>;
+}
+
+/** Frame rendering validates ranges, while packet copying alone requires keyframes. */
+export function prepareReviewRender(args: {
+  frameProbe?: { add(sample: VideoSample): Promise<void> };
+  renderSettings?: ReviewRenderSettings | undefined;
+  index: ReviewMediaIndex;
+  edits: readonly ReviewEdit[];
+  advanced: QuickEditAdvancedState;
+  cursorFacts?: ReviewFrameExportInput['cursorFacts'];
+}): ReviewRenderPreparation {
+  let validRanges = true;
+  try {
+    buildReviewTimeMap(args.index.duration, args.edits);
+  } catch {
+    validRanges = false;
+  }
+  if (!validRanges) throw new Error('Export requires valid non-overlapping edit ranges.');
+  const container = args.renderSettings?.format ?? args.index.container;
+  const supported = reviewOutputCodecs(args.index, container);
+  const codec = args.renderSettings?.codec ?? supported[0];
+  if (!codec || !supported.includes(codec)) throw new QuickEditExportUnavailable(['video-encoder']);
+  const { fps } = resolveReviewOutputProfile(args.index, args.advanced, args.renderSettings);
+  const duration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;
+  const windows = reviewRenderFrameSchedule(
+    args.index.duration,
+    args.edits,
+    fps,
+    args.frameProbe ? videoExportSampleWindows(duration, fps) : undefined
+  );
+  if (!windows.length) throw new Error('The edited video is empty.');
+  return {
+    codec,
+    container,
+    resolution: args.renderSettings?.resolution ?? VideoResolutionPreset.SOURCE,
+    quality: args.renderSettings?.quality ?? 'HIGH',
+    fps,
+    windows,
+    effective: resolveQuickEditEffectiveState(args.advanced, args.cursorFacts),
   };
 }

@@ -1,6 +1,42 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionCursorMessages = defineMessageSource({
+  cursorFocusPathTitle: { ru: 'Путь фокуса курсора', en: 'Cursor focus path' },
+  cursorFocusPrevious: { ru: 'Предыдущий ключ фокуса', en: 'Previous focus key' },
+  cursorFocusNext: { ru: 'Следующий ключ фокуса', en: 'Next focus key' },
+  cursorFocusRowHint: {
+    ru: 'Двойной щелчок добавляет ключ фокуса',
+    en: 'Double-click to add a focus key',
+  },
+  cursorFocusKey: { ru: 'Ключ фокуса', en: 'Focus key' },
+  cursorFocusManualKey: { ru: 'Ручной ключ', en: 'Manual key' },
+  cursorFocusRecordedKey: { ru: 'Записанная позиция', en: 'Recorded position' },
+  cursorFocusMode: { ru: 'Камера', en: 'Camera' },
+  cursorFocusFixed: { ru: 'Фиксированная', en: 'Fixed' },
+  cursorFocusFollow: { ru: 'Следовать курсору', en: 'Follow cursor' },
+  cursorFocusSmoothing: { ru: 'Сглаживание пути', en: 'Path smoothing' },
+  cursorFocusSensitivity: { ru: 'Чувствительность', en: 'Sensitivity' },
+  cursorFocusCurve: { ru: 'Кривая', en: 'Curve' },
+  cursorFocusLinear: { ru: 'Линейная', en: 'Linear' },
+  cursorFocusSmooth: { ru: 'Плавная', en: 'Smooth' },
+  cursorFocusHold: { ru: 'Остановка', en: 'Hold' },
+  cursorFocusConstrained: {
+    ru: 'Кривая ограничена краями исходного кадра',
+    en: 'Curve is constrained by the source frame edges',
+  },
+  cursorFocusHandles: { ru: 'Контрольные точки', en: 'Control handles' },
+  cursorFocusIncoming: { ru: 'Вход', en: 'Incoming' },
+  cursorFocusOutgoing: { ru: 'Выход', en: 'Outgoing' },
+  cursorFocusUnavailable: {
+    ru: 'Нет подтверждённой позиции в этом интервале',
+    en: 'No verified position in this interval',
+  },
+  cursorFocusAdd: { ru: 'Добавить ключ фокуса', en: 'Add focus key' },
+  cursorFocusReset: { ru: 'Восстановить записанный путь', en: 'Reset to recorded path' },
+  cursorFocusEmbedded: {
+    ru: 'Путь управляет камерой; указатель записан в видео',
+    en: 'Path guides the camera; pointer is embedded in the video',
+  },
   cursorTitle: {
     ru: 'Курсор',
     en: 'Cursor',

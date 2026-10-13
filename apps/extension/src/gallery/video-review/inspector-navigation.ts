@@ -164,6 +164,7 @@ export function reviewTimelineInspectorCommands(args: {
   select(selection: ReviewSelection): void;
   navigation: Pick<ReviewInspectorNavigation, 'setSection' | 'shown'>;
   selectedTextId: string | undefined;
+  selection?: ReviewSelection;
   requestExport(update: (current: number) => number): void;
 }) {
   const clearSelection = () => {
@@ -172,6 +173,11 @@ export function reviewTimelineInspectorCommands(args: {
   };
   return {
     selectedTextId: args.selectedTextId,
+    selectedAnnotationEffectId:
+      args.selection?.kind === 'annotation-effect' ? args.selection.id : null,
+    selectedTelemetryRef: args.selection?.kind === 'telemetry' ? args.selection.ref : undefined,
+    selectedCursorFocusId: args.selection?.kind === 'cursor-focus' ? args.selection.id : undefined,
+    onSelectAnnotationEffect: (id: string) => args.select({ kind: 'annotation-effect', id }),
     exportActive: args.navigation.shown === 'export',
     onSelectText: (id: string) => {
       args.video.current?.pause();

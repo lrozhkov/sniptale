@@ -1,3 +1,4 @@
+import { addReviewCursorFocusKey } from '../../features/video/project/cursor-focus-path/authoring';
 import { useReviewAnnotationEffects } from './annotation-effects-editor';
 import { useReviewPresentation } from './use-review-presentation';
 import { useReviewWatermark } from './use-review-watermark';
@@ -72,6 +73,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     setCutting: cuts.setCutting,
     telemetry: resource.telemetry,
     sourceDuration: source.duration,
+    sourceGeometry: source,
     actionsVisible: advanced.ui.tracks.actions,
     play,
     timelineSelection: selection,
@@ -222,7 +224,10 @@ function useReviewEditorBase(resource: LoadedReview) {
   const exporter = useReviewExport(resource);
   const advancedState = useReviewAdvanced(session);
   const advanced = advancedState.advanced;
-  const features = useMemo(() => resolveQuickEditEffectiveState(advanced), [advanced]);
+  const features = useMemo(
+    () => resolveQuickEditEffectiveState(advanced, { facts: resource.telemetry, source }),
+    [advanced, resource.telemetry, source]
+  );
   const [selection, setSelection] = useState<ReviewAnchor>(
     composer.annotation?.anchor ?? { kind: 'point', time: 0 }
   );
@@ -456,12 +461,31 @@ function assembleReviewEditorState(
     ),
     editing: { ...cuts, exporter: wiring.exporter },
     moveHistory: wiring.moveHistory,
+    annotationToolCancellation: wiring.annotationToolCancellation,
     audio,
     text,
     canvasComments,
     telemetry,
     ...reviewAdvancedControls(advancedState, setActiveSelection, core.beforeAction),
     projected,
+    cursorFocusPath: wiring.cursorFocusPath,
+    cursorFocusKeys: wiring.cursorFocusKeys,
+    selectCursorFocusKey: (id: string, time: number) =>
+      core.beforeAction(() => {
+        core.setSelection({ kind: 'point', time });
+        setActiveSelection({ kind: 'cursor-focus', id, time });
+        core.seek(time, false);
+      }),
+    addCursorFocusKey: (time: number) =>
+      core.beforeAction(() => {
+        const id = crypto.randomUUID();
+        advancedState.setCursorFocusPath(
+          addReviewCursorFocusKey(wiring.cursorFocusPath, time, core.source.duration, id)
+        );
+        core.setSelection({ kind: 'point', time });
+        setActiveSelection({ kind: 'cursor-focus', id, time });
+        core.seek(time, false);
+      }),
     selectComment: (annotation: ReviewAnnotation) => {
       core.beforeAction(() => {
         comments.select(annotation);
@@ -487,6 +511,7 @@ function reviewAdvancedControls(
   beforeAction: ReturnType<typeof useReviewNoteTransitions>['beforeAction']
 ) {
   return {
+    setCursorFocusPath: advancedState.setCursorFocusPath,
     setMode: (mode: 'basic' | 'advanced') =>
       beforeAction(() => {
         setActiveSelection({ kind: 'none' });

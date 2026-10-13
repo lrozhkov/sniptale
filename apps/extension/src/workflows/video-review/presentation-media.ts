@@ -18,8 +18,11 @@ type Failure = 'asset-missing' | 'metadata' | 'decode' | 'mapping' | 'busy' | 'd
 
 /** Fixed media failures contain no asset identity or decoder exception text. */
 class PresentationMediaError extends Error {
-  constructor(public readonly code: Failure) {
-    super(`presentation-media:${code}`);
+  constructor(
+    public readonly code: Failure,
+    options?: ErrorOptions
+  ) {
+    super(`presentation-media:${code}`, options);
     this.name = 'PresentationMediaError';
   }
 }
@@ -140,7 +143,9 @@ export async function createReviewPresentationMedia(args: {
     bitmap = null;
     dispose();
     signal.throwIfAborted();
-    throw error instanceof PresentationMediaError ? error : new PresentationMediaError('decode');
+    throw error instanceof PresentationMediaError
+      ? error
+      : new PresentationMediaError('decode', { cause: error });
   }
   return {
     audioTrack,
@@ -226,7 +231,7 @@ export async function createReviewPresentationMedia(args: {
         signal.throwIfAborted();
         throw error instanceof PresentationMediaError
           ? error
-          : new PresentationMediaError('decode');
+          : new PresentationMediaError('decode', { cause: error });
       } finally {
         pending = false;
       }

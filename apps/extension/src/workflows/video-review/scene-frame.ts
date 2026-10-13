@@ -1,6 +1,6 @@
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import type { ReviewSpatialRenderer } from './spatial-renderer';
-import { createReviewWindowRaster } from './window-header';
+import { withReviewWindowRaster, type ReviewWindowRaster } from './window-header';
 import { createVideoCompositionPassBuffer } from '../../features/video/composition/canvas/pass-buffer';
 import {
   computeQuickEditSceneCamera,
@@ -17,7 +17,7 @@ import type {
 import type { CanvasCommentExport } from '../../features/video/review/comments';
 import { drawReviewBackgroundPaint, type createReviewBackgroundPainter } from './scene-background';
 import { drawReviewComments } from './render-comments';
-import { drawReviewSceneShadow } from './scene-shadow';
+import { drawReviewSceneShadow, reviewSpatialSourceRect } from './scene-shadow';
 
 type ReviewCommentSpace = {
   canvas: { width: number; height: number };
@@ -49,33 +49,35 @@ export function drawReviewSceneFrame(
     resources?: RenderResources | undefined;
     windowRasterBacking?: { width: number; height: number } | undefined;
     motionBlur?: readonly { camera: QuickEditCameraTransform; alpha: number }[] | undefined;
+    drawOverlays?: ((raster: ReviewWindowRaster | null) => void) | undefined;
   }
 ) {
   args = { ...args, backgroundCacheContext: args.backgroundCacheContext ?? context };
-  const windowRaster =
-    args.headerImage && args.layout.windowRect
-      ? createReviewWindowRaster({
-          header: args.headerImage,
-          resources: args.resources,
-          backing: args.windowRasterBacking,
-          videoRect: args.layout.videoRect,
-          windowRect: args.layout.windowRect,
-          draw: args.sample.draw,
-        })
-      : null;
-  try {
-    if (args.layout.spatial) drawSpatialScene(context, args, windowRaster);
-    else drawReviewSceneExposure(context, args, windowRaster);
-  } finally {
-    windowRaster?.release();
-  }
+  const paint = (raster: ReviewWindowRaster | null) => {
+    if (args.layout.spatial) drawSpatialScene(context, args, raster);
+    else drawReviewSceneExposure(context, args, raster);
+    args.drawOverlays?.(raster);
+  };
+  if (args.headerImage && args.layout.windowRect)
+    withReviewWindowRaster(
+      {
+        header: args.headerImage,
+        resources: args.resources,
+        backing: args.windowRasterBacking,
+        videoRect: args.layout.videoRect,
+        windowRect: args.layout.windowRect,
+        draw: args.sample.draw,
+      },
+      paint
+    );
+  else paint(null);
 }
 
 /** A background-independent decorated plane, projected with the exact export/preview GPU pass. */
 function drawSpatialScene(
   context: CanvasRenderingContext2D,
   args: Parameters<typeof drawReviewSceneFrame>[1],
-  windowRaster: ReturnType<typeof createReviewWindowRaster> | null
+  windowRaster: ReviewWindowRaster | null
 ) {
   const renderer = args.spatialRenderer;
   const spatial = args.layout.spatial;
@@ -96,6 +98,12 @@ function drawSpatialScene(
   );
   const passes = args.motionBlur?.length ? args.motionBlur : [{ camera: null, alpha: 1 }];
   const exposure = renderer.surface('exposure', args.canvas.width, args.canvas.height);
+  const sourceRect = reviewSpatialSourceRect({
+    output: args.canvas,
+    window: baseWindow,
+    background: fixed,
+    sceneScale: args.sceneScale ?? 1,
+  });
   for (const pass of passes) {
     const layout = pass.camera
       ? {
@@ -104,24 +112,34 @@ function drawSpatialScene(
           videoTransform: computeQuickEditVideoTransform({ ...args.layout, camera: pass.camera }),
         }
       : fullLayout;
-    const plane = renderer.surface('plane', args.canvas.width, args.canvas.height);
+    const plane = renderer.surface('plane', sourceRect.width, sourceRect.height);
     const rasterLayout = computeQuickEditSpatialRasterLayout(layout, args.background);
-    drawReviewSceneSample(
-      plane.context,
-      { ...args, layout: rasterLayout, background: fixed, planeOnly: true },
-      windowRaster
-    );
+    plane.context.save();
+    try {
+      plane.context.translate(-sourceRect.x, -sourceRect.y);
+      drawReviewSceneSample(
+        plane.context,
+        { ...args, layout: rasterLayout, background: fixed, planeOnly: true },
+        windowRaster
+      );
+    } finally {
+      plane.context.restore();
+    }
     exposure.context.save();
-    exposure.context.globalCompositeOperation = 'lighter';
-    exposure.context.globalAlpha = pass.alpha;
-    renderer.draw(
-      exposure.context,
-      plane.canvas,
-      baseWindow,
-      computeQuickEditSpatialWindow(layout, args.background),
-      pass.camera?.spatial ?? spatial
-    );
-    exposure.context.restore();
+    try {
+      exposure.context.globalCompositeOperation = 'lighter';
+      exposure.context.globalAlpha = pass.alpha;
+      renderer.draw(exposure.context, {
+        source: plane.canvas,
+        sourceRect,
+        output: args.canvas,
+        base: baseWindow,
+        target: computeQuickEditSpatialWindow(layout, args.background),
+        frame: pass.camera?.spatial ?? spatial,
+      });
+    } finally {
+      exposure.context.restore();
+    }
   }
   context.drawImage(exposure.canvas, 0, 0);
   if (!args.deferComments && args.comments?.length) {
@@ -134,14 +152,15 @@ function drawSpatialScene(
       cameraScale: 1,
       comments: args.comments.filter((c) => c.attachment === 'content'),
     });
-    renderer.draw(
-      context,
-      overlay.canvas,
-      baseWindow,
-      computeQuickEditSpatialWindow(args.layout, args.background),
-      spatial,
-      true
-    );
+    renderer.draw(context, {
+      source: overlay.canvas,
+      sourceRect: { x: 0, y: 0, width: args.canvas.width, height: args.canvas.height },
+      output: args.canvas,
+      base: baseWindow,
+      target: computeQuickEditSpatialWindow(args.layout, args.background),
+      frame: spatial,
+      sharp: true,
+    });
     drawReviewSceneComments(context, {
       ...args,
       comments: args.comments.filter((c) => c.attachment === 'viewport'),
@@ -152,7 +171,7 @@ function drawSpatialScene(
 function drawReviewSceneExposure(
   context: CanvasRenderingContext2D,
   args: Parameters<typeof drawReviewSceneFrame>[1],
-  windowRaster: ReturnType<typeof createReviewWindowRaster> | null
+  windowRaster: ReviewWindowRaster | null
 ) {
   const passes = args.motionBlur;
   if (passes && passes.length > 1) {
@@ -300,7 +319,7 @@ function drawReviewSceneSample(
     cameraScale?: number;
     sceneScale?: number;
   },
-  windowRaster: ReturnType<typeof createReviewWindowRaster> | null
+  windowRaster: ReviewWindowRaster | null
 ) {
   const { layout, background, sample } = args;
   if (!args.planeOnly) drawReviewSceneBackground(context, args);
@@ -314,29 +333,32 @@ function drawReviewSceneSample(
     (args.sceneScale ?? 1) * motion.scale
   );
   context.save();
-  clipReviewScene(context, layout, background);
-  if (windowRaster) {
-    const window = computeQuickEditWindowTransform(layout);
-    context.drawImage(
-      windowRaster.image,
-      0,
-      0,
-      windowRaster.width,
-      windowRaster.height,
-      window.x,
-      window.y,
-      window.width,
-      window.height
-    );
-  } else
-    sample.draw(
-      context,
-      layout.videoTransform.x,
-      layout.videoTransform.y,
-      layout.videoTransform.width,
-      layout.videoTransform.height
-    );
-  context.restore();
+  try {
+    clipReviewScene(context, layout, background);
+    if (windowRaster) {
+      const window = computeQuickEditWindowTransform(layout);
+      context.drawImage(
+        windowRaster.image,
+        0,
+        0,
+        windowRaster.width,
+        windowRaster.height,
+        window.x,
+        window.y,
+        window.width,
+        window.height
+      );
+    } else
+      sample.draw(
+        context,
+        layout.videoTransform.x,
+        layout.videoTransform.y,
+        layout.videoTransform.width,
+        layout.videoTransform.height
+      );
+  } finally {
+    context.restore();
+  }
 }
 
 /** Background owns its follow-video policy independently of the decorated plane. */

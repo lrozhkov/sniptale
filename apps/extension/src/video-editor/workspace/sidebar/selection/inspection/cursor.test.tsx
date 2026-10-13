@@ -3,7 +3,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectFromRecording,
+} from '../../../../../features/video/project/factories/creation';
 import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
 import {
   VideoCursorAnimationPreset,
@@ -219,3 +222,75 @@ function findButton(label: string) {
     button.textContent?.includes(label)
   );
 }
+
+it('opens the focus inspector for a retained manual key without creating a captured cursor track', () => {
+  const props = createProps();
+  props.project.cursorTrack = null;
+  props.project.version = 3;
+  props.project.duration = 2;
+  props.project.cursorFocusPath = {
+    version: 1,
+    mode: 'fixed',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'manual-run',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 2,
+        keys: [
+          { id: 'sample-1', time: 1, x: 0.2, y: 0.3, anchor: 'manual', interpolation: 'smooth' },
+        ],
+      },
+    ],
+  };
+  act(() =>
+    root!.render(
+      <WorkspaceSidebarInspectPanel
+        {...props}
+        selectedCursorSample={{
+          id: 'sample-1',
+          time: 1,
+          x: props.project.width * 0.2,
+          y: props.project.height * 0.3,
+          visible: true,
+        }}
+      />
+    )
+  );
+  expect(container!.querySelector('[data-ui="cursorFocusPath.inspector"]')).not.toBeNull();
+  expect(props.project.cursorTrack).toBeNull();
+  expect(props.onSetCursorCaptureMode).not.toHaveBeenCalled();
+});
+
+it('opens recorded focus geometry before legacy appearance and keeps embedded guidance compact', () => {
+  const base = createProps();
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'take.webm',
+    width: 640,
+    height: 360,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 10,
+    cursorTrack: {
+      ...base.project.cursorTrack!,
+      captureMode: 'embedded-fallback',
+      samples: base.project.cursorTrack!.samples.map((sample) => ({
+        ...sample,
+        recordingPoint: { x: 0.125, y: 1 / 3 },
+      })),
+    },
+  });
+  renderInspectPanel({ ...base, project, selectedCursorSample: project.cursorTrack!.samples[0]! });
+  const panel = container!.querySelector('[data-ui="cursorFocusPath.inspector"]');
+  expect(panel).not.toBeNull();
+  expect(panel!.textContent).not.toContain('videoEditor.sidebar.cursorFocusEmbedded');
+  expect(panel!.getAttribute('title')).toBe('videoEditor.sidebar.cursorFocusEmbedded');
+  expect(panel!.querySelector('input[aria-label="X"]')).not.toBeNull();
+  expect(container!.querySelector('nav button[aria-pressed="true"]')?.getAttribute('title')).toBe(
+    'videoEditor.sidebar.cursorFocusPathTitle'
+  );
+});

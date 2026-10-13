@@ -2,10 +2,22 @@ import type { RecordingTelemetrySnapshot } from '../../../contracts/messaging/co
 
 export type TelemetryListeners = {
   click: (event: MouseEvent) => void;
+  pointerUp: (event: MouseEvent) => void;
+  pointerCancel: (event: MouseEvent) => void;
+  mouseDown: (event: MouseEvent) => void;
+  mouseUp: (event: MouseEvent) => void;
+  pointerLeave: (event: MouseEvent) => void;
+  dragStart: (event: DragEvent) => void;
+  dragEnd: (event: DragEvent) => void;
+  drop: (event: DragEvent) => void;
+  selectionChange: (event: Event) => void;
+  wheel: (event: WheelEvent) => void;
+  keyUp: (event: KeyboardEvent) => void;
+  blur: (event?: Event) => void;
   change: (event: Event) => void;
   input: (event: Event) => void;
   keyDown: (event: KeyboardEvent) => void;
-  pointerDown: (event: Event) => void;
+  pointerDown: (event: MouseEvent) => void;
   pointerMove: (event: Event) => void;
   scroll: (event: Event) => void;
   visibilityChange: () => void;
@@ -36,7 +48,39 @@ export type TypingTelemetrySignal = Omit<TelemetrySignal, 'data'> & {
   };
 };
 
+export type KeyboardHeldState = {
+  action: RecordingTelemetrySnapshot['actionEvents'][number] | null;
+  onset: number;
+  repeats: number[];
+  repeatCount: number;
+  lastObservedTime: number;
+};
+
 export type TelemetryState = {
+  recordingId: string | null;
+  frameClock:
+    | import('../../../contracts/video/recording-frame-clock').RecordingFrameClockAnchor
+    | null
+    | undefined;
+  observationAvailable: boolean;
+  confirmedMediaTimeSeconds: number;
+  clockUnavailable: boolean;
+  gestures: Map<
+    number,
+    {
+      action: RecordingTelemetrySnapshot['actionEvents'][number];
+      pointerId: number | null;
+      downTimestampMs: number;
+      target: Element | null;
+    }
+  >;
+  keyboard: {
+    held: Map<string, KeyboardHeldState>;
+    modifiers: { label: string; downTime: number; consumed: boolean } | null;
+    target: Element | null;
+    times: number[];
+    repeats: number[];
+  };
   captureSegment: number;
   accumulatedDurationMs: number;
   actionEvents: RecordingTelemetrySnapshot['actionEvents'];

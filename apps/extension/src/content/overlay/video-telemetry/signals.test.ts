@@ -63,7 +63,7 @@ function registerTypingSignalTests() {
     recordTypingActivity(state, createTypingEvent('change', 1_600));
     recordTypingActivity(state, createTypingEvent('input', 2_801));
 
-    expect(state.signals).toEqual([]);
+    expect(state.signals).toHaveLength(1);
     expect(state.typingSignal).toEqual(
       expect.objectContaining({
         data: expect.objectContaining({ eventCount: 1, eventType: 'input' }),
@@ -170,7 +170,7 @@ it('does not inflate short typing with the time of a later stop', () => {
   recordTypingActivity(state, createTypingEvent('input', 1600));
   vi.spyOn(performance, 'now').mockReturnValue(10000);
   finalizeTelemetrySignals(state);
-  expect(state.signals).toEqual([]);
+  expect(state.signals).toMatchObject([{ startTime: 1, endTime: 1.6 }]);
 });
 
 it('combines input across form fields and records only actual input time', () => {
@@ -186,8 +186,14 @@ it('combines input across form fields and records only actual input time', () =>
   }
   vi.spyOn(performance, 'now').mockReturnValue(15000);
   finalizeTelemetrySignals(state);
-  expect(state.signals).toHaveLength(1);
-  expect(state.signals[0]).toMatchObject({ startTime: 1, endTime: 4, data: { eventCount: 6 } });
+  expect(state.signals).toHaveLength(3);
+  expect(
+    state.signals.map((signal) => [signal.startTime, signal.endTime, signal.data['eventCount']])
+  ).toEqual([
+    [1, 1.6, 2],
+    [2.2, 2.8, 2],
+    [3.4, 4, 2],
+  ]);
 });
 
 it('does not merge two qualifying typing intervals across recording pause boundaries', () => {
@@ -207,7 +213,7 @@ it('does not count blur-time change as continued typing', () => {
     recordTypingActivity(state, createTypingEvent('input', time));
   recordTypingActivity(state, createTypingEvent('change', 4100));
   finalizeTelemetrySignals(state);
-  expect(state.signals).toEqual([]);
+  expect(state.signals).toMatchObject([{ startTime: 1, endTime: 3.9, data: { eventCount: 5 } }]);
 });
 
 it('does not promote tiny field changes into a long typing action during capture', () => {
@@ -224,7 +230,8 @@ it('does not promote tiny field changes into a long typing action during capture
     }
   }
   finalizeTelemetrySignals(state);
-  expect(state.signals).toEqual([]);
+  expect(state.signals).toHaveLength(8);
+  expect(state.signals.every((signal) => signal.endTime - signal.startTime < 0.5)).toBe(true);
 });
 
 it('ends a raw typing burst at each pointer-down before short fragments can accumulate', () => {
@@ -236,7 +243,7 @@ it('ends a raw typing burst at each pointer-down before short fragments can accu
     finalizeTypingSignal(state, start + 300);
   }
   finalizeTelemetrySignals(state);
-  expect(state.signals).toEqual([]);
+  expect(state.signals).toHaveLength(8);
   expect(state.typingTarget).toBeNull();
 });
 
@@ -277,4 +284,14 @@ it('does not record keys from sensitive inputs or space used as text input', () 
   expect(state.actionEvents).toEqual([]);
   recordKeyboardShortcut(state, createShortcutEvent('c', 300, { ctrlKey: true, target: text }));
   expect(state.actionEvents.map((event) => event.label)).toEqual(['Ctrl+C']);
+});
+
+it('retains a single delivered input fact without extending it to the later stop', () => {
+  const state = createSignalState();
+  recordTypingActivity(state, createTypingEvent('input', 1000));
+  vi.spyOn(performance, 'now').mockReturnValue(10000);
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toMatchObject([
+    { kind: 'typing', startTime: 1, endTime: 1, data: { eventCount: 1 } },
+  ]);
 });

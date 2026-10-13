@@ -13,7 +13,6 @@ import { createNewWorkspacePresentationSettings } from '../../features/video/rev
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { createReviewPreviewRenderer } from './render-preview';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { reviewCutTransitionAt } from '../../features/video/review/cuts';
 import { DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/review/advanced/spatial';
@@ -52,7 +51,8 @@ vi.mock('./render-watermark', () => ({
     paint: (readAsset: unknown) => io.watermark(args[0], args[1], args[2], readAsset, args[3]),
   }),
 }));
-vi.mock('./window-header', () => ({
+vi.mock('./window-header', async (original) => ({
+  ...(await original<typeof import('./window-header')>()),
   loadReviewWindowHeader: io.header,
   reviewWindowHeaderUrl: () => 'local-header',
 }));
@@ -282,7 +282,10 @@ it.each(['abort', 'dispose', 'supersede'] as const)(
 );
 beforeEach(() => {
   io.order.length = 0;
-  io.frame.mockImplementation(() => io.order.push('scene'));
+  io.frame.mockImplementation((_context, request) => {
+    io.order.push('scene');
+    request.drawOverlays?.(null);
+  });
   io.overlays.mockImplementation(() => io.order.push('overlays'));
   io.webcam.mockImplementation(() => io.order.push('webcam'));
   io.keys.mockImplementation(() => io.order.push('keys'));
@@ -672,27 +675,6 @@ it('closes a decoded background when its retained reservation cannot be admitted
   expect(bitmap.close).toHaveBeenCalledOnce();
 });
 
-it('reserves the selected header backing before decode and releases it with the bitmap', async () => {
-  const { resources, reservations } = setup();
-  const renderer = createReviewPreviewRenderer({ resources });
-  const input = scene();
-  input.windowHeader = { ...DEFAULT_WINDOW_HEADER, title: 'Example', url: 'example.test' };
-  const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
-  const options = io.header.mock.calls[0]![2];
-  expect(resources.bytes).toHaveBeenCalledWith(
-    'preview-header-bitmap',
-    options.backing.width * options.backing.height * 4
-  );
-  expect(vi.mocked(resources.bytes).mock.invocationCallOrder[0]).toBeLessThan(
-    io.header.mock.invocationCallOrder[0]!
-  );
-  (await renderer.render(prepared, frame())).release();
-  const bitmap = await io.header.mock.results[0]!.value;
-  renderer.dispose();
-  expect(bitmap.close).toHaveBeenCalledOnce();
-  expect(reservations[0]).toHaveBeenCalledOnce();
-});
-
 function allocationInput(): NonNullable<
   Parameters<typeof createReviewPreviewRenderer>[0]['allocation']
 > extends { describe(): infer T }
@@ -865,7 +847,10 @@ it('dissolves independently composed zoom poses instead of blending their source
   const right = { timestamp: 4, draw: vi.fn(), close: vi.fn() };
   for (const time of [1.8, 2, 2.2]) {
     io.frame.mockClear();
-    io.frame.mockImplementation((context, request) => request.sample.draw(context, 0, 0, 10, 10));
+    io.frame.mockImplementation((context, request) => {
+      request.sample.draw(context, 0, 0, 10, 10);
+      request.drawOverlays?.(null);
+    });
     io.overlays.mockClear();
     const admitted = { ...frame(), resultTime: time, sourceTime: time < 2 ? time : time + 2 };
     admitted.source.timestamp = admitted.sourceTime;

@@ -1,4 +1,8 @@
 import {
+  matchesRecordingFrameClockBinding,
+  type RecordingClockTiming,
+} from '../../contracts/video/recording-frame-clock';
+import {
   OFFSCREEN_RECORDING_START_TIMEOUT_MS,
   RECORDING_SOURCE_PREPARATION_TIMEOUT_MS,
   RECORDING_START_DELIVERY_TIMEOUT_MS,
@@ -12,6 +16,7 @@ import { startRecording as startRecordingImpl } from './start/index';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../platform/i18n';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { RecordingFrameClockAnchor } from '../../contracts/video/recording-frame-clock';
 import {
   hasActiveSidecarSession,
   pauseActiveSidecarRecorders,
@@ -456,14 +461,15 @@ async function waitForPendingStart(pendingStart: Promise<void>): Promise<boolean
 function notifyState(
   type: StateMessage,
   action: 'paused' | 'resumed',
-  recordingId: string | null
+  recordingId: string | null,
+  frameClock?: RecordingFrameClockAnchor | null
 ): void {
   if (!recordingId) return;
   sendRuntimeMessageBestEffort({
     context: { recordingId },
     logger,
     logMessage: `Failed to notify runtime that recording ${action}`,
-    payload: { type, recordingId },
+    payload: { type, recordingId, ...(frameClock === undefined ? {} : { frameClock }) },
   });
 }
 
@@ -529,7 +535,8 @@ export function pauseRecording(binding: RecordingSourceBinding): void {
   notifyState(
     VideoMessageType.OFFSCREEN_RECORDING_PAUSED,
     'paused',
-    recordingContext.currentRecordingId
+    recordingContext.currentRecordingId,
+    artifactSession.frameClock
   );
 }
 
@@ -556,11 +563,13 @@ export function resumeRecording(binding: RecordingSourceBinding): void {
   resumeActiveSidecarRecorders();
   durationTracker.startSegment();
 
-  notifyState(
-    VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
-    'resumed',
-    recordingContext.currentRecordingId
-  );
+  if (artifactSession.frameClock === undefined) {
+    notifyState(
+      VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
+      'resumed',
+      recordingContext.currentRecordingId
+    );
+  }
 }
 
 export function updateRecordingSettings(
@@ -569,4 +578,23 @@ export function updateRecordingSettings(
 ): Promise<void> {
   assertActiveRecordingBinding(binding);
   return applyRecordingSettings(patch);
+}
+
+/** Read-only timestamps; source lifecycle and command authority remain unchanged. */
+export function getRecordingClockTiming(
+  binding: RecordingSourceBinding
+): RecordingClockTiming | null {
+  const receivedAtMs = performance.timeOrigin + performance.now();
+  if (!matchesActiveRecordingBinding(binding) || !recordingContext.matchesSourceBinding(binding))
+    return null;
+  const anchor = recordingContext.artifactSession?.frameClock;
+  if (!anchor || !matchesRecordingFrameClockBinding(binding, anchor)) return null;
+  return {
+    recordingId: binding.recordingId,
+    generation: binding.generation,
+    streamInstanceId: binding.streamInstanceId,
+    receivedAtMs,
+    repliedAtMs: performance.timeOrigin + performance.now(),
+    maximumUncertaintyMs: anchor.maximumUncertaintyMs ?? 1000 / 120,
+  };
 }

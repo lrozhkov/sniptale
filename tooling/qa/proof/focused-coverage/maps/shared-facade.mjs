@@ -117,13 +117,6 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'sf-offscreen-signals',
-    productionPrefix: 'apps/extension/src/offscreen/recording/signals/',
-    exclusive: true,
-    reason: 'Offscreen signal suite.',
-    testFiles: ['apps/extension/src/offscreen/recording/signals/static-frame.test.ts'],
-  },
-  {
     owner: 'popup-shell-route-slot',
     productionFile: 'apps/extension/src/popup/shell/app/index.tsx',
     exclusive: true,

@@ -23,6 +23,11 @@ import { createReviewMediaOutput } from './media-output';
 import type { ReviewExportClipPlan } from './audio-render';
 import { audioPacketDuration, chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 import { createReviewAudioClipRenderer } from './audio-clip-render';
+import {
+  reviewExportPhase,
+  cleanupReviewExportFailure,
+  classifyReviewExportFailure,
+} from './export-diagnostics';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 export interface ReviewPacketReceipt {
@@ -62,21 +67,31 @@ export async function writeReviewPackets(args: {
   signal.addEventListener('abort', dispose, { once: true });
   let output: Output | null = null;
   try {
-    const video = await input.getPrimaryVideoTrack();
-    const audio = await input.getPrimaryAudioTrack();
+    const video = await reviewExportPhase(signal, 'decode', () => input.getPrimaryVideoTrack());
+    const audio = await reviewExportPhase(signal, 'decode', () => input.getPrimaryAudioTrack());
     if (!video || video.codec !== index.videoCodec || (audio?.codec ?? null) !== index.audioCodec)
-      throw new Error('Source tracks changed.');
-    const videoConfig = await video.getDecoderConfig();
-    const audioConfig = await audio?.getDecoderConfig();
+      throw classifyReviewExportFailure(signal, 'decode', new Error('Source tracks changed.'));
+    const videoConfig = await reviewExportPhase(signal, 'decode', () => video.getDecoderConfig());
+    const audioConfig = await reviewExportPhase(signal, 'decode', () => audio?.getDecoderConfig());
     if (!videoConfig || (audio && !audioConfig))
-      throw new Error('Codec configuration is unavailable.');
+      throw classifyReviewExportFailure(
+        signal,
+        'decode',
+        new Error('Codec configuration is unavailable.')
+      );
 
     const processing = (speedExists && !!audio) || !!args.exportAudio;
-    const processedAudio = processing ? await chooseReviewAudioCodec(audio, index.container) : null;
+    const processedAudio = processing
+      ? await reviewExportPhase(signal, 'audio-prepare', () =>
+          chooseReviewAudioCodec(audio, index.container)
+        )
+      : null;
     if (processing && !processedAudio) throw new Error('Audio processing is unavailable.');
     const videoSink = new EncodedPacketSink(video);
     const audioSink = audio ? new EncodedPacketSink(audio) : null;
-    const sampleRate = audio ? await audio.getSampleRate() : 0;
+    const sampleRate = audio
+      ? await reviewExportPhase(signal, 'decode', () => audio.getSampleRate())
+      : 0;
     const receipt: ReviewPacketReceipt = {
       videoPackets: 0,
       audioPackets: 0,
@@ -87,22 +102,24 @@ export async function writeReviewPackets(args: {
     };
     const clock = { time: 0 };
     const clipRenderer = createReviewAudioClipRenderer();
-    const tracks = createReviewMediaOutput({
-      index,
-      writer: args.writer,
-      signal,
-      processedAudio,
-      ...(args.provenance ? { provenance: args.provenance } : {}),
-      onAudioPacket: (packet) => {
-        receipt.audioPackets++;
-        clock.time = Math.max(clock.time, packet.timestamp + packet.duration);
-      },
-    });
+    const tracks = await reviewExportPhase(signal, 'encode', () =>
+      createReviewMediaOutput({
+        index,
+        writer: args.writer,
+        signal,
+        processedAudio,
+        ...(args.provenance ? { provenance: args.provenance } : {}),
+        onAudioPacket: (packet) => {
+          receipt.audioPackets++;
+          clock.time = Math.max(clock.time, packet.timestamp + packet.duration);
+        },
+      })
+    );
     output = tracks.output;
     if (tracks.video.kind !== 'copy') throw new Error('Video output configuration changed.');
     const videoSource = tracks.video.source;
     let videoEnd = 0;
-    await output.start();
+    await reviewExportPhase(signal, 'encode', () => output!.start());
     const timeEstimator = createExportTimeEstimator([
       { start: 0, end: receipt.resultDuration, cost: 1, route: 'copy' },
     ]);
@@ -118,13 +135,8 @@ export async function writeReviewPackets(args: {
     };
     for (const segment of segments) {
       signal.throwIfAborted();
-      const videoPackets = await segmentVideoPackets(
-        video,
-        videoSink,
-        videoConfig,
-        index,
-        segment,
-        signal
+      const videoPackets = await reviewExportPhase(signal, 'decode', () =>
+        segmentVideoPackets(video, videoSink, videoConfig, index, segment, signal)
       );
       const muted =
         !!args.exportAudio?.originalMuted ||
@@ -166,14 +178,13 @@ export async function writeReviewPackets(args: {
     tracks.audio?.source.close();
     signal.throwIfAborted();
     args.onTimeEstimate?.(null);
-    await output.finalize();
+    await reviewExportPhase(signal, 'mux-finalize', () => output!.finalize());
     signal.throwIfAborted();
     receipt.resultDuration = Math.max(videoEnd, clock.time);
     args.onProgress?.(1);
     return receipt;
   } catch (error) {
-    await output?.cancel().catch(() => undefined);
-    throw error;
+    return await cleanupReviewExportFailure(error, () => output?.cancel());
   } finally {
     args.onTimeEstimate?.(null);
     signal.removeEventListener('abort', dispose);
@@ -251,28 +262,35 @@ async function muxSegmentPackets(args: {
   } = args;
   let videoEnd = 0;
   try {
-    let v = await videoPackets.next();
-    let a = await audioPackets?.next();
+    let v = await reviewExportPhase(signal, 'decode', () => videoPackets.next());
+    let a = await reviewExportPhase(signal, 'audio-prepare', () => audioPackets?.next());
     while (!v.done || (a && !a.done)) {
       signal.throwIfAborted();
       if (!v.done && (!a || a.done || v.value.timestamp <= a.value.timestamp)) {
-        await videoSource.add(v.value, { decoderConfig: videoConfig });
+        const packet = v.value;
+        await reviewExportPhase(signal, 'encode', () =>
+          videoSource.add(packet, { decoderConfig: videoConfig })
+        );
         videoEnd = Math.max(videoEnd, v.value.timestamp + v.value.duration);
         receipt.videoPackets++;
         args.onProgress?.(Math.min(1, v.value.timestamp / receipt.resultDuration));
-        v = await videoPackets.next();
+        v = await reviewExportPhase(signal, 'decode', () => videoPackets.next());
       } else if (a && !a.done && audioSource) {
         if (audioSource.kind === 'processed' && a.value instanceof AudioSample) {
-          await audioSource.source.add(a.value);
+          const sample = a.value;
+          await reviewExportPhase(signal, 'encode', () => audioSource.source.add(sample));
         } else if (
           audioSource.kind === 'copy' &&
           !(a.value instanceof AudioSample) &&
           audioConfig
         ) {
-          await audioSource.source.add(a.value, { decoderConfig: audioConfig });
+          const packet = a.value;
+          await reviewExportPhase(signal, 'encode', () =>
+            audioSource.source.add(packet, { decoderConfig: audioConfig })
+          );
           receipt.audioPackets++;
         } else throw new Error('Audio output configuration changed.');
-        a = await audioPackets!.next();
+        a = await reviewExportPhase(signal, 'audio-prepare', () => audioPackets!.next());
       }
     }
     return videoEnd;

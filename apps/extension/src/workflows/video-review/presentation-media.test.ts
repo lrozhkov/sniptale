@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ALL_FORMATS, BlobSource, Input, InputVideoTrack } from 'mediabunny';
 import { createReviewPresentationMedia } from './presentation-media';
+import { createReviewExportDiagnostics } from './export-diagnostics';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
 
 const io = vi.hoisted(() => ({ getSample: vi.fn() }));
@@ -72,6 +73,39 @@ const mapping = (start = 1, end = 1.04, holdLast = false) => ({
   assetId: 'video',
   range: { start, end },
   holdLast,
+});
+
+it('retains controlled bookend errors and their decoder diagnosis through composition', async () => {
+  const fixture = await videoFixture();
+  const cause = new Error('private decoder details');
+  io.getSample.mockRejectedValue(cause);
+  const owner = await createReviewPresentationMedia({
+    slot: fixture.slot,
+    output,
+    signal: new AbortController().signal,
+    readAsset: async () => fixture.blob,
+  });
+  const summary = vi.fn();
+  const attempt = createReviewExportDiagnostics(
+    { destination: 'download', route: 'presentation' },
+    summary
+  );
+  const error = await attempt
+    .phase('compose', () => owner.frame(mapping()))
+    .catch((value: unknown) => value);
+  expect(error).toMatchObject({
+    stage: 'decode',
+    cause: {
+      code: 'decode',
+      message: 'presentation-media:decode',
+      cause: { stage: 'decode', cause },
+    },
+  });
+  attempt.reportFailure(error);
+  expect(summary).toHaveBeenCalledExactlyOnceWith(
+    'export outcome=failed route=presentation destination=download stage=decode code=decode-failed'
+  );
+  await expect(owner.frame(mapping())).rejects.toMatchObject({ code: 'disposed' });
 });
 beforeEach(() => {
   io.getSample.mockReset();

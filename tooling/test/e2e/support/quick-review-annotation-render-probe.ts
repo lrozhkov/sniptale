@@ -1,4 +1,13 @@
 import {
+  createReviewAnnotationGeometry,
+  convertReviewAnnotationAttachment,
+} from '../../../../apps/extension/src/gallery/video-review/annotation-effects-geometry';
+import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
+import {
+  DEFAULT_QUICK_EDIT_PERSPECTIVE,
+  quickEditSpatialTargetCamera,
+} from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+import {
   sha256EffectV1Bytes,
   resolveEffectV1ControlDefault,
   validateEffectV1Document,
@@ -461,8 +470,61 @@ async function encodedSource() {
   return new Blob([target.buffer!], { type: 'video/webm' });
 }
 
+function annotationExportScene(
+  defs: Awaited<ReturnType<typeof definitions>>,
+  size: Size,
+  converted: boolean
+) {
+  const scene = fixture(defs, 2, size, 'viewport');
+  for (const [i, instance] of scene.annotationEffects!.lane.instances.entries()) {
+    instance.end = 4;
+    instance.attachment = i === 0 ? 'content' : 'viewport';
+  }
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.canvas = size;
+  advanced.annotationEffects = scene.annotationEffects!.lane;
+
+  if (converted) {
+    const region = {
+      ...createQuickEditZoomRegion({ id: 'conversion', at: 0, duration: 4, endMax: 4 }),
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+      perspective: {
+        ...DEFAULT_QUICK_EDIT_PERSPECTIVE,
+        enabled: true,
+        rotateX: 15,
+        rotateY: -30,
+        rotateZ: 5,
+      },
+    };
+    scene.zoomRegions = [region];
+    advanced.zoom = { ...advanced.zoom, enabled: true, regions: scene.zoomRegions };
+    const geometry = createReviewAnnotationGeometry({
+      source: sourceSize,
+      canvas: size,
+      output: size,
+      background: scene.background,
+      camera: quickEditSpatialTargetCamera(region),
+    });
+    if (!geometry) throw new Error('Converted fixture geometry unavailable');
+    scene.annotationEffects!.lane.instances = scene.annotationEffects!.lane.instances.map(
+      (instance) => {
+        const next = convertReviewAnnotationAttachment(
+          instance,
+          instance.attachment === 'content' ? 'viewport' : 'content',
+          geometry
+        );
+        if (!next) throw new Error('Converted fixture attachment unavailable');
+        return next;
+      }
+    );
+  }
+  return { scene, advanced };
+}
+
 /** Actual frame exporter, probed codecs, muxed files and decoded witnesses for full and fragment clocks. */
-export async function exportProbe() {
+export async function exportProbe(converted = false) {
   const defs = await definitions();
   const file = await encodedSource();
   const signal = new AbortController().signal;
@@ -502,15 +564,7 @@ export async function exportProbe() {
     for (const variant of ['full', 'fragment', 'presentation'] as const) {
       const fragment = variant === 'fragment';
       const presentation = variant === 'presentation';
-      const scene = fixture(defs, 2, size, 'viewport');
-      for (const [i, instance] of scene.annotationEffects!.lane.instances.entries()) {
-        instance.end = 4;
-        instance.attachment = i === 0 ? 'content' : 'viewport';
-      }
-      const advanced = createQuickEditAdvancedState();
-      advanced.ui.mode = 'advanced';
-      advanced.canvas = size;
-      advanced.annotationEffects = scene.annotationEffects!.lane;
+      const { scene, advanced } = annotationExportScene(defs, size, converted);
       let bookend: Blob | null = null;
       if (presentation) {
         const card = surface(size);

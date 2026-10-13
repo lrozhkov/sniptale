@@ -204,7 +204,17 @@ export function resolveReviewClickRaster(
   background: QuickEditBackgroundSettings,
   clip: { rect: ReviewRegion; radius: number }
 ) {
-  if (!layout.spatial) return { video: layout.videoTransform, clip, transform: undefined };
+  if (!layout.spatial)
+    return {
+      video: layout.videoTransform,
+      clip,
+      transform: undefined,
+      window: {
+        videoRect: layout.videoRect,
+        windowRect: layout.windowRect,
+        transform: computeQuickEditWindowTransform(layout),
+      },
+    };
   const raster = computeQuickEditSpatialRasterLayout(layout, background);
   const base = layout.windowRect;
   const scale = clip.rect.width / base.width;
@@ -212,6 +222,11 @@ export function resolveReviewClickRaster(
     video: raster.videoTransform,
     clip: { rect: base, radius: clip.radius / scale },
     transform: { scale, x: clip.rect.x - scale * base.x, y: clip.rect.y - scale * base.y },
+    window: {
+      videoRect: raster.videoRect,
+      windowRect: raster.windowRect,
+      transform: computeQuickEditWindowTransform(raster),
+    },
   };
 }
 

@@ -4,11 +4,10 @@ import {
   appendControlledCursorTelemetry,
   beginControlledCursorNavigation,
   clearControlledCursorNavigationPending,
-  getControlledCursorOffsetSeconds,
+  getRecordingFrameClock,
   getVideoRecordingTabId,
   isControlledCursorCaptureEnabled,
   setControlledCursorAutoPaused,
-  setControlledCursorOffsetSeconds,
 } from '../../../session-state';
 import { getVideoRecordingRuntimeState } from '../../session-state';
 import {
@@ -70,7 +69,6 @@ export async function suspendControlledCursorEffects(
 ): Promise<void> {
   if (!isControlledCursorEffectActive(binding)) return;
   setControlledCursorAutoPaused(binding.shouldResume);
-  setControlledCursorOffsetSeconds(getVideoRecordingRuntimeState().duration);
   try {
     const telemetry = await disableControlledCursorCapture(binding.tabId);
     if (isControlledCursorEffectActive(binding)) appendControlledCursorTelemetry(telemetry);
@@ -94,11 +92,15 @@ export async function restoreControlledCursorEffects(
       await enableControlledCursorCapture(
         binding.tabId,
         binding.recordingId,
-        // The tab stream continues recording while the document is replaced.
-        Math.max(getControlledCursorOffsetSeconds(), getVideoRecordingRuntimeState().duration)
+        0,
+        getRecordingFrameClock()
       );
       if (!isControlledCursorEffectActive(binding)) return;
-      await syncControlledCursorCapture(binding.tabId, binding.shouldResume ? 'resume' : 'pause');
+      await syncControlledCursorCapture(
+        binding.tabId,
+        binding.shouldResume ? 'resume' : 'pause',
+        getRecordingFrameClock()
+      );
       if (!isControlledCursorEffectActive(binding)) return;
       clearControlledCursorEffects(binding);
       return;

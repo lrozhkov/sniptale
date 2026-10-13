@@ -17,6 +17,14 @@ export function applyVideoProjectMutationPatch(
   return {
     ...project,
     ...patch,
+    version:
+      project.version === 3 ||
+      project.cursorFocusPath !== undefined ||
+      project.actionFeedback !== undefined ||
+      patch.cursorFocusPath !== undefined ||
+      patch.actionFeedback !== undefined
+        ? 3
+        : 2,
     updatedAt: getVideoProjectMutationTimestamp(),
   };
 }

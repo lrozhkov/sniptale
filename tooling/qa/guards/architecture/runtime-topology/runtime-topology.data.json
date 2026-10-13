@@ -24,6 +24,17 @@
     ]
   },
   {
+    "id": "recording-clock",
+    "root": "apps/extension/src/recording-clock",
+    "manifestOwned": true,
+    "featureRoot": true,
+    "entrypointFiles": [
+      "apps/extension/src/recording-clock/index.html",
+      "apps/extension/src/recording-clock/index.ts",
+      "apps/extension/src/recording-clock/relay.worker.ts"
+    ]
+  },
+  {
     "id": "popup",
     "root": "apps/extension/src/popup",
     "manifestOwned": true,

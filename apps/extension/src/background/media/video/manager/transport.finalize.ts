@@ -1,3 +1,4 @@
+import type { RecordingFrameClockLease } from '../../../../contracts/video/recording-frame-clock';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   CaptureMode,
@@ -98,6 +99,7 @@ export function beginPreparedRecording(args: {
   generation: number;
   recordingId: string;
   streamInstanceId: string;
+  frameClockLease?: RecordingFrameClockLease | null;
 }): Promise<void> {
   return sendOffscreenBeginRecording(args);
 }

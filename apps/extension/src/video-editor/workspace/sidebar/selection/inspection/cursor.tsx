@@ -1,3 +1,4 @@
+import { InspectCursorPath } from './cursor-path';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
 import {
@@ -18,6 +19,12 @@ import { DetailItem, DetailList, PANEL_SECTION_CLASS_NAME } from '../shared/pane
 export function InspectCursorPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const sample = props.selectedCursorSample;
   const cursorTrack = props.project.cursorTrack;
+  if (sample && !cursorTrack && props.project.cursorFocusPath)
+    return (
+      <section className={PANEL_SECTION_CLASS_NAME}>
+        <InspectCursorPath project={props.project} sampleId={sample.id} time={sample.time} />
+      </section>
+    );
   if (!sample || !cursorTrack) {
     return <SelectionEmptyState />;
   }
@@ -30,11 +37,13 @@ export function InspectCursorPanel(props: WorkspaceSidebarSelectionPanelProps) {
       <InspectorGroupedPanel
         groups={createCursorGroups(props, sample, cursorTrack, usesTrackAppearance, effectiveSkin)}
       />
-      <DangerButton
-        className="mt-3"
-        onClick={() => props.onDeleteCursorSample(sample.id)}
-        label={translate('common.actions.delete')}
-      />
+      {!props.project.cursorFocusPath && props.project.source.kind !== 'recording' ? (
+        <DangerButton
+          className="mt-3"
+          onClick={() => props.onDeleteCursorSample(sample.id)}
+          label={translate('common.actions.delete')}
+        />
+      ) : null}
     </section>
   );
 }
@@ -48,7 +57,17 @@ function createCursorGroups(
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['skin']
   >
 ) {
-  return [
+  const groups = [
+    {
+      id: 'focus-path',
+      defaultActive:
+        props.project.source.kind === 'recording' || props.project.cursorFocusPath !== undefined,
+      semantic: 'animation' as const,
+      label: translate('videoEditor.sidebar.cursorFocusPathTitle'),
+      content: (
+        <InspectCursorPath project={props.project} sampleId={sample.id} time={sample.time} />
+      ),
+    },
     {
       id: 'info',
       semantic: 'info' as const,
@@ -90,12 +109,13 @@ function createCursorGroups(
     {
       id: 'appearance',
       semantic: 'appearance' as const,
-      defaultActive: true,
+      defaultActive:
+        props.project.source.kind !== 'recording' && props.project.cursorFocusPath === undefined,
       label: translate('videoEditor.sidebar.inspectorGroupAppearance'),
       content: (
         <>
           <CursorVisibilityField
-            visible={sample.visible}
+            visible={sample.visible && sample.skinOverride?.hidden !== true}
             onChange={(visible) => props.onUpdateCursorSampleVisibility(sample.id, visible)}
           />
           <CursorAppearanceSection
@@ -106,6 +126,9 @@ function createCursorGroups(
       ),
     },
   ] as const;
+  return props.project.cursorTrack?.samples.some((item) => item.id === sample.id)
+    ? groups
+    : groups.filter((group) => group.id === 'focus-path' || group.id === 'info');
 }
 
 function createCursorBehaviorProps(

@@ -7,6 +7,7 @@ import { planPresentationPreview } from '../../features/video/review/presentatio
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { parseReviewProvenance } from '../../features/video/review/provenance';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { createReviewExportDiagnostics } from './export-diagnostics';
 
 const io = vi.hoisted(() => ({
   open: vi.fn(),
@@ -385,6 +386,29 @@ it('rejects audible media without an admitted output codec before muxing', async
   expect(io.rendererDispose).toHaveBeenCalledOnce();
 });
 
+it('keeps native audio encoder setup refusal classified before mux creation', async () => {
+  io.probe.mockResolvedValue({ audible: true, multichannel: false, codec: 'aac' });
+  const cause = new Error('private native configure refusal');
+  io.encoder.mockImplementationOnce(() => {
+    throw cause;
+  });
+  const summary = vi.fn();
+  const attempt = createReviewExportDiagnostics(
+    { destination: 'gallery', route: 'presentation' },
+    summary
+  );
+  const error = await attempt
+    .phase('compose', () => writeReviewPresentationFrames(fixture()))
+    .catch((value: unknown) => value);
+  expect(error).toMatchObject({ stage: 'encode', cause });
+  attempt.reportFailure(error);
+  expect(summary).toHaveBeenCalledExactlyOnceWith(
+    'export outcome=failed route=presentation destination=gallery stage=encode code=encode-failed'
+  );
+  expect(io.media).not.toHaveBeenCalled();
+  expect(io.rendererDispose).toHaveBeenCalledOnce();
+});
+
 it.each(['audio', 'video', 'finalize'] as const)(
   'cleans encoder, output and renderer after %s failure',
   async (stage) => {
@@ -392,7 +416,11 @@ it.each(['audio', 'video', 'finalize'] as const)(
     if (stage === 'audio') io.audioAdd.mockRejectedValueOnce(new Error('Audio failed'));
     if (stage === 'video') io.videoAdd.mockRejectedValueOnce(new Error('Video failed'));
     if (stage === 'finalize') io.finalize.mockRejectedValueOnce(new Error('Finalize failed'));
-    await expect(writeReviewPresentationFrames(fixture())).rejects.toThrow('failed');
+    const failed = writeReviewPresentationFrames(fixture());
+    await expect(failed).rejects.toThrow('failed');
+    await expect(failed).rejects.toMatchObject({
+      stage: stage === 'finalize' ? 'mux-finalize' : 'encode',
+    });
     expect(io.events.indexOf('encoder-dispose')).toBeLessThan(io.events.indexOf('cancel'));
     expect(io.events.indexOf('cancel')).toBeLessThan(io.events.indexOf('renderer-dispose'));
     expect(io.audioDispose).toHaveBeenCalledOnce();

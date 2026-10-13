@@ -1,3 +1,4 @@
+import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { originalAudioRangeViews } from '../../features/video/review/advanced/original-audio-mutes';
 import { createTrackProjection } from './track-projection';
@@ -40,9 +41,16 @@ export function reviewSelectionExists(
   selection: ReviewSelection,
   document: ReviewDocument,
   advanced: QuickEditAdvancedState,
-  markers: readonly ReviewTelemetryMarker[] = []
+  markers: readonly ReviewTelemetryMarker[] = [],
+  cursorFocusPath?: CursorFocusPath
 ): boolean {
   if (selection.kind === 'none') return false;
+  if (selection.kind === 'cursor-focus')
+    return (
+      (cursorFocusPath ?? advanced.cursorFocusPath)?.segments.some((segment) =>
+        segment.keys.some((key) => key.id === selection.id)
+      ) ?? false
+    );
   if (selection.kind === 'webcam') return !!advanced.webcam?.enabled;
   if (selection.kind === 'webcam-position')
     return (
@@ -98,6 +106,8 @@ export function useReviewSelectionLifecycle(args: {
   document: ReviewDocument;
   advanced: QuickEditAdvancedState;
   markers?: readonly ReviewTelemetryMarker[];
+  cursorFocusPath?: CursorFocusPath;
+  deleteCursorFocus?(id: string): void;
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
@@ -114,6 +124,16 @@ export function useReviewSelectionLifecycle(args: {
 }) {
   const remove = () => {
     if (args.selection.kind === 'none' || args.selection.kind === 'telemetry') return;
+    if (args.selection.kind === 'cursor-focus') {
+      const selectedId = args.selection.id;
+      const key = args.cursorFocusPath?.segments
+        .flatMap((segment) => segment.keys)
+        .find((key) => key.id === selectedId);
+      if (key?.anchor !== 'manual') return;
+      args.deleteCursorFocus?.(args.selection.id);
+      args.setSelection({ kind: 'none' });
+      return;
+    }
     const historyRemoval = selectedHistoryRemoval(args.selection, args.document);
     if (historyRemoval) void args.run(() => args.commit(historyRemoval));
     else if (args.selection.kind === 'canvas-comment') args.deleteCanvas(args.selection.id);
@@ -137,7 +157,13 @@ export function useReviewSelectionLifecycle(args: {
   useEffect(() => {
     if (
       args.selection.kind !== 'none' &&
-      !reviewSelectionExists(args.selection, args.document, args.advanced, args.markers)
+      !reviewSelectionExists(
+        args.selection,
+        args.document,
+        args.advanced,
+        args.markers,
+        args.cursorFocusPath
+      )
     )
       args.setSelection({ kind: 'none' });
   }, [args]);
@@ -160,6 +186,8 @@ export function reviewSelectionSourceTime(
   const midpoint = (range: { start: number; end: number } | undefined) =>
     range ? (range.start + range.end) / 2 : null;
   switch (selection.kind) {
+    case 'cursor-focus':
+      return selection.time;
     case 'none':
       return null;
     case 'webcam':

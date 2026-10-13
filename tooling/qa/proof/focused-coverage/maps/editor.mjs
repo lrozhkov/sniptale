@@ -1,5 +1,158 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-review-preview-presentation-session',
+    productionFile: 'apps/extension/src/gallery/video-review/preview-presentation-session.ts',
+    reason:
+      'Mounted preview hooks exercise the session acquisition, source callbacks, stale results, publication, cancellation, failure diagnostics and retry lifecycle.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-review-export-diagnostics',
+    productionFile: 'apps/extension/src/workflows/video-review/export-diagnostics.ts',
+    allowCrossOwner: true,
+    reason:
+      'Actual exporters and mounted Gallery consumers prove terminal summaries, nested stages, cancellation, cleanup, privacy and advisory sink failures.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/export-diagnostics.test.ts',
+      'apps/extension/src/workflows/video-review/export-lifecycle.diagnostics.test.ts',
+      'apps/extension/src/workflows/video-review/export-lifecycle.test.ts',
+      'apps/extension/src/workflows/video-review/render-export.diagnostics.test.ts',
+      'apps/extension/src/workflows/video-review/render-export.test.ts',
+      'apps/extension/src/workflows/video-review/render-presentation-export.test.ts',
+      'apps/extension/src/workflows/video-review/packet-export.test.ts',
+      'apps/extension/src/workflows/video-review/decoded-video-sample.test.ts',
+      'apps/extension/src/workflows/video-review/presentation-media.test.ts',
+      'apps/extension/src/gallery/video-review/use-export.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-review-frame-export-setup',
+    productionFile: 'apps/extension/src/workflows/video-review/render-export-setup.ts',
+    reason:
+      'The frame exporter executes decoration acquisition, partial failure compensation, codec configuration and unchanged caller-owned cleanup.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/render-export.test.ts',
+      'apps/extension/src/workflows/video-review/render-export.diagnostics.test.ts',
+      'apps/extension/src/workflows/video-review/render-export-captions.test.ts',
+      'apps/extension/src/workflows/video-review/render-export-watermark.test.ts',
+      'apps/extension/src/workflows/video-review/render-adaptive.test.ts',
+      'apps/extension/src/workflows/video-review/render-probe.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-review-native-stage',
+    productionFile: 'apps/extension/src/gallery/video-review/stage-video.tsx',
+    reason:
+      'The stage consumer suites exercise native video, header, selection geometry and composition parity through the mounted stage.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/stage.test.tsx',
+      'apps/extension/src/gallery/video-review/stage-geometry.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-review-export-scene',
+    productionFile: 'apps/extension/src/workflows/video-review/render-export-scene.ts',
+    reason:
+      'Export frame and overlay consumer suites execute the extracted scene composition, borrowed raster lifetime and decorated lens sampling.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/render-export.test.ts',
+      'apps/extension/src/workflows/video-review/scene-frame.test.ts',
+      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-review-annotation-numeric',
+    productionFile: 'apps/extension/src/gallery/video-review/annotation-effects-numeric.tsx',
+    reason:
+      'Actual inspector scrub proposals, local anchor bounds and cancellation are proved through presentation and canonical annotation history.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-effects-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-review-timeline-hover',
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-hover.tsx',
+    reason:
+      'Real timeline hit-target tests exercise seek/draw cursor admission, snapped guides, item/control guards and capture cleanup.',
+    testFiles: ['apps/extension/src/gallery/video-review/timeline-hit-targets.test.tsx'],
+  },
+  {
+    owner: 'gallery-review-capture-coverage',
+    productionFile: 'apps/extension/src/gallery/video-review/action-history-coverage.ts',
+    reason:
+      'Available-empty, unavailable, unknown and mixed mouse coverage use the real timeline and history inspector.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-telemetry.test.tsx',
+      'apps/extension/src/gallery/video-review/action-history.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-wiring.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-project-source-authoring-retention',
+    productionFile: 'apps/extension/src/features/video/project/source-interactions.ts',
+    allowCrossOwner: true,
+    reason:
+      'Real feature removal, editor Undo/Redo and selected portable backup/restore prove source-bound authoring retention.',
+    testFiles: [
+      'apps/extension/src/features/video/project/library-source-removal.test.ts',
+      'apps/extension/src/video-editor/project/state/actions.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-review-history-filters',
+    productionFile: 'apps/extension/src/gallery/video-review/action-history-filters.tsx',
+    reason:
+      'History filter admission, element facets, intervals and selection are exercised by the owning history panel.',
+    testFiles: ['apps/extension/src/gallery/video-review/action-history.test.tsx'],
+  },
+  {
+    owner: 'gallery-review-recorded-event-labels',
+    productionFile: 'apps/extension/src/gallery/video-review/controls.tsx',
+    reason:
+      'Changed recorded-event labels and mouse-button hints are exercised by real history rows and action properties.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-telemetry.test.tsx',
+      'apps/extension/src/gallery/video-review/action-history.test.tsx',
+      'apps/extension/src/gallery/video-review/action-properties.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-review-cursor-inspection',
+    productionFile: 'apps/extension/src/gallery/video-review/cursor-path-editor.tsx',
+    reason:
+      'The adjacent overlay suite renders this actual inspector and exercises source-point edits, tangents and global policy.',
+    testFiles: ['apps/extension/src/gallery/video-review/cursor-path-overlay.test.tsx'],
+  },
+  {
+    owner: 'gallery-review-result-time-lane-adapters',
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-lane-bindings.tsx',
+    reason:
+      'Timeline binding and audio placement suites render these adapters with real source/result projection and command gates.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
+      'apps/extension/src/gallery/video-review/audio-track-placement.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-review-editor-state',
+    productionFile: 'apps/extension/src/gallery/video-review/use-editor-state.ts',
+    reason:
+      'Native selection integrations exercise the owning editor state, persisted replay, action selection and contextual tools.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+    ],
+  },
+
+  {
     owner: 'content-drawing-preferences',
     productionFile: 'apps/extension/src/content/drawing/preferences.ts',
     reason:

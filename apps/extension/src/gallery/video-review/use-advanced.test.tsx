@@ -1,5 +1,5 @@
-import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 // @vitest-environment jsdom
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
@@ -79,7 +79,13 @@ function setup(initial = createQuickEditAdvancedState()) {
     return null;
   }
   act(() => root.render(<Harness />));
-  return { session, deps, saveFromOtherTab, build };
+  return {
+    session,
+    deps,
+    saveFromOtherTab,
+    build,
+    rerender: () => act(() => root.render(<Harness />)),
+  };
 }
 
 beforeEach(() => {
@@ -592,4 +598,16 @@ it('does not resurrect a removed optional annotation baseline after content repl
   await act(async () => advanced.flush());
   expect(session.getSnapshot().document.advancedContent.annotationEffects).toBeUndefined();
   expect(advanced.advanced.annotationEffects).toBeUndefined();
+});
+
+it('keeps effective content identity through transport-only rerenders and invalidates on an authored revision', () => {
+  const fixture = setup();
+  const before = advanced.advanced;
+  fixture.rerender();
+  expect(advanced.advanced).toBe(before);
+  act(() => advanced.setZoom((zoom) => ({ ...zoom, enabled: true })));
+  const authored = advanced.advanced;
+  expect(authored).not.toBe(before);
+  fixture.rerender();
+  expect(advanced.advanced).toBe(authored);
 });

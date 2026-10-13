@@ -504,3 +504,59 @@ it('lets appended captured keys inherit global keystroke visibility', () => {
     renderKind: 'keystroke',
   });
 });
+
+it('keeps typing-only telemetry with its inserted source instance through undo and split', () => {
+  const { store, asset } = setup();
+  asset.source = { kind: 'recording', recordingId: 'cadence' };
+  const telemetry: RecordingTelemetryEntry = {
+    recordingId: 'cadence',
+    createdAt: 1,
+    updatedAt: 1,
+    captureMode: null,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [
+      {
+        id: 'typed',
+        kind: 'typing',
+        startTime: 2.1,
+        endTime: 2.9,
+        point: null,
+        data: { eventCount: 3 },
+        keyboardRhythm: [
+          {
+            version: 1,
+            id: 'rhythm',
+            startTime: 2.1,
+            quantumMs: 1,
+            count: 3,
+            encoding: 'delta',
+            ticks: [0, 100, 700],
+          },
+        ],
+      },
+    ],
+  };
+  expect(store.getState().appendMaterial(asset.id, { start: 2, end: 3 }, telemetry).status).toBe(
+    'placed'
+  );
+  const inserted = store.getState().project!;
+  expect(inserted.actionEvents).toHaveLength(0);
+  expect(inserted.actionFeedback).toHaveLength(1);
+  const snapshot = structuredClone(inserted.actionFeedback);
+  telemetry.signals[0]!.keyboardRhythm![0]!.ticks[1] = 999;
+  expect(inserted.actionFeedback).toEqual(snapshot);
+  const clip = inserted.clips.find((item) => item.type === 'VIDEO')!;
+  store.getState().splitClipAt(clip.id, clip.startTime + 0.5);
+  expect(store.getState().project!.actionFeedback).toEqual(snapshot);
+  const split = store.getState();
+  const undoneSplit = undoVideoEditorProjectHistory(split.projectHistory, split.project!);
+  expect(undoneSplit?.status).toBe('applied');
+  if (undoneSplit?.status !== 'applied') throw new Error('Expected split undo');
+  expect(undoneSplit.project.actionFeedback).toEqual(snapshot);
+  const undoneInsertion = undoVideoEditorProjectHistory(undoneSplit.history, undoneSplit.project);
+  expect(undoneInsertion?.status).toBe('applied');
+  if (undoneInsertion?.status !== 'applied') throw new Error('Expected insertion undo');
+  expect(undoneInsertion.project.actionFeedback ?? []).toHaveLength(0);
+});

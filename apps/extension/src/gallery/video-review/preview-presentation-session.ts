@@ -9,6 +9,10 @@ import type { useReviewCutTransitionProvider } from './cut-transition-preview';
 import { createReviewWebcamPreviewSource } from './webcam-preview';
 import { captureReviewPreviewFrame } from './preview-presentation-frame';
 import { createPresentationAdmission } from './preview-presentation-admission';
+import {
+  createReviewExportDiagnostics,
+  reviewExportPhase,
+} from '../../workflows/video-review/export-diagnostics';
 import type {
   PresentationInput,
   PresentationCameraState,
@@ -43,6 +47,8 @@ export function createManualPresentationOwner(
 
 /** One mounted lifetime owns renderer, publication, camera and scheduler teardown. */
 class ManualPresentationSession {
+  private diagnostics = createReviewExportDiagnostics({ destination: 'preview', route: 'render' });
+  private diagnosed = false;
   private disposed = false;
   private waiting = false;
   private sequence = 0;
@@ -150,16 +156,19 @@ class ManualPresentationSession {
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
-    const prepared = await this.renderer.prepare(
-      this.current.scene.captions && this.current.scene.webcam
-        ? {
-            ...this.current.scene,
-            webcamDuration:
-              this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
-          }
-        : this.current.scene,
-      this.current.dimensions,
-      signal
+    const current = this.current;
+    const prepared = await reviewExportPhase(signal, 'prepare', () =>
+      this.renderer.prepare(
+        current.scene.captions && current.scene.webcam
+          ? {
+              ...current.scene,
+              webcamDuration:
+                this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
+            }
+          : current.scene,
+        current.dimensions,
+        signal
+      )
     );
     this.admission.replaceAssets(prepared.allocationAssets);
     return { value: prepared, release: () => prepared.release() };
@@ -219,7 +228,9 @@ class ManualPresentationSession {
     _request: unknown,
     signal: AbortSignal
   ) => {
-    const completed = await this.renderer.render(prepared, frame, signal);
+    const completed = await reviewExportPhase(signal, 'compose', () =>
+      this.renderer.render(prepared, frame, signal)
+    );
     let transferred = false;
     return {
       value: {
@@ -247,6 +258,10 @@ class ManualPresentationSession {
     value.retain();
     previous?.release();
     this.waiting = false;
+    if (this.diagnosed) {
+      this.diagnostics = createReviewExportDiagnostics({ destination: 'preview', route: 'render' });
+      this.diagnosed = false;
+    }
     this.publications.push(performance.now());
     while (this.publications.length > 2 && this.publications[0]! < performance.now() - 1000)
       this.publications.shift();
@@ -256,6 +271,10 @@ class ManualPresentationSession {
 
   private onError = (error: unknown) => {
     this.waiting = error instanceof PendingPresentation;
+    if (!this.waiting) {
+      this.diagnostics.reportFailure(error);
+      this.diagnosed = true;
+    }
     this.status(this.waiting ? 'pending' : 'failed');
   };
 
@@ -331,6 +350,8 @@ class ManualPresentationSession {
   }
 
   retry() {
+    this.diagnostics = createReviewExportDiagnostics({ destination: 'preview', route: 'render' });
+    this.diagnosed = false;
     this.cancelSourceFrameCallback();
     this.waiting = false;
     this.scheduler.invalidate();

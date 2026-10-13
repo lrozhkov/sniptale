@@ -293,3 +293,23 @@ it('fails required crop restoration when geometry or overlay is unavailable', as
     restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess)
   ).rejects.toThrow('region is unavailable');
 });
+
+it('collects outgoing telemetry before optional camera cleanup and durable rebind', async () => {
+  mocks.getSurfaceLease.mockReturnValue({ tabId: binding.tabId, surfaceSessionId: 'surface-1' });
+  let finishCleanup!: () => void;
+  mocks.closeCameraPeer.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      })
+  );
+  const suspension = suspendTabNavigationPageEffects(resolveTabNavigationPageEffects(), binding);
+  await vi.waitFor(() => expect(mocks.closeCameraPeer).toHaveBeenCalledOnce());
+  const collectedBeforeCleanup = mocks.suspendCursor.mock.calls.length;
+  finishCleanup();
+  await suspension;
+  expect(collectedBeforeCleanup).toBe(1);
+  expect(mocks.suspendCursor.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.beginRebind.mock.invocationCallOrder[0]!
+  );
+});

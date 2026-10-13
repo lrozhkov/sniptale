@@ -346,3 +346,101 @@ export async function addReviewFocus(page: Page) {
   await dialog.locator('[data-ui="gallery.videoReview.loopSummary"] button').click();
   if ((await tool.getAttribute('aria-pressed')) === 'true') await tool.click();
 }
+
+export async function seedReviewHistory(
+  page: Page,
+  detailed = false,
+  clickCount = 6,
+  timeStep = 0.01
+) {
+  await page.evaluate(
+    async ({ fixture, detailed, clickCount, timeStep }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(fixture.databaseName);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = db.transaction('recording_telemetry', 'readwrite');
+      const done = new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+      });
+      transaction.objectStore('recording_telemetry').put({
+        recordingId: fixture.records.recordings[0].id,
+        captureMode: 'TAB',
+        createdAt: 1,
+        updatedAt: 1,
+        viewport: null,
+        cursorTrack: null,
+        signals: [
+          ...[
+            [0.13, 3.27],
+            [3.27, 6.41],
+          ].map(([startTime, endTime], index) => ({
+            id: `idle-${index}`,
+            kind: 'cursor-idle',
+            startTime,
+            endTime,
+            point: null,
+            data: {},
+          })),
+          ...(detailed
+            ? [
+                {
+                  id: 'static',
+                  kind: 'static-frame',
+                  startTime: 7,
+                  endTime: 9,
+                  point: null,
+                  data: {},
+                },
+                {
+                  id: 'typing',
+                  kind: 'typing',
+                  startTime: 6.5,
+                  endTime: 12.01,
+                  point: null,
+                  data: { targetName: 'Search field' },
+                },
+              ]
+            : []),
+        ],
+        actionEvents: Array.from({ length: clickCount }, (_, index) => ({
+          id: `click-${index}`,
+          kind: 'CLICK',
+          time: 1 + index * timeStep,
+          duration: 0,
+          point: { x: 40, y: 30 },
+          recordingPoint: { x: 0.25, y: 0.33 },
+          label: detailed ? 'Save recording' : '',
+          data: {},
+          preset: 'NONE',
+        })),
+      });
+      await done;
+      db.close();
+    },
+    { fixture: betaV1Fixture, detailed, clickCount, timeStep }
+  );
+}
+
+export async function expectAnimatedReviewHistory(page: Page, count: number) {
+  const strip = page.locator('[data-ui="gallery.videoReview.historyStrip"]');
+  await expect(strip.locator('button[data-animated="true"]').first()).toBeVisible();
+  const buttons = strip.locator('button[data-animated="true"]');
+  expect(await buttons.count()).toBeLessThanOrEqual(3);
+  let represented = 0;
+  for (const button of await buttons.all()) {
+    const grouped = await button.evaluate((node) =>
+      Boolean(node.closest('[data-ui="gallery.videoReview.historyCluster"]'))
+    );
+    if (grouped) {
+      await button.click();
+      const options = page.getByRole('listbox').getByRole('option');
+      await expect(options.first()).toBeVisible();
+      represented += await options.count();
+      await page.keyboard.press('Escape');
+    } else represented++;
+  }
+  expect(represented).toBe(count);
+}

@@ -170,3 +170,78 @@ it.each(['fixed', 'follow-video'] as const)(
     );
   }
 );
+
+it.each([false, true])(
+  'keeps the inspector padded plane independent of output and cleans a failed frame=%s',
+  (failure) => {
+    const output = { width: 641, height: 401 };
+    const background = {
+      enabled: true,
+      type: 'solid',
+      color: '#ffffffff',
+      zoomBehavior: 'fixed',
+      layout: { padding: 4, cornerRadius: 12, shadow: { intensity: 80, color: '#000000ff' } },
+    } as const;
+    const spatial = {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 1,
+      windowMotion: 1,
+      lockBackground: true,
+      focus: [],
+    };
+    const camera = { scale: 2, centerX: 0.4, centerY: 0.5, spatial };
+    const layout = computeQuickEditSceneLayout({ source: output, output, background, camera });
+    const planeContext = {
+      clearRect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      fill: vi.fn(),
+      globalAlpha: 1,
+      drawImage: vi.fn(() => {
+        if (failure) throw new Error('frame failed');
+      }),
+    };
+    const target = { clearRect: vi.fn() };
+    const canvas = { width: 873, height: 637 } as HTMLCanvasElement;
+    const surface = vi.fn(() => ({
+      canvas,
+      context: planeContext as unknown as CanvasRenderingContext2D,
+    }));
+    const draw = vi.fn();
+    const paint = () =>
+      paintZoomPreview(target as unknown as CanvasRenderingContext2D, {
+        ...output,
+        background,
+        camera,
+        layout,
+        view: 'result',
+        previewScale: 0.5,
+        accent: '#fff',
+        cornerRadius: 12,
+        frame: { image: {} as CanvasImageSource, ...output },
+        spatialRenderer: { surface, draw, dispose: vi.fn() },
+      });
+    if (failure) expect(paint).toThrow('frame failed');
+    else paint();
+    expect(surface).toHaveBeenCalledWith('plane', 873, 637);
+    expect(planeContext.translate).toHaveBeenCalledWith(116, 118);
+    expect(planeContext.restore.mock.calls.length).toBe(planeContext.save.mock.calls.length);
+    if (failure) expect(draw).not.toHaveBeenCalled();
+    else
+      expect(draw).toHaveBeenCalledWith(
+        target,
+        expect.objectContaining({
+          source: canvas,
+          sourceRect: { x: -116, y: -118, width: 873, height: 637 },
+          output,
+          base: layout.windowRect,
+          frame: spatial,
+        })
+      );
+  }
+);

@@ -55,6 +55,7 @@ function anchorRecordingInteractions(params: {
           ? { ...event.point }
           : null,
       capturedDuration: event.duration,
+      ...(event.keyboardRepeats ? { keyboardRepeats: structuredClone(event.keyboardRepeats) } : {}),
       ...(event.kind !== 'CLICK' && event.kind !== 'KEY'
         ? { presentation: { preset: event.preset } }
         : {}),

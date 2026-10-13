@@ -12,6 +12,53 @@ import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 import { createReviewSpatialTextures } from './spatial-textures';
 import { REVIEW_SPATIAL_VERTEX, REVIEW_SPATIAL_FRAGMENT } from './spatial-shaders';
 
+/** The padded source uses scene coordinates; projection always targets the original output. */
+interface ReviewSpatialDrawRequest {
+  source: HTMLCanvasElement;
+  sourceRect: QuickEditRect;
+  output: { width: number; height: number };
+  base: QuickEditRect;
+  target: QuickEditRect;
+  frame: QuickEditSpatialFrame;
+  sharp?: boolean;
+}
+
+function validateSpatialDraw(gl: WebGLRenderingContext, args: ReviewSpatialDrawRequest) {
+  const { source, sourceRect, output } = args;
+  const dimensions = [source.width, source.height, output.width, output.height];
+  if (
+    dimensions.some((value) => !Number.isSafeInteger(value) || value <= 0) ||
+    !Number.isSafeInteger(source.width * source.height * 8) ||
+    !Number.isSafeInteger(output.width * output.height * 4) ||
+    !Number.isSafeInteger(sourceRect.x) ||
+    !Number.isSafeInteger(sourceRect.y) ||
+    sourceRect.width !== source.width ||
+    sourceRect.height !== source.height
+  )
+    throw new Error('Perspective output size is unavailable.');
+  const texture: unknown = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  const buffer: unknown = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
+  const viewport: unknown = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+  if (
+    typeof texture !== 'number' ||
+    !Number.isFinite(texture) ||
+    source.width > texture ||
+    source.height > texture ||
+    typeof buffer !== 'number' ||
+    !Number.isFinite(buffer) ||
+    output.width > buffer ||
+    output.height > buffer ||
+    !(viewport instanceof Int32Array || Array.isArray(viewport)) ||
+    typeof viewport[0] !== 'number' ||
+    typeof viewport[1] !== 'number' ||
+    !Number.isFinite(viewport[0]) ||
+    !Number.isFinite(viewport[1]) ||
+    output.width > viewport[0] ||
+    output.height > viewport[1]
+  )
+    throw new Error('Perspective output size is unavailable.');
+}
+
 /** Compile the shader pipeline before the session admits surfaces or draw requests. */
 function prepareSpatialPipeline(gl: WebGLRenderingContext, resources?: RenderResources) {
   const compile = (type: number, source: string) => {
@@ -72,15 +119,11 @@ function setSpatialFrameUniforms(
     frame: QuickEditSpatialFrame;
     sharp: boolean;
     output: { width: number; height: number };
+    sourceRect: QuickEditRect;
   }
 ) {
   const { base, target, frame, sharp, output } = args;
   const m = quickEditPlaneProjection(base, target, frame);
-  gl.uniformMatrix3fv(
-    uniform('projection'),
-    false,
-    new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]])
-  );
   const inverse = invertQuickEditProjection(m);
   if (!inverse) throw new Error('Perspective projection is unavailable.');
   gl.uniformMatrix3fv(
@@ -99,6 +142,8 @@ function setSpatialFrameUniforms(
     ])
   );
   gl.uniform2f(uniform('outputSize'), output.width, output.height);
+  const source = args.sourceRect;
+  gl.uniform4f(uniform('sourceRect'), source.x, source.y, source.width, source.height);
   gl.uniform4f(uniform('windowRect'), base.x, base.y, base.width, base.height);
   const rotation = quickEditRotationMatrix(frame.rotation);
   gl.uniform2f(uniform('depthAxis'), rotation[6]!, rotation[7]!);
@@ -156,7 +201,7 @@ export function createReviewSpatialRenderer(
   if (!gl) throw new Error('Perspective renderer is unavailable.');
   try {
     // CPU vertex/matrix arrays plus the explicit GL vertex-buffer storage.
-    arrays = resources?.bytes('spatial-vertex-and-matrices', 48 + 48 + 72);
+    arrays = resources?.bytes('spatial-vertex-and-matrices', 48 + 48 + 36);
     const { program, buffer, position, textures, uniform } = prepareSpatialPipeline(gl, resources);
     const surfaces = {
       exposure: resources ? null : document.createElement('canvas'),
@@ -223,18 +268,10 @@ export function createReviewSpatialRenderer(
         return { canvas: surface, context };
       },
       /** Projects a transparent base scene; background and viewport overlays stay outside this pass. */
-      draw(
-        context: CanvasRenderingContext2D,
-        source: HTMLCanvasElement,
-        base: QuickEditRect,
-        target: QuickEditRect,
-        frame: QuickEditSpatialFrame,
-        sharp = false
-      ) {
+      draw(context: CanvasRenderingContext2D, args: ReviewSpatialDrawRequest) {
         try {
-          const maximum: unknown = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-          if (typeof maximum !== 'number' || source.width > maximum || source.height > maximum)
-            throw new Error('Perspective output size is unavailable.');
+          validateSpatialDraw(gl, args);
+          const { source, output, base, target, frame, sourceRect, sharp = false } = args;
           if (disposed || gl.isContextLost()) throw new Error('Perspective context was lost.');
           if (
             !sharp &&
@@ -242,7 +279,7 @@ export function createReviewSpatialRenderer(
             frame.focus.some((focus) => focus.weight * focus.settings.strength > 0)
           )
             throw new Error('Depth renderer precision is unavailable.');
-          if (canvas.width !== source.width || canvas.height !== source.height) {
+          if (canvas.width !== output.width || canvas.height !== output.height) {
             if (resources) {
               canvas.width = 0;
               canvas.height = 0;
@@ -250,16 +287,18 @@ export function createReviewSpatialRenderer(
               drawingBuffer = undefined;
               drawingBuffer = resources.bytes(
                 'spatial-drawing-buffer',
-                source.width * source.height * 4
+                output.width * output.height * 4
               );
             }
-            canvas.width = source.width;
-            canvas.height = source.height;
+            canvas.width = output.width;
+            canvas.height = output.height;
           }
+          if (gl.drawingBufferWidth !== output.width || gl.drawingBufferHeight !== output.height)
+            throw new Error('Perspective output size is unavailable.');
           gl.viewport(0, 0, canvas.width, canvas.height);
           gl.clearColor(0, 0, 0, 0);
           gl.clear(gl.COLOR_BUFFER_BIT);
-          setSpatialFrameUniforms(gl, uniform, { base, target, frame, sharp, output: canvas });
+          setSpatialFrameUniforms(gl, uniform, { base, target, frame, sharp, output, sourceRect });
           let levelSizes: Float32Array;
           try {
             levelSizes = textures.upload(source);

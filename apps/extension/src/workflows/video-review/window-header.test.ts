@@ -5,9 +5,62 @@ import {
   loadReviewWindowHeader,
   reviewWindowHeaderUrl,
   createReviewWindowRaster,
+  reviewWindowRasterBacking,
+  withReviewWindowRaster,
 } from './window-header';
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('keeps native density only for an enlarging lens and never reduces a larger display raster', () => {
+  const windowRect = { x: 0, y: 0, width: 640.2, height: 378.1 };
+  expect(reviewWindowRasterBacking({ windowRect, sourceWidth: 1920, magnify: false })).toEqual({
+    width: 641,
+    height: 379,
+  });
+  expect(reviewWindowRasterBacking({ windowRect, sourceWidth: 1920, magnify: true })).toEqual({
+    width: 1920,
+    height: Math.ceil((378.1 * 1920) / 640.2),
+  });
+  expect(reviewWindowRasterBacking({ windowRect, sourceWidth: 160, magnify: true })).toEqual({
+    width: 641,
+    height: Math.ceil((378.1 * 641) / 640.2),
+  });
+});
+
+it.each([false, true])(
+  'lends one joined original to all effects and releases it on consumer failure=%s',
+  (fail) => {
+    const context = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    const release = vi.fn();
+    const image = document.createElement('canvas');
+    const canvas = vi.fn(() => ({ canvas: image, context, release }));
+    const args = {
+      header: image,
+      videoRect: { x: 0, y: 40, width: 400, height: 200 },
+      windowRect: { x: 0, y: 0, width: 400, height: 240 },
+      backing: { width: 800, height: 480 },
+      resources: { canvas, bytes: vi.fn() },
+      draw: vi.fn(),
+    };
+    const consume = () =>
+      withReviewWindowRaster(args, (raster) => {
+        expect(raster).toEqual({ image, width: 800, height: 480 });
+        expect(release).not.toHaveBeenCalled();
+        if (fail) throw new Error('lens failed');
+      });
+    if (fail) expect(consume).toThrow('lens failed');
+    else consume();
+    expect(canvas).toHaveBeenCalledExactlyOnceWith('decorated-window', { width: 800, height: 480 });
+    expect(args.draw).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+  }
+);
 
 it('encodes title as inert XML text and includes no invented address', () => {
   const url = reviewWindowHeaderUrl(

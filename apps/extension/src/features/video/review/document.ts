@@ -43,6 +43,7 @@ export function reviewAdvancedContentBaseline(state: {
   keyAnimations?: QuickEditAdvancedContent['keyAnimations'];
   clickAnimations?: QuickEditAdvancedContent['clickAnimations'];
   actionAudio?: QuickEditAdvancedContent['actionAudio'];
+  cursorFocusPath?: QuickEditAdvancedContent['cursorFocusPath'];
   canvas?: QuickEditAdvancedContent['canvas'];
   windowHeader?: QuickEditAdvancedContent['windowHeader'];
   webcam?: QuickEditAdvancedContent['webcam'];
@@ -61,6 +62,7 @@ export function reviewAdvancedContentBaseline(state: {
     ...(state.keyAnimations ? { keyAnimations: state.keyAnimations } : {}),
     ...(state.clickAnimations ? { clickAnimations: state.clickAnimations } : {}),
     ...(state.actionAudio ? { actionAudio: state.actionAudio } : {}),
+    ...(state.cursorFocusPath ? { cursorFocusPath: state.cursorFocusPath } : {}),
     ...(state.canvas ? { canvas: state.canvas } : {}),
     ...(state.windowHeader ? { windowHeader: state.windowHeader } : {}),
     ...(state.webcam ? { webcam: state.webcam } : {}),

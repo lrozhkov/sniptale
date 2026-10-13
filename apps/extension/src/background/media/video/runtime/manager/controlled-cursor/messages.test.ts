@@ -57,3 +57,32 @@ it('returns telemetry snapshots from the disable path and syncs pause and resume
     type: VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE,
   });
 });
+it('transmits explicit unavailable and correlated source clocks without creating an offset guess', async () => {
+  const frameClock = {
+    recordingId: 'recording-1',
+    streamInstanceId: 'native',
+    generation: 2,
+    revision: 3,
+    phase: 'active' as const,
+    captureEpochMs: 1000,
+    mediaTimeSeconds: 4,
+  };
+  await enableControlledCursorCapture(7, 'recording-1', 0, null);
+  expect(sendTabMessageMock).toHaveBeenLastCalledWith(7, {
+    type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
+    recordingId: 'recording-1',
+    frameClock: null,
+  });
+  await syncControlledCursorCapture(7, 'resume', frameClock);
+  expect(sendTabMessageMock).toHaveBeenLastCalledWith(7, {
+    type: VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE,
+    frameClock,
+  });
+  await enableControlledCursorCapture(7, 'recording-1', 0, frameClock);
+  expect(sendTabMessageMock).toHaveBeenLastCalledWith(7, {
+    type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
+    recordingId: 'recording-1',
+    frameClock,
+  });
+  await expect(disableControlledCursorCapture(7)).resolves.toBeNull();
+});

@@ -52,20 +52,21 @@ test('perspective filters subpixel rules and depth blur without moving line copi
     const draw = (angle: number, blur: boolean, sharp = false) => {
       const radians = (angle * Math.PI) / 360;
       context.clearRect(0, 0, width, height);
-      renderer.draw(
-        context,
-        plane.canvas,
-        rect,
-        rect,
-        {
+      renderer.draw(context, {
+        source: plane.canvas,
+        sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+        output: { width: plane.canvas.width, height: plane.canvas.height },
+        base: rect,
+        target: rect,
+        frame: {
           rotation: [Math.sin(radians), 0, 0, Math.cos(radians)],
           perspective: 1,
           windowMotion: 1,
           lockBackground: true,
           focus: blur ? focus : [],
         },
-        sharp
-      );
+        sharp: sharp,
+      });
     };
     try {
       plane.context.fillStyle = 'white';
@@ -121,10 +122,26 @@ test('perspective filters subpixel rules and depth blur without moving line copi
         };
         try {
           context.clearRect(0, 0, width, height);
-          fallback.draw(context, plane.canvas, rect, rect, frame);
+          fallback.draw(context, {
+            source: plane.canvas,
+            sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+            output: { width: plane.canvas.width, height: plane.canvas.height },
+            base: rect,
+            target: rect,
+            frame: frame,
+            sharp: false,
+          });
           fallbackAlpha = context.getImageData(480, 293, 1, 1).data[3]!;
           try {
-            fallback.draw(context, plane.canvas, rect, rect, { ...frame, focus });
+            fallback.draw(context, {
+              source: plane.canvas,
+              sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+              output: { width: plane.canvas.width, height: plane.canvas.height },
+              base: rect,
+              target: rect,
+              frame: { ...frame, focus },
+              sharp: false,
+            });
           } catch (error) {
             depthRejected = error instanceof Error && error.message.includes('precision');
           }
@@ -181,7 +198,8 @@ test('visual focus contours bound the real WebGL sharp and fully blurred regions
         "rojectQuickEditPoint } from './apps/extension/src/features/video/review/adva" +
         "nced/spatial-geometry';\n        export { resolveReviewSpatialFocusGeometry, " +
         "unprojectReviewSpatialPoint } from './apps/extension/src/gallery/video-revie" +
-        "w/spatial-control-geometry';",
+        "w/spatial-control-geometry'; export { measureSpatialFocusPixels } from '" +
+        "./tooling/test/e2e/support/spatial-focus-probe';",
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -194,9 +212,8 @@ test('visual focus contours bound the real WebGL sharp and fully blurred regions
     const {
       createReviewSpatialRenderer,
       quickEditPlaneProjection,
-      projectQuickEditPoint,
       resolveReviewSpatialFocusGeometry,
-      unprojectReviewSpatialPoint,
+      measureSpatialFocusPixels,
     } = await import(url);
     URL.revokeObjectURL(url);
     const renderer = createReviewSpatialRenderer();
@@ -326,9 +343,17 @@ test('visual focus contours bound the real WebGL sharp and fully blurred regions
         const context = output.getContext('2d')!;
         const draw = (settings: QuickEditDepthOfField | null) => {
           context.clearRect(0, 0, width, height);
-          renderer.draw(context, plane.canvas, base, target, {
-            ...frame,
-            focus: settings ? [{ weight: 1, settings }] : [],
+          renderer.draw(context, {
+            source: plane.canvas,
+            sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+            output: { width: plane.canvas.width, height: plane.canvas.height },
+            base: base,
+            target: target,
+            frame: {
+              ...frame,
+              focus: settings ? [{ weight: 1, settings }] : [],
+            },
+            sharp: false,
           });
           return context.getImageData(0, 0, width, height).data;
         };
@@ -337,108 +362,21 @@ test('visual focus contours bound the real WebGL sharp and fully blurred regions
         // of the contour helper: the shader sees distance > 0.01 from corner 0,0.
         const blurred = draw({ ...focus, mode: 'area', x: 0, y: 0, width: 0, softness: 0.01 });
         const actual = draw(focus);
-        const errorAt = (
-          a: Uint8ClampedArray,
-          b: Uint8ClampedArray,
-          point: { x: number; y: number }
-        ) => {
-          let sum = 0,
-            count = 0;
-          for (let y = Math.round(point.y) - 1; y <= Math.round(point.y) + 1; y++)
-            for (let x = Math.round(point.x) - 1; x <= Math.round(point.x) + 1; x++) {
-              const index = (y * width + x) * 4;
-              if (a[index + 3]! < 254 || b[index + 3]! < 254)
-                throw new Error('Focus sample left opaque plane');
-              sum += Math.abs(a[index]! - b[index]!);
-              count++;
-            }
-          return sum / count;
-        };
-        const samples: {
-          kind: string;
-          point: { x: number; y: number };
-          error: number;
-          referenceSeparation: number;
-        }[] = [];
-        if (geometry.flat || scenario.offPlane) {
-          // Whole authored plane remains sharp; no fabricated circle or edge.
-          let maximum = 0,
-            count = 0;
-          for (let i = 0; i < actual.length; i += 4) {
-            if (sharp[i + 3]! < 254) continue;
-            maximum = Math.max(maximum, Math.abs(actual[i]! - sharp[i]!));
-            count++;
-          }
-          results.push({
-            name: scenario.name,
-            flat: geometry.flat,
-            sharpPaths: geometry.sharp.length,
-            softPaths: geometry.soft.length,
-            maximum,
-            count,
-            samples,
-          });
-        } else {
-          const center = { x: base.x + base.width * focus.x, y: base.y + base.height * focus.y };
-          for (const kind of ['sharp', 'soft'] as const) {
-            const points: { x: number; y: number }[] = geometry[kind].flatMap(
-              (path: { x: number; y: number }[]) =>
-                path.length === 2
-                  ? Array.from({ length: 17 }, (_, index) => ({
-                      x: path[0]!.x + ((path[1]!.x - path[0]!.x) * index) / 16,
-                      y: path[0]!.y + ((path[1]!.y - path[0]!.y) * index) / 16,
-                    }))
-                  : path
-            );
-            // Sample every contour segment, including both sides of a depth band.
-            const stride = Math.max(1, Math.floor(points.length / 12));
-            for (let i = 0; i < points.length; i += stride) {
-              const point = points[i]!;
-              const unprojected = unprojectReviewSpatialPoint(projection, point);
-              if (!unprojected) throw new Error('Contour inverse failed');
-              for (const [label, factor] of [
-                [kind, 1],
-                [kind === 'sharp' ? 'inside' : 'beyond', kind === 'sharp' ? 0.65 : 1.15],
-              ] as const) {
-                const source = {
-                  x: center.x + (unprojected.x - center.x) * factor,
-                  y: center.y + (unprojected.y - center.y) * factor,
-                };
-                if (
-                  source.x < base.x + 48 ||
-                  source.x > base.x + base.width - 48 ||
-                  source.y < base.y + 64 ||
-                  source.y > base.y + base.height - 48
-                )
-                  continue;
-                const projected = projectQuickEditPoint(projection, source);
-                if (
-                  !projected ||
-                  projected.x < 8 ||
-                  projected.y < 8 ||
-                  projected.x > width - 8 ||
-                  projected.y > height - 8
-                )
-                  continue;
-                samples.push({
-                  kind: label,
-                  point: projected,
-                  error: errorAt(actual, kind === 'sharp' ? sharp : blurred, projected),
-                  referenceSeparation: errorAt(sharp, blurred, projected),
-                });
-              }
-            }
-          }
-          results.push({
-            name: scenario.name,
-            flat: false,
-            sharpPaths: geometry.sharp.length,
-            softPaths: geometry.soft.length,
-            maximum: 0,
-            count: 0,
-            samples,
-          });
-        }
+        results.push({
+          name: scenario.name,
+          ...measureSpatialFocusPixels({
+            geometry,
+            projection,
+            base,
+            focus,
+            width,
+            height,
+            offPlane: scenario.offPlane,
+            actual,
+            sharp,
+            blurred,
+          }),
+        });
         // Keep the actual rendered pixels and overlay together as inspectable proof.
         context.strokeStyle = '#f80';
         context.lineWidth = 1;
@@ -561,7 +499,15 @@ test('a straight faint rule keeps its center across a spatially varying depth bl
             height: height * scale,
           };
           context.clearRect(0, 0, width, height);
-          renderer.draw(context, plane.canvas, rect, target, frame);
+          renderer.draw(context, {
+            source: plane.canvas,
+            sourceRect: { x: 0, y: 0, width: plane.canvas.width, height: plane.canvas.height },
+            output: { width: plane.canvas.width, height: plane.canvas.height },
+            base: rect,
+            target: target,
+            frame: frame,
+            sharp: false,
+          });
           const projection = quickEditPlaneProjection(rect, target, frame);
           const a = projectQuickEditPoint(projection, { x: 0, y: row + 0.5 });
           const b = projectQuickEditPoint(projection, { x: width, y: row + 0.5 });
@@ -591,4 +537,70 @@ test('a straight faint rule keeps its center across a spatially varying depth bl
     expect
       .soft(result.maximum, `source row ${result.row}, scale ${result.scale}`)
       .toBeLessThanOrEqual(result.scale === 1 ? 0.5 : 1);
+});
+
+test('rotated strong shadow stays continuous across the former source-raster edge', async ({
+  page,
+}, info) => {
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/spatial-shadow-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+    loader: { '.woff2': 'dataurl', '.svg': 'text' },
+  });
+  const metrics = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      return (await import(url)).probeSpatialShadowEdge();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  await writeFile(info.outputPath('shadow-source-edge.json'), JSON.stringify(metrics, null, 2));
+  await page.screenshot({ path: info.outputPath('shadow-source-edge.png'), fullPage: false });
+  expect(metrics.count).toBeGreaterThanOrEqual(45);
+  expect(metrics.minimumReference).toBeLessThan(210);
+  // Canvas2D rotation and the GPU bilinear sample may differ by a quantized edge texel.
+  expect(metrics.mean).toBeLessThanOrEqual(3);
+  expect(metrics.maximum).toBeLessThanOrEqual(6);
+});
+
+test('padded tilted blur agrees with an oversized reference and refuses one byte below its real peak', async ({
+  page,
+}, info) => {
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/spatial-shadow-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+    loader: { '.woff2': 'dataurl', '.svg': 'text' },
+  });
+  const results = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      return await (await import(url)).probeSpatialShadowBudget();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  await writeFile(info.outputPath('padded-blur-budget.json'), JSON.stringify(results, null, 2));
+  await page.screenshot({ path: info.outputPath('padded-blur-budget.png'), fullPage: false });
+  for (const result of results) {
+    expect(result.afterDispose).toBe(0);
+    expect(result.peakCanvases).toBeLessThanOrEqual(result.canvasLimit);
+    expect(result.preservedFront).toEqual([238, 68, 170, 255]);
+    if (result.mode === 'refusal') {
+      expect(result.refused).toBe(true);
+      continue;
+    }
+    expect(result.refused).toBe(false);
+    expect(result.peak).toBe(result.limit);
+    expect(result.count).toBeGreaterThan(1000);
+    // Different odd mip grids shift the approximation by a texel; exterior shadow remains smooth.
+    expect(result.mean).toBeLessThanOrEqual(3);
+    expect(result.maximum).toBeLessThanOrEqual(6);
+  }
 });

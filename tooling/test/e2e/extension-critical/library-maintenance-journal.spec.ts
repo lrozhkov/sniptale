@@ -5,6 +5,7 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createMaintenanceLogEntry } from '../../../../apps/extension/src/composition/persistence/library-lifecycle/maintenance-log-model';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, SETTINGS_HARNESS_PATH } from '../extension-critical.helpers';
+import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 
 for (const variant of [
   { width: 1280, height: 560, theme: 'dark', locale: 'ru' },
@@ -202,3 +203,66 @@ for (const variant of [
     }
   });
 }
+
+test('controlled export summaries reach native extension Settings JSONL and ZIP without runtime errors', async () => {
+  const launched = await launchExtensionBrowser({ viewport: { width: 1280, height: 560 } });
+  const page = await launched.context.newPage();
+  const failures: string[] = [];
+  const infoMessages: string[] = [];
+  page.on('pageerror', (error) => failures.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error' || message.type() === 'warning') failures.push(message.text());
+    if (message.type() === 'info') infoMessages.push(message.text());
+  });
+  try {
+    await page.goto(
+      `chrome-extension://${launched.extensionId}${SETTINGS_HARNESS_PATH}?section=events-logs`
+    );
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    const region = page.getByRole('region', { name: label('settings.eventsLogs.title') });
+    await expect(region).toBeVisible();
+    expect(await page.evaluate(() => window.__sniptaleEventHistoryHarness.exportFailure())).toEqual(
+      { matches: 1 }
+    );
+    await region
+      .getByLabel(label('settings.eventsLogs.search'), { exact: true })
+      .fill('export outcome=failed');
+    await expect(region.locator('tbody tr')).toHaveCount(1);
+    const downloadReady = page.waitForEvent('download');
+    await region
+      .getByRole('button', { name: label('settings.eventsLogs.export'), exact: true })
+      .click();
+    const text = await readFile((await (await downloadReady).path())!, 'utf8');
+    expect(JSON.parse(text)).toMatchObject({
+      source: 'ReviewExport',
+      level: 'info',
+      context: 'settings',
+      message:
+        'export outcome=failed route=render destination=download stage=mux-finalize code=mux-finalize-failed',
+    });
+    expect(text).not.toMatch(/private-file|private\.example|user content|stack/);
+    const zipReady = page.waitForEvent('download');
+    await region
+      .getByRole('button', { name: label('settings.eventsLogs.exportZip'), exact: true })
+      .click();
+    const zip = new ZipReader(
+      new BlobReader(new Blob([new Uint8Array(await readFile((await (await zipReady).path())!))])),
+      { useWebWorkers: false }
+    );
+    try {
+      let archived = '';
+      for (const entry of await zip.getEntries())
+        if (!entry.directory) archived += await entry.getData(new TextWriter());
+      expect(archived).toContain('stage=mux-finalize code=mux-finalize-failed');
+      expect(archived).not.toMatch(/private-file|private\.example|user content|stack/);
+    } finally {
+      await zip.close();
+    }
+    expect(infoMessages.filter((message) => message.includes('ReviewExport'))).toEqual([
+      '[ReviewExport] export outcome=failed route=render destination=download stage=mux-finalize code=mux-finalize-failed',
+    ]);
+    expect(failures).toEqual([]);
+  } finally {
+    await closeExtensionBrowser(launched);
+  }
+});

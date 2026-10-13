@@ -116,7 +116,7 @@ describe('annotation canonical geometry', () => {
     expect(mapReviewAnnotationEffectPoint({ x: -70, y: -35 }, mapping, true)?.x).toBeCloseTo(20);
   });
 
-  it('refuses an unrepresentable projective or degenerate attachment switch', () => {
+  it('flattens a projective body while refusing a degenerate mapping', () => {
     const base = { x: 0, y: 0, ...plane };
     const matrix = quickEditPlaneProjection(base, base, {
       rotation: [0, Math.sin(0.2), 0, Math.cos(0.2)],
@@ -125,9 +125,64 @@ describe('annotation canonical geometry', () => {
       lockBackground: false,
       focus: [],
     });
-    expect(transformReviewAnnotationEffectAttachment(transform, plane, plane, matrix)).toBeNull();
+    expect(
+      transformReviewAnnotationEffectAttachment(transform, plane, plane, matrix)
+    ).not.toBeNull();
     expect(
       mapReviewAnnotationEffectPoint({ x: 10, y: 10 }, [0, 0, 0, 0, 0, 0, 0, 0, 0], true)
     ).toBeNull();
   });
+});
+
+it('preserves projected center and finite-difference local axes rather than a corner midpoint', async () => {
+  const { projectQuickEditPoint } = await import('../advanced/spatial-geometry');
+  const mapping = [1, 0.2, 70, 0.1, 1, -30, 0.0006, 0.0002, 1] as const;
+  const output = { width: 1024, height: 768 };
+  const changed = transformReviewAnnotationEffectAttachment(transform, plane, output, mapping)!;
+  const box = resolveReviewAnnotationEffectBox(transform, plane);
+  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const projected = projectQuickEditPoint(mapping, center)!;
+  expect((changed.x + changed.width / 2) * output.width).toBeCloseTo(projected.x, 8);
+  expect((changed.y + changed.height / 2) * output.height).toBeCloseTo(projected.y, 8);
+  const axis = (angle: number, length: number) => {
+    const step = 0.001;
+    const a = projectQuickEditPoint(mapping, {
+      x: center.x - Math.cos(angle) * step,
+      y: center.y - Math.sin(angle) * step,
+    })!;
+    const b = projectQuickEditPoint(mapping, {
+      x: center.x + Math.cos(angle) * step,
+      y: center.y + Math.sin(angle) * step,
+    })!;
+    return { x: ((b.x - a.x) * length) / (2 * step), y: ((b.y - a.y) * length) / (2 * step) };
+  };
+  const u = axis(box.rotation, box.width),
+    v = axis(box.rotation + Math.PI / 2, box.height);
+  expect(changed.width * output.width).toBeCloseTo(Math.hypot(u.x, u.y), 5);
+  expect(changed.height * output.height).toBeCloseTo(Math.hypot(v.x, v.y), 5);
+  expect(changed.rotation).toBeCloseTo(Math.atan2(u.y, u.x), 8);
+  const corner = (sign: number) =>
+    projectQuickEditPoint(mapping, {
+      x:
+        center.x +
+        (sign * (box.width * Math.cos(box.rotation) - box.height * Math.sin(box.rotation))) / 2,
+      y:
+        center.y +
+        (sign * (box.width * Math.sin(box.rotation) + box.height * Math.cos(box.rotation))) / 2,
+    })!;
+  const a = corner(-1),
+    b = corner(1);
+  expect(Math.hypot((a.x + b.x) / 2 - projected.x, (a.y + b.y) / 2 - projected.y)).toBeGreaterThan(
+    1
+  );
+});
+
+it.each([
+  ['singular', [0, 0, 0, 0, 0, 0, 0, 0, 1]],
+  ['reflected', [-1, 0, 0, 0, 1, 0, 0, 0, 1]],
+  ['behind-camera', [1, 0, 0, 0, 1, 0, 0, 0, -1]],
+  ['non-finite', [NaN, 0, 0, 0, 1, 0, 0, 0, 1]],
+  ['outside-bounds', [1e9, 0, 0, 0, 1e9, 0, 0, 0, 1]],
+] as const)('rejects %s without clamping or manufacturing a flattened body', (_reason, mapping) => {
+  expect(transformReviewAnnotationEffectAttachment(transform, plane, plane, mapping)).toBeNull();
 });

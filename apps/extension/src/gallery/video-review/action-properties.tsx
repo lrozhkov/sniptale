@@ -59,6 +59,9 @@ export function ReviewActionProperties(props: {
 }) {
   const { marker, plan } = props;
   if (!marker || !plan) return null;
+  const gestureFeedback =
+    !!marker.gesture &&
+    (marker.gesture.type !== 'click' || marker.gesture.completion !== 'released');
   const target = reviewActionAudioTarget(marker);
   const audioSections =
     target && props.onActionAudio
@@ -87,8 +90,10 @@ export function ReviewActionProperties(props: {
           {translate('gallery.videoReview.historyBack')}
         </ReviewButton>
       ) : null}
-      {isReviewClick(marker) && marker.focusPoint ? (
+      {isReviewClick(marker) &&
+      (marker.focusPoint || (gestureFeedback && marker.gesture?.path?.length)) ? (
         <ReviewClickFields
+          gesture={gestureFeedback}
           extraSections={audioSections}
           information={<RecordedInformation marker={marker} />}
           values={[

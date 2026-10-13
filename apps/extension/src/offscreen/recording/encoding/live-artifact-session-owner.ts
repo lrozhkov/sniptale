@@ -33,6 +33,8 @@ import {
 } from './live-video-encoder-config';
 import { LiveNativeVideoEncoderSource } from './live-native-video-encoder-source';
 import { LiveVideoSessionDiagnostics } from './live-video-session-diagnostics';
+import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
+import type { RecordingFrameClockObserver } from './recording-frame-clock';
 
 type LiveArtifactSessionPhase =
   | 'ready'
@@ -58,11 +60,13 @@ export interface LiveRecordingEncodingConfig {
 interface LiveRecordingArtifactLifecycleCallbacks {
   onFailure?(error: Error): void;
   onStart?(): void;
+  onResume?(clockAnchor: RecordingFrameClockAnchor | null): void;
   onStop?(artifact: FinalizedRecordingStagingArtifact): Promise<void> | void;
 }
 
 export interface LiveRecordingArtifactSession {
   readonly state: RecordingState;
+  readonly frameClock?: RecordingFrameClockAnchor | null | undefined;
   abort(): Promise<void>;
   pause(): void;
   resume(): void;
@@ -77,6 +81,7 @@ interface CreateLiveRecordingArtifactSessionOwnerInput {
   encoding: LiveRecordingEncodingConfig;
   frameTransform?: LiveVideoFrameTransform | undefined;
   onVideoFrameGeometry?: (frame: VideoFrame) => void;
+  frameClockObserver?: RecordingFrameClockObserver;
   stream: MediaStream;
   writer: RecordingStagingArtifactWriter;
 }
@@ -261,6 +266,10 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     return 'inactive';
   }
 
+  get frameClock(): RecordingFrameClockAnchor | null | undefined {
+    return this.input.frameClockObserver?.anchor;
+  }
+
   static async assertSupported(input: CreateLiveRecordingArtifactSessionOwnerInput): Promise<void> {
     const [videoTrack] = input.stream.getVideoTracks();
     if (!videoTrack) throw new Error('Live recording stream has no video track.');
@@ -325,6 +334,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     if (this.phase !== 'recording') return;
     this.phase = 'paused';
     this.pauseStartedAtMs = performance.now();
+    this.input.frameClockObserver?.pause(performance.timeOrigin + this.pauseStartedAtMs);
     this.resumeRequested = false;
     this.videoFrameBuffer.notifyProducer();
     this.audioSources.forEach((source) => source.pause());
@@ -367,6 +377,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   }
 
   private abortEncoderResources(): Promise<void> {
+    this.input.frameClockObserver?.dispose();
     this.videoFrameBuffer.abort();
     this.abortPromise ??= Promise.allSettled([
       this.videoReader.cancel(),
@@ -382,6 +393,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       this.videoPump = this.pumpVideoFrames();
       void this.videoPump.catch(() => undefined);
       await this.firstEncodedVideoPacket;
+      await this.input.frameClockObserver?.ready;
       if (this.phase !== 'starting') return;
       this.phase = 'recording';
       const startedDiagnostic = {
@@ -410,6 +422,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
   private async finalizeOutput(): Promise<void> {
     try {
       this.phase = 'finalizing';
+      this.input.frameClockObserver?.dispose();
       this.input.stream.getVideoTracks().forEach((track) => track.stop());
       this.videoFrameBuffer.closeInput();
       this.resolveVideoDrainRequested();
@@ -458,6 +471,12 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       onFrameDequeued: () => this.completeResumeAfterProcessorDrain(),
       onEncoderSubmissionFailed: () => this.videoDiagnostics.encoderSubmissionFailed(),
       onEncoderSubmissionStarted: () => this.videoDiagnostics.encoderSubmissionStarted(),
+      onSegmentStarted: (sourceTimestampUs, chosenTimestamp) => {
+        const observer = this.input.frameClockObserver;
+        if (!observer || this.phase !== 'recording') return;
+        const anchor = observer.resume(sourceTimestampUs, chosenTimestamp);
+        this.callbacks.onResume?.(anchor);
+      },
       shouldEncodeTerminalFrame: () => this.phase !== 'aborted' && this.phase !== 'failed',
       videoSource: this.videoSource,
       ...(this.nativeVideoSource ? { transformStrategy: 'native-encoder' as const } : {}),
@@ -531,6 +550,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
           frame.close();
           break;
         }
+        this.input.frameClockObserver?.observeFirstFrame(frame);
         this.pendingVideoSegmentRestart = false;
         this.videoDiagnostics.observeFrameBufferDepth(this.videoFrameBuffer.depth);
       }

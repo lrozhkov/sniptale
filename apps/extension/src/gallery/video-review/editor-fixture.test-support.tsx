@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import { vi } from 'vitest';
 import {
   parseReviewAnnotation,
@@ -15,6 +16,19 @@ import type {
   moveVideoWorkspaceHistory,
 } from '../../composition/persistence/review-workspaces/store';
 import type { ReviewOperation } from '../../features/video/review/types';
+
+/** Mirrors the committed-projection adapter using the fixture's accepted history. */
+export function committedEditorFixtureProjection(snapshot: VideoWorkspaceSnapshot) {
+  return {
+    snapshot,
+    document: replayReviewHistory(
+      snapshot.workspace.history,
+      snapshot.workspace.cursor,
+      snapshot.workspace.source,
+      reviewDocumentBaseline(snapshot.workspace)
+    ),
+  };
+}
 
 interface EditorFixtureIntegration {
   load: ReturnType<typeof vi.fn>;

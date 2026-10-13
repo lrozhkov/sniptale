@@ -2,6 +2,25 @@ import { resolveQuickEditShadow } from '../../features/video/review/advanced/sha
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
+/** Shadow storage stays in original scene coordinates, independently of camera projection. */
+export function reviewSpatialSourceRect(args: {
+  output: { width: number; height: number };
+  window: QuickEditRect;
+  background: QuickEditBackgroundSettings;
+  sceneScale?: number;
+}): QuickEditRect {
+  const shadow = resolveQuickEditShadow(args.background, args.sceneScale ?? 1);
+  if (!shadow) return { x: 0, y: 0, width: args.output.width, height: args.output.height };
+  const margin = Math.max(1, shadow.blur * 4);
+  const x = Math.floor(Math.min(0, args.window.x - margin)) - 2;
+  const y = Math.floor(Math.min(0, args.window.y - margin)) - 2;
+  const right =
+    Math.ceil(Math.max(args.output.width, args.window.x + args.window.width + margin)) + 2;
+  const bottom =
+    Math.ceil(Math.max(args.output.height, args.window.y + args.window.height + margin)) + 2;
+  return { x, y, width: right - x, height: bottom - y };
+}
+
 /** Clip out the entire window so the caster never becomes a backing plate. */
 export function drawReviewSceneShadow(
   context: CanvasRenderingContext2D,

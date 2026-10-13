@@ -15,6 +15,7 @@ import type {
   VideoProjectAsset,
   VideoProjectClip,
   VideoProjectCursorTrack,
+  RecordingTelemetrySignal,
   VideoProjectTrack,
 } from '../types/index';
 import { VideoProjectTrackRole, VideoTrackKind } from '../types/index';
@@ -32,6 +33,7 @@ export type CreateVideoProjectFromRecordingOptions = {
   audioPeaks?: number[] | null;
   sourceNormalizedActionEvents?: SourceNormalizedRecordingActionEvent[];
   cursorTrack?: VideoProjectCursorTrack | null;
+  recordingSignals?: RecordingTelemetrySignal[];
   motionRegions?: VideoProject['motionRegions'];
   asset?: VideoProjectAsset;
   sidecarVideos?: RecordingSidecarVideoProjectInput[];
@@ -70,7 +72,7 @@ export function createRecordingVideoProject(
     sidecarAssets,
     sidecarTracks: tracks.sidecarTracks,
   });
-  return createRecordingProjectDocument({
+  const project = createRecordingProjectDocument({
     sourceNormalizedActionEvents: options.sourceNormalizedActionEvents ?? [],
     asset,
     clips,
@@ -80,6 +82,26 @@ export function createRecordingVideoProject(
     sidecarAssets,
     tracks: tracks.allTracks.filter((track) => clips.some((clip) => clip.trackId === track.id)),
   });
+  const sourceClip = clips.find((clip) => clip.type === 'VIDEO' && clip.assetId === asset.id);
+  if (
+    !sourceClip ||
+    sourceClip.type !== 'VIDEO' ||
+    !sourceClip.sourceInstanceId ||
+    (options.recordingSignals === undefined && options.sourceNormalizedActionEvents === undefined)
+  )
+    return project;
+  return {
+    ...project,
+    version: 3,
+    actionFeedback: [
+      {
+        recordingId: options.recordingId,
+        sourceInstanceId: sourceClip.sourceInstanceId,
+        settings: [],
+        signals: structuredClone(options.recordingSignals ?? []),
+      },
+    ],
+  };
 }
 
 function createDefaultProjectTracks(deps: RecordingProjectFactoryDeps): {

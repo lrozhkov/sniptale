@@ -1,3 +1,4 @@
+import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { useMemo } from 'react';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
@@ -39,6 +40,9 @@ type PreviewState = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  setCursorFocusPath?: EditorState['setCursorFocusPath'];
+  selectCursorFocusKey?: EditorState['selectCursorFocusKey'];
+  cursorFocusPath?: EditorState['cursorFocusPath'];
   annotationEffects?: EditorState['annotationEffects'];
   activeSelection?: EditorState['activeSelection'];
   text: Pick<EditorState['text'], 'jump'>;
@@ -88,7 +92,8 @@ export function ReviewPreviewBinding({
   onPreviewRaster,
   onOpenPreviewSettings,
 }: {
-  resource: Pick<LoadedReview, 'file' | 'url' | 'session'>;
+  resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
+    Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
@@ -195,7 +200,8 @@ function ReviewPreviewStage({
   previewPreferences,
   onPreviewRaster,
 }: {
-  resource: Pick<LoadedReview, 'file' | 'url' | 'session'>;
+  resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
+    Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
   fullscreen: boolean;
@@ -204,38 +210,18 @@ function ReviewPreviewStage({
 }) {
   const { busy, features, composer, snapshot, canvasComments } = state;
   const captionPreview = useReviewCaptionPreview(state);
-  const outerFadePlan = useMemo(() => {
-    if (state.advanced.ui.mode !== 'advanced' || !state.exporter.index) return undefined;
-    try {
-      const profile = resolveReviewOutputProfile(
-        state.exporter.index,
-        state.advanced,
-        state.exporter.renderSettings
-      );
-      if (!profile.dimensionsSupported) return undefined;
-      const result = planReviewPresentationSequence({
-        settings: state.presentation.settings,
-        mainDuration: state.timeline.resultDuration,
-        fragmentOffset: 0,
-        includeBookends: true,
-        rate: profile.rate,
-      });
-      return result.ok ? result.plan : undefined;
-    } catch {
-      return undefined;
-    }
-  }, [
-    state.advanced,
-    state.exporter.index,
-    state.exporter.renderSettings,
-    state.presentation.settings,
-    state.timeline.resultDuration,
-  ]);
+  const outerFadePlan = useReviewOuterFadePlan(state);
   const sceneEditable =
     !state.playing && !busy && state.editing.exporter.phase === 'idle' && !composer.annotation;
   return (
     <ReviewStageBinding
       {...captionPreview}
+      cursorPath={reviewCursorPathOverlayBinding(
+        state,
+        resource.telemetry,
+        sceneEditable,
+        sceneActive
+      )}
       annotationEffects={
         features.annotationEffects
           ? {
@@ -402,4 +388,65 @@ function reviewFullscreenFocus(state: PreviewState, enabled: boolean) {
       if (sourceTime !== null) state.seek(sourceTime, false);
     },
   };
+}
+
+function reviewCursorPathOverlayBinding(
+  state: PreviewState,
+  telemetry: LoadedReview['telemetry'] | undefined,
+  sceneEditable: boolean,
+  sceneActive: boolean
+) {
+  return state.setCursorFocusPath &&
+    sceneEditable &&
+    (sceneActive || state.activeSelection?.kind === 'cursor-focus') &&
+    state.advanced.ui.mode === 'advanced' &&
+    state.features.overlaysVisible
+    ? {
+        path:
+          state.cursorFocusPath ??
+          resolveReviewCursorFocusPath(
+            telemetry ?? null,
+            state.source,
+            state.advanced.cursorFocusPath
+          ),
+        time: state.time,
+        ...(state.activeSelection?.kind === 'cursor-focus'
+          ? { selectedKeyId: state.activeSelection.id }
+          : {}),
+        ...(state.selectCursorFocusKey ? { onSelect: state.selectCursorFocusKey } : {}),
+        onChange: state.setCursorFocusPath,
+        onSeek: (time: number) => state.seek(time, false),
+      }
+    : undefined;
+}
+
+function useReviewOuterFadePlan(state: PreviewState) {
+  const outerFadePlan = useMemo(() => {
+    if (state.advanced.ui.mode !== 'advanced' || !state.exporter.index) return undefined;
+    try {
+      const profile = resolveReviewOutputProfile(
+        state.exporter.index,
+        state.advanced,
+        state.exporter.renderSettings
+      );
+      if (!profile.dimensionsSupported) return undefined;
+      const result = planReviewPresentationSequence({
+        settings: state.presentation.settings,
+        mainDuration: state.timeline.resultDuration,
+        fragmentOffset: 0,
+        includeBookends: true,
+        rate: profile.rate,
+      });
+      return result.ok ? result.plan : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [
+    state.advanced,
+    state.exporter.index,
+    state.exporter.renderSettings,
+    state.presentation.settings,
+    state.timeline.resultDuration,
+  ]);
+  return outerFadePlan;
 }

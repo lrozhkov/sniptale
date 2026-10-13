@@ -110,13 +110,21 @@ export function mapReviewAnnotationEffectPoint(
   return matrix ? projectQuickEditPoint(matrix, point) : null;
 }
 
-/** Attachment switching preserves the visible rotated rectangle only when the new plane can represent it. */
+/** Exact rectangles keep their corners; projective/sheared bodies retain center and local axis scales. */
 export function transformReviewAnnotationEffectAttachment(
   transform: ReviewAnnotationEffectTransform,
   from: Size,
   to: Size,
   mapping: QuickEditHomography
 ): ReviewAnnotationEffectTransform | null {
+  if (
+    ![from.width, from.height, to.width, to.height].every(
+      (value) => Number.isFinite(value) && value > 0
+    ) ||
+    !mapping.every(Number.isFinite) ||
+    !invertQuickEditProjection(mapping)
+  )
+    return null;
   const box = resolveReviewAnnotationEffectBox(transform, from);
   const cos = Math.cos(box.rotation),
     sin = Math.sin(box.rotation);
@@ -129,26 +137,76 @@ export function transformReviewAnnotationEffectAttachment(
     b = corner(box.width / 2, -box.height / 2),
     c = corner(box.width / 2, box.height / 2),
     d = corner(-box.width / 2, box.height / 2);
-  if (!a || !b || !c || !d) return null;
+  if (
+    !a ||
+    !b ||
+    !c ||
+    !d ||
+    ![a, b, c, d].every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+  )
+    return null;
   const u = { x: b.x - a.x, y: b.y - a.y },
     v = { x: d.x - a.x, y: d.y - a.y };
   const width = Math.hypot(u.x, u.y),
     height = Math.hypot(v.x, v.y);
   const tolerance = Math.max(width, height, 1) * 1e-7;
+  if (width <= 0 || height <= 0 || u.x * v.y - u.y * v.x <= 0) return null;
   if (
-    width <= 0 ||
-    height <= 0 ||
-    u.x * v.y - u.y * v.x <= 0 ||
     Math.hypot(c.x - b.x - v.x, c.y - b.y - v.y) > tolerance ||
     Math.abs(u.x * v.x + u.y * v.y) > tolerance * Math.max(width, height)
   )
-    return null;
+    return flattenMappedAnnotationBody(box, to, mapping);
   const center = { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 };
-  return {
+  return admitMappedAnnotationBody({
     x: (center.x - width / 2) / to.width,
     y: (center.y - height / 2) / to.height,
     width: width / to.width,
     height: height / to.height,
     rotation: Math.atan2(u.y, u.x),
-  };
+  });
+}
+
+function admitMappedAnnotationBody(transform: ReviewAnnotationEffectTransform) {
+  if (
+    !Object.values(transform).every(Number.isFinite) ||
+    [transform.x, transform.y].some((value) => value < -16 || value > 16) ||
+    [transform.width, transform.height].some((value) => value < 1e-6 || value > 16)
+  )
+    return null;
+  return transform;
+}
+
+/** Local flattening removes shear while projecting the center rather than averaging distant corners. */
+function flattenMappedAnnotationBody(
+  box: ReturnType<typeof resolveReviewAnnotationEffectBox>,
+  to: Size,
+  mapping: QuickEditHomography
+) {
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const center = projectQuickEditPoint(mapping, point);
+  if (!center) return null;
+  const [a, b, , d, e, , g, h, i] = mapping;
+  const w = g * point.x + h * point.y + i;
+  const j00 = (a - center.x * g) / w,
+    j01 = (b - center.x * h) / w;
+  const j10 = (d - center.y * g) / w,
+    j11 = (e - center.y * h) / w;
+  const cos = Math.cos(box.rotation),
+    sin = Math.sin(box.rotation);
+  const u = { x: (j00 * cos + j01 * sin) * box.width, y: (j10 * cos + j11 * sin) * box.width };
+  const v = { x: (-j00 * sin + j01 * cos) * box.height, y: (-j10 * sin + j11 * cos) * box.height };
+  if (
+    ![j00, j01, j10, j11, u.x, u.y, v.x, v.y].every(Number.isFinite) ||
+    u.x * v.y - u.y * v.x <= 0
+  )
+    return null;
+  const width = Math.hypot(u.x, u.y),
+    height = Math.hypot(v.x, v.y);
+  return admitMappedAnnotationBody({
+    x: (center.x - width / 2) / to.width,
+    y: (center.y - height / 2) / to.height,
+    width: width / to.width,
+    height: height / to.height,
+    rotation: Math.atan2(u.y, u.x),
+  });
 }

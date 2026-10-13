@@ -76,6 +76,9 @@ export function addMaterialCapturedActions(
           data: { ...event.data },
           point: event.point ? { ...event.point } : null,
           capturedDuration: event.duration,
+          ...(event.keyboardRepeats
+            ? { keyboardRepeats: structuredClone(event.keyboardRepeats) }
+            : {}),
           ...(event.kind !== 'CLICK' && event.kind !== 'KEY'
             ? { presentation: { preset: event.preset } }
             : {}),
@@ -90,10 +93,37 @@ export function addMaterialCapturedActions(
       ];
     });
   });
-  return added.length === 0
+  const feedback = [...(project.actionFeedback ?? [])];
+  for (const clip of addedClips) {
+    if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) continue;
+    const asset = project.assets.find((item) => item.id === clip.assetId);
+    const recordingId =
+      asset?.source.kind === 'recording'
+        ? asset.source.recordingId
+        : asset?.source.kind === 'project-asset'
+          ? asset.source.originRecordingId
+          : null;
+    if (
+      recordingId !== telemetry.recordingId ||
+      feedback.some(
+        (group) =>
+          group.recordingId === recordingId && group.sourceInstanceId === clip.sourceInstanceId
+      )
+    )
+      continue;
+    feedback.push({
+      recordingId,
+      sourceInstanceId: clip.sourceInstanceId,
+      settings: [],
+      signals: structuredClone(telemetry.signals),
+    });
+  }
+  return added.length === 0 && feedback.length === (project.actionFeedback?.length ?? 0)
     ? project
     : {
         ...project,
         actionEvents: [...project.actionEvents, ...added],
+        version: 3,
+        actionFeedback: feedback,
       };
 }

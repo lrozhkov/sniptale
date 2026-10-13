@@ -99,6 +99,7 @@ export interface VideoCompositionCursorState {
 }
 
 export interface VideoCompositionActionState {
+  gestureFeedback?: import('../review/click-animation').ReviewClickFrame;
   clickStyle?: import('../project/types').VideoActionClickStyle;
   keyStyle?: import('../project/types').VideoActionKeyStyle;
   easing?: import('../project/types').VideoTemporalEasing;

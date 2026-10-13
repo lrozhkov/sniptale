@@ -177,3 +177,21 @@ it('releases the managed source when the cache allocation fails', () => {
   expect(leases[0]!.release).toHaveBeenCalledOnce();
   painter.dispose();
 });
+
+it('reports only defensive geometry of the retained lease through success, failure and disposal', () => {
+  const { painter } = managedBackground();
+  const args = { background, image: null, width: 400, height: 200 };
+  expect(painter.retainedCacheSize).toBeNull();
+  painter.draw(context(), args);
+  expect(painter.retainedCacheSize).toEqual({ width: 400, height: 200 });
+  const size = painter.retainedCacheSize!;
+  size.width = 1;
+  expect(painter.retainedCacheSize).toEqual({ width: 400, height: 200 });
+  vi.mocked(drawReviewBlurredScene).mockImplementationOnce(() => {
+    throw new Error('filter failure');
+  });
+  expect(() => painter.draw(context(), { ...args, width: 800 })).toThrow('filter failure');
+  expect(painter.retainedCacheSize).toEqual({ width: 400, height: 200 });
+  painter.dispose();
+  expect(painter.retainedCacheSize).toBeNull();
+});

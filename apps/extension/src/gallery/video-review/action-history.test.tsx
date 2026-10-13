@@ -6,6 +6,94 @@ import { ReviewActionHistory } from './action-history';
 import { ReviewClickOverlay } from './click-animation-overlay';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { reviewActionAudioRefKey } from '../../features/video/review/advanced/action-audio';
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+
+it('distinguishes empty capture, missing coverage and unavailable history', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    for (const pointer of ['available', 'unavailable', 'unknown'] as const) {
+      act(() =>
+        root.render(
+          <ReviewActionHistory
+            markers={[]}
+            animations={[]}
+            busy={false}
+            captureCapabilities={{
+              version: 1,
+              pointer,
+              keyboard: 'available',
+              wheel: 'unavailable',
+              coverage: 'document',
+            }}
+            onChange={vi.fn()}
+            onSelect={vi.fn()}
+          />
+        )
+      );
+      const rows = host.querySelectorAll('[data-history-coverage-family]');
+      expect(rows).toHaveLength(3);
+      expect(rows[0]?.getAttribute('data-history-coverage')).toBe('available');
+      expect(rows[1]?.getAttribute('data-history-coverage')).toBe(pointer);
+      expect(rows[2]?.getAttribute('data-history-coverage')).toBe(pointer);
+      const suffix =
+        pointer === 'available' ? 'Empty' : pointer === 'unavailable' ? 'Unavailable' : 'Unknown';
+      expect(rows[2]?.textContent).toContain(`gallery.videoReview.historyCapture${suffix}`);
+    }
+    act(() =>
+      root.render(
+        <ReviewActionHistory
+          markers={[]}
+          animations={[]}
+          busy={false}
+          onChange={vi.fn()}
+          onSelect={vi.fn()}
+        />
+      )
+    );
+    expect(host.querySelectorAll('[data-history-coverage="unknown"]')).toHaveLength(3);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('filters recorded mouse buttons and gesture duration while keeping wheel distinct from scroll', async () => {
+  const { queryHistory } = await import('./action-history-filters');
+  const markers: ReviewTelemetryMarker[] = [
+    {
+      ref: { kind: 'action', id: 'left-hold' },
+      eventType: 'HOLD',
+      start: 1,
+      end: 4,
+      mouseButton: 0,
+      gesture: { id: 'g', type: 'hold', button: 0, downTime: 1, upTime: 4, completion: 'released' },
+    },
+    {
+      ref: { kind: 'action', id: 'right-click' },
+      eventType: 'CLICK',
+      start: 2,
+      end: 2.1,
+      mouseButton: 2,
+    },
+    { ref: { kind: 'action', id: 'wheel' }, eventType: 'WHEEL', start: 3, end: 3.5 },
+    { ref: { kind: 'action', id: 'scroll' }, eventType: 'SCROLL', start: 3, end: 3.5 },
+    { ref: { kind: 'action', id: 'key' }, eventType: 'KEY', start: 2, end: 2.5 },
+  ];
+  const query = (patch: Record<string, string | number> = {}) =>
+    queryHistory(
+      markers,
+      new Map(),
+      { query: '', type: 'all', targetType: 'all', status: 'all', longer: 0, ...patch },
+      [],
+      new Map()
+    ).filtered.map(({ ref }) => ref.id);
+  expect(query({ type: 'mouse', button: '0', longer: 2 })).toEqual(['left-hold']);
+  expect(query({ type: 'WHEEL' })).toEqual(['wheel']);
+  expect(query({ type: 'SCROLL' })).toEqual(['scroll']);
+  expect(query({ type: 'keyboard', button: '0' })).toEqual(['key']);
+});
 
 it('selects point-free clicks and typing independently when their opaque IDs match', async () => {
   const { queryHistory } = await import('./action-history-filters');
@@ -142,7 +230,7 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     render();
     expect(host.querySelectorAll('li')).toHaveLength(50);
     click('historyMore');
-    expect(host.querySelectorAll('li')).toHaveLength(58);
+    expect(host.querySelectorAll('li')).toHaveLength(57);
     expect(
       host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.historyConfigure"]')
         ?.disabled
@@ -195,7 +283,7 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     click('clickReset');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), null);
     click('historyBack');
-    expect(host.querySelectorAll('li')).toHaveLength(58);
+    expect(host.querySelectorAll('li')).toHaveLength(57);
     click('historyClear');
     act(() => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
     act(() => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
@@ -213,10 +301,7 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
         .disabled
     ).toBe(true);
     click('historySearchClear');
-    change('historyType', 'static-frame');
-    expect(host.querySelectorAll('li')).toHaveLength(1);
-    change('historyLonger', '2');
-    expect(host.querySelectorAll('li')).toHaveLength(0);
+    expect(host.querySelector('option[value="static-frame"]')).toBeNull();
     change('historyType', 'typing');
     change('historyLonger', '5');
     expect(host.querySelectorAll('li')).toHaveLength(1);
@@ -592,9 +677,7 @@ it('filters concrete targets and clears only incompatible dependent criteria', a
   expect(
     query({ targetType: 'text-field', element: 'Export' }).filtered.map((m) => m.ref.id)
   ).toEqual(['input']);
-  expect(query({ type: 'static-frame', longer: 2 }).filtered.map((m) => m.ref.id)).toEqual([
-    'idle',
-  ]);
+  expect(query({ type: 'static-frame', longer: 2 }).filtered.map((m) => m.ref.id)).toEqual([]);
   expect(query({ query: 'Export' }).filtered).toEqual([]);
   expect(query({ query: 'Export' }).elementMarkers.map((m) => m.ref.id)).toEqual(['export']);
   expect(query({ status: 'animated' }).elementMarkers).toEqual([]);
@@ -637,4 +720,26 @@ it('keeps the inspected action distinct from batch selection on return', () => {
     act(() => root.unmount());
     vi.unstubAllGlobals();
   }
+});
+
+it('keeps additional mouse buttons distinct in labels and exact history filters', async () => {
+  const { reviewMouseButtonLabel } = await import('./controls');
+  const { queryHistory } = await import('./action-history-filters');
+  expect(reviewMouseButtonLabel(4)).toBe('gallery.videoReview.historyButtonForward');
+  expect(reviewMouseButtonLabel(5)).toBe('gallery.videoReview.historyButtonOther');
+  const markers: ReviewTelemetryMarker[] = [4, 5, 31].map((button) => ({
+    ref: { kind: 'action', id: String(button) },
+    eventType: 'CLICK',
+    mouseButton: button,
+    start: 1,
+    end: 1,
+  }));
+  const result = queryHistory(
+    markers,
+    new Map(),
+    { query: '', type: 'mouse', targetType: 'all', status: 'all', longer: 0, button: '5' },
+    [],
+    new Map()
+  );
+  expect(result.filtered.map((marker) => marker.ref.id)).toEqual(['5']);
 });

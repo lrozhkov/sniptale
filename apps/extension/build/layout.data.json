@@ -87,6 +87,12 @@
       "mode": "always"
     },
     {
+      "outputPath": "apps/extension/src/recording-clock/index.html",
+      "sourcePath": "apps/extension/src/recording-clock/index.html",
+      "rollupName": "recordingClock",
+      "mode": "always"
+    },
+    {
       "outputPath": "apps/extension/src/web-snapshot-viewer/index.html",
       "sourcePath": "apps/extension/src/web-snapshot-viewer/index.html",
       "rollupName": "webSnapshotViewer",
@@ -206,7 +212,8 @@
     "icons/icon-16.png",
     "icons/icon-48.png",
     "icons/icon-128.png",
-    "apps/extension/src/tour-preview-sandbox/index.html"
+    "apps/extension/src/tour-preview-sandbox/index.html",
+    "apps/extension/src/recording-clock/index.html"
   ],
   "rootCommands": {
     "dev": "vite --config apps/extension/vite.config.ts",

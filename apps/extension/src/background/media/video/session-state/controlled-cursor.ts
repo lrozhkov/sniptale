@@ -8,11 +8,34 @@ import type {
 } from '../../../../features/video/project/types';
 import type { VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { videoManagerSession } from '../manager/session';
+import {
+  matchesRecordingFrameClockBinding,
+  type RecordingFrameClockAnchor,
+} from '../../../../contracts/video/recording-frame-clock';
+
+export function setRecordingFrameClock(anchor: RecordingFrameClockAnchor): boolean {
+  const current = videoManagerSession.recordingFrameClock;
+  if (
+    current &&
+    (!matchesRecordingFrameClockBinding(current, anchor) || anchor.revision <= current.revision)
+  )
+    return false;
+  videoManagerSession.recordingFrameClock = { ...anchor };
+  return true;
+}
+
+export function getRecordingFrameClock(): RecordingFrameClockAnchor | null {
+  const current = videoManagerSession.recordingFrameClock;
+  return current ? { ...current } : null;
+}
 
 function cloneCursorSamples(
   samples: readonly VideoProjectCursorSample[]
 ): VideoProjectCursorSample[] {
-  return samples.map((sample) => ({ ...sample }));
+  return samples.map((sample) => ({
+    ...sample,
+    ...(sample.recordingPoint ? { recordingPoint: { ...sample.recordingPoint } } : {}),
+  }));
 }
 
 function cloneCursorTrack(track: VideoProjectCursorTrack | null): VideoProjectCursorTrack | null {
@@ -33,6 +56,7 @@ function cloneActionEvents(events: readonly RecordingActionEvent[]): RecordingAc
     ...(event.point === null ? {} : { point: { ...event.point } }),
     ...(event.recordingPoint ? { recordingPoint: { ...event.recordingPoint } } : {}),
     data: { ...event.data },
+    ...(event.keyboardRepeats ? { keyboardRepeats: structuredClone(event.keyboardRepeats) } : {}),
   }));
 }
 
@@ -43,11 +67,16 @@ function cloneTelemetrySignals(
     ...signal,
     point: signal.point === null ? null : { ...signal.point },
     data: { ...signal.data },
+    ...(signal.recordingPoint ? { recordingPoint: { ...signal.recordingPoint } } : {}),
+    ...(signal.keyboardRhythm ? { keyboardRhythm: structuredClone(signal.keyboardRhythm) } : {}),
+    ...(signal.keyboardRepeats ? { keyboardRepeats: structuredClone(signal.keyboardRepeats) } : {}),
   }));
 }
 
 function cloneTelemetrySnapshot(snapshot: RecordingTelemetrySnapshot): RecordingTelemetrySnapshot {
   return {
+    ...(snapshot.provenance ? { provenance: { ...snapshot.provenance } } : {}),
+    ...(snapshot.capabilities ? { capabilities: { ...snapshot.capabilities } } : {}),
     viewportObservation: snapshot.viewportObservation
       ? { ...snapshot.viewportObservation, initial: { ...snapshot.viewportObservation.initial } }
       : null,
@@ -85,7 +114,31 @@ export function mergeTelemetrySnapshots(
     return cloneTelemetrySnapshot(next);
   }
 
+  const sameProvenance =
+    current.provenance &&
+    next.provenance &&
+    current.provenance.source === next.provenance.source &&
+    current.provenance.coordinateSpace === next.provenance.coordinateSpace;
+  const capability = (key: 'pointer' | 'keyboard' | 'wheel') =>
+    current.capabilities?.[key] === next.capabilities?.[key]
+      ? (current.capabilities?.[key] ?? 'unknown')
+      : 'unknown';
   return {
+    ...(sameProvenance && current.provenance ? { provenance: { ...current.provenance } } : {}),
+    ...(current.capabilities || next.capabilities
+      ? {
+          capabilities: {
+            version: 1,
+            pointer: capability('pointer'),
+            keyboard: capability('keyboard'),
+            wheel: capability('wheel'),
+            coverage:
+              current.capabilities?.coverage === next.capabilities?.coverage
+                ? (current.capabilities?.coverage ?? 'unknown')
+                : 'unknown',
+          },
+        }
+      : {}),
     viewportObservation: current.viewportObservation
       ? {
           initial: { ...current.viewportObservation.initial },
@@ -117,6 +170,7 @@ export function resetControlledCursorCaptureState(): void {
   videoManagerSession.controlledCursorVerifiedMode = null;
   videoManagerSession.controlledCursorDisplaySurface = null;
   videoManagerSession.controlledCursorTelemetry = null;
+  videoManagerSession.recordingFrameClock = null;
 }
 
 export function setControlledCursorCaptureEnabled(enabled: boolean): void {

@@ -35,6 +35,55 @@ const added: ReviewOperation = {
   after: annotation,
 };
 
+it('preserves authored cursor keys and handles in the accepted baseline and every replay cursor', () => {
+  const content = createQuickEditAdvancedContent();
+  content.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    segments: [
+      {
+        id: 'segment',
+        binding: { kind: 'project' },
+        start: 1,
+        end: 8,
+        keys: [
+          {
+            id: 'manual-key',
+            time: 3,
+            x: 0.2,
+            y: 0.3,
+            anchor: 'manual',
+            interpolation: 'smooth',
+            outgoing: { x: 0.4, y: 0.5 },
+          },
+        ],
+      },
+    ],
+  };
+  const frozen = structuredClone(content);
+  const baseline = reviewAdvancedContentBaseline(content);
+  expect(baseline.cursorFocusPath).toEqual(content.cursorFocusPath);
+  const after = structuredClone(content);
+  after.cursorFocusPath!.segments[0]!.keys[0]!.x = 0.8;
+  const operation = createReviewAdvancedContentOperation({
+    id: 'path-edit',
+    at: 1,
+    before: baseline,
+    after,
+  });
+  expect(operation).not.toBeNull();
+  expect(
+    replayReviewHistory([operation!], 0, source, baseline).advancedContent.cursorFocusPath
+  ).toEqual(content.cursorFocusPath);
+  expect(
+    replayReviewHistory([operation!], 1, source, baseline).advancedContent.cursorFocusPath
+  ).toEqual(after.cursorFocusPath);
+  expect(content).toEqual(frozen);
+});
+
 it.each(['advancedContent', 'annotation', 'canvasComment', 'edit'] as const)(
   'traverses the before-value once while applying a %s operation',
   (target) => {

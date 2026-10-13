@@ -1,3 +1,4 @@
+import { evaluateReviewFollowCursor } from './cursor-focus-path';
 import { interpolateQuickEditSpatial, quickEditSpatialSpan } from './spatial';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
@@ -281,10 +282,14 @@ export function evaluateQuickEditCameraAtTime(
     regions
   );
   if (!sample || sample.to.spotlight) return QUICK_EDIT_IDENTITY_CAMERA;
-  const camera = interpolateCamera(
-    sample.from?.transform ?? QUICK_EDIT_IDENTITY_CAMERA,
-    sample.to.transform,
-    sample.progress
+  const camera = evaluateReviewFollowCursor(
+    sample.to,
+    timelineTime,
+    interpolateCamera(
+      sample.from?.transform ?? QUICK_EDIT_IDENTITY_CAMERA,
+      sample.to.transform,
+      sample.progress
+    )
   );
   if (
     quickEditSpatialSpan(regions, timelineTime) ||

@@ -1,3 +1,5 @@
+import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
+import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
 import { useState } from 'react';
 import {
   ReviewButton,
@@ -47,6 +49,7 @@ type TimelineProps = {
   playbackRange?: ReviewPlaybackRange | null | undefined;
   onPlaybackRange?: ((range: ReviewPlaybackRange | null) => void) | undefined;
   sourceRangeTool?: boolean;
+  sourceRangeKind?: 'cut' | 'speed' | undefined;
   duration: number;
   time: number;
   playing: boolean;
@@ -73,6 +76,7 @@ type TimelineProps = {
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
   onEdit?(edit: ReviewEdit): void;
   markers: readonly ReviewTelemetryMarker[];
+  captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
   selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
   onSeek(time: number, snap?: boolean): void;
   onClearSelection?(): void;
@@ -80,6 +84,10 @@ type TimelineProps = {
   onPlay(): void;
   onOpenExport?: (() => void) | undefined;
   exportActive?: boolean | undefined;
+  cursorFocusKeys?: readonly CursorFocusTimelineKey[];
+  selectedCursorFocusId?: string;
+  onCursorFocusKey?(key: CursorFocusTimelineKey): void;
+  onAddCursorFocusKey?(time: number): void;
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
 };
@@ -119,6 +127,7 @@ export function ReviewTimeline(props: TimelineProps) {
     zoom,
     focusEnabled: !!props.onFocusRangeCommit,
     originalEnabled: !!props.originalRangeTool,
+    sourceRangeTool: !!props.sourceRangeTool,
     snapRangePreview: !!props.snapRangePreview,
     boundaries: props.boundaries,
   });
@@ -210,6 +219,8 @@ export function ReviewTimeline(props: TimelineProps) {
             <ReviewTimelineEvents {...props} width={width} zoom={zoom} />
             <ReviewSourceLane
               {...props}
+              drawingRange={plane.sourcePreview}
+              drawingKind={props.sourceRangeKind}
               rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
               snapToKeyframes={!!props.boundaries}
             />
@@ -238,6 +249,11 @@ function ReviewTimelineEvents(
   props: Pick<
     TimelineProps,
     | 'markers'
+    | 'captureCapabilities'
+    | 'cursorFocusKeys'
+    | 'selectedCursorFocusId'
+    | 'onCursorFocusKey'
+    | 'onAddCursorFocusKey'
     | 'duration'
     | 'time'
     | 'selectedTelemetryRef'
@@ -257,7 +273,7 @@ function ReviewTimelineEvents(
   const markers = animatedOnly
     ? props.markers.filter((marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id))
     : props.markers;
-  return props.markers.length ? (
+  return props.markers.length || props.onAddCursorFocusKey ? (
     <ReviewTrackRow
       muted={props.actionsEnabled === false}
       label={translate('gallery.videoReview.telemetry')}
@@ -294,6 +310,7 @@ function ReviewTimelineEvents(
     >
       <div className="min-h-7" data-ui="gallery.videoReview.historyTrack">
         <ReviewTelemetryStrip
+          captureCapabilities={props.captureCapabilities}
           markers={markers}
           animatedIds={animated}
           duration={props.duration}
@@ -304,6 +321,12 @@ function ReviewTimelineEvents(
             ? { selectedTelemetryRef: props.selectedTelemetryRef }
             : {})}
           onMarker={props.onMarker}
+          {...(props.cursorFocusKeys ? { cursorFocusKeys: props.cursorFocusKeys } : {})}
+          {...(props.selectedCursorFocusId
+            ? { selectedCursorFocusId: props.selectedCursorFocusId }
+            : {})}
+          {...(props.onCursorFocusKey ? { onCursorFocusKey: props.onCursorFocusKey } : {})}
+          {...(props.onAddCursorFocusKey ? { onAddCursorFocusKey: props.onAddCursorFocusKey } : {})}
         />
       </div>
     </ReviewTrackRow>

@@ -54,21 +54,49 @@ const render = (markers: ReviewTelemetryMarker[]) =>
     );
   });
 
-it('separates colliding markers into disjoint lanes with a consistent pitch', () => {
+it('distinguishes captured empty cursor observations from unavailable and unknown without adding rows', () => {
+  for (const pointer of ['available', 'unavailable', 'unknown'] as const) {
+    act(() =>
+      root.render(
+        <ReviewTelemetryStrip
+          markers={[]}
+          duration={10}
+          time={0}
+          width={1000}
+          zoom={1}
+          onMarker={vi.fn()}
+          captureCapabilities={{
+            version: 1,
+            pointer,
+            keyboard: 'available',
+            wheel: 'available',
+            coverage: 'document',
+          }}
+        />
+      )
+    );
+    const row = host.querySelector('[data-history-family="cursor"]')!;
+    expect(row.getAttribute('data-history-coverage')).toBe(pointer);
+    const suffix =
+      pointer === 'available' ? 'Empty' : pointer === 'unavailable' ? 'Unavailable' : 'Unknown';
+    expect(row.textContent).toContain(`gallery.videoReview.historyCapture${suffix}`);
+    expect(host.querySelectorAll('[data-history-family]')).toHaveLength(3);
+    expect(
+      host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')?.style.height
+    ).toBe('68px');
+  }
+});
+
+it('reserves semantic row pitch and groups collisions within the mouse row', () => {
   render([
     marker('action', 'a', 1, 2),
     marker('action', 'b', 1.1, 2.1),
     marker('action', 'c', 1.2, 2.2),
   ]);
-  const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')];
-  expect(buttons).toHaveLength(3);
-  for (const button of buttons) expect(button.style.height).toBe('20px');
-  const tops = new Set(buttons.map((button) => button.style.top));
-  expect(tops.has('0px')).toBe(true);
-  expect(tops.has('24px')).toBe(true);
-  expect(buttons.some((button) => button.style.top === '7px')).toBe(false);
-  const laneTops = buttons.map((button) => Number(button.style.top.replace('px', '')));
-  expect(new Set(laneTops).size).toBe(laneTops.length);
+  expect(host.querySelectorAll('[data-ui="gallery.videoReview.historyCluster"]')).toHaveLength(1);
+  expect(
+    host.querySelector('[data-ui="gallery.videoReview.historyCluster"]')?.parentElement?.style.top
+  ).toBe('24px');
 });
 
 it('groups overflow within three rows and exposes every member for selection', async () => {
@@ -101,17 +129,25 @@ it('groups overflow within three rows and exposes every member for selection', a
   expect(cluster.getAttribute('data-animated')).toBe('true');
   await act(async () => cluster.click());
   const options = [...document.querySelectorAll<HTMLButtonElement>('[role=option]')];
-  expect(options).toHaveLength(8);
+  expect(options).toHaveLength(10);
   expect(options[0]!.textContent).toContain('0:01.000');
-  expect(options[6]!.textContent).toContain('gallery.videoReview.clickAnimation');
-  await act(async () => options[6]!.click());
+  expect(options[8]!.textContent).toContain('gallery.videoReview.clickAnimation');
+  await act(async () => options[8]!.click());
   expect(onMarker).toHaveBeenCalledWith(markers[8]);
 });
 
-it('reserves no lane space for an empty history', () => {
+it('reserves all three semantic rows for an empty history', () => {
   render([]);
   const strip = host.firstElementChild as HTMLDivElement;
-  expect(strip.style.height).toBe('0px');
+  expect(strip.style.height).toBe('68px');
+  const frames = [...strip.querySelectorAll('[data-history-family] > span[aria-hidden=true]')];
+  expect(frames.slice(0, 2).every((frame) => !frame.classList.contains('border-b'))).toBe(true);
+  expect(frames[2]!.classList.contains('border-b')).toBe(false);
+  const keyboard = strip.querySelector('[data-history-family=keyboard]')!;
+  expect(keyboard.getAttribute('title')).toBe('gallery.videoReview.historyKeyboardCoverage');
+  expect(document.getElementById(keyboard.getAttribute('aria-describedby')!)?.textContent).toBe(
+    keyboard.getAttribute('title')
+  );
 });
 
 it('exposes readable event text for a history interval with available space', () => {
@@ -148,23 +184,23 @@ it('holds groups during zoom then repacks without changing height or selected id
   show(1);
   const strip = host.firstElementChild as HTMLDivElement;
   expect(strip.style.height).toBe('68px');
-  expect(host.querySelectorAll('button')).toHaveLength(3);
+  expect(host.querySelectorAll('button')).toHaveLength(1);
   show(50);
-  expect(host.querySelectorAll('button')).toHaveLength(3);
+  expect(host.querySelectorAll('button')).toHaveLength(1);
   await act(async () => vi.advanceTimersByTime(200));
   show(100);
   await act(async () => vi.advanceTimersByTime(100));
-  expect(host.querySelectorAll('button')).toHaveLength(3);
+  expect(host.querySelectorAll('button')).toHaveLength(1);
   await act(async () => vi.advanceTimersByTime(150));
   expect(host.querySelectorAll('button')).toHaveLength(10);
   expect(new Set([...host.querySelectorAll('button')].map((button) => button.style.top))).toEqual(
-    new Set(['0px'])
+    new Set(['24px'])
   );
   expect(strip.style.height).toBe('68px');
   expect(host.querySelectorAll('[aria-pressed=true]')).toHaveLength(1);
   show(1);
   await act(async () => vi.advanceTimersByTime(250));
-  expect(host.querySelectorAll('button')).toHaveLength(3);
+  expect(host.querySelectorAll('button')).toHaveLength(1);
   expect(strip.style.height).toBe('68px');
 });
 

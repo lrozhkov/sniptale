@@ -1,17 +1,23 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const { debug, warn, error } = vi.hoisted(() => ({
+const { debug, warn, error, sanitize } = vi.hoisted(() => ({
   debug: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
+  sanitize: vi.fn(),
 }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug, warn, error }),
+}));
+vi.mock('@sniptale/platform/observability/diagnostics/sanitizer', () => ({
+  sanitizeDiagnosticData: sanitize,
 }));
 import { runStorageStartupPhase } from './startup-diagnostics';
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  debug.mockReset();
+  sanitize.mockReset().mockImplementation((value) => value);
 });
 afterEach(() => {
   expect(warn).not.toHaveBeenCalled();
@@ -76,3 +82,39 @@ it('preserves synchronous failures and clears their timer', async () => {
   expect(vi.getTimerCount()).toBe(0);
   expect(debug).not.toHaveBeenCalled();
 });
+
+it.each(['sanitizer', 'logger', 'clock'] as const)(
+  'contains failing %s diagnostics and preserves both storage outcomes',
+  async (failure) => {
+    for (const status of ['completed', 'failed'] as const) {
+      let resolve!: (value: object) => void;
+      let reject!: (reason: Error) => void;
+      const work = new Promise<object>((yes, no) => {
+        resolve = yes;
+        reject = no;
+      });
+      const result = { privateResult: 'unchanged' };
+      const original = new Error('original storage failure');
+      const pending = runStorageStartupPhase('database-open', () => work);
+      const observed = pending.catch((reason: unknown) => reason);
+      const diagnosticFailure = () => {
+        throw new Error('unavailable diagnostics');
+      };
+      const clock =
+        failure === 'clock'
+          ? vi.spyOn(performance, 'now').mockImplementation(diagnosticFailure)
+          : null;
+      if (failure === 'sanitizer') sanitize.mockImplementation(diagnosticFailure);
+      if (failure === 'logger') debug.mockImplementation(diagnosticFailure);
+      try {
+        await expect(vi.advanceTimersByTimeAsync(3000)).resolves.toBe(vi);
+        if (status === 'completed') resolve(result);
+        else reject(original);
+        expect(await observed).toBe(status === 'completed' ? result : original);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        clock?.mockRestore();
+      }
+    }
+  }
+);

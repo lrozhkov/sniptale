@@ -263,7 +263,35 @@ function drawVideoLayer(
             : null;
         drawActionCompositionState(
           drawContext,
-          { ...action, point },
+          {
+            ...action,
+            point,
+            ...(action.gestureFeedback
+              ? {
+                  gestureFeedback: {
+                    ...action.gestureFeedback,
+                    ...(action.gestureFeedback.path
+                      ? {
+                          path: action.gestureFeedback.path.map((item) => ({
+                            x: drawX + item.x * drawWidth,
+                            y: drawY + item.y * drawHeight,
+                          })),
+                        }
+                      : {}),
+                    ...(action.gestureFeedback.area
+                      ? {
+                          area: {
+                            x: drawX + action.gestureFeedback.area.x * drawWidth,
+                            y: drawY + action.gestureFeedback.area.y * drawHeight,
+                            width: action.gestureFeedback.area.width * drawWidth,
+                            height: action.gestureFeedback.area.height * drawHeight,
+                          },
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
+          },
           null,
           actionScale,
           contentBounds

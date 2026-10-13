@@ -1,3 +1,4 @@
+import type { RecordingFrameClockLease } from '../../../../contracts/video/recording-frame-clock';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
@@ -82,6 +83,7 @@ export function sendOffscreenBeginRecording(args: {
   generation: number;
   recordingId: string;
   streamInstanceId: string;
+  frameClockLease?: RecordingFrameClockLease | null;
 }): Promise<void> {
   return getBackgroundRuntimeMessaging()
     .sendRuntimeMessage(
@@ -90,6 +92,7 @@ export function sendOffscreenBeginRecording(args: {
         generation: args.generation,
         recordingId: args.recordingId,
         streamInstanceId: args.streamInstanceId,
+        ...(args.frameClockLease === undefined ? {} : { frameClockLease: args.frameClockLease }),
       })
     )
     .then((response) => {

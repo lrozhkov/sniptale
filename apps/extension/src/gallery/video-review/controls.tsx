@@ -244,17 +244,43 @@ export function reviewEventLabel(kind: string): string {
     CLICK: 'gallery.videoReview.eventClick',
     DOUBLE_CLICK: 'gallery.videoReview.eventDoubleClick',
     SCROLL: 'gallery.videoReview.eventScroll',
+    WHEEL: 'gallery.videoReview.eventWheel',
+    HOLD: 'gallery.videoReview.eventHold',
+    PRESS_UNRESOLVED: 'gallery.videoReview.eventIncompletePress',
+    DRAG: 'gallery.videoReview.eventDrag',
+    SELECTION: 'gallery.videoReview.eventSelection',
+    NATIVE_DRAG: 'gallery.videoReview.eventNativeDrag',
+    'cursor-gap': 'gallery.videoReview.eventCursorGap',
     KEY: 'gallery.videoReview.eventKey',
+    KEY_HOLD: 'gallery.videoReview.eventKeyHold',
+    KEY_MODIFIERS: 'gallery.videoReview.eventKeyModifiers',
     PAUSE: 'gallery.videoReview.eventPause',
     CALLOUT: 'gallery.videoReview.eventCallout',
     typing: 'gallery.videoReview.eventTyping',
     'cursor-idle': 'gallery.videoReview.eventCursorIdle',
-    'static-frame': 'gallery.videoReview.eventStatic',
     cursor: 'gallery.videoReview.eventCursor',
   } as const;
   return translate(
     Object.hasOwn(keys, kind) ? keys[kind as keyof typeof keys] : 'gallery.videoReview.telemetry'
   );
+}
+
+/** DOM button identity is displayed only when capture actually recorded it. */
+export function reviewMouseButtonLabel(button: number | undefined): string {
+  if (button === undefined || !Number.isInteger(button) || button < 0 || button > 31) return '';
+  const labels = [
+    'gallery.videoReview.historyButtonLeft',
+    'gallery.videoReview.historyButtonMiddle',
+    'gallery.videoReview.historyButtonRight',
+    'gallery.videoReview.historyButtonBack',
+    'gallery.videoReview.historyButtonForward',
+  ] as const;
+  return button < labels.length
+    ? translate(labels[button]!)
+    : translate('gallery.videoReview.historyButtonOther').replace(
+        '{number}',
+        formatNumber(button + 1)
+      );
 }
 
 /** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */

@@ -19,6 +19,7 @@ import { drawReviewClicks } from './render-click-animation';
 import { drawReviewBorders } from './render-border';
 import { drawReviewSpotlights } from './render-spotlight';
 import type { ReviewSpatialRenderer } from './spatial-renderer';
+import type { ReviewWindowRaster } from './window-header';
 
 /** Sharp content annotations project together; viewport comments remain in output space. */
 export function drawReviewSceneOverlays(args: {
@@ -35,6 +36,7 @@ export function drawReviewSceneOverlays(args: {
   globalResultTime: number;
   cameraScale: number;
   sourceWidth: number;
+  windowRaster?: ReviewWindowRaster | null | undefined;
   clicks?: readonly ReviewClickCue[] | undefined;
   annotationFrames?: readonly Parameters<typeof drawReviewAnnotationFrame>[1][];
 }) {
@@ -133,7 +135,18 @@ export function drawReviewSceneOverlays(args: {
       rect: motion.windowClip,
       radius: background.enabled ? background.layout.cornerRadius * motion.scale : 0,
     },
-    scene.sample
+    args.windowRaster
+      ? {
+          rect: computeQuickEditWindowTransform(overlayLayout),
+          draw: (target, x, y, width, height) => {
+            const raster = args.windowRaster!;
+            target.drawImage(raster.image, 0, 0, raster.width, raster.height, x, y, width, height);
+          },
+        }
+      : {
+          rect: overlayLayout.videoTransform,
+          draw: (target, x, y, width, height) => scene.sample.draw(target, x, y, width, height),
+        }
   );
   const contentFrames = annotationFrames.filter((frame) => frame.instance.attachment === 'content');
   if (contentFrames.length) {
@@ -156,14 +169,15 @@ export function drawReviewSceneOverlays(args: {
     cameraScale: overlayLayout.videoTransform.width / overlayLayout.videoRect.width,
   });
   if (overlay && spatialRenderer && layout.spatial) {
-    spatialRenderer.draw(
-      context,
-      overlay.canvas,
-      layout.windowRect,
-      computeQuickEditSpatialWindow(layout, background),
-      layout.spatial,
-      true
-    );
+    spatialRenderer.draw(context, {
+      source: overlay.canvas,
+      sourceRect: { x: 0, y: 0, width: canvas.width, height: canvas.height },
+      output: canvas,
+      base: layout.windowRect,
+      target: computeQuickEditSpatialWindow(layout, background),
+      frame: layout.spatial,
+      sharp: true,
+    });
     drawReviewSceneComments(context, {
       ...scene,
       canvas,

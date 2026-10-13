@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import {
+  parseVideoDependencyEnvelope,
   scenarioChildUsesMedia,
   videoSourceUsesMedia,
   videoEntryIsUnrelated,
@@ -22,6 +23,35 @@ const targets = {
   },
   'web-snapshot': { id: 'web', source: { kind: 'web-snapshot', snapshotId: 'snapshot' } },
 } satisfies Record<MediaAssetSource['kind'], MediaDependencyTarget>;
+
+it('admits v3 source relationships and disjoint cleanup without trusting invalid or future locators', () => {
+  const entry = createVideoProjectEntryWithMediaClip({ version: 3, actionFeedback: [] });
+  expect(parseVideoDependencyEnvelope(entry)).not.toBeNull();
+  expect(videoEntryIsUnrelated(entry, targets.screenshot, new Set())).toBe(true);
+  const related = {
+    ...entry,
+    project: {
+      ...entry.project,
+      assets: [
+        { ...entry.project.assets[0]!, source: { kind: 'recording', recordingId: 'record' } },
+      ],
+    },
+  };
+  expect(videoEntryIsUnrelated(related, targets.recording, new Set())).toBe(false);
+  expect(
+    parseVideoDependencyEnvelope({ ...entry, project: { ...entry.project, version: 4 } })
+  ).toBeNull();
+  expect(
+    videoEntryIsUnrelated(
+      {
+        ...entry,
+        project: { ...entry.project, assets: [{ source: { kind: 'recording', recordingId: 42 } }] },
+      },
+      targets.screenshot,
+      new Set()
+    )
+  ).toBe(false);
+});
 
 it.each(Object.values(targets))(
   'retains insertion membership across source types: $source.kind',

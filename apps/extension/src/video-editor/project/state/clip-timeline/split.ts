@@ -1,3 +1,4 @@
+import { cursorFocusOverrideId } from '../../../../features/video/project/cursor-focus-path/authoring';
 import { createClipGroupId } from '../../../../features/video/project/factories/creation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import {
@@ -159,6 +160,9 @@ export function duplicateProjectClipsWithResult(
   const duplicateGroupId = operation.clipIds.length > 1 ? createClipGroupId() : null;
   const duplicateIds: string[] = [];
   const sourceInstances = new Map<string, string>();
+  const duplicateClipIds = new Map<string, string>();
+  const duplicateCursorIds = new Map<string, string>();
+  const duplicateActionIds = new Map<string, string>();
   let duplicateClipId: string | null = null;
   const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((item) => {
@@ -176,11 +180,8 @@ export function duplicateProjectClipsWithResult(
         name: `${item.name} ${translate('shared.projectActions.copySuffix')}`,
       } as VideoProjectClip;
 
-      if (item.type === 'VIDEO' && duplicate.type === 'VIDEO' && item.sourceInstanceId) {
-        const sourceInstanceId = sourceInstances.get(item.sourceInstanceId) ?? crypto.randomUUID();
-        sourceInstances.set(item.sourceInstanceId, sourceInstanceId);
-        duplicate.sourceInstanceId = sourceInstanceId;
-      }
+      duplicateCursorSourceInstance(item, duplicate, project, sourceInstances);
+      duplicateClipIds.set(item.id, duplicate.id);
       duplicateIds.push(duplicate.id);
       if (item.id === clipId) duplicateClipId = duplicate.id;
       return [item, duplicate];
@@ -191,11 +192,13 @@ export function duplicateProjectClipsWithResult(
     ...project.actionEvents.flatMap((event) => {
       if (event.anchor.kind !== 'recording-source') return [];
       const sourceInstanceId = sourceInstances.get(event.anchor.sourceInstanceId);
+      const duplicateActionId = crypto.randomUUID();
+      if (sourceInstanceId) duplicateActionIds.set(event.id, duplicateActionId);
       return sourceInstanceId
         ? [
             {
               ...event,
-              id: crypto.randomUUID(),
+              id: duplicateActionId,
               anchor: { ...event.anchor, sourceInstanceId },
               data: { ...event.data },
               point: event.point ? { ...event.point } : null,
@@ -205,6 +208,49 @@ export function duplicateProjectClipsWithResult(
         : [];
     }),
   ];
+  duplicateCursorSamples(project, nextProject, duplicateClipIds, duplicateCursorIds);
+  if (project.cursorFocusPath)
+    nextProject.cursorFocusPath = {
+      ...project.cursorFocusPath,
+      segments: [
+        ...project.cursorFocusPath.segments,
+        ...project.cursorFocusPath.segments.flatMap((segment) => {
+          if (segment.binding.kind !== 'recording-source') return [];
+          const sourceInstanceId = sourceInstances.get(segment.binding.sourceInstanceId);
+          return sourceInstanceId
+            ? [
+                {
+                  ...segment,
+                  id: crypto.randomUUID(),
+                  binding: { ...segment.binding, sourceInstanceId },
+                  keys: segment.keys.map((key) => ({
+                    ...key,
+                    id: duplicateFocusKeyId(
+                      key,
+                      segment.binding.kind === 'recording-source'
+                        ? segment.binding.sourceInstanceId
+                        : '',
+                      sourceInstanceId,
+                      duplicateCursorIds,
+                      duplicateActionIds
+                    ),
+                    ...(key.incoming ? { incoming: { ...key.incoming } } : {}),
+                    ...(key.outgoing ? { outgoing: { ...key.outgoing } } : {}),
+                  })),
+                },
+              ]
+            : [];
+        }),
+      ],
+    };
+  if (project.actionFeedback)
+    nextProject.actionFeedback = [
+      ...project.actionFeedback,
+      ...project.actionFeedback.flatMap((group) => {
+        const sourceInstanceId = sourceInstances.get(group.sourceInstanceId);
+        return sourceInstanceId ? [{ ...structuredClone(group), sourceInstanceId }] : [];
+      }),
+    ];
   const placedProject = applyTimelinePlacementPolicy(nextProject, duplicateIds);
   const selectedDuplicate = placedProject.clips.find((clip) => clip.id === duplicateClipId);
   return selectedDuplicate
@@ -255,4 +301,113 @@ function createSplitSecondClipBase<TClip extends VideoProjectClip>(
     groupId: shouldKeepLinked ? secondGroupId : clip.groupId,
     linkMode: shouldKeepLinked ? VideoClipLinkMode.LINKED : clip.linkMode,
   } as TClip;
+}
+
+/** A focus override keeps its captured-anchor relationship inside the copied source instance. */
+function duplicateFocusKeyId(
+  key: import('../../../../features/video/project/cursor-focus-path/types').CursorFocusKey,
+  originalInstance: string,
+  newInstance: string,
+  cursorIds: ReadonlyMap<string, string>,
+  actionIds: ReadonlyMap<string, string>
+) {
+  const overridePrefix = cursorFocusOverrideId('');
+  if (key.anchor === 'manual') {
+    const captured = key.id.startsWith(overridePrefix)
+      ? duplicateCapturedFocusKeyId(
+          key.id.slice(overridePrefix.length),
+          originalInstance,
+          newInstance,
+          cursorIds,
+          actionIds
+        )
+      : null;
+    return captured ? cursorFocusOverrideId(captured) : crypto.randomUUID();
+  }
+  return (
+    duplicateCapturedFocusKeyId(key.id, originalInstance, newInstance, cursorIds, actionIds) ??
+    crypto.randomUUID()
+  );
+}
+
+function duplicateCapturedFocusKeyId(
+  keyId: string,
+  originalInstance: string,
+  newInstance: string,
+  cursorIds: ReadonlyMap<string, string>,
+  actionIds: ReadonlyMap<string, string>
+): string | null {
+  const cursorId = cursorIds.get(keyId);
+  if (cursorId) return cursorId;
+  for (const prefix of ['click:', 'release:']) {
+    if (keyId.startsWith(prefix)) {
+      const id = actionIds.get(keyId.slice(prefix.length));
+      if (id) return `${prefix}${id}`;
+    }
+  }
+  for (const prefix of ['dwell-start:', 'dwell-end:']) {
+    if (keyId.startsWith(`${prefix}${originalInstance}:`))
+      return `${prefix}${newInstance}:${keyId.slice(prefix.length + originalInstance.length + 1)}`;
+  }
+  if (keyId.startsWith('end:segment:')) {
+    const id = cursorIds.get(keyId.slice('end:segment:'.length));
+    if (id) return `end:segment:${id}`;
+  }
+  return null;
+}
+
+function duplicateCursorSourceInstance(
+  item: VideoProjectClip,
+  duplicate: VideoProjectClip,
+  project: VideoProject,
+  sourceInstances: Map<string, string>
+): void {
+  if (
+    item.type === 'VIDEO' &&
+    duplicate.type === 'VIDEO' &&
+    (item.sourceInstanceId ||
+      project.cursorFocusPath?.segments.some(
+        (segment) =>
+          segment.binding.kind === 'recording-source' &&
+          segment.binding.sourceInstanceId === item.id
+      ))
+  ) {
+    const originalInstanceId = item.sourceInstanceId ?? item.id;
+    const sourceInstanceId = sourceInstances.get(originalInstanceId) ?? crypto.randomUUID();
+    sourceInstances.set(originalInstanceId, sourceInstanceId);
+    duplicate.sourceInstanceId = sourceInstanceId;
+  }
+}
+
+function duplicateCursorSamples(
+  project: VideoProject,
+  nextProject: VideoProject,
+  duplicateClipIds: Map<string, string>,
+  duplicateCursorIds: Map<string, string>
+): void {
+  if (project.cursorTrack)
+    nextProject.cursorTrack = {
+      ...project.cursorTrack,
+      samples: [
+        ...project.cursorTrack.samples,
+        ...project.cursorTrack.samples.flatMap((sample) => {
+          const anchor = sample.sourceAnchor;
+          const sourceClipId = anchor && duplicateClipIds.get(anchor.sourceClipId);
+          if (!anchor || !sourceClipId) return [];
+          const clip = nextProject.clips.find((item) => item.id === sourceClipId);
+          if (clip?.type !== 'VIDEO') return [];
+          const id = crypto.randomUUID();
+          duplicateCursorIds.set(sample.id, id);
+          return [
+            {
+              ...sample,
+              id,
+              time:
+                clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1),
+              sourceAnchor: { ...anchor, sourceClipId },
+            },
+          ];
+        }),
+      ].sort((a, b) => a.time - b.time),
+    };
 }

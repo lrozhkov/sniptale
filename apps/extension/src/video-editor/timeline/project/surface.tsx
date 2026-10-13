@@ -62,7 +62,12 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           historyVisible={props.panelPrefs.telemetryLaneVisible}
           hasHistory={
             props.project.actionEvents.length > 0 ||
-            props.recordingTelemetry.some((entry) => entry.signals.length > 0)
+            (props.project.cursorTrack?.samples.length ?? 0) > 0 ||
+            props.recordingTelemetry.some((entry) =>
+              entry.signals.some(
+                (signal) => signal.kind === 'typing' || signal.kind === 'cursor-idle'
+              )
+            )
           }
           historyActions={{
             project: props.project,

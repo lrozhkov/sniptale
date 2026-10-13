@@ -1,5 +1,6 @@
 import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
 import type { VideoSampleSink } from 'mediabunny';
+import { classifyReviewExportFailure, reviewExportPhase } from './export-diagnostics';
 
 type ReviewSampleSink = Pick<VideoSampleSink, 'getSample' | 'samples' | 'samplesAtTimestamps'>;
 
@@ -7,16 +8,26 @@ type ReviewSampleSink = Pick<VideoSampleSink, 'getSample' | 'samples' | 'samples
 export function createReviewDecodedSampleSink(sink: ReviewSampleSink, signal: AbortSignal) {
   return {
     async getSample(time: number) {
-      const sample = await sink.getSample(time);
-      return sample ? prepareDecodedVideoSample(sample, signal) : null;
+      return reviewExportPhase(signal, 'decode', async () => {
+        const sample = await sink.getSample(time);
+        return sample ? prepareDecodedVideoSample(sample, signal) : null;
+      });
     },
     async *samples(start: number, end: number) {
-      for await (const sample of sink.samples(start, end))
-        yield await prepareDecodedVideoSample(sample, signal);
+      try {
+        for await (const sample of sink.samples(start, end))
+          yield await prepareDecodedVideoSample(sample, signal);
+      } catch (error) {
+        throw classifyReviewExportFailure(signal, 'decode', error);
+      }
     },
     async *samplesAtTimestamps(times: Iterable<number> | AsyncIterable<number>) {
-      for await (const sample of sink.samplesAtTimestamps(times))
-        yield sample ? await prepareDecodedVideoSample(sample, signal) : null;
+      try {
+        for await (const sample of sink.samplesAtTimestamps(times))
+          yield sample ? await prepareDecodedVideoSample(sample, signal) : null;
+      } catch (error) {
+        throw classifyReviewExportFailure(signal, 'decode', error);
+      }
     },
   };
 }

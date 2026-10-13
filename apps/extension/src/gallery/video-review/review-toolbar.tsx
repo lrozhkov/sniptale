@@ -28,6 +28,7 @@ import {
   PanelsTopLeft,
   Volume2,
   SquarePlus,
+  RotateCw,
 } from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
 
@@ -35,9 +36,24 @@ const plain = reviewIconButtonClassName;
 
 type Editing = ReturnType<typeof useReviewEdits>;
 
+/** Annotation choice belongs to the disposable placement tool, before any resource acquisition. */
+export type ReviewAnnotationTool = {
+  active: boolean;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  phase: 'loading' | 'ready' | 'failed';
+  pending: boolean;
+  failure: string | null;
+  retryable: boolean;
+  onToggle(anchor: HTMLElement): void;
+  onChoose(value: string): void;
+  onReload(): void;
+  onRetry(): void;
+};
+
 type ToolbarProps = {
   beforeAction?: ReviewBeforeAction | undefined;
-  annotationTool?: { active: boolean; open?: boolean; onToggle(anchor: HTMLElement): void };
+  annotationTool?: ReviewAnnotationTool;
   focusTool?: {
     active: boolean;
     available: boolean;
@@ -121,9 +137,11 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           mode={
             props.focusTool?.active
               ? 'focus'
-              : props.originalAudioEditor?.originalTool
-                ? 'audio'
-                : props.editing.mode
+              : props.annotationTool?.active
+                ? 'annotation'
+                : props.originalAudioEditor?.originalTool
+                  ? 'audio'
+                  : props.editing.mode
           }
           available={!!props.editing.exporter.index}
           cutHint={props.placementHints?.cut}
@@ -155,26 +173,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
         />
         {advanced.ui.mode === 'advanced' && props.annotationTool ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.annotationEffectsAdd')}
-            toolbarLabel={translate('gallery.videoReview.annotationEffects')}
-            title={translate(
-              props.annotationTool.active
-                ? 'gallery.videoReview.annotationEffectsDraw'
-                : 'gallery.videoReview.annotationEffectsAdd'
-            )}
-            aria-pressed={props.annotationTool.active}
-            aria-haspopup="dialog"
-            aria-expanded={props.annotationTool.open ?? false}
-            className={plain}
-            disabled={busy}
-            onClick={(event) => {
-              const anchor = event.currentTarget;
-              admit(() => props.annotationTool?.onToggle(anchor));
-            }}
-          >
-            <SquarePlus size={16} aria-hidden />
-          </ReviewButton>
+          <ReviewAnnotationToolControl tool={props.annotationTool} busy={busy} admit={admit} />
         ) : null}
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
           <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
@@ -406,4 +405,108 @@ function ReviewFocusToolControl({
       ) : null}
     </ReviewToolGroup>
   );
+}
+
+function ReviewAnnotationToolControl(props: {
+  tool: ReviewAnnotationTool;
+  busy: boolean;
+  admit(action: () => void): void;
+}) {
+  const { tool, busy, admit } = props;
+  const hint = annotationTypeHint(tool);
+  return (
+    <ReviewToolGroup
+      active={tool.active}
+      label={translate('gallery.videoReview.annotationEffects')}
+    >
+      <ReviewButton
+        label={translate('gallery.videoReview.annotationEffectsAdd')}
+        toolbarLabel={translate('gallery.videoReview.annotationEffects')}
+        title={translate(
+          tool.active
+            ? 'gallery.videoReview.annotationEffectsDraw'
+            : 'gallery.videoReview.annotationEffectsAdd'
+        )}
+        aria-pressed={tool.active}
+        className={plain}
+        disabled={busy || tool.pending}
+        onClick={(event) => {
+          const node = event.currentTarget;
+          admit(() => tool.onToggle(node));
+        }}
+      >
+        <SquarePlus size={16} aria-hidden />
+      </ReviewButton>
+      {tool.active ? (
+        <>
+          <ProductSelect
+            aria-label={translate('gallery.videoReview.annotationEffectsChoose')}
+            dataUi="gallery.videoReview.annotationType"
+            controlSize="sm"
+            className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+            containerClassName="!w-auto !min-w-0 max-w-48 shrink-0"
+            menuWidth={280}
+            value={tool.value}
+            placeholder={hint}
+            options={tool.options}
+            disabled={busy || tool.pending || tool.phase !== 'ready' || !tool.options.length}
+            onChange={(value) => admit(() => tool.onChoose(value))}
+          />
+          <ReviewAnnotationToolFeedback {...props} hint={hint} />
+        </>
+      ) : null}
+    </ReviewToolGroup>
+  );
+}
+
+function ReviewAnnotationToolFeedback(props: {
+  tool: ReviewAnnotationTool;
+  busy: boolean;
+  hint: string;
+  admit(action: () => void): void;
+}) {
+  const { tool, busy, hint, admit } = props;
+  return (
+    <>
+      {tool.phase === 'failed' || (tool.phase === 'ready' && !tool.options.length) ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.retry')}
+          title={hint}
+          className={plain}
+          disabled={busy || tool.pending}
+          onClick={() => tool.onReload()}
+        >
+          <RotateCw size={14} aria-hidden />
+        </ReviewButton>
+      ) : null}
+      {tool.pending ? (
+        <span role="status" className="px-1 text-xs">
+          {translate('gallery.videoReview.annotationEffectsAdding')}
+        </span>
+      ) : null}
+      {tool.failure ? (
+        <span role="alert" title={tool.failure} className="flex items-center gap-1 px-1 text-xs">
+          <span className="max-w-48 truncate">{tool.failure}</span>
+          {tool.retryable ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.retry')}
+              className={plain}
+              disabled={busy || tool.pending}
+              onClick={() => admit(tool.onRetry)}
+            >
+              <RotateCw size={14} aria-hidden />
+            </ReviewButton>
+          ) : null}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+function annotationTypeHint(tool: ReviewAnnotationTool): string {
+  if (tool.phase === 'loading') return translate('gallery.videoReview.annotationEffectsLoading');
+  if (tool.phase === 'failed')
+    return translate('gallery.videoReview.annotationEffectsCatalogFailed');
+  if (!tool.options.length) return translate('gallery.videoReview.annotationEffectsCatalogEmpty');
+  return translate('gallery.videoReview.annotationEffectsChoose');
 }

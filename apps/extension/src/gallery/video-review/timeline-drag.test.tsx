@@ -38,6 +38,7 @@ it('retains source drawing across pending note completion and pointerup', async 
       onSeek: seek,
       onSelect: select,
       onRangeCommit: commit,
+      sourceRangeTool: true,
       onClearSelection: clear,
     });
     return (

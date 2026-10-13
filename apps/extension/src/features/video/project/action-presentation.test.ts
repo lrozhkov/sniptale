@@ -175,3 +175,52 @@ it('preserves action kind selection for every editor preset', () => {
   expect(resolveActionKindForPreset('CLICK_PRESS')).toBe('CLICK');
   expect(resolveActionKindForPreset('CLICK_RIPPLE')).toBe('CLICK');
 });
+
+it('never lets a sustained gesture suppress a separate captured click', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 10;
+  project.actionEvents = [
+    { ...event('hold', 1), data: { gestureType: 'hold', downTime: 1, upTime: 4 } },
+    event('click', 1.2),
+    { ...event('drag', 1.3), data: { gestureType: 'drag', downTime: 1.3, upTime: 3 } },
+  ];
+  expect(resolveVideoProjectActionPresentations(project).map(({ enabled }) => enabled)).toEqual([
+    true,
+    true,
+    true,
+  ]);
+});
+
+it.each([null, 'legacy-unknown'])(
+  'keeps ordinary click suppression for unrelated legacy metadata (%s)',
+  (gestureType) => {
+    const project = createEmptyVideoProject();
+    project.duration = 10;
+    project.actionEvents = [{ ...event('first', 1), data: { gestureType } }, event('second', 1.2)];
+    expect(resolveVideoProjectActionPresentations(project).map(({ enabled }) => enabled)).toEqual([
+      true,
+      false,
+    ]);
+  }
+);
+
+it('keeps an unresolved observed press out of generic ripple and completed-click suppression', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 10;
+  project.actionEvents = [
+    {
+      ...event('prefix', 1),
+      data: { gestureType: 'click', completion: 'lost', downTime: 1 },
+      presentation: { preset: 'CLICK_PRESS' },
+    },
+    event('released', 1.2),
+  ];
+  const rows = resolveVideoProjectActionPresentations(project);
+  expect(rows[0]).toMatchObject({ enabled: false, reason: 'unsupported', renderKind: null });
+  expect(rows[1]).toMatchObject({ enabled: true, suppressedByOccurrence: null });
+  project.actionEvents[0]!.data['completion'] = 'released';
+  expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
+    enabled: true,
+    renderKind: 'accent',
+  });
+});

@@ -17,6 +17,7 @@ type HoverOptions = {
   zoom: number;
   focusEnabled: boolean;
   originalEnabled: boolean;
+  sourceRangeTool: boolean;
   snapRangePreview: boolean;
   boundaries: readonly number[] | undefined;
 };
@@ -44,6 +45,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
       options.busy,
       options.focusEnabled,
       options.originalEnabled,
+      options.sourceRangeTool,
     ]
   );
   const move = (event: PointerEvent<HTMLDivElement>, activeLane?: HoverLane) => {
@@ -64,7 +66,13 @@ export function useReviewTimelineHover(options: HoverOptions) {
       return;
     }
     const hit =
-      activeLane ?? reviewPlaneLane(event.target, options.focusEnabled, options.originalEnabled);
+      activeLane ??
+      reviewPlaneLane(
+        event.target,
+        options.focusEnabled,
+        options.originalEnabled,
+        options.sourceRangeTool
+      );
     if (hit === 'control' || hit === 'item') {
       setHover(null);
       return;

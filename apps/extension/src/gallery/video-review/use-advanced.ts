@@ -1,5 +1,5 @@
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import { useReviewAdvancedContent } from './use-advanced-content';
 import { useReviewSnapshot } from './use-session';
@@ -85,26 +85,29 @@ export function useReviewAdvanced(session: Session) {
     }
   }, [contentState, session]);
   const content = contentState.content;
-  const {
-    annotationEffects: _baselineAnnotationEffects,
-    actionsEnabled: _baselineActionsEnabled,
-    keyAnimations: _baselineKeys,
-    clickAnimations: _baselineClicks,
-    actionAudio: _baselineActionAudio,
-    canvas: _baselineCanvas,
-    windowHeader: _baselineHeader,
-    watermark: _baselineWatermark,
-    presentation: _baselinePresentation,
-    webcam: _baselineWebcam,
-    text: _baselineText,
-    captions: _baselineCaptions,
-    ...workspaceState
-  } = persisted;
-  const advanced: QuickEditAdvancedState = {
-    ...workspaceState,
-    ui: optimistic?.value.ui ?? persisted.ui,
-    ...content,
-  };
+  const advanced = useMemo<QuickEditAdvancedState>(() => {
+    const {
+      cursorFocusPath: _baselineCursorFocusPath,
+      annotationEffects: _baselineAnnotationEffects,
+      actionsEnabled: _baselineActionsEnabled,
+      keyAnimations: _baselineKeys,
+      clickAnimations: _baselineClicks,
+      actionAudio: _baselineActionAudio,
+      canvas: _baselineCanvas,
+      windowHeader: _baselineHeader,
+      watermark: _baselineWatermark,
+      presentation: _baselinePresentation,
+      webcam: _baselineWebcam,
+      text: _baselineText,
+      captions: _baselineCaptions,
+      ...workspaceState
+    } = persisted;
+    return {
+      ...workspaceState,
+      ui: optimistic?.value.ui ?? persisted.ui,
+      ...content,
+    };
+  }, [persisted, optimistic, content]);
   return {
     ...contentState.commands,
     advanced,

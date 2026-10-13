@@ -267,3 +267,22 @@ it('magnifies once around the click, returns to identity, and ignores decorative
     evaluateReviewClicks([{ ...cues[0]!, start: 1.5, end: 2.5 }], 2.4999)[0]!.lens!.scale
   ).toBeCloseTo(1, 2);
 });
+
+it('creates an area on explicit selection and preserves existing batch rectangles', () => {
+  const original = patchReviewClicks([], ['existing'], {
+    effect: 'press',
+    gestureArea: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+  });
+  const unchanged = patchReviewClicks(original, ['new'], { effect: 'press' });
+  expect(unchanged.find((style) => style.id === 'new')).not.toHaveProperty('gestureArea');
+  const area = patchReviewClicks(unchanged, ['existing', 'new'], { gestureAppearance: 'area' });
+  expect(area.find((style) => style.id === 'existing')!.gestureArea).toEqual(
+    original[0]!.gestureArea
+  );
+  expect(area.find((style) => style.id === 'new')!.gestureArea).toEqual({
+    x: 0.25,
+    y: 0.25,
+    width: 0.5,
+    height: 0.5,
+  });
+});

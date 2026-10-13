@@ -5,16 +5,15 @@ import { mapSourceRangeToProjectSpans } from '../../../features/video/project/ti
 import type { VideoProject } from '../../../features/video/project/types';
 import { RecordingTelemetrySignalKind } from '../../../features/video/project/types/interaction';
 import { collectRepresentativeRecordingSourceClips } from './source-timed-clips';
-import { buildStableSignalIntersections, mergeTimeRanges } from './time-ranges';
 
 interface TimelineTelemetryLaneSpan {
   endTime: number;
   id: string;
-  kind: 'stable' | 'typing';
+  kind: 'typing' | 'cursor-idle';
   clipId: string;
   recordingId: string;
   sourceInstanceId: string;
-  signalId: string | null;
+  signalId: string;
   sourceEnd: number;
   sourceStart: number;
   startTime: number;
@@ -44,33 +43,24 @@ function buildTelemetryLaneSpans(
           kind,
           recordingId,
           sourceInstanceId: clip.sourceInstanceId,
-          signalId: kind === 'typing' ? idPrefix : null,
+          signalId: idPrefix,
         },
       ];
     });
   const clips = collectRepresentativeRecordingSourceClips(project, recordingId);
   const typingSignals = normalizeRecordingSignals(telemetry.signals).filter(
-    (signal) => signal.kind === RecordingTelemetrySignalKind.TYPING
+    (signal) =>
+      signal.kind === RecordingTelemetrySignalKind.TYPING ||
+      signal.kind === RecordingTelemetrySignalKind.CURSOR_IDLE
   );
   const typingSpans = typingSignals.flatMap((signal) =>
     buildSignalSpans(
       mapSourceRangeToProjectSpans(clips, signal.startTime, signal.endTime),
       signal.id,
-      'typing'
+      signal.kind === 'typing' ? 'typing' : 'cursor-idle'
     )
   );
-  const stableSpans = mergeTimeRanges(
-    buildStableSignalIntersections(telemetry.signals),
-    0.05
-  ).flatMap((signal, index) =>
-    buildSignalSpans(
-      mapSourceRangeToProjectSpans(clips, signal.startTime, signal.endTime),
-      `stable-${index}`,
-      'stable'
-    )
-  );
-
-  return [...typingSpans, ...stableSpans].sort(
+  return typingSpans.sort(
     (left, right) => left.startTime - right.startTime || left.endTime - right.endTime
   );
 }

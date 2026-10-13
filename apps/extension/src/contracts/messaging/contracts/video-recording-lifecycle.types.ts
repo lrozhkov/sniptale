@@ -1,3 +1,4 @@
+import type { RecordingFrameClockAnchor } from '../../video/recording-frame-clock';
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types';
 import type {
   VideoDisplaySurface,
@@ -31,6 +32,7 @@ export type RuntimeOffscreenRecordingStartedMessage = {
   cursorCaptureMode?: VideoCursorCaptureMode;
   displaySurface?: VideoDisplaySurface;
   webcamSettings?: WebcamActualSettings;
+  frameClock?: RecordingFrameClockAnchor | null;
 };
 
 export type RuntimeOffscreenSourceReadyMessage = {
@@ -50,9 +52,11 @@ export type RuntimeOffscreenSourceReadyMessage = {
 export type RuntimeOffscreenRecordingPausedMessage = {
   type: VideoMessageType.OFFSCREEN_RECORDING_PAUSED;
   recordingId: string;
+  frameClock?: RecordingFrameClockAnchor | null;
 };
 
 export type RuntimeOffscreenRecordingResumedMessage = {
   type: VideoMessageType.OFFSCREEN_RECORDING_RESUMED;
   recordingId: string;
+  frameClock?: RecordingFrameClockAnchor | null;
 };

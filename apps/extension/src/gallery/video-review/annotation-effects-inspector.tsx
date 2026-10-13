@@ -9,12 +9,7 @@ import {
   type EffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
 import { translate, useAppLocale } from '../../platform/i18n';
-import {
-  ColorField,
-  NumericRow,
-  SelectField,
-  TextField,
-} from '../../ui/compact-inspector-controls';
+import { ColorField, SelectField, TextField } from '../../ui/compact-inspector-controls';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import { resolveReviewAnnotationEffectControls } from '../../features/video/review/annotation-effects/layout';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
@@ -30,6 +25,12 @@ import {
   convertReviewAnnotationAttachment,
 } from './annotation-effects-geometry';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
+import {
+  AnnotationNumeric,
+  annotationNumericScrub,
+  annotationPlacementScrub,
+} from './annotation-effects-numeric';
+import { reviewAnnotationPresetId } from './annotation-effects-presets';
 
 type Editor = ReturnType<typeof useReviewAnnotationEffects>;
 type Patch = Partial<Omit<ReviewAnnotationEffect, 'id' | 'snapshotId' | 'order'>>;
@@ -90,10 +91,10 @@ function AnnotationParameters(
     max?: number,
     unit?: 's' | '%' | 'deg'
   ) => (
-    <NumericRow
-      appearance="plain"
-      focusAppearance="accent-box"
-      className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+    <AnnotationNumeric
+      editor={editor}
+      id={instance.id}
+      patch={patch}
       key={key}
       label={label}
       value={value}
@@ -106,13 +107,8 @@ function AnnotationParameters(
       min={min}
       max={max}
       step={unit === 's' ? 0.1 : 1}
-      precision={2}
       unit={unit}
-      onPreviewValue={(next) => preview(patch(next))}
-      onCommitValue={(next) => {
-        preview(patch(next));
-        commit();
-      }}
+      scrub={annotationPlacementScrub(key, value, min, max, unit === 's' ? 0.1 : 1)}
     />
   );
   const opposite = instance.attachment === 'content' ? 'viewport' : 'content';
@@ -310,23 +306,12 @@ function AnnotationParameters(
             label: translate('gallery.videoReview.annotationPresets'),
             icon: Palette,
             content: (
-              <SelectField
-                className={reviewSelectFieldClassName}
-                label={translate('gallery.videoReview.annotationPresets')}
-                value=""
+              <AnnotationPreset
+                document={document}
+                instance={instance}
+                editor={editor}
+                locale={locale}
                 disabled={disabled}
-                options={document.controlPresets.map((preset) => ({
-                  value: preset.id,
-                  label: [
-                    resolveEffectLocaleText(preset.theme.label, locale),
-                    resolveEffectLocaleText(preset.label, locale),
-                  ].join(' · '),
-                }))}
-                onChange={(id) =>
-                  editor.change(instance.id, {
-                    controls: applyEffectV1ControlPreset(document, instance.controls, id),
-                  })
-                }
               />
             ),
           },
@@ -413,6 +398,45 @@ function AnnotationParameters(
   );
 }
 
+function AnnotationPreset(props: {
+  document: EffectV1Document;
+  instance: ReviewAnnotationEffect;
+  editor: Editor;
+  locale: string;
+  disabled: boolean;
+}) {
+  const { document, instance, editor, locale, disabled } = props;
+  return (
+    <SelectField
+      className={reviewSelectFieldClassName}
+      label={translate('gallery.videoReview.annotationPresets')}
+      value={reviewAnnotationPresetId(
+        document,
+        editor.lane?.instances.find((item) => item.id === instance.id)?.controls ??
+          instance.controls,
+        locale
+      )}
+      disabled={disabled}
+      options={[
+        { value: '', label: translate('gallery.videoReview.annotationCustomPreset') },
+        ...(document.controlPresets ?? []).map((preset) => ({
+          value: preset.id,
+          label: [
+            resolveEffectLocaleText(preset.theme.label, locale),
+            resolveEffectLocaleText(preset.label, locale),
+          ].join(' · '),
+        })),
+      ]}
+      onChange={(id) =>
+        id &&
+        editor.change(instance.id, {
+          controls: applyEffectV1ControlPreset(document, instance.controls, id),
+        })
+      }
+    />
+  );
+}
+
 function AnnotationControl(props: {
   document: EffectV1Document;
   control: ControlDefinition;
@@ -471,26 +495,39 @@ function AnnotationControl(props: {
         }}
       />
     );
-  if (control.kind === 'number')
+  if (control.kind === 'number') {
+    const value = typeof props.value === 'number' ? props.value : control.defaultValue;
+    const layout = props.document.objectLayout;
+    const handle = layout?.handles?.find(
+      (item) => item.xControl === control.id || item.yControl === control.id
+    );
+    const length =
+      handle && layout
+        ? handle.xControl === control.id
+          ? layout.width
+          : layout.height
+        : undefined;
     return (
-      <NumericRow
-        appearance="plain"
-        focusAppearance="accent-box"
-        className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+      <AnnotationNumeric
+        editor={editor}
+        id={instance.id}
         label={label}
         disabled={disabled}
-        value={typeof props.value === 'number' ? props.value : control.defaultValue}
+        value={value}
         min={control.min}
         max={control.max}
         step={control.step}
-        precision={2}
-        onPreviewValue={preview}
-        onCommitValue={(value) => {
-          preview(value);
-          props.commit();
-        }}
+        patch={patch}
+        scrub={annotationNumericScrub(
+          value,
+          control.min,
+          control.max,
+          control.step,
+          length === undefined ? undefined : { min: -length, max: 2 * length }
+        )}
       />
     );
+  }
   if (control.kind === 'color')
     return (
       <ColorField

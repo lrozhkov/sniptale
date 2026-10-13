@@ -1,3 +1,4 @@
+import { parseCursorFocusPath } from '../../project/cursor-focus-path/validation';
 import { parseReviewActionAudio } from './action-audio';
 import { parseQuickEditShadow } from './shadow-validation';
 import { parseReviewAnnotationEffects } from '../annotation-effects/validation';
@@ -483,6 +484,13 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
 }
 
 function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdvancedContent | null {
+  const cursorFocusPath =
+    raw['cursorFocusPath'] === undefined ? undefined : parseCursorFocusPath(raw['cursorFocusPath']);
+  if (
+    cursorFocusPath === null ||
+    (cursorFocusPath && !supportsAdvancedSchema(raw['schemaVersion'], 18))
+  )
+    return null;
   const actionAudio = parseReviewActionAudio(raw['actionAudio']);
   if (actionAudio === null || (actionAudio && !supportsAdvancedSchema(raw['schemaVersion'], 17)))
     return null;
@@ -513,6 +521,22 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   if (keyAnimations === null) return null;
   const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
   if (clickAnimations === null) return null;
+  if (
+    !supportsAdvancedSchema(raw['schemaVersion'], 18) &&
+    (clickAnimations?.some(
+      (style) => style.gestureAppearance !== undefined || style.gestureArea !== undefined
+    ) ||
+      actionAudio?.some(
+        (style) =>
+          style.presetId?.endsWith('-v2') ||
+          style.downEnabled !== undefined ||
+          style.upEnabled !== undefined ||
+          style.downGain !== undefined ||
+          style.upGain !== undefined ||
+          style.includeRepeats !== undefined
+      ))
+  )
+    return null;
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
@@ -530,6 +554,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   if (!zoom || !background || !audio) return null;
   return {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+    ...(cursorFocusPath ? { cursorFocusPath } : {}),
     zoom,
     background,
     audio,
@@ -604,7 +629,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].some(
       (known) => known >= firstHistorical && version === known
     )
   );

@@ -24,11 +24,15 @@ export interface ReviewActionAudioSource<Buffer> {
 /** Whole-main admission yields between memory batches; querying a fragment cannot change its gain. */
 export async function admitReviewActionAudioPlan(plan: ReviewActionAudioPlan, signal: AbortSignal) {
   const iterator = reviewActionAudioAdmission(plan);
+  let yieldAt = performance.now() + 8;
   while (true) {
     signal.throwIfAborted();
     const next = iterator.next();
     if (next.done) return next.value;
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (performance.now() >= yieldAt) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      yieldAt = performance.now() + 8;
+    }
   }
 }
 

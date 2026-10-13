@@ -130,6 +130,31 @@ export function transformPortableVideoProjectReferences(
           })),
         }
       : null,
+    ...(project.cursorFocusPath
+      ? {
+          cursorFocusPath: {
+            ...project.cursorFocusPath,
+            segments: project.cursorFocusPath.segments.map((segment) => ({
+              ...segment,
+              binding:
+                segment.binding.kind === 'recording-source'
+                  ? {
+                      ...segment.binding,
+                      recordingId: requireRecordingId(rootIds, segment.binding.recordingId),
+                    }
+                  : segment.binding,
+            })),
+          },
+        }
+      : {}),
+    ...(project.actionFeedback
+      ? {
+          actionFeedback: project.actionFeedback.map((group) => ({
+            ...group,
+            recordingId: requireRecordingId(rootIds, group.recordingId),
+          })),
+        }
+      : {}),
     actionEvents: project.actionEvents.map((event) => ({
       ...event,
       anchor:

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
 import { ACTION_SOUND_CATALOG, isActionSoundSampleId } from './action-audio-catalog';
 
-it('pins the minimal shipped v1 WAV subset, native samples and exact byte budget', async () => {
+it('pins immutable v1 and paired v2 WAV bytes, native samples and bounded byte budget', async () => {
   const names: string[] = [];
   let total = 0;
   for (const [id, sample] of Object.entries(ACTION_SOUND_CATALOG)) {
@@ -25,9 +25,9 @@ it('pins the minimal shipped v1 WAV subset, native samples and exact byte budget
     expect(peak).toBeLessThanOrEqual(0.5);
     expect(sample.mimeType).toBe('audio/wav');
     total += bytes.length;
-    names.push(sample.path.split('/').at(-1)!);
+    if (sample.version === 1) names.push(sample.path.split('/').at(-1)!);
   }
-  expect(total).toBe(102630);
+  expect(total).toBe(123974);
   expect(total).toBeLessThanOrEqual(128 * 1024);
   expect(names).toHaveLength(10);
   expect(
@@ -42,4 +42,16 @@ it('pins the minimal shipped v1 WAV subset, native samples and exact byte budget
     'constructor',
   ])
     expect(isActionSoundSampleId(value)).toBe(false);
+});
+
+it('ships distinct down and up attacks instead of a duplicated full legacy click', () => {
+  const ids = [
+    'mouse-classic-down-v2',
+    'mouse-classic-up-v2',
+    'mouse-soft-down-v2',
+    'mouse-soft-up-v2',
+  ] as const;
+  expect(new Set(ids.map((id) => ACTION_SOUND_CATALOG[id].sha256)).size).toBe(4);
+  for (const id of ids)
+    expect(ACTION_SOUND_CATALOG[id].sha256).not.toBe(ACTION_SOUND_CATALOG['mouse-click-v1'].sha256);
 });

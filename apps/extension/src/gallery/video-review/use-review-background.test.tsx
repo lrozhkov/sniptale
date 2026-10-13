@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { committedEditorFixtureProjection } from './editor-fixture.test-support';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewBackgroundImage, useReviewBackgroundImport } from './use-review-background';
@@ -19,6 +20,11 @@ vi.mock('../../workflows/video-review/background-image', () => ({
 vi.mock('../../composition/persistence/review-workspaces/store', async (load) => ({
   ...(await load<typeof import('../../composition/persistence/review-workspaces/store')>()),
   commitVideoWorkspace: mocks.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<
+      typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspaceWithProjection
+    >[0]
+  ) => committedEditorFixtureProjection(await mocks.commit(args)),
 }));
 let root: Root;
 let host: HTMLDivElement;

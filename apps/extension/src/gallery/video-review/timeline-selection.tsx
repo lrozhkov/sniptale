@@ -15,6 +15,8 @@ type SelectionProps = {
   sourceCompact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   rangeEnabled?: boolean;
+  drawingRange?: Extract<ReviewAnchor, { kind: 'range' }> | null | undefined;
+  drawingKind?: 'cut' | 'speed' | undefined;
   duration: number;
   time: number;
   selection: ReviewAnchor;
@@ -54,16 +56,17 @@ export function ReviewSourceLane(props: SelectionProps) {
             style={{ left: percent(guide, props.duration) }}
           />
         ) : null}
-        {props.rangeEnabled !== false &&
-        props.selection.kind === 'range' &&
-        !props.selectedEditId ? (
+        {props.drawingRange ? (
           <div
-            data-ui="gallery.videoReview.sourceRange"
-            className="pointer-events-none absolute inset-y-0 border
-              border-[var(--sniptale-color-accent)] bg-transparent"
+            data-ui="gallery.videoReview.sourceDrawPreview"
+            aria-hidden="true"
+            className={[
+              'pointer-events-none absolute inset-y-0 rounded border',
+              reviewTimelineItemTone(false, props.drawingKind),
+            ].join(' ')}
             style={{
-              left: percent(props.selection.start, props.duration),
-              width: percent(props.selection.end - props.selection.start, props.duration),
+              left: percent(props.drawingRange.start, props.duration),
+              width: percent(props.drawingRange.end - props.drawingRange.start, props.duration),
             }}
           />
         ) : null}

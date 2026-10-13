@@ -42,3 +42,34 @@ it('allows document navigation while no video element is mounted', () => {
   expect(() => commands.onOpenText()).not.toThrow();
   expect(() => commands.onSelectText('text')).not.toThrow();
 });
+
+it('projects one exclusive object identity and keeps annotation selection behavior', () => {
+  const select = vi.fn();
+  const args = {
+    video: { current: null },
+    select,
+    navigation: { shown: 'selected' as const, setSection: vi.fn() },
+    selectedTextId: undefined,
+    requestExport: vi.fn(),
+  };
+  const annotation = reviewTimelineInspectorCommands({
+    ...args,
+    selection: { kind: 'annotation-effect', id: 'annotation' },
+  });
+  expect(annotation.selectedAnnotationEffectId).toBe('annotation');
+  expect(annotation.selectedCursorFocusId).toBeUndefined();
+  annotation.onSelectAnnotationEffect('next');
+  expect(select).toHaveBeenCalledExactlyOnceWith({ kind: 'annotation-effect', id: 'next' });
+  const point = reviewTimelineInspectorCommands({
+    ...args,
+    selection: { kind: 'cursor-focus', id: 'point', time: 1 },
+  });
+  expect(point.selectedCursorFocusId).toBe('point');
+  expect(point.selectedAnnotationEffectId).toBeNull();
+  const event = reviewTimelineInspectorCommands({
+    ...args,
+    selection: { kind: 'telemetry', ref: { kind: 'action', id: 'event' } },
+  });
+  expect(event.selectedTelemetryRef).toEqual({ kind: 'action', id: 'event' });
+  expect(event.selectedCursorFocusId).toBeUndefined();
+});

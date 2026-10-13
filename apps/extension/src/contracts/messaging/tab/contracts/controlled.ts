@@ -1,3 +1,4 @@
+import { isOptionalRecordingFrameClockAnchor } from '../../../video/recording-frame-clock';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   createGuardParser,
@@ -22,7 +23,7 @@ export const tabVideoControlledCursorContracts = {
       createMessageGuard({
         type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
         required: { recordingId: isString },
-        optional: { offsetSeconds: isNumber },
+        optional: { offsetSeconds: isNumber, frameClock: isOptionalRecordingFrameClockAnchor },
       })
     ),
     parseResponse: createGuardParser(
@@ -45,7 +46,10 @@ export const tabVideoControlledCursorContracts = {
   [VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE]: {
     parseRequest: createGuardParser(
       'tab PAUSE_CONTROLLED_CURSOR_CAPTURE message',
-      createMessageGuard({ type: VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE })
+      createMessageGuard({
+        type: VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE,
+        optional: { frameClock: isOptionalRecordingFrameClockAnchor },
+      })
     ),
     parseResponse: createGuardParser(
       'tab PAUSE_CONTROLLED_CURSOR_CAPTURE response',
@@ -55,7 +59,10 @@ export const tabVideoControlledCursorContracts = {
   [VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE]: {
     parseRequest: createGuardParser(
       'tab RESUME_CONTROLLED_CURSOR_CAPTURE message',
-      createMessageGuard({ type: VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE })
+      createMessageGuard({
+        type: VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE,
+        optional: { frameClock: isOptionalRecordingFrameClockAnchor },
+      })
     ),
     parseResponse: createGuardParser(
       'tab RESUME_CONTROLLED_CURSOR_CAPTURE response',

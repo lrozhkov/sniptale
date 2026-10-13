@@ -204,6 +204,47 @@ it('history viewport targets: retains full hit areas at zero and right viewport 
   }
 });
 
+it('keeps a dense group at the right edge wholly inside its scroll owner', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 30;
+  project.actionEvents = [action('edge-a', 1.99), action('edge-b', 2)];
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={project}
+        recordingTelemetry={[]}
+        pixelsPerSecond={100}
+        projection={historyViewport(0)}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  const group = container.querySelector<HTMLElement>(
+    '[data-ui="video-editor.timeline.history-cluster"]'
+  )!;
+  expect(historyTargetLeft(group) + 20).toBeLessThanOrEqual(200);
+});
+
+it('keeps the visible tail of an observed hold selectable after scrolling past its press', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 30;
+  project.actionEvents = [
+    { ...action('held', 1), data: { gestureType: 'hold', downTime: 1, upTime: 6 } },
+  ];
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={project}
+        recordingTelemetry={[]}
+        pixelsPerSecond={100}
+        projection={historyViewport(4)}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  expect(container.querySelector('[data-action-id="held"]')).not.toBeNull();
+});
+
 it('history viewport targets: does not bring an offscreen-only group into view', () => {
   const project = createEmptyVideoProject();
   project.duration = 30;
@@ -389,6 +430,64 @@ function overlappingTypingFixture() {
   return { project, telemetry };
 }
 
+it('keeps a command and overlapping typing instances in one keyboard cluster with independent selection', () => {
+  const { project, telemetry } = overlappingTypingFixture();
+  project.actionEvents = [{ ...action('command', 2), kind: 'KEY', label: 'Ctrl+K' }];
+  const selectAction = vi.fn();
+  const selectSpan = vi.fn();
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={project}
+        recordingTelemetry={[telemetry]}
+        pixelsPerSecond={100}
+        onSeek={vi.fn()}
+        onSelectActionOccurrence={selectAction}
+        onSelectHistorySpan={selectSpan}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.timeline.history-event"]')).toBeNull();
+  const cluster = container.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.history-cluster"] button'
+  )!;
+  act(() => cluster.click());
+  const options = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+  expect(options).toHaveLength(3);
+  act(() => options.find((option) => option.textContent?.includes('Ctrl+K'))!.click());
+  expect(selectAction).toHaveBeenCalledWith('command', null);
+  act(() => cluster.click());
+  act(() => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+  expect(selectSpan).toHaveBeenCalledWith(
+    expect.objectContaining({ signalId: 'typing', sourceInstanceId: 'instance-a' })
+  );
+});
+
+it('shows a recorded hold range independently of the authored animation duration', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 10;
+  project.actionEvents = [
+    {
+      ...action('hold', 1),
+      data: { gestureType: 'hold', downTime: 1, upTime: 3 },
+      presentation: { duration: 0.2 },
+    },
+  ];
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={project}
+        recordingTelemetry={[]}
+        pixelsPerSecond={100}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  expect(container.querySelector<HTMLButtonElement>('[data-action-id="hold"]')?.style.width).toBe(
+    '200px'
+  );
+});
+
 it.each(['pointer', 'keyboard'] as const)(
   'selects each same-time typing instance through the shared %s menu',
   (input) => {
@@ -495,30 +594,4 @@ it('keeps a lone typing span directly selectable despite overlapping stable back
     clipId: 'typing-a',
   });
   expect(seek).not.toHaveBeenCalled();
-});
-
-it('separates simultaneous click and keyboard markers into internal rows', () => {
-  const project = createEmptyVideoProject();
-  project.duration = 5;
-  project.actionEvents = [
-    action('click', 1),
-    { ...action('key', 1), kind: 'KEY', label: 'Ctrl+K' },
-  ];
-  act(() =>
-    root.render(
-      <ProjectTimelineTelemetryLane
-        project={project}
-        recordingTelemetry={[]}
-        pixelsPerSecond={100}
-        onSeek={vi.fn()}
-      />
-    )
-  );
-  const click = container.querySelector<HTMLElement>('[data-action-id="click"]');
-  const key = container.querySelector<HTMLElement>('[data-action-id="key"]');
-  expect(click).not.toBeNull();
-  expect(key).not.toBeNull();
-  expect(
-    Number.parseFloat(key!.style.top) - Number.parseFloat(click!.style.top)
-  ).toBeGreaterThanOrEqual(28);
 });

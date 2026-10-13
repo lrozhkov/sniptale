@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 17;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 18;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -101,6 +101,13 @@ export interface QuickEditBorder {
 }
 
 export interface QuickEditZoomRegion {
+  /** Disposable render context, dropped by storage admission. */
+  cursorFocus?: {
+    sourceFrame?: { headerHeight: number; height: number };
+    path: import('../../project/cursor-focus-path/types').CursorFocusPath;
+    observed?: import('../../project/cursor-focus-path/types').CursorFocusPath;
+    timeMap?: readonly ReviewTimeSegment[];
+  };
   perspective?: QuickEditPerspective;
   depthOfField?: QuickEditDepthOfField;
   /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
@@ -264,6 +271,7 @@ export interface QuickEditAdvancedState extends QuickEditAdvancedContent {
  * zoom/background/audio changes join the same undo timeline as cuts.
  */
 export interface QuickEditAdvancedContent {
+  cursorFocusPath?: import('../../project/cursor-focus-path/types').CursorFocusPath;
   text?: import('../text-document').ReviewTextDocument;
   captions?: import('../text-document').ReviewCaptionSettings;
   annotationEffects?: import('../annotation-effects/types').ReviewAnnotationEffects;

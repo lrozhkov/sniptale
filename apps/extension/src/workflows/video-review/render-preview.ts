@@ -20,7 +20,12 @@ import {
 import { quickEditMotionBlurCameras } from '../../features/video/review/advanced/motion-blur';
 import { resolveReviewAssetBytes } from './asset-bytes';
 import { createReviewBackgroundPainter } from './scene-background';
-import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
+import {
+  loadReviewWindowHeader,
+  reviewWindowHeaderUrl,
+  reviewWindowRasterBacking,
+} from './window-header';
+import { evaluateReviewClicks } from '../../features/video/review/click-animation';
 import { measureReviewWatermark } from './render-watermark';
 import type { createReviewWatermarkRenderer } from './render-watermark';
 import {
@@ -216,9 +221,24 @@ async function prepareAssets(
       windowHeader: scene.windowHeader,
       camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
     });
+    const magnify = scene.clicks.some(
+      (cue) =>
+        !cue.gesture && cue.settings.effect === 'magnify' && (cue.settings.magnification ?? 1.6) > 1
+    );
+    const joined = reviewWindowRasterBacking({
+      windowRect: layout.windowRect,
+      sourceWidth: scene.source.width,
+      magnify,
+    });
     const backing = {
-      width: Math.max(1, Math.ceil(layout.windowRect.width)),
-      height: Math.max(1, Math.ceil(layout.videoRect.y - layout.windowRect.y)),
+      width: joined.width,
+      height: Math.max(
+        1,
+        Math.ceil(
+          (layout.videoRect.y - layout.windowRect.y) *
+            (magnify ? joined.width / layout.windowRect.width : 1)
+        )
+      ),
     };
     assets.allocation.headerBitmap = backing;
     admit(false);
@@ -376,26 +396,31 @@ async function drawPreparedFrame(
         drawReviewSceneFrame(context, {
           ...drawScene,
           spatialRenderer: assets.spatial,
-          windowRasterBacking: {
-            width: Math.max(1, Math.ceil(request.layout.windowRect.width)),
-            height: Math.max(1, Math.ceil(request.layout.windowRect.height)),
-          },
+          windowRasterBacking: reviewWindowRasterBacking({
+            windowRect: request.layout.windowRect,
+            sourceWidth: scene.source.width,
+            magnify: evaluateReviewClicks(scene.clicks, frame.resultTime).some(
+              (click) => (click.lens?.scale ?? 1) > 1
+            ),
+          }),
           motionBlur: frame.cameraTransform
             ? undefined
             : quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime),
-        });
-        drawReviewSceneOverlays({
-          scene: drawScene,
-          renderer: assets.spatial,
-          context,
-          canvas,
-          spotlightScratch: null,
-          regions: scene.zoomRegions,
-          globalResultTime: frame.resultTime,
-          cameraScale: request.camera.scale,
-          sourceWidth: scene.source.width,
-          clicks: scene.clicks,
-          ...(annotations ? { annotationFrames: annotations.entries } : {}),
+          drawOverlays: (windowRaster) =>
+            drawReviewSceneOverlays({
+              scene: drawScene,
+              renderer: assets.spatial,
+              context,
+              canvas,
+              spotlightScratch: null,
+              regions: scene.zoomRegions,
+              globalResultTime: frame.resultTime,
+              cameraScale: request.camera.scale,
+              sourceWidth: scene.source.width,
+              clicks: scene.clicks,
+              windowRaster,
+              ...(annotations ? { annotationFrames: annotations.entries } : {}),
+            }),
         });
       } finally {
         annotations?.release();
@@ -482,10 +507,12 @@ function admitRender(
 ) {
   if (!allocation) return;
   const input = allocation.describe();
+  const previousCache = assets.painter.retainedCacheSize;
   const base = {
     ...input,
     publication: { ...input.publication, backing: prepared.dimensions.backing },
     assets: assets.allocation,
+    background: input.background ? { ...input.background, previousCache } : null,
     scene: { ...input.scene, ...(annotationBitmaps ? { annotationBitmaps } : {}) },
   };
   const candidates = [calculatePreviewRenderAllocation(base)];
@@ -510,7 +537,7 @@ function admitRender(
         transitionBytes: null,
         previousFront: input.publication.previousFront,
         assets: assets.allocation,
-        ...(input.background ? { previousBackgroundCache: input.background.previousCache } : {}),
+        previousBackgroundCache: previousCache,
       });
       candidates.push(
         calculatePreviewRenderAllocation({

@@ -33,14 +33,14 @@ it('keeps the activation gate open for the supported ten-second countdown plus i
   await vi.advanceTimersByTimeAsync(10_000);
   expect(settled).toBe(false);
   allowRecordingBegin(binding);
-  await expect(pending).resolves.toBeUndefined();
+  await expect(pending).resolves.toBeNull();
 });
 
 it('allows only the exact pending recording binding', async () => {
   const pending = waitForRecordingBegin(binding);
   expect(() => assertRecordingBegin(binding)).not.toThrow();
   allowRecordingBegin(binding);
-  await expect(pending).resolves.toBeUndefined();
+  await expect(pending).resolves.toBeNull();
 });
 
 it('rejects parallel gates and stale begin signals', async () => {
@@ -82,7 +82,7 @@ it('retains early BEGIN through preparation and rejects a stale binding', async 
   expect(() => allowRecordingBegin({ ...binding, generation: 0 })).toThrow('Stale');
   allowRecordingBegin(binding);
   await prepared;
-  await expect(waitForRecordingBegin(binding)).resolves.toBeUndefined();
+  await expect(waitForRecordingBegin(binding)).resolves.toBeNull();
 });
 
 it('does not reuse an early BEGIN after cancellation', async () => {
@@ -105,4 +105,21 @@ it('does not renew an expired reserved deadline when stream preparation finishes
   await vi.advanceTimersByTimeAsync(15_000);
   await failed;
   await expect(waitForRecordingBegin(binding)).rejects.toThrow('Timed out');
+});
+
+it('keeps primary BEGIN valid when advisory lease metadata is malformed or expired', async () => {
+  const { RECORDING_FRAME_CLOCK_PURPOSE } =
+    await import('../../../contracts/video/recording-frame-clock');
+  const malformed = waitForRecordingBegin(binding);
+  allowRecordingBegin(binding, { purpose: 'other' });
+  await expect(malformed).resolves.toBeNull();
+  const expired = {
+    ...binding,
+    purpose: RECORDING_FRAME_CLOCK_PURPOSE,
+    nonce: 'ba289176-c099-44d5-8f18-174e05565080',
+    expiresAtEpochMs: 1,
+  };
+  const allowed = waitForRecordingBegin(binding);
+  allowRecordingBegin(binding, expired);
+  await expect(allowed).resolves.toEqual(expired);
 });

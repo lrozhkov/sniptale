@@ -4,6 +4,62 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTimeline } from './timeline';
 import { ReviewTrackRow } from './track-row';
+import { ReviewTextTrack } from './original-speech-track';
+import { useReviewText } from './use-review-text';
+import { ReviewAnnotationEffectsTrack } from './annotation-effects-track';
+
+function ActualTextLane({ selected }: { selected(id: string): void }) {
+  const editor = useReviewText({
+    document: {
+      version: 1,
+      fragments: [
+        {
+          id: 'text',
+          start: 1,
+          end: 2,
+          text: 'Recorded text',
+          originalText: '',
+          timeDomain: 'source',
+          revision: 0,
+          timingRevision: 0,
+          alignment: 'manual',
+          showInVideo: true,
+        },
+      ],
+    },
+    sourceDuration: 4,
+    sourceTime: 0,
+    edits: [],
+    setText: vi.fn(),
+    select: vi.fn(),
+    seek: vi.fn(),
+    pause: vi.fn(),
+  });
+  return (
+    <ReviewTextTrack editor={editor} busy={false} onSelect={selected} onOpenDocument={vi.fn()} />
+  );
+}
+
+function ActualAnnotationLane() {
+  return (
+    <ReviewAnnotationEffectsTrack
+      instances={[]}
+      snapshots={[]}
+      duration={4}
+      time={0}
+      enabled
+      busy={false}
+      selectedId={null}
+      snapTimes={[]}
+      onEnabled={vi.fn()}
+      onSelect={vi.fn()}
+      onBegin={vi.fn(() => true)}
+      onPreview={vi.fn()}
+      onCommit={vi.fn()}
+      onCancel={vi.fn()}
+    />
+  );
+}
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -94,6 +150,168 @@ function changeZoom(host: HTMLElement, value: string) {
     slider.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+
+it.each(['text', 'annotation'] as const)('seeks once on the actual empty %s lane', (family) => {
+  const selected = vi.fn();
+  const { props, host } = renderTimeline({
+    textTrack: family === 'text' ? <ActualTextLane selected={selected} /> : undefined,
+    annotationEffectsTrack: family === 'annotation' ? <ActualAnnotationLane /> : undefined,
+    onRangeCommit: vi.fn(),
+  });
+  planeWithMetrics(host);
+  const lane = host.querySelector<HTMLElement>(
+    family === 'text'
+      ? '[data-ui="gallery.videoReview.textTrack"]'
+      : '[data-ui="gallery.videoReview.annotationEffectsLane"]'
+  )!;
+  dispatchPlane(lane, [
+    { type: 'pointerdown', x: 300 },
+    { type: 'pointerup', x: 300 },
+  ]);
+  expect(props.onSeek).toHaveBeenCalledExactlyOnceWith(3);
+  expect(props.onSelect).toHaveBeenCalledExactlyOnceWith({ kind: 'point', time: 3 });
+  expect(props.onRangeCommit).not.toHaveBeenCalled();
+  expect(selected).not.toHaveBeenCalled();
+});
+
+it('keeps nested text selection and resize outside plane seeking', () => {
+  const selected = vi.fn();
+  const { host, props } = renderTimeline({ textTrack: <ActualTextLane selected={selected} /> });
+  planeWithMetrics(host);
+  const block = host.querySelector<HTMLElement>('[data-text-id="text"]')!;
+  const lane = block.parentElement!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 32));
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  dispatchPlane(block.querySelector('span')!, [
+    { type: 'pointerdown', x: 150 },
+    { type: 'pointerup', x: 150 },
+  ]);
+  expect(selected).toHaveBeenCalledWith('text');
+  dispatchPlane(block.querySelector('[data-text-edge="end"]')!, [
+    { type: 'pointerdown', x: 200 },
+    { type: 'pointerup', x: 200 },
+  ]);
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(props.onSelect).not.toHaveBeenCalled();
+});
+
+it('seeks source with the cursor without creating a range or restoring a generic frame', () => {
+  const { host, props } = renderTimeline({
+    selection: { kind: 'range', start: 1, end: 2 },
+    onRangeCommit: vi.fn(),
+  });
+  const plane = planeWithMetrics(host);
+  const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
+  hoverAt(lane, 100);
+  expect(plane.style.cursor).toBe('default');
+  dispatchPlane(lane, [
+    { type: 'pointerdown', x: 100 },
+    { type: 'pointermove', x: 250 },
+    { type: 'pointerup', x: 250 },
+  ]);
+  expect(props.onSeek).toHaveBeenCalledExactlyOnceWith(1);
+  expect(props.onSelect).toHaveBeenCalledExactlyOnceWith({ kind: 'point', time: 1 });
+  expect(props.onRangeCommit).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
+});
+
+it('rejects delayed source drawing after returning to the cursor', () => {
+  let admitted: (() => void) | undefined;
+  const { host, props } = renderTimeline({
+    sourceRangeTool: true,
+    beforeAction: (action) => {
+      admitted = action;
+    },
+    onRangeCommit: vi.fn(),
+  });
+  const plane = planeWithMetrics(host);
+  dispatchPlane(host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!, [
+    { type: 'pointerdown', x: 100 },
+  ]);
+  dispatchPlane(plane, [
+    { type: 'pointermove', x: 250 },
+    { type: 'pointerup', x: 250 },
+  ]);
+  renderTimeline({ ...props, sourceRangeTool: false });
+  act(() => admitted?.());
+  expect(props.onRangeCommit).not.toHaveBeenCalled();
+  expect(props.onSelect).not.toHaveBeenCalled();
+  expect(props.onSeek).not.toHaveBeenCalled();
+});
+
+it.each([false, true])(
+  'cancels speed-to-cut source tool changes with delayed admission=%s',
+  (deferred) => {
+    let admitted: (() => void) | undefined;
+    const { host, props } = renderTimeline({
+      sourceRangeTool: true,
+      sourceRangeKind: 'speed',
+      onRangeCommit: vi.fn(),
+      beforeAction: (action) => {
+        if (deferred) admitted = action;
+        else action();
+      },
+    });
+    const plane = planeWithMetrics(host);
+    const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
+    dispatchPlane(lane, [{ type: 'pointerdown', x: 100 }]);
+    if (deferred)
+      dispatchPlane(plane, [
+        { type: 'pointermove', x: 250 },
+        { type: 'pointerup', x: 250 },
+      ]);
+    renderTimeline({ ...props, sourceRangeKind: 'cut' });
+    if (!deferred) expect(plane.releasePointerCapture).toHaveBeenCalledOnce();
+    dispatchPlane(plane, [
+      { type: 'pointermove', x: 250 },
+      { type: 'pointerup', x: 250 },
+    ]);
+    act(() => admitted?.());
+    expect(props.onRangeCommit).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-ui="gallery.videoReview.sourceDrawPreview"]')).toBeNull();
+    if (deferred) expect(props.onSeek).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['release', 'Escape', 'cancel', 'tool-change'] as const)(
+  'shows only active source drawing preview and clears it on %s',
+  (completion) => {
+    const { host, props } = renderTimeline({
+      sourceRangeTool: true,
+      sourceRangeKind: 'speed',
+      onRangeCommit: vi.fn(),
+    });
+    const plane = planeWithMetrics(host);
+    dispatchPlane(host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!, [
+      { type: 'pointerdown', x: 100 },
+    ]);
+    dispatchPlane(plane, [{ type: 'pointermove', x: 250 }]);
+    const preview = host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.sourceDrawPreview"]'
+    )!;
+    expect(preview.style.left).toBe('25%');
+    expect(preview.style.width).toBe('37.5%');
+    expect(preview.className).toContain('sniptale-color-info');
+    expect(host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
+    if (completion === 'Escape')
+      act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    else if (completion === 'cancel') dispatchPlane(plane, [{ type: 'pointercancel', x: 250 }]);
+    else if (completion === 'tool-change') renderTimeline({ ...props, sourceRangeTool: false });
+    dispatchPlane(plane, [{ type: 'pointerup', x: 250 }]);
+    expect(host.querySelector('[data-ui="gallery.videoReview.sourceDrawPreview"]')).toBeNull();
+    if (completion === 'release')
+      expect(props.onRangeCommit).toHaveBeenCalledExactlyOnceWith({
+        kind: 'range',
+        start: 1,
+        end: 2.5,
+      });
+    else expect(props.onRangeCommit).not.toHaveBeenCalled();
+  }
+);
 
 it('shows an exact range-start guide only over drawing zones, with neutral seek and control cursors', () => {
   const { host, props } = renderTimeline({

@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../project/factories/creation';
+import { createVideoProjectFromRecording } from '../../project/factories/creation';
+import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
 import {
   VideoMotionFocusMode,
   VideoMotionOverlayZoomMode,
@@ -303,3 +305,74 @@ it('resolves manual-area camera focus and honors hidden camera lanes', () => {
     }).regionId
   ).toBeNull();
 });
+it.each(['embedded-fallback', 'separate'] as const)(
+  'follow uses source geometry and a stable plan in %s mode',
+  (captureMode) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'follow',
+      filename: 'follow.webm',
+      width: 100,
+      height: 100,
+      duration: 3,
+      mimeType: 'video/webm',
+      size: 10,
+      cursorTrack: {
+        captureMode,
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [
+          {
+            id: 'start',
+            time: 0,
+            x: 20,
+            y: 30,
+            visible: true,
+            captureSegment: 0,
+            recordingPoint: { x: 0.2, y: 0.3 },
+          },
+          {
+            id: 'end',
+            time: 2,
+            x: 80,
+            y: 70,
+            visible: true,
+            captureSegment: 0,
+            recordingPoint: { x: 0.8, y: 0.7 },
+          },
+        ],
+      },
+    });
+    project.motionRegions = [
+      {
+        ...createVideoProjectMotionRegion(project, 0),
+        duration: 3,
+        focusMode: VideoMotionFocusMode.CURSOR,
+        scale: 2,
+        zoomInDuration: 0,
+        zoomOutDuration: 0,
+      },
+    ];
+    const at = (time: number) =>
+      resolveVideoCompositionCamera({
+        project,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+    const expected = at(1);
+    at(2);
+    at(0);
+    expect(at(1)).toEqual(expected);
+    expect(expected.scale).toBe(2);
+    expect(expected.focusPoint.x).toBeGreaterThanOrEqual(0);
+    expect(expected.focusPoint.x).toBeLessThanOrEqual(100);
+    const { cursorFocusPath: _path, ...rest } = project;
+    const unknown = { ...rest, cursorTrack: { ...project.cursorTrack!, samples: [] } };
+    const fallback = resolveVideoCompositionCamera({
+      project: unknown,
+      currentTime: 1,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(fallback.focusPoint).toEqual({ x: 50, y: 50 });
+  }
+);

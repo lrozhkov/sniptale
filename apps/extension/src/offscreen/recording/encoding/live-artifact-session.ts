@@ -5,6 +5,7 @@ import {
   type LiveRecordingEncodingConfig,
 } from './live-artifact-session-owner';
 import type { LiveVideoFrameTransform } from './live-video-encoder-pump';
+import type { RecordingFrameClockObserver } from './recording-frame-clock';
 
 interface CreateLiveRecordingArtifactSessionInput {
   artifactId: string;
@@ -13,6 +14,7 @@ interface CreateLiveRecordingArtifactSessionInput {
   filename: string;
   frameTransform?: LiveVideoFrameTransform | undefined;
   onVideoFrameGeometry?: (frame: VideoFrame) => void;
+  frameClockObserver?: RecordingFrameClockObserver;
   mimeType: string;
   stream: MediaStream;
 }
@@ -34,6 +36,7 @@ export async function createLiveRecordingArtifactSession(
   const ownerInput = {
     artifactId: input.artifactId,
     ...(input.onVideoFrameGeometry ? { onVideoFrameGeometry: input.onVideoFrameGeometry } : {}),
+    ...(input.frameClockObserver ? { frameClockObserver: input.frameClockObserver } : {}),
     coordinator: input.coordinator,
     encoding: input.encoding,
     ...(input.frameTransform ? { frameTransform: input.frameTransform } : {}),

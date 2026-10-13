@@ -142,3 +142,30 @@ function resolveTargetElements(event: Event | null) {
     candidate instanceof HTMLLabelElement ? (candidate.control ?? candidate) : candidate;
   return { element, identity, editableBlocked };
 }
+
+/** Checks only root visibility; it never inspects fields inside an opaque root. */
+export function hasOpaqueTelemetryTarget(
+  event: Event | undefined,
+  fallback: Element | null
+): boolean {
+  const path = event && typeof event.composedPath === 'function' ? event.composedPath() : [];
+  const target =
+    path.find((node): node is Element => node instanceof Element) ??
+    (event?.target instanceof Element ? event.target : fallback);
+  if (!target) return false;
+  // These native controls cannot host an author-created shadow tree. Their browser-owned
+  // implementation roots do not conceal a separate author field from this event target.
+  if (target.matches('input,textarea,select,button,option,optgroup')) return false;
+  if (!(target instanceof HTMLElement)) return false;
+  // An exposed open root proves that this retargeted host is inspectable.
+  if (target.shadowRoot?.mode === 'open') return false;
+  try {
+    if (typeof chrome !== 'undefined' && typeof chrome.dom?.openOrClosedShadowRoot === 'function') {
+      const root = chrome.dom.openOrClosedShadowRoot(target);
+      return root !== null && (!(root instanceof ShadowRoot) || root.mode !== 'open');
+    }
+  } catch {
+    return true;
+  }
+  return true;
+}

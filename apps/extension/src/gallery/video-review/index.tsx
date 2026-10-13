@@ -114,7 +114,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
   const [fullHeight, setFullHeight] = useState(false);
   const panelsEnabled = state.advanced.ui.mode === 'advanced';
   const panels = useReviewPanelLayout(panelsEnabled);
-  const { navigation, requestExport } = useReviewEditorNavigation(state);
+  const { navigation, requestExport, historyCommands } = useReviewEditorNavigation(state);
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const music = useReviewMusicImport(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
@@ -190,20 +190,16 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
               annotationEffects={state.annotationEffects}
+              annotationToolCancellation={state.annotationToolCancellation}
               effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
               annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
-              selectedAnnotationEffectId={
-                state.activeSelection.kind === 'annotation-effect' ? state.activeSelection.id : null
-              }
-              onSelectAnnotationEffect={(id) =>
-                state.setActiveSelection({ kind: 'annotation-effect', id })
-              }
               text={state.text}
               {...reviewTimelineInspectorCommands({
                 video: state.video,
                 select: state.setActiveSelection,
                 navigation,
                 selectedTextId: state.text.selectedId,
+                selection: state.activeSelection,
                 requestExport,
               })}
               webcam={state.webcam}
@@ -241,10 +237,8 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
               telemetryAvailable={state.projected.markers.length > 0}
               time={state.time}
               playing={state.playing}
-              markers={state.telemetry ? state.projected.markers : []}
-              selectedTelemetryRef={
-                state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined
-              }
+              markers={state.projected.markers}
+              captureCapabilities={state.projected.captureCapabilities}
               zoom={zoom}
               audio={audio}
               audioState={advanced.audio}
@@ -254,11 +248,8 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
               onOpenMusic={music.open}
               onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
               selectedObject={state.activeSelection.kind !== 'none'}
-              onMarker={(marker) => {
-                if (!state.canStart()) return;
-                state.seek(marker.start, false);
-                state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
-              }}
+              cursorFocusKeys={state.cursorFocusKeys}
+              {...historyCommands}
               onComment={state.selectComment}
               onSeek={state.seek}
               onPlay={() => state.beforeAction(state.play)}
@@ -325,5 +316,25 @@ function useReviewEditorNavigation(state: ReturnType<typeof useReviewEditorState
     exportAvailable: true,
     exportRequest,
   });
-  return { navigation, requestExport };
+  const historyCommands = {
+    onCursorFocusKey: (
+      key: Parameters<
+        NonNullable<Parameters<typeof ReviewTimelineBinding>[0]['onCursorFocusKey']>
+      >[0]
+    ) => {
+      state.selectCursorFocusKey(key.id, key.sourceTime);
+      navigation.setSection('selected');
+    },
+    onAddCursorFocusKey: (time: number) => {
+      state.addCursorFocusKey(time);
+      navigation.setSection('selected');
+    },
+    onMarker: (marker: Parameters<Parameters<typeof ReviewTimelineBinding>[0]['onMarker']>[0]) => {
+      if (!state.canStart()) return;
+      state.seek(marker.start, false);
+      state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
+      navigation.setSection('selected');
+    },
+  };
+  return { navigation, requestExport, historyCommands };
 }

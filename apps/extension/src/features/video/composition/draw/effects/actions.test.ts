@@ -2,6 +2,42 @@ import type { VideoCompositionActionState } from '../../types';
 import { expect, it, vi } from 'vitest';
 import { drawActionCompositionState, drawSceneActionCompositionStates } from './actions';
 
+it('draws held feedback as a stable halo with the mapped factual path and authored frame', () => {
+  const context = createContext();
+  context.strokeRect = vi.fn();
+  drawActionCompositionState(
+    context,
+    {
+      ...createActionState(),
+      preset: 'CLICK_PRESS',
+      renderKind: 'accent',
+      point: { x: 180, y: 150 },
+      gestureFeedback: {
+        effect: 'press',
+        point: { x: 180, y: 150 },
+        radius: 32,
+        stroke: 2,
+        color: '#ffffffff',
+        opacity: 0.5,
+        path: [
+          { x: 52, y: 96 },
+          { x: 180, y: 150 },
+        ],
+        area: { x: 100, y: 105, width: 160, height: 90 },
+      },
+    },
+    null,
+    0.5
+  );
+  expect(context.moveTo).toHaveBeenCalledWith(52, 96);
+  expect(context.lineTo).toHaveBeenCalledWith(180, 150);
+  expect(context.strokeRect).toHaveBeenCalledWith(100, 105, 160, 90);
+  expect(context.arc).toHaveBeenCalledWith(180, 150, 16, 0, Math.PI * 2);
+  expect(context.stroke).toHaveBeenCalledOnce();
+  expect(context.fill).toHaveBeenCalledOnce();
+  expect(context.globalAlpha).toBe(0.5);
+});
+
 it('draws an admitted keystroke label without a captured point', () => {
   const context = createContext();
   context.measureText = vi.fn(() => ({ width: 80 }) as TextMetrics);

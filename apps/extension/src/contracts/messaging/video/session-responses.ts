@@ -1,3 +1,4 @@
+import type { RecordingClockTiming } from '../../video/recording-frame-clock';
 import type {
   RuntimeAckResponse,
   RuntimeMessageResponse,
@@ -42,6 +43,9 @@ export type RuntimeVideoSessionResponseByType = {
   [VideoMessageType.RESUME_RECORDING]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;
   [VideoMessageType.UPDATE_SETTINGS]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;
   [VideoMessageType.GET_RECORDING_STATE]: RecordingStateResponse;
+  [VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING]: RuntimeMessageResponse<{
+    clockTiming: RecordingClockTiming | null;
+  }>;
   [VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT]: RuntimeMessageResponse<{
     result?: 'acknowledged' | 'stale';
   }>;

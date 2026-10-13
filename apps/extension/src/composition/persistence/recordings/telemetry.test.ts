@@ -194,7 +194,7 @@ it('roundtrips recording-image points, unavailable geometry and raw client point
   ).rejects.toThrow('Invalid recording telemetry entry.');
 });
 
-it('applies the same noise policy on publication and read without mutating stored input', async () => {
+it('preserves every raw typing interval on publication and read without mutating stored input', async () => {
   const db = createDb();
   initDbMock.mockResolvedValue(db);
   const entry: RecordingTelemetryEntry = {
@@ -215,7 +215,7 @@ it('applies the same noise policy on publication and read without mutating store
   const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
   await saveRecordingTelemetry(entry);
   const read = await getRecordingTelemetry('noise');
-  expect(read?.signals).toEqual([{ ...entry.signals[0]!, endTime: 3 }]);
+  expect(read?.signals).toEqual(entry.signals);
   expect(db.put).toHaveBeenCalledWith('recording_telemetry', read);
   expect(entry.signals).toHaveLength(3);
   expect(entry.signals[0]!.endTime).toBe(1);

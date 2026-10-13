@@ -84,3 +84,20 @@ it('requires rendered video for enabled advanced captions, but preserves basic c
   advanced.ui.mode = 'basic';
   expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy' });
 });
+
+it.each(['KEY_HOLD', 'KEY_MODIFIERS'])(
+  'keeps %s command captions eligible after semantic projection',
+  (eventType) => {
+    const marker = {
+      ref: { kind: 'action' as const, id: 'command' },
+      eventType,
+      target: 'Ctrl+Shift',
+      start: 1,
+      end: 2,
+    };
+    const settings = patchReviewKeys([], ['command'], { enabled: true, before: 0, after: 0.5 });
+    expect(scheduleReviewKeys([marker], settings, buildReviewTimeMap(4, []))).toMatchObject([
+      { label: 'Ctrl+Shift', start: 1, end: 1.5 },
+    ]);
+  }
+);

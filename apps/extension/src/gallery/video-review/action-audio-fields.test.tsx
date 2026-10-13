@@ -3,7 +3,11 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewActionAudioFields } from './action-audio-fields';
-import type { ReviewActionAudioTarget } from '../../features/video/review/advanced/action-audio';
+import {
+  REVIEW_ACTION_AUDIO_DEFAULT,
+  type ReviewActionAudioTarget,
+} from '../../features/video/review/advanced/action-audio';
+import { translate } from '../../platform/i18n';
 
 vi.mock('../../ui/compact-inspector-controls', () => ({
   SelectField: (p: {
@@ -86,6 +90,93 @@ it('scopes family selectors to typed targets and patches only the edited common 
     const reset = host.querySelector('[data-ui="gallery.videoReview.actionAudioReset"]')!;
     act(() => reset.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(onChange).toHaveBeenLastCalledWith(targets, null);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+it('paired phases and recorded repeats target their own families and stop audition on selection change', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const mouse: ReviewActionAudioTarget = { ref: { kind: 'action', id: 'mouse' }, family: 'mouse' };
+  const typing: ReviewActionAudioTarget = {
+    ref: { kind: 'signal', id: 'typing' },
+    family: 'typing',
+    recorded: true,
+  };
+  const targets = [mouse, typing],
+    onChange = vi.fn(),
+    stop = vi.fn(),
+    audition = vi.fn();
+  const settings = [
+    {
+      ...REVIEW_ACTION_AUDIO_DEFAULT,
+      ref: mouse.ref,
+      enabled: true,
+      presetId: 'mouse-classic-paired-v2' as const,
+    },
+    {
+      ...REVIEW_ACTION_AUDIO_DEFAULT,
+      ref: typing.ref,
+      enabled: true,
+      presetId: 'typing-recorded-v2' as const,
+    },
+  ];
+  const clickLabel = (label: Parameters<typeof translate>[0]) =>
+    act(() =>
+      [...host.querySelectorAll('button')]
+        .find((button) => button.textContent?.startsWith(translate(label)))!
+        .click()
+    );
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionAudioFields
+          targets={targets}
+          settings={settings}
+          busy={false}
+          onChange={onChange}
+          onAudition={audition}
+          onStopAudition={stop}
+        />
+      )
+    );
+    clickLabel('gallery.videoReview.actionAudioDown');
+    expect(onChange).toHaveBeenLastCalledWith([mouse], { downEnabled: false });
+    clickLabel('gallery.videoReview.actionAudioUp');
+    expect(onChange).toHaveBeenLastCalledWith([mouse], { upEnabled: false });
+    clickLabel('gallery.videoReview.actionAudioRepeats');
+    expect(onChange).toHaveBeenLastCalledWith([typing], { includeRepeats: true });
+    for (const [label, field] of [
+      ['gallery.videoReview.actionAudioDownGain', 'downGain'],
+      ['gallery.videoReview.actionAudioUpGain', 'upGain'],
+    ] as const) {
+      const input = host.querySelector<HTMLInputElement>(
+        `input[aria-label="${translate(label!)}"]`
+      )!;
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+          input,
+          '25'
+        );
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(onChange).toHaveBeenLastCalledWith([mouse], { [field!]: 0.25 });
+    }
+    act(() =>
+      root.render(
+        <ReviewActionAudioFields
+          targets={[]}
+          settings={settings}
+          busy={false}
+          onChange={onChange}
+          onStopAudition={stop}
+        />
+      )
+    );
+    expect(stop).toHaveBeenCalledOnce();
+    expect(host.textContent).toBe('');
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

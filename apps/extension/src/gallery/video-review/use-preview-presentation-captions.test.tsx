@@ -10,6 +10,10 @@ import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/
 import { createCanvasComment } from '../../features/video/review/comments';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import {
+  installDiagnosticLogObserver,
+  type DiagnosticLogEvent,
+} from '@sniptale/platform/observability/logger';
 
 const io = vi.hoisted(() => ({
   factory: vi.fn(),
@@ -259,4 +263,34 @@ it('keeps non-transient source construction failures visible rather than treatin
   expect(result.status.phase).toBe('failed');
   expect(props.video.current!.requestVideoFrameCallback).not.toHaveBeenCalled();
   expect(io.bytes).not.toHaveBeenCalled();
+});
+
+it('writes one content-free caption-scene failure summary per failed preview attempt', async () => {
+  const events: DiagnosticLogEvent[] = [];
+  const stop = installDiagnosticLogObserver((event) => events.push(event));
+  vi.stubGlobal('__SNIPTALE_RELEASE_BUILD__', true);
+  try {
+    io.render.mockRejectedValueOnce(
+      new Error('private-frame.webm https://private.example user text')
+    );
+    props.scene.captions = {
+      document: { version: 1, fragments: [] },
+      settings: { ...createReviewCaptionSettings(), enabled: true },
+      segments: buildReviewTimeMap(3, []),
+    };
+    await render();
+    await step(0);
+    expect(result.status.phase).toBe('failed');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.message).toBe(
+      'preview outcome=failed route=render destination=preview stage=compose code=compose-failed'
+    );
+    await step(50);
+    expect(events).toHaveLength(1);
+    act(() => result.retry());
+    await step(100);
+    expect(result.status.phase).toBe('ready');
+  } finally {
+    stop();
+  }
 });

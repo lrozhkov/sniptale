@@ -4,7 +4,9 @@ import type { ReviewTimeSegment } from './timeline';
 import type { ReviewKeyAnimation, ReviewKeyStyle } from './advanced/key-animation';
 
 export function isReviewKey(marker: ReviewTelemetryMarker): boolean {
-  return marker.ref.kind === 'action' && marker.eventType === 'KEY';
+  return (
+    marker.ref.kind === 'action' && ['KEY', 'KEY_HOLD', 'KEY_MODIFIERS'].includes(marker.eventType)
+  );
 }
 export interface ReviewKeyCue {
   label: string;

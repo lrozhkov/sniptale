@@ -10,6 +10,10 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { LoadedReview } from './use-session';
 import { prepareReviewExporter, useReviewExport } from './use-export';
+import {
+  installDiagnosticLogObserver,
+  type DiagnosticLogEvent,
+} from '@sniptale/platform/observability/logger';
 const mocks = vi.hoisted(() => ({ index: vi.fn(), export: vi.fn(), download: vi.fn() }));
 vi.mock('../../workflows/video-review/media-index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/media-index')>()),
@@ -138,7 +142,7 @@ it('serializes the export button, honors cancellation, and leaves no false succe
     act(() => fixture.hook.cancel());
     expect(mocks.export.mock.calls[0]![0].signal.aborted).toBe(true);
     await act(async () => {
-      reject(new Error('aborted'));
+      reject(new DOMException('aborted', 'AbortError'));
       await pending;
     });
     expect(fixture.hook.failed).toBe(false);
@@ -455,7 +459,7 @@ it('binds time estimates to the current attempt and clears them on cancel and pu
     act(() => first.onTimeEstimate({ remainingMs: 99_000 }));
     expect(fixture.hook.timeEstimate).toBeNull();
     await act(async () => {
-      reject(new Error('aborted'));
+      reject(new DOMException('aborted', 'AbortError'));
       await pending;
     });
     await act(async () => {
@@ -548,6 +552,74 @@ it('reports direct downloads and ignores cleanup errors from an older completed 
     expect(fixture.hook.failed).toBe(false);
     expect(fixture.hook.completion).not.toBeNull();
   } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('retains an unexpected diagnosis after unmount while keeping typed cancellation quiet', async () => {
+  const fixture = setup();
+  const previousExport = mocks.export.getMockImplementation();
+  const events: DiagnosticLogEvent[] = [];
+  const stop = installDiagnosticLogObserver((event) => events.push(event));
+  let reject!: (error: Error) => void;
+  mocks.export.mockImplementation(
+    () =>
+      new Promise((_, failure) => {
+        reject = failure;
+      })
+  );
+  let disposed = false;
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = fixture.hook.start();
+    });
+    act(() => fixture.hook.cancel());
+    await act(async () => {
+      reject(new DOMException('aborted', 'AbortError'));
+      await pending;
+    });
+    expect(events).toEqual([]);
+    await act(async () => {
+      pending = fixture.hook.start();
+    });
+    await fixture.cleanup();
+    disposed = true;
+    vi.stubGlobal('__SNIPTALE_RELEASE_BUILD__', true);
+    reject(new Error('private-file.webm https://private.example user text'));
+    await pending;
+    expect(events).toHaveLength(1);
+    expect(events[0]?.message).toBe(
+      'export outcome=failed route=undetermined destination=gallery stage=prepare code=prepare-failed'
+    );
+  } finally {
+    stop();
+    mocks.export.mockImplementation(previousExport ?? (() => undefined));
+    if (!disposed) await fixture.cleanup();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('handles a direct source download refusal through its own diagnostic and UI outcome', async () => {
+  const fixture = setup();
+  const events: DiagnosticLogEvent[] = [];
+  const stop = installDiagnosticLogObserver((event) => events.push(event));
+  vi.stubGlobal('__SNIPTALE_RELEASE_BUILD__', true);
+  mocks.download.mockImplementationOnce(() => {
+    throw new Error('private source filename');
+  });
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () => fixture.hook.download());
+    expect(fixture.hook.failed).toBe(true);
+    expect(fixture.hook.completion).toBeNull();
+    expect(mocks.export).not.toHaveBeenCalled();
+    expect(events[0]?.message).toBe(
+      'export outcome=failed route=copy destination=download stage=prepare code=prepare-failed'
+    );
+  } finally {
+    stop();
     await fixture.cleanup();
   }
 });

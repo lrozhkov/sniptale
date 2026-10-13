@@ -1,3 +1,4 @@
+import { authoredCursorFocusPath } from '../../features/video/project/cursor-focus-path/authoring';
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -164,6 +165,13 @@ function reviewContentCommands(
   stage: (mutation: ContentMutation, typing?: ReviewTextTypingTarget) => void
 ) {
   return {
+    setCursorFocusPath: (cursorFocusPath: QuickEditAdvancedContent['cursorFocusPath']) =>
+      stage((content) => {
+        const { cursorFocusPath: _previous, ...rest } = content;
+        return cursorFocusPath
+          ? { ...rest, cursorFocusPath: authoredCursorFocusPath(cursorFocusPath) }
+          : rest;
+      }),
     setAnnotationEffects: (
       update: (
         lane: QuickEditAdvancedContent['annotationEffects']

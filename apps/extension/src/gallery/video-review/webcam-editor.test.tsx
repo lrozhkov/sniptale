@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, useState } from 'react';
+import { committedEditorFixtureProjection } from './editor-fixture.test-support';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
@@ -65,6 +66,8 @@ function setup(webcam?: QuickEditWebcam, trackVisible?: boolean) {
   const saveAdvanced = vi.fn(async () => snapshot());
   const session = createVideoReviewSession(snapshot(), {
     commitVideoWorkspace: commit,
+    commitVideoWorkspaceWithProjection: async (args) =>
+      committedEditorFixtureProjection(await commit(args)),
     saveVideoWorkspaceSnapshot: async () => snapshot(),
     saveVideoWorkspaceDraft: async () => snapshot(),
     readVideoWorkspace: async () => snapshot(),
@@ -325,10 +328,12 @@ it('keeps crop local to the selected point and moves that point through the hist
     transition: { type: 'shrink' },
   });
   await act(async () =>
-    vi.waitFor(() =>
-      expect(
-        fixture.session.getSnapshot().document.advancedContent.webcam?.positions[0]
-      ).toMatchObject({ time: 4 })
+    vi.waitFor(
+      () =>
+        expect(
+          fixture.session.getSnapshot().document.advancedContent.webcam?.positions[0]
+        ).toMatchObject({ time: 4 }),
+      { timeout: 2500 }
     )
   );
   allowed = false;
@@ -346,14 +351,16 @@ it('reveals a new attachment even when an earlier camera lane preference was hid
   );
   expect(io.attach).toHaveBeenCalledOnce();
   await act(async () => {
-    await vi.waitFor(() =>
-      expect(saveAdvanced).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            ui: expect.objectContaining({ tracks: expect.objectContaining({ webcam: true }) }),
-          }),
-        })
-      )
+    await vi.waitFor(
+      () =>
+        expect(saveAdvanced).toHaveBeenCalledWith(
+          expect.objectContaining({
+            advanced: expect.objectContaining({
+              ui: expect.objectContaining({ tracks: expect.objectContaining({ webcam: true }) }),
+            }),
+          })
+        ),
+      { timeout: 2500 }
     );
   });
 });

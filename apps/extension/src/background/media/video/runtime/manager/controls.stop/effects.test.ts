@@ -213,7 +213,7 @@ it('persists merged controlled cursor telemetry when the dedicated cursor path i
     createdAt: 1234,
     cursorTrack: {
       captureMode: 'embedded-fallback',
-      samples: [{ id: 'sample-1', time: 0.2, visible: true, x: 10, y: 20 }],
+      samples: [{ id: 'sample-1', recordingPoint: null, time: 0.2, visible: true, x: 10, y: 20 }],
       skin: { color: '#fff', hidden: true, scale: 1, shadow: true },
     },
     displaySurface: 'window',
@@ -225,6 +225,7 @@ it('persists merged controlled cursor telemetry when the dedicated cursor path i
         id: 'signal-1',
         kind: 'cursor-idle',
         point: null,
+        recordingPoint: null,
         startTime: 0,
       },
     ],

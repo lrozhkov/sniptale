@@ -1,3 +1,5 @@
+import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
+import { applyRecordingReviewInteractions } from '../../../features/video/review/standalone-interactions';
 import {
   createEmptyVideoProject,
   createVideoProjectFromRecording,
@@ -39,7 +41,7 @@ async function buildRecordingProject(
     viewport: telemetry?.viewport ?? null,
   };
 
-  return createVideoProjectFromRecording({
+  const project = createVideoProjectFromRecording({
     recordingId: sourceRecordingId,
     filename: entry.filename,
     width: metadata.width,
@@ -51,6 +53,7 @@ async function buildRecordingProject(
     audioPeaks: metadata.audioPeaks,
     asset,
     sidecarVideos,
+    ...(telemetry ? { recordingSignals: telemetry.signals } : {}),
     ...(telemetry?.actionEvents === undefined
       ? {}
       : {
@@ -68,6 +71,19 @@ async function buildRecordingProject(
           ),
         }),
   });
+  const snapshot = await readVideoWorkspace(`recording:${sourceRecordingId}`);
+  if (!snapshot) return project;
+  const { source, sourceAssetId } = snapshot.workspace;
+  if (
+    sourceAssetId !== entry.assetId ||
+    source.size !== entry.size ||
+    source.mimeType !== metadata.mimeType ||
+    source.width !== metadata.width ||
+    source.height !== metadata.height ||
+    Math.abs(source.duration - metadata.duration) > 0.001
+  )
+    throw new Error('Review interaction source has changed.');
+  return applyRecordingReviewInteractions(project, sourceRecordingId, snapshot.workspace.advanced);
 }
 
 function buildWebcamSidecarVideo(

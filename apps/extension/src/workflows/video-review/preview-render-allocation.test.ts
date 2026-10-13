@@ -4,6 +4,7 @@ import { createCanvasComment } from '../../features/video/review/comments';
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { expect, it, vi } from 'vitest';
 import {
   calculatePreviewRenderAllocation,
@@ -48,6 +49,55 @@ function phase(plan: ReturnType<typeof calculatePreviewRenderAllocation>, name: 
   if (!found) throw new Error(`Missing phase ${name}`);
   return found;
 }
+
+it('keeps joined native storage live through lens, spotlight and border with exact resource refusal', () => {
+  const graph = input();
+  graph.assets.headerBitmap = { width: 20, height: 4 };
+  graph.scene.windowRaster = { width: 20, height: 24 };
+  graph.scene.clickLens = true;
+  graph.scene.border = size;
+  const plan = calculatePreviewRenderAllocation(graph);
+  for (const name of [
+    'spotlight-coverage',
+    'spotlight-composite',
+    'border',
+    'click-lens',
+    'comment-gradient',
+  ])
+    expect(phase(plan, name).allocations).toContainEqual({
+      role: 'decorated-window',
+      bytes: 20 * 24 * 4,
+      canvases: 1,
+    });
+  expect(phase(plan, 'border').bytes).toBe(1200 + 320 + 1920 + 800);
+  const resources = createPreviewRenderResources({
+    ...plan,
+    createCanvas: () => {
+      const canvas = document.createElement('canvas');
+      vi.spyOn(canvas, 'getContext').mockReturnValue({
+        clearRect: vi.fn(),
+      } as unknown as CanvasRenderingContext2D);
+      return canvas;
+    },
+  });
+  const header = resources.bytes('header-bitmap', 320);
+  const leases = ['front', 'staging', 'source'].map((role) => resources.canvas(role, size));
+  const joined = resources.canvas('decorated-window', graph.scene.windowRaster);
+  const borders = ['border-layer', 'border-mask'].map((role) => resources.canvas(role, size));
+  expect(resources.counters.managedBytes).toBe(plan.maximumManagedBytes);
+  expect(() => resources.bytes('overflow', 1)).toThrow();
+  expect(() =>
+    resources.replaceLimits({
+      maximumManagedBytes: plan.maximumManagedBytes - 1,
+      maximumCanvases: plan.maximumCanvases,
+    })
+  ).toThrow();
+  expect(resources.counters.managedBytes).toBe(plan.maximumManagedBytes);
+  for (const lease of [...leases, joined, ...borders]) lease.release();
+  header.release();
+  resources.dispose();
+  expect(resources.counters.managedBytes).toBe(0);
+});
 
 it('counts exactly front, staging and frozen source without an arbitrary reserve', () => {
   const plan = calculatePreviewRenderAllocation(input());
@@ -110,9 +160,15 @@ it('distinguishes video-frame storage from canvases and counts camera retained/a
 
 it.each([false, true])('uses actual odd spatial levels with half-float=%s', (halfFloat) => {
   const graph = input();
-  graph.scene.spatial = { backing: { width: 5, height: 3 }, halfFloat };
+  graph.scene.spatial = {
+    output: { width: 5, height: 3 },
+    plane: { width: 9, height: 7 },
+    halfFloat,
+  };
   const plan = calculatePreviewRenderAllocation(graph);
-  expect(plan.maximumManagedBytes).toBe(1200 + 4 * 60 + 232 + 60 + 13 * (halfFloat ? 8 : 4));
+  expect(plan.maximumManagedBytes).toBe(
+    1200 + 4 * 63 + 3 * 60 + 196 + 4 * 63 + 32 * (halfFloat ? 8 : 4)
+  );
   expect(plan.maximumCanvases).toBe(6);
 });
 
@@ -365,6 +421,39 @@ it('maps real header geometry and separate transition source backing', () => {
   ]);
 });
 
+it('maps source-density joined raster and explicit lens phase only while magnification is active', () => {
+  const runtime = runtimeInput();
+  runtime.scene.windowHeader = DEFAULT_WINDOW_HEADER;
+  runtime.assets.headerBitmap = { width: 1920, height: 106 };
+  runtime.scene.clicks = [
+    {
+      settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify' },
+      point: { x: 0.5, y: 0.025 },
+      anchor: 1,
+      start: 0,
+      end: 2,
+    },
+  ];
+  const graph = resolvePreviewRenderAllocation(runtime);
+  expect(graph.scene.windowRaster?.width).toBe(1920);
+  expect(graph.scene.clickLens).toBe(true);
+  expect(phase(calculatePreviewRenderAllocation(graph), 'click-lens').allocations).toContainEqual({
+    role: 'decorated-window',
+    bytes: 1920 * graph.scene.windowRaster!.height * 4,
+    canvases: 1,
+  });
+  runtime.resultTime = 0;
+  const identity = resolvePreviewRenderAllocation(runtime);
+  expect(identity.scene.clickLens).toBe(false);
+  expect(identity.scene.windowRaster?.width).toBeLessThan(1920);
+  expect(
+    calculatePreviewRenderAllocation(identity).phases.some((value) => value.name === 'click-lens')
+  ).toBe(false);
+  runtime.assets.headerBitmap = null;
+  runtime.resultTime = 1;
+  expect(resolvePreviewRenderAllocation(runtime).scene.windowRaster).toBeNull();
+});
+
 it('keeps session spatial storage budget outside the current active region and reports unknown format bound', () => {
   const runtime = runtimeInput();
   runtime.scene.zoomRegions = [
@@ -375,7 +464,11 @@ it('keeps session spatial storage budget outside the current active region and r
   ];
   runtime.resultTime = 10;
   const pending = resolvePreviewRenderAllocation(runtime);
-  expect(pending.scene.spatial).toEqual({ backing: runtime.dimensions.backing, halfFloat: true });
+  expect(pending.scene.spatial).toEqual({
+    output: runtime.dimensions.backing,
+    plane: { x: 0, y: 0, ...runtime.dimensions.backing },
+    halfFloat: true,
+  });
   expect(pending.upperBounds.spatialFormatPending).toBe(true);
   runtime.spatialHalfFloat = false;
   expect(resolvePreviewRenderAllocation(runtime).scene.spatial?.halfFloat).toBe(false);

@@ -36,3 +36,45 @@ it('requires an explicit acknowledgement for recording activation', () => {
   expect(contract.parseResponse({ success: true })).toEqual({ success: true });
   expect(() => contract.parseResponse({})).toThrow(/OFFSCREEN_BEGIN_RECORDING/);
 });
+
+it('normalizes malformed advisory BEGIN lease without rejecting strict primary admission', async () => {
+  const { RECORDING_FRAME_CLOCK_PURPOSE } =
+    await import('../../../../../video/recording-frame-clock');
+  const contract =
+    runtimeVideoOffscreenViewportMessageContracts[VideoMessageType.OFFSCREEN_BEGIN_RECORDING];
+  const primary = {
+    type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+    capabilityToken: 'capability',
+    recordingId: 'recording',
+    generation: 2,
+    streamInstanceId: 'source',
+  } as const;
+  const lease = {
+    recordingId: 'recording',
+    generation: 2,
+    streamInstanceId: 'source',
+    purpose: RECORDING_FRAME_CLOCK_PURPOSE,
+    nonce: 'ba289176-c099-44d5-8f18-174e05565080',
+    expiresAtEpochMs: 1,
+  };
+  expect(contract.parseRequest({ ...primary, frameClockLease: lease }).frameClockLease).toEqual(
+    lease
+  );
+  for (const frameClockLease of [
+    {},
+    null,
+    { ...lease, purpose: 'other' },
+    { ...lease, generation: 3 },
+  ]) {
+    expect(contract.parseRequest({ ...primary, frameClockLease })).toEqual({
+      ...primary,
+      frameClockLease: null,
+    });
+  }
+  expect(() =>
+    contract.parseRequest({ ...primary, capabilityToken: 42, frameClockLease: lease })
+  ).toThrow();
+  expect(() =>
+    contract.parseRequest({ ...primary, unexpected: true, frameClockLease: lease })
+  ).toThrow();
+});

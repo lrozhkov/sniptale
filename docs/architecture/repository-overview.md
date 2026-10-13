@@ -28,3 +28,5 @@ Sniptale is a TypeScript and React Manifest V3 Chromium extension built with Vit
 Use the [documentation index](../README.md) to find domain authorities.
 
 `apps/extension/src/tour-preview-sandbox` owns unprivileged exact-file tour preview.
+
+`apps/extension/src/recording-clock` owns the temporary trusted native-frame clock renderer and its port-only SharedWorker rendezvous. Background owns its inactive tab lifetime; offscreen retains all recording, raw frame, audio, encoder and persistence authority.

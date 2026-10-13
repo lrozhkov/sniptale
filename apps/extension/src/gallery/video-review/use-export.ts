@@ -27,6 +27,7 @@ import {
 import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
 import type { ReviewAnchor } from '../../features/video/review/types';
+import { createReviewExportDiagnostics } from '../../workflows/video-review/export-diagnostics';
 
 type ReviewExportBlocker = { context: string; reasons: readonly QuickEditExportReason[] };
 
@@ -180,21 +181,27 @@ function useReviewExportLifetime(
 }
 
 /** Pure full-sequence timing for the export inspector; fragment options do not change it. */
-function reviewPresentationDuration(
+function reviewPresentationMetadata(
   index: ReviewMediaIndex | null,
   advanced: Parameters<typeof resolveReviewOutputProfile>[1],
   edits: Parameters<typeof buildReviewTimeMap>[1],
   renderSettings: ReviewRenderSettings | undefined
 ) {
-  if (!index || !advanced.presentation || advanced.ui.mode !== 'advanced') return null;
+  const presentation = advanced.presentation;
+  const hasBookends =
+    advanced.ui.mode === 'advanced' &&
+    !!presentation &&
+    (presentation.intro.mode !== 'none' || presentation.outro.mode !== 'none');
+  if (!index || !presentation || advanced.ui.mode !== 'advanced')
+    return { hasBookends, duration: null };
   const result = planReviewPresentationSequence({
-    settings: advanced.presentation,
+    settings: presentation,
     mainDuration: buildReviewTimeMap(index.duration, edits).at(-1)?.resultEnd ?? 0,
     fragmentOffset: 0,
     includeBookends: true,
     rate: resolveReviewOutputProfile(index, advanced, renderSettings).rate,
   });
-  return result.ok ? result.plan : null;
+  return { hasBookends, duration: result.ok ? result.plan : null };
 }
 
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
@@ -202,16 +209,11 @@ export function useReviewExport(resource: LoadedReview) {
   const { sourceIndex, indexing } = useReviewSourceIndex(resource.file);
   const { document, snapshot } = resource.session.getSnapshot();
   const advanced = { ui: snapshot.workspace.advanced.ui, ...document.advancedContent };
-  const presentation = document.advancedContent.presentation;
-  const hasBookends =
-    advanced.ui.mode === 'advanced' &&
-    !!presentation &&
-    (presentation.intro.mode !== 'none' || presentation.outro.mode !== 'none');
   const { index, renderSettings, setRenderSettings, checkingCodecs } = useReviewExportSettings(
     sourceIndex,
     advanced
   );
-  const presentationDuration = reviewPresentationDuration(
+  const { hasBookends, duration: presentationDuration } = reviewPresentationMetadata(
     index,
     advanced,
     document.edits,
@@ -220,17 +222,15 @@ export function useReviewExport(resource: LoadedReview) {
   const { phase, progress, timeEstimate, changePhase, setProgress, setTimeEstimate } =
     useReviewExportProgress();
   const feedback = useReviewExportCompletion({ setProgress, setTimeEstimate });
-  const { completionGeneration, dismissCompletion } = feedback;
   const context = reviewExportContext(resource, renderSettings);
   const [blocked, setBlocked] = useState<ReviewExportBlocker | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const { active, publishing, mounted, cancel } = useReviewExportLifetime(
     resource.file,
     setResult,
-    dismissCompletion,
+    feedback.dismissCompletion,
     setTimeEstimate
   );
-  /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
     reviewExportPlan(resource, index, renderSettings, selection);
   const choices = reviewExportChoices(resource, index, renderSettings);
@@ -259,11 +259,13 @@ export function useReviewExport(resource: LoadedReview) {
     }
     setBlocked(null);
     const controller = new AbortController();
+    const diagnostics = createReviewExportDiagnostics({ destination, signal: controller.signal });
     active.current = controller;
     publishing.current = false;
     changePhase('exporting');
     try {
       const value = await exportReviewedVideo({
+        diagnostics,
         renderSettings,
         snapshot: resource.session.getSnapshot().snapshot,
         index,
@@ -286,8 +288,8 @@ export function useReviewExport(resource: LoadedReview) {
       else {
         if (destination === 'download')
           downloadGalleryBlob(value.file, value.receipt.filename, value.release, () => {
-            if (mounted.current && completionGeneration.current === generation) {
-              dismissCompletion();
+            if (mounted.current && feedback.completionGeneration.current === generation) {
+              feedback.dismissCompletion();
               feedback.setFailed(true);
             }
           });
@@ -298,6 +300,7 @@ export function useReviewExport(resource: LoadedReview) {
         );
       }
     } catch (error) {
+      diagnostics.reportFailure(error);
       if (error instanceof QuickEditExportUnavailable) {
         if (mounted.current && !controller.signal.aborted)
           setBlocked({ context: attemptContext, reasons: error.reasons });
@@ -323,7 +326,7 @@ export function useReviewExport(resource: LoadedReview) {
     setSizeEstimateVisible: sizeEstimate.setVisible,
     result,
     completion: feedback.completion,
-    dismissCompletion,
+    dismissCompletion: feedback.dismissCompletion,
     plan,
     sourceVideoAvailable: choices.sourceVideoAvailable,
     renderSettings,
@@ -345,6 +348,9 @@ export function useReviewExport(resource: LoadedReview) {
         setBlocked,
         render: () => start('download'),
         onCopy: () => feedback.showCompletion({ destination: 'download', mediaId: null }),
+        onFailure: () => {
+          if (mounted.current) feedback.setFailed(true);
+        },
       });
     },
   };
@@ -442,20 +448,27 @@ async function downloadReviewExport(args: {
   setBlocked(value: ReviewExportBlocker): void;
   render(): Promise<void>;
   onCopy(): void;
+  onFailure(): void;
 }) {
-  const { resource, renderSettings, plan } = args;
-  if (plan.kind === 'unavailable') {
-    args.setBlocked({
-      context: reviewExportContext(resource, renderSettings),
-      reasons: plan.reasons,
-    });
-    return;
+  const diagnostics = createReviewExportDiagnostics({ destination: 'download', route: 'copy' });
+  try {
+    const { resource, renderSettings, plan } = args;
+    if (plan.kind === 'unavailable') {
+      args.setBlocked({
+        context: reviewExportContext(resource, renderSettings),
+        reasons: plan.reasons,
+      });
+      return;
+    }
+    const state = resource.session.getSnapshot();
+    const applied =
+      plan.video === 'render' || plan.audio === 'process' || state.document.edits.length > 0;
+    if (!applied) {
+      downloadGalleryBlob(resource.file, resource.filename);
+      args.onCopy();
+    } else await args.render();
+  } catch (error) {
+    diagnostics.reportFailure(error);
+    args.onFailure();
   }
-  const state = resource.session.getSnapshot();
-  const applied =
-    plan.video === 'render' || plan.audio === 'process' || state.document.edits.length > 0;
-  if (!applied) {
-    downloadGalleryBlob(resource.file, resource.filename);
-    args.onCopy();
-  } else await args.render();
 }

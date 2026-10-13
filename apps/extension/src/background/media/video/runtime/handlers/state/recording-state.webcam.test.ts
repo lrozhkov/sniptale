@@ -84,6 +84,9 @@ it('stores actual webcam settings from current recording started events', async 
     )
   ).toEqual({ handled: true, keepChannelOpen: true });
   await flushAsyncRoute();
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' })
+  );
 
   expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('rec-1');
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({

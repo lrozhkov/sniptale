@@ -167,3 +167,12 @@ it('remembers the chosen section when returning to the same inspector family', (
   expect(host.querySelector('[data-section="timing"]')).not.toBeNull();
   expect(change).not.toHaveBeenCalled();
 });
+
+it('offers factual hold appearance without inapplicable pulse timing or pointer offset controls', () => {
+  act(() => root.render(<ReviewClickFields gesture values={[click]} onChange={vi.fn()} />));
+  expect(host.querySelector('[aria-label="gallery.videoReview.gestureAppearance"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.clickBefore"]')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.clickX"]')).toBeNull();
+  const choices = host.querySelector('[aria-label="gallery.videoReview.clickEffect"]');
+  expect(choices?.textContent).not.toContain('gallery.videoReview.click_magnify');
+});

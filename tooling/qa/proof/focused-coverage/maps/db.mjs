@@ -1,5 +1,29 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'shared-db-video-dependency-envelope',
+    productionFile: 'apps/extension/src/composition/persistence/media-library/dependencies.ts',
+    exclusive: true,
+    reason:
+      'Dependency admission/refusal is proved directly and through Scenario deletion, ' +
+      'Library cleanup/purge, private retention, source admission and backup.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/media-library/dependencies.test.ts',
+      'apps/extension/src/composition/persistence/scenario/video-asset-detachment.test.ts',
+      'apps/extension/src/composition/persistence/scenario/store/project-records/delete.test.ts',
+      'apps/extension/src/composition/persistence/library-lifecycle/cleanup-orphans.test.ts',
+      'apps/extension/src/composition/persistence/library-lifecycle/cleanup-transaction.test.ts',
+      'apps/extension/src/composition/persistence/library-lifecycle/cleanup-linked-recording.test.ts',
+      'apps/extension/src/composition/persistence/library-lifecycle/cleanup-races.test.ts',
+      'apps/extension/src/composition/persistence/assets/private-source-retention.test.ts',
+      'apps/extension/src/composition/persistence/projects/source-admission.test.ts',
+      'apps/extension/src/composition/persistence/projects/backup-restore.test.ts',
+      'apps/extension/src/composition/persistence/projects/backup-restore.review-assets.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.scenario.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-core-init-maintenance',
     productionFile: 'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.ts',
     reason:

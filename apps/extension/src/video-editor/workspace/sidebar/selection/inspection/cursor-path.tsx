@@ -1,0 +1,373 @@
+import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
+import {
+  projectCursorFocusTimelineKeys,
+  adjacentCursorFocusKey,
+} from '../../../../../features/video/project/cursor-focus-path/timeline';
+import { cursorFocusKeyControls } from '../../../../../features/video/project/cursor-focus-path/evaluator';
+import {
+  useVideoEditorTimelineEditingPort,
+  useVideoEditorPlaybackPort,
+  useVideoEditorClipSelectionPort,
+} from '../../../../runtime/controller/store';
+import {
+  resolveProjectCursorFocusPath,
+  resolveProjectCursorFocus,
+  addProjectCursorFocusKey,
+} from '../../../../../features/video/project/cursor-focus-path/projection';
+import {
+  updateCursorFocusKey,
+  cursorFocusOverrideId,
+  deleteCursorFocusKey,
+  authoredCursorFocusPath,
+} from '../../../../../features/video/project/cursor-focus-path/authoring';
+import type { CursorFocusPath } from '../../../../../features/video/project/cursor-focus-path/types';
+import type { VideoProject } from '../../../../../features/video/project/types';
+import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
+import { translate, formatNumber } from '../../../../../platform/i18n';
+import { NumberInput } from '../inputs/number';
+import { SelectInput } from '../shared/controls';
+import { InspectorActionButton } from '../shared/actions';
+import { InspectorDetails } from '../shared/details';
+import { SlidersHorizontal } from 'lucide-react';
+
+/** Authoring edits use the existing project mutation/history authority. */
+interface CursorInspectorProps {
+  project: VideoProject;
+  sampleId: string;
+  time: number;
+}
+
+function useCursorInspector(props: CursorInspectorProps) {
+  const selectCursorSegment = useVideoEditorClipSelectionPort((port) => port.selectCursorSegment);
+  const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
+  const setCurrentTime = useVideoEditorPlaybackPort((port) => port.setCurrentTime);
+  const keys = projectCursorFocusTimelineKeys(props.project);
+  const selectKey = (id: string) => {
+    const item = keys
+      .filter((key) => key.id === id)
+      .toSorted((a, b) => Math.abs(a.time - props.time) - Math.abs(b.time - props.time))[0];
+    if (item) {
+      selectCursorSegment(id);
+      setCurrentTime(item.time);
+    }
+  };
+  const path = resolveProjectCursorFocusPath(props.project, props.sampleId);
+  const segment = path.segments.find((item) => item.keys.some((key) => key.id === props.sampleId));
+  const key = segment?.keys.find((item) => item.id === props.sampleId);
+  const locked = getVideoProjectUtilityLanes(props.project).actions.locked;
+  const change = (next: CursorFocusPath | undefined) => {
+    let applied = false;
+    updateProject((project) => {
+      if (getVideoProjectUtilityLanes(project).actions.locked) return project;
+      applied = true;
+      const { cursorFocusPath: _previous, ...rest } = project;
+      return applyVideoProjectMutationPatch(
+        rest,
+        next
+          ? {
+              cursorFocusPath: authoredCursorFocusPath(next),
+              ...(next.mode !== path.mode
+                ? {
+                    motionRegions:
+                      project.motionRegions?.map((region) => ({
+                        ...region,
+                        focusMode:
+                          next.mode === 'follow' ? ('CURSOR' as const) : ('MANUAL' as const),
+                      })) ?? [],
+                  }
+                : {}),
+            }
+          : {}
+      );
+    });
+    return applied;
+  };
+  const patch = (value: Parameters<typeof updateCursorFocusKey>[2]) => {
+    if (!key) return;
+    const next = updateCursorFocusKey(path, key.id, value);
+    if (!change(next)) return;
+    const override = next.segments
+      .flatMap((item) => item.keys)
+      .find((item) => item.id === cursorFocusOverrideId(key.id));
+    if (override && (value.time !== undefined || value.x !== undefined || value.y !== undefined)) {
+      selectCursorSegment(override.id);
+      const occurrence = projectCursorFocusTimelineKeys({
+        ...props.project,
+        cursorFocusPath: authoredCursorFocusPath(next),
+      }).find((item) => item.id === override.id);
+      if (occurrence) setCurrentTime(occurrence.time);
+    }
+  };
+  const controls =
+    key && segment
+      ? cursorFocusKeyControls(segment, key.id, path.smoothing)
+      : { incoming: undefined, outgoing: undefined };
+  const editable = key !== undefined && !locked;
+  return {
+    keys,
+    selectKey,
+    path,
+    segment,
+    key,
+    change,
+    patch,
+    controls,
+    editable,
+    locked,
+    selectCursorSegment,
+  };
+}
+
+export function InspectCursorPath(props: CursorInspectorProps) {
+  const state = useCursorInspector(props);
+  const { path, selectKey } = state;
+  return (
+    <div
+      className="space-y-3"
+      data-ui="cursorFocusPath.inspector"
+      title={
+        props.project.cursorTrack?.captureMode === 'embedded-fallback'
+          ? translate('videoEditor.sidebar.cursorFocusEmbedded')
+          : undefined
+      }
+    >
+      <SelectInput
+        label={translate('videoEditor.sidebar.cursorFocusKey')}
+        value={props.sampleId}
+        options={path.segments
+          .flatMap((item) => item.keys)
+
+          .map((item) => {
+            const kind = translate(
+              item.anchor === 'manual'
+                ? 'videoEditor.sidebar.cursorFocusManualKey'
+                : 'videoEditor.sidebar.cursorFocusRecordedKey'
+            );
+            return {
+              value: item.id,
+              label: `${kind} · ${formatNumber(item.time, { maximumFractionDigits: 2 })}`,
+            };
+          })}
+        onChange={selectKey}
+      />
+      {resolveProjectCursorFocus(props.project, props.time, path)?.constrained ? (
+        <span role="status" className="block text-xs">
+          {translate('videoEditor.sidebar.cursorFocusConstrained')}
+        </span>
+      ) : null}
+      <CursorInspectorGeometry state={state} />
+      <CursorInspectorActions state={state} props={props} />
+    </div>
+  );
+}
+
+/** Global follow policy is edited from Scene rather than an individual source point. */
+export function InspectCursorPathSettings({ project }: { project: VideoProject }) {
+  const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
+  const path = resolveProjectCursorFocusPath(project);
+  const locked = getVideoProjectUtilityLanes(project).actions.locked;
+  const change = (next: CursorFocusPath | undefined) =>
+    updateProject((current) => {
+      if (getVideoProjectUtilityLanes(current).actions.locked) return current;
+      const { cursorFocusPath: _previous, ...rest } = current;
+      return applyVideoProjectMutationPatch(
+        rest,
+        next
+          ? {
+              cursorFocusPath: authoredCursorFocusPath(next),
+              ...(next.mode !== path.mode
+                ? {
+                    motionRegions:
+                      current.motionRegions?.map((region) => ({
+                        ...region,
+                        focusMode:
+                          next.mode === 'follow' ? ('CURSOR' as const) : ('MANUAL' as const),
+                      })) ?? [],
+                  }
+                : {}),
+            }
+          : {}
+      );
+    });
+  return (
+    <fieldset
+      disabled={locked}
+      className="m-0 min-w-0 border-0 p-0"
+      data-ui="cursorFocusPath.settings"
+    >
+      <SelectInput
+        label={translate('videoEditor.sidebar.cursorFocusMode')}
+        value={path.mode}
+        options={[
+          { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
+          { value: 'follow', label: translate('videoEditor.sidebar.cursorFocusFollow') },
+        ]}
+        onChange={(mode) => change({ ...path, mode })}
+      />
+      <InspectorDetails
+        preferenceId="cursor-path-policy"
+        icon={SlidersHorizontal}
+        label={translate('videoEditor.sidebar.framingFineTune')}
+      >
+        <NumberInput
+          label={translate('videoEditor.sidebar.cursorFocusSmoothing')}
+          value={path.smoothing}
+          min={0}
+          max={1}
+          step={0.01}
+          scrub={false}
+          onChange={(smoothing) => change({ ...path, smoothing })}
+        />
+        <NumberInput
+          label={translate('videoEditor.sidebar.cursorFocusSensitivity')}
+          value={path.sensitivity}
+          min={0}
+          max={1}
+          step={0.01}
+          scrub={false}
+          onChange={(sensitivity) => change({ ...path, sensitivity })}
+        />
+      </InspectorDetails>
+      <InspectorActionButton compact onClick={() => change(undefined)}>
+        {translate('videoEditor.sidebar.cursorFocusReset')}
+      </InspectorActionButton>
+    </fieldset>
+  );
+}
+
+type CursorInspectorState = ReturnType<typeof useCursorInspector>;
+function CursorInspectorGeometry({ state }: { state: CursorInspectorState }) {
+  const { key, segment, editable, patch, controls } = state;
+  return key && segment ? (
+    <>
+      <NumberInput
+        label={translate('videoEditor.sidebar.actionTimePrefix')}
+        value={key.time}
+        min={segment.start}
+        max={segment.end}
+        step={0.01}
+        scrub={false}
+        disabled={!editable}
+        onChange={(time) => patch({ time })}
+      />
+      <NumberInput
+        label="X"
+        value={key.x}
+        min={0}
+        max={1}
+        step={0.01}
+        scrub={false}
+        disabled={!editable}
+        onChange={(x) => patch({ x })}
+      />
+      <NumberInput
+        label="Y"
+        value={key.y}
+        min={0}
+        max={1}
+        step={0.01}
+        scrub={false}
+        disabled={!editable}
+        onChange={(y) => patch({ y })}
+      />
+      <SelectInput
+        label={translate('videoEditor.sidebar.cursorFocusCurve')}
+        value={key.interpolation}
+        options={[
+          { value: 'linear', label: translate('videoEditor.sidebar.cursorFocusLinear') },
+          { value: 'smooth', label: translate('videoEditor.sidebar.cursorFocusSmooth') },
+          { value: 'hold', label: translate('videoEditor.sidebar.cursorFocusHold') },
+        ]}
+        onChange={(interpolation) => patch({ interpolation })}
+        disabled={!editable}
+      />
+      <InspectorDetails
+        preferenceId="cursor-focus-handles"
+        icon={SlidersHorizontal}
+        label={translate('videoEditor.sidebar.cursorFocusHandles')}
+      >
+        {(['incoming', 'outgoing'] as const).map((handle) => (
+          <div key={handle} className="space-y-2">
+            {(['x', 'y'] as const).map((axis) => (
+              <NumberInput
+                key={axis}
+                label={[
+                  translate(
+                    handle === 'incoming'
+                      ? 'videoEditor.sidebar.cursorFocusIncoming'
+                      : 'videoEditor.sidebar.cursorFocusOutgoing'
+                  ),
+                  axis.toUpperCase(),
+                ].join(' ')}
+                value={controls[handle]?.[axis] ?? key[axis]}
+                min={-4}
+                max={5}
+                step={0.01}
+                scrub={false}
+                disabled={!editable}
+                onChange={(value) =>
+                  patch({
+                    [handle]: {
+                      ...(controls[handle] ?? { x: key.x, y: key.y }),
+                      [axis]: value,
+                    },
+                  })
+                }
+              />
+            ))}
+          </div>
+        ))}
+      </InspectorDetails>
+    </>
+  ) : (
+    <span className="text-xs">{translate('videoEditor.sidebar.cursorFocusUnavailable')}</span>
+  );
+}
+function CursorInspectorActions({
+  state,
+  props,
+}: {
+  state: CursorInspectorState;
+  props: CursorInspectorProps;
+}) {
+  const { keys, key, selectKey, change, selectCursorSegment, path, locked } = state;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {([-1, 1] as const).map((direction) => {
+        const next = adjacentCursorFocusKey(keys, props.sampleId, props.time, direction);
+        return (
+          <InspectorActionButton
+            key={direction}
+            compact
+            disabled={!next}
+            onClick={() => next && selectKey(next.id)}
+          >
+            {translate(
+              direction === -1
+                ? 'videoEditor.sidebar.cursorFocusPrevious'
+                : 'videoEditor.sidebar.cursorFocusNext'
+            )}
+          </InspectorActionButton>
+        );
+      })}
+      <InspectorActionButton
+        compact
+        disabled={locked}
+        onClick={() => {
+          const id = crypto.randomUUID();
+          if (change(addProjectCursorFocusKey(props.project, props.time, id)))
+            selectCursorSegment(id);
+        }}
+      >
+        {translate('videoEditor.sidebar.cursorFocusAdd')}
+      </InspectorActionButton>
+      <InspectorActionButton
+        compact
+        disabled={locked || key?.anchor !== 'manual'}
+        onClick={() => key && change(deleteCursorFocusKey(path, key.id))}
+      >
+        {translate('common.actions.delete')}
+      </InspectorActionButton>
+    </div>
+  );
+}

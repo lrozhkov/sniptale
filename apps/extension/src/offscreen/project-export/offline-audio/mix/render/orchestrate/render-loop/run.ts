@@ -15,6 +15,7 @@ export async function renderOfflineAudioMixLoop({
   offlineContext,
   project,
   signal,
+  actionRange,
 }: {
   clipsWithAudio: OfflineAudioRenderableClip[];
   decodeContext: AudioContext;
@@ -22,6 +23,7 @@ export async function renderOfflineAudioMixLoop({
   offlineContext: OfflineAudioContext;
   project: VideoProject;
   signal?: AbortSignal;
+  actionRange?: { start: number; end: number };
 }): Promise<{
   buffer: AudioBuffer;
   settings: { numberOfChannels: number; sampleRate: number };
@@ -35,6 +37,7 @@ export async function renderOfflineAudioMixLoop({
       buildOfflineAudioMixResult,
       decodeClipAudioBuffer,
       project,
+      ...(actionRange ? { actionRange } : {}),
       scheduleOfflineAudioClipMix,
       throwIfAborted: throwIfOfflineAudioMixAborted,
       ...(signal === undefined ? {} : { signal }),

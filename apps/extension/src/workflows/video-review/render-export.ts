@@ -1,28 +1,21 @@
-import { reviewFrameDecorations } from './render-export-input';
+import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
 import type { ReviewFrameExportInput } from './render-export-input';
 import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
-import { createReviewPresentationMain } from './presentation-main';
-import { createReviewWatermarkRenderer, type ReviewWatermarkRenderer } from './render-watermark';
+import type { createReviewPresentationMain } from './presentation-main';
+import type { ReviewWatermarkRenderer } from './render-watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
-import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { createReviewSpatialRenderer } from './spatial-renderer';
 import {
   createAdaptiveFrameWriter,
   createAdaptiveComparisonBudget,
 } from '../../features/video/project/export/adaptive-frames';
-import type { ReviewClickCue } from '../../features/video/review/click-animation';
-import { drawReviewSceneFrame } from './scene-frame';
-import {
-  hasQuickEditMotionBlur,
-  quickEditMotionBlurCameras,
-} from '../../features/video/review/advanced/motion-blur';
+import { hasQuickEditMotionBlur } from '../../features/video/review/advanced/motion-blur';
 import { createReviewRenderTimeTracking } from './time-estimate-plan';
-import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
-import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-schedule';
-import { createReviewWebcamRenderer } from './render-webcam';
+import type { ReviewFrameWindow } from './render-schedule';
+import type { createReviewWebcamRenderer } from './render-webcam';
 import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
 import {
@@ -38,8 +31,6 @@ import {
   reviewCutTransitionSides,
   paintReviewCutBlackout,
 } from './cut-transition-frames';
-import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
-import type { ReviewOutputCodec, ReviewRenderSettings } from './media-index';
 import {
   ALL_FORMATS,
   BlobSource,
@@ -52,35 +43,24 @@ import {
 } from 'mediabunny';
 import {
   resolveReviewRenderBitrate,
-  resolveReviewOutputProfile,
+  prepareReviewRender,
+  type ReviewRenderPreparation,
   resolveReviewSceneOutput,
-  reviewOutputCodecs,
-  resolveReviewVideoEncoderConfig,
 } from './render-settings';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import type { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
-import type {
-  QuickEditAdvancedState,
-  QuickEditZoomRegion,
-} from '../../features/video/review/advanced/types';
-import {
-  computeQuickEditSceneLayout,
-  computeQuickEditSceneSize,
-  evaluateQuickEditCameraAtTime,
-} from '../../features/video/review/advanced/scene';
-import {
-  isCanvasCommentVisibleAt,
-  type CanvasCommentExport,
-} from '../../features/video/review/comments';
+import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { supportedReviewVideoCodecs, type ReviewMediaIndex } from './media-index';
-import { createReviewMediaOutput } from './media-output';
+import type { createReviewMediaOutput } from './media-output';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import type { ReviewExportClipPlan } from './audio-render';
 import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
-import { prepareReviewFinalCaptions } from './render-captions';
+import type { prepareReviewFinalCaptions } from './render-captions';
+import { reviewExportPhase, cleanupReviewExportFailure } from './export-diagnostics';
+import { prepareReviewFrameDecorations, createReviewFrameOutput } from './render-export-setup';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
@@ -96,7 +76,9 @@ export async function writeReviewFrames(
 ): Promise<ReviewPacketReceipt> {
   if (resolveQuickEditEffectiveState(args.advanced).presentation)
     return writeReviewPresentationFrames(args);
-  const preparation = prepareReviewRender(args);
+  const preparation = await reviewExportPhase(args.signal, 'prepare', () =>
+    prepareReviewRender(args)
+  );
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
   args.signal.addEventListener('abort', dispose, { once: true });
@@ -108,48 +90,16 @@ export async function writeReviewFrames(
   let watermark: ReviewWatermarkRenderer | null = null;
   let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
   try {
-    source = await openReviewRenderSource(args, input, preparation);
-    if (preparation.effective.annotationEffects)
-      main = await createReviewPresentationMain({
-        file: args.file,
-        index: args.index,
-        edits: args.edits,
-        ...(args.captionTimeMap ? { captionTimeMap: args.captionTimeMap } : {}),
-        ...(args.effectSnapshots ? { effectSnapshots: args.effectSnapshots } : {}),
-        fps: preparation.fps,
-        effective: preparation.effective,
-        ...reviewFrameDecorations(args),
-        fragmentOffset: args.fragmentOffset,
-        dimensions: source.dimensions,
-        readAsset: args.readProjectAsset,
-        signal: args.signal,
-      });
-    if (!main) {
-      watermark = await createReviewWatermarkRenderer(
-        preparation.effective.watermark,
-        source.dimensions.backing,
-        args.signal,
-        args.readProjectAsset
-      );
-      if (preparation.effective.captions && args.fragmentOffset > 0 && !args.captionTimeMap)
-        throw new Error('Fragment captions require the full document time map.');
-      if (preparation.effective.webcam)
-        webcam = await createReviewWebcamRenderer(
-          preparation.effective.webcam,
-          args.readProjectAsset,
-          args.signal
-        );
-    }
-    const captions = main
-      ? undefined
-      : await prepareReviewFinalCaptions({
-          input: args,
-          effective: preparation.effective,
-          source: { size: source.sourceSize, output: source.dimensions.backing },
-          webcamDuration: webcam?.duration,
-          watermarkBounds: watermark!.bounds,
-          resultDuration: preparation.windows.at(-1)!.segment.resultEnd,
-        });
+    source = await reviewExportPhase(args.signal, 'decode', () =>
+      openReviewRenderSource(args, input, preparation)
+    );
+    const decorations = await reviewExportPhase(args.signal, 'compose', () =>
+      prepareReviewFrameDecorations(args, preparation, source!)
+    );
+    main = decorations.main;
+    watermark = decorations.watermark;
+    webcam = decorations.webcam;
+    const captions = decorations.captions;
     const receipt: ReviewPacketReceipt = {
       videoPackets: 0,
       audioPackets: 0,
@@ -161,37 +111,13 @@ export async function writeReviewFrames(
     };
     const clock = { time: 0 };
     const clipRenderer = createReviewAudioClipRenderer();
-    const tracks = args.frameProbe
-      ? null
-      : createReviewMediaOutput({
-          index: args.index,
-          container: preparation.container,
-          processedAudio: source.processedAudio,
-          writer: args.writer,
-          signal: args.signal,
-          ...(args.provenance ? { provenance: args.provenance } : {}),
-          sampleVideo: {
-            codec: preparation.codec,
-            quality: preparation.quality,
-            fullCodecString: resolveReviewVideoEncoderConfig(preparation.codec, {
-              ...source.dimensions.backing,
-              fps: preparation.fps,
-            }).codec,
-            frameRate: preparation.fps,
-            frameRateMode: args.renderSettings?.frameRateMode,
-            bitrate: resolveReviewRenderBitrate(
-              {
-                fps: preparation.fps,
-                ...source.dimensions.backing,
-              },
-              args.renderSettings?.quality
-            ),
-          },
-          onAudioPacket: (packet) => {
-            receipt.audioPackets++;
-            clock.time = Math.max(clock.time, packet.timestamp + packet.duration);
-          },
-        });
+    const outputSource = source;
+    const tracks = await reviewExportPhase(args.signal, 'encode', () =>
+      createReviewFrameOutput(args, preparation, outputSource, (packet) => {
+        receipt.audioPackets++;
+        clock.time = Math.max(clock.time, packet.timestamp + packet.duration);
+      })
+    );
     output = tracks?.output ?? null;
     if (tracks && tracks.video.kind !== 'sample')
       throw new Error('Video output configuration changed.');
@@ -202,7 +128,7 @@ export async function writeReviewFrames(
         : null;
     if (!videoOut) throw new Error('Video output configuration changed.');
     const audioOut = tracks?.audio ?? null;
-    await output?.start();
+    await reviewExportPhase(args.signal, 'encode', () => output?.start());
     const frameSink = main
       ? null
       : createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal);
@@ -247,65 +173,70 @@ export async function writeReviewFrames(
         });
       timeTracking?.finishAudio(segment);
       if (main) {
-        receipt.videoPackets += await renderAnnotationWindow({
-          window,
-          main,
-          videoOut,
-          fps: preparation.fps,
-          adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
-          adaptiveBudget,
-          resultDuration: receipt.resultDuration,
-          onProgress: timeTracking?.renderProgress ?? args.onProgress,
-          signal: args.signal,
-        });
+        const composedMain = main;
+        receipt.videoPackets += await reviewExportPhase(args.signal, 'compose', () =>
+          renderAnnotationWindow({
+            window,
+            main: composedMain,
+            videoOut,
+            fps: preparation.fps,
+            adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
+            adaptiveBudget,
+            resultDuration: receipt.resultDuration,
+            onProgress: timeTracking?.renderProgress ?? args.onProgress,
+            signal: args.signal,
+          })
+        );
         continue;
       }
       const visual = source.visual;
       if (!visual || !frameSink) throw new Error('Legacy render source is unavailable.');
-      receipt.videoPackets += await renderRenderWindowFrames({
-        window,
-        adaptiveBudget,
-        adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
-        fps: preparation.fps,
-        fragmentOffset: args.fragmentOffset,
-        zoomRegions: preparation.effective.zoomRegions,
-        background: preparation.effective.background,
-        keyCues: args.keyCues,
-        clickCues: args.clickCues,
-        comments: args.comments ?? [],
-        canvas: visual.canvas,
-        sourceSize: source.sourceSize,
-        sceneScale: source.sceneScale,
-        baseCanvas: source.baseCanvas,
-        windowHeader: preparation.effective.windowHeader,
-        headerImage: visual.headerImage,
-        context: visual.context,
-        image: visual.image,
-        frameSink,
-        sourceTimeResolution,
-        transitions,
-        transitionFrames,
-        webcam,
-        watermark,
-        ...(captions ? { captions } : {}),
-        videoOut,
-        resultDuration: receipt.resultDuration,
-        onProgress: timeTracking?.renderProgress ?? args.onProgress,
-        signal: args.signal,
-      });
+      const renderSource = source;
+      receipt.videoPackets += await reviewExportPhase(args.signal, 'compose', () =>
+        renderRenderWindowFrames({
+          window,
+          adaptiveBudget,
+          adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
+          fps: preparation.fps,
+          fragmentOffset: args.fragmentOffset,
+          zoomRegions: preparation.effective.zoomRegions,
+          background: preparation.effective.background,
+          keyCues: args.keyCues,
+          clickCues: args.clickCues,
+          comments: args.comments ?? [],
+          canvas: visual.canvas,
+          sourceSize: renderSource.sourceSize,
+          sceneScale: renderSource.sceneScale,
+          baseCanvas: renderSource.baseCanvas,
+          windowHeader: preparation.effective.windowHeader,
+          headerImage: visual.headerImage,
+          context: visual.context,
+          image: visual.image,
+          frameSink,
+          sourceTimeResolution,
+          transitions,
+          transitionFrames,
+          webcam,
+          watermark,
+          ...(captions ? { captions } : {}),
+          videoOut,
+          resultDuration: receipt.resultDuration,
+          onProgress: timeTracking?.renderProgress ?? args.onProgress,
+          signal: args.signal,
+        })
+      );
     }
     videoOut.close();
     audioOut?.source.close();
     args.signal.throwIfAborted();
     args.onTimeEstimate?.(null);
-    await output?.finalize();
+    await reviewExportPhase(args.signal, 'mux-finalize', () => output?.finalize());
     args.signal.throwIfAborted();
     receipt.resultDuration = Math.max(receipt.resultDuration, clock.time);
     args.onProgress?.(1);
     return receipt;
   } catch (error) {
-    await output?.cancel().catch(() => undefined);
-    throw error;
+    return await cleanupReviewExportFailure(error, () => output?.cancel());
   } finally {
     args.onTimeEstimate?.(null);
     webcam?.dispose();
@@ -317,55 +248,6 @@ export async function writeReviewFrames(
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
   }
-}
-
-interface ReviewRenderPreparation {
-  codec: ReviewOutputCodec;
-  container: 'mp4' | 'webm';
-  resolution: VideoResolutionPreset;
-  quality: NonNullable<ReviewRenderSettings['quality']>;
-  fps: number;
-  windows: ReviewFrameWindow[];
-  effective: ReturnType<typeof resolveQuickEditEffectiveState>;
-}
-
-/** Frame rendering validates ranges, while packet copying alone requires keyframes. */
-function prepareReviewRender(args: {
-  frameProbe?: { add(sample: VideoSample): Promise<void> };
-  renderSettings?: ReviewRenderSettings | undefined;
-  index: ReviewMediaIndex;
-  edits: readonly ReviewEdit[];
-  advanced: QuickEditAdvancedState;
-}): ReviewRenderPreparation {
-  let validRanges = true;
-  try {
-    buildReviewTimeMap(args.index.duration, args.edits);
-  } catch {
-    validRanges = false;
-  }
-  if (!validRanges) throw new Error('Export requires valid non-overlapping edit ranges.');
-  const container = args.renderSettings?.format ?? args.index.container;
-  const supported = reviewOutputCodecs(args.index, container);
-  const codec = args.renderSettings?.codec ?? supported[0];
-  if (!codec || !supported.includes(codec)) throw new QuickEditExportUnavailable(['video-encoder']);
-  const { fps } = resolveReviewOutputProfile(args.index, args.advanced, args.renderSettings);
-  const duration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;
-  const windows = reviewRenderFrameSchedule(
-    args.index.duration,
-    args.edits,
-    fps,
-    args.frameProbe ? videoExportSampleWindows(duration, fps) : undefined
-  );
-  if (!windows.length) throw new Error('The edited video is empty.');
-  return {
-    codec,
-    container,
-    resolution: args.renderSettings?.resolution ?? VideoResolutionPreset.SOURCE,
-    quality: args.renderSettings?.quality ?? 'HIGH',
-    fps,
-    windows,
-    effective: resolveQuickEditEffectiveState(args.advanced),
-  };
 }
 
 /** Segment playback stays silent only for an explicit mute, never lane visibility. */
@@ -549,18 +431,20 @@ export async function drainSegmentAudio(args: {
   signal.throwIfAborted();
   if (processedAudio) {
     if (audioOut?.kind !== 'processed') throw new Error('Audio output configuration changed.');
-    for await (const sample of renderReviewAudio(
-      args.track,
-      segment,
-      args.muted,
-      signal,
-      args.exportAudio,
-      args.clipRenderer
-    )) {
-      signal.throwIfAborted();
-      await audioOut.source.add(sample);
-      clock.time = Math.max(clock.time, sample.timestamp + sample.duration);
-    }
+    await reviewExportPhase(signal, 'audio-prepare', async () => {
+      for await (const sample of renderReviewAudio(
+        args.track,
+        segment,
+        args.muted,
+        signal,
+        args.exportAudio,
+        args.clipRenderer
+      )) {
+        signal.throwIfAborted();
+        await reviewExportPhase(signal, 'encode', () => audioOut.source.add(sample));
+        clock.time = Math.max(clock.time, sample.timestamp + sample.duration);
+      }
+    });
     receipt.audioRanges.push({
       sourceStart: segment.sourceStart,
       sourceEnd: segment.sourceEnd,
@@ -569,57 +453,54 @@ export async function drainSegmentAudio(args: {
     });
     return;
   }
-  if (args.sink && args.audioCodec && audioOut?.kind === 'copy') {
-    for await (const packet of retainedAudio(
-      args.sink,
-      segment,
-      clock,
-      args.audioCodec,
-      args.sampleRate,
-      receipt,
-      signal
-    )) {
-      signal.throwIfAborted();
-      await audioOut.source.add(packet, {
-        ...(args.audioConfig ? { decoderConfig: args.audioConfig } : {}),
-      });
-      receipt.audioPackets++;
-    }
+  const { sink, audioCodec } = args;
+  if (sink && audioCodec && audioOut?.kind === 'copy') {
+    await reviewExportPhase(signal, 'audio-prepare', async () => {
+      for await (const packet of retainedAudio(
+        sink,
+        segment,
+        clock,
+        audioCodec,
+        args.sampleRate,
+        receipt,
+        signal
+      )) {
+        signal.throwIfAborted();
+        await reviewExportPhase(signal, 'encode', () =>
+          audioOut.source.add(packet, {
+            ...(args.audioConfig ? { decoderConfig: args.audioConfig } : {}),
+          })
+        );
+        receipt.audioPackets++;
+      }
+    });
   }
 }
 
 /** One window's frames: draws the scene and encodes at the fps lattice; returns the count. */
-export async function renderRenderWindowFrames(args: {
-  keyCues?: readonly ReviewKeyCue[] | undefined;
-  clickCues?: readonly ReviewClickCue[] | undefined;
-  window: ReviewFrameWindow;
-  adaptive?: boolean;
-  adaptiveBudget?: ReturnType<typeof createAdaptiveComparisonBudget>;
-  fps: number;
-  fragmentOffset: number;
-  zoomRegions: readonly QuickEditZoomRegion[];
-  background: QuickEditAdvancedState['background'];
-  comments: readonly CanvasCommentExport[];
-  canvas: HTMLCanvasElement;
-  sourceSize: { width: number; height: number };
-  sceneScale?: number;
-  baseCanvas?: { width: number; height: number };
-  windowHeader?: QuickEditAdvancedState['windowHeader'];
-  headerImage?: CanvasImageSource | null;
-  context: CanvasRenderingContext2D;
-  image: ImageBitmap | null;
-  frameSink: Pick<VideoSampleSink, 'samplesAtTimestamps'>;
-  sourceTimeResolution?: number;
-  transitions?: readonly ReviewCutTransitionPlan[];
-  transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
-  webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
-  watermark?: ReviewWatermarkRenderer | null;
-  captions?: Awaited<ReturnType<typeof prepareReviewFinalCaptions>>;
-  videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
-  resultDuration: number;
-  onProgress: ((fraction: number) => void) | undefined;
-  signal: AbortSignal;
-}): Promise<number> {
+export async function renderRenderWindowFrames(
+  args: ReviewRenderScene & {
+    keyCues?: readonly ReviewKeyCue[] | undefined;
+    window: ReviewFrameWindow;
+    adaptive?: boolean;
+    adaptiveBudget?: ReturnType<typeof createAdaptiveComparisonBudget>;
+    fps: number;
+    fragmentOffset: number;
+    canvas: HTMLCanvasElement;
+    context: CanvasRenderingContext2D;
+    frameSink: Pick<VideoSampleSink, 'samplesAtTimestamps'>;
+    sourceTimeResolution?: number;
+    transitions?: readonly ReviewCutTransitionPlan[];
+    transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
+    webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
+    watermark?: ReviewWatermarkRenderer | null;
+    captions?: Awaited<ReturnType<typeof prepareReviewFinalCaptions>>;
+    videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
+    resultDuration: number;
+    onProgress: ((fraction: number) => void) | undefined;
+    signal: AbortSignal;
+  }
+): Promise<number> {
   const { window, fps, canvas, context, videoOut, signal } = args;
   // Stage normalized source pixels once before camera filtering and transition composition.
   const raster = document.createElement('canvas');
@@ -676,61 +557,21 @@ export async function renderRenderWindowFrames(args: {
         const draw = (
           context: CanvasRenderingContext2D,
           canvas: HTMLCanvasElement,
-          drawable: Pick<ReviewTransitionSample, 'draw'>,
+          sample: Pick<ReviewTransitionSample, 'draw'>,
           resultTime: number,
           sourceTime: number
-        ) => {
-          const camera = evaluateQuickEditCameraAtTime(args.zoomRegions, resultTime);
-          const layout = computeQuickEditSceneLayout({
-            output: canvas,
-            source: args.sourceSize,
-            canvas: args.baseCanvas ?? canvas,
-            windowHeader: args.windowHeader,
-            background: args.background,
-            camera,
-          });
-          const burned = args.comments.filter(
-            (comment) => comment.renderToVideo && isCanvasCommentVisibleAt(comment, sourceTime)
-          );
-          drawReviewSceneFrame(context, {
-            spatialRenderer,
-            canvas,
-            layout,
-            background: args.background,
-            image: args.image,
-            headerImage: args.headerImage,
-            sample: drawable,
-            deferComments: true,
-            comments: burned,
-            sourceTime: sourceTime,
-            cameraScale: camera.scale,
-            motionBlur: blurEnabled
-              ? quickEditMotionBlurCameras(args.zoomRegions, resultTime)
-              : undefined,
-            sceneScale: args.sceneScale ?? 1,
-          });
-          drawReviewSceneOverlays({
-            scene: {
-              canvas,
-              layout,
-              background: args.background,
-              image: args.image,
-              sample: drawable,
-              comments: burned,
-              sourceTime: sourceTime,
-              sceneScale: args.sceneScale ?? 1,
-            },
-            renderer: spatialRenderer,
+        ) =>
+          paintReviewExportScene({
+            scene: args,
             context,
             canvas,
-            spotlightScratch: scratch,
-            regions: args.zoomRegions,
-            globalResultTime: resultTime,
-            cameraScale: camera.scale,
-            sourceWidth: args.sourceSize.width,
-            clicks: args.clickCues,
+            sample,
+            resultTime,
+            sourceTime,
+            spatialRenderer,
+            scratch,
+            blurEnabled,
           });
-        };
         if (blend?.plan.type === 'dissolve') {
           const endpoints = await args.transitionFrames?.load(blend.plan);
           signal.throwIfAborted();
@@ -826,7 +667,9 @@ async function renderAnnotationWindow(args: {
   try {
     for (const [index, timestamp] of args.window.timestamps.entries()) {
       args.signal.throwIfAborted();
-      const frame = await args.main.renderAtTime(timestamp);
+      const frame = await reviewExportPhase(args.signal, 'compose', () =>
+        args.main.renderAtTime(timestamp)
+      );
       try {
         args.signal.throwIfAborted();
         writer ??= createReviewFrameWriter({
@@ -875,7 +718,7 @@ function createReviewFrameWriter(args: {
   ) => {
     const sample = new VideoSample(canvas, { timestamp, duration });
     try {
-      await args.videoOut.add(sample);
+      await reviewExportPhase(args.signal, 'encode', () => args.videoOut.add(sample));
       emitted++;
     } finally {
       sample.close();

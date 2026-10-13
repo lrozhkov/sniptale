@@ -7,9 +7,12 @@ import { resolveVideoCompositionFrame } from './index';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
+  createVideoProjectFromRecording,
 } from '../../../project/factories/creation';
 import { createVideoClipFromAsset } from '../../../project/factories/clip';
 import type { VideoProjectActionEvent } from '../../../project/types';
+import { patchReviewClicks } from '../../../review/advanced/click-animation';
+import { normalizeVideoProjectCursorSkin } from '../../../project/cursor';
 
 function manualEvent(): VideoProjectActionEvent {
   return {
@@ -174,3 +177,70 @@ it('projects authored visual settings consistently on seek and validates the sou
   project.assets = [];
   expect(resolveVideoCompositionActionSourceMapping(project, first.occurrence, 2.2)).toBeNull();
 });
+it.each(['halo', 'path', 'area'] as const)(
+  'held source feedback paints one physical appearance (%s)',
+  (gestureAppearance) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'held',
+      filename: 'held.webm',
+      width: 100,
+      height: 100,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 10,
+      cursorTrack: {
+        captureMode: 'embedded-fallback',
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [1, 2, 3].map((time) => ({
+          id: `held-${time}`,
+          time,
+          x: 20,
+          y: 30,
+          visible: true,
+          captureSegment: 0,
+          recordingPoint: { x: 0.2, y: 0.3 },
+        })),
+      },
+      sourceNormalizedActionEvents: [
+        {
+          id: 'hold',
+          kind: 'CLICK',
+          time: 1,
+          duration: 0.6,
+          point: { x: 0.2, y: 0.3 },
+          label: 'Hold',
+          preset: 'NONE',
+          data: {
+            gestureId: 'hold',
+            gestureType: 'hold',
+            downTime: 1,
+            upTime: 3,
+            button: 0,
+            completion: 'released',
+            captureSegment: 0,
+          },
+        },
+      ],
+    });
+    const group = project.actionFeedback![0]!;
+    group.gestureStyles = patchReviewClicks([], ['hold'], {
+      effect: 'press',
+      gestureAppearance,
+      gestureArea: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+    });
+    const original = structuredClone(project.actionEvents);
+    const states = resolveVideoCompositionActions(project, 1.5);
+    expect(states).toHaveLength(1);
+    expect(states[0]!.gestureFeedback).toMatchObject({
+      effect: 'press',
+      point: { x: 0.2, y: 0.3 },
+    });
+    expect(states[0]!.gestureFeedback!.path !== undefined).toBe(gestureAppearance === 'path');
+    expect(states[0]!.gestureFeedback!.area !== undefined).toBe(gestureAppearance === 'area');
+    expect(states[0]!.event.id).toBe(project.actionEvents[0]!.id);
+    expect(resolveVideoCompositionActions(project, 0.5)).toEqual([]);
+    expect(project.actionEvents).toEqual(original);
+    project.actionEvents = [];
+    expect(resolveVideoCompositionActions(project, 1.5)).toEqual([]);
+  }
+);
