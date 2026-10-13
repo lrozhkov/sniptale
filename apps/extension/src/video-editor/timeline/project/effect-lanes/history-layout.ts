@@ -189,17 +189,34 @@ export function buildHistoryTargetGroups({
           );
         return { id, left: anchor - floor, width: duration > 0 ? width : 40 };
       });
-    if (keys)
-      for (const span of spans) {
-        const geometry = projection
-          ? projectTimelineInterval(projection, span.startTime, span.endTime)
-          : {
-              left: span.startTime * pixelsPerSecond,
-              width: (span.endTime - span.startTime) * pixelsPerSecond,
-            };
-        targets.push({ id: span.id, left: geometry?.left ?? null, width: geometry?.width ?? 0 });
-      }
-    return clusterHistoryIntervals(targets, projection?.viewportWidth).map((group) => ({
+    const grouped = clusterHistoryIntervals(targets, projection?.viewportWidth);
+    for (let index = 0; index < grouped.length; index++) {
+      const group = grouped[index]!;
+      const id = group.ids[0]!;
+      if (group.ids.length !== 1 || actionWidths.has(id)) continue;
+      const anchor = actionLeft.get(id)!;
+      const end = grouped[index + 1]
+        ? grouped[index + 1]!.left + (grouped[index + 1]!.ids.length === 1 ? 8 : 0)
+        : (projection?.viewportWidth ?? project.duration * pixelsPerSecond);
+      actionWidths.set(id, Math.min(120, Math.max(24, end - anchor + 8)));
+    }
+    const typing = keys
+      ? spans.map((span) => {
+          const geometry = projection
+            ? projectTimelineInterval(projection, span.startTime, span.endTime)
+            : {
+                left: span.startTime * pixelsPerSecond,
+                width: (span.endTime - span.startTime) * pixelsPerSecond,
+              };
+          return { id: span.id, left: geometry?.left ?? null, width: geometry?.width ?? 0 };
+        })
+      : [];
+    return exposeTypingTargets(
+      grouped,
+      clusterHistoryIntervals(typing, projection?.viewportWidth),
+      actionLeft,
+      actionWidths
+    ).map((group) => ({
       ...group,
       left: projection
         ? Math.max(20, Math.min(projection.viewportWidth - 20, group.left + 20))
@@ -208,4 +225,45 @@ export function buildHistoryTargetGroups({
     }));
   });
   return { actionLeft, actionWidths, groups };
+}
+
+/** A fully covered typing target shares the covering chooser so all facts remain selectable. */
+function exposeTypingTargets(
+  actions: ReturnType<typeof clusterHistoryIntervals>,
+  typing: ReturnType<typeof clusterHistoryIntervals>,
+  actionLeft: Map<string, number>,
+  actionWidths: Map<string, number>
+) {
+  const groups = [...actions];
+  const visibleTyping: typeof typing = [];
+  for (const span of typing) {
+    const end = span.left + Math.max(span.ids.length > 1 ? 40 : 16, span.width);
+    const covering = groups
+      .map((group) => {
+        const id = group.ids[0]!;
+        const left = group.ids.length === 1 ? actionLeft.get(id)! - 12 : group.left;
+        const width = group.ids.length === 1 ? (actionWidths.get(id) ?? 24) : 40;
+        return { group, left, end: left + width };
+      })
+      .filter((rect) => rect.left < end && rect.end > span.left)
+      .sort((a, b) => a.left - b.left);
+    let right = span.left;
+    let gap = 0;
+    for (const rect of covering) {
+      gap = Math.max(gap, rect.left - right);
+      right = Math.max(right, rect.end);
+    }
+    gap = Math.max(gap, end - right);
+    if (!covering.length || gap >= Math.min(24, end - span.left)) {
+      visibleTyping.push(span);
+      continue;
+    }
+    const target = covering[0]!.group;
+    target.ids.push(...span.ids);
+    for (const { group } of covering.slice(1)) {
+      target.ids.push(...group.ids);
+      groups.splice(groups.indexOf(group), 1);
+    }
+  }
+  return [...groups, ...visibleTyping];
 }

@@ -28,6 +28,10 @@ import { reviewEventLabel, reviewMouseButtonLabel, reviewTimeLabel } from './con
 const ACTION_MARKER_HEIGHT_PX = 20;
 const ACTION_LANE_GAP_PX = 4;
 const ACTION_LANE_PITCH_PX = ACTION_MARKER_HEIGHT_PX + ACTION_LANE_GAP_PX;
+const HISTORY_EVENT_BACKGROUND = [
+  'linear-gradient(var(--sniptale-color-surface-hover),var(--sniptale-color-surface-hover))',
+  'var(--sniptale-color-surface-canvas)',
+].join(',');
 /** Dense history never adds a fourth row. */
 const ACTION_LANE_MAX_VISIBLE = 3;
 
@@ -206,7 +210,7 @@ function ReviewHistoryCluster(props: {
   );
   return (
     <div
-      className="absolute z-10"
+      className={`absolute ${props.members.every((marker) => marker.eventType === 'typing') ? 'z-0' : 'z-10'}`}
       title={
         reviewActionLane(props.members[0]!) === 0
           ? translate('gallery.videoReview.historyKeyboardCoverage')
@@ -230,7 +234,9 @@ function ReviewHistoryCluster(props: {
           padding: '0 12px 0 3px',
           borderRadius: 2,
           fontSize: 11,
-          background: 'var(--sniptale-color-surface-hover)',
+          background: props.members.every((marker) => marker.eventType === 'typing')
+            ? 'var(--sniptale-color-surface-hover)'
+            : HISTORY_EVENT_BACKGROUND,
           borderColor: selected
             ? 'var(--sniptale-color-accent)'
             : 'var(--sniptale-color-border-soft)',
@@ -343,7 +349,9 @@ function ReviewHistoryItem({
         .join(' · ')}
       onClick={() => props.onMarker(marker)}
       className={[
-        'absolute z-10 flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
+        'absolute flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
+        marker.eventType === 'typing' ? 'z-0' : 'z-10',
+        marker.eventType === 'typing' ? 'px-1 [&_[data-ui]]:justify-start' : '',
         'rounded-sm border text-[10px] transition-colors',
         tone,
         '!text-[var(--sniptale-color-text-secondary)]',
@@ -354,11 +362,13 @@ function ReviewHistoryItem({
         width: item.width * ratio,
         top: item.lane * ACTION_LANE_PITCH_PX,
         height: ACTION_MARKER_HEIGHT_PX,
+        background: marker.eventType === 'typing' ? undefined : HISTORY_EVENT_BACKGROUND,
       }}
     >
       <ReviewTimelineLabel
         icon={<ReviewEventIcon kind={marker.eventType} />}
         name={reviewEventLabel(marker.eventType)}
+        value={item.lane === 0 && marker.ref.kind === 'action' ? marker.target : undefined}
       />
     </button>
   );

@@ -135,9 +135,7 @@ export function ReviewTimeline(props: TimelineProps) {
     <section
       ref={wheelTarget}
       data-ui="gallery.videoReview.timeline"
-      className={`@container flex min-h-0 ${
-        props.fillHeight ? 'h-full' : 'max-h-[min(42dvh,calc(100dvh-420px))]'
-      } min-w-0 max-w-full shrink-0 flex-col
+      className={`@container flex min-h-0 ${reviewTimelineHeightClass(props)} min-w-0 max-w-full shrink-0 flex-col
         overflow-hidden border-t border-[var(--sniptale-color-border-soft)]`}
     >
       <ReviewToolbar
@@ -242,6 +240,16 @@ export function ReviewTimeline(props: TimelineProps) {
       </div>
     </section>
   );
+}
+
+/** The small viewport budget includes transport, sticky ruler, all history rows and scrollbar. */
+function reviewTimelineHeightClass(
+  props: Pick<TimelineProps, 'fillHeight' | 'markers' | 'onAddCursorFocusKey'>
+) {
+  if (props.fillHeight) return 'h-full';
+  return props.markers.length || props.onAddCursorFocusKey
+    ? 'max-h-[max(160px,min(42dvh,calc(100dvh-420px)))]'
+    : 'max-h-[min(42dvh,calc(100dvh-420px))]';
 }
 
 /** Telemetry row presentation is independent of ruler gestures and transport. */

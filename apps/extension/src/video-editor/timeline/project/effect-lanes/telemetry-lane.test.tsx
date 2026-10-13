@@ -430,9 +430,9 @@ function overlappingTypingFixture() {
   return { project, telemetry };
 }
 
-it('keeps a command and overlapping typing instances in one keyboard cluster with independent selection', () => {
+it('keeps a command above overlapping typing coverage with independent same-row selection', () => {
   const { project, telemetry } = overlappingTypingFixture();
-  project.actionEvents = [{ ...action('command', 2), kind: 'KEY', label: 'Ctrl+K' }];
+  project.actionEvents = [{ ...action('command', 1), kind: 'KEY', label: 'Ctrl+K' }];
   const selectAction = vi.fn();
   const selectSpan = vi.fn();
   act(() =>
@@ -447,16 +447,18 @@ it('keeps a command and overlapping typing instances in one keyboard cluster wit
       />
     )
   );
-  expect(container.querySelector('[data-ui="video-editor.timeline.history-event"]')).toBeNull();
+  const command = container.querySelector<HTMLButtonElement>('[data-action-id="command"]')!;
+  expect(command).not.toBeNull();
+  expect(command.textContent).toContain('Ctrl+K');
+  act(() => command.click());
+  expect(selectAction).toHaveBeenCalledWith('command', null);
   const cluster = container.querySelector<HTMLButtonElement>(
-    '[data-ui="video-editor.timeline.history-cluster"] button'
+    '[data-ui="video-editor.timeline.history-span-cluster"] button'
   )!;
   act(() => cluster.click());
   const options = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
-  expect(options).toHaveLength(3);
-  act(() => options.find((option) => option.textContent?.includes('Ctrl+K'))!.click());
-  expect(selectAction).toHaveBeenCalledWith('command', null);
-  act(() => cluster.click());
+  expect(options).toHaveLength(2);
+  expect(Number.parseFloat(cluster.style.width)).toBeGreaterThanOrEqual(300);
   act(() => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
   expect(selectSpan).toHaveBeenCalledWith(
     expect.objectContaining({ signalId: 'typing', sourceInstanceId: 'instance-a' })
@@ -594,4 +596,91 @@ it('keeps a lone typing span directly selectable despite overlapping stable back
     clipId: 'typing-a',
   });
   expect(seek).not.toHaveBeenCalled();
+});
+
+it('fits an isolated command label before the following dense command group', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 10;
+  project.actionEvents = [1, 2, 2.01].map((time, index) => ({
+    ...action(`command:${index}`, time),
+    kind: 'KEY' as const,
+    label: 'Ctrl+K',
+  }));
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={project}
+        recordingTelemetry={[]}
+        pixelsPerSecond={100}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  const command = container.querySelector<HTMLButtonElement>('[data-action-id="command:0"]')!;
+  const cluster = container.querySelector<HTMLElement>(
+    '[data-ui="video-editor.timeline.history-cluster"]'
+  )!.parentElement!;
+  const labelEnd =
+    Number.parseFloat(command.style.left) - 12 + Number.parseFloat(command.style.width);
+  expect(labelEnd).toBeLessThanOrEqual(Number.parseFloat(cluster.style.left) - 20 - 4);
+});
+
+it.each([
+  ['Ctrl+K', false],
+  ['Alt+Shift', true],
+] as const)('prioritizes %s in an observed keyboard caption', (label, modifierOnly) => {
+  const project = createEmptyVideoProject();
+  project.duration = 10;
+  project.actionEvents = [
+    {
+      ...action('observed', 1),
+      kind: 'KEY',
+      label,
+      data: { keyboardOnsetTime: 1, downTime: 1, upTime: 2, modifierOnly },
+    },
+  ];
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={project}
+        recordingTelemetry={[]}
+        pixelsPerSecond={100}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  expect(container.querySelector('[data-action-id="observed"] > span')!.textContent).toBe(label);
+});
+
+it('keeps every typing instance and held command accessible when their entire hit areas coincide', () => {
+  const { project, telemetry } = overlappingTypingFixture();
+  project.actionEvents = [
+    {
+      ...action('held-command', 1),
+      kind: 'KEY',
+      label: 'Ctrl+K',
+      data: { keyboardOnsetTime: 1, downTime: 1, upTime: 4 },
+    },
+  ];
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={project}
+        recordingTelemetry={[telemetry]}
+        pixelsPerSecond={100}
+        onSeek={vi.fn()}
+        onSelectHistorySpan={vi.fn()}
+        onSelectActionOccurrence={vi.fn()}
+      />
+    )
+  );
+  expect(
+    container.querySelector('[data-ui="video-editor.timeline.history-span-cluster"]')
+  ).toBeNull();
+  const chooser = container.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.history-cluster"] button'
+  )!;
+  expect(chooser).not.toBeNull();
+  act(() => chooser.click());
+  expect(document.querySelectorAll('[role="option"]')).toHaveLength(3);
 });

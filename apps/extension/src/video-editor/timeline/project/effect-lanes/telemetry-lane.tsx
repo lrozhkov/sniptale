@@ -280,13 +280,14 @@ function HistoryMarker(props: {
       className={[
         'video-editor-timeline-item',
         props.movable ? '!cursor-grab' : '!cursor-pointer',
-        'absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-md border',
+        'absolute z-10 flex h-6 w-6 -translate-x-1/2 items-center justify-center gap-1',
+        'overflow-hidden rounded-sm border px-1 text-[10px]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-secondary)]',
         props.selected
           ? 'video-editor-timeline-item-selected border-[var(--sniptale-color-border-soft)]'
           : 'border-[var(--sniptale-color-border-soft)]',
         item.reason === 'suppressed' ? 'border-dashed' : '',
-        !item.enabled ? 'opacity-60' : '',
+        !item.enabled ? '!text-[var(--sniptale-color-text-dim)]' : '',
       ].join(' ')}
       style={{
         left: props.left,
@@ -302,7 +303,14 @@ function HistoryMarker(props: {
         props.onSelect();
       }}
     >
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {(props.width ?? 24) >= 56 ? (
+        <span className="min-w-0 truncate">
+          {item.event.kind === 'KEY' && item.event.label
+            ? item.event.label
+            : observedEventLabel(item.event)}
+        </span>
+      ) : null}
       {!item.enabled && item.reason !== 'suppressed' ? (
         <span aria-hidden="true" className="absolute h-px w-4 -rotate-45 bg-current" />
       ) : null}
@@ -358,7 +366,7 @@ function ProjectTimelineTelemetrySpan(props: {
       data-history-recording-id={props.target?.recordingId}
       title={props.label ?? kindLabel}
       className={[
-        'absolute flex items-center justify-center rounded border text-[10px] truncate px-1',
+        'absolute z-0 flex items-center justify-center gap-1 rounded-sm border text-[10px] truncate px-1',
         props.onSelect ? 'video-editor-timeline-item !cursor-pointer' : 'cursor-default',
         props.selected ? 'video-editor-timeline-item-selected' : '',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
@@ -370,7 +378,8 @@ function ProjectTimelineTelemetrySpan(props: {
         width: Math.max(16, geometry.width),
       }}
     >
-      {props.kind === 'typing' ? <TextCursorInput size={14} aria-hidden="true" /> : null}
+      <TextCursorInput size={14} className="shrink-0" aria-hidden="true" />
+      {geometry.width >= 70 ? <span className="min-w-0 truncate">{kindLabel}</span> : null}
     </button>
   );
 }
@@ -595,8 +604,14 @@ function ActionHistoryMarkers({
         ) : (
           <div
             key={JSON.stringify(group.ids)}
-            className="absolute -translate-x-1/2"
-            style={{ left: group.left, top: group.top }}
+            className={`absolute -translate-x-1/2 ${group.ids.every((id) => spansById.has(id)) ? 'z-0' : 'z-10'}`}
+            style={{
+              left: group.left,
+              top: group.top,
+              ...(group.ids.every((id) => spansById.has(id))
+                ? { transform: 'translateX(-20px)' }
+                : {}),
+            }}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           >
@@ -616,7 +631,9 @@ function ActionHistoryMarkers({
                 })
               }
               aria-label={`${translate('videoEditor.timeline.telemetryLane')} · ${group.ids.length}`}
-              style={historyClusterStyle()}
+              style={historyClusterStyle(
+                group.ids.every((id) => spansById.has(id)) ? Math.max(40, group.width) : 40
+              )}
               className={[
                 'video-editor-timeline-item',
                 selectedId && group.ids.includes(selectedId)
@@ -660,16 +677,16 @@ function ActionHistoryMarkers({
   );
 }
 
-function historyClusterStyle(): CSSProperties & Record<`--${string}`, string> {
+function historyClusterStyle(width = 40): CSSProperties & Record<`--${string}`, string> {
   return {
-    width: 40,
+    width,
     minWidth: 40,
     height: 24,
     minHeight: 24,
     padding: '0 14px 0 4px',
     gap: 2,
     justifyContent: 'center',
-    '--sniptale-field-radius': 'var(--sniptale-radius-lg)',
+    '--sniptale-field-radius': 'var(--sniptale-radius-sm)',
     '--sniptale-field-font-size': '11px',
     '--sniptale-field-bg-idle': 'var(--sniptale-color-surface-panel)',
     '--sniptale-field-bg-hover': 'var(--sniptale-color-surface-panel)',

@@ -244,3 +244,41 @@ it('uses the full editor click cursor for ordinary and double clicks', () => {
   expect(host.querySelectorAll('.lucide-mouse-pointer-click')).toHaveLength(2);
   expect(host.querySelector('.lucide-mouse-pointer-2')).toBeNull();
 });
+
+it('keeps commands separately selectable above typing coverage and shows their safe labels', () => {
+  const onMarker = vi.fn();
+  const typing: ReviewTelemetryMarker = {
+    ref: { kind: 'signal', id: 'typing' },
+    eventType: 'typing',
+    start: 0,
+    end: 9,
+  };
+  const key: ReviewTelemetryMarker = {
+    ref: { kind: 'action', id: 'command' },
+    eventType: 'KEY',
+    target: 'Ctrl+K',
+    start: 3,
+    end: 3,
+  };
+  act(() =>
+    root.render(
+      <ReviewTelemetryStrip
+        markers={[typing, key]}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={onMarker}
+      />
+    )
+  );
+  expect(host.querySelectorAll('[data-ui="gallery.videoReview.historyCluster"]')).toHaveLength(0);
+  const keyboard = host.querySelector('[data-history-family="keyboard"]')!;
+  const buttons = [...keyboard.querySelectorAll<HTMLButtonElement>('button')];
+  expect(buttons).toHaveLength(2);
+  const command = buttons.find((button) => button.getAttribute('aria-label')?.includes('Ctrl+K'))!;
+  expect(command.textContent).toContain('Ctrl+K');
+  act(() => command.click());
+  expect(onMarker).toHaveBeenCalledWith(key);
+  expect(command.style.top).toBe(buttons[0]!.style.top);
+});

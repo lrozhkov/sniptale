@@ -13,19 +13,20 @@ it('keeps observed command holds and modifier combinations in the keyboard famil
     expect(reviewActionLane({ eventType, ref: { kind: 'action', id: eventType } })).toBe(0);
 });
 
-it('keeps typing and keys above mouse actions and cursor dwell despite collisions', () => {
+it('keeps typing coverage and key anchors independently selectable in the same keyboard row', () => {
   const entries: ReviewTelemetryMarker[] = [
     { ref: { kind: 'action', id: 'key' }, eventType: 'KEY', start: 1, end: 1 },
-    { ref: { kind: 'signal', id: 'typing' }, eventType: 'typing', start: 1, end: 2 },
+    { ref: { kind: 'signal', id: 'typing' }, eventType: 'typing', start: 1, end: 4 },
     { ref: { kind: 'action', id: 'mouse' }, eventType: 'CLICK', start: 1, end: 1 },
     { ref: { kind: 'signal', id: 'dwell' }, eventType: 'cursor-idle', start: 1, end: 2 },
   ];
-  const layout = layoutReviewActionLanes(entries, viewport);
-  expect(layout.items.map(({ lane }) => lane)).toEqual([2, 0, 1]);
-  expect(layout.items.find(({ lane }) => lane === 0)?.members.map(({ ref }) => ref.id)).toEqual([
-    'key',
-    'typing',
-  ]);
+  const layout = layoutReviewActionLanes(entries, { ...viewport, width: 1000 });
+  expect(layout.items.map(({ lane }) => lane)).toEqual([2, 0, 1, 0]);
+  expect(
+    layout.items
+      .filter(({ lane }) => lane === 0)
+      .flatMap((item) => item.members.map(({ ref }) => ref.id))
+  ).toEqual(['key', 'typing']);
 });
 const marker = (
   id: string,
@@ -155,4 +156,42 @@ it('keeps every lane disjoint across fractional widths, dense points and long in
         );
     }
   }
+});
+
+it.each([1, 4, 16, 64])(
+  'does not swallow separated commands inside long typing coverage at zoom %s',
+  (zoom) => {
+    const typing: ReviewTelemetryMarker = {
+      ref: { kind: 'signal', id: 'typing' },
+      eventType: 'typing',
+      start: 0.1,
+      end: 9,
+    };
+    const keys: ReviewTelemetryMarker[] = [1, 4, 7].map((time, index) => ({
+      ref: { kind: 'action', id: `command:${index}` },
+      eventType: 'KEY',
+      start: time,
+      end: time,
+    }));
+    const layout = layoutReviewActionLanes([typing, ...keys], { duration: 10, width: 1000, zoom });
+    expect(layout.items).toHaveLength(4);
+    expect(layout.items.every((item) => item.lane === 0 && item.members.length === 1)).toBe(true);
+    expect(
+      layout.items
+        .filter((item) => item.marker.eventType === 'KEY')
+        .every((item) => item.width >= 100)
+    ).toBe(true);
+  }
+);
+
+it('preserves the typing choice when a command covers its entire hit target', () => {
+  const layout = layoutReviewActionLanes(
+    [
+      { ref: { kind: 'action', id: 'key' }, eventType: 'KEY', start: 1, end: 1 },
+      { ref: { kind: 'signal', id: 'typing' }, eventType: 'typing', start: 1, end: 1.2 },
+    ],
+    { duration: 10, width: 1000, zoom: 1 }
+  );
+  expect(layout.items).toHaveLength(1);
+  expect(layout.items[0]!.members.map(({ ref }) => ref.id)).toEqual(['key', 'typing']);
 });

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { translate, formatNumber } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
@@ -41,7 +42,7 @@ for (const variant of [
         height: 90,
         duration: 12.01,
       });
-      await seedHistory(page, false, 6, 0.03);
+      await seedReadableKeyboardHistory(page);
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -50,7 +51,18 @@ for (const variant of [
         `button[aria-label^="${label('gallery.videoReview.telemetry')} ·"]`
       );
       const strip = dialog.locator('[data-ui="gallery.videoReview.historyStrip"]');
-      const cluster = strip.locator('[data-ui="gallery.videoReview.historyCluster"] button');
+      const cluster = strip.locator(
+        '[data-history-family="mouse"] [data-ui="gallery.videoReview.historyCluster"] button'
+      );
+      const keyboardCluster = strip.locator(
+        '[data-history-family="keyboard"] [data-ui="gallery.videoReview.historyCluster"] button'
+      );
+      await expect(keyboardCluster).toHaveCount(1);
+      await revealHistoryRows(dialog);
+      await keyboardCluster.click();
+      await expect(page.getByRole('option')).toHaveCount(2);
+      await page.getByRole('option').last().click();
+      await expect(keyboardCluster).toHaveAttribute('aria-pressed', 'true');
       await expect(cluster).toHaveCount(1);
       const height = (await strip.boundingBox())!.height;
       expect(height).toBe(68);
@@ -68,7 +80,14 @@ for (const variant of [
       await zoom.fill('100');
       await zoom.dispatchEvent('input');
       await expect(cluster).toHaveCount(0);
-      await expect(markers).toHaveCount(8);
+      await expect(markers).toHaveCount(13);
+      const command = strip
+        .locator('[data-history-family="keyboard"] > button')
+        .filter({ hasText: 'Ctrl+K' });
+      await command.focus();
+      await command.press('Enter');
+      await expect(command).toHaveAttribute('aria-pressed', 'true');
+      await expect(command.locator('[data-label-part="value"]')).toBeVisible();
       expect((await strip.boundingBox())!.height).toBe(height);
       expect(await strip.evaluate((node) => node.scrollHeight)).toBe(68);
       const tail = markers.filter({ hasText: label('gallery.videoReview.eventClick') }).last();
@@ -791,7 +810,8 @@ async function revealHistoryRows(dialog: Locator) {
   });
   const owner = (await viewport.boundingBox())!,
     stack = (await strip.boundingBox())!;
-  expect(stack.y).toBeGreaterThanOrEqual(owner.y);
+  const ruler = (await dialog.locator('[data-ui="gallery.videoReview.rulerRow"]').boundingBox())!;
+  expect(stack.y).toBeGreaterThanOrEqual(ruler.y + ruler.height - 0.5);
   expect(stack.y + stack.height).toBeLessThanOrEqual(owner.y + owner.height + 0.5);
   await expect(strip).toHaveCSS('padding-bottom', '0px');
   await expect(strip).toHaveCSS('margin-bottom', '0px');
@@ -849,4 +869,82 @@ async function verifyClickTiming(
   await expect(overlay).toBeVisible();
   await seek(2.2);
   await expect(overlay).toHaveCount(0);
+}
+
+async function seedReadableKeyboardHistory(page: Page) {
+  await page.evaluate(async (fixture) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(fixture.databaseName);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const tx = db.transaction('recording_telemetry', 'readwrite');
+    const done = new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error);
+    });
+    tx.objectStore('recording_telemetry').put({
+      recordingId: fixture.records.recordings[0]!.id,
+      captureMode: 'TAB',
+      createdAt: 1,
+      updatedAt: 1,
+      viewport: null,
+      cursorTrack: null,
+      signals: [
+        { id: 'short-typing', kind: 'typing', startTime: 2, endTime: 2.02, point: null, data: {} },
+        {
+          id: 'idle-0',
+          kind: 'cursor-idle',
+          startTime: 0.13,
+          endTime: 3.27,
+          point: null,
+          data: {},
+        },
+        {
+          id: 'idle-1',
+          kind: 'cursor-idle',
+          startTime: 3.27,
+          endTime: 6.41,
+          point: null,
+          data: {},
+        },
+        { id: 'typing', kind: 'typing', startTime: 6.5, endTime: 12.01, point: null, data: {} },
+      ],
+      actionEvents: [
+        {
+          id: 'covered-command',
+          kind: 'KEY',
+          time: 2,
+          duration: 0,
+          point: null,
+          label: 'Ctrl+A',
+          data: {},
+          preset: 'NONE',
+        },
+        ...Array.from({ length: 6 }, (_, index) => ({
+          id: `click-${index}`,
+          kind: 'CLICK',
+          time: 1 + index * 0.03,
+          duration: 0,
+          point: { x: 40, y: 30 },
+          recordingPoint: { x: 0.25, y: 0.33 },
+          label: '',
+          data: {},
+          preset: 'NONE',
+        })),
+        ...['Ctrl+K', 'Ctrl+S', 'Alt+Shift'].map((label, index) => ({
+          id: `command-${index}`,
+          kind: 'KEY',
+          time: 7 + index,
+          duration: 0,
+          point: null,
+          label,
+          data: {},
+          preset: 'NONE',
+        })),
+      ],
+    });
+    await done;
+    db.close();
+  }, betaV1Fixture);
 }
