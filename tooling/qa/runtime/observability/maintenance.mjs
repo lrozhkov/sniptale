@@ -65,6 +65,28 @@ function createStaleRecoveryStep(finishedAt) {
   });
 }
 
+function interruptUnfinishedActivities(record, finishedAt) {
+  for (const activity of record.timeline?.activities ?? []) {
+    if (activity.finishedAt !== null) continue;
+    activity.state = 'interrupted';
+    activity.finishedAt = finishedAt;
+    activity.durationMs =
+      activity.startedAt === null
+        ? 0
+        : Math.max(0, Date.parse(finishedAt) - Date.parse(activity.startedAt));
+    activity.queueDurationMs ??= Math.max(
+      0,
+      Date.parse(finishedAt) - Date.parse(activity.queuedAt)
+    );
+    record.timeline.events.push({
+      sequence: record.timeline.events.length,
+      activityId: activity.activityId,
+      state: 'interrupted',
+      at: finishedAt,
+    });
+  }
+}
+
 export function recoverStaleRuns({
   rootDir = process.cwd(),
   now = Date.now(),
@@ -77,12 +99,14 @@ export function recoverStaleRuns({
     if (now - Date.parse(entry.record.startedAt) < staleAfterMs) continue;
     if (isOwnerAlive(entry.record.ownerPid)) continue;
     const finishedAt = new Date(now).toISOString();
+    interruptUnfinishedActivities(entry.record, finishedAt);
     entry.record.steps.push(createStaleRecoveryStep(finishedAt));
     entry.record.status = 'interrupted';
     entry.record.exitCode = 143;
     entry.record.finishedAt = finishedAt;
     entry.record.durationMs = Math.max(0, now - Date.parse(entry.record.startedAt));
     entry.record.summary = summarizeSteps(entry.record.steps);
+    parseRunRecord(entry.record);
     const logResult = appendBoundedLog(
       path.join(rootDir, ...entry.record.log.path.split('/')),
       '[wrapper.stale-run-recovery]\nRun recovered as interrupted after its owner stopped updating it.\n',

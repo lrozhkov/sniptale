@@ -42,6 +42,46 @@ it('recovers abandoned running records as interrupted', () => {
   expect(persisted.log.digest).toMatch(/^[a-f0-9]{64}$/u);
 });
 
+it('recovers unfinished activities and preserves completed work once', () => {
+  const root = createRepository('qa-observability-timeline-recovery-');
+  const startedAt = Date.parse('2026-07-14T01:00:00.000Z');
+  let now = startedAt;
+  const run = createObservabilityRun({
+    wrapperId: 'qa:checkpoint',
+    rootDir: root,
+    clock: () => now,
+    createId: () => 'e18f68b2-6e52-7cb0-bdb7-7f0a901c94de',
+  });
+  for (const activityId of ['done', 'active', 'waiting']) {
+    run.recordActivityTransition({ activityId, kind: 'scheduler-lane', state: 'queued' });
+  }
+  now += 100;
+  for (const activityId of ['done', 'active']) {
+    run.recordActivityTransition({ activityId, kind: 'scheduler-lane', state: 'started' });
+  }
+  now += 200;
+  run.recordActivityTransition({ activityId: 'done', kind: 'scheduler-lane', state: 'completed' });
+  const completed = run.snapshot().timeline.activities[0];
+  now += 1000;
+  const options = { rootDir: root, now, staleAfterMs: 1000, isOwnerAlive: () => false };
+
+  expect(recoverStaleRuns(options)).toEqual([run.runId]);
+  const persisted = JSON.parse(fs.readFileSync(run.runPath, 'utf8'));
+  expect(persisted.timeline.activities).toEqual([
+    completed,
+    expect.objectContaining({ state: 'interrupted', durationMs: 1200, queueDurationMs: 100 }),
+    expect.objectContaining({ state: 'interrupted', durationMs: 0, queueDurationMs: 1300 }),
+  ]);
+  expect(
+    persisted.timeline.events.slice(-2).map((event: { state: string }) => event.state)
+  ).toEqual(['interrupted', 'interrupted']);
+  expect(collectRunStatistics({ rootDir: root }).invalidRecordCount).toBe(0);
+  const log = fs.readFileSync(run.logPath, 'utf8');
+  expect(recoverStaleRuns(options)).toEqual([]);
+  expect(fs.readFileSync(run.logPath, 'utf8')).toBe(log);
+  expect(JSON.parse(fs.readFileSync(run.runPath, 'utf8'))).toEqual(persisted);
+});
+
 it('does not recover an old record while its owner process remains alive', () => {
   const root = createRepository('qa-observability-live-owner-');
   const startedAt = Date.parse('2026-07-14T01:00:00.000Z');
