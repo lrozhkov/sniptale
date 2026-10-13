@@ -101,11 +101,12 @@ async function collectFormatStep(context) {
   });
 }
 
-function collectAdvisoryStep(context, { producerRunId } = {}) {
+function collectAdvisoryStep(context, { producerRunId, structuralReport = null } = {}) {
   return timeSyncStep(() => {
     const report = collectAndPersistAdvisoryReport(context, {
       printReport: false,
       producerRunId,
+      structuralReport,
     });
     const actionable = [...report.buckets.introduced, ...report.buckets.worsened];
     return {
@@ -141,17 +142,26 @@ function deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps) {
 }
 
 async function collectCheckpointVerificationSteps({
-  advisoryStep,
+  advisoryStepCollector,
   context,
   focusedStepCollector,
   formatStep,
+  producerRunId,
 }) {
-  if (formatStep.status === 'failed') return [formatStep, advisoryStep];
   const focusedSteps = await focusedStepCollector({
     ...context,
     shouldRunManifestPermissions,
     shouldRunRuntimeTopology,
   });
+  const structuralReport = focusedSteps.find(
+    (step) => step.label === 'Structural risk'
+  )?.structuralReport;
+  const advisoryStep = collectFailSoftAdvisoryStep(
+    advisoryStepCollector,
+    context,
+    producerRunId,
+    structuralReport
+  );
   const findings = collectChangeRisks({
     targetFiles: context.allQualityTargetFiles ?? context.qualityTargetFiles ?? context.targetFiles,
     mode: 'checkpoint',
@@ -189,9 +199,16 @@ function normalizeAdvisoryStep(advisoryStep) {
   };
 }
 
-function collectFailSoftAdvisoryStep(advisoryStepCollector, context, producerRunId) {
+function collectFailSoftAdvisoryStep(
+  advisoryStepCollector,
+  context,
+  producerRunId,
+  structuralReport
+) {
   try {
-    return normalizeAdvisoryStep(advisoryStepCollector(context, { producerRunId }));
+    return normalizeAdvisoryStep(
+      advisoryStepCollector(context, { producerRunId, structuralReport })
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return createSkippedStep(
@@ -241,13 +258,9 @@ async function collectCheckpointPrerequisites({
 
 async function collectProductCheckpointResult(prerequisites, dependencies) {
   const { context, formatStep, harnessFreshnessStep } = prerequisites;
-  const advisoryStep = collectFailSoftAdvisoryStep(
-    dependencies.advisoryStepCollector,
-    context,
-    dependencies.producerRunId
-  );
   const verification = await collectCheckpointVerificationSteps({
-    advisoryStep,
+    advisoryStepCollector: dependencies.advisoryStepCollector,
+    producerRunId: dependencies.producerRunId,
     context,
     focusedStepCollector: dependencies.focusedStepCollector,
     formatStep,

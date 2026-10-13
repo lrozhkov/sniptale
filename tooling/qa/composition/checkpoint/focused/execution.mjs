@@ -49,17 +49,29 @@ function runDeadCommentedCodeStep(codeFiles, baseline) {
   return createViolationStep('Dead commented code', 'Dead commented code found:', result);
 }
 
-function runStructuralRiskStep(codeFiles, baseline) {
-  const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
+/** Check structural risk within the supplied code population. */
+export function runStructuralRiskStep(codeFiles, baseline) {
+  if (codeFiles.length === 0) {
+    return {
+      ...createSkippedStep('Structural risk'),
+      structuralReport: { violations: [], advisories: [] },
+    };
+  }
   const result = runStructuralRiskCheck({
-    files: behavioralCodeFiles,
+    files: codeFiles,
     reportScope: 'current-diff',
     enforce: true,
   });
-  return createViolationStep('Structural risk', 'Structural risk violations found:', {
-    ...result,
-    violations: filterAllowedViolations(result.violations, baseline),
-  });
+  return {
+    ...createViolationStep('Structural risk', 'Structural risk violations found:', {
+      ...result,
+      violations: filterAllowedViolations(result.violations, baseline),
+    }),
+    structuralReport: {
+      violations: result.report.violations,
+      advisories: result.report.advisories,
+    },
+  };
 }
 
 export function resolveFocusedCodeStepFiles(options, codeFiles, behavioralCodeFiles) {
