@@ -111,6 +111,10 @@ function initializeObservabilityRun(options) {
     clock: options.clock,
     maximumLogBytes: options.maximumLogBytes,
     sensitiveValues: collectSensitiveEnvironmentValues(options.environment),
+    refreshRepositoryContext: () => {
+      const repository = collectRepository(options);
+      return { repository, correlation: resolveCorrelation(options, repository) };
+    },
   };
 }
 

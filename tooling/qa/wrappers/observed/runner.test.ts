@@ -1,9 +1,13 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTempRoot, initGitRepo, withCwd } from '../../test-support/test-helpers';
+import { createTempRoot, initGitRepo, runGit, withCwd } from '../../test-support/test-helpers';
 import { runObservedWrapper } from './runner.mjs';
+import { HOST_QUEUE_TICKET_ENV } from '../../runtime/locking/host-queue.mjs';
+import { collectRepositoryContext } from '../../runtime/observability/repository-context.mjs';
+import { parseRunRecord } from '../../runtime/observability/schema.mjs';
 
 function createTestLockFactory() {
   const release = vi.fn();
@@ -20,6 +24,118 @@ const PRIVATE_VALUES = {
   commitMessage: 'qa private commit message',
 };
 const JSON_ONLY_SECRETS = ['json-child-api-key', 'json-child-bearer'];
+
+it('waits before execution, reads fresh inputs, and releases both slots after failure', async () => {
+  const root = createTempRoot('observed-wrapper-host-wait-');
+  const storageRoot = createTempRoot('observed-wrapper-host-wait-records-');
+  initGitRepo(storageRoot);
+  initGitRepo(root);
+  const candidate = `${root}/candidate.txt`;
+  fs.writeFileSync(candidate, 'before');
+  runGit(root, 'add', 'candidate.txt');
+  runGit(root, 'commit', '-m', 'initial fixture');
+  const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  const { lockFactory, release } = createTestLockFactory();
+  const releaseHost = vi.fn();
+  let grant!: (slot: { ticketName: string; release: typeof releaseHost }) => void;
+  const admission = new Promise<{ ticketName: string; release: typeof releaseHost }>((resolve) => {
+    grant = resolve;
+  });
+  const hostSlotFactory = vi.fn(() => admission);
+  const previous = process.env[HOST_QUEUE_TICKET_ENV];
+  const execute = vi.fn(async () => {
+    expect(fs.readFileSync(candidate, 'utf8')).toBe('after');
+    expect(process.env[HOST_QUEUE_TICKET_ENV]).toBe('fixture-ticket');
+    throw new Error('Expected fixture failure.');
+  });
+  try {
+    await withCwd(root, async () => {
+      const running = runObservedWrapper({
+        wrapperId: 'qa:checkpoint',
+        label: 'QA checkpoint',
+        blocking: true,
+        argv: [],
+        environment: {
+          ...process.env,
+          CODEX_THREAD_ID: 'queue-fixture',
+          SNIPTALE_QA_OBSERVABILITY_ROOT: storageRoot,
+        },
+        contractValidator: ignoreStepContract,
+        lockFactory,
+        hostSlotFactory,
+        execute,
+      });
+      expect(hostSlotFactory).toHaveBeenCalledOnce();
+      expect(execute).not.toHaveBeenCalled();
+      fs.writeFileSync(candidate, 'intermediate');
+      runGit(root, 'add', 'candidate.txt');
+      runGit(root, 'commit', '-m', 'queued fixture update');
+      fs.writeFileSync(candidate, 'after');
+      const admittedRepository = collectRepositoryContext({ rootDir: root });
+      grant({ ticketName: 'fixture-ticket', release: releaseHost });
+      const result = await running;
+      expect(result.exitCode).toBe(1);
+      expect(result.record.repository.diffFingerprint).toBe(admittedRepository.diffFingerprint);
+      expect(result.record.repository.head).toBe(admittedRepository.head);
+      expect(result.record.repository.treeFingerprint).toBe(admittedRepository.treeFingerprint);
+      const persisted = parseRunRecord(JSON.parse(fs.readFileSync(result.runPath, 'utf8')));
+      expect(persisted.repository).toMatchObject(admittedRepository);
+      expect(persisted.correlation.workflowId).toBe(
+        `workflow.${createHash('sha256')
+          .update(`queue-fixture\0${admittedRepository.head}`)
+          .digest('hex')
+          .slice(0, 24)}`
+      );
+      expect(execute).toHaveBeenCalledOnce();
+      expect(result.record.timeline.activities).toContainEqual(
+        expect.objectContaining({
+          activityId: 'wrapper.host-admission',
+          kind: 'host-admission',
+          state: 'completed',
+        })
+      );
+      expect(releaseHost).toHaveBeenCalledOnce();
+      expect(release).toHaveBeenCalledOnce();
+      expect(process.env[HOST_QUEUE_TICKET_ENV]).toBe(previous);
+    });
+  } finally {
+    output.mockRestore();
+  }
+});
+
+it.each([
+  { wrapperId: 'qa:preflight', blocking: false, argv: [], handoff: false },
+  { wrapperId: 'qa:checkpoint', blocking: true, argv: ['--help'], handoff: false },
+  { wrapperId: 'qa:build', blocking: true, argv: [], handoff: true },
+])(
+  'does not acquire another host slot for $wrapperId with help=$argv and handoff=$handoff',
+  async ({ wrapperId, blocking, argv, handoff }) => {
+    const root = createTempRoot('observed-wrapper-without-host-wait-');
+    initGitRepo(root);
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const hostSlotFactory = vi.fn();
+    const release = vi.fn();
+    try {
+      const result = await withCwd(root, () =>
+        runObservedWrapper({
+          wrapperId,
+          label: 'Fixture',
+          blocking,
+          argv,
+          environment: { ...process.env, SNIPTALE_QA_OBSERVABILITY_ROOT: root },
+          contractValidator: ignoreStepContract,
+          lockFactory: () => ({ handoff, release }),
+          hostSlotFactory,
+          execute: async () => ({ steps: [] }),
+        })
+      );
+      expect(result.exitCode).toBe(0);
+      expect(hostSlotFactory).not.toHaveBeenCalled();
+    } finally {
+      output.mockRestore();
+    }
+  }
+);
 
 function createPrivateEnvironment(root: string) {
   return {
@@ -65,6 +181,7 @@ describe('observed wrapper lifecycle', () => {
     initGitRepo(root);
     const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const { lockFactory, release } = createTestLockFactory();
+    const hostSlotFactory = vi.fn(async () => ({ ticketName: null, release: vi.fn() }));
 
     await withCwd(root, async () => {
       const environment = { ...process.env, SNIPTALE_QA_OBSERVABILITY_ROOT: root };
@@ -76,6 +193,7 @@ describe('observed wrapper lifecycle', () => {
         contractValidator: ignoreStepContract,
         environment,
         lockFactory,
+        hostSlotFactory,
         execute: async () => ({
           context: { suite: 'product', targetFiles: ['src/a.ts'] },
           steps: [{ label: 'Oxlint', status: 'ok', durationMs: 3 }],
@@ -93,6 +211,7 @@ describe('observed wrapper lifecycle', () => {
         contractValidator: ignoreStepContract,
         environment,
         lockFactory,
+        hostSlotFactory,
         execute: async () => ({ steps: [] }),
       });
       expect(failure.exitCode).toBe(1);

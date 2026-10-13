@@ -30,6 +30,8 @@ Resource flags are `--cpu N`, `--memory-mib N`, and `--workers N`. Use them only
 
 Follow the [blocking-wrapper rule](wrapper-summary.md#locks-and-scheduling).
 
+On WSL/Linux, blocking wrappers in different directories wait for the same user's QA slot. Leave the waiting command running. It prints one queue message and continues after admission. Use Ctrl+C to cancel its ticket. A second wrapper in the same directory still reports the existing repository lock.
+
 ## GitHub operations
 
 Ready pull requests run **Continuous Integration**. A merge to `main` does not repeat this gate for the squash commit.

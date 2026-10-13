@@ -48,11 +48,11 @@ it.each(['_canonical-proof', 'release', 'provenance-finalize'])(
 it('keeps normalization inside the existing candidate wrapper execution boundary', () => {
   for (const name of ['proof', 'release']) {
     const source = read(`tooling/ci/${name}-wrapper.mjs`);
+    const operation =
+      name === 'proof' ? 'collectProofWrapperResults' : 'collectReleaseWrapperResults';
+    expect(source).toContain(`execute: ${operation}`);
     expect(source.indexOf('normalizeMediabunny();')).toBeGreaterThan(
-      source.indexOf('if (isExecutedAsScript')
-    );
-    expect(source.indexOf('normalizeMediabunny();')).toBeLessThan(
-      source.indexOf('await runObservedWrapper')
+      source.indexOf(`export function ${operation}`)
     );
   }
   const release = read('tooling/ci/release-wrapper.mjs');

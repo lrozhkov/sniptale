@@ -334,6 +334,18 @@ function callName(expression) {
 function processTargetCandidates(name, argumentsList, sourceFile) {
   if (name === 'fork' || name === 'runRepoNodeEntry') return [argumentsList[0]];
   const command = argumentsList[0]?.getText(sourceFile) ?? '';
+  const args = argumentsList[1];
+  if (
+    argumentsList[0] &&
+    literalText(argumentsList[0]) === 'flock' &&
+    args &&
+    ts.isArrayLiteralExpression(args) &&
+    args.elements.length >= 4 &&
+    literalText(args.elements[0]) === '--exclusive' &&
+    args.elements[2]?.getText(sourceFile) === 'process.execPath'
+  ) {
+    return [args.elements[3]];
+  }
   const interpreter = /^(?:["'](?:node|tsx|bash|sh|python3?)["']|process\.execPath)$/u.test(
     command
   );

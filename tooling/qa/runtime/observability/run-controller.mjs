@@ -77,14 +77,24 @@ export class ObservabilityRunController {
   #clock;
   #maximumLogBytes;
   #sensitiveValues;
+  #refreshRepositoryContext;
   #finalized = false;
 
-  constructor({ record, paths, repositoryRoots, clock, maximumLogBytes, sensitiveValues }) {
+  constructor({
+    record,
+    paths,
+    repositoryRoots,
+    clock,
+    maximumLogBytes,
+    sensitiveValues,
+    refreshRepositoryContext,
+  }) {
     this.#record = record;
     this.#repositoryRoots = repositoryRoots;
     this.#clock = clock;
     this.#maximumLogBytes = maximumLogBytes;
     this.#sensitiveValues = new Set(sensitiveValues);
+    this.#refreshRepositoryContext = refreshRepositoryContext;
     this.runId = record.runId;
     this.rootRunId = record.rootRunId;
     this.parentRunId = record.parentRunId;
@@ -230,6 +240,24 @@ export class ObservabilityRunController {
     this.#record.steps.push(step);
     this.#persist();
     return step;
+  }
+
+  /** Collect the admitted candidate identity without changing run identity or scope. */
+  refreshRepositoryContext() {
+    this.#assertActive();
+    if (!this.#refreshRepositoryContext)
+      throw new Error('Resumed runs cannot collect a new candidate identity.');
+    const { repository, correlation } = this.#refreshRepositoryContext();
+    this.#record.repository = {
+      ...repository,
+      scope: this.#record.repository.scope,
+      suite: this.#record.repository.suite,
+      mode: this.#record.repository.mode,
+      targetFiles: this.#record.repository.targetFiles,
+    };
+    this.#record.correlation = correlation;
+    this.#persist();
+    return structuredClone(this.#record.repository);
   }
 
   attachRepositoryContext({ scope, suite, mode, targetFiles } = {}) {

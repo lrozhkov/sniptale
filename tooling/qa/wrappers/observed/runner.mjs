@@ -9,6 +9,7 @@ import {
 } from '../../runtime/observability/index.mjs';
 import { assertQaExecutionContract } from '../../composition/catalog/contract.mjs';
 import { acquireBlockingWrapperLock } from '../../runtime/locking/blocking-wrapper-lock.helpers.mjs';
+import { acquireHostQaSlot, HOST_QUEUE_TICKET_ENV } from '../../runtime/locking/host-queue.mjs';
 import { parseWrapperArguments } from '../contracts/cli-contracts.mjs';
 import { formatObservedRunSummary, normalizeObservedStep } from './output.mjs';
 import { createHelpStep, recordObservedResult, resolveInvocationMode } from './result.mjs';
@@ -92,7 +93,29 @@ function failObservedRun(session, error) {
 
 async function executeObservedCommand(input) {
   let lock = null;
-  let detachSignals = () => {};
+  let hostSlot = null;
+  let environmentChanged = false;
+  const previousTicket = process.env[HOST_QUEUE_TICKET_ENV];
+  const controller = new AbortController();
+  function releaseLocks() {
+    if (environmentChanged) {
+      if (previousTicket === undefined) delete process.env[HOST_QUEUE_TICKET_ENV];
+      else process.env[HOST_QUEUE_TICKET_ENV] = previousTicket;
+      environmentChanged = false;
+    }
+    try {
+      hostSlot?.release();
+    } finally {
+      lock?.release();
+    }
+  }
+  const detachSignals = attachObservedSignalHandlers({
+    ...input,
+    releaseLock: () => {
+      controller.abort(new Error('QA wrapper was interrupted.'));
+      releaseLocks();
+    },
+  });
   try {
     if (input.blocking) {
       lock = input.lockFactory(input.wrapperId, {
@@ -101,10 +124,34 @@ async function executeObservedCommand(input) {
         parentRunId: input.session.parentRunId,
       });
     }
-    detachSignals = attachObservedSignalHandlers({
-      ...input,
-      releaseLock: () => lock?.release(),
-    });
+    if (input.blocking && !lock?.handoff) {
+      const activityId = 'wrapper.host-admission';
+      const kind = 'host-admission';
+      const queuedAt = Date.now();
+      input.session.recordActivityTransition({ activityId, kind, state: 'queued' });
+      hostSlot = await input.hostSlotFactory(input.wrapperId, {
+        runId: input.session.runId,
+        signal: controller.signal,
+        onWaiting: ({ owner, position }) => {
+          process.stdout.write(
+            `Waiting for QA slot: position=${position}, owner=${owner ?? 'pending'}.\n`
+          );
+        },
+      });
+      input.session.recordActivityTransition({
+        activityId,
+        kind,
+        state: 'started',
+        waitReasons: ['concurrency-limit'],
+        waitDurations: { concurrencyLimitMs: Date.now() - queuedAt },
+      });
+      input.session.recordActivityTransition({ activityId, kind, state: 'completed' });
+      if (hostSlot.ticketName) {
+        process.env[HOST_QUEUE_TICKET_ENV] = hostSlot.ticketName;
+        environmentChanged = true;
+      }
+    }
+    if (input.blocking) input.session.refreshRepositoryContext();
     const result = await withObservabilityTimeline(input.session, () =>
       input.execute({ options: input.parsed.values, session: input.session })
     );
@@ -115,10 +162,11 @@ async function executeObservedCommand(input) {
       wrapperId: input.wrapperId,
     });
   } catch (error) {
+    if (controller.signal.aborted) return input.session.snapshot();
     return failObservedRun(input.session, error);
   } finally {
     detachSignals();
-    lock?.release();
+    releaseLocks();
   }
 }
 
@@ -179,7 +227,7 @@ function completeObservedRun({ helpText, label, record, session, storageRoot, su
   return { exitCode: record.exitCode, helpText, record, runPath: session.runPath, summary };
 }
 
-/** Own one complete CLI lifecycle so every exit path produces one durable run record. */
+/** Own one observed CLI lifecycle. A caller that injects retained leases must release them. */
 export async function runObservedWrapper({
   wrapperId,
   label,
@@ -189,6 +237,7 @@ export async function runObservedWrapper({
   parseArguments = parseWrapperArguments,
   sessionFactory = createObservabilityRun,
   lockFactory = acquireBlockingWrapperLock,
+  hostSlotFactory = acquireHostQaSlot,
   environment = process.env,
   processExit = process.exit,
   contractValidator = assertQaExecutionContract,
@@ -208,6 +257,7 @@ export async function runObservedWrapper({
     execute,
     label,
     lockFactory,
+    hostSlotFactory,
     parseArguments,
     processExit,
     session,

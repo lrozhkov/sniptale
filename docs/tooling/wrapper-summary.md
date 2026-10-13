@@ -40,7 +40,15 @@ Resource settings are execution metadata from the run record. They do not change
 
 ## Locks and scheduling
 
-`qa:release-harness`, `qa:checkpoint`, `qa:closeout`, `ci:proof`, and `ci:release` share the blocking lifecycle. They must not run concurrently. Closeout alone may hand its lock to the internal build.
+`qa:release-harness`, `qa:checkpoint`, `qa:closeout`, `ci:proof`, and `ci:release` share the blocking lifecycle. Closeout alone may hand its lock to the internal build.
+
+On Linux, including WSL, these wrappers share one FIFO queue across directories under the same user. An active wrapper holds the slot. Other wrappers wait before formatting or checks. The kernel lock suspends the waiting process. The wrapper prints one waiting message and records a separate `host-admission` timeline activity. It reads the candidate after admission.
+
+The queue uses private records in `/tmp/sniptale-qa-<uid>`. Cancellation removes the waiting ticket. Recovery checks the Linux boot identity and process start time. Before admission, recovery stops abandoned QA descendants that inherit the ticket marker. Cleanup requires a readable process environment. It never signals a process without the matching marker.
+
+The repository lock still rejects a second active wrapper in the same directory. Other platforms retain this repository lock. Preflight and help do not enter the host queue. An authenticated closeout/build handoff retains the existing host slot.
+
+Local CI holds both slots through setup, canonical checks, and artifact sealing. It executes the canonical operation in the same process. Standalone CI wrappers also normalize dependencies and admit inherited evidence after host admission. Observability refreshes candidate identity after admission, including a derived workflow ID when HEAD changes.
 
 Checkpoint completes formatting before parallel focused lanes start. Fast proof schedules repository controls, product proof, harness proof, audits, and build through the machine catalog. Release does not rerun product or harness tests.
 
