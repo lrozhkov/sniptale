@@ -47,7 +47,14 @@ export async function openReviewAudioClipSource(
       numberOfChannels > 8
     )
       throw new Error('Invalid external audio parameters');
-    const length = Math.ceil(duration * sampleRate);
+    const frames = duration * sampleRate;
+    const nativeFrames = Math.round(frames);
+    // Native PCM durations can land one ULP above their integer frame count.
+    const length =
+      nativeFrames > 0 &&
+      Math.abs(frames - nativeFrames) <= Number.EPSILON * Math.max(1, frames) * 4
+        ? nativeFrames
+        : Math.ceil(frames);
     if (!Number.isSafeInteger(length)) throw new Error('Invalid external audio duration');
     const sink = new AudioSampleSink(track);
     signal.throwIfAborted();

@@ -38,6 +38,23 @@ beforeEach(() => {
     };
   });
 });
+it.each([
+  [0.07, 44100, 3087],
+  [0.05, 44100, 2205],
+  [0.07001, 44100, 3088],
+  [0.07, 48000, 3360],
+  [1e-20, 44100, 1],
+])('admits %ss at %sHz on its native frame grid (%s frames)', async (duration, rate, frames) => {
+  io.track.mockResolvedValue({
+    canDecode: async () => true,
+    getSampleRate: async () => rate,
+    getNumberOfChannels: async () => 1,
+    computeDuration: async () => duration,
+  });
+  const source = await openReviewAudioClipSource(new Blob(), new AbortController().signal);
+  expect(source.length).toBe(frames);
+  source.dispose();
+});
 it('seeks late intervals with bounded PCM and never decodes complete long source', async () => {
   const controller = new AbortController();
   const source = await openReviewAudioClipSource(new Blob(), controller.signal);

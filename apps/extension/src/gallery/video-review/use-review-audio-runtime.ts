@@ -261,6 +261,7 @@ export function useReviewEditorAudioRuntime(args: {
 class ReviewAudioPlaybackSession {
   private buffers = new Map<string, Promise<ReviewAudioClipBuffer | null>>();
   private prepared = new Map<string, ReviewAudioClipBuffer>();
+  private actionBuffers = new Map<ActionSoundSampleId, ReviewAudioClipBuffer>();
   private planKey = '';
   private generation = 0;
   private preparation: AbortController | null = null;
@@ -290,6 +291,32 @@ class ReviewAudioPlaybackSession {
   }
   cancelAudition() {
     if (this.auditionActive) this.stop();
+  }
+  async preparePlayback(): Promise<boolean> {
+    this.stop();
+    const current = this.latest.current;
+    const plan = current.actionPlan;
+    if (current.silent || !plan?.descriptors.length) return true;
+    const controller = new AbortController();
+    this.preparation = controller;
+    const generation = this.generation;
+    const valid = () =>
+      !controller.signal.aborted &&
+      generation === this.generation &&
+      this.latest.current.sessionKey === current.sessionKey &&
+      this.latest.current.actionPlan === plan &&
+      this.latest.current.seekRevision === current.seekRevision &&
+      this.latest.current.silent === current.silent;
+    try {
+      await this.loadActions(current, controller.signal, valid);
+      return valid();
+    } catch (error) {
+      if (valid()) {
+        this.stop();
+        current.onFailure(error instanceof ReviewActionAudioUnavailable ? error.reason : undefined);
+      }
+      return false;
+    }
   }
   audition(plan: ReviewActionAudioPlan, at?: number, duration = 2) {
     this.stop();
@@ -327,6 +354,7 @@ class ReviewAudioPlaybackSession {
     this.stop();
     this.buffers.clear();
     this.prepared.clear();
+    this.actionBuffers.clear();
     this.admission = null;
   }
   private clearActionResources() {
@@ -409,6 +437,8 @@ class ReviewAudioPlaybackSession {
     try {
       await job.engine.resume();
       if (!this.active(job)) return;
+      await this.startActions(job);
+      if (!this.active(job)) return;
       const plan = buildQuickEditAudioPlan({
         voiceover: job.current.voiceover,
         music: job.current.music,
@@ -450,7 +480,6 @@ class ReviewAudioPlaybackSession {
             prepared
           );
       }
-      await this.startActions(job);
     } catch (error) {
       this.fail(job, error);
     }
@@ -460,31 +489,45 @@ class ReviewAudioPlaybackSession {
     this.stop();
     job.current.onFailure(error instanceof ReviewActionAudioUnavailable ? error.reason : undefined);
   }
+  private async loadActions(
+    current: ReviewAudioRuntimeProps,
+    signal: AbortSignal,
+    valid: () => boolean
+  ) {
+    const plan = current.actionPlan;
+    if (!plan?.descriptors.length || !valid()) return null;
+    let admission = this.admission?.plan === plan ? this.admission.result : null;
+    if (!admission) {
+      admission = await admitReviewActionAudioPlan(plan, signal);
+      if (!valid()) return null;
+      this.admission = { plan, result: admission };
+    }
+    const missing = admission.sampleIds.filter((sampleId) => !this.actionBuffers.has(sampleId));
+    if (missing.length) {
+      const source =
+        current.createActionSource?.(signal) ??
+        createReviewActionAudioSource({
+          signal,
+          getURL: runtimeInfo.getURL,
+          fetch: (url, init) => fetch(url, init),
+          decode: decodeReviewAudioClipBuffer,
+        });
+      this.actionSource = source;
+      for (const sampleId of missing) {
+        const native = await source.read(sampleId);
+        if (!valid()) return null;
+        this.actionBuffers.set(sampleId, new BrowserReviewAudioBuffer(native));
+      }
+    }
+    return valid() ? admission : null;
+  }
   private async startActions(job: PlaybackJob) {
     const plan = job.current.actionPlan;
     if (!plan?.descriptors.length || !this.active(job)) return;
-    let admission = this.admission?.plan === plan ? this.admission.result : null;
-    if (!admission) {
-      admission = await admitReviewActionAudioPlan(plan, job.signal);
-      if (!this.active(job)) return;
-      this.admission = { plan, result: admission };
-    }
-    const source =
-      job.current.createActionSource?.(job.signal) ??
-      createReviewActionAudioSource({
-        signal: job.signal,
-        getURL: runtimeInfo.getURL,
-        fetch: (url, init) => fetch(url, init),
-        decode: decodeReviewAudioClipBuffer,
-      });
-    this.actionSource = source;
-    const buffers = new Map<ActionSoundSampleId, ReviewAudioClipBuffer>();
-    for (const sampleId of admission.sampleIds) {
-      const native = await source.read(sampleId);
-      if (!this.active(job)) return;
-      buffers.set(sampleId, new BrowserReviewAudioBuffer(native));
-    }
-    if (!this.active(job)) return;
+    const admission = await this.loadActions(job.current, job.signal, () => this.active(job));
+    if (!admission || !this.active(job)) return;
+    if (job.audition)
+      this.anchor = { outputTime: job.current.outputTime, audioNow: job.engine.now() };
     job.current.onActionAudioRecovered?.();
     const action: QuickEditActionAudioSchedule = {
       plan,
@@ -512,7 +555,7 @@ class ReviewAudioPlaybackSession {
           if (!this.active(job) || !this.anchor) return;
           if (visited.has(entry.clipId)) continue;
           if (entry.source.kind !== 'bundled') throw new Error('Invalid action audio source.');
-          const buffer = buffers.get(entry.source.sampleId);
+          const buffer = this.actionBuffers.get(entry.source.sampleId);
           if (!buffer) throw new ReviewActionAudioUnavailable('resource-missing');
           const now = job.engine.now();
           const schedule = planQuickEditClipPlayback({
@@ -589,5 +632,9 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     []
   );
   const stopAudition = useCallback(() => session.current?.cancelAudition(), []);
-  return { audition, stopAudition };
+  const preparePlayback = useCallback(
+    () => session.current?.preparePlayback() ?? Promise.resolve(false),
+    []
+  );
+  return { audition, stopAudition, preparePlayback };
 }

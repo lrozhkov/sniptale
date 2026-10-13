@@ -100,7 +100,12 @@ export function useReviewTransport(args: {
     playing,
     setPlaying,
     seek,
-    play,
+    play: async () => {
+      if (video.current?.paused && !args.silent) {
+        if (!(await actionSoundPreview.preparePlayback())) return;
+      }
+      play();
+    },
     timeline,
     playbackRange,
     setPlaybackRange,

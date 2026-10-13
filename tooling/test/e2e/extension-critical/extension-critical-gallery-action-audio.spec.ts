@@ -41,7 +41,9 @@ test('all bundled action sounds decode at native rate with exact PCM and bounded
       await probeText()
     );
     await writeFile(info.outputPath('action-native-samples.json'), JSON.stringify(result, null, 2));
-    expect(result).toHaveLength(10);
+    expect(result.map((sample) => sample.id).sort()).toEqual(
+      Object.keys(ACTION_SOUND_CATALOG).sort()
+    );
     for (const sample of result) {
       const expected = Object.entries(ACTION_SOUND_CATALOG).find(([id]) => id === sample.id)?.[1];
       expect(expected).toBeDefined();

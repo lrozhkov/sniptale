@@ -226,3 +226,151 @@ it('auditions exclusively on the existing graph without starting video playback'
     vi.useRealTimers();
   }
 });
+
+it('starts a short audition after decode instead of consuming its window while loading', async () => {
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  vi.spyOn(video, 'pause').mockImplementation(() => undefined);
+  let release!: (buffer: AudioBuffer) => void;
+  const pending = new Promise<AudioBuffer>((resolve) => {
+    release = resolve;
+  });
+  const read = vi.fn(() => pending);
+  const f = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    createActionSource: () => ({ read, dispose() {} }),
+  });
+  await act(async () => root.render(<f.Harness />));
+  act(() => f.controls.audition(typingActionPlan(0.5), 0, 0.5));
+  await vi.waitFor(() => expect(read).toHaveBeenCalled());
+  engine.currentTime = 101;
+  await act(async () => release(actionBuffer()));
+  await vi.waitFor(() => expect(engine.scheduled.length).toBeGreaterThan(0));
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 101 });
+  act(() => f.controls.stopAudition());
+});
+
+it('prepares bundled cues before playback and reuses admitted native buffers', async () => {
+  const engine = new FakeEngine();
+  let release!: (buffer: AudioBuffer) => void;
+  const pending = new Promise<AudioBuffer>((resolve) => {
+    release = resolve;
+  });
+  const read = vi.fn(() => pending);
+  const f = renderRuntime({
+    createEngine: () => engine,
+    actionPlan: typingActionPlan(0.5),
+    createActionSource: () => ({ read, dispose() {} }),
+  });
+  await act(async () => root.render(<f.Harness />));
+  let prepared!: Promise<boolean>;
+  act(() => {
+    prepared = f.controls.preparePlayback();
+  });
+  await vi.waitFor(() => expect(read).toHaveBeenCalled());
+  expect(engine.scheduled).toHaveLength(0);
+  engine.currentTime = 101;
+  await act(async () => {
+    release(actionBuffer());
+    expect(await prepared).toBe(true);
+  });
+  expect(read).toHaveBeenCalledTimes(3);
+  await act(async () => root.render(<f.Harness playing />));
+  await vi.waitFor(() => expect(engine.scheduled.length).toBeGreaterThan(0));
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 101 });
+  expect(read).toHaveBeenCalledTimes(3);
+});
+
+it.each(['seek', 'switch', 'off'] as const)(
+  'cancels pending playback preparation after %s',
+  async (change) => {
+    const onFailure = vi.fn();
+    let release!: (buffer: AudioBuffer) => void;
+    const pending = new Promise<AudioBuffer>((resolve) => {
+      release = resolve;
+    });
+    const read = vi.fn(() => pending);
+    const dispose = vi.fn();
+    const f = renderRuntime({
+      actionPlan: typingActionPlan(0.5),
+      onFailure,
+      createActionSource: () => ({ read, dispose }),
+    });
+    await act(async () => root.render(<f.Harness />));
+    let prepared!: Promise<boolean>;
+    act(() => {
+      prepared = f.controls.preparePlayback();
+    });
+    await vi.waitFor(() => expect(read).toHaveBeenCalled());
+    await act(async () =>
+      root.render(
+        change === 'seek' ? (
+          <f.Harness seekRevision={1} />
+        ) : change === 'switch' ? (
+          <f.Harness sessionKey="other" />
+        ) : (
+          <f.Harness actionPlan={{ duration: 0.5, descriptors: [] }} />
+        )
+      )
+    );
+    await act(async () => {
+      release(actionBuffer());
+      expect(await prepared).toBe(false);
+    });
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(onFailure).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses playback preparation when a selected bundled sample is missing', async () => {
+  const onFailure = vi.fn();
+  const f = renderRuntime({
+    actionPlan: typingActionPlan(0.5),
+    onFailure,
+    createActionSource: () => ({
+      read: async () => {
+        throw new ReviewActionAudioUnavailable('resource-missing');
+      },
+      dispose() {},
+    }),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(false));
+  expect(onFailure).toHaveBeenCalledExactlyOnceWith('resource-missing');
+});
+
+it('schedules prepared action cues while an external music asset is still loading', async () => {
+  const engine = new FakeEngine();
+  let release!: (asset: Blob) => void;
+  const pending = new Promise<Blob>((resolve) => {
+    release = resolve;
+  });
+  const resolveAsset = vi.fn(() => pending);
+  const f = renderRuntime({
+    createEngine: () => engine,
+    resolveAsset,
+    actionPlan: typingActionPlan(0.5),
+    createActionSource: () => ({ read: async () => actionBuffer(), dispose() {} }),
+    music: [
+      {
+        id: 'music',
+        assetId: 'project-asset:music',
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 4,
+        volume: 1,
+        muted: false,
+        fadeIn: 0,
+        fadeOut: 0,
+      },
+    ],
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  await act(async () => root.render(<f.Harness playing />));
+  await vi.waitFor(() => expect(resolveAsset).toHaveBeenCalledOnce());
+  expect(engine.scheduled.length).toBeGreaterThan(0);
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 100 });
+  await act(async () => release(new Blob()));
+});
