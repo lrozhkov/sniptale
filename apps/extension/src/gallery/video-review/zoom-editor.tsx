@@ -167,6 +167,7 @@ function resetFocusSettings(zoom: ZoomState, id: string): ZoomState {
   );
   const reset = fitQuickEditZoomTransitions({
     ...defaults,
+    ...(selected.followCursor === undefined ? {} : { followCursor: selected.followCursor }),
     ...(selected.dormant !== undefined ? { dormant: selected.dormant } : {}),
     ...(selected.linkTo ? { linkTo: selected.linkTo } : {}),
   });

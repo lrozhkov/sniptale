@@ -113,23 +113,27 @@ export function resolveQuickEditEffectiveState(
 ): QuickEditEffectiveState {
   const advanced = state.ui.mode === 'advanced';
   const features = resolveQuickEditEffectiveFeatures(state);
+  const needsCursor =
+    features.zoomApplied &&
+    state.zoom.regions.some(
+      (region) => region.followCursor ?? state.cursorFocusPath?.mode === 'follow'
+    );
+  const cursorPath = needsCursor
+    ? cursorFacts
+      ? resolveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, state.cursorFocusPath)
+      : state.cursorFocusPath
+    : undefined;
   return {
     ...features,
     zoomRegions: projectReviewFocus(
       features.zoomApplied ? state.zoom.regions : [],
       state.audio.voiceoverSegments
     ).map((region) =>
-      state.cursorFocusPath?.mode === 'follow'
+      (region.followCursor ?? cursorPath?.mode === 'follow') && cursorPath
         ? {
             ...region,
             cursorFocus: {
-              path: cursorFacts
-                ? resolveReviewCursorFocusPath(
-                    cursorFacts.facts,
-                    cursorFacts.source,
-                    state.cursorFocusPath
-                  )
-                : state.cursorFocusPath,
+              path: { ...cursorPath, mode: 'follow' },
               ...(cursorFacts && state.windowHeader
                 ? {
                     sourceFrame: {

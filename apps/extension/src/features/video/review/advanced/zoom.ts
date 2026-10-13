@@ -88,6 +88,7 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  followCursor?: boolean;
   perspective?: QuickEditZoomRegion['perspective'];
   depthOfField?: QuickEditZoomRegion['depthOfField'];
   motionBlur?: QuickEditZoomRegion['motionBlur'];
@@ -139,6 +140,7 @@ export function updateQuickEditZoomRegion(
     const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
     const updated = {
       ...rest,
+      ...(patch.followCursor === undefined ? {} : { followCursor: patch.followCursor }),
       ...(patch.perspective ? { perspective: patch.perspective } : {}),
       ...(patch.depthOfField ? { depthOfField: patch.depthOfField } : {}),
       ...(patch.motionBlur ? { motionBlur: normalizeMotionBlur(patch.motionBlur) } : {}),

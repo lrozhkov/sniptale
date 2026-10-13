@@ -26,7 +26,8 @@ import {
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
 import { Trash2, Copy, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
-import { SegmentedRow } from '../../ui/compact-inspector-controls';
+import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
+import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
@@ -34,6 +35,7 @@ import {
   ReviewInterval,
   ReviewDetails,
   reviewTimeLabel,
+  reviewSelectFieldClassName,
   reviewTextButtonClassName,
   reviewDeleteButtonClassName,
 } from './controls';
@@ -96,6 +98,7 @@ function ZoomTransitionSection(props: {
 /** Inspector form for the selected zoom region; edits clamp into the persisted contract. */
 export function ReviewZoomInspector(props: {
   region: QuickEditZoomRegion;
+  cursorPath?: CursorFocusPath | undefined;
   spatialPreview?: QuickEditZoomRegion;
   cutSuppressed?: boolean;
   zoomConversionBlocked?: boolean;
@@ -147,6 +150,15 @@ export function ReviewZoomInspector(props: {
                       region={region}
                       previewRegion={props.spatialPreview}
                       tool={tool}
+                      followCursor={region.followCursor ?? props.cursorPath?.mode === 'follow'}
+                      cursorAvailable={
+                        props.cursorPath?.segments.some(
+                          (segment) =>
+                            segment.keys.length > 0 &&
+                            segment.end >= (sourceRange?.start ?? region.start) &&
+                            segment.start <= (sourceRange?.end ?? region.end)
+                        ) ?? false
+                      }
                       onChange={onChange}
                       onPreview={props.onPreview}
                     />
@@ -192,6 +204,8 @@ type FocusParameterProps = {
   region: QuickEditZoomRegion;
   previewRegion?: QuickEditZoomRegion | undefined;
   tool: SpatialTool;
+  followCursor?: boolean;
+  cursorAvailable?: boolean;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
 };
@@ -232,6 +246,25 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
   const { region, onChange } = props;
   return (
     <>
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('videoEditor.sidebar.cursorFocusMode')}
+        value={props.followCursor ? 'follow' : 'fixed'}
+        options={[
+          { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
+          {
+            value: 'follow',
+            label: translate('videoEditor.sidebar.cursorFocusFollow'),
+            disabled: !props.cursorAvailable,
+          },
+        ]}
+        onChange={(mode) => onChange({ followCursor: mode === 'follow' })}
+      />
+      {!props.cursorAvailable ? (
+        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.sidebar.cursorFocusUnavailable')}
+        </p>
+      ) : null}
       <ReviewPreviewNumberRow
         enterBehavior="blur"
         label={translate('gallery.videoReview.zoomScale')}
@@ -253,6 +286,7 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
         <ReviewPreviewNumberRow
           enterBehavior="blur"
           label={translate('gallery.videoReview.zoomFocusX')}
+          disabled={props.followCursor ?? false}
           unit="%"
           min={0}
           max={100}
@@ -268,6 +302,7 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
         <ReviewPreviewNumberRow
           enterBehavior="blur"
           label={translate('gallery.videoReview.zoomFocusY')}
+          disabled={props.followCursor ?? false}
           unit="%"
           min={0}
           max={100}

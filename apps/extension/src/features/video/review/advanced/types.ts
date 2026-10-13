@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 18;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 19;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -101,6 +101,8 @@ export interface QuickEditBorder {
 }
 
 export interface QuickEditZoomRegion {
+  /** Explicit local camera policy; absence inherits the scene cursor-focus mode. */
+  followCursor?: boolean;
   /** Disposable render context, dropped by storage admission. */
   cursorFocus?: {
     sourceFrame?: { headerHeight: number; height: number };

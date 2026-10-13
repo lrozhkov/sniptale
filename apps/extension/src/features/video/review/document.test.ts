@@ -1,3 +1,4 @@
+import { createQuickEditZoomRegion } from './advanced/zoom';
 import { createQuickEditWatermark } from './advanced/watermark';
 import { reviewAdvancedContentBaseline } from './document';
 import { projectReviewVoiceover } from './voiceover-edits';
@@ -63,11 +64,18 @@ it('preserves authored cursor keys and handles in the accepted baseline and ever
       },
     ],
   };
+  content.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'local-camera', at: 1, duration: 2, endMax: 12 }),
+      followCursor: true,
+    },
+  ];
   const frozen = structuredClone(content);
   const baseline = reviewAdvancedContentBaseline(content);
   expect(baseline.cursorFocusPath).toEqual(content.cursorFocusPath);
   const after = structuredClone(content);
   after.cursorFocusPath!.segments[0]!.keys[0]!.x = 0.8;
+  after.zoom.regions[0]!.followCursor = false;
   const operation = createReviewAdvancedContentOperation({
     id: 'path-edit',
     at: 1,
@@ -81,6 +89,14 @@ it('preserves authored cursor keys and handles in the accepted baseline and ever
   expect(
     replayReviewHistory([operation!], 1, source, baseline).advancedContent.cursorFocusPath
   ).toEqual(after.cursorFocusPath);
+  expect(
+    replayReviewHistory([operation!], 0, source, baseline).advancedContent.zoom.regions[0]
+      ?.followCursor
+  ).toBe(true);
+  expect(
+    replayReviewHistory([operation!], 1, source, baseline).advancedContent.zoom.regions[0]
+      ?.followCursor
+  ).toBe(false);
   expect(content).toEqual(frozen);
 });
 

@@ -1,3 +1,4 @@
+import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { ReviewTextPhrase } from './speech-phrase';
 import { ReviewTextVoiceForm } from './text-voice-panel';
 import { ReviewTextRewriteForm } from './text-rewrite-panel';
@@ -8,9 +9,8 @@ import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sec
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import { ReviewSpeechPanel } from './speech-panel';
 import type { ReviewBeforeAction } from './note-transitions';
-import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { ColorField, NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { planReviewCutTransitions } from '../../features/video/review/cuts';
@@ -179,12 +179,22 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
         ) : selection.kind === 'zoom' || selection.kind === 'zoom-link' ? (
           <ReviewAdvancedPanels
             advanced={advanced}
+            cursorPath={resolveReviewCursorFocusPath(
+              resource.telemetry,
+              resource.source,
+              advanced.cursorFocusPath
+            )}
             zoom={zoom}
             zoomPreview={(region) => (
               <ReviewZoomPreview
                 key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle'}
                 region={zoom.previewRegion(region)}
+                cursorFollowing={
+                  !region.spotlight &&
+                  !region.border &&
+                  (region.followCursor ?? advanced.cursorFocusPath?.mode === 'follow')
+                }
                 spatialEdit={{
                   region,
                   revision: zoom.revision(region),
@@ -192,17 +202,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                   onCommit: (revision, patch) => zoom.changeAtRevision(region.id, revision, patch),
                 }}
                 focus={{
-                  regions:
-                    resolveQuickEditEffectiveFeatures(advanced).zoomTrackVisible &&
-                    advanced.zoom.enabled
-                      ? projectReviewFocus(
-                          advanced.zoom.regions.map((item) => zoom.previewRegion(item)),
-                          buildReviewTimeMap(
-                            resource.source.duration,
-                            resource.session.getSnapshot().document.edits
-                          )
-                        )
-                      : [],
+                  regions: selectedReviewCameraRegions(props),
                   time: props.playback
                     ? (props.focusTime ?? (region.start + region.end) / 2)
                     : (region.start + region.end) / 2,
@@ -224,6 +224,28 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
       </fieldset>
     </>
   );
+}
+
+/** The selected preview consumes the source/time-mapped camera policy shared with export. */
+function selectedReviewCameraRegions(props: SelectedPropertiesProps) {
+  const { advanced, resource, zoom } = props;
+  return resolveQuickEditEffectiveState(
+    {
+      ...advanced,
+      zoom: {
+        ...advanced.zoom,
+        regions: advanced.zoom.regions.map((region) => zoom.previewRegion(region)),
+      },
+      audio: {
+        ...advanced.audio,
+        voiceoverSegments: buildReviewTimeMap(
+          resource.source.duration,
+          resource.session.getSnapshot().document.edits
+        ),
+      },
+    },
+    { facts: resource.telemetry, source: resource.source }
+  ).zoomRegions;
 }
 
 function overlapsSelected(

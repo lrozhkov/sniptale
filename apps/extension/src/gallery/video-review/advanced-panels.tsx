@@ -1,3 +1,4 @@
+import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { ReviewButton } from './controls';
 import { ReviewPresentationBinding } from './presentation-binding';
 import { ReviewWatermarkInspector } from './watermark-inspector';
@@ -25,6 +26,7 @@ import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
 
 type ReviewAdvancedPanelsProps = {
   advanced: QuickEditAdvancedState;
+  cursorPath?: CursorFocusPath;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   /** Optional framing preview mounted inside the selected region inspector. */
   zoomPreview?(region: QuickEditZoomRegion): ReactNode;
@@ -68,6 +70,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
       ) : zoomRegion ? (
         <ReviewZoomInspector
           region={zoomRegion}
+          cursorPath={args.cursorPath}
           spatialPreview={args.zoom.previewRegion(zoomRegion)}
           zoomConversionBlocked={!args.zoom.canConvertToZoom(zoomRegion)}
           onPreview={(patch) => args.zoom.preview(zoomRegion.id, patch)}

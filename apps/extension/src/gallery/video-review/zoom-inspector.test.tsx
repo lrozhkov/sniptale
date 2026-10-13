@@ -680,3 +680,99 @@ it.each([
     expect(change.mock.lastCall![0][target]).not.toEqual(value[target]);
   }
 );
+
+it('offers local cursor follow in Position and leaves it unavailable without focus data', async () => {
+  const change = vi.fn();
+  const props = {
+    region,
+    onChange: change,
+    onReset: vi.fn(),
+    onDelete: vi.fn(),
+    cursorPath: {
+      version: 1 as const,
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      mode: 'fixed' as const,
+      gapPolicy: 'hold' as const,
+      segments: [
+        {
+          id: 'path',
+          binding: { kind: 'project' as const },
+          start: 0,
+          end: 6,
+          keys: [
+            {
+              id: 'focus',
+              time: 1,
+              x: 0.2,
+              y: 0.3,
+              anchor: 'manual' as const,
+              authored: true as const,
+              interpolation: 'smooth' as const,
+            },
+          ],
+        },
+      ],
+    },
+  };
+  await act(async () => root.render(<ReviewZoomInspector {...props} />));
+  const mode = host.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.sidebar.cursorFocusMode"]'
+  );
+  expect(mode).not.toBeNull();
+  await act(async () => mode!.click());
+  const choice =
+    document.querySelector<HTMLButtonElement>('[role="option"][data-value="follow"]') ??
+    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((option) =>
+      option.textContent?.includes('videoEditor.sidebar.cursorFocusFollow')
+    );
+  expect(choice).toBeDefined();
+  await act(async () => choice!.click());
+  expect(change).toHaveBeenLastCalledWith({ followCursor: true });
+  await act(async () =>
+    root.render(<ReviewZoomInspector {...props} region={{ ...region, followCursor: true }} />)
+  );
+  expect(field('gallery.videoReview.zoomFocusX').disabled).toBe(true);
+  expect(field('gallery.videoReview.zoomScale').disabled).toBe(false);
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector {...props} cursorPath={{ ...props.cursorPath, segments: [] }} />
+    )
+  );
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.sidebar.cursorFocusMode"]')!
+      .click()
+  );
+  const unavailable = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (option) => option.textContent?.includes('videoEditor.sidebar.cursorFocusFollow')
+  );
+  expect(unavailable?.disabled).toBe(true);
+  await act(async () => unavailable!.click());
+  expect(change).toHaveBeenCalledOnce();
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.sidebar.cursorFocusMode"]')!
+      .click()
+  );
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector
+        {...props}
+        region={{ ...region, followCursor: true, sourceAnchor: { start: 8, end: 10 } }}
+      />
+    )
+  );
+  expect(field('gallery.videoReview.zoomFocusX').disabled).toBe(true);
+  expect(host.textContent).toContain('videoEditor.sidebar.cursorFocusUnavailable');
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.sidebar.cursorFocusMode"]')!
+      .click()
+  );
+  const outsideInterval = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (option) => option.textContent?.includes('videoEditor.sidebar.cursorFocusFollow')
+  );
+  expect(outsideInterval?.disabled).toBe(true);
+  expect(change).toHaveBeenCalledOnce();
+});

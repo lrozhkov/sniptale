@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
+import { expect, test, type Page } from '@playwright/test';
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { syntheticSpeechWav, speechModelResponse } from '../support/voiceover-speech-fixture';
 import { startHostServer } from '../support/host-server';
@@ -232,24 +234,7 @@ for (const variant of [
       expect(await remove.evaluate((node) => getComputedStyle(node).color)).not.toBe(normal);
       await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       for (const target of [523, 524, 525]) {
-        const scroll = dialog.locator('.review-inspector-scroll');
-        const width = () =>
-          scroll.evaluate((node) => {
-            const style = getComputedStyle(node);
-            return (
-              node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-            );
-          });
-        const handle = dialog.locator('[data-ui="gallery.videoReview.resizeInspector"]');
-        for (let attempt = 0; attempt < 3 && Math.abs((await width()) - target) > 0.5; attempt++) {
-          const current = await width();
-          const box = (await handle.boundingBox())!;
-          await page.mouse.move(box.x + box.width / 2, box.y + 20);
-          await page.mouse.down();
-          await page.mouse.move(box.x + box.width / 2 + current - target, box.y + 20, { steps: 4 });
-          await page.mouse.up();
-        }
-        await expect.poll(width).toBe(target);
+        await resizeReviewInspector(page, target);
         await remove.scrollIntoViewIfNeeded();
         const bounds = (await actions.boundingBox())!;
         expect(bounds.width).toBeCloseTo(target < 524 ? target : (target - 12) / 2, 0);
@@ -364,3 +349,167 @@ test('embedded speech Actions retain their section width', async ({ page }, info
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+/** Exercise the real inspector divider at its container breakpoint. */
+async function resizeReviewInspector(page: Page, target: number) {
+  const scroll = page.locator('dialog').locator('.review-inspector-scroll');
+  const width = () =>
+    scroll.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+  const handle = page.locator('dialog').locator('[data-ui="gallery.videoReview.resizeInspector"]');
+  for (let attempt = 0; attempt < 3 && Math.abs((await width()) - target) > 0.5; attempt++) {
+    const current = await width();
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + current - target, box.y + 20, { steps: 4 });
+    await page.mouse.up();
+  }
+  await expect.poll(width).toBe(target);
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`local camera cursor follow persists independently (${viewport.name})`, async ({
+    page,
+  }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
+    try {
+      await page.setViewportSize(viewport.size);
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'ru', 'sniptale-theme-preference': 'light' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(
+        page,
+        'review-vp8-opus.webm',
+        { width: 160, height: 90, duration: 12 },
+        false,
+        true
+      );
+      await page.evaluate(
+        async (track) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const open = indexedDB.open('sniptale-db');
+            open.onsuccess = () => resolve(open.result);
+            open.onerror = () => reject(open.error);
+          });
+          try {
+            const tx = db.transaction('recording_telemetry', 'readwrite');
+            const table = tx.objectStore('recording_telemetry');
+            const request = table.getAll();
+            await new Promise<void>((resolve, reject) => {
+              request.onsuccess = () => table.put({ ...request.result[0], cursorTrack: track });
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+            });
+          } finally {
+            db.close();
+          }
+        },
+        {
+          ...createVideoProjectCursorTrack('embedded-fallback'),
+          samples: [
+            {
+              id: 'cursor-start',
+              time: 0,
+              x: 32,
+              y: 36,
+              visible: true,
+              recordingPoint: { x: 0.2, y: 0.4 },
+            },
+            {
+              id: 'cursor-end',
+              time: 12,
+              x: 128,
+              y: 36,
+              visible: true,
+              recordingPoint: { x: 0.8, y: 0.4 },
+            },
+          ],
+        }
+      );
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await addReviewFocus(page);
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
+      const mode = inspector.getByRole('button', {
+        name: label('videoEditor.sidebar.cursorFocusMode'),
+        exact: true,
+      });
+      await mode.scrollIntoViewIfNeeded();
+      await mode.click();
+      const follow = page.getByRole('option', {
+        name: label('videoEditor.sidebar.cursorFocusFollow'),
+        exact: true,
+      });
+      await expect(follow).toBeEnabled();
+      await follow.click();
+      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(true);
+      await inspector
+        .getByRole('heading', { name: label('gallery.videoReview.precisePosition'), exact: true })
+        .click();
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.zoomFocusX'),
+          exact: true,
+        })
+      ).toBeDisabled();
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.zoomScale'),
+          exact: true,
+        })
+      ).toBeEnabled();
+      await mode.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('local-camera-follow.png'), fullPage: false });
+      if (viewport.size.width === 1920)
+        for (const width of [523, 524, 525]) {
+          await resizeReviewInspector(page, width);
+          await mode.scrollIntoViewIfNeeded();
+          await page.screenshot({
+            path: info.outputPath(`local-camera-${width}.png`),
+            fullPage: false,
+          });
+        }
+      await page.setViewportSize({ width: 1100, height: 560 });
+      await dialog
+        .getByRole('slider', { name: label('videoEditor.timeline.zoom'), exact: true })
+        .press('End');
+      const timelineViewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+      await expect
+        .poll(() => timelineViewport.evaluate((node) => node.scrollWidth - node.clientWidth))
+        .toBeGreaterThan(100);
+      await timelineViewport.evaluate((node) => {
+        node.scrollLeft = 100;
+      });
+      await expect
+        .poll(() => timelineViewport.evaluate((node) => node.scrollLeft))
+        .toBeGreaterThan(0);
+      await mode.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('local-camera-narrow.png'), fullPage: false });
+      await page.setViewportSize(viewport.size);
+      await mode.scrollIntoViewIfNeeded();
+      await mode.click();
+      await page
+        .getByRole('option', { name: label('videoEditor.sidebar.cursorFocusFixed'), exact: true })
+        .click();
+      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(false);
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(false);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

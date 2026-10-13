@@ -1,3 +1,4 @@
+import { evaluateReviewFollowCursor } from '../../features/video/review/advanced/cursor-focus-path';
 import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
@@ -55,6 +56,7 @@ const PREVIEW_WIDTH_PX = 480;
  */
 type ZoomPreviewProps = {
   region: QuickEditZoomRegion;
+  cursorFollowing?: boolean;
   spatialEdit?: {
     region: QuickEditZoomRegion;
     revision: string;
@@ -93,6 +95,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(props, camera);
   const previewStatus = playback ? 'ready' : status;
   const interactive = !props.disabled && !playback && status === 'ready';
+  const positionInteractive = interactive && !props.cursorFollowing;
   const spatialInteractive =
     interactive && props.spatialEdit?.enabled !== false && !props.spatialEdit?.region.dormant;
   const background = props.background;
@@ -102,7 +105,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
     imageUrl: image.url,
     cornerRadius,
     camera,
-    disabled: !interactive || tool !== 'position',
+    disabled: !positionInteractive || tool !== 'position',
     live: !!playback,
     frame: playback ? { image: playback.video, ...props.source } : frame,
     layout,
@@ -140,7 +143,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
       <div
         ref={bounds}
         {...previewInteractionHandlers(
-          interactive && tool === 'position',
+          positionInteractive && tool === 'position',
           sourceTime,
           props.onInteract
         )}
@@ -427,7 +430,16 @@ function ZoomPreviewHeading(props: {
 function resolvePreviewCamera(props: ZoomPreviewProps) {
   if (props.region.spotlight || props.region.border)
     return { scale: 1, centerX: 0.5, centerY: 0.5 };
-  return props.playback?.camera ?? quickEditSpatialTargetCamera(props.region);
+  if (props.playback) return props.playback.camera;
+  const target = quickEditSpatialTargetCamera(props.region);
+  const time = props.focus?.time ?? (props.region.start + props.region.end) / 2;
+  const effective = props.focus?.regions.find(
+    (region) =>
+      (region.id === props.region.id || region.id.startsWith(`${props.region.id}:slice:`)) &&
+      time >= region.start &&
+      time < region.end
+  );
+  return effective ? evaluateReviewFollowCursor(effective, time, target) : target;
 }
 
 /** Results composite all sampled masks before source-attached strokes in the same window. */

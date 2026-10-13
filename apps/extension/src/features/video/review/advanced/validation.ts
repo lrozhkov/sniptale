@@ -179,6 +179,8 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     value['start'] >= value['end']
   )
     return null;
+  if (value['followCursor'] !== undefined && typeof value['followCursor'] !== 'boolean')
+    return null;
   const perspective = parseQuickEditPerspective(value['perspective']);
   const depthOfField = parseQuickEditDepth(value['depthOfField']);
   if (perspective === null || depthOfField === null) return null;
@@ -215,6 +217,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   )
     return null;
   return {
+    ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
     ...(perspective ? { perspective } : {}),
     ...(depthOfField ? { depthOfField } : {}),
     ...(motionBlur ? { motionBlur } : {}),
@@ -513,6 +516,12 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     return null;
   if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
   const zoom = parseZoomState(raw['zoom'], supportsAdvancedSchema(raw['schemaVersion'], 3));
+  if (
+    zoom &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 19) &&
+    zoom.regions.some((region) => region.followCursor !== undefined)
+  )
+    return null;
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio'], supportsAdvancedSchema(raw['schemaVersion'], 7));
   const actionsEnabled = raw['actionsEnabled'];
@@ -629,7 +638,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].some(
       (known) => known >= firstHistorical && version === known
     )
   );

@@ -49,6 +49,7 @@ const frame: ZoomPreviewFrame = {
 };
 
 function renderPreview(args: {
+  cursorFollowing?: boolean;
   region?: QuickEditZoomRegion;
   spatialEdit?: ComponentProps<typeof ReviewZoomPreview>['spatialEdit'];
   sourceTime?: number | null;
@@ -63,6 +64,7 @@ function renderPreview(args: {
     root.render(
       <ReviewZoomPreview
         region={args.region ?? region()}
+        cursorFollowing={args.cursorFollowing ?? false}
         {...(args.spatialEdit ? { spatialEdit: args.spatialEdit } : {})}
         background={background}
         source={{ width: 640, height: 360 }}
@@ -731,4 +733,24 @@ it('cancels captured spatial coordinates when the scene canvas changes without r
   );
   expect(onCommit).not.toHaveBeenCalled();
   expect(loadFrame).toHaveBeenCalledTimes(1);
+});
+
+it('keeps Area/Result navigation available while following disables manual position dragging', async () => {
+  const authored = region();
+  const onCommit = vi.fn();
+  const view = renderPreview({
+    cursorFollowing: true,
+    spatialEdit: { region: authored, revision: 'follow', onCommit },
+  });
+  await act(async () => Promise.resolve());
+  expect(previewButton('zoomPreviewResult').disabled).toBe(false);
+  const canvas = view.canvas();
+  vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
+  await pointer(canvas, 'pointerdown', 20, 20);
+  await pointer(canvas, 'pointermove', 80, 80);
+  await pointer(canvas, 'pointerup', 80, 80);
+  expect(view.onChange).not.toHaveBeenCalled();
+  expect(onCommit).not.toHaveBeenCalled();
+  await act(async () => previewButton('zoomPreviewResult').click());
+  expect(view.section().getAttribute('data-view')).toBe('result');
 });
