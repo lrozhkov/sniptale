@@ -80,7 +80,7 @@ it('projects surviving observed release independently without manufacturing a pr
     { id: 'cut', kind: 'cut', start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
   ]);
   expect(cues).toHaveLength(1);
-  expect(cues[0]).toMatchObject({ sampleId: 'mouse-click-v1', start: 3, rate: 1 });
+  expect(cues[0]).toMatchObject({ sampleId: 'mouse-click-03-v1', start: 3, rate: 1 });
   delete marker.gesture!.upTime;
   expect(collect(marker, 'mouse-classic-paired-v2')).toHaveLength(1);
 });
@@ -190,27 +190,30 @@ it.each(['KEY_HOLD', 'KEY_MODIFIERS'])(
 );
 
 it.each([
-  ['mouse-classic-paired-v2', 'mouse-click-v1'],
-  ['mouse-soft-paired-v2', 'mouse-click-03-v1'],
-] as const)('reuses the original click for both observed phases of %s', (preset, sampleId) => {
-  const marker: ReviewTelemetryMarker = {
-    ref: { kind: 'action', id: 'physical-pair' },
-    eventType: 'SELECTION_DRAG',
-    start: 1,
-    end: 1.5,
-    gesture: {
-      id: 'physical-pair',
-      type: 'selection-drag',
-      downTime: 1,
-      upTime: 1.5,
-      completion: 'released',
-      button: 0,
-    },
-  };
-  const cues = collect(marker, preset);
-  expect(cues.map((cue) => [cue.sampleId, cue.start])).toEqual([
-    [sampleId, 1],
-    [sampleId, 1.5],
-  ]);
-  expect(new Set(cues.map((cue) => cue.id)).size).toBe(2);
-});
+  ['mouse-classic-paired-v2', 'mouse-click-v1', 'mouse-click-03-v1'],
+  ['mouse-soft-paired-v2', 'mouse-click-03-v1', 'mouse-click-02-v1'],
+] as const)(
+  'combines distinct original clicks at the observed phases of %s',
+  (preset, downSample, upSample) => {
+    const marker: ReviewTelemetryMarker = {
+      ref: { kind: 'action', id: 'physical-pair' },
+      eventType: 'SELECTION_DRAG',
+      start: 1,
+      end: 1.5,
+      gesture: {
+        id: 'physical-pair',
+        type: 'selection-drag',
+        downTime: 1,
+        upTime: 1.5,
+        completion: 'released',
+        button: 0,
+      },
+    };
+    const cues = collect(marker, preset);
+    expect(cues.map((cue) => [cue.sampleId, cue.start])).toEqual([
+      [downSample, 1],
+      [upSample, 1.5],
+    ]);
+    expect(new Set(cues.map((cue) => cue.id)).size).toBe(2);
+  }
+);

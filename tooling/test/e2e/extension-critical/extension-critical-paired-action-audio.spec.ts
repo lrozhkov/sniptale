@@ -67,9 +67,9 @@ for (const viewport of [
           return read(reset) as number[];
         }, reset);
       const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video');
-      for (const [preset, key] of [
-        ['mouse-classic-paired-v2', 'gallery.videoReview.actionAudioMousePaired'],
-        ['mouse-soft-paired-v2', 'gallery.videoReview.actionAudioMouseSoftPaired'],
+      for (const [preset, key, expectedFrames] of [
+        ['mouse-classic-paired-v2', 'gallery.videoReview.actionAudioMousePaired', [7995, 7995]],
+        ['mouse-soft-paired-v2', 'gallery.videoReview.actionAudioMouseSoftPaired', [6484, 7995]],
       ] as const) {
         if (!(await audio.isVisible())) {
           await button('gallery.videoReview.historyOpen').click();
@@ -89,7 +89,7 @@ for (const viewport of [
         await expect
           .poll(async () => (await persistedReviewContent(page))?.actionAudio?.[0]?.presetId)
           .toBe(preset);
-        await verifyPairedPlayback(dialog, probe, label);
+        await verifyPairedPlayback(dialog, probe, label, expectedFrames);
         await button('gallery.videoReview.historyOpen').click();
         await dialog
           .locator('[data-ui="gallery.videoReview.actionHistory"] li')
@@ -105,12 +105,14 @@ for (const viewport of [
             exact: true,
           })
           .click();
-        await expect.poll(async () => (await probe()).sort((a, b) => a - b)).toEqual([7995, 7995]);
+        await expect
+          .poll(async () => (await probe()).sort((a, b) => a - b))
+          .toEqual(expectedFrames);
         expect(await video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
         await expect(
           dialog.getByText(label('gallery.videoReview.actionAudioResource'), { exact: true })
         ).toHaveCount(0);
-        await verifyPairedPlayback(dialog, probe, label);
+        await verifyPairedPlayback(dialog, probe, label, expectedFrames);
       }
       await page.screenshot({
         path: info.outputPath('paired-selection-audio.png'),
@@ -126,7 +128,8 @@ for (const viewport of [
 async function verifyPairedPlayback(
   dialog: Locator,
   probe: (reset?: boolean) => Promise<number[]>,
-  label: (key: Parameters<typeof translate>[0]) => string
+  label: (key: Parameters<typeof translate>[0]) => string,
+  expectedFrames: readonly number[]
 ) {
   const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video');
   const before = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
@@ -137,7 +140,7 @@ async function verifyPairedPlayback(
   await expect
     .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime))
     .toBeGreaterThan(before + 0.8);
-  await expect.poll(async () => (await probe()).sort((a, b) => a - b)).toEqual([7995, 7995]);
+  await expect.poll(async () => (await probe()).sort((a, b) => a - b)).toEqual(expectedFrames);
   await dialog
     .getByRole('button', { name: label('gallery.videoReview.pause'), exact: true })
     .click();

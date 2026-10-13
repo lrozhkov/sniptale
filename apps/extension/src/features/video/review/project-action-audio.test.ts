@@ -150,7 +150,7 @@ it('projects every surviving source attack independently across cut, Speed and w
   expect(whole.map((cue) => [cue.sampleId, cue.start])).toEqual([
     [expect.stringMatching(/^key-/), 0.5],
     [expect.stringMatching(/^key-/), 0.55],
-    ['mouse-click-v1', 1.5],
+    ['mouse-click-03-v1', 1.5],
   ]);
   expect(whole.every((cue) => cue.rate === 1)).toBe(true);
   const partitioned = [...cues(plan, 0, 0.53), ...cues(plan, 0.53, 2)];
@@ -242,7 +242,7 @@ it('roundtrips settings and rejects malformed rhythm or precise protected input 
   group.settings[1]!.upGain = 0.25;
   expect(
     cues(buildProjectActionAudioPlan(project)).filter((cue) => cue.sampleId.startsWith('mouse'))
-  ).toMatchObject([{ sampleId: 'mouse-click-v1', volume: 0.125 }]);
+  ).toMatchObject([{ sampleId: 'mouse-click-03-v1', volume: 0.125 }]);
   group.signals[0]!.keyboardRhythm![0]!.count = 4097;
   expect(parseVideoProjectActionFeedback(project.actionFeedback)).toBeNull();
 });

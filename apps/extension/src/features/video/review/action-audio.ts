@@ -269,7 +269,7 @@ function pairedAudioPhases(
       phases.push({
         id: `${gesture.id}:up`,
         time: gesture.upTime,
-        sampleId: soft ? 'mouse-click-03-v1' : 'mouse-click-v1',
+        sampleId: soft ? 'mouse-click-02-v1' : 'mouse-click-03-v1',
         gain: setting.upGain ?? 1,
       });
   }
