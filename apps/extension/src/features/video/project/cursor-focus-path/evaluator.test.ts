@@ -1,11 +1,12 @@
 import { expect, it } from 'vitest';
-import { evaluateCursorFocusSegment } from './evaluator';
+import { evaluateCursorFocusSegment, sampleCursorFocusSegment } from './evaluator';
 import {
   insertCursorFocusKey,
   updateCursorFocusKey,
   deleteCursorFocusKey,
   authoredCursorFocusPath,
   resolveAuthoredCursorFocusPath,
+  simplifyCursorFocusPath,
 } from './authoring';
 import { parseCursorFocusPath } from './validation';
 import type { CursorFocusPath } from './types';
@@ -202,4 +203,105 @@ it('uses a coincident manual override for both curve endpoints without moving th
     expect(evaluateCursorFocusSegment(reopened.segments[0]!, time)).toEqual(
       evaluateCursorFocusSegment(segment, time)
     );
+});
+
+it('reduces 25ms velocity jitter to geometric focus anchors without losing deliberate edits', () => {
+  const dense: CursorFocusPath = {
+    ...path,
+    segments: [
+      {
+        ...path.segments[0]!,
+        keys: Array.from({ length: 81 }, (_, index) => ({
+          id: `sample:${index}`,
+          time: index * 0.025,
+          x: 0.1 + 0.8 * (index / 80) ** 2,
+          y: 0.4 + (index % 2 ? 0.0005 : -0.0005),
+          anchor: index === 0 || index === 80 ? ('boundary' as const) : ('movement' as const),
+          interpolation: 'smooth' as const,
+        })),
+      },
+    ],
+  };
+  const before = structuredClone(dense);
+  expect(simplifyCursorFocusPath(dense).segments[0]!.keys.map((key) => key.id)).toEqual([
+    'sample:0',
+    'sample:80',
+  ]);
+  const edited = updateCursorFocusKey(dense, 'sample:40', { outgoing: { x: 0.4, y: 0.8 } });
+  const sparse = simplifyCursorFocusPath(edited, 'sample:20');
+  expect(sparse.segments[0]!.keys.map((key) => key.id)).toEqual(
+    expect.arrayContaining(['sample:0', 'sample:20', 'sample:40', 'sample:80'])
+  );
+  expect(sparse.segments[0]!.keys.find((key) => key.id === 'sample:40')!.outgoing).toEqual({
+    x: 0.4,
+    y: 0.8,
+  });
+  expect(dense).toEqual(before);
+});
+
+it('draws a short authored bend and exact key endpoints inside a long segment', () => {
+  const segment = {
+    ...path.segments[0]!,
+    end: 10,
+    keys: [
+      {
+        id: 'start',
+        time: 0,
+        x: 0.1,
+        y: 0.1,
+        anchor: 'boundary' as const,
+        interpolation: 'smooth' as const,
+        outgoing: { x: 0.2, y: 0.9 },
+      },
+      {
+        id: 'turn',
+        time: 0.05,
+        x: 0.9,
+        y: 0.1,
+        anchor: 'manual' as const,
+        interpolation: 'linear' as const,
+        incoming: { x: 0.8, y: 0.9 },
+      },
+      {
+        id: 'end',
+        time: 10,
+        x: 0.9,
+        y: 0.1,
+        anchor: 'boundary' as const,
+        interpolation: 'linear' as const,
+      },
+    ],
+  };
+  const before = structuredClone(segment);
+  const points = sampleCursorFocusSegment(segment, 0.5);
+  expect(Math.max(...points.map((point) => point.y))).toBeGreaterThan(0.69);
+  expect(points).toContainEqual(expect.objectContaining({ x: 0.9, y: 0.1 }));
+  expect(points.length).toBeLessThan(257);
+  expect(segment).toEqual(before);
+});
+
+it('preserves a real reversal along a straight line while removing velocity-only subdivisions', () => {
+  const positions = [0.1, 0.4, 0.7, 0.5, 0.3, 0.6, 0.9];
+  const returning: CursorFocusPath = {
+    ...path,
+    segments: [
+      {
+        ...path.segments[0]!,
+        keys: positions.map((x, index) => ({
+          id: `turn:${index}`,
+          time: index / 3,
+          x,
+          y: 0.4,
+          anchor: index === 0 || index === 6 ? ('boundary' as const) : ('movement' as const),
+          interpolation: 'smooth' as const,
+        })),
+      },
+    ],
+  };
+  expect(simplifyCursorFocusPath(returning).segments[0]!.keys.map((key) => key.id)).toEqual([
+    'turn:0',
+    'turn:2',
+    'turn:4',
+    'turn:6',
+  ]);
 });

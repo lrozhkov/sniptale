@@ -121,7 +121,7 @@ export function deleteCursorFocusKey(path: CursorFocusPath, id: string): CursorF
   };
 }
 
-/** Timestamp-aware simplification affects derived focus only, retaining every mandatory anchor. */
+/** Geometric simplification removes recording jitter from focus, retaining facts and authored anchors. */
 export function simplifyCursorFocusPath(
   path: CursorFocusPath,
   retainedKeyId?: string
@@ -132,7 +132,13 @@ export function simplifyCursorFocusPath(
       if (segment.keys.length < 3) return segment;
       const keep = new Set<number>([0, segment.keys.length - 1]);
       for (let index = 0; index < segment.keys.length; index++)
-        if (segment.keys[index]!.anchor !== 'movement' || segment.keys[index]!.id === retainedKeyId)
+        if (
+          segment.keys[index]!.anchor !== 'movement' ||
+          segment.keys[index]!.id === retainedKeyId ||
+          segment.keys[index]!.authored ||
+          segment.keys[index]!.incoming ||
+          segment.keys[index]!.outgoing
+        )
           keep.add(index);
       const anchors = [...keep].sort((a, b) => a - b);
       const pending = anchors.slice(1).map((end, index) => ({ start: anchors[index]!, end }));
@@ -140,12 +146,17 @@ export function simplifyCursorFocusPath(
         const interval = pending.pop()!;
         const first = segment.keys[interval.start]!;
         const last = segment.keys[interval.end]!;
+        const dx = last.x - first.x;
+        const dy = last.y - first.y;
+        const distance = dx * dx + dy * dy;
+        let furthestProgress = 0;
+        let furthestIndex = interval.start;
         let worst = -1;
         let error = 0.002;
         for (let index = interval.start + 1; index < interval.end; index++) {
           const key = segment.keys[index]!;
           const progress =
-            last.time > first.time ? (key.time - first.time) / (last.time - first.time) : 0;
+            distance > 0 ? unit(((key.x - first.x) * dx + (key.y - first.y) * dy) / distance) : 0;
           const deviation = Math.hypot(
             key.x - first.x - (last.x - first.x) * progress,
             key.y - first.y - (last.y - first.y) * progress
@@ -153,6 +164,15 @@ export function simplifyCursorFocusPath(
           if (deviation > error) {
             error = deviation;
             worst = index;
+          }
+          const reversal = (furthestProgress - progress) * Math.sqrt(distance);
+          if (reversal > error) {
+            error = reversal;
+            worst = furthestIndex;
+          }
+          if (progress > furthestProgress) {
+            furthestProgress = progress;
+            furthestIndex = index;
           }
         }
         if (worst >= 0) {

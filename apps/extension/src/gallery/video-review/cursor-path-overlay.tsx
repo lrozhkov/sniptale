@@ -12,7 +12,7 @@ import {
   compareCursorFocusKeys,
 } from '../../features/video/project/cursor-focus-path/authoring';
 import {
-  evaluateCursorFocusSegment,
+  sampleCursorFocusSegment,
   cursorFocusKeyControls,
 } from '../../features/video/project/cursor-focus-path/evaluator';
 
@@ -60,16 +60,7 @@ export function ReviewCursorPathOverlay(props: ReviewCursorOverlayProps) {
   const controls = layoutReviewCursorControls(props, selected, rawControls);
   const point = (position: CursorFocusPoint) =>
     `${position.x * props.width},${position.y * props.height}`;
-  const curve = Array.from({ length: 49 }, (_, step) =>
-    evaluateCursorFocusSegment(
-      segment,
-      segment.start + ((segment.end - segment.start) * step) / 48,
-      path.smoothing
-    )
-  )
-    .filter((item) => item !== null)
-    .map(point)
-    .join(' ');
+  const curve = sampleCursorFocusSegment(segment, path.smoothing).map(point).join(' ');
   const commitGeometry = (next: CursorFocusPath, id: string) => {
     props.onChange(next);
     const override = next.segments

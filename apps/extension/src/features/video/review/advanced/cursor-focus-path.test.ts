@@ -176,3 +176,18 @@ it('closes the prior observation run on capture segment change even without a se
   expect(evaluateReviewCursorFocus(path, 2)).toBeNull();
   expect(evaluateReviewCursorFocus(path, 3)).toMatchObject({ x: 0.9, y: 0.9 });
 });
+
+it('keeps dense observations intact while offering sparse geometric keys in Gallery', () => {
+  const samples = Array.from({ length: 161 }, (_, index) => ({
+    ...facts.cursorTrack!.samples[0]!,
+    id: `dense:${index}`,
+    time: index * 0.025,
+    recordingPoint: { x: 0.1 + 0.8 * (index / 160) ** 2, y: 0.4 },
+  }));
+  const recorded = { ...facts, cursorTrack: { ...facts.cursorTrack!, samples } };
+  const before = structuredClone(recorded);
+  const focus = deriveReviewCursorFocusPath(recorded, source);
+  expect(focus.segments[0]!.keys.map((key) => key.id)).toEqual(['dense:0', 'dense:160']);
+  expect(deriveReviewCursorFocusPath(recorded, source, true).segments[0]!.keys).toHaveLength(161);
+  expect(recorded).toEqual(before);
+});

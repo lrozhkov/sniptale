@@ -7,6 +7,7 @@ import {
   deriveProjectCursorFocusPath,
   resolveProjectCursorFocus,
   resolveProjectCursorFocusSamples,
+  resolveProjectCursorFocusPath,
 } from './projection';
 import { insertCursorFocusKey, updateCursorFocusKey, authoredCursorFocusPath } from './authoring';
 import { isValidVideoProject } from '../validation';
@@ -159,4 +160,28 @@ it('projects retained derived keys into source-instance clips and keeps unsuppor
   expect(projected.map((sample) => sample.time)).toEqual(
     projected.map((sample) => sample.time).toSorted((a, b) => a - b)
   );
+});
+
+it('offers the same sparse focus in Video Editor and restores an authored dense-sample identity', () => {
+  const project = fixture();
+  project.cursorTrack!.samples = Array.from({ length: 161 }, (_, index) => ({
+    id: `dense:${index}`,
+    time: index * 0.025,
+    x: 10 + 80 * (index / 160) ** 2,
+    y: 40,
+    visible: true,
+    recordingPoint: { x: 0.1 + 0.8 * (index / 160) ** 2, y: 0.4 },
+  }));
+  const before = structuredClone(project.cursorTrack);
+  const focus = deriveProjectCursorFocusPath(project);
+  expect(focus.segments[0]!.keys.map((key) => key.id)).toEqual(['dense:0', 'dense:160']);
+  const selected = deriveProjectCursorFocusPath(project, 'dense:80');
+  const edited = updateCursorFocusKey(selected, 'dense:80', { outgoing: { x: 0.6, y: 0.7 } });
+  const saved = { ...project, cursorFocusPath: authoredCursorFocusPath(edited) };
+  const reopened = resolveProjectCursorFocusPath(hydrateVideoProject(structuredClone(saved)));
+  expect(reopened.segments[0]!.keys.find((key) => key.id === 'dense:80')).toMatchObject({
+    authored: true,
+    outgoing: { x: 0.6, y: 0.7 },
+  });
+  expect(project.cursorTrack).toEqual(before);
 });

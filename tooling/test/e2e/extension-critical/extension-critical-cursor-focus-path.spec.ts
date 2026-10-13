@@ -17,38 +17,19 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
-const samples = [
-  {
-    id: 'focus-start',
-    time: 0,
-    x: 32,
-    y: 27,
+const samples = Array.from({ length: 481 }, (_, index) => {
+  const progress = (index / 480) ** 2;
+  return {
+    id: `focus-sample:${index}`,
+    time: index * 0.025,
+    x: (0.2 + 0.6 * progress) * 160,
+    y: (0.3 + 0.4 * progress) * 90,
     visible: true,
     observation: 'observed' as const,
     captureSegment: 0,
-    recordingPoint: { x: 0.2, y: 0.3 },
-  },
-  {
-    id: 'focus-mid',
-    time: 6,
-    x: 80,
-    y: 45,
-    visible: true,
-    observation: 'observed' as const,
-    captureSegment: 0,
-    recordingPoint: { x: 0.5, y: 0.5 },
-  },
-  {
-    id: 'focus-end',
-    time: 12,
-    x: 128,
-    y: 63,
-    visible: true,
-    observation: 'observed' as const,
-    captureSegment: 0,
-    recordingPoint: { x: 0.8, y: 0.7 },
-  },
-];
+    recordingPoint: { x: 0.2 + 0.6 * progress, y: 0.3 + 0.4 * progress },
+  };
+});
 
 for (const viewport of [
   { width: 1280, height: 560 },
@@ -203,6 +184,11 @@ for (const viewport of [
         return dialog;
       };
       const dialog = await open();
+      const sparseRow = dialog.locator('[data-ui="cursorFocusPath.timelineKeys"]');
+      await expect(sparseRow).toBeVisible();
+      expect(
+        await sparseRow.locator('[data-cursor-focus-key], [data-cursor-focus-group]').count()
+      ).toBeLessThanOrEqual(8);
       await expect(dialog.locator('[data-ui="cursorFocusPath.overlay"]')).toHaveCount(0);
       const dwell = dialog
         .locator('[data-history-family="cursor"] button')
@@ -473,6 +459,11 @@ for (const viewport of [
       await page.goto(
         `${server.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=light`
       );
+      const sparseRow = page.locator('[data-ui="cursorFocusPath.timelineKeys"]');
+      await expect(sparseRow).toBeVisible();
+      expect(
+        await sparseRow.locator('[data-cursor-focus-key], [data-cursor-focus-group]').count()
+      ).toBeLessThanOrEqual(3);
       await page
         .locator(
           '[data-ui="video-editor.timeline.history-cursor-row"] [data-timeline-effect-segment]'

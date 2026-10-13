@@ -99,3 +99,43 @@ export function cursorFocusKeyControls(segment: CursorFocusSegment, id: string, 
     ? keyControls(segment, index, smoothing)
     : { incoming: undefined, outgoing: undefined };
 }
+
+/** Samples every key interval; short curves cannot disappear inside a long recording segment. */
+export function sampleCursorFocusSegment(
+  segment: CursorFocusSegment,
+  smoothing: number
+): CursorFocusPoint[] {
+  segment = effectiveCurveSegment(segment);
+  if (!segment.keys.length) return [];
+  const points: CursorFocusPoint[] = [segment.keys[0]!];
+  const append = (start: number, end: number, depth: number) => {
+    const first = evaluateCursorFocusSegment(segment, start, smoothing)!;
+    const last = evaluateCursorFocusSegment(segment, end, smoothing)!;
+    const times = [0.25, 0.5, 0.75];
+    const curved = times.some((progress) => {
+      const point = evaluateCursorFocusSegment(
+        segment,
+        start + (end - start) * progress,
+        smoothing
+      )!;
+      return (
+        Math.hypot(
+          point.x - first.x - (last.x - first.x) * progress,
+          point.y - first.y - (last.y - first.y) * progress
+        ) > 0.00025
+      );
+    });
+    if (curved && depth < 8) {
+      const middle = (start + end) / 2;
+      append(start, middle, depth + 1);
+      append(middle, end, depth + 1);
+    } else points.push(last);
+  };
+  for (let index = 1; index < segment.keys.length; index++) {
+    const left = segment.keys[index - 1]!;
+    const right = segment.keys[index]!;
+    if (left.interpolation === 'hold') points.push(left, right);
+    else append(left.time, right.time, 0);
+  }
+  return points;
+}

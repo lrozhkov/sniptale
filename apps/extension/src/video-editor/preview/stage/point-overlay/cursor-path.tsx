@@ -17,7 +17,7 @@ import {
   authoredCursorFocusPath,
 } from '../../../../features/video/project/cursor-focus-path/authoring';
 import {
-  evaluateCursorFocusSegment,
+  sampleCursorFocusSegment,
   cursorFocusKeyControls,
 } from '../../../../features/video/project/cursor-focus-path/evaluator';
 import type {
@@ -108,14 +108,7 @@ function useCursorOverlay(params: PointOverlayParams) {
     const style = getPointHandleStyle(params.project, scenePoint, params.camera, stage);
     return { x: Number.parseFloat(String(style.left)), y: Number.parseFloat(String(style.top)) };
   };
-  const curve = Array.from({ length: 49 }, (_, index) =>
-    evaluateCursorFocusSegment(
-      segment,
-      segment.start + ((segment.end - segment.start) * index) / 48,
-      path.smoothing
-    )
-  )
-    .filter((point) => point !== null)
+  const curve = sampleCursorFocusSegment(segment, path.smoothing)
     .map((point) => {
       const value = mapped(point);
       return `${value.x},${value.y}`;
