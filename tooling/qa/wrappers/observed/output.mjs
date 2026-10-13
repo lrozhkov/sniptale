@@ -1,3 +1,4 @@
+import { collectProcessDiagnosticLocations } from './process-diagnostics.mjs';
 import { findObservedQaRule } from '../../composition/catalog/runtime-registry.mjs';
 import { formatDuration } from '../../runtime/observability/run-metrics.helpers.mjs';
 import { summarizeTimeline } from '../../runtime/observability/timeline-metrics.mjs';
@@ -96,7 +97,8 @@ function structuredLocations(step) {
       message: `${id}: ${reason}`,
     };
   });
-  return [...violations, ...failures, ...advisories];
+  const processLocations = violations.length === 0 ? collectProcessDiagnosticLocations(step) : [];
+  return [...violations, ...failures, ...advisories, ...processLocations];
 }
 
 function createStructuredDiagnostic(step, definition, failed) {
@@ -106,10 +108,18 @@ function createStructuredDiagnostic(step, definition, failed) {
   return {
     summary: step.summary ?? step.detail ?? (failed ? 'step failed' : null),
     locations,
-    remediation: step.advice ?? definition.remediation,
+    remediation: step.advice || definition.remediation,
     ruleDoc: definition.ruleDoc,
     evidence,
   };
+}
+
+export function hasCanonicalAdvisoryLog(step) {
+  return (
+    ['Advisory report', 'QA checkpoint'].includes(step.label) &&
+    typeof step.stdout === 'string' &&
+    step.stdout.includes('Advisory log:')
+  );
 }
 
 export function renderObservedStepLog(step, definition) {
@@ -120,7 +130,7 @@ export function renderObservedStepLog(step, definition) {
     step.summary ? `summary: ${step.summary}` : '',
     step.detail ? `detail: ${step.detail}` : '',
     ...renderViolations(step.violations),
-    ...renderAdvisories(step.advisories),
+    ...(hasCanonicalAdvisoryLog(step) ? [] : renderAdvisories(step.advisories)),
     ...(step.failures ?? []).map((failure) => `- ${failure}`),
     step.stdout ? `stdout:\n${step.stdout}` : '',
     step.stderr ? `stderr:\n${step.stderr}` : '',

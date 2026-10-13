@@ -41,6 +41,8 @@ function createPrivateFailure(session: { addSensitiveValues: (values: string[]) 
         status: 'failed',
         stdout: [
           ...Object.values(PRIVATE_VALUES),
+          `src/private.ts:7:2: token=${PRIVATE_VALUES.secret}`,
+          `src/private.ts:8:2: ${PRIVATE_VALUES.dynamicToken}`,
           JSON.stringify({
             apiKey: JSON_ONLY_SECRETS[0],
             Authorization: `Bearer ${JSON_ONLY_SECRETS[1]}`,
@@ -318,3 +320,65 @@ describe('observed wrapper console output', () => {
     output.mockRestore();
   });
 });
+
+it.each(['Advisory report', 'QA checkpoint'])(
+  'prints blockers before canonical %s and stores one complete section',
+  async (advisoryLabel) => {
+    const root = createTempRoot('observed-wrapper-advisory-order-');
+    initGitRepo(root);
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      const result = await withCwd(root, () =>
+        runObservedWrapper({
+          wrapperId: 'qa:checkpoint',
+          label: 'QA checkpoint',
+          argv: [],
+          contractValidator: ignoreStepContract,
+          environment: { ...process.env, SNIPTALE_QA_OBSERVABILITY_ROOT: root },
+          execute: async () => ({
+            steps: [
+              {
+                label: advisoryLabel,
+                status: 'ok',
+                consoleOutput:
+                  'Change risk: HIGH\nRequired: security-code-review\nAdvisory: introduced=1\n',
+                advisories: [
+                  { id: 'advisory.structural-file', file: 'src/a.ts', reason: 'unique finding' },
+                ],
+                stdout: 'Advisory log:\n- src/a.ts unique finding\n',
+              },
+              {
+                label: 'Structural risk',
+                status: 'ok',
+                advisories: [{ file: 'src/a.ts', reason: 'unique finding' }],
+              },
+              {
+                label: 'Oxlint',
+                status: 'failed',
+                summary: 'Missing cause',
+                advice: '',
+                stdout: 'src/a.ts:4:2: Missing error cause. [Error/eslint(preserve-caught-error)]',
+              },
+            ],
+          }),
+        })
+      );
+      const consoleText = output.mock.calls.map(([value]) => String(value)).join('');
+      const log = fs.readFileSync(`${root}/${result.record.log.path}`, 'utf8');
+      expect(consoleText).toContain('Blockers:');
+      expect(log).toContain('Blockers:');
+      expect(consoleText.indexOf('Blockers:')).toBeLessThan(consoleText.indexOf('Advisory:'));
+      expect(consoleText).toContain('Required: security-code-review');
+      expect(log.indexOf('Blockers:')).toBeLessThan(log.indexOf('Advisory log:'));
+      expect(log.match(/unique finding/gu)).toHaveLength(1);
+      expect(
+        result.record.steps.find((step) => step.stepId === 'qa.rule.oxlint')?.diagnostic
+      ).toMatchObject({
+        locations: [expect.objectContaining({ file: 'src/a.ts', line: 4 })],
+        remediation: expect.stringContaining('reported tool'),
+      });
+    } finally {
+      output.mockRestore();
+    }
+  }
+);

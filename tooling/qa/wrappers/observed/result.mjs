@@ -1,5 +1,9 @@
 import { collectQaResultSteps } from '../../composition/catalog/contract.mjs';
-import { normalizeObservedStep } from './output.mjs';
+import {
+  hasCanonicalAdvisoryLog,
+  normalizeObservedStep,
+  renderObservedStepLog,
+} from './output.mjs';
 
 export function createHelpStep() {
   return {
@@ -48,7 +52,7 @@ function emitFailureTail(session, step) {
 
 function summarizeAdvisoryConsole(session, step) {
   const findings = step.advisories ?? [];
-  if (findings.length <= 12) return null;
+  if (hasCanonicalAdvisoryLog(step) || findings.length <= 12) return null;
   const top = findings.slice(0, 6).map((finding) => {
     const id = finding.id ?? finding.family ?? 'advisory';
     return `${finding.file ?? '<repository>'}: ${id}`;
@@ -77,6 +81,17 @@ export function recordObservedResult(session, result, verbose, contract) {
     steps,
     skipped: result.skipped ?? false,
   });
+  const blockers = steps.filter((step) => ['failed', 'blocked'].includes(step.status));
+  if (blockers.length > 0) {
+    const summary =
+      [
+        'Blockers:',
+        ...blockers.map((step) => `- ${step.label}: ${step.summary || step.detail || step.status}`),
+      ].join('\n') + '\n';
+    process.stdout.write(session.sanitizeConsoleOutput(summary));
+    session.writeLog(summary);
+  }
+  const canonicalAdvisory = steps.some(hasCanonicalAdvisoryLog);
   for (const step of steps) {
     if (step.consoleOutput) {
       const fullOutput = session.sanitizeConsoleOutput(step.consoleOutput, 1024 * 1024);
@@ -84,9 +99,17 @@ export function recordObservedResult(session, result, verbose, contract) {
         summarizeAdvisoryConsole(session, step) ??
         session.sanitizeConsoleOutput(step.consoleOutput);
       process.stdout.write(consoleOutput.endsWith('\n') ? consoleOutput : `${consoleOutput}\n`);
-      session.writeLog(`[${step.label}.console]\n${fullOutput}\n`);
+      if (!hasCanonicalAdvisoryLog(step)) {
+        session.writeLog(`[${step.label}.console]\n${fullOutput}\n`);
+      }
     }
     const normalized = normalizeObservedStep(step);
+    if (canonicalAdvisory && step.label === 'Structural risk') {
+      normalized.observation.log = renderObservedStepLog(
+        { ...step, advisories: [] },
+        normalized.definition
+      );
+    }
     session.addStep(normalized.observation);
     if (verbose) process.stdout.write(normalized.observation.log);
     else if (step.status === 'failed') emitFailureTail(session, step);

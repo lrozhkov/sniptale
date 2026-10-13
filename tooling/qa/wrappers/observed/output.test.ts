@@ -198,3 +198,86 @@ it('persists successful advisory findings as diagnostic locations', () => {
     },
   });
 });
+
+it.each([
+  [
+    'Oxlint',
+    'src/a.ts:4:2: Missing error cause. [Error/eslint(preserve-caught-error)]',
+    'src/a.ts',
+    4,
+  ],
+  ['Typecheck', 'src/b.ts(12,8): error TS2322: Type mismatch.', 'src/b.ts', 12],
+  ['Typecheck', 'src/c.ts:9:3 - error TS2345: Invalid argument.', 'src/c.ts', 9],
+  [
+    'Unit tests',
+    ' FAIL  src/start.test.ts > start failures\nError: Test timed out in 10000ms.',
+    'src/start.test.ts',
+    null,
+  ],
+])('preserves %s process diagnostics and fallback remediation', (label, stdout, file, line) => {
+  const normalized = normalizeObservedStep({
+    label,
+    status: 'failed',
+    summary: 'failed',
+    stdout,
+    advice: '',
+  });
+  expect(normalized.observation.diagnostic).toMatchObject({
+    locations: [expect.objectContaining({ file, line, message: expect.any(String) })],
+    remediation: expect.stringContaining('reported tool'),
+  });
+});
+
+it('keeps unlocated tool failures without a fabricated source location', () => {
+  const normalized = normalizeObservedStep({
+    label: 'Unit tests',
+    status: 'failed',
+    stderr: 'Process exited unexpectedly.',
+  });
+  expect(normalized.observation.diagnostic?.locations).toEqual([]);
+});
+
+it.each(['Advisory report', 'QA checkpoint'])(
+  'renders canonical %s without repeating its locations',
+  (label) => {
+    const normalized = normalizeObservedStep({
+      label,
+      status: 'ok',
+      advisories: [{ id: 'advisory.structural-file', file: 'src/a.ts', reason: 'unique advisory' }],
+      stdout: 'Advisory log:\n- src/a.ts unique advisory\n',
+    });
+    expect(normalized.observation.log.match(/unique advisory/gu)).toHaveLength(1);
+    expect(normalized.observation.diagnostic?.locations).toHaveLength(1);
+  }
+);
+
+it('retains suite import failures after long output from either stream', () => {
+  const failure =
+    ' FAIL  src/suite.test.ts [ src/suite.test.ts ]\nError: Cannot find module missing-owner.';
+  const normalized = normalizeObservedStep({
+    label: 'Unit tests',
+    status: 'failed',
+    stdout: 'passing output\n'.repeat(50_000),
+    stderr: 'progress\n'.repeat(50_000) + failure,
+  });
+  expect(normalized.observation.diagnostic?.locations).toEqual([
+    {
+      file: 'src/suite.test.ts',
+      line: null,
+      message: 'Test suite failed: Error: Cannot find module missing-owner.',
+    },
+  ]);
+});
+
+it('bounds locations and rejects invalid line numbers without losing the final test reason', () => {
+  const stdout =
+    'src/invalid.ts:0:1: invalid\n' +
+    'src/invalid.ts:999999999999999999999:1: invalid\n' +
+    Array.from({ length: 101 }, (_, index) => `src/a.ts:${index + 1}:2: issue`).join('\n');
+  const normalized = normalizeObservedStep({ label: 'Oxlint', status: 'failed', stdout });
+  expect(normalized.observation.diagnostic?.locations).toHaveLength(100);
+  expect(normalized.observation.diagnostic?.locations[0]).toMatchObject({
+    file: 'src/a.ts',
+    line: 1,
+  });
+});
