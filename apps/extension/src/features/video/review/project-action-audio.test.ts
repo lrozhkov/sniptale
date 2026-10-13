@@ -4,6 +4,7 @@ import { createVideoProjectFromRecording } from '../project/factories/creation';
 import { encodeRecordingKeyboardRhythm } from '../project/keyboard-rhythm';
 import {
   buildProjectActionAudioPlan,
+  projectActionFeedbackMarkers,
   evaluateProjectGestureFeedback,
 } from './project-action-audio';
 import { iterateReviewActionAudioCues } from './action-audio';
@@ -229,6 +230,18 @@ it('keeps halo on verified actual coordinates and ends at observed release witho
   expect(frames[0]!.frame).toMatchObject({ effect: 'press', point: { x: 0.2, y: 0.2 } });
   expect(frames[0]!.frame.path!.length).toBeGreaterThan(0);
   expect(evaluateProjectGestureFeedback(project, 5)).toEqual([]);
+  group.gestureStyles = patchReviewClicks(
+    group.gestureStyles,
+    ['drag'],
+    { gestureAppearance: 'area' },
+    projectActionFeedbackMarkers(project, group)
+  );
+  expect(evaluateProjectGestureFeedback({ ...project }, 2)[0]!.frame.area).toEqual({
+    x: 0.1,
+    y: 0.2,
+    width: 0.4,
+    height: 0.01,
+  });
 });
 it('roundtrips settings and rejects malformed rhythm or precise protected input rather than playing it', () => {
   const project = fixture();

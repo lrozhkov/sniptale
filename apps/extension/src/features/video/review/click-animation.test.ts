@@ -275,14 +275,52 @@ it('creates an area on explicit selection and preserves existing batch rectangle
   });
   const unchanged = patchReviewClicks(original, ['new'], { effect: 'press' });
   expect(unchanged.find((style) => style.id === 'new')).not.toHaveProperty('gestureArea');
-  const area = patchReviewClicks(unchanged, ['existing', 'new'], { gestureAppearance: 'area' });
+  const facts: ReviewTelemetryMarker[] = [
+    {
+      ...marker,
+      ref: { kind: 'action', id: 'new' },
+      gesture: {
+        id: 'new',
+        type: 'selection',
+        button: 0,
+        downTime: 1,
+        upTime: 2,
+        completion: 'released',
+        path: [
+          { time: 1, x: 0.8, y: 0.7 },
+          { time: 2, x: 0.2, y: 0.1 },
+        ],
+      },
+    },
+  ];
+  const source = structuredClone(facts);
+  const area = patchReviewClicks(
+    unchanged,
+    ['existing', 'new'],
+    { gestureAppearance: 'area' },
+    facts
+  );
+  expect(facts).toEqual(source);
   expect(area.find((style) => style.id === 'existing')!.gestureArea).toEqual(
     original[0]!.gestureArea
   );
   expect(area.find((style) => style.id === 'new')!.gestureArea).toEqual({
-    x: 0.25,
-    y: 0.25,
-    width: 0.5,
-    height: 0.5,
+    x: 0.2,
+    y: 0.1,
+    width: 0.6000000000000001,
+    height: 0.6,
   });
+});
+
+it('does not invent a central frame without observed geometry', () => {
+  expect(patchReviewClicks([], ['missing'], { gestureAppearance: 'area' })[0]).not.toHaveProperty(
+    'gestureArea'
+  );
+});
+
+it('keeps a point-only frame visible within the source bounds', () => {
+  const result = patchReviewClicks([], ['click'], { gestureAppearance: 'area' }, [
+    { ...marker, focusPoint: { x: 1, y: 1 } },
+  ]);
+  expect(result[0]!.gestureArea).toEqual({ x: 0.99, y: 0.99, width: 0.01, height: 0.01 });
 });

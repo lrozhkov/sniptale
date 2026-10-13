@@ -157,6 +157,16 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
     };
     try {
       render();
+      if (family === 'mouse') {
+        click('gallery.videoReview.gestureAppearance');
+        await act(async () =>
+          [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+            .find((option) => option.textContent === 'gallery.videoReview.gesture_area')!
+            .click()
+        );
+        accept();
+        expect(project.actionFeedback![0]!.gestureStyles![0]!.effect).toBe('press');
+      }
       click('gallery.videoReview.actionAudioEnabled');
       accept();
       expect(project.actionFeedback![0]!.settings[0]!.presetId).toBe(
@@ -185,6 +195,17 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
             .click()
         );
         accept();
+        expect(project.actionFeedback![0]!.gestureStyles![0]!.gestureArea).toEqual({
+          x: 0.2,
+          y: 0.3,
+          width: 0.01,
+          height: 0.01,
+        });
+        const range = host.querySelector<HTMLInputElement>(
+          'input[aria-label="gallery.videoReview.gestureArea_x range"]'
+        )!;
+        expect(range.closest('details')?.open).toBe(false);
+        expect(range.max).toBe('99');
         for (const [axis, value] of [
           ['x', '10'],
           ['y', '20'],

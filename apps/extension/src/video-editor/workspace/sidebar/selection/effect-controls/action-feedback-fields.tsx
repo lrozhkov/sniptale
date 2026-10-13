@@ -1,3 +1,5 @@
+import { projectActionFeedbackMarkers } from '../../../../../features/video/review/project-action-audio';
+import { InspectorDetails } from '../shared/details';
 import { useState, useEffect } from 'react';
 import { NumericRow, type NumericRowProps } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
@@ -87,7 +89,15 @@ export function ActionFeedbackFields(props: FeedbackProps) {
             gestureStyles: patchReviewClicks(
               current.gestureStyles ?? [],
               [props.target.ref.id],
-              patch
+              {
+                effect:
+                  current.gestureStyles?.find((item) => item.id === props.target.ref.id)?.effect ??
+                  (project.actionPresentation?.enabled === false ? 'off' : 'press'),
+                ...patch,
+              },
+              patch.gestureAppearance === 'area'
+                ? projectActionFeedbackMarkers(project, current)
+                : []
             ),
           })
         : project;
@@ -287,38 +297,42 @@ function FeedbackGestureFields({
         }))}
         onChange={(gestureAppearance) => changeGesture({ gestureAppearance })}
       />
-      {gestureStyle.gestureAppearance === 'area'
-        ? (['x', 'y', 'width', 'height'] as const).map((key) => (
-            <FeedbackNumber
-              key={key}
-              label={translate(`gallery.videoReview.gestureArea_${key}`)}
-              value={(gestureStyle.gestureArea?.[key] ?? 0) * 100}
-              min={key === 'width' || key === 'height' ? 0.1 : 0}
-              max={
-                (1 -
-                  (gestureStyle.gestureArea?.[
-                    key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y'
-                  ] ?? (key === 'x' || key === 'y' ? 0.5 : 0.25))) *
-                100
-              }
-              step={0.1}
-              precision={1}
-              unit="%"
-              onCommitValue={(value) =>
-                changeGesture({
-                  gestureArea: {
-                    x: 0.25,
-                    y: 0.25,
-                    width: 0.5,
-                    height: 0.5,
-                    ...gestureStyle.gestureArea,
-                    [key]: value / 100,
-                  },
-                })
-              }
-            />
-          ))
-        : null}
+      {gestureStyle.gestureAppearance === 'area' && gestureStyle.gestureArea ? (
+        <InspectorDetails
+          preferenceId="action-feedback:gesture-area"
+          label={translate('gallery.videoReview.gestureAreaDetails')}
+        >
+          {(['x', 'y', 'width', 'height'] as const).map((key) => {
+            const area = gestureStyle.gestureArea!;
+            const min = key === 'width' || key === 'height' ? 0.1 : 0;
+            const max =
+              (1 -
+                area[
+                  key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y'
+                ]) *
+              100;
+            return (
+              <FeedbackNumber
+                key={key}
+                appearance="plain"
+                focusAppearance="accent-box"
+                className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+                label={translate(`gallery.videoReview.gestureArea_${key}`)}
+                value={area[key] * 100}
+                min={min}
+                max={max}
+                step={0.1}
+                precision={1}
+                unit="%"
+                scrub={{ min, max, step: 0.1 }}
+                onCommitValue={(value) =>
+                  changeGesture({ gestureArea: { ...area, [key]: value / 100 } })
+                }
+              />
+            );
+          })}
+        </InspectorDetails>
+      ) : null}
     </>
   );
 }

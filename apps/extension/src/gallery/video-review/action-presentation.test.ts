@@ -11,6 +11,7 @@ it('flushes before one functional typed audio batch and blocks failure or concur
     editing: { exporter: { phase: 'idle' } },
     canStart: vi.fn(() => true),
     advanced: createQuickEditAdvancedState(),
+    projected: { markers: [] },
     setMode: vi.fn(),
     setActiveSelection: vi.fn(),
     activeSelection: { kind: 'telemetry', ref: { kind: 'signal', id: 'same' } },
@@ -50,13 +51,14 @@ it('admits authored presentation only when editing is available, retaining the e
     editing: { exporter: { phase: 'idle' } },
     canStart: vi.fn(() => true),
     advanced: createQuickEditAdvancedState(),
+    projected: { markers: [] },
     setMode: vi.fn(),
     setActiveSelection: vi.fn(),
     activeSelection: { kind: 'telemetry', ref: { kind: 'action', id: 'key' } },
     setMessage: vi.fn(),
     setClickAnimations: vi.fn(),
     setKeyAnimations: vi.fn(),
-  } as unknown as Parameters<typeof changeRecordedKeys>[0];
+  } as unknown as Parameters<typeof changeRecordedClicks>[0];
   changeRecordedKeys(state, ['key'], { enabled: true });
   expect(state.setKeyAnimations).toHaveBeenCalledOnce();
   expect(state.setMode).toHaveBeenCalledWith('advanced');
@@ -83,6 +85,22 @@ it('admits authored presentation only when editing is available, retaining the e
   expect(vi.mocked(state.setClickAnimations).mock.calls[0]![0]([])).toMatchObject([
     { id: 'click', effect: 'ripple' },
   ]);
+  state.projected.markers = [
+    {
+      ref: { kind: 'action', id: 'click' },
+      eventType: 'SELECTION',
+      start: 1,
+      end: 2,
+      focusPoint: { x: 0.8, y: 0.7 },
+    },
+  ];
+  changeRecordedClicks(state, ['click'], { gestureAppearance: 'area' });
+  expect(vi.mocked(state.setClickAnimations).mock.lastCall![0]([])[0]!.gestureArea).toEqual({
+    x: 0.8,
+    y: 0.7,
+    width: 0.01,
+    height: 0.01,
+  });
   changeRecordedClicks(state, ['click'], { after: NaN });
   expect(state.setMessage).toHaveBeenCalledTimes(2);
 });

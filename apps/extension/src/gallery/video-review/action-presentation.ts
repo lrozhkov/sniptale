@@ -107,14 +107,16 @@ export function changeRecordedKeys(
 
 /** Both single and bulk edits use the existing advanced-content transaction and admission. */
 export function changeRecordedClicks(
-  state: PresentationState,
+  state: PresentationState & Pick<ReturnType<typeof useReviewEditorState>, 'projected'>,
   ids: readonly string[],
   patch: Partial<ReviewClickStyle> | null
 ) {
   if (state.busy || state.editing.exporter.phase !== 'idle' || !state.canStart()) return;
   try {
-    patchReviewClicks(state.advanced.clickAnimations ?? [], ids, patch);
-    state.setClickAnimations((current) => patchReviewClicks(current, ids, patch));
+    patchReviewClicks(state.advanced.clickAnimations ?? [], ids, patch, state.projected.markers);
+    state.setClickAnimations((current) =>
+      patchReviewClicks(current, ids, patch, state.projected.markers)
+    );
     if (patch?.effect && patch.effect !== 'off' && state.advanced.ui.mode !== 'advanced') {
       state.setMode('advanced');
       state.setActiveSelection(state.activeSelection);

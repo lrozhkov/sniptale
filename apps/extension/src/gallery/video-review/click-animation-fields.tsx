@@ -14,7 +14,12 @@ import {
   REVIEW_CLICK_BOUNDS,
   type ReviewClickStyle,
 } from '../../features/video/review/advanced/click-animation';
-import { ReviewButton, reviewSelectFieldClassName, reviewTextButtonClassName } from './controls';
+import {
+  ReviewDetails,
+  ReviewButton,
+  reviewSelectFieldClassName,
+  reviewTextButtonClassName,
+} from './controls';
 
 // Slider limits are deliberately narrower than the persisted/manual-input bounds.
 const CLICK_BOUNDS = {
@@ -391,38 +396,44 @@ function ClickAnimation({
               props.onChange({ gestureAppearance })
             }
           />
-          {props.values.length === 1 && common('gestureAppearance') === 'area'
-            ? (['x', 'y', 'width', 'height'] as const).map((key) => (
-                <ClickNumberRow
-                  key={key}
-                  label={translate(`gallery.videoReview.gestureArea_${key}`)}
-                  value={(props.values[0]?.gestureArea?.[key] ?? 0) * 100}
-                  min={key === 'width' || key === 'height' ? 0.1 : 0}
-                  max={
-                    (1 -
-                      (props.values[0]?.gestureArea?.[
-                        key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y'
-                      ] ?? (key === 'x' || key === 'y' ? 0.5 : 0.25))) *
-                    100
-                  }
-                  step={0.1}
-                  precision={1}
-                  unit="%"
-                  onCommitValue={(value) =>
-                    props.onChange({
-                      gestureArea: {
-                        x: 0.25,
-                        y: 0.25,
-                        width: 0.5,
-                        height: 0.5,
-                        ...props.values[0]?.gestureArea,
-                        [key]: value / 100,
-                      },
-                    })
-                  }
-                />
-              ))
-            : null}
+          {props.values.length === 1 &&
+          common('gestureAppearance') === 'area' &&
+          props.values[0]?.gestureArea ? (
+            <ReviewDetails
+              preferenceId="review-click:gesture-area"
+              label={translate('gallery.videoReview.gestureAreaDetails')}
+            >
+              {(['x', 'y', 'width', 'height'] as const).map((key) => {
+                const area = props.values[0]!.gestureArea!;
+                const min = key === 'width' || key === 'height' ? 0.1 : 0;
+                const max =
+                  (1 -
+                    area[
+                      key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y'
+                    ]) *
+                  100;
+                return (
+                  <ClickNumberRow
+                    key={key}
+                    appearance="plain"
+                    focusAppearance="accent-box"
+                    className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+                    label={translate(`gallery.videoReview.gestureArea_${key}`)}
+                    value={area[key] * 100}
+                    min={min}
+                    max={max}
+                    step={0.1}
+                    precision={1}
+                    unit="%"
+                    scrub={{ min, max, step: 0.1 }}
+                    onCommitValue={(value) =>
+                      props.onChange({ gestureArea: { ...area, [key]: value / 100 } })
+                    }
+                  />
+                );
+              })}
+            </ReviewDetails>
+          ) : null}
         </>
       ) : null}
       {common('effect') === null ? (

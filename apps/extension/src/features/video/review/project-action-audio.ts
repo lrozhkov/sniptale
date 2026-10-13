@@ -50,7 +50,12 @@ function segments(clips: readonly VideoProjectVideoClip[]): ReviewTimeSegment[] 
     rate: clip.playbackRate ?? 1,
   }));
 }
-function markers(project: VideoProject, group: VideoProjectActionFeedback, geometry = true) {
+/** Projects the original source gesture for presentation editing and rendering. */
+export function projectActionFeedbackMarkers(
+  project: VideoProject,
+  group: VideoProjectActionFeedback,
+  geometry = true
+) {
   const actionEvents: RecordingActionEvent[] = project.actionEvents.flatMap((event) => {
     const anchor = event.anchor;
     if (
@@ -118,7 +123,7 @@ export function buildProjectActionAudioPlan(project: VideoProject): ReviewAction
   if (!getVideoProjectActionPresentation(project).enabled)
     return { duration: project.duration, descriptors };
   for (const group of project.actionFeedback ?? []) {
-    const facts = markers(project, group, false);
+    const facts = projectActionFeedbackMarkers(project, group, false);
     for (const clips of clipRuns(sourceClips(project, group))) {
       const plan = buildReviewActionAudioPlan({
         markers: facts,
@@ -168,7 +173,7 @@ export function evaluateProjectGestureFeedback(project: VideoProject, time: numb
 /** Source facts and timing are prepared together; random seeks retain no playback state. */
 function prepareProjectGestureFeedback(project: VideoProject) {
   return (project.actionFeedback ?? []).flatMap((group) => {
-    const facts = markers(project, group);
+    const facts = projectActionFeedbackMarkers(project, group);
     const explicit = new Map((group.gestureStyles ?? []).map((style) => [style.id, style]));
     const defaults = getVideoProjectActionPresentation(project);
     const styles = facts.flatMap((marker) => {

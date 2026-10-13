@@ -1,10 +1,16 @@
+import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
+import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
-import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+import {
+  applyHarnessBootstrap,
+  GALLERY_HARNESS_PATH,
+  VIDEO_EDITOR_HARNESS_PATH,
+} from '../extension-critical.helpers';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
 
 for (const viewport of [
@@ -229,4 +235,312 @@ async function seedSelectionGesture(page: Page) {
     },
     { fixture: betaV1Fixture, track }
   );
+}
+
+for (const width of [1280, 1920]) {
+  for (const editor of ['gallery', 'standalone'] as const) {
+    test(`authored selection frame ${editor} ${width}`, async ({ page }, info) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+      try {
+        await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          apiBehavior: { runtimeFallback: 'typed-success' },
+          storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
+        });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedReviewVideo(page, 'review-vp8-opus.webm', {
+          width: 160,
+          height: 90,
+          duration: 12,
+        });
+        await seedSelectionGesture(page);
+        if (editor === 'standalone') {
+          const recording = betaV1Fixture.records.recordings[0]!;
+          const track = createVideoProjectCursorTrack('embedded-fallback');
+          track.samples = [
+            {
+              id: 'down',
+              time: 1,
+              x: 32,
+              y: 27,
+              visible: true,
+              recordingPoint: { x: 0.2, y: 0.3 },
+              captureSegment: 0,
+            },
+            {
+              id: 'up',
+              time: 1.5,
+              x: 112,
+              y: 54,
+              visible: true,
+              recordingPoint: { x: 0.7, y: 0.6 },
+              captureSegment: 0,
+            },
+          ];
+          const project = createVideoProjectFromRecording({
+            recordingId: recording.id,
+            filename: recording.filename,
+            width: 160,
+            height: 90,
+            duration: 12,
+            mimeType: 'video/webm',
+            size: recording.size,
+            cursorTrack: track,
+            sourceNormalizedActionEvents: [
+              {
+                id: 'selection',
+                kind: 'CLICK',
+                time: 1,
+                duration: 0.5,
+                point: { x: 0.2, y: 0.3 },
+                label: 'Selection proof',
+                preset: 'NONE',
+                data: {
+                  gestureId: 'selection',
+                  gestureType: 'selection',
+                  downTime: 1,
+                  upTime: 1.5,
+                  button: 0,
+                  completion: 'released',
+                  downX: 32,
+                  downY: 27,
+                  upX: 112,
+                  upY: 54,
+                  maxExcursionCssPx: 85,
+                  pressDuration: 0.5,
+                },
+              },
+            ],
+          });
+          expect(parseHydratableVideoProject(project)).not.toBeNull();
+          await page.evaluate(
+            async ({ databaseName, project }) => {
+              const db = await new Promise<IDBDatabase>((resolve, reject) => {
+                const request = indexedDB.open(databaseName);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+              });
+              try {
+                await new Promise<void>((resolve, reject) => {
+                  const tx = db.transaction('video_projects', 'readwrite');
+                  tx.objectStore('video_projects').put({
+                    id: project.id,
+                    project,
+                    createdAt: project.createdAt,
+                    updatedAt: project.updatedAt,
+                  });
+                  tx.oncomplete = () => resolve();
+                  tx.onabort = () => reject(tx.error);
+                });
+              } finally {
+                db.close();
+              }
+            },
+            { databaseName: betaV1Fixture.databaseName, project }
+          );
+          await page.goto(
+            `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=light`
+          );
+          await page.locator('[data-ui="video-editor.timeline.history-event"]').first().click();
+          await page
+            .locator('nav')
+            .getByRole('button', { name: label('gallery.videoReview.actionAudio'), exact: true })
+            .click();
+        } else {
+          await page.reload();
+          await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+          await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+          await page
+            .getByRole('button', {
+              name: label('gallery.videoReview.advancedEditing'),
+              exact: true,
+            })
+            .click();
+          await page
+            .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+            .click();
+          await page
+            .locator('[data-ui="gallery.videoReview.actionHistory"] li')
+            .filter({ hasText: 'Selection proof' })
+            .getByRole('button')
+            .first()
+            .click();
+        }
+        const appearance = page.getByRole('button', {
+          name: label('gallery.videoReview.gestureAppearance'),
+          exact: true,
+        });
+        if (editor === 'gallery' && !(await appearance.isVisible()))
+          await page
+            .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
+            .click();
+        if (editor === 'gallery') {
+          await page
+            .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
+            .last()
+            .click();
+          await page
+            .getByRole('option', { name: label('gallery.videoReview.click_press'), exact: true })
+            .click();
+        }
+        await appearance.click();
+        await page
+          .getByRole('option', { name: label('gallery.videoReview.gesture_area'), exact: true })
+          .click();
+        const details = page.locator('details[data-level="group"]').filter({
+          has: page.getByText(label('gallery.videoReview.gestureAreaDetails'), { exact: true }),
+        });
+        await expect(details).not.toHaveAttribute('open');
+        await details.locator('summary').click();
+        const x = details.getByRole('textbox', {
+          name: label('gallery.videoReview.gestureArea_x'),
+          exact: true,
+        });
+        await expect(x).toHaveValue('20');
+        await expect(
+          details.getByRole('textbox', {
+            name: label('gallery.videoReview.gestureArea_y'),
+            exact: true,
+          })
+        ).toHaveValue('30');
+        await expect(
+          details.getByRole('textbox', {
+            name: label('gallery.videoReview.gestureArea_width'),
+            exact: true,
+          })
+        ).toHaveValue('50');
+        await expect(
+          details.getByRole('textbox', {
+            name: label('gallery.videoReview.gestureArea_height'),
+            exact: true,
+          })
+        ).toHaveValue('30');
+        await x.hover();
+        const slider = details.getByRole('slider', {
+          name: `${label('gallery.videoReview.gestureArea_x')} range`,
+          exact: true,
+        });
+        await slider.scrollIntoViewIfNeeded();
+        await slider.focus();
+        await slider.press('ArrowRight');
+        await slider.press('Tab');
+        await expect(x).toHaveValue('20.1');
+        await x.fill('10');
+        await x.press('Enter');
+        await expect(x).toHaveValue('10');
+        if (editor === 'gallery') {
+          await expect
+            .poll(
+              async () => (await persistedReviewContent(page))?.clickAnimations?.[0]?.gestureArea?.x
+            )
+            .toBe(0.1);
+          await page
+            .getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
+            .click();
+          await expect
+            .poll(
+              async () => (await persistedReviewContent(page))?.clickAnimations?.[0]?.gestureArea?.x
+            )
+            .toBeUndefined();
+          await page
+            .getByRole('button', { name: label('gallery.videoReview.redo'), exact: true })
+            .click();
+          await expect
+            .poll(
+              async () => (await persistedReviewContent(page))?.clickAnimations?.[0]?.gestureArea?.x
+            )
+            .toBe(0.1);
+          await page
+            .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+            .click();
+          await page
+            .locator('[data-ui="gallery.videoReview.actionHistory"] li')
+            .filter({ hasText: 'Selection proof' })
+            .getByRole('button')
+            .first()
+            .click();
+          if (!(await appearance.isVisible()))
+            await page
+              .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
+              .click();
+          await expect(x).toHaveValue('10');
+        }
+        await details.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: info.outputPath(`frame-${editor}.png`), fullPage: false });
+        if (editor === 'standalone') {
+          const event = await page
+            .locator('[data-ui="video-editor.timeline.history-event"]')
+            .first()
+            .boundingBox();
+          const ruler = page.locator('[data-ui="video-editor.timeline.ruler"]');
+          const box = await ruler.boundingBox();
+          await ruler.click({ position: { x: event!.x + event!.width / 2 - box!.x, y: 8 } });
+          await expect
+            .poll(() =>
+              page.locator('[data-preview-stage-canvas]').evaluate((canvas: HTMLCanvasElement) => {
+                const pixel = canvas
+                  .getContext('2d')!
+                  .getImageData(
+                    Math.round(canvas.width * 0.12),
+                    Math.round(canvas.height * 0.3),
+                    1,
+                    1
+                  ).data;
+                return Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+              })
+            )
+            .toBeGreaterThan(160);
+        } else {
+          await page
+            .locator('[data-ui="gallery.videoReview.stage"] video')
+            .evaluate(async (video: HTMLVideoElement) => {
+              video.currentTime = 1.25;
+              await new Promise<void>((resolve) =>
+                video.addEventListener('seeked', () => resolve(), { once: true })
+              );
+            });
+        }
+        await page.screenshot({
+          path: info.outputPath(`frame-preview-${editor}.png`),
+          fullPage: false,
+        });
+        if (editor === 'standalone')
+          await expect(
+            page.getByRole('button', { name: 'Autosave: Saved', exact: true })
+          ).toBeVisible();
+        await page.reload();
+        if (editor === 'gallery') {
+          await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+          await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+          await page
+            .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+            .click();
+          await page
+            .locator('[data-ui="gallery.videoReview.actionHistory"] li')
+            .filter({ hasText: 'Selection proof' })
+            .getByRole('button')
+            .first()
+            .click();
+          if (!(await appearance.isVisible()))
+            await page
+              .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
+              .click();
+        } else {
+          await page.locator('[data-ui="video-editor.timeline.history-event"]').first().click();
+          await page
+            .locator('nav')
+            .getByRole('button', { name: label('gallery.videoReview.actionAudio'), exact: true })
+            .click();
+        }
+        if ((await details.getAttribute('open')) === null) await details.locator('summary').click();
+        await expect(x).toHaveValue('10');
+      } finally {
+        host.server.closeAllConnections();
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
+  }
 }

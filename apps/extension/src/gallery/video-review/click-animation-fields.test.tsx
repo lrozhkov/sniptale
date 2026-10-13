@@ -176,3 +176,32 @@ it('offers factual hold appearance without inapplicable pulse timing or pointer 
   const choices = host.querySelector('[aria-label="gallery.videoReview.clickEffect"]');
   expect(choices?.textContent).not.toContain('gallery.videoReview.click_magnify');
 });
+
+it('puts frame geometry in a disclosure with bounded plain sliders', () => {
+  const change = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewClickFields
+        gesture
+        values={[
+          {
+            ...click,
+            gestureAppearance: 'area',
+            gestureArea: { x: 0.2, y: 0.3, width: 0.5, height: 0.3 },
+          },
+        ]}
+        onChange={change}
+      />
+    )
+  );
+  const range = field('gestureArea_x', 'range');
+  expect(range).not.toBeNull();
+  expect(range.closest('details')?.open).toBe(false);
+  expect(range.max).toBe('50');
+  act(() => input(range, '40'));
+  expect(change).not.toHaveBeenCalled();
+  act(() => range.dispatchEvent(new Event('pointerup', { bubbles: true })));
+  expect(change).toHaveBeenCalledExactlyOnceWith({
+    gestureArea: { x: 0.4, y: 0.3, width: 0.5, height: 0.3 },
+  });
+});
