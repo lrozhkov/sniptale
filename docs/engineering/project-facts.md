@@ -136,6 +136,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/color-selector`
 - `apps/extension/src/ui/command-palette`
 - `apps/extension/src/ui/compact-inspector-controls`
+- `apps/extension/src/ui/cursor-focus-control-layout.test.ts`
+- `apps/extension/src/ui/cursor-focus-control-layout.ts`
 - `apps/extension/src/ui/cursor-focus-timeline-keys.test.tsx`
 - `apps/extension/src/ui/cursor-focus-timeline-keys.tsx`
 - `apps/extension/src/ui/document-autosave-labels.ts`

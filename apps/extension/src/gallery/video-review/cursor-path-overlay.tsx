@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { translate } from '../../platform/i18n';
+import { layoutCursorFocusControls } from '../../ui/cursor-focus-control-layout';
 import type {
   CursorFocusPath,
   CursorFocusPoint,
@@ -22,6 +23,7 @@ interface ReviewCursorOverlayProps {
   width: number;
   height: number;
   displayWidth?: number;
+  bounds?: { left: number; top: number; right: number; bottom: number };
   onChange(path: CursorFocusPath): void;
   onSeek(time: number): void;
   selectedKeyId?: string;
@@ -54,7 +56,8 @@ export function ReviewCursorPathOverlay(props: ReviewCursorOverlayProps) {
   const keys = segment.keys.slice(Math.max(0, index - 1), index + 2);
   const selected = segment.keys[index]!;
   const handleRadius = (props.width * 10) / (props.displayWidth ?? props.width);
-  const controls = cursorFocusKeyControls(segment, selected.id, path.smoothing);
+  const rawControls = cursorFocusKeyControls(segment, selected.id, path.smoothing);
+  const controls = layoutReviewCursorControls(props, selected, rawControls);
   const point = (position: CursorFocusPoint) =>
     `${position.x * props.width},${position.y * props.height}`;
   const curve = Array.from({ length: 49 }, (_, step) =>
@@ -96,26 +99,72 @@ export function ReviewCursorPathOverlay(props: ReviewCursorOverlayProps) {
         vectorEffect="non-scaling-stroke"
       />
       {keys.map((key) => (
-        <circle
-          key={key.id}
-          cx={key.x * props.width}
-          cy={key.y * props.height}
-          r={handleRadius}
-          fill="var(--sniptale-color-surface-panel)"
-          stroke="var(--sniptale-color-accent)"
-          strokeWidth="2"
-          className="pointer-events-auto cursor-grab"
-          role="button"
-          tabIndex={0}
-          aria-label={`${translate('videoEditor.sidebar.cursorFocusPathTitle')} ${key.time.toFixed(2)}`}
-          onPointerDown={(event) => begin(event, key)}
-          onKeyDown={(event) => navigateReviewCursorPoint(event, key, props, commitGeometry)}
-        />
+        <g key={key.id}>
+          <circle
+            cx={key.x * props.width}
+            cy={key.y * props.height}
+            r={handleRadius * (key.id === selected.id ? 1 : 0.7)}
+            fill="color-mix(in srgb, var(--sniptale-color-accent) 25%, transparent)"
+            stroke={
+              key.id === selected.id
+                ? 'var(--sniptale-color-accent)'
+                : 'var(--sniptale-color-text-secondary)'
+            }
+            strokeWidth={key.id === selected.id ? 3 : 1.5}
+            vectorEffect="non-scaling-stroke"
+            aria-pressed={key.id === selected.id}
+            data-cursor-focus-key={key.id}
+            className="pointer-events-auto cursor-grab"
+            role="button"
+            tabIndex={0}
+            aria-label={`${translate('videoEditor.sidebar.cursorFocusPathTitle')} ${key.time.toFixed(2)}`}
+            onPointerDown={(event) => begin(event, key)}
+            onKeyDown={(event) => navigateReviewCursorPoint(event, key, props, commitGeometry)}
+          />
+          {key.id === selected.id ? (
+            <circle
+              cx={key.x * props.width}
+              cy={key.y * props.height}
+              r={handleRadius * 0.25}
+              fill="var(--sniptale-color-accent)"
+            />
+          ) : null}
+        </g>
       ))}
+      <ReviewCursorTangents
+        props={props}
+        selected={selected}
+        controls={controls}
+        handleRadius={handleRadius}
+        begin={begin}
+      />
+    </svg>
+  );
+}
+
+/** Tangent rendering and keyboard edits share the parent gesture and authoring authority. */
+function ReviewCursorTangents({
+  props,
+  selected,
+  controls,
+  handleRadius,
+  begin,
+}: {
+  props: ReviewCursorOverlayProps;
+  selected: CursorFocusKey;
+  controls: ReturnType<typeof cursorFocusKeyControls>;
+  handleRadius: number;
+  begin(
+    event: React.PointerEvent<SVGCircleElement>,
+    key: CursorFocusKey,
+    handle?: 'incoming' | 'outgoing'
+  ): void;
+}) {
+  return (
+    <>
       {(['incoming', 'outgoing'] as const).map((handle) => {
         const position = controls[handle];
-        if (!position || Math.hypot(position.x - selected.x, position.y - selected.y) < 0.005)
-          return null;
+        if (!position) return null;
         return (
           <g key={handle}>
             <line
@@ -129,8 +178,8 @@ export function ReviewCursorPathOverlay(props: ReviewCursorOverlayProps) {
             <circle
               cx={position.x * props.width}
               cy={position.y * props.height}
-              r={handleRadius * 0.8}
-              fill="var(--sniptale-color-text-primary)"
+              r={handleRadius}
+              fill="transparent"
               className="pointer-events-auto cursor-grab"
               role="button"
               tabIndex={0}
@@ -145,7 +194,7 @@ export function ReviewCursorPathOverlay(props: ReviewCursorOverlayProps) {
                   event.preventDefault();
                   props.onChange(
                     updateCursorFocusKey(props.path, selected.id, {
-                      [handle]: {
+                      [handle]: boundReviewCursorControl(props, {
                         x:
                           position.x +
                           (event.key === 'ArrowRight'
@@ -156,17 +205,69 @@ export function ReviewCursorPathOverlay(props: ReviewCursorOverlayProps) {
                         y:
                           position.y +
                           (event.key === 'ArrowDown' ? 0.01 : event.key === 'ArrowUp' ? -0.01 : 0),
-                      },
+                      }),
                     })
                   );
                 }
               }}
             />
+            <rect
+              x={position.x * props.width - handleRadius * 0.4}
+              y={position.y * props.height - handleRadius * 0.4}
+              width={handleRadius * 0.8}
+              height={handleRadius * 0.8}
+              rx={handleRadius * 0.15}
+              fill="color-mix(in srgb, var(--sniptale-color-accent) 25%, transparent)"
+              stroke="var(--sniptale-color-accent)"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+            />
           </g>
         );
       })}
-    </svg>
+    </>
   );
+}
+
+function layoutReviewCursorControls(
+  props: ReviewCursorOverlayProps,
+  selected: CursorFocusKey,
+  controls: ReturnType<typeof cursorFocusKeyControls>
+) {
+  const width = props.displayWidth ?? props.width,
+    height = (width * props.height) / props.width;
+  const bounds = props.bounds ?? { left: 0, top: 0, right: 1, bottom: 1 };
+  const display = (point: CursorFocusPoint | undefined) =>
+    point && Math.hypot(point.x - selected.x, point.y - selected.y) > Number.EPSILON
+      ? { x: point.x * width, y: point.y * height }
+      : undefined;
+  const layout = layoutCursorFocusControls({
+    point: { x: selected.x * width, y: selected.y * height },
+    controls: { incoming: display(controls.incoming), outgoing: display(controls.outgoing) },
+    bounds: {
+      left: bounds.left * width,
+      top: bounds.top * height,
+      right: bounds.right * width,
+      bottom: bounds.bottom * height,
+    },
+  });
+  const source = (point: CursorFocusPoint | undefined) =>
+    point ? { x: point.x / width, y: point.y / height } : undefined;
+  return { incoming: source(layout.incoming), outgoing: source(layout.outgoing) };
+}
+
+function boundReviewCursorControl(
+  props: ReviewCursorOverlayProps,
+  point: CursorFocusPoint
+): CursorFocusPoint {
+  const bounds = props.bounds ?? { left: 0, top: 0, right: 1, bottom: 1 };
+  const radius = (props.width * 14) / (props.displayWidth ?? props.width);
+  const insetX = Math.min(radius / props.width, (bounds.right - bounds.left) / 2);
+  const insetY = Math.min(radius / props.height, (bounds.bottom - bounds.top) / 2);
+  return {
+    x: Math.max(bounds.left + insetX, Math.min(bounds.right - insetX, point.x)),
+    y: Math.max(bounds.top + insetY, Math.min(bounds.bottom - insetY, point.y)),
+  };
 }
 
 function beginReviewCursorGesture(
@@ -194,10 +295,15 @@ function beginReviewCursorGesture(
     const candidates = (['incoming', 'outgoing'] as const)
       .filter((name) => controls[name] !== undefined)
       .map((name) => ({ name, distance: distance(controls[name]!) }))
-      .filter((item) => item.distance <= 12)
+      .filter((item) => item.distance <= 14)
       .toSorted((a, b) => a.distance - b.distance);
+    const activated = candidates.find((item) => item.name === handle);
     handle =
-      candidates[0] && candidates[0].distance < distance(selected) ? candidates[0].name : undefined;
+      candidates[0] && candidates[0].distance < distance(selected)
+        ? activated && Math.abs(activated.distance - candidates[0].distance) < 0.01
+          ? handle
+          : candidates[0].name
+        : undefined;
   }
   if (!handle && props.onSelect && props.selectedKeyId !== key.id) {
     event.preventDefault();
@@ -214,7 +320,11 @@ function beginReviewCursorGesture(
       x: (pointer.clientX - rect.left) / rect.width,
       y: (pointer.clientY - rect.top) / rect.height,
     };
-    next = updateCursorFocusKey(base, key.id, handle ? { [handle]: position } : position);
+    next = updateCursorFocusKey(
+      base,
+      key.id,
+      handle ? { [handle]: boundReviewCursorControl(props, position) } : position
+    );
     setDraft(next);
   };
   const cleanup = () => {

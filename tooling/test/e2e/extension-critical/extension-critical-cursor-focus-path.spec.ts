@@ -203,6 +203,7 @@ for (const viewport of [
         return dialog;
       };
       const dialog = await open();
+      await expect(dialog.locator('[data-ui="cursorFocusPath.overlay"]')).toHaveCount(0);
       const dwell = dialog
         .locator('[data-history-family="cursor"] button')
         .filter({ hasText: label('gallery.videoReview.eventCursorIdle') })
@@ -289,8 +290,18 @@ for (const viewport of [
         .flatMap((segment) => segment.keys)
         .find((key) => key.anchor === 'manual')!;
       expect(manual.outgoing?.x).toBe(0.6);
-      const handle = dialog.locator('[data-ui="cursorFocusPath.overlay"] circle[role="button"]');
-      const manualHandle = await findCircleAt(handle, 0.35);
+      await verifyCursorHandleBounds(page, dialog, () =>
+        dialog
+          .getByRole('button', {
+            name: label('gallery.videoReview.undo'),
+            exact: true,
+          })
+          .click()
+      );
+      const manualHandle = dialog.locator(
+        `[data-ui="cursorFocusPath.overlay"] [data-cursor-focus-key="${manual.id}"]`
+      );
+      await expect(manualHandle).toBeVisible();
       await drag(page, manualHandle, 28, 14, true);
       await expect
         .poll(
@@ -501,6 +512,9 @@ for (const viewport of [
         exact: true,
       });
       await expect(handle).toBeVisible();
+      await verifyCursorHandleBounds(page, page.locator('body'), () =>
+        page.keyboard.press('Control+z')
+      );
       await drag(page, handle, 30, 12, true);
       await expect(x).toHaveValue('0.35');
       await drag(page, handle, 32, 16, false);
@@ -615,14 +629,6 @@ for (const viewport of [
   });
 }
 
-async function findCircleAt(circles: Locator, x: number) {
-  for (let index = 0; index < (await circles.count()); index++) {
-    const circle = circles.nth(index);
-    const center = Number(await circle.getAttribute('cx'));
-    if (Math.abs(center / 160 - x) < 0.001) return circle;
-  }
-  throw new Error('Authored manual canvas handle is absent');
-}
 async function drag(page: Page, handle: Locator, dx: number, dy: number, cancel: boolean) {
   await handle.scrollIntoViewIfNeeded();
   const box = await handle.boundingBox();
@@ -770,4 +776,28 @@ async function verifyCursorInspectorWidths(
       fullPage: false,
     });
   }
+}
+
+/** Tangent editing remains recoverable at the edge of the native rendered canvas. */
+async function verifyCursorHandleBounds(page: Page, owner: Locator, undo: () => Promise<unknown>) {
+  const overlay = owner.locator('[data-ui="cursorFocusPath.overlay"]');
+  await expect(overlay.locator('[aria-pressed="true"]')).toHaveCount(1);
+  const tangent = overlay.getByRole('button', {
+    name: translate('videoEditor.sidebar.cursorFocusOutgoing', 'en'),
+    exact: true,
+  });
+  await expect(tangent).toBeVisible();
+  const box = (await tangent.boundingBox())!;
+  const stage = (await overlay.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(stage.x + stage.width + 200, stage.y - 200, { steps: 3 });
+  await page.mouse.up();
+  await expect.poll(async () => (await tangent.boundingBox())!.x).toBeGreaterThan(box.x + 20);
+  const bounded = (await tangent.boundingBox())!;
+  expect(bounded.x).toBeGreaterThanOrEqual(stage.x);
+  expect(bounded.y).toBeGreaterThanOrEqual(stage.y);
+  expect(bounded.x + bounded.width).toBeLessThanOrEqual(stage.x + stage.width);
+  expect(bounded.y + bounded.height).toBeLessThanOrEqual(stage.y + stage.height);
+  await undo();
 }

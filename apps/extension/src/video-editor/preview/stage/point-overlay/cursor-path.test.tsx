@@ -222,3 +222,148 @@ it('neighbor keys navigate and tangent edits leave recorded endpoints unchanged'
   expect(key).toMatchObject({ x: 0.25, y: 0.25, outgoing: { x: 0.61, y: 0.45 } });
   expect(useVideoEditorStore.getState().project!.cursorTrack).toEqual(project.cursorTrack);
 });
+
+it('keeps edited tangent targets inside the visible canvas and distinguishes selection', () => {
+  const { project, params, handle } = renderCursor();
+  expect(handle.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelector('[aria-pressed="false"]')).not.toBeNull();
+  const tangent = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  pointer(
+    tangent,
+    'pointerdown',
+    Number(tangent.getAttribute('cx')),
+    Number(tangent.getAttribute('cy'))
+  );
+  pointer(window, 'pointermove', 170, -70);
+  pointer(window, 'pointerup');
+  const edited = useVideoEditorStore.getState().project!;
+  act(() => root.render(<PreviewCursorPathOverlay {...params} project={edited} />));
+  const bounded = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  expect(Number(bounded.getAttribute('cx'))).toBeLessThan(100);
+  expect(Number(bounded.getAttribute('cy'))).toBeGreaterThan(0);
+  expect(edited.cursorTrack).toEqual(project.cursorTrack);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(1);
+  pointer(
+    bounded,
+    'pointerdown',
+    Number(bounded.getAttribute('cx')),
+    Number(bounded.getAttribute('cy'))
+  );
+  pointer(window, 'pointermove', 55, 60);
+  pointer(window, 'pointerup');
+  expect(
+    useVideoEditorStore.getState().project!.cursorFocusPath!.segments[0]!.keys[0]!.outgoing
+  ).toMatchObject({ x: 0.55, y: 0.6 });
+});
+
+it('recovers existing outside controls within a fitted zoomed canvas without changing them on render', () => {
+  const { project, params } = renderCursor();
+  const imported = applyVideoProjectMutationPatch(project, {
+    cursorFocusPath: {
+      ...project.cursorFocusPath!,
+      segments: project.cursorFocusPath!.segments.map((segment) => ({
+        ...segment,
+        keys: segment.keys.map((key, index) =>
+          index === 0 ? { ...key, outgoing: { x: 2, y: -1 } } : key
+        ),
+      })),
+    },
+  });
+  act(() => useVideoEditorStore.getState().setProject(imported));
+  act(() => useVideoEditorStore.getState().selectCursorSegment('recorded-0'));
+  vi.mocked(host.getBoundingClientRect).mockReturnValue(new DOMRect(0, 0, 200, 100));
+  act(() =>
+    root.render(
+      <PreviewCursorPathOverlay
+        {...params}
+        project={imported}
+        camera={{ ...params.camera, scale: 2 }}
+      />
+    )
+  );
+  const tangent = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  expect(Number(tangent.getAttribute('cx'))).toBeGreaterThan(25);
+  expect(Number(tangent.getAttribute('cx'))).toBeLessThan(75);
+  expect(Number(tangent.getAttribute('cy'))).toBeGreaterThan(0);
+  expect(Number(tangent.getAttribute('cy'))).toBeLessThan(100);
+  expect(useVideoEditorStore.getState().project!.cursorFocusPath).toEqual(imported.cursorFocusPath);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('a tangent border drag edits the tangent instead of moving its recorded key', () => {
+  const { project } = renderCursor();
+  const tangent = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  pointer(
+    tangent,
+    'pointerdown',
+    Number(tangent.getAttribute('cx')) + 12.5,
+    Number(tangent.getAttribute('cy'))
+  );
+  pointer(window, 'pointermove', 70, 60);
+  pointer(window, 'pointerup');
+  const edited = useVideoEditorStore.getState().project!;
+  expect(edited.cursorFocusPath!.segments[0]!.keys).toHaveLength(
+    project.cursorFocusPath!.segments[0]!.keys.length
+  );
+  expect(edited.cursorFocusPath!.segments[0]!.keys[0]).toMatchObject({
+    x: 0.25,
+    y: 0.25,
+    outgoing: { x: 0.7, y: 0.6 },
+  });
+});
+
+it.each(['control', 'key'] as const)(
+  'keeps a clipped tangent recoverable beside a coincident %s',
+  (collision) => {
+    const { project, params } = renderCursor();
+    const manual = {
+      id: 'edge-key',
+      time: 0,
+      x: collision === 'key' ? 0.986 : 0.5,
+      y: 0.5,
+      anchor: 'manual' as const,
+      interpolation: 'smooth' as const,
+      ...(collision === 'control' ? { incoming: { x: 2, y: 0.5 } } : {}),
+      outgoing: { x: collision === 'control' ? 0.986 : 2, y: 0.5 },
+    };
+    const imported = applyVideoProjectMutationPatch(project, {
+      cursorFocusPath: {
+        ...project.cursorFocusPath!,
+        segments: project.cursorFocusPath!.segments.map((segment, index) =>
+          index === 0 ? { ...segment, keys: [...segment.keys, manual] } : segment
+        ),
+      },
+    });
+    act(() => useVideoEditorStore.getState().setProject(imported));
+    act(() => useVideoEditorStore.getState().selectCursorSegment(manual.id));
+    vi.mocked(host.getBoundingClientRect).mockReturnValue(new DOMRect(0, 0, 1000, 1000));
+    act(() => root.render(<PreviewCursorPathOverlay {...params} project={imported} />));
+    const outgoing = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+    expect(outgoing).not.toBeNull();
+    if (collision === 'key')
+      expect(
+        Math.hypot(
+          Number(outgoing.getAttribute('cx')) * 10 - 986,
+          Number(outgoing.getAttribute('cy')) * 10 - 500
+        )
+      ).toBeGreaterThanOrEqual(24);
+    pointer(
+      outgoing,
+      'pointerdown',
+      Number(outgoing.getAttribute('cx')) * 10,
+      Number(outgoing.getAttribute('cy')) * 10
+    );
+    pointer(window, 'pointermove', 900, 600);
+    pointer(window, 'pointerup');
+    const edited = useVideoEditorStore.getState().project!;
+    expect(
+      edited
+        .cursorFocusPath!.segments.flatMap((segment) => segment.keys)
+        .find((key) => key.id === manual.id)
+    ).toMatchObject({
+      ...(collision === 'control' ? { incoming: { x: 2, y: 0.5 } } : {}),
+      outgoing: { x: 0.9, y: 0.6 },
+    });
+    expect(edited.cursorTrack).toEqual(project.cursorTrack);
+  }
+);

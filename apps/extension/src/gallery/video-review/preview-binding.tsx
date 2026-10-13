@@ -216,12 +216,7 @@ function ReviewPreviewStage({
   return (
     <ReviewStageBinding
       {...captionPreview}
-      cursorPath={reviewCursorPathOverlayBinding(
-        state,
-        resource.telemetry,
-        sceneEditable,
-        sceneActive
-      )}
+      cursorPath={reviewCursorPathOverlayBinding(state, resource.telemetry, sceneEditable)}
       annotationEffects={
         features.annotationEffects
           ? {
@@ -393,12 +388,11 @@ function reviewFullscreenFocus(state: PreviewState, enabled: boolean) {
 function reviewCursorPathOverlayBinding(
   state: PreviewState,
   telemetry: LoadedReview['telemetry'] | undefined,
-  sceneEditable: boolean,
-  sceneActive: boolean
+  sceneEditable: boolean
 ) {
   return state.setCursorFocusPath &&
     sceneEditable &&
-    (sceneActive || state.activeSelection?.kind === 'cursor-focus') &&
+    state.activeSelection?.kind === 'cursor-focus' &&
     state.advanced.ui.mode === 'advanced' &&
     state.features.overlaysVisible
     ? {

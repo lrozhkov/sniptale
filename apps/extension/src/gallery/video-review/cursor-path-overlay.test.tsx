@@ -451,3 +451,178 @@ it('canvas keyboard activation seeks and missing source coverage has no handle',
   );
   expect(host.querySelector('svg')).toBeNull();
 });
+
+it('marks the selected key and recovers imported outside tangents at a bounded edge', () => {
+  const outside: CursorFocusPath = {
+    ...path,
+    segments: [
+      {
+        ...path.segments[0]!,
+        keys: [
+          { ...path.segments[0]!.keys[0]!, outgoing: { x: 2, y: -1 } },
+          { id: 'next', time: 2, x: 0.8, y: 0.8, anchor: 'manual', interpolation: 'smooth' },
+        ],
+      },
+    ],
+  };
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewCursorPathOverlay
+        path={outside}
+        selectedKeyId="manual"
+        time={1}
+        width={100}
+        height={100}
+        onChange={onChange}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  expect(host.querySelector('[aria-pressed="true"]')).not.toBeNull();
+  expect(host.querySelector('[aria-pressed="false"]')).not.toBeNull();
+  const svg = host.querySelector('svg')!;
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 100));
+  const handle = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  expect(Number(handle.getAttribute('cx'))).toBeLessThan(100);
+  expect(Number(handle.getAttribute('cy'))).toBeGreaterThan(0);
+  expect(onChange).not.toHaveBeenCalled();
+  act(() =>
+    handle.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        bubbles: true,
+        clientX: Number(handle.getAttribute('cx')),
+        clientY: Number(handle.getAttribute('cy')),
+      })
+    )
+  );
+  act(() => {
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 150, clientY: -50 }));
+    window.dispatchEvent(new MouseEvent('pointerup'));
+  });
+  const control = onChange.mock.lastCall![0].segments[0].keys[0].outgoing;
+  expect(control.x).toBeLessThan(1);
+  expect(control.y).toBeGreaterThan(0);
+  expect(outside.segments[0]!.keys[0]!.outgoing).toEqual({ x: 2, y: -1 });
+});
+
+it('uses the actual canvas bounds when the canvas extends beyond source video', () => {
+  const outside = {
+    ...path,
+    segments: [
+      {
+        ...path.segments[0]!,
+        keys: [{ ...path.segments[0]!.keys[0]!, outgoing: { x: 2, y: -1 } }],
+      },
+    ],
+  };
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewCursorPathOverlay
+        path={outside}
+        time={1}
+        width={100}
+        height={100}
+        bounds={{ left: -0.5, top: -0.5, right: 1.5, bottom: 1.5 }}
+        onChange={onChange}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  const handle = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  expect(Number(handle.getAttribute('cx'))).toBeGreaterThan(100);
+  expect(Number(handle.getAttribute('cx'))).toBeLessThan(150);
+  expect(Number(handle.getAttribute('cy'))).toBeGreaterThan(-50);
+  expect(Number(handle.getAttribute('cy'))).toBeLessThan(0);
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it('preserves the activated outgoing tangent when a clipped incoming proxy shares its edge', () => {
+  const collision = {
+    ...path,
+    segments: [
+      {
+        ...path.segments[0]!,
+        keys: [
+          {
+            ...path.segments[0]!.keys[0]!,
+            x: 0.5,
+            y: 0.5,
+            incoming: { x: 2, y: 0.5 },
+            outgoing: { x: 0.988, y: 0.5 },
+          },
+        ],
+      },
+    ],
+  };
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewCursorPathOverlay
+        path={collision}
+        time={1}
+        width={1000}
+        height={1000}
+        onChange={onChange}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  vi.spyOn(host.querySelector('svg')!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 1000, 1000)
+  );
+  const outgoing = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  act(() =>
+    outgoing.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        bubbles: true,
+        clientX: Number(outgoing.getAttribute('cx')),
+        clientY: Number(outgoing.getAttribute('cy')),
+      })
+    )
+  );
+  act(() => {
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 900, clientY: 600 }));
+    window.dispatchEvent(new MouseEvent('pointerup'));
+  });
+  expect(onChange.mock.lastCall![0].segments[0].keys[0]).toMatchObject({
+    incoming: { x: 2, y: 0.5 },
+    outgoing: { x: 0.9, y: 0.6 },
+  });
+});
+
+it.each([2, 0.989])(
+  'retains a tangent target when its edge proxy would coincide with the selected key (%s)',
+  (x) => {
+    const collision = {
+      ...path,
+      segments: [
+        {
+          ...path.segments[0]!,
+          keys: [{ ...path.segments[0]!.keys[0]!, x: 0.988, y: 0.5, outgoing: { x, y: 0.5 } }],
+        },
+      ],
+    };
+    act(() =>
+      root.render(
+        <ReviewCursorPathOverlay
+          path={collision}
+          time={1}
+          width={1000}
+          height={1000}
+          onChange={vi.fn()}
+          onSeek={vi.fn()}
+        />
+      )
+    );
+    const outgoing = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]');
+    expect(outgoing).not.toBeNull();
+    expect(
+      Math.hypot(
+        Number(outgoing!.getAttribute('cx')) - 988,
+        Number(outgoing!.getAttribute('cy')) - 500
+      )
+    ).toBeGreaterThanOrEqual(24);
+  }
+);

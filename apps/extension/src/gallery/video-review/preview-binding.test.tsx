@@ -541,3 +541,24 @@ it('uses effective preview controls and retains geometry while overlays are hidd
   expect(stage().annotationEffects).toBeUndefined();
   expect(stage().annotationEditing).toBeUndefined();
 });
+
+it('shows the cursor authoring overlay only for an explicitly selected key', async () => {
+  state.setCursorFocusPath = vi.fn();
+  state.cursorFocusPath = {
+    version: 1,
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [],
+  };
+  state.activeSelection = { kind: 'none' };
+  await render(true);
+  expect(stage().cursorPath).toBeUndefined();
+  state.activeSelection = { kind: 'cursor-focus', id: 'key', time: 1 };
+  await render(false);
+  expect(stage().cursorPath?.selectedKeyId).toBe('key');
+  state.playing = true;
+  await render(false);
+  expect(stage().cursorPath).toBeUndefined();
+});

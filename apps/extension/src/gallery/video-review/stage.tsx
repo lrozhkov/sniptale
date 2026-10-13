@@ -557,6 +557,13 @@ function ReviewStageContent({
             width={props.source.width}
             height={props.source.height}
             displayWidth={sceneLayout.videoTransform.width}
+            bounds={{
+              left: -sceneLayout.videoTransform.x / sceneLayout.videoTransform.width,
+              top: -sceneLayout.videoTransform.y / sceneLayout.videoTransform.height,
+              right: (size.width - sceneLayout.videoTransform.x) / sceneLayout.videoTransform.width,
+              bottom:
+                (size.height - sceneLayout.videoTransform.y) / sceneLayout.videoTransform.height,
+            }}
           />
         </div>
       ) : null}

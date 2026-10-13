@@ -27,8 +27,10 @@ import type {
 } from '../../../../features/video/project/cursor-focus-path/types';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { translate } from '../../../../platform/i18n';
+import { layoutCursorFocusControls } from '../../../../ui/cursor-focus-control-layout';
 import type { PointOverlayParams } from './types';
 import { getPointHandleStyle, resolvePointFromPointer } from './helpers';
+import { resolvePreviewStageViewportMetrics } from '../canvas/geometry';
 
 /** Disposable canvas gesture commits one final path through existing project history. */
 function useCursorOverlay(params: PointOverlayParams) {
@@ -125,7 +127,19 @@ function useCursorOverlay(params: PointOverlayParams) {
     x: 1200 / Math.max(1, stageBounds.width),
     y: 1200 / Math.max(1, stageBounds.height),
   };
-  const controls = cursorFocusKeyControls(segment, selected.id, path.smoothing);
+  const boundControl = (point: CursorFocusPoint) => {
+    const position = mapped(point);
+    return (
+      resolveCursorTangent(
+        params,
+        stageBounds.left + (position.x * stageBounds.width) / 100,
+        stageBounds.top + (position.y * stageBounds.height) / 100,
+        mapping
+      ) ?? point
+    );
+  };
+  const rawControls = cursorFocusKeyControls(segment, selected.id, path.smoothing);
+  const controls = layoutProjectCursorControls(params, selected, rawControls, mapping, mapped);
   const begin = createCursorGesture({
     params,
     stage,
@@ -148,6 +162,7 @@ function useCursorOverlay(params: PointOverlayParams) {
     radius,
     mapped,
     controls,
+    boundControl,
     begin,
     choose,
     path,
@@ -183,7 +198,7 @@ export function PreviewCursorPathOverlay(params: PointOverlayParams) {
         points={curve}
         fill="none"
         stroke="var(--sniptale-color-accent)"
-        strokeWidth="0.25"
+        strokeWidth="2"
         vectorEffect="non-scaling-stroke"
       />
       {segment.keys
@@ -200,11 +215,13 @@ export function PreviewCursorPathOverlay(params: PointOverlayParams) {
               data-authored={key.anchor === 'manual' || key.authored ? 'true' : 'false'}
               cx={point.x}
               cy={point.y}
-              rx={radius.x}
-              ry={radius.y}
-              fill="var(--sniptale-color-surface-panel)"
+              rx={radius.x * 0.7}
+              ry={radius.y * 0.7}
+              fill="color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent)"
+              aria-pressed="false"
               stroke="var(--sniptale-color-text-secondary)"
-              strokeWidth="0.2"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
               role="button"
               tabIndex={0}
               aria-label={`${translate('videoEditor.sidebar.cursorFocusKey')} ${key.time.toFixed(2)}`}
@@ -227,9 +244,11 @@ export function PreviewCursorPathOverlay(params: PointOverlayParams) {
         cy={selectedPoint.y}
         rx={radius.x}
         ry={radius.y}
-        fill="var(--sniptale-color-surface-panel)"
+        fill="color-mix(in srgb, var(--sniptale-color-accent) 35%, transparent)"
+        aria-pressed="true"
         stroke="var(--sniptale-color-accent)"
-        strokeWidth="0.2"
+        strokeWidth="3"
+        vectorEffect="non-scaling-stroke"
         className="pointer-events-auto cursor-grab"
         role="button"
         tabIndex={0}
@@ -252,6 +271,13 @@ export function PreviewCursorPathOverlay(params: PointOverlayParams) {
             );
           }
         }}
+      />
+      <ellipse
+        cx={selectedPoint.x}
+        cy={selectedPoint.y}
+        rx={radius.x * 0.22}
+        ry={radius.y * 0.22}
+        fill="var(--sniptale-color-accent)"
       />
       <PreviewCursorTangents model={model} />
     </svg>
@@ -302,11 +328,14 @@ function createCursorGesture(context: {
       const candidates = (['incoming', 'outgoing'] as const)
         .filter((name) => controls[name] !== undefined)
         .map((name) => ({ name, distance: distance(controls[name]!) }))
-        .filter((item) => item.distance <= 12)
+        .filter((item) => item.distance <= 14)
         .toSorted((a, b) => a.distance - b.distance);
+      const activated = candidates.find((item) => item.name === handle);
       handle =
         candidates[0] && candidates[0].distance < distance(selected)
-          ? candidates[0].name
+          ? activated && Math.abs(activated.distance - candidates[0].distance) < 0.01
+            ? handle
+            : candidates[0].name
           : undefined;
     }
     if (!handle && key.id !== selected.id) {
@@ -329,9 +358,12 @@ function createCursorGesture(context: {
         !!handle
       );
       if (!point) return;
-      const normalized = mapping
-        ? mapCursorFocusControlPoint(mapping, point, true)
-        : { x: point.x / params.project.width, y: point.y / params.project.height };
+      const normalized = handle
+        ? resolveCursorTangent(params, pointer.clientX, pointer.clientY, mapping)
+        : mapping
+          ? mapCursorFocusControlPoint(mapping, point, true)
+          : { x: point.x / params.project.width, y: point.y / params.project.height };
+      if (!normalized) return;
       next = updateCursorFocusKey(base, key.id, handle ? { [handle]: normalized } : normalized);
       setDraft(next);
     };
@@ -376,17 +408,25 @@ function PreviewCursorTangents({
 }: {
   model: Pick<
     NonNullable<ReturnType<typeof useCursorOverlay>>,
-    'controls' | 'selected' | 'mapped' | 'selectedPoint' | 'radius' | 'begin' | 'commit' | 'path'
+    | 'controls'
+    | 'boundControl'
+    | 'selected'
+    | 'mapped'
+    | 'selectedPoint'
+    | 'radius'
+    | 'begin'
+    | 'commit'
+    | 'path'
   >;
 }) {
-  const { controls, selected, mapped, selectedPoint, radius, begin, commit, path } = model;
+  const { controls, boundControl, selected, mapped, selectedPoint, radius, begin, commit, path } =
+    model;
   return (
     <>
       {' '}
       {(['incoming', 'outgoing'] as const).map((handle) => {
         const control = controls[handle];
-        if (!control || Math.hypot(control.x - selected.x, control.y - selected.y) < 0.005)
-          return null;
+        if (!control) return null;
         const position = mapped(control);
         return (
           <g key={handle}>
@@ -402,9 +442,9 @@ function PreviewCursorTangents({
             <ellipse
               cx={position.x}
               cy={position.y}
-              rx={radius.x * 0.8}
-              ry={radius.y * 0.8}
-              fill="var(--sniptale-color-text-primary)"
+              rx={radius.x}
+              ry={radius.y}
+              fill="transparent"
               className="pointer-events-auto cursor-grab"
               role="button"
               tabIndex={0}
@@ -419,7 +459,7 @@ function PreviewCursorTangents({
                   event.preventDefault();
                   commit(
                     updateCursorFocusKey(path, selected.id, {
-                      [handle]: {
+                      [handle]: boundControl({
                         x:
                           control.x +
                           (event.key === 'ArrowRight'
@@ -430,15 +470,95 @@ function PreviewCursorTangents({
                         y:
                           control.y +
                           (event.key === 'ArrowDown' ? 0.01 : event.key === 'ArrowUp' ? -0.01 : 0),
-                      },
+                      }),
                     })
                   );
                 }
               }}
+            />
+            <rect
+              x={position.x - radius.x * 0.325}
+              y={position.y - radius.y * 0.325}
+              width={radius.x * 0.65}
+              height={radius.y * 0.65}
+              rx={radius.x * 0.12}
+              fill="color-mix(in srgb, var(--sniptale-color-accent) 25%, transparent)"
+              stroke="var(--sniptale-color-accent)"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
             />
           </g>
         );
       })}
     </>
   );
+}
+
+/** Visible canvas bounds constrain authoring without rewriting imported control geometry. */
+function resolveCursorTangent(
+  params: PointOverlayParams,
+  clientX: number,
+  clientY: number,
+  mapping: ReturnType<typeof resolveCursorSourcePointMapping>
+): CursorFocusPoint | null {
+  const stage = params.stageRef.current;
+  if (!stage) return null;
+  const { bounds, viewport } = resolvePreviewStageViewportMetrics(stage, params.project);
+  const insetX = Math.min(14, viewport.width / 2);
+  const insetY = Math.min(14, viewport.height / 2);
+  const point = resolvePointFromPointer(
+    Math.max(
+      bounds.left + viewport.offsetX + insetX,
+      Math.min(bounds.left + viewport.offsetX + viewport.width - insetX, clientX)
+    ),
+    Math.max(
+      bounds.top + viewport.offsetY + insetY,
+      Math.min(bounds.top + viewport.offsetY + viewport.height - insetY, clientY)
+    ),
+    stage,
+    params.project,
+    params.camera,
+    true
+  );
+  return !point
+    ? null
+    : mapping
+      ? mapCursorFocusControlPoint(mapping, point, true)
+      : { x: point.x / params.project.width, y: point.y / params.project.height };
+}
+
+function layoutProjectCursorControls(
+  params: PointOverlayParams,
+  selected: CursorFocusKey,
+  controls: ReturnType<typeof cursorFocusKeyControls>,
+  mapping: ReturnType<typeof resolveCursorSourcePointMapping>,
+  mapped: (point: CursorFocusPoint) => { x: number; y: number }
+) {
+  const stage = params.stageRef.current;
+  if (!stage) return controls;
+  const { bounds, viewport } = resolvePreviewStageViewportMetrics(stage, params.project);
+  const display = (point: CursorFocusPoint) => {
+    const value = mapped(point);
+    return { x: (value.x * bounds.width) / 100, y: (value.y * bounds.height) / 100 };
+  };
+  const visible = (point: CursorFocusPoint | undefined) =>
+    point && Math.hypot(point.x - selected.x, point.y - selected.y) > Number.EPSILON
+      ? display(point)
+      : undefined;
+  const layout = layoutCursorFocusControls({
+    point: display(selected),
+    controls: { incoming: visible(controls.incoming), outgoing: visible(controls.outgoing) },
+    bounds: {
+      left: viewport.offsetX,
+      top: viewport.offsetY,
+      right: viewport.offsetX + viewport.width,
+      bottom: viewport.offsetY + viewport.height,
+    },
+  });
+  const source = (point: CursorFocusPoint | undefined) =>
+    point
+      ? (resolveCursorTangent(params, bounds.left + point.x, bounds.top + point.y, mapping) ??
+        undefined)
+      : undefined;
+  return { incoming: source(layout.incoming), outgoing: source(layout.outgoing) };
 }
