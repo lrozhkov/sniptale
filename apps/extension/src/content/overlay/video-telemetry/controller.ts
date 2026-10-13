@@ -13,11 +13,6 @@ import {
   type RecordingFrameClockAnchor,
 } from '../../../contracts/video/recording-frame-clock';
 import {
-  encodeRecordingKeyboardRhythm,
-  iterateRecordingKeyboardRhythm,
-} from '../../../features/video/project/keyboard-rhythm';
-import type { RecordingKeyboardRhythmBlock } from '../../../features/video/project/types';
-import {
   attachListeners,
   attachViewportObserver,
   removeViewportObserver,
@@ -35,9 +30,13 @@ interface VideoTelemetryController {
     offsetSeconds?: number,
     frameClock?: RecordingFrameClockAnchor | null
   ) => void;
+  updateClock: (recordingId: string, anchor: RecordingFrameClockAnchor) => void;
   isEnabled: () => boolean;
   pause: (frameClock?: RecordingFrameClockAnchor | null) => void;
-  resume: (frameClock?: RecordingFrameClockAnchor | null) => void;
+  resume: (
+    frameClock?: RecordingFrameClockAnchor | null,
+    sourcePhase?: RecordingFrameClockAnchor
+  ) => void;
 }
 
 function enableTelemetryState(
@@ -50,11 +49,16 @@ function enableTelemetryState(
     frameClock &&
     (!isRecordingFrameClockAnchor(frameClock) ||
       frameClock.recordingId !== recordingId ||
-      (state.frameClock &&
+      (state.recordingId === recordingId &&
+        state.frameClock &&
         (!matchesRecordingFrameClockBinding(state.frameClock, frameClock) ||
           frameClock.revision <= state.frameClock.revision)))
   )
     return;
+  if (recordingId !== null && state.recordingId === recordingId && state.isEnabled) {
+    if (frameClock) updateTelemetryClock(state, recordingId, frameClock);
+    return;
+  }
   clearLegacyControlledCursorArtifacts();
   removeListeners(state);
   removeViewportObserver(state);
@@ -78,190 +82,101 @@ function acceptsClockPhase(
     isRecordingFrameClockAnchor(anchor) &&
     anchor.phase === phase &&
     anchor.recordingId === state.recordingId &&
+    anchor.revision >= state.clockRevision &&
     (!state.frameClock ||
       (matchesRecordingFrameClockBinding(state.frameClock, anchor) &&
         anchor.revision > state.frameClock.revision))
   );
 }
 
-function rhythmPrefix(
-  blocks: RecordingKeyboardRhythmBlock[] | undefined,
-  boundary: number
-): RecordingKeyboardRhythmBlock[] | undefined {
-  if (!blocks) return undefined;
-  return blocks.flatMap((block) => {
-    const times = [...iterateRecordingKeyboardRhythm(block, 0, boundary)].map(
-      (attack) => attack.time
-    );
-    return times.length ? [encodeRecordingKeyboardRhythm(block.id, times)] : [];
-  });
-}
-
-/** Preserve observed onsets; discard excluded tail facts without manufacturing a release. */
-function retainTelemetryPrefix(state: TelemetryState, boundary: number): void {
-  if (state.cursorTrack)
-    state.cursorTrack.samples = state.cursorTrack.samples.filter(
-      (sample) => sample.time <= boundary
-    );
-  const sample = state.cursorTrack?.samples.toReversed().find((entry) => entry.visible !== false);
-  state.lastKnownPointerPosition = sample ? { x: sample.x, y: sample.y } : null;
-  state.actionEvents = state.actionEvents
-    .filter((event) => event.time <= boundary)
-    .map((event) => {
-      const repeats = rhythmPrefix(event.keyboardRepeats, boundary);
-      if (repeats) event.keyboardRepeats = repeats;
-      const late = ['upTime', 'semanticEndTime', 'lastObservedTime', 'dragStartTime'].some(
-        (key) => typeof event.data[key] === 'number' && Number(event.data[key]) > boundary
-      );
-      if (!late) return event;
-      for (const key of [
-        'upTime',
-        'upX',
-        'upY',
-        'pressDuration',
-        'semanticEndTime',
-        'dragStartTime',
-        'maxExcursionCssPx',
-        'clickCount',
-        'dropObserved',
-        'pointerCancelled',
-      ])
-        delete event.data[key];
-      event.data['completion'] = 'lost';
-      event.data['lastObservedTime'] = event.time;
-      if (event.kind === 'CLICK') {
-        event.data['gestureType'] = 'click';
-        event.preset = 'CLICK_PRESS';
-      }
-      return event;
-    });
-  state.signals = state.signals
-    .filter((signal) => signal.startTime <= boundary)
-    .map((signal) => {
-      if (signal.data['privacy'] === 'protected') {
-        // Preserve coarse private-activity coverage without adding identifying timing facts.
-        signal.endTime = Math.min(signal.endTime, boundary);
-        return signal;
-      }
-      const rhythm = rhythmPrefix(signal.keyboardRhythm, boundary);
-      const repeats = rhythmPrefix(signal.keyboardRepeats, boundary);
-      if (rhythm) signal.keyboardRhythm = rhythm;
-      if (repeats) signal.keyboardRepeats = repeats;
-      if (signal.endTime > boundary) {
-        const observed = [...(rhythm ?? []), ...(repeats ?? [])].flatMap((block) =>
-          [...iterateRecordingKeyboardRhythm(block)].map((attack) => attack.time)
-        );
-        signal.endTime = observed.length ? Math.max(...observed) : signal.startTime;
-        for (const key of ['upTime', 'pressDuration', 'eventCount']) delete signal.data[key];
-        signal.data['completion'] = 'lost';
-        signal.data['lastObservedTime'] = signal.endTime;
-      }
-      return signal;
-    });
+/** Calibration replaces the phase binding only; it never replays or clears input. */
+function updateTelemetryClock(
+  state: TelemetryState,
+  recordingId: string,
+  anchor: RecordingFrameClockAnchor
+): void {
   if (
-    state.pointerStationaryStartedAtMs !== null &&
-    state.accumulatedDurationMs +
-      state.pointerStationaryStartedAtMs -
-      state.segmentStartedAtTimestamp >
-      boundary * 1000
-  ) {
-    state.pointerStationaryPosition = null;
-    state.pointerStationaryStartedAtMs = null;
-    state.cursorIdleSignal = null;
-  }
-}
-
-/** Optional synchronization failure discards unverified history and releases every observer. */
-function invalidateExactTelemetry(state: TelemetryState): void {
-  retainTelemetryPrefix(state, state.confirmedMediaTimeSeconds);
-  recordTelemetryPauseBoundary(
-    state,
-    state.segmentStartedAtTimestamp +
-      state.confirmedMediaTimeSeconds * 1000 -
-      state.accumulatedDurationMs
-  );
-  retainTelemetryPrefix(state, state.confirmedMediaTimeSeconds);
-  removeListeners(state);
-  removeViewportObserver(state);
-  state.isEnabled = false;
-  state.isPaused = true;
-  state.clockUnavailable = true;
-  state.observationAvailable = false;
+    !state.isEnabled ||
+    state.recordingId !== recordingId ||
+    !acceptsClockPhase(state, anchor, state.isPaused ? 'paused' : 'active')
+  )
+    return;
+  state.clockRevision = anchor.revision;
+  state.frameClock = { ...anchor };
+  state.observationClock.update(anchor);
 }
 
 function pauseTelemetryState(
   state: TelemetryState,
   frameClock?: RecordingFrameClockAnchor | null
 ): void {
-  if (!state.isEnabled || state.isPaused) {
-    return;
-  }
-
-  clearLegacyControlledCursorArtifacts();
-  if (frameClock === null) {
-    invalidateExactTelemetry(state);
-    return;
-  }
+  if (!state.isEnabled || state.isPaused) return;
   if (frameClock && !acceptsClockPhase(state, frameClock, 'paused')) return;
-  if (state.frameClock !== undefined && !frameClock) return;
-  if (frameClock) retainTelemetryPrefix(state, frameClock.mediaTimeSeconds);
-  recordTelemetryPauseBoundary(
-    state,
-    frameClock ? frameClock.captureEpochMs - performance.timeOrigin : undefined
-  );
-  if (frameClock) {
-    retainTelemetryPrefix(state, frameClock.mediaTimeSeconds);
-    state.frameClock = { ...frameClock };
-    state.accumulatedDurationMs = frameClock.mediaTimeSeconds * 1000;
-    state.confirmedMediaTimeSeconds = frameClock.mediaTimeSeconds;
-  } else
+  clearLegacyControlledCursorArtifacts();
+  try {
+    recordTelemetryPauseBoundary(state);
+  } finally {
     state.accumulatedDurationMs += Math.max(0, performance.now() - state.segmentStartedAtTimestamp);
+    state.isPaused = true;
+    removeListeners(state);
+  }
+  state.mediaResumeEstimateSeconds =
+    frameClock?.mediaTimeSeconds ??
+    state.observationClock.estimateAt(state.accumulatedDurationMs / 1000);
+  if (frameClock) updateTelemetryClock(state, state.recordingId ?? '', frameClock);
   observeViewportGeometry(state);
-  state.isPaused = true;
   removeListeners(state);
 }
 
 function resumeTelemetryState(
   state: TelemetryState,
-  frameClock?: RecordingFrameClockAnchor | null
+  frameClock?: RecordingFrameClockAnchor | null,
+  sourcePhase?: RecordingFrameClockAnchor
 ): void {
-  if (!state.isEnabled && !state.clockUnavailable) return;
-  if (frameClock !== null && !state.isPaused && !frameClock) return;
-
-  clearLegacyControlledCursorArtifacts();
-  if (frameClock === null) {
-    invalidateExactTelemetry(state);
-    return;
-  }
+  if (!state.isEnabled) return;
   if (frameClock && !acceptsClockPhase(state, frameClock, 'active')) return;
-  if (frameClock && !state.isPaused) {
-    if (frameClock.previousMediaTimeSeconds === undefined) {
-      invalidateExactTelemetry(state);
+  if (sourcePhase) {
+    if (
+      !acceptsClockPhase(state, sourcePhase, 'active') ||
+      sourcePhase.revision <= state.clockRevision
+    )
+      return;
+    state.clockRevision = sourcePhase.revision;
+    // A newly admitted document has no preceding local phase to close.
+    if (
+      !state.isPaused &&
+      !state.frameClock &&
+      !state.cursorTrack &&
+      !state.actionEvents.length &&
+      !state.signals.length &&
+      !state.keyboard.times.length
+    )
+      return;
+  }
+  const phase = frameClock ?? sourcePhase;
+  if (!state.isPaused) {
+    if (!phase) return;
+    if (phase.previousMediaTimeSeconds === undefined) {
+      if (frameClock) updateTelemetryClock(state, state.recordingId ?? '', frameClock);
       return;
     }
-    const boundary = frameClock.previousMediaTimeSeconds;
-    retainTelemetryPrefix(state, boundary);
-    recordTelemetryPauseBoundary(
-      state,
-      state.segmentStartedAtTimestamp + boundary * 1000 - state.accumulatedDurationMs
-    );
-    retainTelemetryPrefix(state, boundary);
-    state.confirmedMediaTimeSeconds = boundary;
+    recordTelemetryPauseBoundary(state);
+    state.accumulatedDurationMs += Math.max(0, performance.now() - state.segmentStartedAtTimestamp);
+    state.mediaResumeEstimateSeconds = phase.previousMediaTimeSeconds;
     removeListeners(state);
   }
-  if (state.frameClock !== undefined && !frameClock) return;
+  if (phase?.previousMediaTimeSeconds !== undefined)
+    state.observationClock.end(phase.previousMediaTimeSeconds);
+  clearLegacyControlledCursorArtifacts();
   state.isPaused = false;
-  state.isEnabled = true;
-  state.clockUnavailable = false;
   state.observationAvailable = false;
-  if (frameClock) {
-    state.frameClock = { ...frameClock };
-    state.accumulatedDurationMs = frameClock.mediaTimeSeconds * 1000;
-  }
-  state.segmentStartedAtTimestamp = frameClock
-    ? frameClock.captureEpochMs - performance.timeOrigin
-    : performance.now();
-  // Pause time is not cursor inactivity in the recorded result.
+  state.segmentStartedAtTimestamp = performance.now();
+  state.observationClock.start(
+    state.segmentStartedAtTimestamp,
+    state.accumulatedDurationMs / 1000,
+    phase?.mediaTimeSeconds ?? state.mediaResumeEstimateSeconds
+  );
+  if (frameClock) updateTelemetryClock(state, state.recordingId ?? '', frameClock);
   state.pointerStationaryStartedAtMs = state.pointerStationaryPosition
     ? state.segmentStartedAtTimestamp
     : null;
@@ -272,13 +187,17 @@ function resumeTelemetryState(
 
 function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetrySnapshot {
   clearLegacyControlledCursorArtifacts();
-  if (!state.clockUnavailable) recordTelemetryPauseBoundary(state);
-  removeListeners(state);
+  try {
+    if (!state.isPaused) recordTelemetryPauseBoundary(state);
+  } finally {
+    removeListeners(state);
+    removeViewportObserver(state);
+    state.isEnabled = false;
+  }
   observeViewportGeometry(state);
-  removeViewportObserver(state);
-  state.isEnabled = false;
   state.viewport = buildViewportSnapshot();
   return {
+    observationClock: state.observationClock.snapshot(),
     provenance: {
       source: 'browser',
       normalizationVersion: 1,
@@ -291,6 +210,7 @@ function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetry
       keyboard: window.top === window ? 'available' : 'unknown',
       wheel: window.top === window ? 'available' : 'unknown',
       coverage: 'document',
+      timing: state.observationClock.timing(),
     },
     viewport: state.viewport,
     viewportObservation: state.viewportObservation ?? null,
@@ -309,38 +229,44 @@ function disableTelemetryState(state: TelemetryState): RecordingTelemetrySnapsho
   if (!state.isEnabled) {
     removeViewportObserver(state);
     removeListeners(state);
-    if (
-      !state.clockUnavailable ||
-      (!state.actionEvents.length && !state.signals.length && !state.cursorTrack?.samples.length)
-    )
-      return null;
+    return null;
   }
 
   return disableEnabledTelemetryState(state);
 }
 
-export function createVideoTelemetryController(): VideoTelemetryController {
+export function createVideoTelemetryController(
+  deps: {
+    publish?: (recordingId: string, snapshot: RecordingTelemetrySnapshot) => void;
+  } = {}
+): VideoTelemetryController {
   const state = createInitialState();
   const textCursor = createRecordingTextCursor();
+  const disable = () => {
+    window.removeEventListener('pagehide', disable);
+    textCursor.stop();
+    const snapshot = disableTelemetryState(state);
+    if (snapshot && state.recordingId) deps.publish?.(state.recordingId, snapshot);
+    return snapshot;
+  };
 
   return {
     enable: (recordingId, offsetSeconds, frameClock) => {
       textCursor.stop();
       enableTelemetryState(state, recordingId, offsetSeconds, frameClock);
+      if (state.isEnabled) window.addEventListener('pagehide', disable);
       if (state.isEnabled && !state.isPaused) textCursor.start();
     },
-    disable: () => {
-      textCursor.stop();
-      return disableTelemetryState(state);
-    },
+    disable,
+    updateClock: (recordingId, anchor) => updateTelemetryClock(state, recordingId, anchor),
     isEnabled: () => state.isEnabled,
     pause: (frameClock) => {
       textCursor.stop();
       pauseTelemetryState(state, frameClock);
     },
-    resume: (frameClock) => {
+    resume: (frameClock, sourcePhase) => {
       textCursor.stop();
-      resumeTelemetryState(state, frameClock);
+      resumeTelemetryState(state, frameClock, sourcePhase);
       if (state.isEnabled && !state.isPaused) textCursor.start();
     },
   };

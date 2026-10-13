@@ -1,3 +1,4 @@
+import { projectRecordingObservationClock } from '../../../../features/video/project/observation-clock';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
@@ -42,6 +43,7 @@ export function addMaterialCapturedActions(
   telemetry: RecordingTelemetryEntry | undefined
 ): VideoProject {
   if (!telemetry) return project;
+  telemetry = projectRecordingObservationClock(telemetry);
   const events = normalizeRecordingActionEventsToProjectSpace(
     telemetry.actionEvents,
     createRecordingTelemetryNormalizationParams(telemetry, project)

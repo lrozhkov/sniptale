@@ -1,5 +1,4 @@
 import { runBestEffort } from '@sniptale/foundation/best-effort';
-import { closeRecordingFrameClockCompanions } from '../../manager/frame-clock-companion';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
@@ -61,7 +60,6 @@ export async function notifyRecordingStartFailed(
     return;
   }
   const recordingTabId = getVideoRecordingTabId();
-  await closeRecordingFrameClockCompanions(recordingId);
   // Collection ends even if restoring the capture surface fails and authority must remain.
   if (recordingTabId !== null) {
     const mode = getVideoRecordingRuntimeState().captureMode;

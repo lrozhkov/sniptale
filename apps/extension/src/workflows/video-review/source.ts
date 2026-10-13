@@ -1,3 +1,4 @@
+import { projectRecordingObservationClock } from '../../features/video/project/observation-clock';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { getMediaLibraryEntry } from '../../composition/persistence/media-library';
 import { getRecording } from '../../composition/persistence/recordings';
@@ -134,7 +135,7 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
       source,
       ...(provenance ? { provenance } : {}),
       snapshot,
-      telemetry: telemetry ?? null,
+      telemetry: telemetry ? projectRecordingObservationClock(telemetry) : null,
       ...(media.recordingMetadata ? { recordingMetadata: media.recordingMetadata } : {}),
     };
   } catch (error) {

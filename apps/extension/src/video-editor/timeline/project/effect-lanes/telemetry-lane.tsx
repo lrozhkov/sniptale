@@ -14,6 +14,7 @@ import { getActionEventLabel } from '../../../chrome/display';
 import type { VideoEditorTypingSpanTarget } from '../../../contracts/commands/timeline';
 import { projectTimelineInterval, type TimelineProjection } from '../interaction-state/projection';
 import {
+  Clock,
   Keyboard,
   Mouse,
   MousePointerClick,
@@ -60,6 +61,7 @@ const TELEMETRY_EMPTY_LABEL_CLASS_NAME = [
 
 export function ProjectTimelineTelemetryLaneLabelRow(props: {
   compactRows: boolean;
+  recordingTelemetry?: readonly RecordingTelemetryEntry[] | undefined;
   height?: number;
   project?: VideoProject;
   onSelect?: (() => void) | undefined;
@@ -67,6 +69,16 @@ export function ProjectTimelineTelemetryLaneLabelRow(props: {
   onToggleVisibility?: (() => void) | undefined;
   onToggleLock?: (() => void) | undefined;
 }) {
+  const approximate = (props.recordingTelemetry ?? []).filter(
+    (entry) => entry.capabilities?.timing?.mode === 'approximate'
+  );
+  const unknownAccuracy = approximate.some(
+    (entry) => entry.capabilities?.timing?.accuracyMs == null
+  );
+  const accuracy = Math.ceil(
+    Math.max(0, ...approximate.map((entry) => entry.capabilities?.timing?.accuracyMs ?? 0))
+  );
+
   const enabled = props.project ? getVideoProjectActionPresentation(props.project).enabled : true;
   const locked = props.project ? getVideoProjectUtilityLanes(props.project).actions.locked : false;
   return (
@@ -92,6 +104,31 @@ export function ProjectTimelineTelemetryLaneLabelRow(props: {
         />
       </button>
       <div className="flex shrink-0 items-center gap-1">
+        {approximate.length ? (
+          <span
+            role="status"
+            data-ui="history.timing"
+            title={
+              unknownAccuracy
+                ? translate('gallery.videoReview.historyTimingUnknown')
+                : translate('gallery.videoReview.historyTimingApproximate').replace(
+                    '{accuracy}',
+                    String(accuracy)
+                  )
+            }
+            aria-label={
+              unknownAccuracy
+                ? translate('gallery.videoReview.historyTimingUnknown')
+                : translate('gallery.videoReview.historyTimingApproximate').replace(
+                    '{accuracy}',
+                    String(accuracy)
+                  )
+            }
+            className="inline-flex items-center text-[var(--sniptale-color-text-secondary)]"
+          >
+            <Clock size={13} aria-hidden="true" />
+          </span>
+        ) : null}
         {props.onToggleVisibility ? (
           <TimelineIconButton
             frameless

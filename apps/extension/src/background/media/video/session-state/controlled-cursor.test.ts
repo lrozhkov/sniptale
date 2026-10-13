@@ -347,3 +347,138 @@ it('keeps source-clock revision and identity authority isolated from caller muta
   resetControlledCursorCaptureState();
   expect(getRecordingFrameClock()).toBeNull();
 });
+
+it('retains independent document clocks and the least certain timing quality across navigation', () => {
+  const snapshot = (
+    id: string,
+    timing: { mode: 'bounded' | 'approximate'; accuracyMs: number | null }
+  ) => ({
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    capabilities: {
+      version: 1 as const,
+      pointer: 'available' as const,
+      keyboard: 'available' as const,
+      wheel: 'available' as const,
+      coverage: 'document' as const,
+      timing,
+    },
+    observationClock: {
+      version: 1 as const,
+      domain: 'observation' as const,
+      segments: [
+        {
+          id,
+          documentId: id,
+          timeOriginMs: 100000,
+          startedAtTimestampMs: 100,
+          observationStartSeconds: 0.1,
+          mediaStartEstimateSeconds: 0,
+          mapping: null,
+        },
+      ],
+    },
+  });
+  const first = snapshot('one', { mode: 'bounded', accuracyMs: 2 });
+  const second = snapshot('two', { mode: 'bounded', accuracyMs: 4 });
+  const merged = mergeTelemetrySnapshots(first, second);
+  expect(merged.observationClock?.segments.map((segment) => segment.id)).toEqual(['one', 'two']);
+  expect(merged.capabilities?.timing).toEqual({ mode: 'bounded', accuracyMs: 4 });
+  merged.observationClock!.segments[0]!.mediaStartEstimateSeconds = 99;
+  expect(first.observationClock.segments[0]!.mediaStartEstimateSeconds).toBe(0);
+  const estimated = snapshot('estimated', { mode: 'approximate', accuracyMs: 25 });
+  expect(mergeTelemetrySnapshots(first, estimated).capabilities?.timing).toEqual({
+    mode: 'approximate',
+    accuracyMs: 25,
+  });
+  const unknown = snapshot('unknown', { mode: 'approximate', accuracyMs: null });
+  expect(mergeTelemetrySnapshots(first, unknown).capabilities?.timing).toEqual({
+    mode: 'approximate',
+    accuracyMs: null,
+  });
+  expect(mergeTelemetrySnapshots(null, first).observationClock).toEqual(first.observationClock);
+  expect(
+    mergeTelemetrySnapshots(first, {
+      viewport: null,
+      cursorTrack: null,
+      actionEvents: [],
+      signals: [],
+    }).capabilities?.timing
+  ).toEqual({ mode: 'approximate', accuracyMs: null });
+});
+
+it('isolates nested timing quality from input and returned snapshot mutations', () => {
+  const snapshot = {
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    capabilities: {
+      version: 1 as const,
+      pointer: 'available' as const,
+      keyboard: 'available' as const,
+      wheel: 'available' as const,
+      coverage: 'document' as const,
+      timing: { mode: 'approximate' as const, accuracyMs: 25 },
+    },
+  };
+  appendControlledCursorTelemetry(snapshot);
+  snapshot.capabilities.timing.accuracyMs = 99;
+  expect(getControlledCursorTelemetry()?.capabilities?.timing?.accuracyMs).toBe(25);
+  const returned = getControlledCursorTelemetry()!;
+  returned.capabilities!.timing!.accuracyMs = 88;
+  expect(getControlledCursorTelemetry()?.capabilities?.timing?.accuracyMs).toBe(25);
+});
+
+it('deduplicates final snapshots delivered by pagehide and navigation response', () => {
+  const snapshot = {
+    viewport: null,
+    cursorTrack: createCursorTrack('#fff', 1, true),
+    actionEvents: [
+      {
+        id: 'event',
+        kind: VideoProjectActionEventKind.CLICK,
+        time: 0.2,
+        duration: 0.45,
+        point: { x: 10, y: 20 },
+        label: '',
+        data: {},
+        preset: VideoProjectActionPreset.CLICK_RIPPLE,
+      },
+    ],
+    signals: [
+      {
+        id: 'idle',
+        kind: 'cursor-idle' as const,
+        startTime: 0.2,
+        endTime: 0.8,
+        point: { x: 10, y: 20 },
+        data: {},
+      },
+    ],
+    observationClock: {
+      version: 1 as const,
+      domain: 'observation' as const,
+      segments: [
+        {
+          id: 'phase',
+          documentId: 'document',
+          timeOriginMs: 1000,
+          startedAtTimestampMs: 100,
+          observationStartSeconds: 0,
+          mediaStartEstimateSeconds: 0,
+          mapping: null,
+        },
+      ],
+    },
+  };
+  appendControlledCursorTelemetry(snapshot);
+  appendControlledCursorTelemetry(structuredClone(snapshot));
+  const merged = getControlledCursorTelemetry();
+  expect(merged?.cursorTrack?.samples).toHaveLength(1);
+  expect(merged?.actionEvents).toHaveLength(1);
+  expect(merged?.signals).toHaveLength(1);
+  expect(merged?.observationClock?.segments).toHaveLength(1);
+});

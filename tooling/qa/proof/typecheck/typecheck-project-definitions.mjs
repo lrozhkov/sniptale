@@ -54,12 +54,6 @@ export const PRODUCTION_TYPECHECK_PROJECTS = [
     ],
   },
   {
-    id: 'recording-clock',
-    include: ['apps/extension/src/recording-clock/**/*'],
-    references: ['app-core'],
-    rootPrefixes: ['apps/extension/src/recording-clock/'],
-  },
-  {
     id: 'background',
     include: ['apps/extension/src/background/**/*'],
     references: ['app-core'],

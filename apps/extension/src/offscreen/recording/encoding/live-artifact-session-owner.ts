@@ -393,7 +393,6 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       this.videoPump = this.pumpVideoFrames();
       void this.videoPump.catch(() => undefined);
       await this.firstEncodedVideoPacket;
-      await this.input.frameClockObserver?.ready;
       if (this.phase !== 'starting') return;
       this.phase = 'recording';
       const startedDiagnostic = {

@@ -13,11 +13,8 @@ import {
 } from '../../../../validators/index';
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
 import type { RuntimeOffscreenBeginRecordingMessage } from '../../../offscreen-command.types';
-import { normalizeRecordingFrameClockLease } from '../../../../../video/recording-frame-clock';
 
-const parseBeginEnvelope = createGuardParser<
-  Omit<RuntimeOffscreenBeginRecordingMessage, 'frameClockLease'> & { frameClockLease?: unknown }
->(
+const parseBeginEnvelope = createGuardParser<RuntimeOffscreenBeginRecordingMessage>(
   'runtime OFFSCREEN_BEGIN_RECORDING message',
   createMessageGuard({
     type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
@@ -27,18 +24,10 @@ const parseBeginEnvelope = createGuardParser<
       generation: isNumber,
       streamInstanceId: isString,
     },
-    // Only this advisory field is normalized. Primary envelope fields remain strict.
-    optional: { frameClockLease: () => true },
   })
 );
 
-function parseBeginRequest(input: unknown): RuntimeOffscreenBeginRecordingMessage {
-  const parsed = parseBeginEnvelope(input);
-  const { frameClockLease, ...primary } = parsed;
-  return 'frameClockLease' in parsed
-    ? { ...primary, frameClockLease: normalizeRecordingFrameClockLease(frameClockLease, primary) }
-    : primary;
-}
+const parseBeginRequest = parseBeginEnvelope;
 
 export const runtimeVideoOffscreenViewportMessageContracts = {
   [VideoMessageType.OFFSCREEN_START_RECORDING]: {

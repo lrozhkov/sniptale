@@ -102,7 +102,7 @@ function registerCursorIdleSignalTests() {
     tickCursorIdleTelemetry(state);
     expect(state.cursorIdleSignal).toEqual(
       expect.objectContaining({
-        data: { dwellMs: 1_250 },
+        data: expect.objectContaining({ dwellMs: 1_250 }),
         kind: 'cursor-idle',
         point: { x: 100, y: 100 },
         startTime: 0.1,
@@ -114,7 +114,7 @@ function registerCursorIdleSignalTests() {
     expect(state.cursorIdleSignal).toBeNull();
     expect(state.signals).toEqual([
       expect.objectContaining({
-        data: { dwellMs: 1_250 },
+        data: expect.objectContaining({ dwellMs: 1_250 }),
         endTime: 1.41,
         kind: 'cursor-idle',
         point: { x: 100, y: 100 },

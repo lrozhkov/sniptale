@@ -67,6 +67,7 @@ function recordCursorSample(
     id: crypto.randomUUID(),
     time: getElapsedSeconds(state, event.timeStamp),
     visible,
+    observationClockId: state.observationClock.id,
     captureSegment: state.captureSegment,
     observation: visible ? 'observed' : 'outside',
     x: event.clientX,
@@ -153,9 +154,14 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
               altKey: event.altKey,
               shiftKey: event.shiftKey,
               metaKey: event.metaKey,
+              observationClockId: state.observationClock.id,
               captureSegment: state.captureSegment,
             }
-          : { eventType: 'scroll', captureSegment: state.captureSegment },
+          : {
+              eventType: 'scroll',
+              observationClockId: state.observationClock.id,
+              captureSegment: state.captureSegment,
+            },
     });
   };
   return {

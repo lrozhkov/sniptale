@@ -1,20 +1,9 @@
 /** Advisory native clock metadata with a measured error bound; never primary command authority. */
-export const RECORDING_FRAME_CLOCK_PURPOSE = 'tab-native-frame-clock-v1';
-export const RECORDING_FRAME_CLOCK_LEASE_MS = 15_000;
-export const RECORDING_FRAME_CLOCK_PROBE_MS = 3_000;
-
 export type RecordingFrameClockBinding = Readonly<{
   generation: number;
   recordingId: string;
   streamInstanceId: string;
 }>;
-
-export type RecordingFrameClockLease = RecordingFrameClockBinding &
-  Readonly<{
-    purpose: typeof RECORDING_FRAME_CLOCK_PURPOSE;
-    nonce: string;
-    expiresAtEpochMs: number;
-  }>;
 
 export type RecordingFrameClockAnchor = RecordingFrameClockBinding &
   Readonly<{
@@ -58,41 +47,6 @@ export function matchesRecordingFrameClockBinding(
     left.generation === right.generation &&
     left.streamInstanceId === right.streamInstanceId
   );
-}
-
-/** Syntactic admission only: temporal expiry belongs to the optional observer. */
-export function normalizeRecordingFrameClockLease(
-  value: unknown,
-  binding?: RecordingFrameClockBinding
-): RecordingFrameClockLease | null {
-  if (
-    !isRecord(value) ||
-    !hasOnlyKeys(value, [
-      'purpose',
-      'nonce',
-      'expiresAtEpochMs',
-      'recordingId',
-      'generation',
-      'streamInstanceId',
-    ]) ||
-    !isBinding(value) ||
-    value['purpose'] !== RECORDING_FRAME_CLOCK_PURPOSE ||
-    typeof value['nonce'] !== 'string' ||
-    !/^[a-f0-9-]{36}$/i.test(value['nonce']) ||
-    typeof value['expiresAtEpochMs'] !== 'number' ||
-    !Number.isFinite(value['expiresAtEpochMs']) ||
-    value['expiresAtEpochMs'] <= 0
-  )
-    return null;
-  const lease: RecordingFrameClockLease = {
-    purpose: RECORDING_FRAME_CLOCK_PURPOSE,
-    nonce: value['nonce'],
-    expiresAtEpochMs: value['expiresAtEpochMs'],
-    recordingId: String(value['recordingId']),
-    generation: Number(value['generation']),
-    streamInstanceId: String(value['streamInstanceId']),
-  };
-  return binding && !matchesRecordingFrameClockBinding(lease, binding) ? null : lease;
 }
 
 export function isRecordingFrameClockAnchor(value: unknown): value is RecordingFrameClockAnchor {

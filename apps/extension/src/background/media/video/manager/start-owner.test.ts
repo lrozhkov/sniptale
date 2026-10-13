@@ -422,7 +422,6 @@ it('persists source authority before delivery and waits to arm the activation wa
   });
   expect(finalizeRecordingStartMock).toHaveBeenCalledTimes(1);
   expect(beginPreparedRecordingMock).toHaveBeenCalledWith({
-    frameClockLease: null,
     generation: 1,
     recordingId: 'recording-1',
     streamInstanceId: 'recording-1',

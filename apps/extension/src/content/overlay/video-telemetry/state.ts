@@ -1,3 +1,4 @@
+import { createObservationClock } from './observation-clock';
 import type { RecordingTelemetrySnapshot } from '../../../contracts/messaging/contracts/response-types';
 import { tickCursorIdleTelemetry } from './signals';
 import { createTelemetryListeners } from './events';
@@ -6,12 +7,13 @@ import type { RecordingFrameClockAnchor } from '../../../contracts/video/recordi
 
 export function createInitialState(): TelemetryState {
   return {
+    observationClock: createObservationClock(),
     recordingId: null,
     frameClock: undefined,
+    clockRevision: 0,
     captureSegment: 0,
     observationAvailable: true,
-    confirmedMediaTimeSeconds: 0,
-    clockUnavailable: false,
+    mediaResumeEstimateSeconds: 0,
     gestures: new Map(),
     keyboard: { held: new Map(), modifiers: null, target: null, times: [], repeats: [] },
     accumulatedDurationMs: 0,
@@ -99,31 +101,34 @@ export function resetTelemetryState(
   offsetSeconds = 0,
   frameClock?: RecordingFrameClockAnchor | null
 ): void {
+  state.observationClock = createObservationClock();
   state.captureSegment = 0;
   state.recordingId = recordingId;
   state.frameClock =
     frameClock === undefined || frameClock === null ? frameClock : { ...frameClock };
+  state.clockRevision = frameClock?.revision ?? 0;
   state.observationAvailable = true;
-  state.confirmedMediaTimeSeconds = frameClock?.mediaTimeSeconds ?? 0;
-  state.clockUnavailable = recordingId !== null && frameClock === null;
+  state.mediaResumeEstimateSeconds = frameClock?.mediaTimeSeconds ?? 0;
   state.gestures.clear();
   state.keyboard = { held: new Map(), modifiers: null, target: null, times: [], repeats: [] };
-  state.accumulatedDurationMs = frameClock
-    ? frameClock.mediaTimeSeconds * 1000
-    : Math.max(0, offsetSeconds * 1000);
+  state.accumulatedDurationMs = 0;
   state.actionEvents = [];
   state.cursorIdleSignal = null;
   state.cursorTrack = null;
   state.idleTimerId = null;
-  state.isEnabled = recordingId !== null && frameClock !== null;
-  state.isPaused = state.clockUnavailable || frameClock?.phase === 'paused';
+  state.isEnabled = recordingId !== null;
+  state.isPaused = frameClock?.phase === 'paused';
   state.lastKnownPointerPosition = null;
   state.lastSampleTimeMs = -1;
   state.pointerStationaryPosition = null;
   state.pointerStationaryStartedAtMs = null;
-  state.segmentStartedAtTimestamp = frameClock
-    ? frameClock.captureEpochMs - performance.timeOrigin
-    : performance.now();
+  state.segmentStartedAtTimestamp = performance.now();
+  state.observationClock.start(
+    state.segmentStartedAtTimestamp,
+    state.accumulatedDurationMs / 1000,
+    Math.max(0, offsetSeconds)
+  );
+  if (frameClock) state.observationClock.update(frameClock);
   state.signals = [];
   state.typingSignal = null;
   state.typingTarget = null;

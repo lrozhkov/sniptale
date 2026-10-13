@@ -4,6 +4,7 @@ import {
 } from '../keyboard-rhythm';
 import type {
   RecordingTelemetrySignal,
+  RecordingObservationClock,
   RecordingTelemetryCapabilities,
   RecordingTelemetryProvenance,
   RecordingViewportGeometry,
@@ -83,6 +84,7 @@ export function isVideoProjectCursorTrack(value: unknown): value is VideoProject
       (sample) =>
         isRecord(sample) &&
         isString(sample['id']) &&
+        hasOptionalField(sample, 'observationClockId', isClockIdentifier) &&
         isNonNegativeNumber(sample['time']) &&
         isNumber(sample['x']) &&
         isNumber(sample['y']) &&
@@ -165,6 +167,7 @@ export function isRecordingTelemetrySnapshot(value: unknown): boolean {
   return (
     isRecord(value) &&
     hasOptionalField(value, 'capabilities', isRecordingTelemetryCapabilities) &&
+    hasOptionalField(value, 'observationClock', isRecordingObservationClock) &&
     hasOptionalField(value, 'provenance', isRecordingTelemetryProvenance) &&
     (value['viewportObservation'] === undefined ||
       value['viewportObservation'] === null ||
@@ -246,6 +249,7 @@ function isRecordingTelemetryCapabilities(value: unknown): value is RecordingTel
   return (
     isRecord(value) &&
     value['version'] === 1 &&
+    hasOptionalField(value, 'timing', isRecordingTiming) &&
     ['pointer', 'keyboard', 'wheel'].every(
       (key) =>
         value[key] === 'available' || value[key] === 'unavailable' || value[key] === 'unknown'
@@ -254,7 +258,7 @@ function isRecordingTelemetryCapabilities(value: unknown): value is RecordingTel
       value['coverage'] === 'desktop' ||
       value['coverage'] === 'unknown') &&
     Object.keys(value).every((key) =>
-      ['version', 'pointer', 'keyboard', 'wheel', 'coverage'].includes(key)
+      ['version', 'pointer', 'keyboard', 'wheel', 'coverage', 'timing'].includes(key)
     )
   );
 }
@@ -279,6 +283,7 @@ export function isRecordingTelemetryProvenance(
 export function isRecordingInteractionMetadata(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
+    hasOptionalField(value, 'observationClockId', isClockIdentifier) &&
     hasValidInteractionTimes(value) &&
     hasValidInteractionCoordinates(value) &&
     hasValidMouseGesture(value) &&
@@ -402,6 +407,89 @@ function isProtectedActivitySignal(value: Record<string, unknown>): boolean {
     typeof data['captureSegment'] === 'number' &&
     Number.isSafeInteger(data['captureSegment']) &&
     data['captureSegment'] >= 0 &&
-    Object.keys(data).every((key) => ['privacy', 'activity', 'captureSegment'].includes(key))
+    Object.keys(data).every((key) =>
+      ['privacy', 'activity', 'captureSegment', 'observationClockId'].includes(key)
+    )
   );
+}
+
+function isClockIdentifier(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= 200;
+}
+
+function isRecordingTiming(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value['mode'] === 'bounded' || value['mode'] === 'approximate') &&
+    (value['accuracyMs'] === null || isNonNegativeNumber(value['accuracyMs'])) &&
+    Object.keys(value).every((key) => ['mode', 'accuracyMs'].includes(key))
+  );
+}
+
+/** Optional v1 document clocks are retained by storage and explicit backup without changing schemas. */
+function isRecordingObservationClock(value: unknown): value is RecordingObservationClock {
+  if (
+    !isRecord(value) ||
+    value['version'] !== 1 ||
+    (value['domain'] !== 'observation' && value['domain'] !== 'media') ||
+    !Array.isArray(value['segments']) ||
+    value['segments'].length > 10000 ||
+    !Object.keys(value).every((key) => ['version', 'domain', 'segments'].includes(key))
+  )
+    return false;
+  const ids = new Set<string>();
+  return value['segments'].every((segment) => {
+    if (
+      !isRecord(segment) ||
+      !isClockIdentifier(segment['id']) ||
+      ids.has(segment['id']) ||
+      !isClockIdentifier(segment['documentId']) ||
+      ![
+        'timeOriginMs',
+        'startedAtTimestampMs',
+        'observationStartSeconds',
+        'mediaStartEstimateSeconds',
+      ].every(
+        (key) => isNonNegativeNumber(segment[key]) && segment[key] <= Number.MAX_SAFE_INTEGER
+      ) ||
+      !['observationStartSeconds', 'mediaStartEstimateSeconds'].every(
+        (key) => isNonNegativeNumber(segment[key]) && segment[key] <= 86400
+      ) ||
+      !hasOptionalField(
+        segment,
+        'mediaEndSeconds',
+        (value) => isNonNegativeNumber(value) && value <= 86400
+      ) ||
+      !Object.keys(segment).every((key) =>
+        [
+          'id',
+          'documentId',
+          'timeOriginMs',
+          'startedAtTimestampMs',
+          'observationStartSeconds',
+          'mediaStartEstimateSeconds',
+          'mapping',
+          'mediaEndSeconds',
+        ].includes(key)
+      )
+    )
+      return false;
+    ids.add(segment['id']);
+    const mapping = segment['mapping'];
+    return (
+      mapping === null ||
+      (isRecord(mapping) &&
+        ['captureEpochMs', 'mediaTimeSeconds', 'uncertaintyMs'].every(
+          (key) => isNonNegativeNumber(mapping[key]) && mapping[key] <= Number.MAX_SAFE_INTEGER
+        ) &&
+        isNonNegativeNumber(mapping['mediaTimeSeconds']) &&
+        mapping['mediaTimeSeconds'] <= 86400 &&
+        hasOptionalField(mapping, 'maximumUncertaintyMs', isNonNegativeNumber) &&
+        Object.keys(mapping).every((key) =>
+          ['captureEpochMs', 'mediaTimeSeconds', 'uncertaintyMs', 'maximumUncertaintyMs'].includes(
+            key
+          )
+        ))
+    );
+  });
 }

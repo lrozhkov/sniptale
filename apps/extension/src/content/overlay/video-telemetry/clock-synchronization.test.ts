@@ -51,10 +51,17 @@ it('bounds native time and preserves PTS while reusing the document binding for 
   expect(f.exchange).toHaveBeenCalledTimes(3);
   expect(JSON.stringify(anchor)).toBe(before);
 });
-it('refuses a slow or incompatible exchange and never replaces it with arrival time', async () => {
+it('retains an over-budget estimate with its measured uncertainty, never receipt time', async () => {
   const f = fixture(3458.233, 100);
-  expect(await f.sync.localize(anchor, true)).toEqual({ status: 'unavailable' });
-  expect(f.exchange).toHaveBeenCalledTimes(5);
+  const result = await f.sync.localize(anchor, true);
+  expect(result.status).toBe('ready');
+  if (result.status !== 'ready') throw new Error('Missing estimate');
+  expect(result.anchor.uncertaintyMs).toBeGreaterThan(8);
+  expect(Math.abs(result.anchor.captureEpochMs - 100000)).toBeLessThanOrEqual(
+    result.anchor.uncertaintyMs!
+  );
+  expect(result.anchor.maximumUncertaintyMs).toBe(8);
+  expect(f.exchange).toHaveBeenCalledTimes(3);
 });
 it('refuses stale generation and malformed timing values from the receiver', async () => {
   for (const timing of [

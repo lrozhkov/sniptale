@@ -1,3 +1,4 @@
+import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
@@ -325,7 +326,12 @@ export async function prepareAutoProcessing(
   const recordingIds = [
     ...new Set(request.targets.map((target) => target.recordingId).filter(Boolean)),
   ];
-  const telemetry = await Promise.all(recordingIds.map((id) => getRecordingTelemetry(id)));
+  const telemetry = await Promise.all(
+    recordingIds.map(async (id) => {
+      const entry = await getRecordingTelemetry(id);
+      return entry ? projectRecordingObservationClock(entry) : undefined;
+    })
+  );
   const audio: Record<string, AutoProcessingAudio> = {};
   for (const target of request.targets) {
     const clip = project.clips.find((item) => item.id === target.clipId);
@@ -374,6 +380,11 @@ export async function isAutoProcessingTelemetryCurrent(preview: AutoProcessingPr
   const ids = [
     ...new Set(preview.request.targets.map((target) => target.recordingId).filter(Boolean)),
   ];
-  const current = await Promise.all(ids.map((id) => getRecordingTelemetry(id)));
+  const current = await Promise.all(
+    ids.map(async (id) => {
+      const entry = await getRecordingTelemetry(id);
+      return entry ? projectRecordingObservationClock(entry) : undefined;
+    })
+  );
   return JSON.stringify(current) === JSON.stringify(preview.telemetry);
 }

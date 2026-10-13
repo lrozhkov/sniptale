@@ -1,3 +1,4 @@
+import { sampleRecordingSourceClock } from '../encoding/recording-frame-clock';
 import { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import {
   CaptureMode,
@@ -42,6 +43,7 @@ async function acquireDesktopStream(settings: VideoRecordingSettings) {
   ) {
     logger.debug('Reusing cached desktop stream', { hasLabel: Boolean(cached.label) });
     return {
+      sourceClockCalibration: null,
       stream: cached.stream,
       cursorCaptureMode: resolveCursorCaptureMode(cached.stream, settings, CaptureMode.SCREEN),
       sourceLabel: cached.label,
@@ -76,6 +78,7 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
   });
   return {
     stream,
+    sourceClockCalibration: null,
     cursorCaptureMode: null,
     sourceLabel: stream.getVideoTracks()[0]?.label || null,
   };
@@ -183,6 +186,7 @@ async function acquireTabStream({
   );
 
   const requestedFrameRate = resolveVideoOutputProfile(settings).frameRate;
+  const acquisitionEpochMs = performance.timeOrigin + performance.now();
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: audioConstraints,
     video: createTabSourceConstraints(streamId, {
@@ -190,6 +194,9 @@ async function acquireTabStream({
       physicalSize: requestedPhysicalSize,
     }),
   });
+  const track = stream.getVideoTracks()[0];
+  const sourceClockCalibration =
+    track?.kind === 'video' ? await sampleRecordingSourceClock(track, acquisitionEpochMs) : null;
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {
     hasAudio: Boolean(audioConstraints),
@@ -198,6 +205,7 @@ async function acquireTabStream({
   });
   return {
     stream,
+    sourceClockCalibration,
     cursorCaptureMode,
     sourceLabel: stream.getVideoTracks()[0]?.label || null,
   };

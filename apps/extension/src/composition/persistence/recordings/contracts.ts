@@ -7,6 +7,7 @@ import type {
 import type {
   RecordingTelemetrySignal,
   RecordingTelemetryCapabilities,
+  RecordingObservationClock,
   RecordingTelemetryProvenance,
   RecordingActionEvent,
   VideoProjectCursorTrack,
@@ -39,6 +40,7 @@ export interface RecordingEntry extends StoredRecordingEntry {
 
 export interface RecordingTelemetryEntry {
   capabilities?: RecordingTelemetryCapabilities;
+  observationClock?: RecordingObservationClock;
   /** Captured source clock/coordinates; absence means legacy provenance is unknown. */
   provenance?: RecordingTelemetryProvenance;
   recordingId: string;

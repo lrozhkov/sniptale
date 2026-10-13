@@ -1,3 +1,4 @@
+import { handleRecordingObservations } from './handlers/state/recording-observations';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import type {
   DiagnosticEventFromCS,
@@ -66,6 +67,8 @@ function routeRecordingRuntimeMessage(
   senderTabId?: number,
   sender?: chrome.runtime.MessageSender
 ): RouteResult | null {
+  if (message.type === VideoMessageType.RECORDING_OBSERVATIONS)
+    return handleRecordingObservations(message, sendResponse, sender);
   if (message.type === VideoMessageType.GET_RECORDING_STATE) {
     if (message.recordingClock)
       return handleRecordingClockTiming(message.recordingClock, sendResponse, sender);

@@ -10,6 +10,7 @@ import {
   enableVideoTelemetry,
   pauseVideoTelemetry,
   resumeVideoTelemetry,
+  updateVideoTelemetryClock,
 } from '../../overlay/video-telemetry';
 import { hideVideoCountdown, showVideoCountdown } from '../../overlay/video-countdown';
 import {
@@ -57,16 +58,13 @@ function handleEnableControlledCursorCaptureMessage(
     recordingClock.invalidate();
     enableVideoTelemetry(message.recordingId, message.offsetSeconds, null);
   } else {
+    enableVideoTelemetry(message.recordingId, message.offsetSeconds, null);
+    if (message.frameClock.phase === 'paused') pauseVideoTelemetry(null);
     void recordingClock.localize(message.frameClock, true).then((result) => {
-      if (result.status !== 'stale')
-        enableVideoTelemetry(
-          message.recordingId,
-          message.offsetSeconds,
-          result.status === 'ready' ? result.anchor : null
-        );
-      sendResponse({ success: true, viewport: getViewportInfo() });
+      if (result.status === 'ready') updateVideoTelemetryClock(message.recordingId, result.anchor);
     });
-    return true;
+    sendResponse({ success: true, viewport: getViewportInfo() });
+    return false;
   }
   sendResponse({ success: true, viewport: getViewportInfo() });
   return false;
@@ -125,11 +123,13 @@ function handleKnownViewportMessage(
         apply(null);
         return acknowledgeViewportMessage(sendResponse);
       }
+      if (pause) pauseVideoTelemetry(null);
+      else resumeVideoTelemetry(null, message.frameClock);
       void recordingClock.localize(message.frameClock, !pause).then((result) => {
-        if (result.status !== 'stale') apply(result.status === 'ready' ? result.anchor : null);
-        sendResponse({ success: true });
+        if (result.status === 'ready')
+          updateVideoTelemetryClock(result.anchor.recordingId, result.anchor);
       });
-      return true;
+      return acknowledgeViewportMessage(sendResponse);
     }
   }
 

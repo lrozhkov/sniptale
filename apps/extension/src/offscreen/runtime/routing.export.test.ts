@@ -364,7 +364,7 @@ it('opens recording only after the correlated begin authority is accepted', asyn
   } as const;
   await handleOffscreenRuntimeMessage(message);
   expect(mocks.assertBegin).toHaveBeenCalledWith(message);
-  expect(mocks.allowBegin).toHaveBeenCalledWith(message, undefined);
+  expect(mocks.allowBegin).toHaveBeenCalledWith(message);
 
   mocks.assertBegin.mockImplementationOnce(() => {
     throw new Error('stale binding');

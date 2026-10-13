@@ -26,7 +26,6 @@ const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
 const BUILD_LAYOUT = createExtensionBuildLayout(APP_ROOT);
 normalizeMediabunny({ root: BUILD_LAYOUT.repositoryRoot, check: true });
 const REQUIRED_APP_HTML_OUTPUTS = [
-  'apps/extension/src/recording-clock/index.html',
   'apps/extension/src/camera-recorder/index.html',
   'apps/extension/src/design-system/index.html',
   'apps/extension/src/editor/index.html',

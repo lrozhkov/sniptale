@@ -7,10 +7,6 @@ import { issueCameraRecorderLaunchToken } from '../runtime/camera-recorder-contr
 import { activateVideoRecordingLease } from '../recording-control-lease';
 import { beginPreparedRecording } from './flow';
 import { scheduleRecordingStartActivationWatchdog } from './start-activation-watchdog';
-import {
-  createRecordingFrameClockCompanion,
-  closeRecordingFrameClockCompanions,
-} from './frame-clock-companion';
 import type { VideoRecordingStartFailureCode } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 export type RecordingStartResult =
@@ -34,20 +30,7 @@ export async function finalizeAcceptedRecordingStart(
     normalizeVideoSourceCount(context.settings.sourceCount) > 1;
   if (!isMultiSource) {
     const binding = { generation: context.generation, recordingId, streamInstanceId };
-    const needsClock =
-      context.captureMode === CaptureMode.TAB || context.captureMode === CaptureMode.TAB_CROP;
-    const frameClockLease = needsClock
-      ? await createRecordingFrameClockCompanion(binding)
-      : undefined;
-    try {
-      await beginPreparedRecording({
-        ...binding,
-        ...(frameClockLease === undefined ? {} : { frameClockLease }),
-      });
-    } catch (error) {
-      await closeRecordingFrameClockCompanions(recordingId);
-      throw error;
-    }
+    await beginPreparedRecording(binding);
   }
   const activeLease = await activateVideoRecordingLease({
     generation: context.generation,

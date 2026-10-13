@@ -1,3 +1,4 @@
+import type { RecordingObservationsMessage } from '../../video/types/messages';
 import type { GetRecordingStateMessage } from '@sniptale/runtime-contracts/video/types/messages.content';
 import type { RecordingFrameClockBinding } from '../../video/recording-frame-clock';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -34,6 +35,7 @@ import type {
 export type { RuntimeVideoSessionResponseByType } from './session-responses';
 
 export type RuntimeVideoSessionRequestByType = {
+  [VideoMessageType.RECORDING_OBSERVATIONS]: RecordingObservationsMessage;
   [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: ReleaseVideoRecordingSurfaceMessage;
   [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: VideoRecordingSurfaceCommandMessage;
   [VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER]: VideoRecordingCameraOfferMessage;

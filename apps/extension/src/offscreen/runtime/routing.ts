@@ -291,7 +291,7 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
       assertRecordingBegin(message);
       try {
-        allowRecordingBegin(message, message.frameClockLease);
+        allowRecordingBegin(message);
       } catch (error) {
         cancelRecordingBegin(error instanceof Error ? error.message : String(error));
         throw error;

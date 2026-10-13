@@ -3,7 +3,6 @@ import {
   matchesRecordingFrameClockBinding,
   type RecordingFrameClockAnchor,
 } from '../../../../../../contracts/video/recording-frame-clock';
-import { closeRecordingFrameClockCompanions } from '../../../manager/frame-clock-companion';
 import {
   enableControlledCursorCapture,
   syncControlledCursorCapture,
@@ -161,7 +160,6 @@ async function handleOffscreenRecordingStartedIfCurrent(message?: {
     return;
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
-  await closeRecordingFrameClockCompanions(message.recordingId ?? null);
   if (!(await synchronizeExactRecordingHistory(message, 'start'))) return;
   clearRecordingStartActivationWatchdog(message.recordingId);
   markVideoRecordingPreparationSettled();
@@ -203,7 +201,6 @@ async function handleOffscreenRecordingStoppedIfCurrent(message?: {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
-  await closeRecordingFrameClockCompanions(message.recordingId ?? null);
   await releaseVideoCaptureSurface(message.recordingId);
   if (isCurrentVideoRecordingId(message.recordingId)) {
     finishVideoRecordingStop();

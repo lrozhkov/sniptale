@@ -69,6 +69,7 @@ class PointerGestureRecorder {
         downY: event.clientY,
         maxExcursionCssPx: 0,
         completion: 'lost',
+        observationClockId: state.observationClock.id,
         captureSegment: state.captureSegment,
         ...modifiers(event),
       },

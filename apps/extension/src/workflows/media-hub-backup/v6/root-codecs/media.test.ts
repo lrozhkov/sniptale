@@ -221,3 +221,44 @@ it('refuses a published root that declares private acquisition membership', asyn
     })
   ).toThrow('association is invalid');
 });
+
+it('roundtrips raw phase descriptors and stable observation identities in explicit backup', () => {
+  const input = recordingMetadata();
+  const telemetry = {
+    recordingId: 'recording-one',
+    captureMode: 'TAB',
+    createdAt: 1,
+    updatedAt: 1,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    observationClock: {
+      version: 1,
+      domain: 'observation',
+      segments: [
+        {
+          id: 'phase',
+          documentId: 'doc',
+          timeOriginMs: 100000,
+          startedAtTimestampMs: 5000,
+          observationStartSeconds: 5,
+          mediaStartEstimateSeconds: 0.4,
+          mapping: null,
+        },
+      ],
+    },
+    capabilities: {
+      version: 1,
+      pointer: 'available',
+      keyboard: 'available',
+      wheel: 'available',
+      coverage: 'document',
+      timing: { mode: 'approximate', accuracyMs: null },
+    },
+  };
+  const portable = { ...input, recording: { ...input.recording, telemetry } };
+  const restored = parsePortableMediaMetadata(JSON.parse(JSON.stringify(portable)));
+  expect(restored.recording?.telemetry).toEqual(telemetry);
+  expect(portable.recording.telemetry.observationClock.domain).toBe('observation');
+});

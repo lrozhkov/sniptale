@@ -37,7 +37,12 @@ export function flushKeyboardRhythm(state: TelemetryState): void {
     startTime: Math.min(...bounds),
     endTime: Math.max(...bounds),
     point: null,
-    data: { activity: 'keyboard', eventType: 'keydown', captureSegment: state.captureSegment },
+    data: {
+      activity: 'keyboard',
+      eventType: 'keydown',
+      observationClockId: state.observationClock.id,
+      captureSegment: state.captureSegment,
+    },
     ...(times.length
       ? { keyboardRhythm: [encodeRecordingKeyboardRhythm(crypto.randomUUID(), times)] }
       : {}),
@@ -177,6 +182,7 @@ function observeKeyboardDown(state: TelemetryState, event: KeyboardEvent): void 
       downTime: time,
       completion: 'lost',
       repeatCount: 0,
+      observationClockId: state.observationClock.id,
       captureSegment: state.captureSegment,
     });
   else appendKeyboardTick(state, false, time);
@@ -209,6 +215,7 @@ function observeModifierUp(state: TelemetryState, time: number): void {
         completion: 'released',
         keyboardOnsetTime: chord.downTime,
         keyboardAttackId: id,
+        observationClockId: state.observationClock.id,
         captureSegment: state.captureSegment,
       },
       preset: 'SPOTLIGHT',
@@ -258,6 +265,7 @@ function recordAnonymousHold(
       downTime: held.onset,
       repeatCount: held.repeatCount,
       completion: upTime === undefined ? 'lost' : 'released',
+      observationClockId: state.observationClock.id,
       captureSegment: state.captureSegment,
       ...(upTime === undefined
         ? { lastObservedTime: held.lastObservedTime }

@@ -213,7 +213,6 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `background` → `apps/extension/src/background`
 - `content` → `apps/extension/src/content`
 - `camera-recorder` → `apps/extension/src/camera-recorder`
-- `recording-clock` → `apps/extension/src/recording-clock`
 - `popup` → `apps/extension/src/popup`
 - `settings` → `apps/extension/src/settings`
 - `gallery` → `apps/extension/src/gallery`

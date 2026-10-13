@@ -5,6 +5,7 @@ import type { ProjectExportCapabilitiesPayload } from './types';
 import type {
   RecordingTelemetrySignal,
   RecordingTelemetryCapabilities,
+  RecordingObservationClock,
   RecordingTelemetryProvenance,
   RecordingViewportObservation,
   RecordingActionEvent,
@@ -107,6 +108,7 @@ export type ViewportCoordsResponse = RuntimeMessageResponse<{
 
 export type RecordingTelemetrySnapshot = {
   capabilities?: RecordingTelemetryCapabilities;
+  observationClock?: RecordingObservationClock;
   provenance?: RecordingTelemetryProvenance;
   viewportObservation?: RecordingViewportObservation | null;
   viewport: ViewportInfo | null;

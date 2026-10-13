@@ -1,5 +1,4 @@
 import type { RecordingFrameClockAnchor } from '../recording-frame-clock';
-import type { RecordingFrameClockLease } from '../recording-frame-clock';
 import type { VideoProjectExportSettings } from '../../../features/video/project/types/index';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type {
@@ -51,7 +50,6 @@ export interface OffscreenBeginRecordingMessage {
   recordingId: string;
   generation: number;
   streamInstanceId: string;
-  frameClockLease?: RecordingFrameClockLease | null;
 }
 
 export interface OffscreenRecordingStartedMessage {

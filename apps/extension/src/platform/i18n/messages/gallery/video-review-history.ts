@@ -21,6 +21,14 @@ export const galleryVideoReviewHistoryMessages = defineMessageSource({
   historyClicks: { ru: 'Щелчки', en: 'Clicks' },
   historyMore: { ru: 'Показать ещё', en: 'Show more' },
   historyEmpty: { ru: 'Нет подходящих действий', en: 'No matching actions' },
+  historyTimingApproximate: {
+    ru: 'Приблизительная привязка: ±{accuracy} мс',
+    en: 'Approximate timing: ±{accuracy} ms',
+  },
+  historyTimingUnknown: {
+    ru: 'Приблизительная привязка: точность не измерена',
+    en: 'Approximate timing: accuracy not measured',
+  },
   historyCaptureEmpty: { ru: 'Нет событий', en: 'No events' },
   historyCaptureUnavailable: { ru: 'Запись событий недоступна', en: 'Event capture unavailable' },
   historyCaptureUnknown: { ru: 'Нет данных о записи событий', en: 'Event capture unknown' },

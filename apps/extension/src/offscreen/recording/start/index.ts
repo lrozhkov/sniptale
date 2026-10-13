@@ -1,7 +1,6 @@
 import { createFilenameSession } from '../../../workflows/file-naming/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode as RecordingCaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import type { RecordingFrameClockLease } from '../../../contracts/video/recording-frame-clock';
 import type {
   CaptureMode,
   VideoRecordingSettings,
@@ -97,10 +96,8 @@ async function startRecordingInternal(
     Math.max(0, params.settings.countdownSeconds ?? 0) * 1_000
   );
   // Observe rejection immediately: shared cleanup cancels this gate on DENY/transport failures.
-  const observedBegin: Promise<
-    { ok: true; frameClockLease: RecordingFrameClockLease | null } | { error: unknown; ok: false }
-  > = begin.then(
-    (frameClockLease) => ({ ok: true, frameClockLease }),
+  const observedBegin: Promise<{ ok: true } | { error: unknown; ok: false }> = begin.then(
+    () => ({ ok: true }),
     (error: unknown) => ({ error, ok: false })
   );
   try {
@@ -165,7 +162,7 @@ async function startRecordingInternal(
     onVideoFrameGeometry,
     ...(params.captureMode === RecordingCaptureMode.TAB ||
     params.captureMode === RecordingCaptureMode.TAB_CROP
-      ? { frameClockLease: beginResult.frameClockLease }
+      ? { sourceClockCalibration: prepared.sourceClockCalibration ?? null }
       : {}),
     sourceContext: params.sourceContext ?? null,
     sourceLabel: params.sourceContext?.title ?? prepared.sourceLabel,

@@ -30,11 +30,11 @@ import {
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
 import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
-import type {
-  RecordingFrameClockAnchor,
-  RecordingFrameClockLease,
-} from '../../../contracts/video/recording-frame-clock';
-import { RecordingFrameClockObserver } from '../encoding/recording-frame-clock';
+import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
+import {
+  RecordingFrameClockObserver,
+  type RecordingSourceClockCalibration,
+} from '../encoding/recording-frame-clock';
 
 type RecordingSourceBinding = {
   generation: number;
@@ -143,7 +143,7 @@ export async function finalizeRecordingBootstrap(params: {
   cursorCaptureMode?: VideoCursorCaptureMode | null;
   encoderFrameTransform?: LiveVideoFrameTransform | null;
   onVideoFrameGeometry?: (frame: VideoFrame) => void;
-  frameClockLease?: RecordingFrameClockLease | null;
+  sourceClockCalibration?: RecordingSourceClockCalibration | null;
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
   sourceBinding?: RecordingSourceBinding;
@@ -198,14 +198,12 @@ export async function finalizeRecordingBootstrap(params: {
     ),
     frameTransform: params.encoderFrameTransform ?? undefined,
     ...(params.onVideoFrameGeometry ? { onVideoFrameGeometry: params.onVideoFrameGeometry } : {}),
-    ...(params.frameClockLease === undefined || !params.sourceBinding
+    ...(params.sourceClockCalibration === undefined || !params.sourceBinding
       ? {}
       : {
           frameClockObserver: new RecordingFrameClockObserver(
             params.sourceBinding,
-            params.frameClockLease,
-            undefined,
-            undefined,
+            params.sourceClockCalibration,
             500 / encoderConfig.frameRate
           ),
         }),

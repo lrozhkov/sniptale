@@ -1,4 +1,3 @@
-import type { RecordingFrameClockLease } from '../../video/recording-frame-clock';
 import type {
   CaptureMode,
   VideoRecordingSettings,
@@ -58,7 +57,6 @@ export type RuntimeOffscreenBeginRecordingMessage = RuntimeOffscreenCommandCapab
   recordingId: string;
   generation: number;
   streamInstanceId: string;
-  frameClockLease?: RecordingFrameClockLease | null;
 };
 
 export type RuntimeOffscreenUpdateSettingsMessage = RuntimeOffscreenCommandCapability & {

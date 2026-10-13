@@ -1,5 +1,4 @@
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { closeRecordingFrameClockCompanions } from '../../../manager/frame-clock-companion';
 import type { VideoRuntimeMessage } from '../../../../../../contracts/video/types/messages';
 import { translate } from '../../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -110,7 +109,6 @@ async function handleOffscreenErrorAsync(message: {
       return;
     }
 
-    await closeRecordingFrameClockCompanions(message.recordingId ?? null);
     if (message.recordingId) {
       await clearCameraRecorderControlGrant(message.recordingId);
       if (!isCurrentVideoRecordingId(message.recordingId)) {

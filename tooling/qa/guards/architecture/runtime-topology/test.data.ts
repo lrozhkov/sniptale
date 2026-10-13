@@ -24,17 +24,6 @@ export const DEFAULT_RUNTIME_TOPOLOGY = [
     ],
   },
   {
-    id: 'recording-clock',
-    root: 'apps/extension/src/recording-clock',
-    manifestOwned: true,
-    featureRoot: true,
-    entrypointFiles: [
-      'apps/extension/src/recording-clock/index.html',
-      'apps/extension/src/recording-clock/index.ts',
-      'apps/extension/src/recording-clock/relay.worker.ts',
-    ],
-  },
-  {
     id: 'popup',
     root: 'apps/extension/src/popup',
     manifestOwned: true,
@@ -154,7 +143,6 @@ export const DEFAULT_BUILD_HTML_INPUTS = [
   ['settings', 'always'],
   ['gallery', 'always'],
   ['camera-recorder', 'always'],
-  ['recording-clock', 'always'],
   ['web-snapshot-viewer', 'always'],
   ['offscreen/offscreen', 'always'],
   ['popup', 'manifest'],

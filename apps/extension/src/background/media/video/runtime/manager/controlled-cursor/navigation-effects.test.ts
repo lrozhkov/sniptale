@@ -91,7 +91,7 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
     await suspendControlledCursorEffects(binding);
     expect(mocks.appendTelemetry).toHaveBeenCalledWith({ signals: [] });
     await restoreControlledCursorEffects(binding);
-    expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 0, clock);
+    expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12, clock);
     expect(mocks.sync).toHaveBeenCalledWith(7, 'resume', clock);
   }
 );
@@ -107,7 +107,7 @@ it('flushes telemetry without owning recorder pause or resume transport', async 
 
 it('restores content telemetry state and clears pending effects', async () => {
   await restoreControlledCursorEffects(binding);
-  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 0, clock);
+  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12, clock);
   expect(mocks.sync).toHaveBeenCalledWith(7, 'resume', clock);
   expect(mocks.setAutoPaused).toHaveBeenCalledWith(false);
   expect(mocks.clearNavigation).toHaveBeenCalledWith(11);
@@ -119,7 +119,7 @@ it('keeps navigation time on the continuously recorded source clock', async () =
   await suspendControlledCursorEffects(binding);
   mocks.getRuntimeState.mockReturnValue({ duration: 15.5, captureMode: CaptureMode.TAB });
   await restoreControlledCursorEffects(binding);
-  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 0, clock);
+  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 15.5, clock);
 });
 
 it('abandons stale continuations without publishing restored state', async () => {
@@ -213,11 +213,11 @@ it('restores a manually paused cursor session without publishing stale completio
   expect(mocks.clearNavigation).not.toHaveBeenCalled();
 });
 
-it('refuses a receipt-duration clock after worker cache loss while preserving navigation cleanup', async () => {
+it('retains explicit approximate navigation timing after native calibration is unavailable', async () => {
   mocks.getClock.mockReturnValue(null);
   mocks.getRuntimeState.mockReturnValue({ duration: 999, captureMode: CaptureMode.TAB });
   await restoreControlledCursorEffects(binding);
-  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 0, null);
+  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 999, null);
   expect(mocks.sync).toHaveBeenCalledWith(7, 'resume', null);
   expect(mocks.setOffset).not.toHaveBeenCalled();
 });

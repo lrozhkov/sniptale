@@ -1,3 +1,4 @@
+import type { RecordingTelemetrySnapshot } from '../../messaging/contracts/response-types';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type {
   ContentVideoMessage,
@@ -35,7 +36,14 @@ export type * from '@sniptale/runtime-contracts/video/types/messages.control';
 export type * from './messages.export.ts';
 export type * from './messages.offscreen.ts';
 
+export interface RecordingObservationsMessage {
+  type: typeof VideoMessageType.RECORDING_OBSERVATIONS;
+  recordingId: string;
+  telemetry: RecordingTelemetrySnapshot;
+}
+
 export type VideoRuntimeMessage =
+  | RecordingObservationsMessage
   | GetRecordingStateMessage
   | {
       type: typeof VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT;

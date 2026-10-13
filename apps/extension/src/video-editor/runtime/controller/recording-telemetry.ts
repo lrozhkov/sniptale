@@ -1,3 +1,4 @@
+import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
 import { useEffect, useRef } from 'react';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
@@ -35,7 +36,7 @@ export function useRecordingTelemetry(
         recordingIds.map(async (id) => {
           try {
             const entry = await getRecordingTelemetry(id);
-            return entry?.recordingId === id ? [entry] : [];
+            return entry?.recordingId === id ? [projectRecordingObservationClock(entry)] : [];
           } catch {
             return [];
           }

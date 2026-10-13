@@ -75,8 +75,11 @@ function cloneTelemetrySignals(
 
 function cloneTelemetrySnapshot(snapshot: RecordingTelemetrySnapshot): RecordingTelemetrySnapshot {
   return {
+    ...(snapshot.observationClock
+      ? { observationClock: structuredClone(snapshot.observationClock) }
+      : {}),
     ...(snapshot.provenance ? { provenance: { ...snapshot.provenance } } : {}),
-    ...(snapshot.capabilities ? { capabilities: { ...snapshot.capabilities } } : {}),
+    ...(snapshot.capabilities ? { capabilities: structuredClone(snapshot.capabilities) } : {}),
     viewportObservation: snapshot.viewportObservation
       ? { ...snapshot.viewportObservation, initial: { ...snapshot.viewportObservation.initial } }
       : null,
@@ -101,7 +104,13 @@ function mergeCursorTrack(
   return {
     ...current,
     captureMode: next.captureMode,
-    samples: [...cloneCursorSamples(current.samples), ...cloneCursorSamples(next.samples)],
+    samples: [
+      ...new Map(
+        [...cloneCursorSamples(current.samples), ...cloneCursorSamples(next.samples)].map(
+          (sample) => [sample.id, sample]
+        )
+      ).values(),
+    ],
     skin: { ...current.skin, ...next.skin },
   };
 }
@@ -124,6 +133,22 @@ export function mergeTelemetrySnapshots(
       ? (current.capabilities?.[key] ?? 'unknown')
       : 'unknown';
   return {
+    ...(current.observationClock || next.observationClock
+      ? {
+          observationClock: {
+            version: 1 as const,
+            domain: 'observation' as const,
+            segments: structuredClone([
+              ...new Map(
+                [
+                  ...(current.observationClock?.segments ?? []),
+                  ...(next.observationClock?.segments ?? []),
+                ].map((segment) => [segment.id, segment])
+              ).values(),
+            ]),
+          },
+        }
+      : {}),
     ...(sameProvenance && current.provenance ? { provenance: { ...current.provenance } } : {}),
     ...(current.capabilities || next.capabilities
       ? {
@@ -132,6 +157,25 @@ export function mergeTelemetrySnapshots(
             pointer: capability('pointer'),
             keyboard: capability('keyboard'),
             wheel: capability('wheel'),
+            ...(current.capabilities?.timing || next.capabilities?.timing
+              ? {
+                  timing: {
+                    mode:
+                      current.capabilities?.timing?.mode === 'bounded' &&
+                      next.capabilities?.timing?.mode === 'bounded'
+                        ? 'bounded'
+                        : 'approximate',
+                    accuracyMs:
+                      current.capabilities?.timing?.accuracyMs == null ||
+                      next.capabilities?.timing?.accuracyMs == null
+                        ? null
+                        : Math.max(
+                            current.capabilities.timing.accuracyMs,
+                            next.capabilities.timing.accuracyMs
+                          ),
+                  },
+                }
+              : {}),
             coverage:
               current.capabilities?.coverage === next.capabilities?.coverage
                 ? (current.capabilities?.coverage ?? 'unknown')
@@ -153,11 +197,20 @@ export function mergeTelemetrySnapshots(
         }
       : null,
     actionEvents: [
-      ...cloneActionEvents(current.actionEvents),
-      ...cloneActionEvents(next.actionEvents),
+      ...new Map(
+        [...cloneActionEvents(current.actionEvents), ...cloneActionEvents(next.actionEvents)].map(
+          (event) => [event.id, event]
+        )
+      ).values(),
     ],
     cursorTrack: mergeCursorTrack(current.cursorTrack, next.cursorTrack),
-    signals: [...cloneTelemetrySignals(current.signals), ...cloneTelemetrySignals(next.signals)],
+    signals: [
+      ...new Map(
+        [...cloneTelemetrySignals(current.signals), ...cloneTelemetrySignals(next.signals)].map(
+          (signal) => [signal.id, signal]
+        )
+      ).values(),
+    ],
     viewport: next.viewport === null ? current.viewport : { ...next.viewport },
   };
 }

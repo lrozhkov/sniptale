@@ -5,13 +5,6 @@ const mocks = vi.hoisted(() => ({
   beginPreparedRecording: vi.fn(),
   scheduleWatchdog: vi.fn(),
   enableHistory: vi.fn(),
-  createClock: vi.fn(),
-  closeClock: vi.fn(),
-}));
-
-vi.mock('./frame-clock-companion', () => ({
-  createRecordingFrameClockCompanion: mocks.createClock,
-  closeRecordingFrameClockCompanions: mocks.closeClock,
 }));
 
 vi.mock('../runtime/manager/controlled-cursor/messages', async (importOriginal) => ({
@@ -40,11 +33,9 @@ beforeEach(() => {
   mocks.beginPreparedRecording.mockResolvedValue(undefined);
   mocks.activateLease.mockResolvedValue({ controlToken: 'active-token' });
   mocks.enableHistory.mockResolvedValue(undefined);
-  mocks.createClock.mockResolvedValue(null);
-  mocks.closeClock.mockResolvedValue(undefined);
 });
 
-it('delivers optional native clock admission at BEGIN without a receipt-time history reset', async () => {
+it('activates the recorder without a helper capability or receipt-time history reset', async () => {
   await finalizeAcceptedRecordingStart(
     'recording-1',
     {
@@ -56,16 +47,10 @@ it('delivers optional native clock admission at BEGIN without a receipt-time his
     },
     'stream-1'
   );
-  expect(mocks.createClock).toHaveBeenCalledWith({
-    generation: 3,
-    recordingId: 'recording-1',
-    streamInstanceId: 'stream-1',
-  });
   expect(mocks.beginPreparedRecording).toHaveBeenCalledWith({
     generation: 3,
     recordingId: 'recording-1',
     streamInstanceId: 'stream-1',
-    frameClockLease: null,
   });
   expect(mocks.enableHistory).not.toHaveBeenCalled();
 });
@@ -155,18 +140,7 @@ it('activates a prepared multi-source recording without a redundant begin comman
   });
 });
 
-it('passes a fresh exact clock lease unchanged through bound BEGIN and cleans failed delivery', async () => {
-  const { RECORDING_FRAME_CLOCK_PURPOSE } =
-    await import('../../../../contracts/video/recording-frame-clock');
-  const lease = {
-    recordingId: 'recording-1',
-    generation: 3,
-    streamInstanceId: 'stream-1',
-    purpose: RECORDING_FRAME_CLOCK_PURPOSE,
-    nonce: 'ba289176-c099-44d5-8f18-174e05565080',
-    expiresAtEpochMs: Date.now() + 10000,
-  };
-  mocks.createClock.mockResolvedValue(lease);
+it('never publishes active authority after a failed BEGIN delivery', async () => {
   mocks.beginPreparedRecording.mockRejectedValueOnce(new Error('BEGIN transport failed'));
   await expect(
     finalizeAcceptedRecordingStart(
@@ -185,8 +159,6 @@ it('passes a fresh exact clock lease unchanged through bound BEGIN and cleans fa
     generation: 3,
     recordingId: 'recording-1',
     streamInstanceId: 'stream-1',
-    frameClockLease: lease,
   });
-  expect(mocks.closeClock).toHaveBeenCalledExactlyOnceWith('recording-1');
   expect(mocks.activateLease).not.toHaveBeenCalled();
 });

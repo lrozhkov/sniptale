@@ -13,13 +13,13 @@ const TIMER_EDGE_ALLOWANCE_MS = 0.2;
 /** B−A lies between B2−A3 and B1−A0; asymmetric delivery is uncertainty, not exact calibration. */
 export function inferRecordingClockOffset(
   exchanges: readonly RecordingClockExchange[],
-  maximumUncertaintyMs: number
+  maximumUncertaintyMs?: number
 ): RecordingClockOffset | null {
   if (
     exchanges.length === 0 ||
     exchanges.length > MAX_EXCHANGES ||
-    !Number.isFinite(maximumUncertaintyMs) ||
-    maximumUncertaintyMs <= 0
+    (maximumUncertaintyMs !== undefined &&
+      (!Number.isFinite(maximumUncertaintyMs) || maximumUncertaintyMs <= 0))
   )
     return null;
   let lowerMs = -Infinity;
@@ -30,7 +30,11 @@ export function inferRecordingClockOffset(
     upperMs = Math.min(upperMs, b1 - a0 + TIMER_EDGE_ALLOWANCE_MS);
   }
   const uncertaintyMs = (upperMs - lowerMs) / 2;
-  if (lowerMs > upperMs || !Number.isFinite(uncertaintyMs) || uncertaintyMs > maximumUncertaintyMs)
+  if (
+    lowerMs > upperMs ||
+    !Number.isFinite(uncertaintyMs) ||
+    (maximumUncertaintyMs !== undefined && uncertaintyMs > maximumUncertaintyMs)
+  )
     return null;
   return { lowerMs, upperMs, offsetMs: lowerMs + uncertaintyMs, uncertaintyMs };
 }

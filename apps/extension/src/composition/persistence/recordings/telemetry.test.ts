@@ -256,3 +256,45 @@ it('preserves click target semantics through save and read without changing even
   const restored = await getRecordingTelemetry('semantic');
   expect(restored?.actionEvents).toEqual(entry.actionEvents);
 });
+
+it('stores and reloads observation descriptors and timing quality without projecting or losing IDs', async () => {
+  const db = createDb();
+  initDbMock.mockResolvedValue(db);
+  const entry: RecordingTelemetryEntry = {
+    recordingId: 'raw',
+    captureMode: 'TAB',
+    createdAt: 1,
+    updatedAt: 2,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    observationClock: {
+      version: 1,
+      domain: 'observation',
+      segments: [
+        {
+          id: 'phase',
+          documentId: 'doc',
+          timeOriginMs: 100000,
+          startedAtTimestampMs: 5000,
+          observationStartSeconds: 5,
+          mediaStartEstimateSeconds: 0.4,
+          mapping: null,
+        },
+      ],
+    },
+    capabilities: {
+      version: 1,
+      pointer: 'available',
+      keyboard: 'available',
+      wheel: 'available',
+      coverage: 'document',
+      timing: { mode: 'approximate', accuracyMs: null },
+    },
+  };
+  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
+  await saveRecordingTelemetry(entry);
+  db.get.mockResolvedValue(structuredClone(db.put.mock.calls.at(-1)?.[1]));
+  expect(await getRecordingTelemetry('raw')).toEqual(entry);
+});

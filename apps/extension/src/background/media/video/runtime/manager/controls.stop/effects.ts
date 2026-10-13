@@ -1,5 +1,4 @@
 import { mergeTelemetrySnapshots } from '../../../session-state/controlled-cursor';
-import { closeRecordingFrameClockCompanions } from '../../../manager/frame-clock-companion';
 import type {
   RecordingPointTransform,
   RecordingActionEvent,
@@ -117,6 +116,9 @@ function collectAndPersistTelemetry(
       const timestamp = Date.now();
       await saveRecordingTelemetrySafely({
         recordingId,
+        ...(telemetry.observationClock
+          ? { observationClock: structuredClone(telemetry.observationClock) }
+          : {}),
         ...(telemetry.capabilities ? { capabilities: { ...telemetry.capabilities } } : {}),
         ...(telemetry.provenance ? { provenance: { ...telemetry.provenance } } : {}),
         createdAt: timestamp,
@@ -222,7 +224,6 @@ export function runStopSideEffects(
   options: StopTelemetryOptions = {}
 ): Promise<void> {
   const failureLogger = resolveStopFailureLogger(failureLogging, logger);
-  const companionCleanup = closeRecordingFrameClockCompanions(getVideoRecordingId());
   let backgroundSideEffects: Promise<void>;
   let collected: Promise<void> = Promise.resolve();
   if (context.tabId) {
@@ -254,10 +255,8 @@ export function runStopSideEffects(
     backgroundSideEffects = Promise.resolve();
   }
 
-  pendingStopSideEffects = Promise.all([backgroundSideEffects, companionCleanup]).then(
-    () => undefined
-  );
-  return Promise.all([collected, companionCleanup]).then(() => undefined);
+  pendingStopSideEffects = backgroundSideEffects;
+  return collected;
 }
 
 export function waitForStopSideEffects(): Promise<void> {

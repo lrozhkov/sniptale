@@ -17,6 +17,7 @@ type RuntimeRecordingStartResult = RuntimeRecordingCommandResult & {
 };
 
 export type RuntimeVideoSessionResponseByType = {
+  [VideoMessageType.RECORDING_OBSERVATIONS]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: RuntimeMessageResponse<{
     result?: unknown;

@@ -92,7 +92,7 @@ export async function restoreControlledCursorEffects(
       await enableControlledCursorCapture(
         binding.tabId,
         binding.recordingId,
-        0,
+        getVideoRecordingRuntimeState().duration,
         getRecordingFrameClock()
       );
       if (!isControlledCursorEffectActive(binding)) return;

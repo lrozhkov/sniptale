@@ -120,6 +120,7 @@ export type VideoProjectInteractionTimeBasis =
 export interface VideoProjectCursorSample {
   /** Original client point projected only by an admitted source transform. */
   readonly recordingPoint?: Readonly<{ x: number; y: number }> | null;
+  observationClockId?: string;
   captureSegment?: number;
   observation?: 'observed' | 'outside' | 'hidden' | 'blur' | 'paused';
   /** Retained normalized interval of the easing curve toward the following key. */
@@ -212,6 +213,30 @@ export interface RecordingTelemetryCapabilities {
   keyboard: 'available' | 'unavailable' | 'unknown';
   wheel: 'available' | 'unavailable' | 'unknown';
   coverage: 'document' | 'desktop' | 'unknown';
+  timing?: { mode: 'bounded' | 'approximate'; accuracyMs: number | null };
+}
+
+/** Original document observations and independently replaceable source-media bindings. */
+export interface RecordingObservationClock {
+  version: 1;
+  domain: 'observation' | 'media';
+  segments: RecordingObservationClockSegment[];
+}
+
+export interface RecordingObservationClockSegment {
+  id: string;
+  documentId: string;
+  timeOriginMs: number;
+  startedAtTimestampMs: number;
+  observationStartSeconds: number;
+  mediaStartEstimateSeconds: number;
+  mapping: null | {
+    captureEpochMs: number;
+    mediaTimeSeconds: number;
+    uncertaintyMs: number;
+    maximumUncertaintyMs?: number;
+  };
+  mediaEndSeconds?: number;
 }
 
 export type RecordingTelemetryProvenance =

@@ -1,3 +1,4 @@
+import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
 import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
 import { applyRecordingReviewInteractions } from '../../../features/video/review/standalone-interactions';
 import {
@@ -34,7 +35,8 @@ async function buildRecordingProject(
   const duration = metadata.duration;
   if (duration === null || !Number.isFinite(duration) || duration <= 0)
     throw new Error('Recording video metadata is unavailable.');
-  const telemetry = await getRecordingTelemetry(sourceRecordingId);
+  const rawTelemetry = await getRecordingTelemetry(sourceRecordingId);
+  const telemetry = rawTelemetry ? projectRecordingObservationClock(rawTelemetry) : undefined;
   const normalizedTelemetryParams = {
     captureMode: telemetry?.captureMode ?? null,
     displaySurface: telemetry?.displaySurface ?? null,

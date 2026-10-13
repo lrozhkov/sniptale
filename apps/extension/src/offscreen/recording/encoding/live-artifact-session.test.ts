@@ -12,24 +12,16 @@ import {
 } from './live-artifact-session.fixture.test-support';
 import { createLiveRecordingArtifactSession } from './live-artifact-session';
 import { RecordingFrameClockObserver } from './recording-frame-clock';
-import { RECORDING_FRAME_CLOCK_PURPOSE } from '../../../contracts/video/recording-frame-clock';
 import { waitForRecordingBegin, allowRecordingBegin } from '../start/gate';
 beforeEach(resetLiveSessionFixture);
 
 describe('source-driven live recording flow', () => {
-  it('starts and encodes primary video after an optional clock lease expires in transit', async () => {
+  it('starts primary video when optional source calibration is unavailable', async () => {
     const binding = { recordingId: 'recording-1', generation: 1, streamInstanceId: 'source' };
-    const expired = {
-      ...binding,
-      purpose: RECORDING_FRAME_CLOCK_PURPOSE,
-      nonce: 'ba289176-c099-44d5-8f18-174e05565080',
-      expiresAtEpochMs: Date.now() - 1,
-    };
     const primaryBegin = waitForRecordingBegin(binding);
-    allowRecordingBegin(binding, expired);
-    const admitted = await primaryBegin;
-    const connect = vi.fn();
-    const clock = new RecordingFrameClockObserver(binding, admitted, connect);
+    allowRecordingBegin(binding);
+    await primaryBegin;
+    const clock = new RecordingFrameClockObserver(binding, null);
     const { session } = await createSession({ frameClockObserver: clock });
     const started = vi.fn();
     session.setLifecycleCallbacks({ onStart: started });
@@ -38,7 +30,6 @@ describe('source-driven live recording flow', () => {
     expect(mediabunny.Output.instances[0]?.videoSource?.add).toHaveBeenCalledOnce();
     expect(session.state).toBe('recording');
     expect(session.frameClock).toBeNull();
-    expect(connect).not.toHaveBeenCalled();
     await session.abort();
   });
 

@@ -31,10 +31,8 @@ export function createRecordingClockSynchronizer(
     offset: RecordingClockOffset
   ): Localization {
     const uncertaintyMs = (anchor.uncertaintyMs ?? 0) + offset.uncertaintyMs;
-    const maximum = anchor.maximumUncertaintyMs ?? 1000 / 120;
     const captureEpochMs = anchor.captureEpochMs - offset.offsetMs;
-    if (!Number.isFinite(captureEpochMs) || captureEpochMs <= 0 || uncertaintyMs > maximum)
-      return { status: 'unavailable' };
+    if (!Number.isFinite(captureEpochMs) || captureEpochMs <= 0) return { status: 'unavailable' };
     return { status: 'ready', anchor: { ...anchor, captureEpochMs, uncertaintyMs } };
   }
   return {
@@ -52,7 +50,6 @@ export function createRecordingClockSynchronizer(
         streamInstanceId: anchor.streamInstanceId,
       };
       const samples: RecordingClockExchange[] = [];
-      let maximum = anchor.maximumUncertaintyMs ?? 1000 / 120;
       try {
         for (let index = 0; index < 5; index++) {
           const a0 = readClock();
@@ -70,10 +67,9 @@ export function createRecordingClockSynchronizer(
           )
             return { status: 'unavailable' };
           const timing = reply.clockTiming;
-          maximum = Math.min(maximum, timing.maximumUncertaintyMs);
           samples.push({ a0, b1: timing.receivedAtMs, b2: timing.repliedAtMs, a3 });
           if (index < 2) continue;
-          const offset = inferRecordingClockOffset(samples, maximum - (anchor.uncertaintyMs ?? 0));
+          const offset = inferRecordingClockOffset(samples);
           if (offset) {
             current = { binding, offset };
             return localized(anchor, offset);

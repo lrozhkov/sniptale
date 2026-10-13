@@ -33,6 +33,7 @@ type TelemetrySignal = RecordingTelemetrySnapshot['signals'][number];
 export type CursorIdleTelemetrySignal = TelemetrySignal & {
   kind: 'cursor-idle';
   data: {
+    observationClockId: string;
     dwellMs: number;
   };
 };
@@ -40,6 +41,7 @@ export type CursorIdleTelemetrySignal = TelemetrySignal & {
 export type TypingTelemetrySignal = Omit<TelemetrySignal, 'data'> & {
   kind: 'typing';
   data: {
+    observationClockId: string;
     captureSegment: number;
     eventCount: number;
     eventType: string;
@@ -57,14 +59,15 @@ export type KeyboardHeldState = {
 };
 
 export type TelemetryState = {
+  observationClock: ReturnType<typeof import('./observation-clock').createObservationClock>;
   recordingId: string | null;
   frameClock:
     | import('../../../contracts/video/recording-frame-clock').RecordingFrameClockAnchor
     | null
     | undefined;
+  clockRevision: number;
   observationAvailable: boolean;
-  confirmedMediaTimeSeconds: number;
-  clockUnavailable: boolean;
+  mediaResumeEstimateSeconds: number;
   gestures: Map<
     number,
     {

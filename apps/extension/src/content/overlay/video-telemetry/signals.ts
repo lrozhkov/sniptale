@@ -32,12 +32,14 @@ function pushCompletedSignal(
   const data =
     signal.kind === RecordingTelemetrySignalKind.TYPING
       ? {
+          observationClockId: signal.data.observationClockId,
           captureSegment: signal.data.captureSegment,
           eventCount: signal.data.eventCount,
           eventType: signal.data.eventType,
           ...signal.data.targetDescription,
         }
       : {
+          observationClockId: signal.data.observationClockId,
           dwellMs: signal.data.dwellMs,
         };
 
@@ -210,6 +212,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
     endTime: elapsedSeconds,
     point: resolveSignalPoint(state),
     data: {
+      observationClockId: state.observationClock.id,
       captureSegment: state.captureSegment,
       eventCount: 1,
       eventType: event.type,
@@ -264,6 +267,7 @@ function syncCursorIdleSignal(state: TelemetryState, timestampMs: number): void 
       endTime,
       point: { ...state.pointerStationaryPosition },
       data: {
+        observationClockId: state.observationClock.id,
         dwellMs: timestampMs - state.pointerStationaryStartedAtMs,
       },
     };
@@ -310,7 +314,12 @@ export function recordProtectedActivity(state: TelemetryState, timestampMs: numb
     startTime,
     endTime: startTime + 1,
     point: null,
-    data: { privacy: 'protected', activity: 'input', captureSegment: state.captureSegment },
+    data: {
+      privacy: 'protected',
+      activity: 'input',
+      observationClockId: state.observationClock.id,
+      captureSegment: state.captureSegment,
+    },
   });
 }
 

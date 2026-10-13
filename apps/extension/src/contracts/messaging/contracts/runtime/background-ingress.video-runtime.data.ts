@@ -23,6 +23,7 @@ export const backgroundIngressVideoRouteGroups = [
     transitiveStateOwner: 'background video runtime owner',
     messageTypes: [
       'GET_RECORDING_STATE',
+      'RECORDING_OBSERVATIONS',
       'ACKNOWLEDGE_POST_RECORD_RESULT',
       'REGISTER_CAMERA_RECORDER_CONTROL',
       'GET_RECORDING_TAB_ID',
