@@ -38,7 +38,11 @@ it('rejects duplicate block identities before preview can lose an otherwise acce
 
 const collect = (
   marker: ReviewTelemetryMarker,
-  presetId: 'mouse-classic-paired-v2' | 'typing-recorded-v2' | 'keyboard-recorded-v2',
+  presetId:
+    | 'mouse-classic-paired-v2'
+    | 'mouse-soft-paired-v2'
+    | 'typing-recorded-v2'
+    | 'keyboard-recorded-v2',
   edits: Parameters<typeof buildReviewTimeMap>[1] = []
 ) => {
   const plan = buildReviewActionAudioPlan({
@@ -76,7 +80,7 @@ it('projects surviving observed release independently without manufacturing a pr
     { id: 'cut', kind: 'cut', start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
   ]);
   expect(cues).toHaveLength(1);
-  expect(cues[0]).toMatchObject({ sampleId: 'mouse-classic-up-v2', start: 3, rate: 1 });
+  expect(cues[0]).toMatchObject({ sampleId: 'mouse-click-v1', start: 3, rate: 1 });
   delete marker.gesture!.upTime;
   expect(collect(marker, 'mouse-classic-paired-v2')).toHaveLength(1);
 });
@@ -184,3 +188,29 @@ it.each(['KEY_HOLD', 'KEY_MODIFIERS'])(
     expect(collect(marker, 'keyboard-recorded-v2')).toEqual([]);
   }
 );
+
+it.each([
+  ['mouse-classic-paired-v2', 'mouse-click-v1'],
+  ['mouse-soft-paired-v2', 'mouse-click-03-v1'],
+] as const)('reuses the original click for both observed phases of %s', (preset, sampleId) => {
+  const marker: ReviewTelemetryMarker = {
+    ref: { kind: 'action', id: 'physical-pair' },
+    eventType: 'SELECTION_DRAG',
+    start: 1,
+    end: 1.5,
+    gesture: {
+      id: 'physical-pair',
+      type: 'selection-drag',
+      downTime: 1,
+      upTime: 1.5,
+      completion: 'released',
+      button: 0,
+    },
+  };
+  const cues = collect(marker, preset);
+  expect(cues.map((cue) => [cue.sampleId, cue.start])).toEqual([
+    [sampleId, 1],
+    [sampleId, 1.5],
+  ]);
+  expect(new Set(cues.map((cue) => cue.id)).size).toBe(2);
+});

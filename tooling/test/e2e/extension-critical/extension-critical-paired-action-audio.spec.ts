@@ -105,7 +105,7 @@ for (const viewport of [
             exact: true,
           })
           .click();
-        await expect.poll(async () => (await probe()).sort((a, b) => a - b)).toEqual([2205, 3087]);
+        await expect.poll(async () => (await probe()).sort((a, b) => a - b)).toEqual([7995, 7995]);
         expect(await video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
         await expect(
           dialog.getByText(label('gallery.videoReview.actionAudioResource'), { exact: true })
@@ -137,7 +137,7 @@ async function verifyPairedPlayback(
   await expect
     .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime))
     .toBeGreaterThan(before + 0.8);
-  await expect.poll(async () => (await probe()).sort((a, b) => a - b)).toEqual([2205, 3087]);
+  await expect.poll(async () => (await probe()).sort((a, b) => a - b)).toEqual([7995, 7995]);
   await dialog
     .getByRole('button', { name: label('gallery.videoReview.pause'), exact: true })
     .click();
