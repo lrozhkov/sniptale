@@ -19,7 +19,6 @@ import {
   type VideoProjectAsset,
 } from '../../../features/video/project/types';
 import { ensureRecordingAssets } from './assets';
-import { loadVideoMetadata } from '../media-metadata';
 import {
   normalizeRecordingActionEventsToProjectSpace,
   normalizeRecordingCursorTrackToProjectSpace,
@@ -31,7 +30,10 @@ async function buildRecordingProject(
   sourceRecordingId: string,
   sidecarVideos: RecordingSidecarVideoProjectInput[]
 ): Promise<VideoProject> {
-  const metadata = await loadVideoMetadata(entry.file);
+  const metadata = asset.metadata;
+  const duration = metadata.duration;
+  if (duration === null || !Number.isFinite(duration) || duration <= 0)
+    throw new Error('Recording video metadata is unavailable.');
   const telemetry = await getRecordingTelemetry(sourceRecordingId);
   const normalizedTelemetryParams = {
     captureMode: telemetry?.captureMode ?? null,
@@ -46,7 +48,7 @@ async function buildRecordingProject(
     filename: entry.filename,
     width: metadata.width,
     height: metadata.height,
-    duration: metadata.duration,
+    duration,
     mimeType: metadata.mimeType,
     size: entry.size,
     hasAudio: metadata.hasAudio,
@@ -80,7 +82,7 @@ async function buildRecordingProject(
     source.mimeType !== metadata.mimeType ||
     source.width !== metadata.width ||
     source.height !== metadata.height ||
-    Math.abs(source.duration - metadata.duration) > 0.001
+    Math.abs(source.duration - duration) > 0.001
   )
     throw new Error('Review interaction source has changed.');
   return applyRecordingReviewInteractions(project, sourceRecordingId, snapshot.workspace.advanced);

@@ -208,6 +208,8 @@ async function verifyRecordingHydration() {
     kind: 'recording',
     recordingId: 'recording-1',
   });
+  const { loadVideoMetadata } = await import('../media-metadata');
+  expect(loadVideoMetadata).not.toHaveBeenCalled();
 }
 
 async function verifyRecordingPersistenceFailure() {
