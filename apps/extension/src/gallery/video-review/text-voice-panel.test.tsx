@@ -19,6 +19,8 @@ import type { SpeechProfileFields } from './speech-profile';
 const mocks = vi.hoisted(() => ({
   generate: vi.fn(),
   apply: vi.fn(),
+  batch: vi.fn(),
+  pendingPublication: false,
   cleanup: vi.fn(),
   reload: vi.fn(),
   failCatalog: false,
@@ -39,7 +41,12 @@ vi.mock('../../workflows/video-review/text-voice', async (original) => ({
   ...(await original<typeof import('../../workflows/video-review/text-voice')>()),
   generateReviewTextVoice: mocks.generate,
   applyReviewTextVoice: mocks.apply,
+  applyReviewTextVoiceBatch: mocks.batch,
   cleanupReviewTextVoicePreview: mocks.cleanup,
+}));
+vi.mock('../../workflows/video-review/text-take-batch', async (original) => ({
+  ...(await original<typeof import('../../workflows/video-review/text-take-batch')>()),
+  reviewTextTakeBatchPending: () => mocks.pendingPublication,
 }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -210,6 +217,8 @@ beforeEach(() => {
   root = createRoot(host);
   mocks.generate.mockImplementation(async (_session, id: string) => preview(id));
   mocks.apply.mockResolvedValue(undefined);
+  mocks.batch.mockResolvedValue(undefined);
+  mocks.pendingPublication = false;
   mocks.cleanup.mockResolvedValue(undefined);
 });
 afterEach(async () => {
@@ -433,7 +442,10 @@ it('keeps successful batch results and retries only failed phrases through an ex
   expect(mocks.generate).toHaveBeenCalledTimes(3);
   expect(mocks.generate.mock.calls[2]?.[1]).toBe('second');
   await click('gallery.videoReview.speechApplySelected');
-  expect(mocks.apply).toHaveBeenCalledTimes(2);
+  expect(mocks.batch).toHaveBeenCalledOnce();
+  expect(
+    mocks.batch.mock.calls[0]?.[1].map((entry: ReviewTextVoicePreview) => entry.clipId)
+  ).toEqual(['clip-first', 'clip-second']);
 });
 
 it('shows real elapsed time and cancels without accepting a late response', async () => {
@@ -471,8 +483,9 @@ it('respects the inspector disabled state before any Save or egress', async () =
   expect(mocks.generate).not.toHaveBeenCalled();
 });
 
-it('retains a refused take and retries only its Apply without regenerating accepted neighbors', async () => {
-  mocks.apply.mockRejectedValueOnce(new Error('stale'));
+it('retains a refused batch and retries its complete Apply without generation or partial accepted items', async () => {
+  mocks.pendingPublication = true;
+  mocks.batch.mockRejectedValueOnce(new Error('stale'));
   await render(['first', 'second']);
   await start();
   await approve();
@@ -481,13 +494,34 @@ it('retains a refused take and retries only its Apply without regenerating accep
     'gallery.videoReview.speechChanged'
   );
   expect(host.querySelectorAll('audio')).toHaveLength(2);
-  expect(mocks.apply).toHaveBeenCalledTimes(2);
-  expect(host.textContent?.match(/gallery.videoReview.textVoiceAccepted/g)).toHaveLength(1);
-  await click('gallery.videoReview.speechApply');
-  expect(mocks.apply).toHaveBeenCalledTimes(3);
-  expect(mocks.apply.mock.calls[2]?.[1].clipId).toBe('clip-first');
+  expect(mocks.batch).toHaveBeenCalledOnce();
+  expect(host.textContent?.match(/gallery.videoReview.textVoiceAccepted/g)).toBeNull();
+  expect(host.querySelector('fieldset')?.disabled).toBe(true);
+  expect(
+    [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .filter((button) => button.textContent === 'gallery.videoReview.speechApply')
+      .every((button) => button.disabled)
+  ).toBe(true);
+  await click('gallery.videoReview.speechApplySelected');
+  expect(mocks.batch).toHaveBeenCalledTimes(2);
+  expect(
+    mocks.batch.mock.calls[1]?.[1].map((entry: ReviewTextVoicePreview) => entry.clipId)
+  ).toEqual(['clip-first', 'clip-second']);
   expect(mocks.generate).toHaveBeenCalledTimes(2);
   expect(host.textContent?.match(/gallery.videoReview.textVoiceAccepted/g)).toHaveLength(2);
+});
+
+it('unlocks settings after proven stale refusal and regenerates only on an explicit action', async () => {
+  mocks.batch.mockRejectedValueOnce(new Error('stale'));
+  await render(['first', 'second']);
+  await start();
+  await approve();
+  await click('gallery.videoReview.speechApplySelected');
+  expect(host.querySelector('fieldset')?.disabled).toBe(false);
+  expect(host.querySelectorAll('audio')).toHaveLength(0);
+  expect(mocks.generate).toHaveBeenCalledTimes(2);
+  await start();
+  expect(mocks.generate).toHaveBeenCalledTimes(4);
 });
 
 it('reports a project overrun without a preview and permits explicit corrected generation', async () => {

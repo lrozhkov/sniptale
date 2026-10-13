@@ -7,7 +7,11 @@ import {
   type ReviewLocalTextVoicePreview,
   type ReviewLocalTextVoiceSelection,
 } from '../../workflows/video-review/text-voice-local';
-import { cleanupReviewTextTakePreview } from '../../workflows/video-review/text-take';
+import {
+  cleanupReviewTextTakePreview,
+  assertReviewTextTakeBasis,
+  type ReviewTextTakeOptions,
+} from '../../workflows/video-review/text-take';
 import {
   reviewSpeechTextSignature,
   type ReviewSpeechProfile,
@@ -15,11 +19,13 @@ import {
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
 import {
   applyReviewTextVoice,
+  applyReviewTextVoiceBatch,
   cleanupReviewTextVoicePreview,
   generateReviewTextVoice,
   prepareReviewTextVoiceBatch,
   type ReviewTextVoicePreview,
 } from '../../workflows/video-review/text-voice';
+import { reviewTextTakeBatchPending } from '../../workflows/video-review/text-take-batch';
 
 /** Flushes all editor owners before the explicitly disclosed whole-workspace Save. */
 export interface ReviewTextVoiceAccess {
@@ -169,6 +175,98 @@ function useTextVoiceAttempt(props: Options) {
   };
 }
 
+/** Owns frozen Apply selection and publication retry; the form attempt still owns cancellation. */
+function useTextVoiceApply(
+  props: Options,
+  attempt: ReturnType<typeof useTextVoiceAttempt>,
+  takeOptions: () => ReviewTextTakeOptions
+) {
+  const pendingApply = useRef<{
+    session: ReviewTextVoiceAccess['session'];
+    previews: ReviewTextVoicePreview[];
+    options: ReviewTextTakeOptions;
+  } | null>(null);
+  if (pendingApply.current?.session !== props.access.session) pendingApply.current = null;
+  const { command, accept, report } = attempt;
+  return {
+    pendingApplyIds: pendingApply.current?.previews.map((preview) => preview.clipId) ?? [],
+    retains: (id: string) =>
+      !!pendingApply.current?.previews.some((preview) => preview.clipId === id),
+    apply: (selected: readonly Preview[]) => {
+      const retained =
+        pendingApply.current?.session === props.access.session ? pendingApply.current : null;
+      const generated =
+        retained?.previews ??
+        selected.filter((preview): preview is ReviewTextVoicePreview => 'staged' in preview);
+      const options = retained?.options ?? takeOptions();
+      return command(
+        async (signal) => {
+          if (!retained) await attempt.beforeRequest();
+          if (generated.length) {
+            const admitted = retained ?? {
+              session: props.access.session,
+              previews: generated,
+              options,
+            };
+            pendingApply.current = admitted;
+            try {
+              if (generated.length === 1)
+                await applyReviewTextVoice(props.access.session, generated[0]!, signal, options);
+              else
+                await applyReviewTextVoiceBatch(props.access.session, generated, signal, options);
+            } catch (cause) {
+              if (
+                pendingApply.current === admitted &&
+                !reviewTextTakeBatchPending(props.access.session, generated)
+              ) {
+                pendingApply.current = null;
+                attempt.discard(
+                  generated.filter((preview) => {
+                    try {
+                      assertReviewTextTakeBasis(props.access.session, preview);
+                      return false;
+                    } catch {
+                      return true;
+                    }
+                  })
+                );
+              }
+              throw cause;
+            }
+            if (pendingApply.current === admitted && attempt.isCurrent()) {
+              for (const preview of generated) accept(preview);
+              pendingApply.current = null;
+            }
+            attempt.complete(generated.length);
+          }
+          const local = selected.filter(
+            (preview): preview is ReviewLocalTextVoicePreview => !('staged' in preview)
+          );
+          if (retained && local.length) await attempt.beforeRequest();
+          for (const [index, preview] of local.entries()) {
+            signal.throwIfAborted();
+            try {
+              await applyReviewLocalTextVoice(
+                props.access.session,
+                preview,
+                signal,
+                undefined,
+                options
+              );
+              if (!signal.aborted) accept(preview);
+            } catch (cause) {
+              if (signal.aborted) break;
+              report(cause);
+            }
+            attempt.complete(generated.length + index + 1);
+          }
+        },
+        generated.length + selected.filter((preview) => !('staged' in preview)).length
+      );
+    },
+  };
+}
+
 /** Coordinates authored voice commands through the form's single attempt/resource owner. */
 export function useReviewTextVoiceOperation(props: Options) {
   const [muteSource, setMuteSource] = useState(false);
@@ -178,6 +276,7 @@ export function useReviewTextVoiceOperation(props: Options) {
   });
   const attempt = useTextVoiceAttempt(props);
   const { state, command, remember, accept, report } = attempt;
+  const applying = useTextVoiceApply(props, attempt, takeOptions);
   const readyIds = new Set(
     state.previews
       .filter((preview) => preview.textSnapshot.kind === 'ai')
@@ -186,6 +285,8 @@ export function useReviewTextVoiceOperation(props: Options) {
   const remainingIds = props.ids.filter((id) => !readyIds.has(id));
   return {
     ...state,
+    pendingApplyIds: applying.pendingApplyIds,
+    apply: applying.apply,
     muteSource,
     setMuteSource,
     remaining: remainingIds.length,
@@ -200,6 +301,7 @@ export function useReviewTextVoiceOperation(props: Options) {
         return (
           snapshot.kind === 'ai' &&
           !accepted.has(preview.clipId) &&
+          !applying.retains(preview.clipId) &&
           (!snapshot.profile ||
             reviewSpeechTextSignature(snapshot.text, snapshot.profile) !==
               reviewSpeechTextSignature(snapshot.text, profile))
@@ -282,32 +384,6 @@ export function useReviewTextVoiceOperation(props: Options) {
               return;
             }
             remember(preview);
-          } catch (cause) {
-            if (signal.aborted) break;
-            report(cause);
-          }
-          attempt.complete(index + 1);
-        }
-      }, selected.length);
-    },
-    apply: (selected: readonly Preview[]) => {
-      const options = takeOptions();
-      return command(async (signal) => {
-        await attempt.beforeRequest();
-        for (const [index, preview] of selected.entries()) {
-          signal.throwIfAborted();
-          try {
-            if ('staged' in preview)
-              await applyReviewTextVoice(props.access.session, preview, signal, options);
-            else
-              await applyReviewLocalTextVoice(
-                props.access.session,
-                preview,
-                signal,
-                undefined,
-                options
-              );
-            if (!signal.aborted) accept(preview);
           } catch (cause) {
             if (signal.aborted) break;
             report(cause);

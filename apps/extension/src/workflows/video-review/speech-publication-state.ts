@@ -91,6 +91,7 @@ export function prepareReviewSpeechPublication(
 
 export type ReviewPublicationFields =
   | { kind: 'text' }
+  | { kind: 'voiceover-takes' }
   | { kind: 'speech'; targets: readonly ReviewSpeechTarget[] };
 
 function adoptPublicationFields(
@@ -100,6 +101,11 @@ function adoptPublicationFields(
   fields: ReviewPublicationFields
 ): QuickEditAdvancedContent {
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  if (fields.kind === 'voiceover-takes') {
+    if (!same(content.audio, before.audio))
+      throw new Error('Review publication conflicts with local audio.');
+    return { ...content, audio: current.audio };
+  }
   if (fields.kind === 'text') {
     if (!same(content.text, before.text))
       throw new Error('Review publication conflicts with local text.');

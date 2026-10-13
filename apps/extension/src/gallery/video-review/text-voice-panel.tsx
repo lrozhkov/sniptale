@@ -96,7 +96,12 @@ export function ReviewTextVoiceForm(props: Props) {
           aria-label={translate('gallery.videoReview.textVoiceMuteSource')}
           aria-checked={operation.muteSource}
           on={operation.muteSource}
-          disabled={props.disabled || operation.running || !props.access.sourceAudioAvailable?.()}
+          disabled={
+            props.disabled ||
+            operation.running ||
+            operation.pendingApplyIds.length > 0 ||
+            (!props.access.sourceAudioAvailable?.() && !operation.muteSource)
+          }
           onClick={() => operation.setMuteSource(!operation.muteSource)}
         />
       </div>
@@ -108,7 +113,7 @@ export function ReviewTextVoiceForm(props: Props) {
       <div hidden={source !== 'ai'}>
         <TextVoiceSettings
           operation={operation}
-          disabled={props.disabled || source !== 'ai'}
+          disabled={props.disabled || source !== 'ai' || operation.pendingApplyIds.length > 0}
           autosaveEnabled={props.access.session.getSnapshot().autosaveEnabled}
         />
       </div>
@@ -327,7 +332,7 @@ function TextVoiceResults({
 }: {
   operation: Pick<
     ReturnType<typeof useReviewTextVoiceOperation>,
-    'previews' | 'accepted' | 'running' | 'apply'
+    'previews' | 'accepted' | 'running' | 'apply' | 'pendingApplyIds'
   >;
   disabled?: boolean | undefined;
   source: VoiceSource;
@@ -369,7 +374,13 @@ function TextVoiceResults({
             <ReviewButton
               label={translate('gallery.videoReview.speechApply')}
               className={buttonClass}
-              disabled={disabled || operation.running}
+              disabled={
+                disabled ||
+                operation.running ||
+                (operation.pendingApplyIds.length > 0 &&
+                  (operation.pendingApplyIds.length !== 1 ||
+                    operation.pendingApplyIds[0] !== preview.clipId))
+              }
               onClick={() => operation.apply([preview])}
             >
               {translate('gallery.videoReview.speechApply')}
@@ -386,12 +397,18 @@ function TextVoiceResults({
           {translate('gallery.videoReview.textFragmentMore')}
         </ReviewButton>
       )}
-      {pending.length > 1 && (
+      {pending.length > 1 && operation.pendingApplyIds.length !== 1 && (
         <ReviewButton
           label={translate('gallery.videoReview.speechApplySelected')}
           className={buttonClass}
           disabled={disabled || operation.running}
-          onClick={() => operation.apply(pending)}
+          onClick={() =>
+            operation.apply(
+              operation.pendingApplyIds.length
+                ? pending.filter((preview) => operation.pendingApplyIds.includes(preview.clipId))
+                : pending
+            )
+          }
         >
           {translate('gallery.videoReview.speechApplySelected')}
         </ReviewButton>

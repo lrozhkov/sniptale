@@ -10,7 +10,6 @@ import { parseReviewSpeechProfile } from '../../features/video/review/speech-val
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
 import { reviewAudioRestriction } from './audio-import';
 import {
-  applyReviewTextTake,
   assertReviewTextTakeBasis as assertTextVoiceBasis,
   captureReviewTextTakeBasis,
   cleanupReviewTextTakePreview,
@@ -20,6 +19,7 @@ import {
   type ReviewTextTakeOptions,
 } from './text-take';
 import { runReviewSpeechJob } from './speech-client';
+import { applyReviewTextTakeBatch } from './text-take-batch';
 
 import type { createVideoReviewSession } from './session';
 
@@ -148,12 +148,24 @@ export async function applyReviewTextVoice(
   signal: AbortSignal,
   options?: ReviewTextTakeOptions
 ): Promise<void> {
-  await applyReviewTextTake({
+  await applyReviewTextVoiceBatch(session, [preview], signal, options);
+}
+
+/** Authored AI takes share one durable operation, independently of their paid generation jobs. */
+export async function applyReviewTextVoiceBatch(
+  session: Session,
+  previews: readonly ReviewTextVoicePreview[],
+  signal: AbortSignal,
+  options?: ReviewTextTakeOptions
+): Promise<void> {
+  await applyReviewTextTakeBatch({
     session,
-    preview,
     signal,
-    filename: `${preview.clipId}.${preview.staged.mimeType === 'audio/wav' ? 'wav' : 'mp3'}`,
     options,
+    entries: previews.map((preview) => ({
+      preview,
+      filename: `${preview.clipId}.${preview.staged.mimeType === 'audio/wav' ? 'wav' : 'mp3'}`,
+    })),
   });
 }
 

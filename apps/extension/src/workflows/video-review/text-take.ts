@@ -149,55 +149,17 @@ async function commitReviewTextTake(
 ) {
   const { session, preview, signal } = args;
   signal.throwIfAborted();
-  assertReviewTextTakeBasis(session, preview);
-  const state = session.getSnapshot();
-  const before = state.document.advancedContent;
-  if (
-    args.options?.muteSource &&
-    (!args.options.sourceAudioAvailable?.() || (before.audio.original.mutes?.length ?? 0) >= 512)
-  )
-    throw new Error('invalid-request');
-  const map = buildReviewTimeMap(state.snapshot.workspace.source.duration, state.document.edits);
-  const end = map.at(-1)?.resultEnd ?? 0;
-  if (Math.abs(duration - preview.duration) > 0.001 || preview.resultStart + duration > end)
-    throw new Error('duration');
-  if (before.audio.voiceover.some((clip) => clip.id === preview.clipId)) throw new Error('stale');
-  const clip = anchorReviewVoiceover(
-    {
-      ...importedAudioClip(assetId, duration, preview.resultStart, end),
-      id: preview.clipId,
-      textSnapshot: structuredClone(preview.textSnapshot),
-    },
-    map
+  const content = prepareReviewTextTakeContent(
+    session,
+    [{ preview, assetId, duration }],
+    args.options
   );
   try {
     await session.commitDurable({
       id: crypto.randomUUID(),
       at: Date.now(),
       target: 'advancedContent',
-      before,
-      after: {
-        ...before,
-        audio: {
-          ...before.audio,
-          ...(args.options?.muteSource
-            ? {
-                original: {
-                  ...before.audio.original,
-                  mutes: [
-                    ...(before.audio.original.mutes ?? []),
-                    { id: crypto.randomUUID(), kind: 'take' as const, clipId: preview.clipId },
-                  ],
-                },
-              }
-            : {}),
-          voiceoverSegments: [...map],
-          voiceover: [
-            ...before.audio.voiceover.map((item) => anchorReviewVoiceover(item, map)),
-            clip,
-          ],
-        },
-      },
+      ...content,
     });
   } catch (error) {
     if (await session.hasRetainedVoiceoverClip(preview.clipId, assetId).catch(() => false))
@@ -205,6 +167,76 @@ async function commitReviewTextTake(
     throw error;
   }
   args.onRetained?.();
+}
+
+/** Shared take geometry and mute assembly; callers retain transaction/publication ownership. */
+export function prepareReviewTextTakeContent(
+  session: Session,
+  entries: readonly { preview: ReviewTextTakePreview; assetId: string; duration: number }[],
+  options?: ReviewTextTakeOptions
+) {
+  for (const { preview } of entries) assertReviewTextTakeBasis(session, preview);
+  const state = session.getSnapshot();
+  const before = state.document.advancedContent;
+  if (
+    !entries.length ||
+    before.audio.voiceover.length + entries.length > 512 ||
+    (options?.muteSource &&
+      (!options.sourceAudioAvailable?.() ||
+        (before.audio.original.mutes?.length ?? 0) + entries.length > 512))
+  )
+    throw new Error('invalid-request');
+  const map = buildReviewTimeMap(state.snapshot.workspace.source.duration, state.document.edits);
+  const end = map.at(-1)?.resultEnd ?? 0;
+  const ids = new Set(before.audio.voiceover.map((clip) => clip.id));
+  const clips = entries.map(({ preview, assetId, duration }) => {
+    if (
+      !Number.isFinite(preview.duration) ||
+      !Number.isFinite(preview.resultStart) ||
+      Math.abs(duration - preview.duration) > 0.001 ||
+      preview.resultStart + duration > end
+    )
+      throw new Error('duration');
+    if (ids.has(preview.clipId)) throw new Error('stale');
+    ids.add(preview.clipId);
+    return anchorReviewVoiceover(
+      {
+        ...importedAudioClip(assetId, duration, preview.resultStart, end),
+        id: preview.clipId,
+        textSnapshot: structuredClone(preview.textSnapshot),
+      },
+      map
+    );
+  });
+  return {
+    before,
+    after: {
+      ...before,
+      audio: {
+        ...before.audio,
+        ...(options?.muteSource
+          ? {
+              original: {
+                ...before.audio.original,
+                mutes: [
+                  ...(before.audio.original.mutes ?? []),
+                  ...entries.map(({ preview }) => ({
+                    id: crypto.randomUUID(),
+                    kind: 'take' as const,
+                    clipId: preview.clipId,
+                  })),
+                ],
+              },
+            }
+          : {}),
+        voiceoverSegments: [...map],
+        voiceover: [
+          ...before.audio.voiceover.map((item) => anchorReviewVoiceover(item, map)),
+          ...clips,
+        ],
+      },
+    },
+  };
 }
 
 /** Disposes audition data; current/history/recovery and ambiguous authority preserve publication claims. */
