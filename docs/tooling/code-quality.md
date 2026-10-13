@@ -4,7 +4,7 @@ This document owns quality-control and exception policy. Commands belong in [ope
 
 ## Authorities
 
-Oxfmt owns formatting. Oxlint owns JS/TS lint, typed rules, React, Vitest, accessibility, security syntax, and retained SonarJS syntax rules. Ast-grep owns syntax patterns that do not require semantic state. Custom guards are allowed only for repository invariants that these engines, types, or owner tests cannot express without losing semantics.
+Oxfmt owns formatting. Oxlint owns JS/TS lint, typed rules, React, Vitest, accessibility, security syntax, and retained SonarJS syntax rules. Ast-grep owns syntax patterns that do not require semantic state. Custom guards may serve only repository invariants that these engines, types, or owner tests cannot express without loss of semantics.
 
 Machine authorities are:
 
@@ -19,7 +19,7 @@ Local workflow order belongs in [wrapper-summary.md](wrapper-summary.md). `AGENT
 
 ## Guard acceptance
 
-Keep a guard only when all of these conditions hold:
+Keep a guard only if all of these conditions hold:
 
 - it protects a reachable defect or named invariant
 - its roots, consumers, modes, and owner match the current repository
@@ -37,18 +37,20 @@ Generated documentation facts are exact machine output. Authored-prose contradic
 
 ## Exceptions
 
-Treat heuristic findings as triage. Fix confirmed defects.
+Investigate heuristic findings. Fix established defects.
 
-Record only confirmed false positives as exact `tool-noise`. Each entry names the rule, exact scope, owner, reason, removal condition, and review date when the schema requires one. Do not baseline debt, auto-update a baseline, weaken a rule, or add a directory or message-pattern waiver.
+Record only established false positives as exact `tool-noise`. Each entry names the rule, exact scope, owner, reason, and removal condition. If the schema requires a review date, include that date. Do not baseline debt.
+
+Do not auto-update a baseline. Do not weaken a rule. Do not add a directory or message-pattern waiver.
 
 A stale exception is cleanup advice unless its schema declares expiry blocking. A malformed exception or unmatched new finding fails under the owning control.
 
-Structural allowances additionally bind the current symbol and body hashes defined by machine policy. Clone allowances bind normalized endpoints. Machine-generated summaries never authorize an exception.
+Structural allowances also bind the current symbol and body hashes from machine policy. Clone allowances bind normalized endpoints. Machine-generated summaries never authorize an exception.
 
 ## Coverage and assurance
 
-Changed-scope product coverage follows the machine rollout registry. `ci:proof` owns full product coverage. Tooling coverage is a separate maintenance proof; its current scope and thresholds come from the executable owner.
+Changed-scope product coverage follows the machine rollout registry. `ci:proof` owns full product coverage. Tooling coverage is a separate maintenance proof. Its current scope and thresholds come from the executable owner.
 
-Global data-flow and history-scoped audits remain release-only. Supply-chain locks and digests are justified only when they bind an external dependency, immutable image, proof input, or release artifact.
+Global data-flow and history-scoped audits remain release-only. Only a bound external dependency, immutable image, proof input, or release artifact justifies supply-chain locks and digests.
 
 Automated controls own deterministic properties. Review owns intent, authority placement, trust boundaries, and semantic tradeoffs that cannot be reduced to a low-noise check.

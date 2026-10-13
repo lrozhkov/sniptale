@@ -27,7 +27,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential curl git python3 python3-pip xvfb
 ```
 
-Install the Node version from [`.nvmrc`](../../.nvmrc), then install the package manager declared by [`package.json`](../../package.json):
+Install the Node version from [`.nvmrc`](../../.nvmrc). Then install the package manager from [`package.json`](../../package.json):
 
 ```bash
 nvm install
@@ -37,7 +37,7 @@ hash -r
 node tooling/ci/runtime-parity.mjs
 ```
 
-The runtime-parity command validates Node, npm, npx, PATH resolution, real executable paths, and their shared npm package root against [`toolchain.lock.json`](../../tooling/configs/ci/toolchain.lock.json).
+The runtime-parity command checks Node, npm, npx, PATH resolution, real executable paths, and their shared npm package root against [`toolchain.lock.json`](../../tooling/configs/ci/toolchain.lock.json).
 
 If non-interactive shells cannot find the pinned runtime, link all three executables together:
 
@@ -63,9 +63,9 @@ node node_modules/@ast-grep/cli/postinstall.js
 npm run prepare
 ```
 
-Do not delete or regenerate `package-lock.json` during setup. Install optional local agent files separately with `npm run agents:install`; maintainers refresh their archive with `npm run agents:pack`.
+Do not remove or regenerate `package-lock.json` during setup. Install optional local agent files separately with `npm run agents:install`. Maintainers refresh their archive with `npm run agents:pack`.
 
-The repository npm policy owns release-age admission. For an evidenced urgent security fix that is younger than the configured window, exclude only the exact package for one install command. Do not commit an exclusion to `.npmrc`.
+The repository npm policy owns release-age admission. For an evidenced urgent security fix younger than the configured window, exclude only the exact package for one install command. Do not commit an exclusion to `.npmrc`.
 
 ```bash
 npm install '<package>@<exact-version>' --min-release-age-exclude='<package>'
@@ -78,15 +78,15 @@ npm run qa:e2e:install
 npm run qa:e2e:install:deps
 ```
 
-`xvfb` supplies a display when WSL has none. Playwright browsers are installed under `.playwright-browsers/` by the package scripts.
+`xvfb` supplies a display when WSL has none. The package scripts install Playwright browsers under `.playwright-browsers/`.
 
 ## Resource overrides
 
-Inspect available resources with `nproc`, `lscpu`, and `free -h`. Use the [operator resource overrides](operator-handbook.md#commands) only after measuring contention. Machine policy validates and clamps the values.
+Inspect available resources with `nproc`, `lscpu`, and `free -h`. Use the [operator resource overrides](operator-handbook.md#commands) only after you measure contention. Machine policy checks and clamps the values.
 
 ## Recovery
 
-If Windows npm appears in WSL, fix shell configuration until `which node npm npx` returns Linux paths. Then remove `node_modules` and run the dependency installation procedure again.
+If Windows npm appears in WSL, fix shell configuration until `which node npm npx` returns Linux paths. Then remove `node_modules`. Run the dependency installation procedure again.
 
 If only interactive shells find Node, compare login-shell resolution:
 
@@ -94,10 +94,10 @@ If only interactive shells find Node, compare login-shell resolution:
 bash -lc 'which node npm npx && readlink -f "$(which node)" "$(which npm)" "$(which npx)"'
 ```
 
-Repair all three `~/.local/bin` links and the login-shell `PATH` when this command fails.
+Fix all three `~/.local/bin` links and the login-shell `PATH` when this command fails.
 
 If a command cannot create temporary files, retry it with `TMPDIR=/tmp TMP=/tmp TEMP=/tmp`.
 
-If Chromium cannot launch, rerun `npm run qa:e2e:install:deps`, verify `.playwright-browsers/`, and use a normal WSL terminal that permits browser processes and CDP sockets.
+If Chromium cannot launch, rerun `npm run qa:e2e:install:deps`. For that failure, check `.playwright-browsers/`. Use a normal WSL terminal that permits browser processes and CDP sockets for that recovery.
 
 If a registry-backed audit cannot reach its source, diagnose with `npm ping` and the audit output. Network or tool bootstrap failure is not passing proof and is not a product defect.

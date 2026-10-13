@@ -13,7 +13,7 @@ Apply the dependency direction in [code organization](code-organization.md#depen
 
 ## App-core residency
 
-Keep app-core contracts and implementations app-local when they require extension lifecycle, product state, concrete persistence, product copy, feature authority, or runtime composition. Generated [project facts](../engineering/project-facts.md) project the current app-core roots.
+Keep app-core contracts and implementations app-local if they require extension lifecycle, product state, or concrete persistence. Also keep them app-local if they require product copy, feature authority, or runtime composition. Generated [project facts](../engineering/project-facts.md) project the current app-core roots.
 
 `apps/extension/src/composition/persistence` owns shared schemas, upgrades, browser-storage composition, cross-runtime persistence adapters, and transaction coordination. Features and workflows own product behavior. Runtime-specific adapters remain in their runtime.
 
@@ -21,4 +21,4 @@ Keep app-core contracts and implementations app-local when they require extensio
 
 ## Change rule
 
-Add a package export only for an existing cross-owner consumer. Promote code to a package only when its dependency closure is package-safe and it has no extension lifecycle, persistence, product catalog, or product-state dependency.
+Add a package export only for an existing cross-owner consumer. Promote code to a package only if its dependency closure is package-safe. Also require no extension lifecycle, persistence, product catalog, or product-state dependency for that promotion.

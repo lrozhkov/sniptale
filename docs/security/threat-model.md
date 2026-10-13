@@ -1,6 +1,6 @@
 # Sniptale threat model
 
-Review this model when a privileged entrypoint, store, permission, network destination, import or export format, dependency-admission rule, or release boundary changes.
+Review this model for changes to privileged entrypoints, stores, permissions, or network destinations. Also review it for changes to import/export formats, dependency-admission rules, or release boundaries.
 
 ## Trust assumptions
 
@@ -8,7 +8,9 @@ Chromium APIs and the browser profile are trusted computing base. Encryption and
 
 The optional native companion, native-host registration, executable loading, code-signing enforcement, and operating system are outside this repository and extension artifact. The extension cannot attest a compromised local account, operating system, or replaced registered host.
 
-Treat native messages as untrusted protocol input. Parse them through the native contract. Negotiate the protocol version. Enforce capability bounds. Bind each message to its request. Route effects through the native controller. Treat `signedBinary`, `rollbackProtected`, `notarized`, and `packageIntegrity` as self-reported compatibility fields, not cryptographic attestation.
+Treat native messages as untrusted protocol input. Parse them through the native contract. Negotiate the protocol version. Enforce capability bounds. Bind each message to its request.
+
+Route effects through the native controller. Treat `signedBinary`, `rollbackProtected`, `notarized`, and `packageIntegrity` as self-reported compatibility fields, not cryptographic attestation.
 
 ## Threats and invariants
 
@@ -25,9 +27,9 @@ Treat native messages as untrusted protocol input. Parse them through the native
 | Hostile DOM reaches an unsafe sink | `INV-DOM-SANITIZATION` | sanitizer owner | Sanitizer or browser-rendering defects |
 | Diagnostics retain sensitive data | `INV-OBS-REDACTION` | diagnostics owner | Previously exported user-controlled logs |
 | Manifest or artifact exceeds policy | `INV-ARTIFACT-BOUNDARY` | build and release owners | Compromise of the admitted release builder |
-| Native status is presented as attestation | `INV-NATIVE-TRUST` | native adapter and compatibility owner | A replaced registered host is indistinguishable |
+| Native status appears as attestation | `INV-NATIVE-TRUST` | native adapter and compatibility owner | A replaced registered host is indistinguishable |
 
-The adversaries are malicious pages and frames, unauthorized or replayed senders, hostile archives and render inputs, compromised external endpoints, dependency or build compromise, hostile QA child processes or hooks, accidental retention, and local profile readers.
+Adversaries include malicious pages and frames, unauthorized or replayed senders, hostile archives and render inputs, and compromised external endpoints. They also include dependency or build compromise, hostile QA child processes or hooks, accidental retention, and local profile readers.
 
 ## Boundary map
 
@@ -45,7 +47,7 @@ The adversaries are malicious pages and frames, unauthorized or replayed senders
 
 Treat pull-request source, dependency hooks, candidate QA controls, and candidate-built image contents as untrusted. Candidate execution must not receive repository tokens, cloud credentials, OIDC authority, or write access to the trusted mount.
 
-Proof admission must bind evidence to the candidate and preserve the trusted-control boundary. Canonical candidate-admission and proof-reuse rules belong to [Canonical CI/CD](../tooling/ci-cd.md).
+Proof admission must bind evidence to the candidate. It must preserve the trusted-control boundary. Canonical candidate-admission and proof-reuse rules belong to [Canonical CI/CD](../tooling/ci-cd.md).
 
 Legal closure belongs to [OSS provenance](../oss/provenance.md). Publication admission belongs to the [release runbook](../oss/release.md).
 
@@ -53,4 +55,4 @@ Legal closure belongs to [OSS provenance](../oss/provenance.md). Publication adm
 
 Security architecture reviews semantic changes to the triggers listed at the top of this document. A relocation that preserves authority and invariants does not require threat-model changes.
 
-The current reporting and GitHub release facts are projected in the [generated project facts](../engineering/project-facts.md). Confidential reporting instructions belong to [SECURITY.md](../../.github/SECURITY.md).
+The [generated project facts](../engineering/project-facts.md) project current reporting and GitHub release facts. Confidential reporting instructions belong to [SECURITY.md](../../.github/SECURITY.md).
