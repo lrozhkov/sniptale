@@ -195,3 +195,15 @@ it('preserves the typing choice when a command covers its entire hit target', ()
   expect(layout.items).toHaveLength(1);
   expect(layout.items[0]!.members.map(({ ref }) => ref.id)).toEqual(['key', 'typing']);
 });
+
+it('does not inflate adjacent short cursor runs into a group', () => {
+  const layout = layoutReviewActionLanes(
+    [
+      { ref: { kind: 'cursor', id: 'a' }, eventType: 'cursor', start: 1, end: 1.025 },
+      { ref: { kind: 'cursor', id: 'b' }, eventType: 'cursor-gap', start: 1.025, end: 1.05 },
+    ],
+    { duration: 10, width: 1000, zoom: 1 }
+  );
+  expect(layout.items).toHaveLength(2);
+  expect(layout.items[0]!.width).toBeCloseTo(2.5);
+});

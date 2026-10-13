@@ -1,3 +1,4 @@
+import { createVideoProjectCursorTrack } from '../project/defaults';
 import { expect, it } from 'vitest';
 import { buildHistoryCursorRuns } from './cursor-history';
 
@@ -71,5 +72,42 @@ it('uses captured dwell masks within sparse movement samples and stops at an obs
     ['cursor', 2, 3],
     ['cursor-idle', 3, 5],
     ['cursor-gap', 5, 7],
+  ]);
+});
+
+it('displays brief repeated positions as one movement without deleting observed samples', () => {
+  const track = createVideoProjectCursorTrack();
+  track.samples = Array.from({ length: 41 }, (_, index) => ({
+    id: `s${index}`,
+    time: index / 40,
+    x: Math.floor(index / 2) / 40,
+    y: 0.5,
+    visible: true,
+    captureSegment: 0,
+  }));
+  const before = structuredClone(track);
+  const runs = buildHistoryCursorRuns(track, 1);
+  expect(runs).toHaveLength(1);
+  expect(runs[0]).toMatchObject({ kind: 'cursor', start: 0, end: 1 });
+  expect(runs[0]!.sampleIds).toHaveLength(40);
+  expect(track).toEqual(before);
+});
+
+it('retains a short confirmed dwell and a long inferred stop', () => {
+  const track = createVideoProjectCursorTrack();
+  track.samples = [
+    { id: 'a', time: 0, x: 0, y: 0, visible: true },
+    { id: 'b', time: 0.025, x: 0, y: 0, visible: true },
+    { id: 'c', time: 0.5, x: 0.5, y: 0, visible: true },
+    { id: 'd', time: 1.1, x: 0.5, y: 0, visible: true },
+  ];
+  expect(
+    buildHistoryCursorRuns(track, 2, [{ startTime: 0, endTime: 0.025 }]).map(
+      ({ kind, recordedDwell }) => [kind, recordedDwell]
+    )
+  ).toEqual([
+    ['cursor-idle', true],
+    ['cursor', false],
+    ['cursor-idle', false],
   ]);
 });

@@ -290,6 +290,9 @@ function ReviewCursorKeyRow({ props }: { props: TelemetryStripProps }) {
   ) : null;
 }
 
+const CURSOR_MOVEMENT_BACKGROUND =
+  'linear-gradient(var(--sniptale-color-border-soft),var(--sniptale-color-border-soft)) center/100% 2px no-repeat';
+
 function ReviewHistoryItem({
   item,
   props,
@@ -306,6 +309,7 @@ function ReviewHistoryItem({
     marker.ref.id === props.selectedTelemetryRef.id;
   const animated = marker.ref.kind === 'action' && props.animatedIds?.has(marker.ref.id);
   const tone = reviewTimelineItemTone(selected);
+  const cursorLine = item.lane === 2 && marker.eventType !== 'cursor-idle' && !selected;
   if (item.members.length > 1)
     return (
       <ReviewHistoryCluster
@@ -349,11 +353,13 @@ function ReviewHistoryItem({
         .join(' · ')}
       onClick={() => props.onMarker(marker)}
       className={[
-        'absolute flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
+        'absolute flex items-center justify-center gap-1 overflow-hidden',
+        item.lane === 2 ? 'min-w-0' : 'min-w-1.5',
         marker.eventType === 'typing' ? 'z-0' : 'z-10',
         marker.eventType === 'typing' ? 'px-1 [&_[data-ui]]:justify-start' : '',
         'rounded-sm border text-[10px] transition-colors',
         tone,
+        cursorLine ? '!border-transparent' : '',
         '!text-[var(--sniptale-color-text-secondary)]',
         animated ? '!bg-[color-mix(in_srgb,var(--sniptale-color-info)_15%,transparent)]' : '',
       ].join(' ')}
@@ -362,14 +368,24 @@ function ReviewHistoryItem({
         width: item.width * ratio,
         top: item.lane * ACTION_LANE_PITCH_PX,
         height: ACTION_MARKER_HEIGHT_PX,
-        background: marker.eventType === 'typing' ? undefined : HISTORY_EVENT_BACKGROUND,
+        background: cursorLine
+          ? marker.eventType === 'cursor-gap'
+            ? 'transparent'
+            : CURSOR_MOVEMENT_BACKGROUND
+          : marker.eventType === 'typing'
+            ? undefined
+            : HISTORY_EVENT_BACKGROUND,
+        opacity: cursorLine && marker.eventType === 'cursor-gap' ? 0.4 : 1,
       }}
     >
-      <ReviewTimelineLabel
-        icon={<ReviewEventIcon kind={marker.eventType} />}
-        name={reviewEventLabel(marker.eventType)}
-        value={item.lane === 0 && marker.ref.kind === 'action' ? marker.target : undefined}
-      />
+      {item.lane !== 2 ||
+      ((marker.eventType === 'cursor-idle' || selected) && item.width * ratio >= 100) ? (
+        <ReviewTimelineLabel
+          icon={<ReviewEventIcon kind={marker.eventType} />}
+          name={reviewEventLabel(marker.eventType)}
+          value={item.lane === 0 && marker.ref.kind === 'action' ? marker.target : undefined}
+        />
+      ) : null}
     </button>
   );
 }

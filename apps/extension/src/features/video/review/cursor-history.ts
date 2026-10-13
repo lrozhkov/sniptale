@@ -58,7 +58,7 @@ export function buildHistoryCursorRuns(
         recordedDwell: true,
         kind: 'cursor-idle',
       });
-  return runs;
+  return mergeBriefStops(runs);
 }
 
 type CursorDwellMask = { id?: string; startTime: number; endTime: number };
@@ -143,4 +143,19 @@ function appendCursorHistoryRun(
       recordedDwell: kind === 'cursor-idle' && confirmedDwell,
       kind,
     });
+}
+
+/** Brief repeated positions belong to the movement display; captured dwell remains factual. */
+function mergeBriefStops(runs: CursorHistoryRun[]): CursorHistoryRun[] {
+  const result: CursorHistoryRun[] = [];
+  for (const run of runs) {
+    if (run.kind === 'cursor-idle' && !run.recordedDwell && run.end - run.start < 0.5)
+      run.kind = 'cursor';
+    const previous = result.at(-1);
+    if (run.kind === 'cursor' && previous?.kind === 'cursor' && previous.end === run.start) {
+      previous.end = run.end;
+      previous.sampleIds.push(...run.sampleIds.filter((id) => id !== previous.sampleIds.at(-1)));
+    } else result.push(run);
+  }
+  return result;
 }

@@ -282,3 +282,10 @@ it('keeps commands separately selectable above typing coverage and shows their s
   expect(onMarker).toHaveBeenCalledWith(key);
   expect(command.style.top).toBe(buttons[0]!.style.top);
 });
+
+it('shows a brief cursor gap without a competing text label', () => {
+  render([{ ref: { kind: 'cursor', id: 'gap' }, eventType: 'cursor-gap', start: 1, end: 1.025 }]);
+  const gap = host.querySelector('[data-history-family="cursor"] button')!;
+  expect(gap.textContent).toBe('');
+  expect(gap.getAttribute('aria-label')).toContain('1');
+});

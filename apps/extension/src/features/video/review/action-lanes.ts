@@ -38,7 +38,10 @@ export function layoutReviewActionLanes(
     const natural = (marker.end - marker.start) * (planeWidth / viewport.duration);
     const lane = reviewActionLane(marker);
     if (lane === null) continue;
-    const width = Math.min(planeWidth, Math.max(natural, REVIEW_ACTION_MIN_POINT_WIDTH_PX));
+    const width = Math.min(
+      planeWidth,
+      lane === 2 && natural > 0 ? natural : Math.max(natural, REVIEW_ACTION_MIN_POINT_WIDTH_PX)
+    );
     const left = Math.max(
       0,
       Math.min(marker.start * (planeWidth / viewport.duration), planeWidth - width)

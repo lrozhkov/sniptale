@@ -18,7 +18,7 @@ import {
 } from '../extension-critical.helpers';
 
 const samples = Array.from({ length: 481 }, (_, index) => {
-  const progress = (index / 480) ** 2;
+  const progress = ((Math.floor(index / 2) * 2) / 480) ** 2;
   return {
     id: `focus-sample:${index}`,
     time: index * 0.025,
@@ -184,6 +184,12 @@ for (const viewport of [
         return dialog;
       };
       const dialog = await open();
+      await expect(
+        dialog.locator(
+          '[data-history-family="cursor"] [data-ui="gallery.videoReview.historyCluster"]'
+        )
+      ).toHaveCount(0);
+      await expect(dialog.locator('[data-history-family="cursor"] > button')).toHaveCount(3);
       const sparseRow = dialog.locator('[data-ui="cursorFocusPath.timelineKeys"]');
       await expect(sparseRow).toBeVisible();
       expect(
@@ -191,8 +197,8 @@ for (const viewport of [
       ).toBeLessThanOrEqual(8);
       await expect(dialog.locator('[data-ui="cursorFocusPath.overlay"]')).toHaveCount(0);
       const dwell = dialog
-        .locator('[data-history-family="cursor"] button')
-        .filter({ hasText: label('gallery.videoReview.eventCursorIdle') })
+        .locator('[data-history-family="cursor"]')
+        .getByRole('button', { name: new RegExp(label('gallery.videoReview.eventCursorIdle')) })
         .first();
       await dwell.click();
       const focus = dialog
@@ -459,6 +465,11 @@ for (const viewport of [
       await page.goto(
         `${server.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=light`
       );
+      await expect(
+        page.locator(
+          '[data-ui="video-editor.timeline.history-cursor-row"] [data-timeline-effect-segment]'
+        )
+      ).toHaveCount(1);
       const sparseRow = page.locator('[data-ui="cursorFocusPath.timelineKeys"]');
       await expect(sparseRow).toBeVisible();
       expect(

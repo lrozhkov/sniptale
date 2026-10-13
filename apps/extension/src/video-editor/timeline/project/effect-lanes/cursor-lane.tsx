@@ -22,6 +22,9 @@ import type {
   TimelineEffectDragDraft,
 } from '../types';
 
+const CURSOR_LINE_BACKGROUND_CLASS_NAME =
+  '![background-image:linear-gradient(var(--sniptale-color-border-soft),var(--sniptale-color-border-soft))]';
+
 const CURSOR_VISIBLE_SEGMENT_CLASS_NAME = [
   'pointer-events-auto !rounded-sm',
   'border-[color:var(--sniptale-color-border-soft)]',
@@ -128,37 +131,60 @@ function ProjectTimelineCursorSegment(props: {
   segment: CursorSegment;
   selectedEffectSelection: TimelineEffectSelection | null;
 }) {
+  const width = props.projection
+    ? (projectTimelineInterval(props.projection, props.segment.start, props.segment.end)?.width ??
+      0)
+    : (props.segment.end - props.segment.start) * props.pixelsPerSecond;
+  const selected = isSelectedEffectSegment(
+    props.selectedEffectSelection,
+    'cursor',
+    props.segment.id
+  );
+  const label = translate(
+    props.segment.kind === 'cursor-gap'
+      ? 'videoEditor.timeline.historyCursorGap'
+      : props.segment.kind === 'cursor-idle'
+        ? 'videoEditor.timeline.historyCursorDwell'
+        : 'videoEditor.timeline.historyCursorMove'
+  );
+  const compact = (props.segment.kind !== 'cursor-idle' && !selected) || width < 100;
   return (
     <ProjectTimelineEffectSegment
       height={20}
       top={2}
       segmentId={props.segment.id}
-      className={
-        props.segment.visible ? CURSOR_VISIBLE_SEGMENT_CLASS_NAME : CURSOR_HIDDEN_SEGMENT_CLASS_NAME
-      }
+      className={[
+        props.segment.visible
+          ? CURSOR_VISIBLE_SEGMENT_CLASS_NAME
+          : CURSOR_HIDDEN_SEGMENT_CLASS_NAME,
+        props.segment.kind === 'cursor-gap' && !selected
+          ? '!border-transparent !bg-transparent'
+          : props.segment.kind === 'cursor' && !selected
+            ? [
+                '!border-transparent !bg-transparent',
+                CURSOR_LINE_BACKGROUND_CLASS_NAME,
+                '![background-size:100%_2px] ![background-position:center] ![background-repeat:no-repeat]',
+              ].join(' ')
+            : '',
+        compact ? '[&>div]:invisible !px-0' : '',
+      ].join(' ')}
       isSelected={isSelectedEffectSegment(
         props.selectedEffectSelection,
         'cursor',
         props.segment.id
       )}
-      label={translate(
-        props.segment.kind === 'cursor-gap'
-          ? 'videoEditor.timeline.historyCursorGap'
-          : props.segment.kind === 'cursor-idle'
-            ? 'videoEditor.timeline.historyCursorDwell'
-            : 'videoEditor.timeline.historyCursorMove'
-      )}
-      hideLabel
+      label={label}
+      hideLabel={false}
       leadingIcon={<span className="[&_svg]:h-3 [&_svg]:w-3">{getCursorLaneIcon()}</span>}
       startTime={props.segment.start}
       endTime={props.segment.end}
       pixelsPerSecond={props.pixelsPerSecond}
       projection={props.projection}
-      minimumWidth={14}
+      minimumWidth={0}
       onBeginEffectInteraction={(event) => {
         handleCursorSegmentInteraction(event, props);
       }}
-      subtitle={`${formatTime(props.segment.start)} - ${formatTime(props.segment.end)}`}
+      title={`${label} · ${formatTime(props.segment.start)} - ${formatTime(props.segment.end)}`}
     />
   );
 }

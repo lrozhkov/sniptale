@@ -79,6 +79,7 @@ it('retains grouped keys and doubleclick adds once without a deferred seek', asy
       />
     )
   );
+  expect(host.querySelector('[data-cursor-focus-group] button')!.textContent).toBe('');
   act(() => host.querySelector<HTMLButtonElement>('[data-cursor-focus-group] button')!.click());
   const options = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
   expect(options).toHaveLength(2);

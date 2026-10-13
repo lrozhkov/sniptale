@@ -212,18 +212,37 @@ function CursorKeyGroup({
     >
       <ProductSelect
         value=""
-        placeholder={String(group.members.length)}
+        placeholder=""
         aria-label={`${translate('videoEditor.sidebar.cursorFocusKey')} · ${group.members.length}`}
         aria-pressed={selected}
         controlSize="sm"
         menuWidth={320}
-        style={{ height: props.height ?? 24, minHeight: props.height ?? 24, borderRadius: 2 }}
+        style={{
+          height: props.height ?? 24,
+          minHeight: props.height ?? 24,
+          width: 20,
+          minWidth: 20,
+          background: 'transparent',
+          borderColor: 'transparent',
+          boxShadow: 'none',
+        }}
         className="!px-1 !text-[10px] [&_.sniptale-select-chevron]:!hidden"
         options={group.members.map((key) => ({ value: key.timelineId, label: label(key) }))}
         onChange={(id) => {
           const key = group.members.find((item) => item.timelineId === id);
           if (key) props.onSelect(key);
         }}
+      />
+      <span
+        aria-hidden="true"
+        className={[
+          'pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 border',
+          authored ? 'rotate-45' : 'rounded-full',
+          selected
+            ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent)]'
+            : 'border-[var(--sniptale-color-text-secondary)] bg-[var(--sniptale-color-surface-panel)]',
+          'shadow-[2px_2px_0_var(--sniptale-color-border-soft)]',
+        ].join(' ')}
       />
     </div>
   );
