@@ -1,3 +1,5 @@
+import { releaseUnpublishedProjectAssets } from './delete-cascade.sources';
+import { buildPhysicalDeleteOperation } from '../assets';
 import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
 import { withVideoProjectUsage } from './usage-index-keys';
 import { expect, it } from 'vitest';
@@ -124,7 +126,7 @@ it.each(sources)(
     ]);
     expect(rows.get('media_library')?.has(mediaId)).toBe(false);
     const saved = rows.get('video_projects')!.get(video.id) as typeof video;
-    expect(saved).toMatchObject({ usageReferenceKeys: ['indexed:v1'] });
+    expect(saved).toMatchObject({ usageReferenceKeys: ['indexed:v2'] });
     expect(saved.project.assets).toEqual([]);
     expect(saved.project.clips).toEqual([]);
     if (source.kind !== 'screenshot') {
@@ -295,7 +297,7 @@ it.each(
       (['music', 'watermark', 'presentation'] as const).map((resource) => ({ mode, resource }))
   )
 )(
-  'reclaims $resource review auxiliaries according to identity ownership: $mode',
+  'reclaims $resource after project purge according to identity ownership: $mode',
   async ({ mode, resource }) => {
     const { createQuickEditAdvancedState } =
       await import('../../../features/video/review/advanced/defaults');
@@ -404,7 +406,15 @@ it.each(
       video.project.assets[0]!.source = { kind: 'project-asset', projectAssetId: 'private-music' };
       rows.get('video_projects')!.set(video.id, video);
     }
-    await deleteMediaAssetWithProjectCascade(mediaId, []);
+    rows.get('video_workspaces')!.delete(mediaId);
+    const db = await harness.db();
+    const tx = db.transaction([...rows.keys()], 'readwrite');
+    await releaseUnpublishedProjectAssets(
+      tx,
+      new Set([mode === 'root-self' ? 'project-asset-1' : 'private-music']),
+      buildPhysicalDeleteOperation([])
+    );
+    await tx.done;
     expect(rows.get('project_assets')?.has('private-music')).toBe(
       mode !== 'private' && mode !== 'missing'
     );
@@ -412,7 +422,7 @@ it.each(
   }
 );
 
-it('reconsiders private auxiliaries after their consuming workspace is released', async () => {
+it('retains a private source and its auxiliaries while its own saved project remains', async () => {
   const { createQuickEditAdvancedState } =
     await import('../../../features/video/review/advanced/defaults');
   installSource({ kind: 'screenshot' });
@@ -472,9 +482,14 @@ it('reconsiders private auxiliaries after their consuming workspace is released'
     assetId: 'project-asset:a',
   });
   rows.get('video_workspaces')!.set(mediaId, root);
-  await deleteMediaAssetWithProjectCascade(mediaId, []);
-  expect(rows.get('project_assets')?.has('a')).toBe(false);
-  expect(rows.get('project_assets')?.has('b')).toBe(false);
+  rows.get('video_workspaces')!.delete(mediaId);
+  const db = await harness.db();
+  const tx = db.transaction([...rows.keys()], 'readwrite');
+  await releaseUnpublishedProjectAssets(tx, new Set(['a', 'b']), buildPhysicalDeleteOperation([]));
+  await tx.done;
+  expect(rows.get('project_assets')?.has('a')).toBe(true);
+  expect(rows.get('project_assets')?.has('b')).toBe(true);
+  expect(rows.get('video_workspaces')?.has('project-asset:a')).toBe(true);
 });
 
 it('confirmed image-origin purge strips active and remembered logos from the retained review graph', async () => {

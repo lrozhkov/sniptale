@@ -98,7 +98,7 @@ function sharedSourceStores() {
   return target;
 }
 
-it('reclaims three levels of private review resources during archive replacement', async () => {
+it('retains independent quick-edit projects and their private sources during montage replacement', async () => {
   const target = stores();
   const existing = createVideoProjectEntryWithMediaClip({ id: 'project' });
   const ids = ['project-asset-1', 'child', 'grandchild'];
@@ -138,9 +138,9 @@ it('reclaims three levels of private review resources during archive replacement
     tx: createVideoProjectRestoreTransaction(target),
     strategy: 'replace',
   });
-  for (const id of ids) expect(target.assets.delete).toHaveBeenCalledWith(id);
-  expect(reviews.size).toBe(0);
-  expect(operation.assetIds).toEqual(expect.arrayContaining(ids.map((id) => `object-${id}`)));
+  expect(target.assets.delete).not.toHaveBeenCalled();
+  expect(reviews.size).toBe(2);
+  expect(operation.assetIds).toEqual([]);
 });
 
 it('replaces review-only children and protects assets referenced by another workspace', async () => {

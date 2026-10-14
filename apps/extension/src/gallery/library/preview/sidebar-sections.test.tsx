@@ -596,3 +596,34 @@ it('uses the same navigation icon for image, recording and project editors', asy
   expect(props.onEdit).toHaveBeenCalledTimes(3);
   act(() => root.unmount());
 });
+
+it('resets unsaved quick-edit names without exposing media file commands', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const item = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 4,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const onResetChanges = vi.fn();
+  await act(async () =>
+    root.render(
+      <PreviewActions {...createProps()} item={item} hasChanges onResetChanges={onResetChanges} />
+    )
+  );
+  const reset = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('gallery.preview.resetChanges')
+  );
+  expect(reset).toBeDefined();
+  await act(async () => reset?.click());
+  expect(onResetChanges).toHaveBeenCalledOnce();
+  expect(container.textContent).not.toContain('gallery.preview.fileActions');
+  await act(async () => root.unmount());
+});

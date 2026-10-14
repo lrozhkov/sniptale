@@ -1,3 +1,8 @@
+import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
+import {
+  deleteVideoWorkspaceProject,
+  renameVideoWorkspaceProject,
+} from '../../composition/persistence/review-workspaces/project-commands';
 import { createMaintenanceLog } from '../../composition/persistence/library-lifecycle/maintenance-log';
 import type { LocalStoragePolicy } from '../../contracts/settings';
 import type { LibraryLifecycle } from '../../composition/persistence/library-lifecycle/contracts';
@@ -71,6 +76,8 @@ async function deleteLibraryTarget(
       [target.id],
       new Map([[target.id, expectedUsage ?? []]])
     );
+  } else if (target.kind === 'quick-edit-project') {
+    await deleteVideoWorkspaceProject(target.id, target.expectedRevision);
   } else if (target.kind === 'scenario-project') {
     await deleteScenarioProjectRecord(target.id);
   } else if (target.kind === 'video-project') {
@@ -103,10 +110,11 @@ export async function cleanupLibraryTrash(
 ): Promise<{ failedCount: number }> {
   if (signal?.aborted || !policy.trashCleanupEnabled) return { failedCount: 0 };
   const cutoff = now - (policy.trashRetentionDays ?? 30) * 86_400_000;
-  const [media, videos, scenarios] = await Promise.all([
+  const [media, videos, scenarios, quickEdits] = await Promise.all([
     listMediaLibrary(),
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
+    listVideoWorkspaceSummaries(),
   ]);
   const candidates: TrashDeletionTarget[] = [];
   const append = (target: LibraryTrashTarget, trashedAt: number | undefined) => {
@@ -121,6 +129,12 @@ export async function cleanupLibraryTrash(
   );
   videos.forEach((item) =>
     append({ kind: 'video-project', id: item.id }, item.lifecycle?.trashedAt)
+  );
+  quickEdits.forEach((item) =>
+    append(
+      { kind: 'quick-edit-project', id: item.aggregateId, expectedRevision: item.revision },
+      item.lifecycle.trashedAt
+    )
   );
   media.forEach((item) => append({ kind: 'media', id: item.id }, item.lifecycle?.trashedAt));
   let failedCount = 0;
@@ -162,4 +176,14 @@ export async function cleanupLibraryTrash(
       counts: { failed: failedCount },
     });
   return { failedCount };
+}
+
+/** Publish a project rename only after its revisioned metadata commit. */
+export async function renameQuickEditProject(
+  id: string,
+  expectedRevision: number,
+  name: string
+): Promise<void> {
+  await renameVideoWorkspaceProject(id, expectedRevision, name);
+  publishMediaHubLibraryChanged('update', [id]);
 }

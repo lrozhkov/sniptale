@@ -521,3 +521,27 @@ it('allows editing the selected HTML export filename', () => {
   expect(input?.readOnly).toBe(false);
   expect(input?.labels?.[0]?.textContent).toBe('gallery.preview.filename');
 });
+
+it('edits the active quick-edit project name and makes it read-only in Trash', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const item = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 4,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const props = createProps({ item, filenameDraft: item.filename });
+  render(props);
+  const input = container?.querySelector('input');
+  if (!(input instanceof HTMLInputElement)) throw new Error('Missing project name input');
+  expect(input.disabled).toBe(false);
+  setInputValue(input, 'Renamed edit');
+  expect(props.onFilenameChange).toHaveBeenCalledWith('Renamed edit');
+  render({ ...props, trashMode: true });
+  expect(container?.querySelector('input')).toBeNull();
+  expect(container?.textContent).toContain('Saved edit');
+});

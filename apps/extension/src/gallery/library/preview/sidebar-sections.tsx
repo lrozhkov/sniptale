@@ -601,7 +601,9 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
     );
   const { item, onCopy, onDelete, onDownload, onResetChanges } = props;
   const canEditMetadata =
-    isMetadataEditable(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
+    isMetadataEditable(item) ||
+    item.type === 'quick-edit-project' ||
+    (isGalleryScenarioExportItem(item) && item.format === 'html');
   const canDownload =
     isGalleryMediaItem(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);

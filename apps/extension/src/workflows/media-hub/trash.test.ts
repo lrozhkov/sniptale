@@ -3,6 +3,9 @@ import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../composition/persistence/libr
 
 const mocks = vi.hoisted(() => ({
   media: vi.fn(),
+  quickEdits: vi.fn(),
+  deleteQuickEdit: vi.fn(),
+  renameQuickEdit: vi.fn(),
   videos: vi.fn(),
   scenarios: vi.fn(),
   exports: vi.fn(),
@@ -15,6 +18,13 @@ const mocks = vi.hoisted(() => ({
   deleteVideo: vi.fn(),
   deleteScenario: vi.fn(),
   publish: vi.fn(),
+}));
+vi.mock('../../composition/persistence/review-workspaces/summaries', () => ({
+  listVideoWorkspaceSummaries: mocks.quickEdits,
+}));
+vi.mock('../../composition/persistence/review-workspaces/project-commands', () => ({
+  deleteVideoWorkspaceProject: mocks.deleteQuickEdit,
+  renameVideoWorkspaceProject: mocks.renameQuickEdit,
 }));
 vi.mock('../../composition/persistence/library-lifecycle/trash', () => ({
   moveStoredItemsToTrash: vi.fn(),
@@ -58,6 +68,7 @@ beforeEach(() => {
     async (_target, _lifecycle, action: () => Promise<void>) => action()
   );
   mocks.media.mockResolvedValue([]);
+  mocks.quickEdits.mockResolvedValue([]);
   mocks.videos.mockResolvedValue([]);
   mocks.scenarios.mockResolvedValue([]);
   mocks.exports.mockResolvedValue([]);
@@ -211,4 +222,18 @@ it('cancels automatic deletion after a pending usage check resolves', async () =
   );
   expect(mocks.guard).not.toHaveBeenCalled();
   expect(mocks.deleteMedia).not.toHaveBeenCalled();
+});
+
+it('purges an expired quick-edit project through its owner before considering the source', async () => {
+  mocks.quickEdits.mockResolvedValue([
+    { aggregateId: 'source', revision: 4, lifecycle: { trashedAt: 1 } },
+  ]);
+  await cleanupLibraryTrash(
+    { ...DEFAULT_LOCAL_STORAGE_POLICY, trashCleanupEnabled: true, trashRetentionDays: 1 },
+    2 * 86_400_000
+  );
+  expect(mocks.deleteQuickEdit).toHaveBeenCalledExactlyOnceWith('source', 4);
+  expect(mocks.deleteMedia).not.toHaveBeenCalled();
+  expect(mocks.deleteVideo).not.toHaveBeenCalled();
+  expect(mocks.publish).toHaveBeenCalledWith('delete', ['source']);
 });

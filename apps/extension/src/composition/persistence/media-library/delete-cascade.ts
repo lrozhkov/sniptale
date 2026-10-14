@@ -188,16 +188,15 @@ async function loadCascadeGraph(
     'scenario-project',
     (value) => isRecord(value) && typeof value['id'] === 'string' && !scenarioIds.has(value['id'])
   );
-  // Auxiliary review references admit only project-assets; the root's own sidecar is purged.
-  const reviews =
-    reviewReferencesForMedia(target).size > 0
-      ? requireVerifiedGraphEntries(
-          rawReview.filter((value) => !isRecord(value) || value['aggregateId'] !== media.id),
-          parseVideoWorkspace,
-          'quick-edit',
-          () => false
-        )
-      : [];
+  const externalReferences = reviewReferencesForMedia(target).size > 0;
+  const reviews = requireVerifiedGraphEntries(
+    rawReview.filter(
+      (value) => externalReferences || (isRecord(value) && value['aggregateId'] === media.id)
+    ),
+    parseVideoWorkspace,
+    'quick-edit',
+    () => false
+  );
   return { media: { ...media, ...target }, videos, scenarios, scenarioChildren, reviews };
 }
 
@@ -265,13 +264,15 @@ async function detachReviewWorkspaces(
 ): Promise<MediaAssetProjectUsage[]> {
   const affected: MediaAssetProjectUsage[] = [];
   for (const workspace of graph.reviews) {
-    if (workspace.aggregateId === graph.media.id) continue;
+    if (workspace.aggregateId === graph.media.id) throw new PrimaryMediaAssetDeleteError();
     const attached = reviewWorkspaceUsesMedia(workspace, graph.media);
     if (!attached) continue;
     affected.push({
       id: workspace.aggregateId,
       kind: 'review',
-      name: 'filename' in graph.media ? graph.media.filename : graph.media.id,
+      name:
+        workspace.project?.name ??
+        ('filename' in graph.media ? graph.media.filename : graph.media.id),
       primary: false,
     });
     let next = workspace;

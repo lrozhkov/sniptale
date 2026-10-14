@@ -22,7 +22,13 @@ type GalleryActionContext = {
     | 'backup-prepare'
     | 'backup-export'
     | 'backup-import';
-  materialType: 'media' | 'scenario-project' | 'video-project' | 'scenario-export' | 'mixed';
+  materialType:
+    | 'quick-edit-project'
+    | 'media'
+    | 'scenario-project'
+    | 'video-project'
+    | 'scenario-export'
+    | 'mixed';
 };
 export type GalleryBusyAction = (
   action: () => Promise<void>,

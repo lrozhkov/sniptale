@@ -25,6 +25,7 @@ import { FOLDER_LABELS, formatDate, getGalleryFolderIcon, getGalleryItemFolder }
 function isMetadataEditable(item: PreviewPanelProps['item']) {
   return (
     isGalleryMediaItem(item) ||
+    item.type === 'quick-edit-project' ||
     isGalleryScenarioItem(item) ||
     (isGalleryScenarioExportItem(item) && item.format === 'html')
   );

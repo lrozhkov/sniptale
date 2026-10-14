@@ -133,7 +133,7 @@ it.each([false, true])(
       { id: montage.id, kind: 'video', name: montage.project.name, primary: false },
     ]);
     expect(rows.get('video_projects')!.get(montage.id)).toMatchObject({
-      usageReferenceKeys: ['indexed:v1'],
+      usageReferenceKeys: ['indexed:v2'],
       project: { assets: [], clips: [] },
     });
     const saved = parseScenarioProjectEntry(

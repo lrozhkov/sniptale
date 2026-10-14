@@ -206,3 +206,20 @@ it('coalesces a burst of invalidations while a request is pending', async () => 
   expect(mocks.usage).toHaveBeenCalledTimes(2);
   expect(container.textContent).toContain('gallery.preview.projectsEmpty');
 });
+
+it('refreshes the primary quick-edit name after metadata invalidation while retaining its identity', async () => {
+  mocks.usage
+    .mockResolvedValueOnce([{ id: 'source', name: 'Original edit', kind: 'review', primary: true }])
+    .mockResolvedValueOnce([{ id: 'source', name: 'Renamed edit', kind: 'review', primary: true }]);
+  await act(async () =>
+    root.render(
+      <PreviewProjectUsage item={createMediaItem({ id: 'source', entityId: 'source' })} />
+    )
+  );
+  expect(container.textContent).toContain('Original edit');
+  await act(async () => mocks.subscribe.mock.calls[0]?.[0]());
+  expect(container.textContent).not.toContain('Original edit');
+  expect(container.textContent).toContain('Renamed edit');
+  await act(async () => container.querySelector('button')?.click());
+  expect(mocks.gallery).toHaveBeenCalledExactlyOnceWith({ mediaId: 'source', quickEdit: true });
+});

@@ -35,25 +35,29 @@ export function useLoadedReview(aggregateId: string) {
     let url: string | null = null;
     let ownedSession: Session | null = null;
     let reader: AssetResourceSession | null = null;
-    const release = async () => {
-      try {
-        await ownedSession?.dispose();
-      } finally {
-        await reader?.release();
-        reader = null;
-      }
-    };
+    let releasing: Promise<void> | null = null;
     setResource(null);
     setFailed(null);
     let loadedSource = false;
-    void (async () => {
+    const loading = (async () => {
       reader = await acquireAssetResourceSession();
-      if (controller.signal.aborted) {
-        await release();
-        return null;
-      }
+      if (controller.signal.aborted) return null;
       return loadVideoReviewSource(aggregateId, controller.signal);
-    })()
+    })();
+    const release = (): Promise<void> => {
+      releasing ??= (async () => {
+        // Opening can still commit after abort; retain exclusion until that writer settles.
+        await loading.catch(() => undefined);
+        try {
+          await ownedSession?.dispose();
+        } finally {
+          await reader?.release();
+          reader = null;
+        }
+      })();
+      return releasing;
+    };
+    void loading
       .then((loaded) => {
         if (!loaded || controller.signal.aborted) return;
         loadedSource = true;
@@ -78,7 +82,7 @@ export function useLoadedReview(aggregateId: string) {
       });
     return () => {
       controller.abort();
-      if (reader) void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
+      void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
       if (url) URL.revokeObjectURL(url);
     };
   }, [aggregateId, attempt]);

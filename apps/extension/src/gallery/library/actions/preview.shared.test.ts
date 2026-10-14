@@ -475,3 +475,29 @@ it('opens the saved quick-edit identity and refuses unavailable or trashed cards
   openInEditor({ ...item, lifecycle: { ...item.lifecycle!, trashedAt: 2 } });
   expect(openGalleryPageMock).toHaveBeenCalledTimes(1);
 });
+
+it('does not write unchanged quick-edit project metadata', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const { persistPreviewMetadata } = await import('./preview');
+  const workflow = await import('../../../workflows/media-hub/trash');
+  const rename = vi.spyOn(workflow, 'renameQuickEditProject');
+  const item = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 4,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const { controller } = createController({ previewItem: item, filenameDraft: 'Saved edit' });
+  expect(
+    await persistPreviewMetadata(controller, {
+      item,
+      draft: controller.state.preview.draft,
+      baseline: item,
+    })
+  ).toBe(false);
+  expect(rename).not.toHaveBeenCalled();
+});

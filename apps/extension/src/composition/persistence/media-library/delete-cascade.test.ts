@@ -279,7 +279,7 @@ it('detaches a disabled webcam held only by redo history when its Library origin
   expect(rows.get('asset_refs')!.has('camera-body')).toBe(false);
 });
 
-it('deletes the media own quick-edit workspace together with its root', async () => {
+it('retains a primary source while its own quick-edit project exists', async () => {
   rows.get('video_projects')!.clear();
   rows.set(
     'video_workspaces',
@@ -301,9 +301,9 @@ it('deletes the media own quick-edit workspace together with its root', async ()
       ],
     ])
   );
-  await deleteMediaAssetWithProjectCascade(mediaId, []);
-  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
-  expect(rows.get('video_workspaces')?.has(mediaId)).toBe(false);
+  const before = structuredClone(rows);
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toThrow('primary source');
+  expect(rows).toEqual(before);
 });
 
 it('ignores unrelated invalid scenario metadata with a known disjoint project identity', async () => {
@@ -334,11 +334,12 @@ it('ignores invalid metadata on a scenario child with disjoint dependency locato
   expect(rows.get('scenario_assets')?.has('other')).toBe(true);
 });
 
-it('deletes its own invalid quick-edit sidecar without validating it as an external dependency', async () => {
+it('retains a source when its own quick-edit project evidence is invalid', async () => {
   rows.get('video_projects')!.clear();
   rows.set('video_workspaces', new Map([[mediaId, { aggregateId: mediaId, invalid: true }]]));
-  await deleteMediaAssetWithProjectCascade(mediaId, []);
-  expect(rows.get('video_workspaces')?.has(mediaId)).toBe(false);
+  const before = structuredClone(rows);
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toThrow();
+  expect(rows).toEqual(before);
 });
 
 it('does not validate unrelated quick-edit rows for a stored image source', async () => {

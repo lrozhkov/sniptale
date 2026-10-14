@@ -75,6 +75,7 @@ it('releases the old reader and rejects its late source after another recording 
   const signal: AbortSignal = mocks.load.mock.calls[0]![1];
   await act(async () => root.render(<Owner id="recording:new" />));
   expect(signal.aborted).toBe(true);
+  expect(mocks.release).not.toHaveBeenCalled();
   expect(current.resource?.snapshot.workspace.aggregateId).toBe('recording:new');
   await act(async () => resolve(source('recording:old')));
   expect(current.resource?.snapshot.workspace.aggregateId).toBe('recording:new');

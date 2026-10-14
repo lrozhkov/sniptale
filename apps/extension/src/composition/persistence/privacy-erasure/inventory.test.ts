@@ -24,6 +24,8 @@ it('uses the canonical IndexedDB store inventory for local data erasure', () => 
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toEqual(EXPECTED_STORES);
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('image_workspaces');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspace_history');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspaces');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspace_drafts');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('aggregate_presentations');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).not.toContain('editor_sessions');
 });

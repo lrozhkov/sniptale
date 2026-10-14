@@ -1,3 +1,4 @@
+import { renameQuickEditProject } from '../../../workflows/media-hub/trash';
 import { canOpenGalleryProject } from '../items/types';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
@@ -285,6 +286,12 @@ export async function persistPreviewMetadata(
 
   const { filename: nextFilename, tags: nextTags } = getPreviewMetadataValues(previewItem, draft);
   const baseline = snapshot?.baseline ?? previewItem;
+
+  if (previewItem.type === 'quick-edit-project') {
+    if (nextFilename === baseline.filename) return false;
+    await renameQuickEditProject(previewItem.entityId, previewItem.project.revision, nextFilename);
+    return true;
+  }
 
   if (isGalleryScenarioExportItem(previewItem) && previewItem.format === 'html') {
     if (nextFilename === baseline.filename) return false;
