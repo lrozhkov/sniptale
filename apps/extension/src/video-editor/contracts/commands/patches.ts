@@ -55,7 +55,10 @@ export type VideoEditorMotionRegionPatch = Partial<
     | 'zoomInDuration'
     | 'zoomOutDuration'
   >
-> & { sourceClipId?: string | null };
+> & {
+  sourceClipId?: string | null;
+  cameraFollow?: VideoProjectMotionRegion['cameraFollow'] | null;
+};
 
 export type VideoEditorTransitionTemplatePatch = Partial<
   Pick<VideoProjectTransition, 'direction' | 'highlightColor' | 'intensity' | 'templateKind'>

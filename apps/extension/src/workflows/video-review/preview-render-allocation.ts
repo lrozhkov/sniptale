@@ -439,7 +439,14 @@ function runtimeSceneGeometry(input: PreviewRuntimeAllocationInput) {
   const { scene, dimensions } = input;
   const backing = dimensions.backing;
   const camera =
-    input.cameraTransform ?? evaluateQuickEditCameraAtTime(scene.zoomRegions, input.resultTime);
+    input.cameraTransform ??
+    evaluateQuickEditCameraAtTime(scene.zoomRegions, input.resultTime, {
+      source: scene.source,
+      canvas: scene.canvas,
+      background: scene.background,
+      windowHeader: scene.windowHeader,
+      output: backing,
+    });
   const layout = computeQuickEditSceneLayout({
     source: scene.source,
     canvas: scene.canvas,

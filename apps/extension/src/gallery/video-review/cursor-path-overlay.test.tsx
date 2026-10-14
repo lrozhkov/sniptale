@@ -96,6 +96,7 @@ it('canvas drag commits once, retains tangents, and Escape/pointer cancel commit
 });
 it('inspector adds a manual key and reset uses the existing content writer without changing facts', () => {
   const onChange = vi.fn();
+  const onPolicyChange = vi.fn();
   act(() =>
     root.render(
       <ReviewCursorPathEditor path={path} time={1} disabled={false} onChange={onChange} />
@@ -108,7 +109,14 @@ it('inspector adds a manual key and reset uses the existing content writer witho
   );
   expect(onChange.mock.calls[0]![0].segments[0].keys).toHaveLength(2);
   act(() =>
-    root.render(<ReviewCursorPathSettings path={path} disabled={false} onChange={onChange} />)
+    root.render(
+      <ReviewCursorPathSettings
+        path={path}
+        disabled={false}
+        onChange={onChange}
+        onPolicyChange={onPolicyChange}
+      />
+    )
   );
   act(() =>
     host
@@ -316,6 +324,7 @@ it('selected recorded-point fields create one explicit override and retain autom
 });
 it('tangent and policy numeric commits retain endpoints and use their independent writers', () => {
   const onChange = vi.fn();
+  const onPolicyChange = vi.fn();
   act(() =>
     root.render(
       <ReviewCursorPathEditor path={path} time={1} disabled={false} onChange={onChange} />
@@ -334,12 +343,23 @@ it('tangent and policy numeric commits retain endpoints and use their independen
     outgoing: { x: 0.25, y: 0.8 },
   });
   act(() =>
-    root.render(<ReviewCursorPathSettings path={path} disabled={false} onChange={onChange} />)
+    root.render(
+      <ReviewCursorPathSettings
+        path={path}
+        disabled={false}
+        onChange={onChange}
+        onPolicyChange={onPolicyChange}
+      />
+    )
   );
   commitCursorNumber('videoEditor.sidebar.cursorFocusSmoothing', '0.8');
   expect(onChange.mock.lastCall![0]).toEqual({ ...path, smoothing: 0.8 });
-  commitCursorNumber('videoEditor.sidebar.cursorFocusSensitivity', '0.3');
-  expect(onChange.mock.lastCall![0]).toEqual({ ...path, sensitivity: 0.3 });
+  const geometryCalls = onChange.mock.calls.length;
+  commitCursorNumber('videoEditor.sidebar.cameraZoneSize', '80');
+  expect(onPolicyChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ zoneSize: 0.8, legacySensitivity: 0.5 })
+  );
+  expect(onChange).toHaveBeenCalledTimes(geometryCalls);
 });
 it('key navigation and deletion keep empty-path authoring available within a known duration', () => {
   const onSeek = vi.fn(),

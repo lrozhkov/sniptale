@@ -361,6 +361,8 @@ export interface VideoProjectMotionArea {
 }
 
 export interface VideoProjectMotionRegion {
+  /** Absent settings inherit the project policy or the retained legacy path coefficients. */
+  cameraFollow?: import('../camera/cursor-policy').CameraFollowSettings;
   /** Authored interval tied to one source clip, retained while its visible part is trimmed. */
   sourceBinding?: {
     animationGroupId?: string;

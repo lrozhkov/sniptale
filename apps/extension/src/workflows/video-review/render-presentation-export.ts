@@ -22,6 +22,7 @@ import {
 } from '../../features/video/project/export/time-estimate';
 import {
   resolveReviewOutputProfile,
+  assertReviewCameraAdmission,
   resolveReviewVideoEncoderConfig,
   reviewOutputCodecs,
 } from './render-settings';
@@ -336,6 +337,7 @@ export async function writeReviewPresentationFrames(
   args: Args,
   preview?: PresentationExportPreview
 ): Promise<ReviewPacketReceipt> {
+  assertReviewCameraAdmission(args);
   const prepared = await reviewExportPhase(args.signal, 'prepare', () => prepare(args, preview));
   const receipt: ReviewPacketReceipt = {
     videoPackets: 0,

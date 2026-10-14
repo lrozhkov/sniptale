@@ -1,3 +1,4 @@
+import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import type { VideoProject } from '../../project/types/index';
 import { motionBlurSamples } from '../motion/blur';
 import { resolveTransitionOverlays } from '../../project/transition/presentation';
@@ -22,7 +23,11 @@ function hasMeaningfulMotionBlurSpread(
 
 function resolveRenderFrameOptions(
   project: VideoProject,
-  options: { includeSubtitles?: boolean; timelineIndex?: VideoCompositionTimelineIndex }
+  options: {
+    includeSubtitles?: boolean;
+    timelineIndex?: VideoCompositionTimelineIndex;
+    cameraViewport?: CameraOutputViewport;
+  }
 ) {
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   return {
@@ -30,6 +35,7 @@ function resolveRenderFrameOptions(
       ? {}
       : { includeSubtitles: options.includeSubtitles }),
     timelineIndex,
+    ...(options.cameraViewport ? { cameraViewport: options.cameraViewport } : {}),
   };
 }
 
@@ -76,7 +82,11 @@ function createSingleVisualPassResult(params: {
 export function resolveVideoCompositionRenderPasses(
   project: VideoProject,
   currentTime: number,
-  options: { includeSubtitles?: boolean; timelineIndex?: VideoCompositionTimelineIndex } = {}
+  options: {
+    includeSubtitles?: boolean;
+    timelineIndex?: VideoCompositionTimelineIndex;
+    cameraViewport?: CameraOutputViewport;
+  } = {}
 ): {
   overlayFrame: VideoCompositionFrame;
   visualPasses: VideoCompositionVisualPass[];

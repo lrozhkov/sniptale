@@ -1,3 +1,4 @@
+import { parseCameraFollowSettings } from '../../project/camera/cursor-policy';
 import { parseCursorFocusPath } from '../../project/cursor-focus-path/validation';
 import { parseReviewActionAudio } from './action-audio';
 import { parseQuickEditShadow } from './shadow-validation';
@@ -181,6 +182,11 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     return null;
   if (value['followCursor'] !== undefined && typeof value['followCursor'] !== 'boolean')
     return null;
+  const cameraFollow =
+    value['cameraFollow'] === undefined
+      ? undefined
+      : parseCameraFollowSettings(value['cameraFollow']);
+  if (cameraFollow === null) return null;
   const perspective = parseQuickEditPerspective(value['perspective']);
   const depthOfField = parseQuickEditDepth(value['depthOfField']);
   if (perspective === null || depthOfField === null) return null;
@@ -217,6 +223,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   )
     return null;
   return {
+    ...(cameraFollow ? { cameraFollow } : {}),
     ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
     ...(perspective ? { perspective } : {}),
     ...(depthOfField ? { depthOfField } : {}),
@@ -487,6 +494,15 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
 }
 
 function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdvancedContent | null {
+  const cameraFollowDefaults =
+    raw['cameraFollowDefaults'] === undefined
+      ? undefined
+      : parseCameraFollowSettings(raw['cameraFollowDefaults']);
+  if (
+    cameraFollowDefaults === null ||
+    (cameraFollowDefaults && !supportsAdvancedSchema(raw['schemaVersion'], 20))
+  )
+    return null;
   const cursorFocusPath =
     raw['cursorFocusPath'] === undefined ? undefined : parseCursorFocusPath(raw['cursorFocusPath']);
   if (
@@ -516,6 +532,11 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     return null;
   if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
   const zoom = parseZoomState(raw['zoom'], supportsAdvancedSchema(raw['schemaVersion'], 3));
+  if (
+    zoom?.regions.some((region) => region.cameraFollow !== undefined) &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 20)
+  )
+    return null;
   if (
     zoom &&
     !supportsAdvancedSchema(raw['schemaVersion'], 19) &&
@@ -563,6 +584,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   if (!zoom || !background || !audio) return null;
   return {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+    ...(cameraFollowDefaults ? { cameraFollowDefaults } : {}),
     ...(cursorFocusPath ? { cursorFocusPath } : {}),
     zoom,
     background,
@@ -638,7 +660,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].some(
       (known) => known >= firstHistorical && version === known
     )
   );

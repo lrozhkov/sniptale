@@ -1,3 +1,5 @@
+import { createCameraFollowSettings } from '../../../../features/video/project/camera/cursor-policy';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../../../../composition/persistence/projects/index.test-support';
 import { encodePortableVideoProjectAssetRefs } from '../root-codecs/projects';
@@ -683,4 +685,46 @@ it('keeps one editable captured-key override through Gallery handoff and portabl
   });
   expect({ cursorTrack: track, actionEvents: [action], signals: [] }).toEqual(facts);
   expect(handed.cursorFocusPath?.segments[0]?.binding).toMatchObject({ recordingId: 'old' });
+});
+
+it('retains camera defaults and overrides through portable backup admission and reference remapping', async () => {
+  const { parsePortableVideoProjectMetadata, decodePortableVideoProjectAssetRefs } =
+    await import('../root-codecs/projects');
+  const { parseHydratableVideoProject } =
+    await import('../../../../features/video/project/validation/root');
+  const { transformPortableVideoProjectReferences } = await import('./video-project-references');
+  const entry = createVideoProjectEntryWithMediaClip();
+  const project = entry.project;
+  project.version = 4;
+  project.cameraFollowDefaults = createCameraFollowSettings('calm');
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      cameraFollow: createCameraFollowSettings('fast'),
+    },
+  ];
+  const before = structuredClone(project);
+  const portable = parsePortableVideoProjectMetadata(
+    JSON.parse(
+      JSON.stringify({
+        entry: { ...entry, project: encodePortableVideoProjectAssetRefs(project) },
+        projectAssets: [portableProjectAsset('project-asset-1')],
+        projectExports: [],
+      })
+    )
+  );
+  const decoded = parseHydratableVideoProject(
+    decodePortableVideoProjectAssetRefs({ ...portable.entry.project, effectSnapshots: [] })
+  );
+  if (!decoded) throw new Error('Expected camera backup admission');
+  const restored = transformPortableVideoProjectReferences(
+    decoded,
+    new Map([['project-asset-1', 'restored-asset']]),
+    { 'media:library-item:recording:recording-1': 'recording:restored-recording' },
+    {}
+  );
+  expect(restored.cameraFollowDefaults).toEqual(project.cameraFollowDefaults);
+  expect(restored.motionRegions?.[0]?.cameraFollow).toEqual(project.motionRegions[0]!.cameraFollow);
+  expect(restored.version).toBe(4);
+  expect(project).toEqual(before);
 });

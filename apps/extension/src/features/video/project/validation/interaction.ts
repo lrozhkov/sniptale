@@ -1,3 +1,4 @@
+import { parseCameraFollowSettings } from '../camera/cursor-policy';
 import { isRecordingInteractionMetadata } from './recording-telemetry';
 import {
   isRecordingKeyboardRhythmBlocks,
@@ -196,6 +197,8 @@ export function isVideoProjectActionPresentationOverride(value: unknown): boolea
 export function isMotionRegion(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['cameraFollow'] === undefined ||
+      parseCameraFollowSettings(value['cameraFollow']) !== null) &&
     (value['sourceBinding'] === undefined ||
       parseMotionSourceBinding(value['sourceBinding']) !== null) &&
     isString(value['id']) &&

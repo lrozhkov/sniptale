@@ -512,6 +512,7 @@ function reviewAdvancedControls(
 ) {
   return {
     setCursorFocusPath: advancedState.setCursorFocusPath,
+    setCameraFollowDefaults: advancedState.setCameraFollowDefaults,
     setMode: (mode: 'basic' | 'advanced') =>
       beforeAction(() => {
         setActiveSelection({ kind: 'none' });

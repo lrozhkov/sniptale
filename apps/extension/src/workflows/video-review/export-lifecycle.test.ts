@@ -8,6 +8,50 @@ import { createCanvasComment } from '../../features/video/review/comments';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
+it('rejects a camera plan conflict before audio acquisition, staging, or publication', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
+  advanced.zoom = {
+    enabled: true,
+    regions: [
+      {
+        ...createQuickEditZoomRegion({ id: 'too-fast', at: 0, duration: 2 }),
+        transform: { scale: 3, centerX: 0.7, centerY: 0.7 },
+        enter: { type: 'ease-in-out', duration: 0.001 },
+      },
+    ],
+  };
+  advanced.cursorFocusPath = {
+    version: 1,
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'authored',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 6,
+        keys: [{ id: 'focus', time: 0, x: 0.7, y: 0.7, anchor: 'manual', interpolation: 'hold' }],
+      },
+    ],
+  };
+  args.index.processedVideoCodec = 'vp8';
+  const before = structuredClone(args.snapshot);
+  await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
+    reasons: ['camera-follow'],
+  });
+  expect(deps.openAudioSource).not.toHaveBeenCalled();
+  expect(deps.createActionSource).not.toHaveBeenCalled();
+  expect(deps.assertAssetWriteAdmission).not.toHaveBeenCalled();
+  expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+  expect(args.snapshot).toEqual(before);
+});
+
 it('routes annotation-only fragments with immutable workspace sources and the full main clock', async () => {
   const { args, deps } = fixture();
   args.snapshot.workspace.advanced.ui.mode = 'advanced';

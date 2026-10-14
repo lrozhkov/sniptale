@@ -517,6 +517,28 @@
       "signatureHash": "b8ad0625a0a5ae6b376c2f16711495726f771a47a4a9367a052e3c18ae243d29",
       "reason": "tool-noise: One fixed codec/variant matrix uses actual exporter, encoder/muxer and decoded samples to compare a captured lossless reference with encoded output at the full/fragment/presentation clock. Each decoded sample closes in finally and input disposes; typed fixture settings do not create product state. Main/full/fragment evidence depends on the same args/reference, not another runtime owner. This is executable cross-boundary proof, with exact durations/frame counts and witnesses asserted by its spec. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
       "reviewDate": "2026-10-11"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/motion/camera-geometry.ts",
+      "symbol": "createProjectWorkingZoneCameraGeometry",
+      "owner": "extension:feature:video:composition",
+      "reason": "tool-noise: This factory binds one renderer geometry snapshot. Parent line count includes nested methods. Parent control metrics skip those methods. The parent has 16 statements, cyclomatic 3, cognitive 2, nesting 0, and no effects or state. Source bounds now use separate crop, rotation, and transition functions. Projection and source-end/cut tests prove their paths. A forwarding factory split would add navigation without separating authority. The architecture reviewer must assess this classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess new authority, independent responsibilities, or method growth. Remove when the analyzer separates parent and nested method line counts.",
+      "reviewDate": "2026-10-14",
+      "astHash": "b43a97196b5bc077f1d7e788c7e2c474ad89a4f6f7e8d4fa15bd073c82da19f8",
+      "signatureHash": "bf0f4f53e34843f435e3221d9ec8a76f30cbe24c2ee8d7c390def907f6c82e95"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/advanced/camera-geometry.ts",
+      "symbol": "createReviewWorkingZoneCameraGeometry",
+      "owner": "extension:feature:video:review",
+      "reason": "tool-noise: This factory binds one Gallery geometry snapshot. Its parent lines include returned geometry methods and phase closures. The analyzer measures those methods separately. The parent has 14 statements, no effects or state, and one owner. Phase selection and raster modes belong to this adapter. A forwarding factory split would retain every closure and add navigation. Projection parity and continuous admission tests prove those methods. The architecture reviewer must assess this classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess new authority, independent responsibilities, or method growth. Remove when the analyzer separates parent and nested method line counts.",
+      "reviewDate": "2026-10-14",
+      "astHash": "1c78cd78d0f8d7182c0e6068ec7d39174dbeeb9bb427684e4231f458e5bee2a8",
+      "signatureHash": "d7eedef8ad30f228812a1c1dfd6213c1bd5617c0ae6336b72ea201f8ef198fee"
     }
   ]
 }

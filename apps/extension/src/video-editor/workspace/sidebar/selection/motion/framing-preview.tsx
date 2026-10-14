@@ -7,6 +7,8 @@ import {
 } from '../../../../../features/video/project/types';
 import type { resolveCameraViewportFrame } from '../../../../../features/video/composition/motion/viewport';
 import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
+import { isVideoProjectUtilityLaneVisible } from '../../../../../features/video/project/utility-lanes';
+import { resolveProjectCursorCameraPlan } from '../../../../../features/video/composition/motion/project-follow';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { useFramingFrame } from './framing-preview-frame';
 import { useFramingInteraction, type FramingPreviewProps } from './framing-preview-interaction';
@@ -42,6 +44,11 @@ export function MotionFramingPreview(props: {
 }
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
+  const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
+  const plan =
+    following && isVideoProjectUtilityLaneVisible(props.project, 'camera')
+      ? resolveProjectCursorCameraPlan(props.project, props.region)
+      : null;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { areaMode, area, camera, viewport, left, top, width, height, handlers } =
@@ -50,6 +57,15 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
 
   return (
     <div className="space-y-2" data-ui="video-editor.framing-preview">
+      {plan?.status === 'conflict' ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('videoEditor.app.exportCameraConflict')}
+        </p>
+      ) : plan?.status === 'ready' && plan.targetScale < props.region.scale ? (
+        <p role="status" className="text-xs">
+          {translate('videoEditor.sidebar.cameraExpansionApplied')}
+        </p>
+      ) : null}
       <div className="flex gap-1" aria-label={translate('videoEditor.sidebar.framingPreviewLabel')}>
         {[true, false].map((mode) => (
           <button
@@ -79,7 +95,7 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
 border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-muted)]
 touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-default`}
         style={{ aspectRatio: `${width} / ${height}` }}
-        {...(overview ? handlers : {})}
+        {...(overview && !following ? handlers : {})}
       >
         <FramingOverlays
           canvasRef={canvasRef}
@@ -99,7 +115,7 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
         >
           {translate('common.actions.retry')}
         </button>
-      ) : overview ? (
+      ) : overview && !following ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate(
             areaMode

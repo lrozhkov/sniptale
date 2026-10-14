@@ -63,15 +63,55 @@ export function resolveCursorSample(
     return previousSample;
   }
 
-  const continuous =
-    nextSample &&
-    previousSample.visible &&
-    (!nextSample.observation || nextSample.observation === 'observed') &&
-    previousSample.captureSegment === nextSample.captureSegment &&
-    previousSample.sourceAnchor?.sourceClipId === nextSample.sourceAnchor?.sourceClipId;
+  const continuous = cursorSamplesContinuous(previousSample, nextSample);
   return continuous && nextSample
     ? interpolateCursorSample(previousSample, nextSample, currentTime)
     : previousSample;
+}
+
+function cursorSamplesContinuous(
+  previous: VideoProjectCursorSample,
+  next: VideoProjectCursorSample | null
+): next is VideoProjectCursorSample {
+  return (
+    !!next &&
+    previous.visible &&
+    (!next.observation || next.observation === 'observed') &&
+    previous.captureSegment === next.captureSegment &&
+    previous.sourceAnchor?.sourceClipId === next.sourceAnchor?.sourceClipId
+  );
+}
+
+/** Bound one rendered key interval before camera transforms. Callers split at sample and clip boundaries. */
+export function boundRenderedCursorPosition(project: VideoProject, start: number, end: number) {
+  const { previousSample: previous, nextSample: next } = cursorSamplesAtTime(
+    project,
+    (start + end) / 2,
+    undefined
+  );
+  if ((previous && start < previous.time) || (next && end > next.time))
+    throw new Error('Rendered cursor bounds require one key interval.');
+  if (!previous?.visible || resolveCursorSkin(project, previous).hidden) return null;
+  const owner =
+    previous.sourceAnchor &&
+    project.clips.find((clip) => clip.id === previous.sourceAnchor?.sourceClipId);
+  const middle = (start + end) / 2;
+  if (
+    previous.sourceAnchor &&
+    (!owner || middle < owner.startTime || middle >= owner.startTime + owner.duration)
+  )
+    return null;
+  const continuous =
+    project.cursorTrack?.captureMode !== VideoCursorCaptureMode.EMBEDDED_FALLBACK &&
+    cursorSamplesContinuous(previous, next);
+  const from = continuous && next ? interpolateCursorSample(previous, next, start) : previous;
+  const to = continuous && next ? interpolateCursorSample(previous, next, end) : previous;
+  return {
+    minX: Math.min(from.x, to.x),
+    maxX: Math.max(from.x, to.x),
+    minY: Math.min(from.y, to.y),
+    maxY: Math.max(from.y, to.y),
+  };
 }
 
 function resolveCursorSkin(project: VideoProject, sample: VideoProjectCursorSample) {
@@ -219,9 +259,20 @@ function cursorSamplesAtTime(
 export function resolveObservedCursorPosition(
   project: VideoProject,
   time: number,
-  sourceClipId?: string
+  sourceClipId?: string,
+  options?: { includeSourceEnd?: boolean }
 ): VideoProjectCursorSample | null {
-  const sample = resolveCursorSample(project, time, sourceClipId);
+  const owner =
+    options?.includeSourceEnd && sourceClipId
+      ? project.clips.find(
+          (clip) =>
+            clip.id === sourceClipId && clip.duration > 0 && time === clip.startTime + clip.duration
+        )
+      : undefined;
+  // A closing proof owns the left source at its exact endpoint. Playback keeps its ordinary half-open dispatch.
+  const sample = owner
+    ? cursorSamplesAtTime(project, time, sourceClipId).previousSample
+    : resolveCursorSample(project, time, sourceClipId);
   if (
     !sample?.visible ||
     sample.recordingPoint === null ||

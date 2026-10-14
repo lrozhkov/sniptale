@@ -1,17 +1,5 @@
-import {
-  resolveProjectCursorFocusPath,
-  resolveProjectCursorFocus,
-} from '../../project/cursor-focus-path/projection';
-import {
-  resolveObservedCursorPosition,
-  resolveVideoCompositionCursor,
-  resolveCursorSourcePointMapping,
-} from '../timeline/frame/cursor';
-import {
-  planFollowCursorCamera,
-  evaluateFollowCursorCamera,
-  type FollowCursorFrame,
-} from './follow-cursor';
+import type { CameraOutputViewport } from '../../project/export/output-dimensions';
+import { resolveProjectFollowingCamera, resolveProjectCameraEdges } from './project-follow';
 import { resolveVideoProjectActionOccurrences } from '../../project/action-occurrences';
 import { resolveVideoCompositionActionSourceMapping } from '../timeline/frame/actions';
 import { mapSourceNormalizedPointToVisualLayer } from '../draw/fitted-media';
@@ -103,8 +91,9 @@ function resolveActionFocusPoint(
 function resolveMotionFocusPoint(
   project: VideoProject,
   region: VideoProjectMotionRegion,
-  cursorSample: VideoProjectCursorSample | null,
-  currentTime: number
+  _cursorSample: VideoProjectCursorSample | null,
+  currentTime: number,
+  output?: CameraOutputViewport
 ) {
   switch (region.focusMode) {
     case VideoMotionFocusMode.MANUAL:
@@ -114,12 +103,7 @@ function resolveMotionFocusPoint(
         ? getMotionFocusAreaCenter(region.focusArea)
         : (region.focusPoint ?? getDefaultFocusPoint(project));
     case VideoMotionFocusMode.CURSOR:
-      return (
-        resolveFollowingPoint(project, region, currentTime) ??
-        (cursorSample?.visible ? { x: cursorSample.x, y: cursorSample.y } : null) ??
-        region.focusPoint ??
-        getDefaultFocusPoint(project)
-      );
+      return resolveProjectFollowingCamera(project, region, currentTime, output).focusPoint;
     case VideoMotionFocusMode.ACTION:
       return resolveActionFocusPoint(project, region, currentTime);
   }
@@ -150,6 +134,7 @@ export function resolveVideoCompositionCamera(params: {
   cursorSample: VideoProjectCursorSample | null;
   currentTime: number;
   project: VideoProject;
+  cameraViewport?: CameraOutputViewport;
 }): VideoCompositionCameraState {
   if (!isVideoProjectUtilityLaneVisible(params.project, 'camera')) {
     return createDefaultCameraState(params.project);
@@ -160,35 +145,50 @@ export function resolveVideoCompositionCamera(params: {
     return resolveConnectingCamera(params) ?? createDefaultCameraState(params.project);
   }
 
-  const animationGroupId = activeRegion.sourceBinding?.animationGroupId;
-  const animationParts = animationGroupId
-    ? (params.project.motionRegions ?? [])
-        .filter(
-          (region) =>
-            region.duration > 0 && region.sourceBinding?.animationGroupId === animationGroupId
-        )
-        .sort((a, b) => (a.animation?.start ?? 0) - (b.animation?.start ?? 0))
-    : [activeRegion];
-  const firstPart = animationParts[0] ?? activeRegion;
-  const lastPart = animationParts.at(-1) ?? activeRegion;
-  const connectedIn = resolveMotionConnectionSource(params.project, firstPart) !== null;
-  const connectedOut = (params.project.motionRegions ?? []).some(
-    (region) => resolveMotionConnectionSource(params.project, region)?.id === lastPart.id
-  );
+  const { connectedIn, connectedOut } = resolveProjectCameraEdges(params.project, activeRegion);
   const progress = resolveMotionProgress(
     activeRegion,
     params.currentTime,
     connectedIn,
     connectedOut
   );
-  const targetScale = resolveMotionTargetScale(params.project, activeRegion);
+  const following =
+    activeRegion.focusMode === VideoMotionFocusMode.CURSOR
+      ? resolveProjectFollowingCamera(
+          params.project,
+          activeRegion,
+          params.currentTime,
+          params.cameraViewport
+        )
+      : null;
+  const targetScale =
+    following?.targetScale ?? resolveMotionTargetScale(params.project, activeRegion);
   const scale = 1 + (targetScale - 1) * progress;
-  const focusPoint = resolveMotionFocusPoint(
-    params.project,
-    activeRegion,
-    params.cursorSample,
-    params.currentTime
-  );
+  const focusPoint =
+    following?.focusPoint ??
+    resolveMotionFocusPoint(
+      params.project,
+      activeRegion,
+      params.cursorSample,
+      params.currentTime,
+      params.cameraViewport
+    );
+  if (following)
+    return {
+      focusPoint,
+      scale,
+      regionId: activeRegion.id,
+      motionBlurAmount: activeRegion.motionBlurAmount ?? 0,
+      overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
+      viewportHeight: params.project.height / scale,
+      viewportWidth: params.project.width / scale,
+      viewportX:
+        ((following.pan.x / following.geometry.window.width) * params.project.width * progress) /
+        scale,
+      viewportY:
+        ((following.pan.y / following.geometry.window.height) * params.project.height * progress) /
+        scale,
+    };
   const targetViewport = resolveCameraViewportFrame(params.project, focusPoint, targetScale);
   const currentViewport = resolveCameraViewportFrame(params.project, focusPoint, scale);
   // Interpolate the rendered translation, then convert it back to source coordinates.
@@ -221,8 +221,14 @@ function resolveConnectingCamera(
       destination.incomingConnection.easing
     );
     const focusPoint = lerpPoint(
-      resolveMotionFocusPoint(params.project, source, null, start),
-      resolveMotionFocusPoint(params.project, destination, null, destination.startTime),
+      resolveMotionFocusPoint(params.project, source, null, start, params.cameraViewport),
+      resolveMotionFocusPoint(
+        params.project,
+        destination,
+        null,
+        destination.startTime,
+        params.cameraViewport
+      ),
       progress
     );
     const scale = lerpNumber(
@@ -277,81 +283,4 @@ export function mapViewportPointToComposition(
     x: point.x / camera.scale + camera.viewportX,
     y: point.y / camera.scale + camera.viewportY,
   };
-}
-
-const followPlans = new WeakMap<
-  VideoProject,
-  Map<string, ReturnType<typeof planFollowCursorCamera>>
->();
-
-function resolveFollowingPoint(
-  project: VideoProject,
-  region: VideoProjectMotionRegion,
-  time: number
-) {
-  const path = resolveProjectCursorFocusPath(project);
-  let plans = followPlans.get(project);
-  if (!plans) {
-    plans = new Map();
-    followPlans.set(project, plans);
-  }
-  let plan = plans.get(region.id);
-  if (!plan) {
-    const frames: FollowCursorFrame[] = [];
-    const step = Math.max(1 / 30, region.duration / 18000);
-    for (
-      let output = region.startTime;
-      output <= region.startTime + region.duration;
-      output += step
-    ) {
-      const focus = resolveProjectCursorFocus(project, output, path, region.sourceBinding?.clipId);
-      if (!focus) continue;
-      const focusPoint = cursorScenePoint(project, focus, output, focus.sourceClipId);
-      if (!focusPoint) continue;
-      const actualPoint = actualCursorScenePoint(project, output, region.sourceBinding?.clipId);
-      frames.push({
-        x: focusPoint.x / project.width,
-        y: focusPoint.y / project.height,
-        time: output,
-        segmentId: focus.segmentId,
-        ...(actualPoint
-          ? { actual: { x: actualPoint.x / project.width, y: actualPoint.y / project.height } }
-          : {}),
-      });
-    }
-    plan = planFollowCursorCamera(frames, region.scale, path.sensitivity);
-    plans.set(region.id, plan);
-  }
-  const actualPoint = actualCursorScenePoint(project, time, region.sourceBinding?.clipId);
-  const pose = evaluateFollowCursorCamera(
-    plan,
-    time,
-    actualPoint
-      ? { x: actualPoint.x / project.width, y: actualPoint.y / project.height }
-      : undefined,
-    region.scale
-  );
-  return pose ? { x: pose.x * project.width, y: pose.y * project.height } : null;
-}
-
-function cursorScenePoint(
-  project: VideoProject,
-  point: { x: number; y: number; recordingPoint?: { x: number; y: number } | null },
-  time: number,
-  clipId: string | undefined
-) {
-  const mapping = resolveCursorSourcePointMapping(project, clipId, time);
-  return mapping
-    ? mapSourceNormalizedPointToVisualLayer({
-        ...mapping,
-        point: point.recordingPoint ?? { x: point.x / project.width, y: point.y / project.height },
-      })
-    : point;
-}
-
-function actualCursorScenePoint(project: VideoProject, time: number, clipId: string | undefined) {
-  if (project.cursorTrack?.captureMode === 'separate')
-    return resolveVideoCompositionCursor(project, time, []);
-  const actual = resolveObservedCursorPosition(project, time, clipId);
-  return actual ? cursorScenePoint(project, actual, time, actual.sourceAnchor?.sourceClipId) : null;
 }

@@ -1,3 +1,4 @@
+import { createCameraFollowSettings } from '../project/camera/cursor-policy';
 import { expect, it } from 'vitest';
 import { normalizeVideoProjectCursorSkin } from '../project/cursor';
 import { deriveReviewCursorFocusPath } from './advanced/cursor-focus-path';
@@ -219,3 +220,18 @@ it.each(['click:source-click', 'release:source-click', 'dwell-start:idle', 'dwel
     expect(content).toEqual(authored);
   }
 );
+
+it('retains camera defaults through a settings-only Gallery-to-Montage handoff and native reopen', () => {
+  const project = recording(),
+    content = createQuickEditAdvancedContent();
+  content.cameraFollowDefaults = createCameraFollowSettings('calm');
+  const before = structuredClone(project);
+  const result = applyRecordingReviewInteractions(project, 'recording', content);
+  expect(result.version).toBe(4);
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(result)))?.cameraFollowDefaults
+  ).toEqual(content.cameraFollowDefaults);
+  content.cameraFollowDefaults.zoneSize = 0.25;
+  expect(result.cameraFollowDefaults?.zoneSize).toBe(0.55);
+  expect(project).toEqual(before);
+});

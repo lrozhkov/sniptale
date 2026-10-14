@@ -80,7 +80,13 @@ export function previewTransitionBacking(
   const backing = description.dimensions.backing;
   const zoom = (
     description.cameraTransform ??
-    evaluateQuickEditCameraAtTime(description.scene.zoomRegions, time)
+    evaluateQuickEditCameraAtTime(description.scene.zoomRegions, time, {
+      source,
+      canvas: description.scene.canvas,
+      background: description.scene.background,
+      windowHeader: description.scene.windowHeader,
+      output: backing,
+    })
   ).scale;
   const scale = Math.min(
     1,

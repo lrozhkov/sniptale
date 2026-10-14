@@ -626,4 +626,36 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 22, to: 23 },
+      { domainId: 'videoProjects', from: 4, to: 5 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 27,
+    toDatabaseVersion: 28,
+    risk: 'additive',
+    stores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      VIDEO_PROJECTS_STORE,
+    ],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+          VIDEO_PROJECTS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Camera policy stores are unavailable.');
+      return undefined;
+    },
+  },
 ];

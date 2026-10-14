@@ -107,7 +107,12 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
     };
   });
   const camera: QuickEditCameraTransform = regions.length
-    ? evaluateQuickEditCameraAtTime(regions, props.outputTime)
+    ? evaluateQuickEditCameraAtTime(regions, props.outputTime, {
+        source: props.source,
+        canvas: props.canvas,
+        background: props.background,
+        windowHeader: props.windowHeader,
+      })
     : { scale: 1, centerX: 0.5, centerY: 0.5 };
   const geometryRef = useRef<{
     output: { width: number; height: number };

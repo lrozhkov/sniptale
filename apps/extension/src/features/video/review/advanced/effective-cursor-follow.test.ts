@@ -48,6 +48,8 @@ it('applies local cursor mode independently of the scene default and neighboring
   state.zoom.regions = [
     Object.assign(createQuickEditZoomRegion({ id: 'local', at: 0, duration: 2, endMax: 6 }), {
       followCursor: true,
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
     }),
     Object.assign(createQuickEditZoomRegion({ id: 'fixed', at: 3, duration: 2, endMax: 6 }), {
       followCursor: false,
@@ -56,7 +58,12 @@ it('applies local cursor mode independently of the scene default and neighboring
   const local = resolveQuickEditEffectiveState(state);
   expect(local.zoomRegions[0]?.cursorFocus?.path.mode).toBe('follow');
   expect(local.zoomRegions[1]?.cursorFocus).toBeUndefined();
-  expect(evaluateQuickEditCameraAtTime(local.zoomRegions, 1).centerX).not.toBe(0.5);
+  expect(
+    evaluateQuickEditCameraAtTime(local.zoomRegions, 1, {
+      source: { width: 1000, height: 600 },
+      background: { enabled: false },
+    }).centerX
+  ).not.toBe(0.5);
   expect(state.cursorFocusPath.mode).toBe('fixed');
   state.cursorFocusPath.mode = 'follow';
   const global = resolveQuickEditEffectiveState(state);

@@ -125,7 +125,7 @@ export function addMaterialCapturedActions(
     : {
         ...project,
         actionEvents: [...project.actionEvents, ...added],
-        version: 3,
+        version: project.version === 4 ? 4 : 3,
         actionFeedback: feedback,
       };
 }

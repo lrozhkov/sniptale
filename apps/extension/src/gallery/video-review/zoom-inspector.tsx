@@ -1,3 +1,8 @@
+import { ReviewCameraFollowSettings } from './cursor-path-editor';
+import {
+  resolveCameraFollowPolicy,
+  type CameraFollowSettings,
+} from '../../features/video/project/camera/cursor-policy';
 import { ReviewSpatialInspector } from './spatial-inspector';
 import { useContext, useState } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
@@ -98,6 +103,7 @@ function ZoomTransitionSection(props: {
 /** Inspector form for the selected zoom region; edits clamp into the persisted contract. */
 export function ReviewZoomInspector(props: {
   region: QuickEditZoomRegion;
+  cameraFollowDefaults?: CameraFollowSettings | undefined;
   cursorPath?: CursorFocusPath | undefined;
   spatialPreview?: QuickEditZoomRegion;
   cutSuppressed?: boolean;
@@ -162,6 +168,25 @@ export function ReviewZoomInspector(props: {
                       onChange={onChange}
                       onPreview={props.onPreview}
                     />
+                    {!region.border &&
+                    !region.spotlight &&
+                    (region.followCursor ?? props.cursorPath?.mode === 'follow') ? (
+                      <ReviewCameraFollowSettings
+                        settings={
+                          resolveCameraFollowPolicy({
+                            legacySensitivity: props.cursorPath?.sensitivity ?? 0.5,
+                            ...(props.cameraFollowDefaults
+                              ? { defaults: props.cameraFollowDefaults }
+                              : {}),
+                            ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
+                          }).settings
+                        }
+                        inherited={!region.cameraFollow}
+                        legacySensitivity={props.cursorPath?.sensitivity ?? 0.5}
+                        onChange={(cameraFollow) => onChange({ cameraFollow })}
+                        onReset={() => onChange({ cameraFollow: null })}
+                      />
+                    ) : null}
                   </div>
                 </ReviewInspectorColumns>
               ),

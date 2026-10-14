@@ -40,6 +40,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   captions: 'gallery.videoReview.captions',
   'annotation-effects': 'gallery.videoReview.annotationEffects',
   'caption-layout': 'gallery.videoReview.captionConflict',
+  'camera-follow': 'gallery.videoReview.cameraFollowConflict',
   presentation: 'gallery.videoReview.presentation',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',
   'cut-transition': 'gallery.videoReview.cutTransition',

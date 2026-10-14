@@ -1,6 +1,14 @@
 import { expect, it, vi } from 'vitest';
-import { assertPreparedProjectAssetSources } from './source-admission';
-import { createMediaLibraryEntry, createProjectAssetEntry } from './index.test-support';
+import { createCameraFollowSettings } from '../../../features/video/project/camera/cursor-policy';
+import {
+  assertMediaSourceReplaceable,
+  assertPreparedProjectAssetSources,
+} from './source-admission';
+import {
+  createMediaLibraryEntry,
+  createProjectAssetEntry,
+  createVideoProjectEntryWithMediaClip,
+} from './index.test-support';
 const ref = {
   assetId: 'body',
   createdAt: 1,
@@ -152,3 +160,37 @@ it('refuses prepared source evidence associated with a different byte object', a
     )
   ).rejects.toThrow('source changed');
 });
+
+it.each(['unrelated', 'related', 'future'] as const)(
+  'admits source replacement only with disjoint supported camera-policy projects: %s',
+  async (state) => {
+    const source = { id: 'changed-image', source: { kind: 'screenshot' as const } };
+    const project = createVideoProjectEntryWithMediaClip({
+      version: 4,
+      cameraFollowDefaults: createCameraFollowSettings(),
+    });
+    if (state === 'related')
+      project.project.assets[0]!.source = {
+        kind: 'library-asset',
+        mediaId: source.id,
+      };
+    const row =
+      state === 'future'
+        ? {
+            ...project,
+            project: { ...project.project, version: 5 },
+          }
+        : project;
+    const empty = { getAll: async () => [] };
+    const replacement = assertMediaSourceReplaceable(source, {
+      assets: empty,
+      scenarioAssets: empty,
+      videoWorkspaces: empty,
+      projects: { getAll: async () => [row] },
+    });
+    if (state === 'unrelated') await expect(replacement).resolves.toBeUndefined();
+    else await expect(replacement).rejects.toMatchObject({ reason: 'source-unavailable' });
+    expect(project.project.version).toBe(4);
+    expect(project.project.cameraFollowDefaults).toEqual(createCameraFollowSettings());
+  }
+);

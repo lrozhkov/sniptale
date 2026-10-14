@@ -14,6 +14,7 @@ import {
   type VideoProjectMotionArea,
 } from '../../../../../features/video/project/types';
 import { resolveCameraViewportFrame } from '../../../../../features/video/composition/motion/viewport';
+import { resolveVideoCompositionCamera } from '../../../../../features/video/composition/motion';
 
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
 type AreaGesture = { area: VideoProjectMotionArea; start: Point; corner: Corner | null };
@@ -107,7 +108,13 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
     height,
     handlers: {
       onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
-        if (!overview || event.button !== 0 || event.currentTarget.matches(':disabled')) return;
+        if (
+          !overview ||
+          region.focusMode === VideoMotionFocusMode.CURSOR ||
+          event.button !== 0 ||
+          event.currentTarget.matches(':disabled')
+        )
+          return;
         event.preventDefault();
         event.currentTarget.focus();
         gesture.current.world = { left, top, width, height };
@@ -276,6 +283,26 @@ function resolveFramingView(
   areaDraft: VideoProjectMotionArea | null,
   overview: boolean
 ) {
+  if (region.focusMode === VideoMotionFocusMode.CURSOR) {
+    const viewport = resolveVideoCompositionCamera({
+      project,
+      currentTime: Math.min(project.duration, region.startTime + region.duration / 2),
+      actions: [],
+      cursorSample: null,
+    });
+    const width = overview ? project.width : viewport.viewportWidth;
+    const height = overview ? project.height : viewport.viewportHeight;
+    return {
+      areaMode: false,
+      area: null,
+      focus: viewport.focusPoint,
+      viewport,
+      left: overview ? 0 : viewport.viewportX,
+      top: overview ? 0 : viewport.viewportY,
+      width,
+      height,
+    };
+  }
   const areaMode = region.focusMode === VideoMotionFocusMode.MANUAL_AREA;
   const area = areaMode
     ? (areaDraft ??

@@ -80,6 +80,10 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   captionSize: { ru: 'Размер текста', en: 'Text size' },
   captionColor: { ru: 'Цвет текста', en: 'Text color' },
   captionBackground: { ru: 'Фон текста', en: 'Text background' },
+  cameraFollowConflict: {
+    ru: 'Камера: движение и кадрирование несовместимы. Измените скорость, разрешите расширение или выберите фиксированную камеру.',
+    en: 'Camera movement conflicts with framing. Change the speed, allow wider framing, or select a fixed camera.',
+  },
   captionConflict: {
     ru: 'Текст не помещается или перекрывает другие элементы',
     en: 'Text does not fit or overlaps other elements',

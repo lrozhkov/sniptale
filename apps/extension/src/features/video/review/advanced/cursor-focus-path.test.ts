@@ -1,5 +1,9 @@
 import { createQuickEditAdvancedContent } from './defaults';
 import { loadQuickEditAdvancedContentState } from './validation';
+import {
+  createCameraFollowSettings,
+  resolveCameraFollowPolicy,
+} from '../../project/camera/cursor-policy';
 import { expect, it } from 'vitest';
 import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
 import type { CursorFocusPath } from '../../project/cursor-focus-path/types';
@@ -9,7 +13,11 @@ import {
   evaluateReviewFollowCursor,
   type ReviewCursorFacts,
 } from './cursor-focus-path';
-import { evaluateQuickEditCameraAtTime } from './scene';
+import {
+  evaluateQuickEditCameraAtTime,
+  resolveReviewCameraGeometry,
+  resolveReviewSceneCameraPlan,
+} from './scene';
 import type { QuickEditZoomRegion } from './types';
 
 const facts: ReviewCursorFacts = {
@@ -70,19 +78,33 @@ const authored: CursorFocusPath = {
   ],
 };
 
-it.each([0.5, 1, 2, 4])(
-  'evaluates Follow in output seconds at speed %s and contains the physical pointer over an opposing authored path',
-  (rate) => {
+it.each([0.5, 1, 2, 4].flatMap((rate) => [1.2, 2, 2.5, 4].map((scale) => [rate, scale] as const)))(
+  [
+    'evaluates Follow at speed %s and zoom %s ',
+    'and contains the physical pointer over an opposing authored path',
+  ].join(''),
+  (rate, scale) => {
+    const stationaryFacts = {
+      ...facts,
+      cursorTrack: {
+        ...facts.cursorTrack!,
+        samples: facts.cursorTrack!.samples.map((sample, index) => ({
+          ...sample,
+          recordingPoint: { x: [0.57, 0.58, 0.56][index]!, y: 0.57 },
+        })),
+      },
+    };
     const region: QuickEditZoomRegion = {
       id: 'follow',
       start: 0,
       end: 4 / rate,
-      transform: { scale: 4, centerX: 0.5, centerY: 0.5 },
+      transform: { scale, centerX: 0.5, centerY: 0.5 },
       enter: { type: 'linear', duration: 0 },
       exit: { type: 'linear', duration: 0 },
       cursorFocus: {
+        scene: { source, background: { enabled: false } },
         path: authored,
-        observed: deriveReviewCursorFocusPath(facts, source, true),
+        observed: deriveReviewCursorFocusPath(stationaryFacts, source, true),
         timeMap: [
           {
             kind: rate === 1 ? 'keep' : 'speed',
@@ -95,14 +117,20 @@ it.each([0.5, 1, 2, 4])(
         ],
       },
     };
+    expect(resolveReviewSceneCameraPlan([region], region)?.status).toBe('ready');
     for (const outputTime of [0.75 / rate, 1.25 / rate, 2 / rate]) {
       const shared = evaluateQuickEditCameraAtTime([region], outputTime);
-      const adapter = evaluateReviewFollowCursor(region, outputTime, region.transform);
+      const adapter = evaluateReviewFollowCursor(
+        region,
+        outputTime,
+        region.transform,
+        resolveReviewCameraGeometry([region], region)
+      );
       expect(shared).toEqual(adapter);
       const actual = evaluateReviewCursorFocus(region.cursorFocus!.observed!, outputTime * rate)!;
       expect(Math.abs(actual.x - shared.centerX)).toBeLessThanOrEqual(1 / shared.scale / 2 + 1e-9);
       expect(Math.abs(actual.y - shared.centerY)).toBeLessThanOrEqual(1 / shared.scale / 2 + 1e-9);
-      expect(shared.scale).toBe(4);
+      expect(shared.scale).toBe(scale);
       expect(evaluateQuickEditCameraAtTime([region], outputTime)).toEqual(shared);
     }
   }
@@ -190,4 +218,59 @@ it('keeps dense observations intact while offering sparse geometric keys in Gall
   expect(focus.segments[0]!.keys.map((key) => key.id)).toEqual(['dense:0', 'dense:160']);
   expect(deriveReviewCursorFocusPath(recorded, source, true).segments[0]!.keys).toHaveLength(161);
   expect(recorded).toEqual(before);
+});
+
+it('keeps one continuous camera across adjacent speed runs of the same captured source', () => {
+  const path: CursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'native',
+        start: 0,
+        end: 2,
+        binding: { kind: 'project' },
+        keys: [0, 1, 2].map((time) => ({
+          id: `speed-${time}`,
+          time,
+          x: 0.4 + time * 0.1,
+          y: 0.5,
+          anchor: 'movement',
+          interpolation: 'linear',
+        })),
+      },
+    ],
+  };
+  const scene = { source: { width: 1000, height: 600 }, background: { enabled: false as const } };
+  const region: QuickEditZoomRegion = {
+    id: 'speed-camera',
+    start: 0,
+    end: 2.5,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    cursorFocus: {
+      path,
+      observed: path,
+      scene,
+      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('fast') }),
+      timeMap: [
+        { kind: 'speed', sourceStart: 0, sourceEnd: 1, resultStart: 0, resultEnd: 2, rate: 0.5 },
+        { kind: 'speed', sourceStart: 1, sourceEnd: 2, resultStart: 2, resultEnd: 2.5, rate: 2 },
+      ],
+    },
+  };
+  const before = structuredClone(region);
+  const plan = resolveReviewSceneCameraPlan([region], region, scene);
+  expect(plan?.status).toBe('ready');
+  if (plan?.status !== 'ready') return;
+  expect(plan.spans).toHaveLength(1);
+  expect(plan.discontinuities).not.toContainEqual({ time: 2, reason: 'source' });
+  expect(evaluateQuickEditCameraAtTime([region], 2 - 1e-6, scene)).toEqual(
+    evaluateQuickEditCameraAtTime([region], 2, scene)
+  );
+  expect(region).toEqual(before);
 });

@@ -92,6 +92,7 @@ type InspectorState = Pick<
   | 'setWindowHeader'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
+  | 'setCameraFollowDefaults'
   | 'flushAdvanced'
   | 'registerSpeechFlush'
   | 'setVoiceoverSilent'
@@ -728,6 +729,8 @@ function ReviewSceneBinding({
     <>
       <ReviewCursorPathSettings
         path={state.cursorFocusPath}
+        cameraFollowDefaults={state.advanced.cameraFollowDefaults}
+        onPolicyChange={state.setCameraFollowDefaults}
         disabled={busy || state.playing || editing.exporter.phase !== 'idle'}
         onChange={state.setCursorFocusPath}
       />

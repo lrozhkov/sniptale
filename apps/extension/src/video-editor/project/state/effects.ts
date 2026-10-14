@@ -241,9 +241,13 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
                       })
                     : region;
                 }
-                const { sourceClipId, ...properties } = patch;
+                const { sourceClipId, cameraFollow, ...properties } = patch;
                 if (sourceClipId !== undefined && region.duration <= 0) return region;
                 let updated = { ...region, ...properties };
+                if (cameraFollow !== undefined) {
+                  const { cameraFollow: _previous, ...rest } = updated;
+                  updated = cameraFollow ? { ...rest, cameraFollow } : rest;
+                }
                 if (sourceClipId === null) {
                   const { sourceBinding: _binding, ...sceneRegion } = updated;
                   updated = sceneRegion;

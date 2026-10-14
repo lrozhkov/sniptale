@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 19;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 20;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -101,10 +101,13 @@ export interface QuickEditBorder {
 }
 
 export interface QuickEditZoomRegion {
+  cameraFollow?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   /** Explicit local camera policy; absence inherits the scene cursor-focus mode. */
   followCursor?: boolean;
   /** Disposable render context, dropped by storage admission. */
   cursorFocus?: {
+    scene?: import('./scene').QuickEditCameraSceneInput;
+    policy?: import('../../project/camera/cursor-policy').ResolvedCameraFollowPolicy;
     sourceFrame?: { headerHeight: number; height: number };
     path: import('../../project/cursor-focus-path/types').CursorFocusPath;
     observed?: import('../../project/cursor-focus-path/types').CursorFocusPath;
@@ -273,6 +276,7 @@ export interface QuickEditAdvancedState extends QuickEditAdvancedContent {
  * zoom/background/audio changes join the same undo timeline as cuts.
  */
 export interface QuickEditAdvancedContent {
+  cameraFollowDefaults?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   cursorFocusPath?: import('../../project/cursor-focus-path/types').CursorFocusPath;
   text?: import('../text-document').ReviewTextDocument;
   captions?: import('../text-document').ReviewCaptionSettings;

@@ -1,5 +1,5 @@
 import { resolveEffectRuntimeVisualLayers } from '../../../features/video/composition/draw/effect-runtime';
-import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
+import { resolveProjectOutputTransform } from '../../../features/video/project/export/output-dimensions';
 import {
   createEffectRuntimeDrawState,
   drawEffectRuntimeVisualLayer,
@@ -34,28 +34,6 @@ type VisualPass = RenderPasses['visualPasses'][number];
 type OverlayFrame = RenderPasses['overlayFrame'];
 type VisualLayer = ReturnType<typeof mapVisualLayerToViewportSpace>;
 type DrawParams = Parameters<typeof drawVisualPasses>[0];
-
-function resolveProjectOutputTransform(
-  project: Pick<VideoProject, 'height' | 'width'>,
-  settings: Pick<VideoProjectExportSettings, 'height' | 'resolution' | 'width'>
-) {
-  const isOnePixelSourceCrop =
-    settings.resolution === VideoResolutionPreset.SOURCE &&
-    project.width >= settings.width &&
-    project.width - settings.width <= 1 &&
-    project.height >= settings.height &&
-    project.height - settings.height <= 1;
-  if (isOnePixelSourceCrop) {
-    return { offsetX: 0, offsetY: 0, scale: 1 };
-  }
-
-  const scale = Math.min(settings.width / project.width, settings.height / project.height);
-  return {
-    offsetX: (settings.width - project.width * scale) / 2,
-    offsetY: (settings.height - project.height * scale) / 2,
-    scale,
-  };
-}
 
 function beginExportCameraPass(
   context: CanvasRenderingContext2D,
@@ -251,6 +229,11 @@ export function drawProjectFrame(
   const { offsetX, offsetY, scale } = resolveProjectOutputTransform(project, settings);
   const renderPasses = resolveVideoCompositionRenderPasses(project, currentTime, {
     includeSubtitles: settings.burnInSubtitles === true,
+    cameraViewport: {
+      width: settings.width,
+      height: settings.height,
+      ...(settings.resolution ? { resolution: settings.resolution } : {}),
+    },
     ...(options.compositionIndex ? { timelineIndex: options.compositionIndex } : {}),
   });
 

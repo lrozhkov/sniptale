@@ -29,5 +29,7 @@ export function patchVideoProjectActionFeedback(
       : group
   );
   const parsed = parseVideoProjectActionFeedback(values);
-  return parsed ? { ...project, version: 3, actionFeedback: parsed } : project;
+  return parsed
+    ? { ...project, version: project.version === 4 ? 4 : 3, actionFeedback: parsed }
+    : project;
 }

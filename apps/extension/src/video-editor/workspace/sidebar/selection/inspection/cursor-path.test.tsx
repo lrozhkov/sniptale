@@ -254,10 +254,27 @@ it('fine tangent tuning retains source endpoints and global policy tuning stays 
   act(() =>
     root.render(<InspectCursorPathSettings project={useVideoEditorStore.getState().project!} />)
   );
-  inspectorNumber('videoEditor.sidebar.cursorFocusSensitivity', '0.3');
+  const beforePolicy = useVideoEditorStore.getState().project!;
+  inspectorNumber('videoEditor.sidebar.cameraZoneSize', '80');
   expect(useVideoEditorStore.getState().project!.cursorFocusPath).toMatchObject({
     smoothing: 0.8,
-    sensitivity: 0.3,
+    sensitivity: project.cursorFocusPath?.sensitivity ?? 0.5,
   });
-  expect(useVideoEditorStore.getState().project!.cursorTrack).toEqual(project.cursorTrack);
+  const policyProject = useVideoEditorStore.getState().project!;
+  expect(policyProject.cameraFollowDefaults).toMatchObject({
+    zoneSize: 0.8,
+    legacySensitivity: beforePolicy.cursorFocusPath!.sensitivity,
+  });
+  expect(policyProject.version).toBe(4);
+  expect(policyProject.cursorTrack).toEqual(project.cursorTrack);
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(useVideoEditorStore.getState().project!.cameraFollowDefaults).toBeUndefined();
+  act(() => useVideoEditorStore.getState().redoProject());
+  expect(useVideoEditorStore.getState().project!.cameraFollowDefaults).toEqual(
+    policyProject.cameraFollowDefaults
+  );
+  act(() => useVideoEditorStore.getState().setProject(structuredClone(policyProject)));
+  expect(useVideoEditorStore.getState().project!.cameraFollowDefaults).toEqual(
+    policyProject.cameraFollowDefaults
+  );
 });

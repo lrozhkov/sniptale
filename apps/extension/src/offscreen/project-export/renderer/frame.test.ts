@@ -278,6 +278,7 @@ function expectFrameRenderingCalls(
   project: ReturnType<typeof createRenderedFrame>['project']
 ) {
   expect(resolveVideoCompositionRenderPassesMock).toHaveBeenCalledWith(project, 1.5, {
+    cameraViewport: { width: 200, height: 100 },
     includeSubtitles: false,
   });
   expect(drawExportSceneBackgroundMock).toHaveBeenCalledWith({
@@ -418,6 +419,7 @@ it('passes the burn-in flag into composition rendering when subtitle export is e
   );
 
   expect(resolveVideoCompositionRenderPassesMock).toHaveBeenCalledWith(project, 2, {
+    cameraViewport: { width: 200, height: 100 },
     includeSubtitles: true,
   });
 });

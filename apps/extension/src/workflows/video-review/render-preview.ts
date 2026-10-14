@@ -148,7 +148,14 @@ function scaledBackground(background: Scene['background'], scale: number): Scene
 function sceneRequest(prepared: PreparedScene, frame: Frame) {
   const { scene, dimensions } = prepared;
   const camera =
-    frame.cameraTransform ?? evaluateQuickEditCameraAtTime(scene.zoomRegions, frame.resultTime);
+    frame.cameraTransform ??
+    evaluateQuickEditCameraAtTime(scene.zoomRegions, frame.resultTime, {
+      source: scene.source,
+      canvas: scene.canvas,
+      background: scene.background,
+      windowHeader: scene.windowHeader,
+      output: dimensions.backing,
+    });
   const input = {
     source: scene.source,
     canvas: scene.canvas,

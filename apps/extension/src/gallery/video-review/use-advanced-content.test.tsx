@@ -1,3 +1,4 @@
+import { createCameraFollowSettings } from '../../features/video/project/camera/cursor-policy';
 // @vitest-environment jsdom
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { act } from 'react';
@@ -169,5 +170,25 @@ it('writes one action-sound batch, preserves unrelated content and rejects no-op
     content.commands.setActionAudio((current) => patchReviewActionAudio(current, targets, null))
   );
   await act(async () => content.flush());
+  expect(commit).toHaveBeenCalledTimes(2);
+});
+
+it('publishes camera defaults through the existing native history writer and reset removes only policy', async () => {
+  const { session, commit } = setup();
+  const cameraFollowDefaults = createCameraFollowSettings('calm');
+  act(() => content.commands.setCameraFollowDefaults(cameraFollowDefaults));
+  expect(content.content.cameraFollowDefaults).toEqual(cameraFollowDefaults);
+  await act(async () => {
+    await content.flush();
+  });
+  expect(commit).toHaveBeenCalledTimes(1);
+  expect(session.getSnapshot().document.advancedContent.cameraFollowDefaults).toEqual(
+    cameraFollowDefaults
+  );
+  act(() => content.commands.setCameraFollowDefaults(undefined));
+  await act(async () => {
+    await content.flush();
+  });
+  expect(session.getSnapshot().document.advancedContent.cameraFollowDefaults).toBeUndefined();
   expect(commit).toHaveBeenCalledTimes(2);
 });

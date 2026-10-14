@@ -6,7 +6,10 @@ import { videoExportSampleWindows } from '../../features/video/project/export/si
 import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-schedule';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import { resolveVideoExportDimensions } from '../../features/video/project/export/output-dimensions';
-import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
+import {
+  computeQuickEditSceneSize,
+  resolveReviewCameraConflicts,
+} from '../../features/video/review/advanced/scene';
 import { parseQuickEditCanvas } from '../../features/video/review/advanced/canvas';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { VideoQuality, VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
@@ -16,6 +19,51 @@ import type { QuickEditAdvancedState } from '../../features/video/review/advance
 import { resolveReviewRenderBitrate, type ReviewOutputCodec } from './render-codec';
 
 export { resolveReviewRenderBitrate, resolveReviewVideoEncoderConfig } from './render-codec';
+
+/** Direct render and probe entrypoints must admit the shared camera plan before acquiring resources. */
+export function assertReviewCameraAdmission(
+  args: Pick<
+    ReviewFrameExportInput,
+    'advanced' | 'index' | 'edits' | 'fragmentOffset' | 'cursorFacts' | 'renderSettings'
+  >
+): void {
+  const effective = resolveQuickEditEffectiveState(args.advanced, args.cursorFacts);
+  if (!effective.zoomRegions.some((region) => region.cursorFocus)) return;
+  const duration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;
+  const interval = { start: args.fragmentOffset, end: args.fragmentOffset + duration };
+  const source =
+    args.cursorFacts?.source ??
+    (args.index.width !== undefined &&
+    args.index.height !== undefined &&
+    Number.isFinite(args.index.width) &&
+    Number.isFinite(args.index.height) &&
+    args.index.width > 0 &&
+    args.index.height > 0
+      ? { width: args.index.width, height: args.index.height }
+      : undefined);
+  if (!source) {
+    const conflicts = resolveReviewCameraConflicts(effective.zoomRegions, undefined, interval);
+    if (conflicts.length) throw new QuickEditExportUnavailable(['camera-follow'], [], conflicts);
+    return;
+  }
+  const profile = resolveReviewOutputProfile(
+    { ...args.index, width: source.width, height: source.height },
+    args.advanced,
+    args.renderSettings
+  );
+  const conflicts = resolveReviewCameraConflicts(
+    effective.zoomRegions,
+    {
+      source,
+      background: effective.background,
+      canvas: effective.canvas,
+      windowHeader: effective.windowHeader,
+      output: { width: profile.width, height: profile.height },
+    },
+    interval
+  );
+  if (conflicts.length) throw new QuickEditExportUnavailable(['camera-follow'], [], conflicts);
+}
 
 const RATE_ERROR = 1e-9;
 const MAX_RATE_DENOMINATOR = 1_000_000_000;

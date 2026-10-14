@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  exportCameraConflict: {
+    ru: 'Камера не может сохранить указатель в кадре с выбранным движением. Измените настройки камеры или разрешите временное расширение кадра.',
+    en: 'The camera cannot keep the pointer visible with this movement. Change the camera settings or allow temporary frame expansion.',
+  },
   startDescription: {
     ru: 'Создайте проект или продолжите работу с сохранённым видео.',
     en: 'Create a project or continue working on a saved video.',

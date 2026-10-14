@@ -46,6 +46,7 @@ import {
   prepareReviewRender,
   type ReviewRenderPreparation,
   resolveReviewSceneOutput,
+  assertReviewCameraAdmission,
 } from './render-settings';
 import type { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -74,6 +75,7 @@ type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
 export async function writeReviewFrames(
   args: ReviewFrameExportInput
 ): Promise<ReviewPacketReceipt> {
+  assertReviewCameraAdmission(args);
   if (resolveQuickEditEffectiveState(args.advanced).presentation)
     return writeReviewPresentationFrames(args);
   const preparation = await reviewExportPhase(args.signal, 'prepare', () =>

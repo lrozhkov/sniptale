@@ -1,3 +1,4 @@
+import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import { windowHeaderGeometry } from '../../../browser-frame/header';
 import {
   deriveReviewCursorFocusPath,
@@ -103,60 +104,27 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   music: readonly QuickEditAudioClip[];
 }
 
+type CursorFactsInput = {
+  facts: ReviewCursorFacts | null;
+  source: { width: number; height: number; duration: number };
+};
+interface CursorRegionCache {
+  key: string;
+  facts: ReviewCursorFacts | null | undefined;
+  regions: readonly QuickEditZoomRegion[];
+}
+const cursorRegions = new WeakMap<QuickEditAdvancedState, CursorRegionCache[]>();
+
 /** Derives the applied configuration without mutating the stored document. */
 export function resolveQuickEditEffectiveState(
   state: QuickEditAdvancedState,
-  cursorFacts?: {
-    facts: ReviewCursorFacts | null;
-    source: { width: number; height: number; duration: number };
-  }
+  cursorFacts?: CursorFactsInput
 ): QuickEditEffectiveState {
   const advanced = state.ui.mode === 'advanced';
   const features = resolveQuickEditEffectiveFeatures(state);
-  const needsCursor =
-    features.zoomApplied &&
-    state.zoom.regions.some(
-      (region) => region.followCursor ?? state.cursorFocusPath?.mode === 'follow'
-    );
-  const cursorPath = needsCursor
-    ? cursorFacts
-      ? resolveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, state.cursorFocusPath)
-      : state.cursorFocusPath
-    : undefined;
   return {
     ...features,
-    zoomRegions: projectReviewFocus(
-      features.zoomApplied ? state.zoom.regions : [],
-      state.audio.voiceoverSegments
-    ).map((region) =>
-      (region.followCursor ?? cursorPath?.mode === 'follow') && cursorPath
-        ? {
-            ...region,
-            cursorFocus: {
-              path: { ...cursorPath, mode: 'follow' },
-              ...(cursorFacts && state.windowHeader
-                ? {
-                    sourceFrame: {
-                      headerHeight: windowHeaderGeometry(state.windowHeader, cursorFacts.source)
-                        .height,
-                      height: cursorFacts.source.height,
-                    },
-                  }
-                : {}),
-              ...(cursorFacts
-                ? {
-                    observed: deriveReviewCursorFocusPath(
-                      cursorFacts.facts,
-                      cursorFacts.source,
-                      true
-                    ),
-                  }
-                : {}),
-              ...(state.audio.voiceoverSegments ? { timeMap: state.audio.voiceoverSegments } : {}),
-            },
-          }
-        : region
-    ),
+    zoomRegions: resolveCursorRegions(state, features, cursorFacts),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     windowHeader: advanced ? state.windowHeader : undefined,
@@ -189,6 +157,89 @@ export function resolveQuickEditEffectiveState(
   };
 }
 
+function resolveCursorRegions(
+  state: QuickEditAdvancedState,
+  features: QuickEditEffectiveFeatures,
+  cursorFacts: CursorFactsInput | undefined
+) {
+  const advanced = state.ui.mode === 'advanced';
+  const key = JSON.stringify({
+    defaults: state.cameraFollowDefaults,
+    applied: features.zoomApplied,
+    zoom: state.zoom.regions,
+    path: state.cursorFocusPath,
+    timeMap: state.audio.voiceoverSegments,
+    source: cursorFacts?.source,
+    background: advanced ? state.background : undefined,
+    canvas: advanced ? state.canvas : undefined,
+    header: advanced ? state.windowHeader : undefined,
+  });
+  const cached = cursorRegions.get(state) ?? [];
+  const previous = cached.find((entry) => entry.key === key && entry.facts === cursorFacts?.facts);
+  if (previous) return previous.regions;
+  const needsCursor =
+    features.zoomApplied &&
+    state.zoom.regions.some(
+      (region) => region.followCursor ?? state.cursorFocusPath?.mode === 'follow'
+    );
+  const cursorPath = needsCursor
+    ? cursorFacts
+      ? resolveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, state.cursorFocusPath)
+      : state.cursorFocusPath
+    : undefined;
+  const regions = projectReviewFocus(
+    features.zoomApplied ? state.zoom.regions : [],
+    state.audio.voiceoverSegments
+  ).map<QuickEditZoomRegion>((region) =>
+    (region.followCursor ?? cursorPath?.mode === 'follow') && cursorPath
+      ? {
+          ...region,
+          cursorFocus: {
+            policy: resolveCameraFollowPolicy({
+              ...(state.cameraFollowDefaults ? { defaults: state.cameraFollowDefaults } : {}),
+              ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
+              legacySensitivity: cursorPath.sensitivity,
+            }),
+            path: { ...cursorPath, mode: 'follow' },
+            ...(cursorFacts
+              ? {
+                  scene: {
+                    source: cursorFacts.source,
+                    background: advanced ? state.background : { enabled: false as const },
+                    ...(advanced && state.canvas ? { canvas: state.canvas } : {}),
+                    ...(advanced && state.windowHeader ? { windowHeader: state.windowHeader } : {}),
+                  },
+                }
+              : {}),
+            ...(cursorFacts && state.windowHeader
+              ? {
+                  sourceFrame: {
+                    headerHeight: windowHeaderGeometry(state.windowHeader, cursorFacts.source)
+                      .height,
+                    height: cursorFacts.source.height,
+                  },
+                }
+              : {}),
+            ...(cursorFacts
+              ? {
+                  observed: deriveReviewCursorFocusPath(
+                    cursorFacts.facts,
+                    cursorFacts.source,
+                    true
+                  ),
+                }
+              : {}),
+            ...(state.audio.voiceoverSegments ? { timeMap: state.audio.voiceoverSegments } : {}),
+          },
+        }
+      : region
+  );
+  cached.push({ key, facts: cursorFacts?.facts, regions });
+  if (cached.length > 4) cached.shift();
+  cursorRegions.set(state, cached);
+  return regions;
+}
+
 export type QuickEditExportReason =
   | 'canvas'
   | 'window-header'
@@ -197,6 +248,7 @@ export type QuickEditExportReason =
   | 'captions'
   | 'annotation-effects'
   | 'caption-layout'
+  | 'camera-follow'
   | 'presentation'
   | 'canvas-size'
   | 'precise-edits'

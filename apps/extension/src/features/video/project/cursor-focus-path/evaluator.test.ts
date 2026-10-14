@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { evaluateCursorFocusSegment, sampleCursorFocusSegment } from './evaluator';
+import {
+  cursorFocusPreferenceWeight,
+  evaluateCursorFocusSegment,
+  sampleCursorFocusSegment,
+} from './evaluator';
 import {
   insertCursorFocusKey,
   updateCursorFocusKey,
@@ -10,6 +14,46 @@ import {
 } from './authoring';
 import { parseCursorFocusPath } from './validation';
 import type { CursorFocusPath } from './types';
+
+it('weights a manual anchor over its neighboring source-time intervals without adding authoring keys', () => {
+  const segment = {
+    id: 'weight',
+    start: 0,
+    end: 2,
+    binding: { kind: 'project' as const },
+    keys: [
+      {
+        id: 'a',
+        time: 0,
+        x: 0.2,
+        y: 0.5,
+        anchor: 'movement' as const,
+        interpolation: 'linear' as const,
+      },
+      {
+        id: 'b',
+        time: 1,
+        x: 0.6,
+        y: 0.5,
+        anchor: 'manual' as const,
+        interpolation: 'linear' as const,
+      },
+      {
+        id: 'c',
+        time: 2,
+        x: 0.2,
+        y: 0.5,
+        anchor: 'movement' as const,
+        interpolation: 'linear' as const,
+      },
+    ],
+  };
+  const before = structuredClone(segment);
+  expect([0, 0.5, 1, 1.5, 2].map((time) => cursorFocusPreferenceWeight(segment, time))).toEqual([
+    1, 2.5, 4, 2.5, 1,
+  ]);
+  expect(segment).toEqual(before);
+});
 const path: CursorFocusPath = {
   version: 1,
   smoothing: 0.5,

@@ -249,7 +249,7 @@ export function parseVideoDependencyEnvelope(value: unknown): VideoDependencyEnv
   if (!isRecord(value) || !isRecord(value['project'])) return null;
   const project = value['project'];
   if (
-    (project['version'] !== 2 && project['version'] !== 3) ||
+    (project['version'] !== 2 && project['version'] !== 3 && project['version'] !== 4) ||
     Object.hasOwn(project, 'templateInstances') ||
     !Array.isArray(project['assets']) ||
     !(project['baseRecordingId'] === null || typeof project['baseRecordingId'] === 'string')

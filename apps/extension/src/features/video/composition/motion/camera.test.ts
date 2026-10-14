@@ -363,6 +363,18 @@ it.each(['embedded-fallback', 'separate'] as const)(
     at(0);
     expect(at(1)).toEqual(expected);
     expect(expected.scale).toBe(2);
+    const scaledOutput = resolveVideoCompositionCamera({
+      project,
+      currentTime: 1,
+      actions: [],
+      cursorSample: null,
+      cameraViewport: { width: 50, height: 50 },
+    });
+    expect(scaledOutput.focusPoint.x).toBeCloseTo(expected.focusPoint.x, 8);
+    expect(scaledOutput.focusPoint.y).toBeCloseTo(expected.focusPoint.y, 8);
+    expect(scaledOutput.viewportX).toBeCloseTo(expected.viewportX, 8);
+    expect(scaledOutput.viewportY).toBeCloseTo(expected.viewportY, 8);
+    expect(scaledOutput.scale).toBe(expected.scale);
     expect(expected.focusPoint.x).toBeGreaterThanOrEqual(0);
     expect(expected.focusPoint.x).toBeLessThanOrEqual(100);
     const { cursorFocusPath: _path, ...rest } = project;

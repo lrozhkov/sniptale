@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { resolveVideoExportDimensions } from './output-dimensions';
+import { resolveProjectOutputTransform, resolveVideoExportDimensions } from './output-dimensions';
 
 it.each([
   [1904, 1064, '1080P', 1904, 1064],
@@ -14,4 +14,18 @@ it.each([
 });
 it('rejects invalid dimensions before computing an encoder profile', () => {
   expect(() => resolveVideoExportDimensions(NaN, 1080, '1080P')).toThrow();
+});
+
+it('preserves the SOURCE one-pixel crop and centers other output profiles uniformly', () => {
+  const source = { width: 853, height: 479 };
+  expect(resolveProjectOutputTransform(source, { width: 852, height: 478 })).toEqual({
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0,
+  });
+  const output = { width: 852, height: 478, resolution: '1080P' } as const;
+  const transform = resolveProjectOutputTransform(source, output);
+  expect(transform.scale).toBeCloseTo(478 / 479);
+  expect(transform.offsetX).toBeCloseTo((852 - 853 * transform.scale) / 2);
+  expect(transform.offsetY).toBe(0);
 });

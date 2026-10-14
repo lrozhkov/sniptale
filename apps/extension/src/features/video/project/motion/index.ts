@@ -21,6 +21,7 @@ import {
   resolveMotionStartTime,
 } from './normalization';
 import { isMotionAnimation } from './timing';
+import { parseCameraFollowSettings } from '../camera/cursor-policy';
 
 export const DEFAULT_VIDEO_MOTION_OVERLAY_ZOOM_MODE = VideoMotionOverlayZoomMode.LOCK_OVERLAYS;
 
@@ -207,8 +208,10 @@ export function normalizeVideoProjectMotionRegion(
   const scale = resolveMotionScale(region.scale);
   const incomingConnection = normalizeMotionConnection(region.incomingConnection);
   const startTime = resolveMotionStartTime(project.duration, region.startTime, duration);
+  const cameraFollow = parseCameraFollowSettings(region.cameraFollow);
 
   return projectMotionSourceBinding(project, {
+    ...(cameraFollow ? { cameraFollow } : {}),
     ...(sourceBinding ? { sourceBinding } : {}),
     ...(animation ? { animation } : {}),
     ...(incomingConnection ? { incomingConnection } : {}),

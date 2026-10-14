@@ -11,6 +11,7 @@ export function applyRecordingReviewInteractions(
 ): VideoProject {
   if (
     content.cursorFocusPath === undefined &&
+    content.cameraFollowDefaults === undefined &&
     content.actionAudio === undefined &&
     content.clickAnimations === undefined &&
     content.actionsEnabled === undefined
@@ -60,6 +61,9 @@ export function applyRecordingReviewInteractions(
       }
     : undefined;
   return applyVideoProjectMutationPatch(project, {
+    ...(content.cameraFollowDefaults
+      ? { cameraFollowDefaults: structuredClone(content.cameraFollowDefaults) }
+      : {}),
     actionFeedback: [...(project.actionFeedback ?? []).filter((item) => item !== current), group],
     ...(cursorFocusPath ? { cursorFocusPath } : {}),
     ...(content.actionsEnabled === undefined

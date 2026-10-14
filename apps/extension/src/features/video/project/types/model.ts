@@ -287,7 +287,8 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2 | 3;
+  version: 2 | 3 | 4;
+  cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;
   name: string;
   source: VideoProjectSource;

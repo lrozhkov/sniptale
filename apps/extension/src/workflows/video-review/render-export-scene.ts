@@ -55,7 +55,13 @@ export function paintReviewExportScene({
   scratch: HTMLCanvasElement | null;
   blurEnabled: boolean;
 }) {
-  const camera = evaluateQuickEditCameraAtTime(scene.zoomRegions, resultTime);
+  const camera = evaluateQuickEditCameraAtTime(scene.zoomRegions, resultTime, {
+    source: scene.sourceSize,
+    canvas: scene.baseCanvas ?? canvas,
+    background: scene.background,
+    windowHeader: scene.windowHeader,
+    output: canvas,
+  });
   const layout = computeQuickEditSceneLayout({
     output: canvas,
     source: scene.sourceSize,

@@ -1,3 +1,11 @@
+import {
+  applyCameraFollowPreset,
+  cameraFollowPreset,
+  resolveCameraFollowPolicy,
+  type CameraFollowSettings,
+} from '../../../../../features/video/project/camera/cursor-policy';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { SliderField } from '../shared/sliders';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
 import {
   projectCursorFocusTimelineKeys,
@@ -190,12 +198,9 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
       );
     });
   return (
-    <fieldset
-      disabled={locked}
-      className="m-0 min-w-0 border-0 p-0"
-      data-ui="cursorFocusPath.settings"
-    >
+    <fieldset className="m-0 min-w-0 border-0 p-0" data-ui="cursorFocusPath.settings">
       <SelectInput
+        disabled={locked}
         label={translate('videoEditor.sidebar.cursorFocusMode')}
         value={path.mode}
         options={[
@@ -204,12 +209,35 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
         ]}
         onChange={(mode) => change({ ...path, mode })}
       />
+      <InspectCameraFollowSettings
+        global
+        settings={
+          resolveCameraFollowPolicy({
+            legacySensitivity: path.sensitivity,
+            ...(project.cameraFollowDefaults ? { defaults: project.cameraFollowDefaults } : {}),
+          }).settings
+        }
+        inherited={!project.cameraFollowDefaults}
+        disabled={getVideoProjectUtilityLanes(project).camera.locked}
+        legacySensitivity={path.sensitivity}
+        onChange={(cameraFollowDefaults) =>
+          updateProject((current) => {
+            if (getVideoProjectUtilityLanes(current).camera.locked) return current;
+            const { cameraFollowDefaults: _previous, ...rest } = current;
+            return applyVideoProjectMutationPatch(
+              rest,
+              cameraFollowDefaults ? { cameraFollowDefaults } : {}
+            );
+          })
+        }
+      />
       <InspectorDetails
         preferenceId="cursor-path-policy"
         icon={SlidersHorizontal}
         label={translate('videoEditor.sidebar.framingFineTune')}
       >
         <NumberInput
+          disabled={locked}
           label={translate('videoEditor.sidebar.cursorFocusSmoothing')}
           value={path.smoothing}
           min={0}
@@ -218,17 +246,8 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
           scrub={false}
           onChange={(smoothing) => change({ ...path, smoothing })}
         />
-        <NumberInput
-          label={translate('videoEditor.sidebar.cursorFocusSensitivity')}
-          value={path.sensitivity}
-          min={0}
-          max={1}
-          step={0.01}
-          scrub={false}
-          onChange={(sensitivity) => change({ ...path, sensitivity })}
-        />
       </InspectorDetails>
-      <InspectorActionButton compact onClick={() => change(undefined)}>
+      <InspectorActionButton compact disabled={locked} onClick={() => change(undefined)}>
         {translate('videoEditor.sidebar.cursorFocusReset')}
       </InspectorActionButton>
     </fieldset>
@@ -369,5 +388,147 @@ function CursorInspectorActions({
         {translate('common.actions.delete')}
       </InspectorActionButton>
     </div>
+  );
+}
+
+/** Existing inspector controls edit policy through the document history callback. */
+export function InspectCameraFollowSettings(props: {
+  global?: boolean;
+  settings: CameraFollowSettings;
+  inherited: boolean;
+  legacySensitivity: number;
+  disabled?: boolean;
+  onChange(settings: CameraFollowSettings | undefined): void;
+}) {
+  const settings = props.settings;
+  const label = (key: Parameters<typeof translate>[0]) => translate(key);
+  const update = (patch: Partial<CameraFollowSettings>, movement = false) => {
+    const { legacySensitivity: legacy, ...current } = settings;
+    props.onChange({
+      ...current,
+      ...(!movement && legacy !== undefined ? { legacySensitivity: legacy } : {}),
+      ...patch,
+    });
+  };
+  const number = (
+    name: 'transitionDuration' | 'marginFraction' | 'minimumHoldDuration' | 'minimumScale',
+    key: Parameters<typeof translate>[0],
+    min: number,
+    max: number,
+    factor = 1,
+    unit: '' | '%' | 's' = ''
+  ) => (
+    <NumberInput
+      key={name}
+      label={label(key)}
+      value={settings[name] * factor}
+      min={min}
+      max={max}
+      step={factor === 100 ? 1 : 0.05}
+      unit={unit}
+      disabled={props.disabled ?? false}
+      onChange={(value) =>
+        update(
+          { [name]: value / factor },
+          name === 'transitionDuration' || name === 'minimumHoldDuration'
+        )
+      }
+    />
+  );
+  const toggle = (
+    name: 'preservePointer' | 'allowExpansion',
+    key: Parameters<typeof translate>[0]
+  ) => (
+    <div className="flex min-w-0 items-center justify-between gap-2" key={name}>
+      <span className="text-xs">{label(key)}</span>
+      <ProductGlassSwitch
+        role="switch"
+        aria-label={label(key)}
+        aria-checked={settings[name]}
+        on={settings[name]}
+        disabled={props.disabled}
+        onClick={() => update({ [name]: !settings[name] })}
+      />
+    </div>
+  );
+  return (
+    <fieldset
+      disabled={props.disabled}
+      className="m-0 min-w-0 space-y-2 border-0 p-0"
+      data-ui="cameraFollow.settings"
+    >
+      <p className="text-xs">
+        {label(
+          props.global
+            ? 'videoEditor.sidebar.cameraDefaults'
+            : props.inherited
+              ? 'videoEditor.sidebar.cameraInherited'
+              : 'videoEditor.sidebar.cameraOverride'
+        )}
+      </p>
+      <SliderField
+        label={label('videoEditor.sidebar.cameraZoneSize')}
+        value={settings.zoneSize * 100}
+        min={10}
+        max={100}
+        step={1}
+        onChange={(value) => update({ zoneSize: value / 100 })}
+      />
+      <p className="text-xs">{label('videoEditor.sidebar.cameraZoneHints')}</p>
+      <SelectInput
+        label={label('videoEditor.sidebar.cameraMovement')}
+        value={cameraFollowPreset(settings)}
+        options={[
+          { value: 'legacy', label: label('videoEditor.sidebar.cameraLegacy') },
+          { value: 'calm', label: label('videoEditor.sidebar.cameraCalm') },
+          { value: 'balanced', label: label('videoEditor.sidebar.cameraBalanced') },
+          { value: 'fast', label: label('videoEditor.sidebar.cameraFast') },
+          { value: 'custom', label: label('videoEditor.sidebar.cameraCustom'), disabled: true },
+        ]}
+        onChange={(preset) => {
+          if (preset === 'legacy')
+            props.onChange({
+              ...settings,
+              ...resolveCameraFollowPolicy({ legacySensitivity: props.legacySensitivity }).settings,
+              zoneSize: settings.zoneSize,
+              preservePointer: settings.preservePointer,
+              allowExpansion: settings.allowExpansion,
+              minimumScale: settings.minimumScale,
+            });
+          else if (preset !== 'custom') props.onChange(applyCameraFollowPreset(settings, preset));
+        }}
+      />
+      {toggle('preservePointer', 'videoEditor.sidebar.cameraPreservePointer')}
+      {toggle('allowExpansion', 'videoEditor.sidebar.cameraAllowExpansion')}
+      <InspectorDetails
+        label={label('videoEditor.sidebar.framingFineTune')}
+        preferenceId="camera-follow-advanced"
+      >
+        {number(
+          'transitionDuration',
+          'videoEditor.sidebar.cameraTransitionDuration',
+          0.05,
+          5,
+          1,
+          's'
+        )}
+        {number('marginFraction', 'videoEditor.sidebar.cameraMargin', 0, 30, 100, '%')}
+        {number('minimumHoldDuration', 'videoEditor.sidebar.cameraMinimumHold', 0, 5, 1, 's')}
+        {settings.allowExpansion
+          ? number('minimumScale', 'videoEditor.sidebar.cameraMinimumScale', 1, 4)
+          : null}
+      </InspectorDetails>
+      <InspectorActionButton
+        compact
+        disabled={props.inherited || props.disabled}
+        onClick={() => props.onChange(undefined)}
+      >
+        {label(
+          props.global
+            ? 'videoEditor.sidebar.cameraResetDefaults'
+            : 'videoEditor.sidebar.cameraResetPolicy'
+        )}
+      </InspectorActionButton>
+    </fieldset>
   );
 }

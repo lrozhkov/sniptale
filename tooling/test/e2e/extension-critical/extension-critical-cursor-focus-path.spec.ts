@@ -1,8 +1,11 @@
-import { expect, test, type Page, type Locator } from '@playwright/test';
 import {
-  replayReviewHistory,
-  reviewAdvancedContentBaseline,
-} from '../../../../apps/extension/src/features/video/review/document';
+  applyCameraPolicyBootstrap,
+  openGalleryCursorScene,
+  readReviewContent,
+  verifyGalleryCameraPolicy,
+  verifyMontageCameraPolicy,
+} from '../support/cursor-camera-policy-proof';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { parseCursorFocusPath } from '../../../../apps/extension/src/features/video/project/cursor-focus-path/validation';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
@@ -10,7 +13,6 @@ import { createVideoProjectFromRecording } from '../../../../apps/extension/src/
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
-import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import {
   applyHarnessBootstrap,
   GALLERY_HARNESS_PATH,
@@ -48,7 +50,12 @@ for (const viewport of [
           'sniptale-theme-preference': 'light',
         },
       });
-      await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+      await page.addInitScript(() =>
+        localStorage.setItem(
+          'sniptale-locale-preference',
+          new URL(location.href).searchParams.get('locale') === 'ru' ? 'ru' : 'en'
+        )
+      );
       await page.goto(`${server.origin}${GALLERY_HARNESS_PATH}?theme=light`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', {
@@ -154,11 +161,7 @@ for (const viewport of [
     const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
     const recordingId = betaV1Fixture.records.recordings[0]!.id;
     try {
-      await applyHarnessBootstrap(page, {
-        preserveMediaLibrary: true,
-        storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
-      });
-      await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+      await applyCameraPolicyBootstrap(page, { preserveMediaLibrary: true, storage: {} });
       await page.goto(`${server.origin}${GALLERY_HARNESS_PATH}?theme=light`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', {
@@ -168,22 +171,7 @@ for (const viewport of [
       });
       await seedCursor(page);
       await page.reload();
-      const open = async () => {
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-        const dialog = page.locator('dialog');
-        const advanced = dialog.getByRole('button', {
-          name: label('gallery.videoReview.advancedEditing'),
-          exact: true,
-        });
-        await expect(advanced).toBeVisible();
-        if ((await advanced.getAttribute('aria-pressed')) !== 'true') await advanced.click();
-        await dialog
-          .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
-          .click();
-        return dialog;
-      };
-      const dialog = await open();
+      const dialog = await openGalleryCursorScene(page);
       await expect(
         dialog.locator(
           '[data-history-family="cursor"] [data-ui="gallery.videoReview.historyCluster"]'
@@ -352,7 +340,7 @@ for (const viewport of [
       });
       if (viewport.width === 1920) await verifyCursorInspectorWidths(page, dialog, inspector, info);
       await page.reload();
-      const reopened = await open();
+      const reopened = await openGalleryCursorScene(page);
       await expect(
         reopened.locator('[data-ui="cursorFocusPath.settings"]:visible').getByRole('button', {
           name: label('videoEditor.sidebar.cursorFocusMode'),
@@ -374,6 +362,7 @@ for (const viewport of [
         path: info.outputPath('gallery-cursor-focus-reopened.png'),
         fullPage: false,
       });
+      await verifyGalleryCameraPolicy(page, info, recordingId);
       if (viewport.width < 1280) {
         const scroll = reopened.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
         expect(await scroll.evaluate((node) => node.scrollWidth)).toBeGreaterThan(
@@ -415,8 +404,8 @@ for (const viewport of [
       cursorTrack,
     });
     try {
-      await applyHarnessBootstrap(page, {
-        apiBehavior: { runtimeFallback: 'typed-success' },
+      await applyCameraPolicyBootstrap(page, {
+        apiBehavior: { runtimeFallback: 'typed-success' as const },
         preserveMediaLibrary: true,
         storage: {
           'sniptale-locale-preference': 'en',
@@ -428,7 +417,6 @@ for (const viewport of [
           },
         },
       });
-      await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
       await page.goto(`${server.origin}${GALLERY_HARNESS_PATH}?theme=light`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', {
@@ -609,6 +597,7 @@ for (const viewport of [
         path: info.outputPath('standalone-cursor-focus-reopened.png'),
         fullPage: false,
       });
+      await verifyMontageCameraPolicy(page, info, project.id);
       if (viewport.width < 1280) {
         const scroll = page.locator('[data-ui="video-editor.workspace.root"]');
         expect(await scroll.evaluate((node) => node.scrollWidth)).toBeGreaterThan(
@@ -681,18 +670,6 @@ async function seedCursor(page: Page) {
     },
     { fixture: betaV1Fixture, cursorTrack: track }
   );
-}
-
-async function readReviewContent(page: Page, recordingId: string) {
-  const workspace = await readNativeReviewWorkspace(page, `recording:${recordingId}`);
-  return workspace
-    ? replayReviewHistory(
-        workspace.history,
-        workspace.cursor,
-        workspace.source,
-        workspace.baseline ?? reviewAdvancedContentBaseline(workspace.advanced)
-      ).advancedContent
-    : undefined;
 }
 
 async function readCursorPath(page: Page, recordingId: string) {

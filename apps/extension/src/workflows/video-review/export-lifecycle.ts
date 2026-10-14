@@ -26,6 +26,7 @@ import { summarizeRecordingMetadata } from '../../features/media-hub/recording-m
 import { createOutputFilename } from '../file-naming/index';
 import { configuredReviewExportPlan } from './export-configuration';
 import { resolveReviewOutputProfile } from './render-settings';
+import { resolveReviewCameraConflicts } from '../../features/video/review/advanced/scene';
 import type { ReviewRenderSettings } from './media-index';
 import {
   assertAssetWriteAdmission,
@@ -344,6 +345,28 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     renderSettings,
     plan.video
   );
+  const effective = resolveQuickEditEffectiveState(advanced, {
+    facts: original.telemetry,
+    source: original.source,
+  });
+  const cameraConflicts = resolveReviewCameraConflicts(
+    effective.zoomRegions,
+    {
+      source: original.source,
+      background: effective.background,
+      canvas: effective.canvas,
+      windowHeader: effective.windowHeader,
+      output: { width: outputProfile.width, height: outputProfile.height },
+    },
+    {
+      start: fragmentOffset,
+      end: fragment
+        ? reviewOutputTimeAt(fullMap, fragment.end)
+        : (fullMap.at(-1)?.resultEnd ?? index.duration),
+    }
+  );
+  if (cameraConflicts.length)
+    throw new QuickEditExportUnavailable(['camera-follow'], [], cameraConflicts);
   return {
     workspace,
     original,

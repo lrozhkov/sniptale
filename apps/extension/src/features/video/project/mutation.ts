@@ -18,13 +18,20 @@ export function applyVideoProjectMutationPatch(
     ...project,
     ...patch,
     version:
-      project.version === 3 ||
-      project.cursorFocusPath !== undefined ||
-      project.actionFeedback !== undefined ||
-      patch.cursorFocusPath !== undefined ||
-      patch.actionFeedback !== undefined
-        ? 3
-        : 2,
+      project.version === 4 ||
+      project.cameraFollowDefaults !== undefined ||
+      patch.cameraFollowDefaults !== undefined ||
+      (patch.motionRegions ?? project.motionRegions)?.some(
+        (region) => region.cameraFollow !== undefined
+      )
+        ? 4
+        : project.version === 3 ||
+            project.cursorFocusPath !== undefined ||
+            project.actionFeedback !== undefined ||
+            patch.cursorFocusPath !== undefined ||
+            patch.actionFeedback !== undefined
+          ? 3
+          : 2,
     updatedAt: getVideoProjectMutationTimestamp(),
   };
 }

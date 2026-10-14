@@ -3,6 +3,14 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { cancelProjectExportUseCase, startProjectExportUseCase } from './use-case';
 import { reserveMediaErasureExclusion } from '../../../../mutation-exclusion/media-activity';
+import { createVideoProjectFromRecording } from '../../../../../features/video/project/factories/creation';
+import { createVideoProjectMotionRegion } from '../../../../../features/video/project/motion';
+import { normalizeVideoProjectCursorSkin } from '../../../../../features/video/project/cursor';
+import {
+  VideoCursorCaptureMode,
+  VideoMotionFocusMode,
+} from '../../../../../features/video/project/types';
+import { ProjectCameraConflictError } from '../../../../../features/video/composition/motion/project-follow';
 import {
   createProjectExportInputReference as createInputReference,
   createProjectExportPorts as createPorts,
@@ -12,6 +20,58 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+it('refuses a conflicting camera before offscreen, capabilities, or ledger writes', async () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'camera',
+    filename: 'camera.webm',
+    width: 1280,
+    height: 720,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 10,
+    cursorTrack: {
+      captureMode: VideoCursorCaptureMode.EMBEDDED_FALLBACK,
+      skin: normalizeVideoProjectCursorSkin(undefined),
+      samples: [0, 3].map((time) => ({
+        id: `point-${time}`,
+        time,
+        x: 730,
+        y: 360,
+        visible: true,
+        recordingPoint: { x: 0.57, y: 0.5 },
+        captureSegment: 0,
+      })),
+    },
+  });
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    duration: 3,
+    focusMode: VideoMotionFocusMode.CURSOR,
+    scale: 4,
+    zoomInDuration: 0.01,
+    zoomOutDuration: 0,
+  };
+  project.motionRegions = [region];
+  const before = structuredClone(project);
+  const ports = createPorts();
+  vi.mocked(ports.loadProjectExportInput).mockResolvedValue(project);
+  const result = await startProjectExportUseCase(
+    { input: createInputReference(), jobId: 'job-1', settings: createSettings() },
+    owner,
+    ports
+  ).catch((error: unknown) => error);
+  expect(result).toBeInstanceOf(ProjectCameraConflictError);
+  expect(result).toMatchObject({
+    conflicts: [{ regionId: region.id, reason: 'dynamics', interval: { start: 0, end: 3 } }],
+  });
+  expect(ports.ensureOffscreenDocument).not.toHaveBeenCalled();
+  expect(ports.issueProjectExportCancelCapability).not.toHaveBeenCalled();
+  expect(ports.reserveProjectExportJobLedgerEntry).not.toHaveBeenCalled();
+  expect(ports.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(ports.deleteProjectExportInput).toHaveBeenCalledWith('job-1');
+  expect(project).toEqual(before);
 });
 
 it('reserves the ledger and sends an offscreen start command', async () => {

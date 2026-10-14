@@ -8,6 +8,18 @@ import type {
 const unit = (value: number) => Math.max(0, Math.min(1, value));
 const curveKeys = new WeakMap<CursorFocusKey[], CursorFocusKey[]>();
 
+/** Manual focus has a continuous time weight that reaches four at its key and one at adjacent recorded keys. */
+export function cursorFocusPreferenceWeight(segment: CursorFocusSegment, time: number): number {
+  segment = effectiveCurveSegment(segment);
+  const left = segment.keys.findLast((key) => key.time <= time) ?? segment.keys[0];
+  if (!left) return 1;
+  const right = segment.keys.find((key) => key.time > time);
+  const weight = (key: CursorFocusKey) => (key.anchor === 'manual' || key.authored ? 4 : 1);
+  if (!right || time <= left.time) return weight(left);
+  const progress = (time - left.time) / (right.time - left.time);
+  return weight(left) + (weight(right) - weight(left)) * progress;
+}
+
 /** A deliberate coincident override is the endpoint on both sides; facts retain their own identity. */
 function effectiveCurveSegment(segment: CursorFocusSegment): CursorFocusSegment {
   let keys = curveKeys.get(segment.keys);

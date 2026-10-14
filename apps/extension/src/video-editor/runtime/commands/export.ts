@@ -27,10 +27,10 @@ export function useExportHandlers(
     try {
       const response = await startProjectExport(jobId, project, resolvedSettings);
       if (!response?.success) {
-        port.failExport(toErrorMessage(response?.error, 'videoEditor.app.exportStartFailed'));
+        port.failExport(exportFailureMessage(response?.error));
       }
     } catch (exportError) {
-      port.failExport(toErrorMessage(exportError, 'videoEditor.app.exportStartFailed'));
+      port.failExport(exportFailureMessage(exportError));
     }
   }, [port]);
 
@@ -52,6 +52,13 @@ export function useExportHandlers(
     () => ({ handleStartExport, handleCancelExport }),
     [handleCancelExport, handleStartExport]
   );
+}
+
+function exportFailureMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : error;
+  return message === 'PROJECT_EXPORT_CAMERA_CONFLICT'
+    ? translate('videoEditor.app.exportCameraConflict')
+    : toErrorMessage(error, 'videoEditor.app.exportStartFailed');
 }
 
 function resolveExportSettings(

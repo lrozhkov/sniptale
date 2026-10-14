@@ -165,6 +165,13 @@ function reviewContentCommands(
   stage: (mutation: ContentMutation, typing?: ReviewTextTypingTarget) => void
 ) {
   return {
+    setCameraFollowDefaults: (
+      cameraFollowDefaults: QuickEditAdvancedContent['cameraFollowDefaults']
+    ) =>
+      stage((content) => {
+        const { cameraFollowDefaults: _previous, ...rest } = content;
+        return cameraFollowDefaults ? { ...rest, cameraFollowDefaults } : rest;
+      }),
     setCursorFocusPath: (cursorFocusPath: QuickEditAdvancedContent['cursorFocusPath']) =>
       stage((content) => {
         const { cursorFocusPath: _previous, ...rest } = content;

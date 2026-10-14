@@ -1,4 +1,8 @@
 import {
+  createCameraFollowSettings,
+  resolveCameraFollowPolicy,
+} from '../../../features/video/project/camera/cursor-policy';
+import {
   getActionClickStyle,
   getActionKeyStyle,
 } from '../../../features/video/project/action-style';
@@ -664,4 +668,38 @@ it('clamps zoom timing at its neighbour and retains the result through undo and 
   expect(redo.project.motionRegions?.[0]).toMatchObject({ startTime: 4, duration: 2 });
   store.getState().updateMotionRegion(first.id, { duration: 8 });
   expect(store.getState().project?.motionRegions?.[0]).toMatchObject({ startTime: 4, duration: 2 });
+});
+
+it('retains local camera policy through history and hydration, then reset restores defaults', () => {
+  const project = createEmptyVideoProject('Camera override', 1000, 600);
+  const defaults = createCameraFollowSettings('calm');
+  project.version = 4;
+  project.cameraFollowDefaults = defaults;
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    focusMode: VideoMotionFocusMode.CURSOR,
+  };
+  project.motionRegions = [region];
+  const store = createStoreState();
+  store.getState().setProject(project);
+  const override = { ...createCameraFollowSettings('fast'), zoneSize: 0.25 };
+  store.getState().updateMotionRegion(region.id, { cameraFollow: override });
+  const edited = store.getState().project!;
+  expect(edited.motionRegions?.[0]?.cameraFollow).toEqual(override);
+  expect(edited.cameraFollowDefaults).toEqual(defaults);
+  expect(edited.version).toBe(4);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, edited);
+  if (undo?.status !== 'applied') throw new Error('Expected policy undo');
+  expect(undo.project.motionRegions?.[0]?.cameraFollow).toBeUndefined();
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected policy redo');
+  expect(redo.project.motionRegions?.[0]?.cameraFollow).toEqual(override);
+  store.getState().setProject(structuredClone(redo.project));
+  expect(store.getState().project?.motionRegions?.[0]?.cameraFollow).toEqual(override);
+  store.getState().updateMotionRegion(region.id, { cameraFollow: null });
+  const reset = store.getState().project!;
+  expect(reset.motionRegions?.[0]?.cameraFollow).toBeUndefined();
+  expect(resolveCameraFollowPolicy({ defaults: reset.cameraFollowDefaults! }).settings).toEqual(
+    defaults
+  );
 });

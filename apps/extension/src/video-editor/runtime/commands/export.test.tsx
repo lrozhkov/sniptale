@@ -175,6 +175,27 @@ it('exports only the selected clip range when the dialog scope targets a clip', 
   );
 });
 
+it.each(['response', 'exception'])(
+  'explains camera admission conflicts from a %s',
+  async (kind) => {
+    const params = createParams();
+    if (kind === 'response')
+      startProjectExportMock.mockResolvedValueOnce({
+        success: false,
+        error: 'PROJECT_EXPORT_CAMERA_CONFLICT',
+      });
+    else startProjectExportMock.mockRejectedValueOnce(new Error('PROJECT_EXPORT_CAMERA_CONFLICT'));
+    renderHook(params);
+    await act(async () => {
+      await latestHandlers?.handleStartExport();
+    });
+    expect(params.failExport).toHaveBeenCalledWith(
+      translate('videoEditor.app.exportCameraConflict')
+    );
+    expect(params.project.clips).toHaveLength(1);
+  }
+);
+
 it('fails export when selected-clip scope is requested without an active clip', async () => {
   const params = createParams();
   renderHook(params);

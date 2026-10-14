@@ -1,3 +1,6 @@
+import { InspectCameraFollowSettings } from '../inspection/cursor-path';
+import { resolveCameraFollowPolicy } from '../../../../../features/video/project/camera/cursor-policy';
+import { resolveProjectCursorFocusPath } from '../../../../../features/video/project/cursor-focus-path/projection';
 import { InspectorDetails } from '../shared/details';
 import { getMotionBindingCandidates } from '../../../../../features/video/project/motion/source-binding';
 import { SelectInput } from '../shared/controls';
@@ -25,11 +28,34 @@ export function MotionCameraFields(props: {
   return (
     <div className="grid grid-cols-1 gap-3">
       {props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL ||
-      props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL_AREA ? (
+      props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
+      props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
         <MotionFramingPreview {...props} />
       ) : null}
       <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
       <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
+      {props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
+        <InspectCameraFollowSettings
+          settings={
+            resolveCameraFollowPolicy({
+              legacySensitivity: resolveProjectCursorFocusPath(props.panel.project).sensitivity,
+              ...(props.panel.project.cameraFollowDefaults
+                ? { defaults: props.panel.project.cameraFollowDefaults }
+                : {}),
+              ...(props.motionRegion.cameraFollow
+                ? { override: props.motionRegion.cameraFollow }
+                : {}),
+            }).settings
+          }
+          legacySensitivity={resolveProjectCursorFocusPath(props.panel.project).sensitivity}
+          inherited={!props.motionRegion.cameraFollow}
+          onChange={(cameraFollow) =>
+            props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+              cameraFollow: cameraFollow ?? null,
+            })
+          }
+        />
+      ) : null}
       <MotionPlacementFields motionRegion={props.motionRegion} panel={props.panel} />
     </div>
   );

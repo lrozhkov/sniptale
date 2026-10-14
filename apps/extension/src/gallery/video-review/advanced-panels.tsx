@@ -70,6 +70,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
       ) : zoomRegion ? (
         <ReviewZoomInspector
           region={zoomRegion}
+          cameraFollowDefaults={args.advanced.cameraFollowDefaults}
           cursorPath={args.cursorPath}
           spatialPreview={args.zoom.previewRegion(zoomRegion)}
           zoomConversionBlocked={!args.zoom.canConvertToZoom(zoomRegion)}

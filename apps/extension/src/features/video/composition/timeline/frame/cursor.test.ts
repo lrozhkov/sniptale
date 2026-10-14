@@ -154,3 +154,30 @@ it('cursor controls round-trip outside source bounds through rotation and transi
   project.assets = [];
   expect(resolveCursorSourcePointMapping(project, clip.id, 0)).toBeNull();
 });
+
+it('retains source-owned closing observations without changing half-open playback or bridging a gap', () => {
+  const project = observedProject();
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.duration = 1;
+  expect(resolveObservedCursorPosition(project, 1, clip.id)).toBeNull();
+  const closing = resolveObservedCursorPosition(project, 1, clip.id, { includeSourceEnd: true });
+  expect(closing?.sourceAnchor?.sourceClipId).toBe(clip.id);
+  expect(closing?.recordingPoint?.x).toBeCloseTo(0.6, 10);
+  expect(closing?.recordingPoint?.y).toBeCloseTo(0.7, 10);
+  expect(
+    resolveObservedCursorPosition(project, 1.01, clip.id, { includeSourceEnd: true })
+  ).toBeNull();
+  expect(
+    resolveObservedCursorPosition(project, 1, 'another-instance', { includeSourceEnd: true })
+  ).toBeNull();
+  const lost = {
+    ...project,
+    cursorTrack: {
+      ...project.cursorTrack!,
+      samples: project.cursorTrack!.samples.map((sample, index) =>
+        index === 1 ? { ...sample, recordingPoint: null, observation: 'outside' as const } : sample
+      ),
+    },
+  };
+  expect(resolveObservedCursorPosition(lost, 1, clip.id, { includeSourceEnd: true })).toBeNull();
+});

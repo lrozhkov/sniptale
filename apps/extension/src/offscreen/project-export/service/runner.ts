@@ -3,6 +3,10 @@ import { loadImagesForProject } from '../media';
 import { translate } from '../../../platform/i18n';
 import { renderCompositeExport } from '../render';
 import { resolveProjectRenderScope } from '../../../features/video/project/export/render-scope';
+import {
+  ProjectCameraConflictError,
+  resolveProjectCameraConflicts,
+} from '../../../features/video/composition/motion/project-follow';
 import type { ExportJobState } from '../types';
 import {
   VideoProjectExportPhase,
@@ -22,6 +26,12 @@ export async function runProjectExport(
   settings: VideoProjectExportSettings,
   jobState: ExportJobState
 ): Promise<void> {
+  const renderProject = resolveProjectRenderScope(project, settings);
+  const conflicts = resolveProjectCameraConflicts(renderProject, settings, {
+    start: settings.rangeStartSeconds ?? 0,
+    end: settings.rangeEndSeconds ?? project.duration,
+  });
+  if (conflicts.length) throw new ProjectCameraConflictError(conflicts);
   jobState.exportAbortController = new AbortController();
 
   await sendProgress(
@@ -33,7 +43,6 @@ export async function runProjectExport(
 
   assertProjectExportNotCancelled(jobState);
 
-  const renderProject = resolveProjectRenderScope(project, settings);
   const loadedImages = await loadImagesForProject(
     renderProject,
     jobState,

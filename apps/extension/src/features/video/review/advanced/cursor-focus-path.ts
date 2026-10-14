@@ -9,13 +9,19 @@ import type {
   VideoProjectCursorTrack,
 } from '../../project/types';
 import type { CursorFocusPath, CursorFocusSegment } from '../../project/cursor-focus-path/types';
-import { evaluateCursorFocusSegment } from '../../project/cursor-focus-path/evaluator';
 import {
-  planFollowCursorCamera,
-  evaluateFollowCursorCamera,
+  cursorFocusPreferenceWeight,
+  evaluateCursorFocusSegment,
+} from '../../project/cursor-focus-path/evaluator';
+import {
+  planWorkingZoneCamera,
+  evaluateWorkingZoneCamera,
   type FollowCursorFrame,
+  type WorkingZoneCameraGeometry,
+  type WorkingZoneCameraPlan,
+  type WorkingZoneCameraBoundaries,
 } from '../../composition/motion/follow-cursor';
-import type { ReviewTimeSegment } from '../time-segment';
+import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
 
 export interface ReviewCursorFacts {
@@ -56,84 +62,171 @@ export function evaluateReviewCursorFocus(path: CursorFocusPath, sourceTime: num
   return null;
 }
 
-function sourceTimeAt(time: number, segments: readonly ReviewTimeSegment[] | undefined) {
-  if (!segments) return time;
-  const run = segments.find(
-    (item) => item.kind !== 'cut' && time >= item.resultStart && time < item.resultEnd
-  );
-  return run ? run.sourceStart + (time - run.resultStart) * run.rate : null;
-}
-
 const plans = new WeakMap<
   NonNullable<QuickEditZoomRegion['cursorFocus']>,
-  Map<string, ReturnType<typeof planFollowCursorCamera>>
+  WeakMap<
+    WorkingZoneCameraGeometry,
+    Map<string, { signature: string; plan: WorkingZoneCameraPlan }>
+  >
 >();
 
-/** Shared preview/export camera adapter; dynamics are rebuilt after speed/cut mapping. */
+function reviewCameraObservationTimes(
+  context: NonNullable<QuickEditZoomRegion['cursorFocus']>,
+  run: { resultStart: number; sourceStart: number; rate: number },
+  start: number,
+  end: number,
+  step: number
+) {
+  const times = new Set([start, end]);
+  for (let time = start + step; time < end; time += step) times.add(time);
+  for (const path of [context.path, context.observed]) {
+    if (!path) continue;
+    for (const segment of path.segments) {
+      for (const sourceTime of [
+        segment.start,
+        segment.end,
+        ...segment.keys.map((key) => key.time),
+      ]) {
+        const time = run.resultStart + (sourceTime - run.sourceStart) / run.rate;
+        if (time >= start && time <= end) times.add(time);
+      }
+    }
+  }
+  return [...times].sort((a, b) => a - b);
+}
+
+/** Retain native observation runs over a camera interval or a link gap. */
+export function reviewCameraPlanObservations(region: QuickEditZoomRegion): FollowCursorFrame[] {
+  const context = region.cursorFocus;
+  if (!context) return [];
+  const runs = context.timeMap?.filter((run) => run.kind !== 'cut') ?? [
+    {
+      resultStart: region.start,
+      resultEnd: region.end,
+      sourceStart: region.start,
+      sourceEnd: region.end,
+      rate: 1,
+    },
+  ];
+  const frames: FollowCursorFrame[] = [];
+  const step = Math.max(1 / 30, (region.end - region.start) / 18000);
+  let continuity = 0;
+  for (let index = 0; index < runs.length; index++) {
+    const run = runs[index]!;
+    const previous = runs[index - 1];
+    if (
+      previous &&
+      (Math.abs(previous.resultEnd - run.resultStart) > 1e-9 ||
+        Math.abs(previous.sourceEnd - run.sourceStart) > 1e-9)
+    )
+      continuity++;
+    const start = Math.max(region.start, run.resultStart);
+    const end = Math.min(region.end, run.resultEnd);
+    if (end < start) continue;
+    for (const time of reviewCameraObservationTimes(context, run, start, end, step)) {
+      const sourceTime =
+        time === run.resultStart
+          ? run.sourceStart
+          : time === run.resultEnd
+            ? run.sourceEnd
+            : run.sourceStart + (time - run.resultStart) * run.rate;
+      const observed = context.observed
+        ? evaluateReviewCursorFocus(context.observed, sourceTime)
+        : null;
+      const preferred = evaluateReviewCursorFocus(context.path, sourceTime) ?? observed;
+      if (!preferred) continue;
+      const authoredSegment = context.path.segments.find(
+        (segment) => segment.id === preferred.segmentId
+      );
+      const segmentId = `${observed?.segmentId ?? preferred.segmentId}:${continuity}`;
+      const previousFrame = frames.at(-1);
+      if (previousFrame?.time === time && previousFrame.segmentId === segmentId) continue;
+      frames.push({
+        x: preferred.x,
+        y: preferred.y,
+        time,
+        ...(authoredSegment
+          ? { preferenceWeight: cursorFocusPreferenceWeight(authoredSegment, sourceTime) }
+          : {}),
+        segmentId,
+        ...(observed ? { actual: { x: observed.x, y: observed.y } } : {}),
+      });
+    }
+  }
+  return frames;
+}
+
+/** Admit native facts and sparse authoring against the exact consuming renderer geometry. */
+export function resolveReviewCursorCameraPlan(
+  region: QuickEditZoomRegion,
+  geometry: WorkingZoneCameraGeometry,
+  boundaries: WorkingZoneCameraBoundaries = {}
+): WorkingZoneCameraPlan {
+  const context = region.cursorFocus;
+  if (!context)
+    return {
+      status: 'conflict',
+      reason: 'unproven',
+      interval: { start: region.start, end: region.end },
+      time: region.start,
+      fallback: { x: 0, y: 0 },
+    };
+  let geometries = plans.get(context);
+  if (!geometries) {
+    geometries = new WeakMap();
+    plans.set(context, geometries);
+  }
+  let cached = geometries.get(geometry);
+  if (!cached) {
+    cached = new Map();
+    geometries.set(geometry, cached);
+  }
+  const signature = `${region.start}:${region.end}:${region.transform.scale}:${context.path.smoothing}:${context.path.sensitivity}`;
+  const key = `${region.id}:${JSON.stringify(boundaries)}`;
+  const previous = cached.get(key);
+  if (previous?.signature === signature) return previous.plan;
+  const policy =
+    context.policy ?? resolveCameraFollowPolicy({ legacySensitivity: context.path.sensitivity });
+  const plan = planWorkingZoneCamera({
+    frames: reviewCameraPlanObservations(region),
+    start: region.start,
+    end: region.end,
+    targetScale: region.transform.scale,
+    geometry,
+    policy,
+    ...boundaries,
+    fallback: {
+      x: (region.transform.centerX * region.transform.scale - 0.5) * geometry.window.width,
+      y: (region.transform.centerY * region.transform.scale - 0.5) * geometry.window.height,
+    },
+  });
+  cached.set(key, { signature, plan });
+  if (cached.size > 16) cached.delete(cached.keys().next().value ?? '');
+  return plan;
+}
+
+/** Shared random-access adapter. An unresolved plan preserves a deterministic preview pose. */
 export function evaluateReviewFollowCursor(
   region: QuickEditZoomRegion,
   time: number,
-  camera: QuickEditCameraTransform
+  camera: QuickEditCameraTransform,
+  geometry?: WorkingZoneCameraGeometry,
+  admittedPlan?: WorkingZoneCameraPlan
 ) {
   const context = region.cursorFocus;
-  const path = context?.path;
-  if (!context || !path || path.mode !== 'follow') return camera;
-  let contextPlans = plans.get(context);
-  if (!contextPlans) {
-    contextPlans = new Map();
-    plans.set(context, contextPlans);
-  }
-  const planKey = `${region.id}:${region.start}:${region.end}:${region.transform.scale}`;
-  let plan = contextPlans.get(planKey);
-  if (!plan) {
-    const frames: FollowCursorFrame[] = [];
-    const step = Math.max(1 / 30, (region.end - region.start) / 18000);
-    for (let output = region.start; output <= region.end; output += step) {
-      const source = sourceTimeAt(output, region.cursorFocus?.timeMap);
-      if (source === null) continue;
-      const point = evaluateReviewCursorFocus(path, source);
-      if (!point) continue;
-      const observed =
-        region.cursorFocus?.observed &&
-        evaluateReviewCursorFocus(region.cursorFocus.observed, source);
-      const run =
-        region.cursorFocus?.timeMap?.findIndex(
-          (item) => item.kind !== 'cut' && output >= item.resultStart && output < item.resultEnd
-        ) ?? 0;
-      const focus = windowPoint(region, point);
-      const actual = observed ? windowPoint(region, observed) : undefined;
-      frames.push({
-        ...focus,
-        segmentId: `${point.segmentId}:${run}`,
-        time: output,
-        ...(actual ? { actual } : {}),
-      });
-    }
-    plan = planFollowCursorCamera(frames, region.transform.scale, path.sensitivity);
-    contextPlans.set(planKey, plan);
-  }
-  const sourceTime = sourceTimeAt(time, region.cursorFocus?.timeMap);
-  const observed =
-    sourceTime === null || !region.cursorFocus?.observed
-      ? undefined
-      : (evaluateReviewCursorFocus(region.cursorFocus.observed, sourceTime) ?? undefined);
-  const pose = evaluateFollowCursorCamera(
-    plan,
-    time,
-    observed ? windowPoint(region, observed) : undefined,
-    camera.scale
-  );
-  return pose ? { ...camera, centerX: pose.x, centerY: pose.y } : camera;
-}
-
-function windowPoint(region: QuickEditZoomRegion, point: { x: number; y: number }) {
-  const frame = region.cursorFocus?.sourceFrame;
-  return frame
-    ? {
-        x: point.x,
-        y: (frame.headerHeight + point.y * frame.height) / (frame.headerHeight + frame.height),
-      }
-    : point;
+  if (!context || context.path.mode !== 'follow' || !geometry) return camera;
+  const plan = admittedPlan ?? resolveReviewCursorCameraPlan(region, geometry);
+  const pan = evaluateWorkingZoneCamera(plan, time);
+  const targetScale = plan.status === 'ready' ? plan.targetScale : region.transform.scale;
+  const progress =
+    region.transform.scale > 1 ? (camera.scale - 1) / (region.transform.scale - 1) : 1;
+  const scale = 1 + (targetScale - 1) * progress;
+  return {
+    ...camera,
+    scale,
+    centerX: (0.5 + (progress * pan.x) / geometry.window.width) / scale,
+    centerY: (0.5 + (progress * pan.y) / geometry.window.height) / scale,
+  };
 }
 
 /** Resolves immutable recording facts plus sparse project-owned authoring without writing on read. */
@@ -276,4 +369,32 @@ function appendReviewFocusAnchors(
       });
     else if (last.anchor === 'movement') last.anchor = 'boundary';
   }
+}
+
+/** Test the same captured source clock and coverage runs that feed camera observations. */
+export function hasContinuousReviewCameraSource(
+  context: NonNullable<QuickEditZoomRegion['cursorFocus']>,
+  time: number
+) {
+  const before = context.timeMap?.find(
+    (run) => run.kind !== 'cut' && run.resultStart < time && run.resultEnd >= time
+  );
+  const after = context.timeMap?.find(
+    (run) => run.kind !== 'cut' && run.resultStart <= time && run.resultEnd > time
+  );
+  const sourceTime = before ? before.sourceStart + (time - before.resultStart) * before.rate : time;
+  if (
+    context.timeMap &&
+    (!before ||
+      !after ||
+      Math.abs(sourceTime - (after.sourceStart + (time - after.resultStart) * after.rate)) > 1e-9)
+  )
+    return false;
+  const observed = context.observed ?? context.path;
+  if (
+    observed.segments.length &&
+    !observed.segments.some((segment) => segment.start < sourceTime && segment.end > sourceTime)
+  )
+    return false;
+  return true;
 }

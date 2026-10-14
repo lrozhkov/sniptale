@@ -88,6 +88,7 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  cameraFollow?: QuickEditZoomRegion['cameraFollow'] | null;
   followCursor?: boolean;
   perspective?: QuickEditZoomRegion['perspective'];
   depthOfField?: QuickEditZoomRegion['depthOfField'];
@@ -125,6 +126,7 @@ export function updateQuickEditZoomRegion(
       linkTo: previousLink,
       spotlight: previousSpotlight,
       border: previousBorder,
+      cameraFollow: previousCameraFollow,
       ...rest
     } = timing;
     const spotlight = patch.border
@@ -138,8 +140,11 @@ export function updateQuickEditZoomRegion(
         ? previousBorder
         : patch.border;
     const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
+    const cameraFollow =
+      patch.cameraFollow === undefined ? previousCameraFollow : patch.cameraFollow;
     const updated = {
       ...rest,
+      ...(cameraFollow ? { cameraFollow } : {}),
       ...(patch.followCursor === undefined ? {} : { followCursor: patch.followCursor }),
       ...(patch.perspective ? { perspective: patch.perspective } : {}),
       ...(patch.depthOfField ? { depthOfField: patch.depthOfField } : {}),
