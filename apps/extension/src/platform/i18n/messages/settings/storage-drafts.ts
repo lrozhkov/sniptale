@@ -15,37 +15,37 @@ export const settingsStorageDraftsMessages = defineMessageSource({
   recordingDestination: { ru: 'Видеозаписи', en: 'Video recordings' },
   webSnapshotDestination: { ru: 'Веб-архивы', en: 'Web archives' },
   destinationDescription: {
-    ru: 'Правила категорий применяются только к новым материалам. Существующие материалы не меняют статус. Действие «Сохранить в библиотеку» всегда имеет приоритет.',
-    en: 'Category rules apply only to new materials. Existing items keep their status. The “Save to library” action always takes priority.',
+    ru: 'Правила категорий применяются только к новым материалам. Создание проекта и явный импорт сохраняют материалы постоянно. Действие «Сохранить в библиотеку» всегда имеет приоритет.',
+    en: 'Category rules apply only to new materials. Creating a project and explicit import keep materials permanently. The “Save to library” action always takes priority.',
   },
   destinationTemporary: { ru: 'В черновики', en: 'Drafts' },
   destinationLibrary: { ru: 'Сразу в библиотеку', en: 'Library immediately' },
   cleanupTitle: { ru: 'Срок хранения черновиков', en: 'Draft retention' },
   cleanupEnabled: {
-    ru: 'Автоматически удалять старые черновики',
-    en: 'Automatically delete old drafts',
+    ru: 'Автоматически перемещать старые черновики в корзину',
+    en: 'Automatically move old drafts to Trash',
   },
   cleanupEnabledDescription: {
-    ru: 'Срок отсчитывается от последнего успешного изменения.',
-    en: 'The retention period starts from the last successful change.',
+    ru: 'Срок отсчитывается от последнего успешного изменения. После восстановления из корзины начинается новый полный срок.',
+    en: 'The retention period starts from the last successful change. Restoring a draft from Trash starts a new full period.',
   },
   cleanupDisabledWarning: {
     ru:
-      'Черновики будут храниться без срока удаления и могут заполнить хранилище. ' +
-      'Действие «Удалить просроченные» недоступно, пока автоочистка выключена.',
+      'Черновики будут храниться бессрочно и могут заполнить хранилище. ' +
+      'Действие «Переместить просроченные в корзину» недоступно, пока автоочистка выключена.',
     en:
       'Drafts will have no expiration and may fill available storage. ' +
-      '“Delete expired” is unavailable while automatic cleanup is off.',
+      '“Move expired drafts to Trash” is unavailable while automatic cleanup is off.',
   },
   retentionConsequence: {
     ru:
       'Сокращение срока может сделать уже сохранённые черновики просроченными. ' +
-      'Они удалятся при следующей штатной очистке или после подтверждённого действия ' +
-      '«Удалить просроченные». Увеличение срока не восстановит удалённое.',
+      'Они переместятся в корзину при следующей штатной очистке или после подтверждённого действия ' +
+      '«Переместить просроченные в корзину». Увеличение срока не восстановит безвозвратно удалённое.',
     en:
       'Shortening a period can make existing drafts expired. ' +
-      'They are removed at the next regular cleanup or after you confirm “Delete expired”. ' +
-      'A longer period cannot restore deleted drafts.',
+      'They move to Trash at the next regular cleanup or after you confirm “Move expired drafts to Trash”. ' +
+      'A longer period cannot restore permanently deleted drafts.',
   },
   ordinaryRetention: { ru: 'Изображения и веб-архивы', en: 'Images and web archives' },
   videoRetention: { ru: 'Исходные видеозаписи', en: 'Source video recordings' },
@@ -67,7 +67,7 @@ export const settingsStorageDraftsMessages = defineMessageSource({
     ru:
       'Срок отсчитывается с перемещения в корзину. При включённой автоочистке сокращение срока ' +
       'может безвозвратно удалить уже просроченные материалы при следующем открытии или ' +
-      'обновлении библиотеки. Увеличение срока не восстановит удалённое.',
+      'обновлении библиотеки. Увеличение срока не восстановит безвозвратно удалённое.',
     en:
       'The period starts when an item moves to Trash. With automatic cleanup on, shortening it ' +
       'may permanently remove already expired items at the next Library opening or refresh. ' +
@@ -87,32 +87,44 @@ export const settingsStorageDraftsMessages = defineMessageSource({
   availableUsage: { ru: 'Доступно', en: 'Available' },
   openDrafts: { ru: 'Открыть черновики', en: 'Open drafts' },
   draftActionsTitle: { ru: 'Управление черновиками', en: 'Manage drafts' },
-  deleteExpired: { ru: 'Удалить просроченные', en: 'Delete expired drafts' },
+  deleteExpired: { ru: 'Переместить просроченные в корзину', en: 'Move expired drafts to Trash' },
   deleteExpiredConfirm: {
     ru:
-      'Безвозвратно удалить все черновики, срок хранения которых истёк? ' +
-      'Корзина и материалы библиотеки не затрагиваются. Это действие нельзя отменить.',
+      'Переместить просроченные черновики в корзину? Файлы сохранятся. ' +
+      'Их можно восстановить до безвозвратного удаления. Материалы проектов сохраняются.',
     en:
-      'Permanently delete all drafts whose retention period has expired? ' +
-      'Trash and Library items are unaffected. This cannot be undone.',
+      'Move expired drafts to Trash? Their files remain available. ' +
+      'You can restore them before permanent deletion. Project materials are retained.',
   },
-  deleteAll: { ru: 'Удалить все черновики', en: 'Delete all drafts' },
+  deleteAll: { ru: 'Переместить все черновики в корзину', en: 'Move all drafts to Trash' },
   deleteAllConfirm: {
-    ru: 'Удалить все черновики? Это действие нельзя отменить.',
-    en: 'Delete all drafts? This action cannot be undone.',
+    ru: 'Переместить все черновики в корзину? Их можно восстановить до безвозвратного удаления. Материалы проектов сохраняются.',
+    en: 'Move all drafts to Trash? You can restore them before permanent deletion. Project materials are retained.',
   },
   privacyLink: { ru: 'Удаление всех локальных данных', en: 'Delete all local data' },
   resetDefaults: { ru: 'Восстановить настройки по умолчанию', en: 'Restore defaults' },
   resetDefaultsConfirm: {
     ru:
       'Восстановить стандартную политику целиком: место для новых материалов, сроки, ' +
-      'автоудаление черновиков (включится) и автоочистку корзины (выключится)? ' +
+      'перемещение старых черновиков в корзину (включится) и автоочистку корзины (выключится)? ' +
       'Сокращённые сроки могут сделать существующие материалы просроченными при следующей штатной очистке.',
     en:
       'Restore the entire default policy: destination, periods, draft cleanup (on) and ' +
       'Trash cleanup (off)? Shorter periods may make existing items eligible at the next regular cleanup.',
   },
-  cleanupDone: { ru: 'Удалено черновиков: {count}', en: 'Drafts deleted: {count}' },
+  moveToTrash: { ru: 'В корзину', en: 'Move to Trash' },
+  cleanupDone: {
+    ru: 'Перемещено в корзину: {count}. Оставлено без перемещения: {retained}.',
+    en: 'Moved to Trash: {count}. Retained without moving: {retained}.',
+  },
+  cleanupPartial: {
+    ru: 'Очистка остановлена из-за ошибки. Перемещено в корзину: {count}. Оставлено без перемещения: {retained}. Повторите действие для оставшихся черновиков.',
+    en: 'Cleanup stopped after an error. Moved to Trash: {count}. Retained without moving: {retained}. Retry for the remaining drafts.',
+  },
+  usageRefreshFailed: {
+    ru: 'Не удалось обновить данные о занятом месте. Выполненные перемещения сохранены.',
+    en: 'Could not refresh storage usage. Completed moves are retained.',
+  },
   error: { ru: 'Не удалось выполнить операцию', en: 'The operation could not be completed' },
   policyUnavailable: {
     ru: 'Не удалось загрузить настройки хранения.',

@@ -545,3 +545,25 @@ it('edits the active quick-edit project name and makes it read-only in Trash', a
   expect(container?.querySelector('input')).toBeNull();
   expect(container?.textContent).toContain('Saved edit');
 });
+
+it('shows permanent storage after promotion and omits active draft expiry in Trash', () => {
+  const baseProps = createProps();
+  render(
+    createProps({
+      item: { ...baseProps.item, lifecycle: { savedAt: 2, storageClass: 'library', updatedAt: 2 } },
+    })
+  );
+  expect(container?.textContent).toContain('gallery.app.permanentStorage');
+  render(
+    createProps({
+      trashMode: true,
+      item: {
+        ...baseProps.item,
+        expiresAt: 99,
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2, trashedAt: 3 },
+      },
+    })
+  );
+  expect(container?.textContent).not.toContain('gallery.app.draftExpires');
+  expect(container?.textContent).not.toContain('gallery.app.draftNoExpiration');
+});

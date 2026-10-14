@@ -38,6 +38,7 @@ export interface MaintenanceDiagnosticInput {
   counts?: {
     candidates?: number;
     deleted?: number;
+    moved?: number;
     retained?: number;
     absent?: number;
     failed?: number;

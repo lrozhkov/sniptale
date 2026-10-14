@@ -32,8 +32,39 @@ for (const viewport of [
         height: 90,
         duration: 12.01,
       });
+      await page.evaluate(async (fixture) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(fixture.databaseName);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        try {
+          const tx = db.transaction(['media_library', 'recordings'], 'readwrite');
+          const done = new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error);
+          });
+          for (const [store, key] of [
+            ['media_library', fixture.records.media_library[0]!.id],
+            ['recordings', fixture.records.recordings[0]!.id],
+          ]) {
+            const request = tx.objectStore(store!).get(key!);
+            request.onsuccess = () =>
+              tx.objectStore(store!).put({
+                ...request.result,
+                lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: Date.now() },
+              });
+          }
+          await done;
+        } finally {
+          db.close();
+        }
+      }, betaV1Fixture);
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await expect(
+        page.getByRole('button', { name: 'Save to library', exact: true })
+      ).toBeVisible();
       expect(await readNativeReviewWorkspace(page, id)).toBeNull();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
@@ -44,6 +75,19 @@ for (const viewport of [
       await expect
         .poll(async () => (await readNativeReviewWorkspace(page, id))?.history.length ?? 0)
         .toBeGreaterThan(0);
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(dialog).toBeHidden();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await expect(page.locator('[data-ui="gallery.preview.inspectorHeader"]')).toContainText(
+        'Stored permanently'
+      );
+      await expect(page.getByRole('button', { name: 'Save to library', exact: true })).toHaveCount(
+        0
+      );
+      await page.screenshot({
+        path: info.outputPath('source-promoted-without-reload.png'),
+        fullPage: false,
+      });
       await page.reload();
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       expect(await readNativeReviewWorkspace(page, id)).not.toBeNull();

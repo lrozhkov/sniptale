@@ -44,8 +44,20 @@ import { recoverImageWorkspacePublications } from '../image-aggregates/mutations
 const maintenanceLog = createMaintenanceLog();
 
 export interface DraftCleanupResult {
-  deletedCount: number;
-  deletedIds: string[];
+  movedCount: number;
+  movedIds: string[];
+  retainedCount: number;
+}
+
+/** Committed moves survive a later failure; callers must not report complete success. */
+export class DraftCleanupError extends Error {
+  constructor(
+    readonly result: DraftCleanupResult,
+    cause: unknown
+  ) {
+    super('Draft cleanup stopped before completion', { cause });
+    this.name = 'DraftCleanupError';
+  }
 }
 
 function isExpired(updatedAt: number, retentionMs: number | null, now: number): boolean {
@@ -58,7 +70,7 @@ export async function cleanupDrafts(args: {
   signal?: AbortSignal;
   now?: number;
 }): Promise<DraftCleanupResult> {
-  const empty = { deletedCount: 0, deletedIds: [] };
+  const empty = { movedCount: 0, movedIds: [], retainedCount: 0 };
   if (args.signal?.aborted) return empty;
   await recoverRecordingAssetPublications();
   if (args.signal?.aborted) return empty;
@@ -76,7 +88,13 @@ export async function cleanupDrafts(args: {
   const ordinaryRetention = getDraftRetentionMs(args.policy, 'ordinary');
   const videoRetention = getDraftRetentionMs(args.policy, 'video');
   const [media, videoProjects] = await Promise.all([listMediaLibrary(), listVideoProjectEntries()]);
-  const deletedIds: string[] = [];
+  const movedIds: string[] = [];
+  let retainedCount = 0;
+  const result = (): DraftCleanupResult => ({
+    movedCount: movedIds.length,
+    movedIds: [...movedIds],
+    retainedCount,
+  });
   const referencedMediaIds = new Set<string>();
   const referencedRecordingIds = new Set<string>();
   for (const project of videoProjects) {
@@ -94,16 +112,19 @@ export async function cleanupDrafts(args: {
     const lifecycle = entry.lifecycle;
     if (!lifecycle || lifecycle.trashedAt !== undefined || lifecycle.storageClass !== 'temporary')
       continue;
-    if (referencedMediaIds.has(entry.id)) continue;
-    if (entry.source.kind === 'recording' && referencedRecordingIds.has(entry.source.recordingId)) {
-      continue;
-    }
     const retention = entry.source.kind === 'recording' ? videoRetention : ordinaryRetention;
     if (!includeUnexpired && !isExpired(lifecycle.updatedAt, retention, now)) continue;
-    if (entry.source.kind === 'web-snapshot') await recoverMediaSourcePublications(entry);
-    if (args.signal?.aborted) break;
     if (
-      await runWithLibraryTrashMutation(() =>
+      referencedMediaIds.has(entry.id) ||
+      (entry.source.kind === 'recording' && referencedRecordingIds.has(entry.source.recordingId))
+    ) {
+      retainedCount++;
+      continue;
+    }
+    try {
+      if (entry.source.kind === 'web-snapshot') await recoverMediaSourcePublications(entry);
+      if (args.signal?.aborted) break;
+      const outcome = await runWithLibraryTrashMutation(() =>
         runWithDurableAssetLifecycleLock(() =>
           moveExpiredMediaToTrash(
             entry.id,
@@ -113,13 +134,15 @@ export async function cleanupDrafts(args: {
             args.signal
           )
         )
-      )
-    ) {
-      deletedIds.push(entry.id);
+      );
+      if (outcome === 'moved') movedIds.push(entry.id);
+      else if (outcome === 'retained') retainedCount++;
+    } catch (cause) {
+      throw new DraftCleanupError(result(), cause);
     }
   }
 
-  return { deletedCount: deletedIds.length, deletedIds };
+  return result();
 }
 
 type ExpiryTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
@@ -152,8 +175,8 @@ async function moveExpiredMediaToTrash(
   retention: number | null,
   includeUnexpired: boolean,
   signal?: AbortSignal
-): Promise<boolean> {
-  if (signal?.aborted) return false;
+): Promise<'moved' | 'retained' | 'skipped'> {
+  if (signal?.aborted) return 'skipped';
   return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
@@ -178,7 +201,7 @@ async function moveExpiredMediaToTrash(
         (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, retention, clock()))
       ) {
         await tx.done;
-        return false;
+        return 'skipped';
       }
       if (await hasRetainedProjectForExpiry(tx, current)) {
         await tx.done;
@@ -187,7 +210,7 @@ async function moveExpiredMediaToTrash(
           code: 'in-use',
           counts: { retained: 1 },
         });
-        return false;
+        return 'retained';
       }
       const recordingStore = tx.objectStore(STORE_NAME);
       const recording =
@@ -200,19 +223,19 @@ async function moveExpiredMediaToTrash(
           (!includeUnexpired && !isExpired(recording.lifecycle.updatedAt, retention, clock())))
       ) {
         await tx.done;
-        return false;
+        return 'retained';
       }
 
       if (signal?.aborted) {
         await tx.done;
-        return false;
+        return 'skipped';
       }
       await mediaStore.put({
         ...current,
         lifecycle: { ...current.lifecycle, trashedAt: clock() },
       });
       await tx.done;
-      return true;
+      return 'moved';
     } catch (error) {
       try {
         tx.abort();

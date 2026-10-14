@@ -49,7 +49,7 @@ export async function maintainLibraryAssets(
     [
       'drafts',
       async () => {
-        const [{ loadSettings }, { cleanupDrafts }] = await Promise.all([
+        const [{ loadSettings }, { cleanupDrafts, DraftCleanupError }] = await Promise.all([
           import('../../composition/persistence/settings'),
           import('../../composition/persistence/library-lifecycle/cleanup'),
         ]);
@@ -57,14 +57,29 @@ export async function maintainLibraryAssets(
         if (signal.aborted) return;
         const result = await runStorageStartupPhase('gallery-draft-cleanup', () =>
           cleanupDrafts({ policy: settings.localStoragePolicy, signal })
-        );
-        if (result.deletedCount > 0) {
+        ).catch((error: unknown) => {
+          if (error instanceof DraftCleanupError) {
+            if (error.result.movedCount > 0)
+              publishMediaHubLibraryChanged('cleanup', error.result.movedIds);
+            void maintenanceLog.append({
+              operation: 'drafts',
+              code: 'failed',
+              counts: {
+                moved: error.result.movedCount,
+                retained: error.result.retainedCount,
+                failed: 1,
+              },
+            });
+          }
+          throw error;
+        });
+        if (result.movedCount > 0) {
           void maintenanceLog.append({
             operation: 'drafts',
-            code: 'expired',
-            counts: { deleted: result.deletedCount },
+            code: 'moved-to-trash',
+            counts: { moved: result.movedCount, retained: result.retainedCount },
           });
-          publishMediaHubLibraryChanged('cleanup', result.deletedIds);
+          publishMediaHubLibraryChanged('cleanup', result.movedIds);
         }
       },
     ],

@@ -92,8 +92,9 @@ it('retains a legacy draft project and its linked recording and media', async ()
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    movedCount: 0,
+    retainedCount: 0,
+    movedIds: [],
   });
   expect(values.get('video_projects')?.has(project.id)).toBe(true);
   expect(values.get('recordings')?.get(recording.id)).toMatchObject({

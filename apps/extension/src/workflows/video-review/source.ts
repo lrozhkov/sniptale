@@ -1,3 +1,4 @@
+import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { projectRecordingObservationClock } from '../../features/video/project/observation-clock';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { getMediaLibraryEntry } from '../../composition/persistence/media-library';
@@ -128,6 +129,7 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
     signal.throwIfAborted();
     stage = 'workspace';
     const snapshot = await openVideoWorkspace(aggregateId, source, original.assetId);
+    publishMediaHubLibraryChanged('update', [aggregateId]);
     signal.throwIfAborted();
     return {
       file: original.file,

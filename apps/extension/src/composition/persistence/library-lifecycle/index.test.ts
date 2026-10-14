@@ -127,7 +127,7 @@ beforeEach(() => {
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listStoredScenarioStepEditorDocuments.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
-  persistenceMocks.runWithIndexedDbMutation.mockResolvedValue(true);
+  persistenceMocks.runWithIndexedDbMutation.mockResolvedValue('moved');
 });
 
 describe('library lifecycle cleanup and usage', () => {
@@ -176,8 +176,9 @@ describe('library lifecycle cleanup and usage', () => {
       { id: 'scenario-library', lifecycle: createLibraryLifecycle('library', now - 90 * day) },
     ]);
     await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-      deletedCount: 2,
-      deletedIds: ['draft-image', 'draft-video'],
+      movedCount: 2,
+      retainedCount: 0,
+      movedIds: ['draft-image', 'draft-video'],
     });
   });
 
@@ -192,12 +193,14 @@ describe('library lifecycle cleanup and usage', () => {
     const policy = { ...DEFAULT_LOCAL_STORAGE_POLICY, cleanupEnabled: false };
 
     await expect(cleanupDrafts({ now: 10_000, policy })).resolves.toEqual({
-      deletedCount: 0,
-      deletedIds: [],
+      movedCount: 0,
+      retainedCount: 0,
+      movedIds: [],
     });
     await expect(cleanupDrafts({ includeUnexpired: true, now: 10_000, policy })).resolves.toEqual({
-      deletedCount: 1,
-      deletedIds: ['media-1'],
+      movedCount: 1,
+      retainedCount: 0,
+      movedIds: ['media-1'],
     });
   });
 
@@ -415,7 +418,7 @@ describe('library lifecycle concurrent cleanup', () => {
 
     await expect(
       cleanupDrafts({ includeUnexpired: true, now: 3, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-    ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+    ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
     expect(deleteMedia).not.toHaveBeenCalled();
   });
 
@@ -452,7 +455,7 @@ describe('library lifecycle concurrent cleanup', () => {
 
     await expect(
       cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-    ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+    ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
     expect(deleteMedia).not.toHaveBeenCalled();
   });
 });

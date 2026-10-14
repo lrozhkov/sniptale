@@ -80,6 +80,7 @@ export const eventsLogsMessages = defineMessageSource({
   counts: {
     candidates: { ru: 'Кандидатов', en: 'Candidates' },
     deleted: { ru: 'Удалено', en: 'Deleted' },
+    moved: { ru: 'В корзину', en: 'Moved to Trash' },
     retained: { ru: 'Сохранено', en: 'Retained' },
     absent: { ru: 'Отсутствует', en: 'Absent' },
     failed: { ru: 'Ошибок', en: 'Failed' },
@@ -208,6 +209,10 @@ export const eventsLogsMessages = defineMessageSource({
     'delete-failed': {
       ru: 'Ошибка физического удаления. Запись сохранена для повторной попытки.',
       en: 'Physical deletion failed. Intent retained for retry.',
+    },
+    'moved-to-trash': {
+      ru: 'Черновики перемещены в корзину. Файлы сохранены.',
+      en: 'Drafts were moved to Trash. Their files were retained.',
     },
     expired: {
       ru: 'Материалы автоматически удалены по сроку хранения.',

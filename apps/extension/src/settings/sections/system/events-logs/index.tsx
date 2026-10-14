@@ -270,7 +270,7 @@ function JournalTable({
             </td>
             <td className="p-3">
               <div className="space-y-1">
-                {(['candidates', 'deleted', 'retained', 'absent', 'failed'] as const)
+                {(['candidates', 'deleted', 'moved', 'retained', 'absent', 'failed'] as const)
                   .filter((key) => entry.counts?.[key] !== undefined)
                   .map((key) => (
                     <div key={key}>

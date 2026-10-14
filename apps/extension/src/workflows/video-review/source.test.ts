@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   export: vi.fn(),
   telemetry: vi.fn(),
   open: vi.fn(),
+  publish: vi.fn(),
   dispose: vi.fn(),
   duration: vi.fn(),
   metadataDuration: vi.fn(),
@@ -39,6 +40,9 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
     typeof import('../../composition/persistence/review-workspaces/store')
   >()),
   openVideoWorkspace: mocks.open,
+}));
+vi.mock('../../features/media-hub/events', () => ({
+  publishMediaHubLibraryChanged: mocks.publish,
 }));
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
@@ -259,4 +263,21 @@ it('carries structured workspace validation details without raw errors', async (
   await expect(
     loadVideoReviewSource('private-id', new AbortController().signal)
   ).rejects.toMatchObject({ stage: 'workspace', reason: 'invalid', diagnostic });
+});
+
+it('publishes project admission only after commit, including cancellation after commit', async () => {
+  const abort = new AbortController();
+  mocks.open.mockImplementationOnce(async () => {
+    expect(mocks.publish).not.toHaveBeenCalled();
+    abort.abort();
+    return { workspace: {}, draft: null };
+  });
+  await expect(loadVideoReviewSource('recording:r', abort.signal)).rejects.toThrow();
+  expect(mocks.publish).toHaveBeenCalledWith('update', ['recording:r']);
+  mocks.publish.mockClear();
+  mocks.open.mockRejectedValueOnce(new Error('commit refused'));
+  await expect(
+    loadVideoReviewSource('recording:r', new AbortController().signal)
+  ).rejects.toThrow();
+  expect(mocks.publish).not.toHaveBeenCalled();
 });

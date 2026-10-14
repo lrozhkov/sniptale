@@ -141,9 +141,10 @@ export const galleryAppMessages = defineMessageSource({
     en: 'Drafts',
   },
   draftExpires: {
-    ru: 'Удаление:',
-    en: 'Deletes:',
+    ru: 'В корзину:',
+    en: 'Moves to Trash:',
   },
+  permanentStorage: { ru: 'Постоянное хранение', en: 'Stored permanently' },
   draftNoExpiration: {
     ru: 'Без срока удаления',
     en: 'No expiration',

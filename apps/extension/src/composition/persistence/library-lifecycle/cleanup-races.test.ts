@@ -122,8 +122,9 @@ it('moves an expired image root to Trash and preserves its sidecars', async () =
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [media.id],
+    movedCount: 1,
+    retainedCount: 0,
+    movedIds: [media.id],
   });
   expect(deletes).not.toHaveBeenCalled();
   expect(put).toHaveBeenCalledWith(
@@ -186,8 +187,9 @@ it.each([
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    movedCount: 0,
+    retainedCount: 1,
+    movedIds: [],
   });
   expect(deletes).not.toHaveBeenCalled();
 });
@@ -252,8 +254,9 @@ async function runExpiredVideoProjectCleanup(args: {
   await expect(
     cleanupDrafts({ now: args.now, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    movedCount: 0,
+    retainedCount: 0,
+    movedIds: [],
   });
   return { deletes, media, project };
 }
@@ -335,8 +338,9 @@ it('retains recording telemetry and project thumbnail with a legacy project grap
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    movedCount: 0,
+    retainedCount: 1,
+    movedIds: [],
   });
   expect(deletes).not.toHaveBeenCalled();
 });
@@ -358,7 +362,7 @@ it('does not start recovery or deletion for cancelled maintenance', async () => 
   abort.abort();
   await expect(
     cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(recoverRecordingAssetPublications).not.toHaveBeenCalled();
 });
 
@@ -381,7 +385,7 @@ it.each(['recording', 'project', 'image'] as const)(
     });
     await expect(
       cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal })
-    ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+    ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
     expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
   }
 );
@@ -400,7 +404,7 @@ it('cancels candidate deletion when discovery completes after cancellation', asy
   });
   await expect(
     cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal, now: 40 * day })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
 });
 
@@ -504,15 +508,15 @@ it('uses actual Trash admission, preserves duplicate admission and renews expiry
         videoDraftRetentionDays: 7,
       },
     });
-  expect((await expire(1 + 7 * day - 1)).deletedCount).toBe(0);
-  expect((await expire(1 + 7 * day, false)).deletedCount).toBe(0);
-  expect((await expire(1 + 7 * day)).deletedCount).toBe(1);
+  expect((await expire(1 + 7 * day - 1)).movedCount).toBe(0);
+  expect((await expire(1 + 7 * day, false)).movedCount).toBe(0);
+  expect((await expire(1 + 7 * day)).movedCount).toBe(1);
   const admitted = structuredClone(fixture.rows);
-  expect((await expire(1 + 40 * day)).deletedCount).toBe(0);
+  expect((await expire(1 + 40 * day)).movedCount).toBe(0);
   expect(fixture.rows).toEqual(admitted);
   await restoreStoredItemsFromTrash([{ kind: 'media', id: media.id }], 1 + 41 * day);
-  expect((await expire(1 + 48 * day - 1)).deletedCount).toBe(0);
-  expect((await expire(1 + 48 * day)).deletedCount).toBe(1);
+  expect((await expire(1 + 48 * day - 1)).movedCount).toBe(0);
+  expect((await expire(1 + 48 * day)).movedCount).toBe(1);
   expect(fixture.rows.get('media_library')!.get(media.id)).toMatchObject({
     lifecycle: { trashedAt: 1 + 48 * day },
   });
@@ -549,7 +553,7 @@ it.each(['image', 'review', 'unknown-review', 'write-failure'] as const)(
     const before = structuredClone(fixture.rows);
     const result = cleanupDrafts({ now: 1 + 7 * day, policy: DEFAULT_LOCAL_STORAGE_POLICY });
     if (state === 'write-failure') await expect(result).rejects.toThrow();
-    else expect((await result).deletedCount).toBe(0);
+    else expect((await result).movedCount).toBe(0);
     expect(fixture.rows).toEqual(before);
   }
 );
@@ -581,7 +585,7 @@ it('starts the full Trash window when delayed admission resumes', async () => {
           videoDraftRetentionDays: 7,
         },
       })
-    ).resolves.toEqual({ deletedCount: 1, deletedIds: [media.id] });
+    ).resolves.toEqual({ movedCount: 1, retainedCount: 0, movedIds: [media.id] });
     expect(fixture.rows.get('media_library')!.get(media.id)).toMatchObject({
       lifecycle: { trashedAt: 1 + 47 * day },
     });
@@ -589,4 +593,49 @@ it('starts the full Trash window when delayed admission resumes', async () => {
   } finally {
     clock.mockRestore();
   }
+});
+
+it('reports committed Trash moves after a later failure and retries without counting them twice', async () => {
+  let writes = 0;
+  let fail = true;
+  const fixture = createReviewWorkspaceStoreFixture(
+    (store) => store === 'media_library' && ++writes === 2 && fail
+  );
+  fixture.rows.get('media_library')!.clear();
+  fixture.rows.get('recordings')!.clear();
+  const entries = ['first', 'second', 'third'].map((id) => {
+    const lifecycle = createLibraryLifecycle('temporary', 1);
+    const media = {
+      ...betaV1Fixture.records.media_library[0]!,
+      id: `recording:${id}`,
+      source: { kind: 'recording' as const, recordingId: id },
+      lifecycle,
+    };
+    fixture.rows.get('media_library')!.set(media.id, media);
+    fixture.rows.get('recordings')!.set(id, {
+      ...betaV1Fixture.records.recordings[0]!,
+      id,
+      lifecycle,
+    });
+    return media;
+  });
+  persistenceMocks.listMediaLibrary.mockResolvedValue(entries);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) =>
+    operation(fixture.database)
+  );
+  const args = { now: 1 + 7 * day, policy: DEFAULT_LOCAL_STORAGE_POLICY };
+  await expect(cleanupDrafts(args)).rejects.toMatchObject({
+    result: { movedCount: 1, movedIds: [entries[0]!.id], retainedCount: 0 },
+    cause: { name: 'QuotaExceededError' },
+  });
+  expect(fixture.rows.get('media_library')!.get(entries[0]!.id)).toMatchObject({
+    lifecycle: { trashedAt: args.now },
+  });
+  expect(fixture.rows.get('media_library')!.get(entries[2]!.id)).toEqual(entries[2]);
+  fail = false;
+  await expect(cleanupDrafts(args)).resolves.toEqual({
+    movedCount: 2,
+    movedIds: entries.slice(1).map((entry) => entry.id),
+    retainedCount: 0,
+  });
 });

@@ -17,7 +17,7 @@ const {
   collect: vi.fn(),
   provenance: vi.fn(),
   backfill: vi.fn(),
-  drafts: vi.fn(async () => ({ deletedCount: 0, deletedIds: [] })),
+  drafts: vi.fn(async () => ({ movedCount: 0, retainedCount: 0, movedIds: [] })),
   trash: vi.fn(),
   recover: vi.fn(),
   settings: vi.fn(async () => ({ localStoragePolicy: {} })),
@@ -34,7 +34,10 @@ vi.mock('../../composition/persistence/infrastructure/indexed-db/maintenance/pro
 vi.mock('../../composition/persistence/scenario/library-publication', () => ({
   backfillScenarioLibraryAssets: backfill,
 }));
-vi.mock('../../composition/persistence/library-lifecycle/cleanup', () => ({
+vi.mock('../../composition/persistence/library-lifecycle/cleanup', async (importOriginal) => ({
+  DraftCleanupError: (
+    await importOriginal<typeof import('../../composition/persistence/library-lifecycle/cleanup')>()
+  ).DraftCleanupError,
   cleanupDrafts: drafts,
 }));
 vi.mock('../../composition/persistence/settings', () => ({ loadSettings: settings }));
@@ -137,5 +140,27 @@ it('retains unverified data after project retention maintenance fails', async ()
   expect(collect).not.toHaveBeenCalled();
   expect(log).toHaveBeenCalledWith(
     expect.objectContaining({ operation: 'drafts', code: 'failed' })
+  );
+});
+
+it('publishes committed draft moves after partial failure and stops later destructive phases', async () => {
+  const { DraftCleanupError } =
+    await import('../../composition/persistence/library-lifecycle/cleanup');
+  drafts.mockRejectedValueOnce(
+    new DraftCleanupError(
+      { movedCount: 1, movedIds: ['saved'], retainedCount: 1 },
+      new Error('quota')
+    )
+  );
+  await maintainLibraryAssets(new AbortController().signal);
+  expect(publish).toHaveBeenCalledWith('cleanup', ['saved']);
+  expect(trash).not.toHaveBeenCalled();
+  expect(recover).not.toHaveBeenCalled();
+  expect(log).toHaveBeenCalledWith(
+    expect.objectContaining({
+      operation: 'drafts',
+      code: 'failed',
+      counts: { moved: 1, retained: 1, failed: 1 },
+    })
   );
 });

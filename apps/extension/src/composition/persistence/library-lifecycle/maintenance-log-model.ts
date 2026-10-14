@@ -63,6 +63,10 @@ const MAINTENANCE_LOG_CODES = {
     status: 'error',
     message: 'Physical deletion failed; durable intent remains for retry.',
   },
+  'moved-to-trash': {
+    status: 'completed',
+    message: 'Drafts were moved to Trash; their files were retained.',
+  },
   expired: {
     status: 'completed',
     message: 'Expired Library materials were automatically deleted.',
@@ -86,7 +90,7 @@ export interface MaintenanceLogEntry extends MaintenanceLogInput {
   message: string;
   repeats: number;
 }
-const countKeys = ['candidates', 'deleted', 'retained', 'absent', 'failed'] as const;
+const countKeys = ['candidates', 'deleted', 'moved', 'retained', 'absent', 'failed'] as const;
 function metric(value: unknown): value is number {
   return (
     typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000_000

@@ -19,7 +19,7 @@ export function StorageDraftsDialogs(props: {
     <ProductConfirmDialog
       cancelText={translate('common.actions.cancel')}
       confirmText={translate(
-        reset ? 'settings.storageDrafts.resetDefaults' : 'common.actions.delete'
+        reset ? 'settings.storageDrafts.resetDefaults' : 'settings.storageDrafts.moveToTrash'
       )}
       dialogClassName={settingsModalClassName}
       isLoading={props.busy}

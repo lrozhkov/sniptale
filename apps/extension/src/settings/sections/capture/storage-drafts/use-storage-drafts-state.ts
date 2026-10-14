@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import {
   cleanupDrafts,
+  DraftCleanupError,
+  type DraftCleanupResult,
   getLibraryStorageUsage,
 } from '../../../../composition/persistence/library-lifecycle';
 import { getStorageEstimateInfo } from '../../../../features/media-hub/storage-capacity';
@@ -41,13 +43,24 @@ export function useStorageDraftsState() {
     async (includeUnexpired: boolean) => {
       setCleanupBusy(true);
       try {
-        const result = await cleanupDrafts({ includeUnexpired, policy: policyState.policy });
-        await refreshUsage();
-        const message = translate('settings.storageDrafts.cleanupDone').replace(
-          '{count}',
-          String(result.deletedCount)
+        let result: DraftCleanupResult;
+        let failed = false;
+        try {
+          result = await cleanupDrafts({ includeUnexpired, policy: policyState.policy });
+        } catch (error) {
+          if (!(error instanceof DraftCleanupError)) throw error;
+          result = error.result;
+          failed = true;
+        }
+        const message = translate(
+          failed ? 'settings.storageDrafts.cleanupPartial' : 'settings.storageDrafts.cleanupDone'
+        )
+          .replace('{count}', String(result.movedCount))
+          .replace('{retained}', String(result.retainedCount));
+        showToast(message, failed ? 'error' : 'success');
+        await refreshUsage().catch(() =>
+          showToast(translate('settings.storageDrafts.usageRefreshFailed'), 'error')
         );
-        showToast(message, 'success');
       } catch {
         showToast(translate('settings.storageDrafts.error'), 'error');
       } finally {

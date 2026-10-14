@@ -195,8 +195,9 @@ it('moves standalone media to Trash without deleting dependency graphs or sideca
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 2,
-    deletedIds: [recordingMedia.id, projectAssetMedia.id],
+    movedCount: 2,
+    retainedCount: 0,
+    movedIds: [recordingMedia.id, projectAssetMedia.id],
   });
   expect(deletes).not.toHaveBeenCalled();
   expect(valuesByStore.get('recordings')!.get(recording.id)).toEqual(recording);
@@ -403,7 +404,7 @@ it('retains legacy project graphs and linked media when clearing drafts', async 
 
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 1, movedIds: [] });
   expect(deletes).not.toHaveBeenCalled();
   expect(valuesByStore.get('video_projects')?.has(project.id)).toBe(true);
   expect(valuesByStore.get('scenario_projects')?.has(scenario.id)).toBe(true);
@@ -430,7 +431,7 @@ it('preserves trashed roots even when explicitly clearing every draft', async ()
       includeUnexpired: true,
       now: 1_000_000,
     })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
   expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
@@ -459,7 +460,7 @@ it('rechecks a draft project trashed after the candidate snapshot before deletin
       includeUnexpired: true,
       now: 1_000_000,
     })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(remove).not.toHaveBeenCalled();
 });
 
@@ -557,7 +558,7 @@ it.each(['scenario-snapshot', 'video-snapshot', 'review-audio'] as const)(
     );
     expect(
       await cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-    ).toEqual({ deletedCount: 0, deletedIds: [] });
+    ).toEqual({ movedCount: 0, retainedCount: 1, movedIds: [] });
     expect(deletes).not.toHaveBeenCalled();
   }
 );

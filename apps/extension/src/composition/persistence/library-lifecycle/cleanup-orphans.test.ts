@@ -117,8 +117,9 @@ it('retains expired project-asset bytes in Trash and never schedules a library a
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [temporary.id],
+    movedCount: 1,
+    retainedCount: 0,
+    movedIds: [temporary.id],
   });
   expect(deletes).not.toHaveBeenCalled();
 
@@ -127,7 +128,7 @@ it('retains expired project-asset bytes in Trash and never schedules a library a
   ]);
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(persistenceMocks.runWithIndexedDbMutation).toHaveBeenCalledOnce();
 });
 
@@ -146,7 +147,7 @@ it('does not schedule one timer per permanent material during draft discovery', 
       signal: new AbortController().signal,
     });
     await vi.runAllTimersAsync();
-    expect(await pending).toEqual({ deletedCount: 0, deletedIds: [] });
+    expect(await pending).toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
     expect(timer.mock.calls.length).toBeLessThanOrEqual(32);
   } finally {
     timer.mockRestore();

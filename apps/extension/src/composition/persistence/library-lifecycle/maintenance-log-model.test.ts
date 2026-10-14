@@ -135,3 +135,18 @@ it('separates different reasons, metrics and old repetitions', () => {
     expect(appendMaintenanceLog([first], next)).toHaveLength(2);
   expect(maintenanceLogJsonl([])).toBe('');
 });
+
+it('distinguishes reversible draft moves from permanent Trash deletion', () => {
+  const moved = createMaintenanceLogEntry(
+    { operation: 'drafts', code: 'moved-to-trash', counts: { moved: 2, retained: 1 } },
+    1000
+  );
+  expect(moved).toMatchObject({
+    counts: { moved: 2, retained: 1 },
+    message: 'Drafts were moved to Trash; their files were retained.',
+  });
+  expect(
+    createMaintenanceLogEntry({ operation: 'trash', code: 'expired', counts: { deleted: 2 } }, 1000)
+      ?.message
+  ).toContain('deleted');
+});

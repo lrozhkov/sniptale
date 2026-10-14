@@ -24,7 +24,10 @@ vi.mock('../../../../composition/persistence/settings', () => ({
   subscribeToSettingsChanges: mocks.subscribe,
   StaleLocalStoragePolicyError: class StaleLocalStoragePolicyError extends Error {},
 }));
-vi.mock('../../../../composition/persistence/library-lifecycle', () => ({
+vi.mock('../../../../composition/persistence/library-lifecycle', async (importOriginal) => ({
+  DraftCleanupError: (
+    await importOriginal<typeof import('../../../../composition/persistence/library-lifecycle')>()
+  ).DraftCleanupError,
   DEFAULT_LOCAL_STORAGE_POLICY: {
     cleanupEnabled: true,
     defaultDestination: 'temporary',
@@ -161,4 +164,39 @@ it('ignores a late load after disposal and removes its subscription', async () =
   expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
   await act(async () => load.resolve({ localStoragePolicy: base }));
   root = createRoot(container);
+});
+
+it('reports committed moves even when the subsequent usage refresh fails', async () => {
+  mocks.load.mockResolvedValue({ localStoragePolicy: base });
+  mocks.cleanup.mockResolvedValue({ movedCount: 2, movedIds: ['a', 'b'], retainedCount: 1 });
+  await act(async () => root.render(<Probe />));
+  mocks.toast.mockClear();
+  mocks.usage.mockRejectedValueOnce(new Error('usage unavailable'));
+  await act(async () => state.runCleanup(true));
+  expect(mocks.toast.mock.calls.some(([message]) => /2/.test(message) && /1/.test(message))).toBe(
+    true
+  );
+  expect(state.busy).toBe(false);
+});
+
+it('shows partial committed counts as an error and permits a later cleanup retry', async () => {
+  const { DraftCleanupError } =
+    await import('../../../../composition/persistence/library-lifecycle');
+  mocks.load.mockResolvedValue({ localStoragePolicy: base });
+  mocks.cleanup
+    .mockRejectedValueOnce(
+      new DraftCleanupError(
+        { movedCount: 2, movedIds: ['a', 'b'], retainedCount: 1 },
+        new Error('quota')
+      )
+    )
+    .mockResolvedValueOnce({ movedCount: 1, movedIds: ['c'], retainedCount: 0 });
+  await act(async () => root.render(<Probe />));
+  mocks.toast.mockClear();
+  await act(async () => state.runCleanup(true));
+  expect(mocks.toast).toHaveBeenCalledWith(expect.stringMatching(/2.*1/), 'error');
+  expect(mocks.toast.mock.calls.some(([, kind]) => kind === 'success')).toBe(false);
+  await act(async () => state.runCleanup(true));
+  expect(mocks.cleanup).toHaveBeenCalledTimes(2);
+  expect(mocks.toast).toHaveBeenLastCalledWith(expect.stringMatching(/1.*0/), 'success');
 });

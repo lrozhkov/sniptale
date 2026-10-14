@@ -69,7 +69,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
         <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
           {formatDate(props.item.createdAt)}
         </div>
-        {isDraft ? (
+        {isDraft && !props.trashMode ? (
           <div
             className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2
               text-xs font-medium text-[var(--sniptale-color-warning)]"
@@ -80,6 +80,10 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
                 : translate('gallery.app.draftNoExpiration')}
             </span>
             {!props.trashMode ? <PreviewPromotionAction {...props} /> : null}
+          </div>
+        ) : !props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
+          <div className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate('gallery.app.permanentStorage')}
           </div>
         ) : null}
       </div>

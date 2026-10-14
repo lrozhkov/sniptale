@@ -154,3 +154,22 @@ it('exports full history independently of recent filters and prevents duplicate 
   await act(async () => button(translate('settings.eventsLogs.exportZip')).click());
   expect(container.textContent).toContain(translate('settings.eventsLogs.exportFailed'));
 });
+
+it('shows reversible draft moves separately from permanent deletion counts', async () => {
+  mocks.read.mockResolvedValue([
+    createMaintenanceLogEntry(
+      { operation: 'drafts', code: 'moved-to-trash', counts: { moved: 2, retained: 1 } },
+      1000
+    ),
+  ]);
+  await open();
+  expect(container.querySelector('tbody')?.textContent).toContain(
+    `${translate('settings.eventsLogs.counts.moved')}: 2`
+  );
+  expect(container.querySelector('tbody')?.textContent).toContain(
+    `${translate('settings.eventsLogs.counts.retained')}: 1`
+  );
+  expect(container.querySelector('tbody')?.textContent).not.toContain(
+    translate('settings.eventsLogs.counts.deleted')
+  );
+});
