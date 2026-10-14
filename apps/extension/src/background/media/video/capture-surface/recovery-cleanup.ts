@@ -5,6 +5,7 @@ import {
 import { isViewportPresetAllowedForVideoCaptureMode } from '../../../../features/viewport-presets/video-recording-policy';
 import {
   clearActiveVideoRecordingLease,
+  updateVideoRecordingTerminal,
   type ensureActiveVideoRecordingLeaseHydrated,
 } from '../recording-control-lease';
 import { requestBoundOffscreenRecordingStop } from '../offscreen-recording-stop';
@@ -49,13 +50,28 @@ export async function stopBoundRecordingBeforeAbandonedStackRestore(
     (surface) => surface.owner === 'video' && surface.sessionId === activeLease.recordingId
   );
   if (!containsBoundRecording) return false;
+  if (activeLease.phase === 'terminal' && activeLease.terminal.outcome === 'stopped') return true;
+  if (activeLease.phase === 'terminal' && activeLease.terminal.outcome === 'failed') {
+    throw new Error('Recording cleanup failed. The capture surface remains retained.');
+  }
   if (!activeLease.surfaceBinding) {
     throw new Error('Recovered recording source binding is incomplete before surface cleanup');
   }
-  await requestOffscreenStopAcknowledgement({
+  const binding = {
     recordingId: activeLease.recordingId,
     ...activeLease.surfaceBinding,
-  });
+  };
+  if (activeLease.phase === 'terminal') {
+    const result = await requestBoundOffscreenRecordingStop(binding, activeLease.terminal.discard);
+    if (result.terminalError) throw new Error('Recording cleanup remains incomplete.');
+    await updateVideoRecordingTerminal(binding, {
+      ...activeLease.terminal,
+      outcome: 'stopped',
+      cleanupStep: 'surface',
+    });
+  } else {
+    await requestOffscreenStopAcknowledgement(binding);
+  }
   return true;
 }
 

@@ -22,7 +22,7 @@ import {
 } from './result';
 import { releaseVideoRecordingSurface } from '../video/content-surface/surface-lease';
 
-export async function recoverInvalidDurableMediaState() {
+export async function recoverDurableMediaStateForErasure() {
   let containmentFailed = false;
   try {
     await releaseVideoRecordingSurface();

@@ -1,3 +1,4 @@
+import { getActiveVideoRecordingLeaseSnapshot } from '../../recording-control-lease';
 import { runBestEffort } from '@sniptale/foundation/best-effort';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -6,6 +7,7 @@ import {
   getVideoRecordingTabId,
   getVideoRecordingId,
   isCurrentVideoRecordingId,
+  isVideoRecordingStopInProgress,
   isControlledCursorCaptureEnabled,
   resetVideoRecordingStartSession,
   setVideoRecordingId,
@@ -59,6 +61,7 @@ export async function notifyRecordingStartFailed(
     logger.warn('Ignoring stale recording start failure', { recordingId: options.recordingId });
     return;
   }
+  if (hasTerminalRecordingAuthority(recordingId)) return;
   const recordingTabId = getVideoRecordingTabId();
   // Collection ends even if restoring the capture surface fails and authority must remain.
   if (recordingTabId !== null) {
@@ -83,6 +86,7 @@ export async function notifyRecordingStartFailed(
     }
   }
 
+  if (hasTerminalRecordingAuthority(recordingId)) return;
   if (recordingTabId !== null) hideRecordingOverlay(recordingTabId);
 
   if (options.retainAuthority !== true) {
@@ -99,5 +103,15 @@ export async function notifyRecordingStartFailed(
     }),
     logger,
     'Failed to broadcast recording start failure'
+  );
+}
+
+function hasTerminalRecordingAuthority(recordingId: string | null): boolean {
+  const lease = getActiveVideoRecordingLeaseSnapshot();
+  return Boolean(
+    recordingId &&
+    isCurrentVideoRecordingId(recordingId) &&
+    (isVideoRecordingStopInProgress() ||
+      (lease?.recordingId === recordingId && lease.phase === 'terminal'))
   );
 }

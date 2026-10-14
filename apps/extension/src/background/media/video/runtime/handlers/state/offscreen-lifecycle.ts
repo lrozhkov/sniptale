@@ -8,6 +8,7 @@ import {
   finishVideoRecordingStop,
   getVideoRecordingId,
   isCurrentVideoRecordingId,
+  isVideoRecordingStopInProgress,
   resetCompletedVideoRecordingSession,
 } from '../../../session-state';
 import {
@@ -18,10 +19,17 @@ import {
 } from '../../../../../../composition/persistence/export-ledger';
 import { coordinateProjectExportLifecycle } from '../../../application/export/coordination';
 import {
+  getActiveVideoRecordingLeaseSnapshot,
   clearActiveVideoRecordingLease,
   restoreCurrentRecordingFromLease,
+  ensureActiveVideoRecordingLeaseHydrated,
+  updateVideoRecordingTerminal,
 } from '../../../recording-control-lease';
-import { resetVideoRecordingRuntimeState } from '../../session-state';
+import {
+  resetVideoRecordingRuntimeState,
+  setVideoRecordingRuntimeState,
+} from '../../session-state';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import {
   notifyRecordingStartFailed,
   getRecordingTabId,
@@ -90,6 +98,41 @@ export function handleOffscreenError(
   );
 }
 
+function hasTerminalRecordingAuthority(recordingId: string | undefined): boolean {
+  const lease = getActiveVideoRecordingLeaseSnapshot();
+  return Boolean(
+    recordingId &&
+    isCurrentVideoRecordingId(recordingId) &&
+    (isVideoRecordingStopInProgress() ||
+      (lease?.recordingId === recordingId && lease.phase === 'terminal'))
+  );
+}
+
+async function retainFailedRecordingCompletion(recordingId: string): Promise<void> {
+  const lease = await ensureActiveVideoRecordingLeaseHydrated();
+  if (!isCurrentVideoRecordingId(recordingId)) return;
+  if (lease?.recordingId !== recordingId || !lease.surfaceBinding) {
+    throw new Error('Recording terminal source binding is unavailable.');
+  }
+  const terminal = await updateVideoRecordingTerminal(
+    {
+      recordingId,
+      ...lease.surfaceBinding,
+    },
+    {
+      outcome: 'failed',
+      cleanupStep: 'surface',
+    }
+  );
+  if (!isCurrentVideoRecordingId(recordingId)) return;
+  if (terminal.phase === 'terminal' && terminal.terminal.outcome === 'stopped') return;
+  finishVideoRecordingStop();
+  setVideoRecordingRuntimeState({
+    status: VideoRecordingStatus.STOPPING,
+    error: 'Recording cleanup failed. Local data cleanup is required.',
+  });
+}
+
 async function handleOffscreenErrorAsync(message: {
   error?: string;
   phase?: 'start' | 'stop' | 'runtime' | 'export';
@@ -109,6 +152,14 @@ async function handleOffscreenErrorAsync(message: {
       return;
     }
 
+    if (
+      message.recordingId &&
+      (message.phase === 'stop' || hasTerminalRecordingAuthority(message.recordingId))
+    ) {
+      await retainFailedRecordingCompletion(message.recordingId);
+      return;
+    }
+
     if (message.recordingId) {
       await clearCameraRecorderControlGrant(message.recordingId);
       if (!isCurrentVideoRecordingId(message.recordingId)) {
@@ -119,12 +170,20 @@ async function handleOffscreenErrorAsync(message: {
         return;
       }
     }
+    if (message.recordingId && hasTerminalRecordingAuthority(message.recordingId)) {
+      await retainFailedRecordingCompletion(message.recordingId);
+      return;
+    }
     if (shouldNotifyRecordingFailure(message.phase)) {
       clearRecordingStartActivationWatchdog(message.recordingId);
       await notifyRecordingStartFailed(
         message.error || translate('background.runtime.recordingError'),
         message.recordingId ? { recordingId: message.recordingId } : undefined
       );
+      if (message.recordingId && hasTerminalRecordingAuthority(message.recordingId)) {
+        await retainFailedRecordingCompletion(message.recordingId);
+        return;
+      }
       await clearActiveVideoRecordingLease(message.recordingId);
       return;
     }
@@ -135,6 +194,10 @@ async function handleOffscreenErrorAsync(message: {
         eventRecordingId: message.recordingId,
       });
       await clearActiveVideoRecordingLease(message.recordingId);
+      return;
+    }
+    if (message.recordingId && hasTerminalRecordingAuthority(message.recordingId)) {
+      await retainFailedRecordingCompletion(message.recordingId);
       return;
     }
     finishVideoRecordingStop();

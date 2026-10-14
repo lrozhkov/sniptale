@@ -11,6 +11,9 @@ vi.mock(
   })
 );
 
+const completionMock = vi.hoisted(() => vi.fn());
+vi.mock('../../recording-completion', () => ({ completeVideoRecording: completionMock }));
+
 const {
   finalizeRecordingDiagnosticsMock,
   finishVideoRecordingStopMock,
@@ -238,9 +241,7 @@ async function verifyRecordingStartStopLifecycle(
     keepChannelOpen: true,
   });
   await flushAsyncRoute();
-  expect(finishVideoRecordingStopMock).toHaveBeenCalledTimes(1);
-  expect(resetRecordingTabIdMock).toHaveBeenCalledTimes(1);
-  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
+  expect(completionMock).toHaveBeenCalledWith('rec-1');
   expectAcceptedLifecycleResponse(sendResponse);
 }
 

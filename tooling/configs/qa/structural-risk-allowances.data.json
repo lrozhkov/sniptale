@@ -550,6 +550,28 @@
       "reviewDate": "2026-10-14",
       "astHash": "d4500ae243c0fe02592cf31987fa38a384c728c02f837b856aed676f13548fcf",
       "signatureHash": "ff8c68cb0e8b86daca47585aeecefb99bbbf0d6c5797a913f7ad64bf9c3328c8"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/offscreen/recording/controller.start-stop.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:offscreen:recording",
+      "reason": "tool-noise: This fixture tests one recording controller lifecycle. Each test now imports a fresh worker to isolate retained terminal outcomes. The added assertions use the existing recorder, staging, identity and publication fixtures. The file exceeds the line limit with unchanged structural score and full cohesion. An independent reader confirmed that a split would duplicate mocks or add a fixture-only boundary. Final architecture review must confirm this classification.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent fixture, state receiver, effect lifetime or owner boundary. Remove when the analyzer models this cohesive test fixture.",
+      "reviewDate": "2026-10-14",
+      "astHash": "1c732babe2cef22dde6f31ff3cfb77c31d01dc5591660cad5e5fa00f3bc9c316",
+      "signatureHash": "a284d9bc5865640ee67c5b7e5bd1a2a64a6d3fd56ea21767753951d9c612e42b"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:background:media",
+      "reason": "tool-noise: This fixture tests the existing offscreen lifecycle route. Added cases cover refused terminal evidence, changed recording identity and late errors after confirmed completion. They use the existing lease, runtime and response mocks. Separate ready, export and saved-replay fixtures already exist. An independent reader found no new fixture lifetime or owner boundary. Final architecture review must confirm this classification.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent fixture, state receiver, effect lifetime or owner boundary. Remove when the analyzer models this cohesive test fixture.",
+      "reviewDate": "2026-10-14",
+      "astHash": "7de45cd7b0ba64a67dd5824c3f1237e854baca7340cbcd651f77e424fca3a6af",
+      "signatureHash": "0119e36127416f06999a34d279a32cccb731c0f4bdf706225c18c9f1d53b3d8d"
     }
   ]
 }

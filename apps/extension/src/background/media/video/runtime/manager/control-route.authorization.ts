@@ -1,10 +1,12 @@
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoControlMessage } from '../../../../../contracts/video/types/messages';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
 import {
   ensureActiveVideoRecordingLeaseHydrated,
   getActiveVideoRecordingLeaseSnapshot,
   validateRecordingControlCapability,
+  validateTerminalRecordingStopCapability,
 } from '../../recording-control-lease';
 import { restoreAuthorizedCameraRecorderDocument } from '../camera-recorder-control';
 import { waitForVideoCaptureSurfaceRecovery } from '../../capture-surface/recovery';
@@ -32,6 +34,16 @@ export async function isAuthorizedRecordingControl(args: {
     args.sender,
     args.message.recordingId
   );
+  if (
+    args.message.type === VideoMessageType.STOP_RECORDING &&
+    resolveTrustedPopupRuntimeSenderUrl(args.sender) !== null &&
+    validateTerminalRecordingStopCapability({
+      controlToken: args.message.controlToken,
+      ownerSenderUrl,
+      recordingId: args.message.recordingId,
+    })
+  )
+    return true;
   if (
     validateRecordingControlCapability({
       controlToken: args.message.controlToken,

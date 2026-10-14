@@ -64,6 +64,22 @@ async function recoverVideoCaptureSurfaceInternal(
   const captureSurfaceService = getCaptureSurfaceService();
   const appliedBinding = captureSurfaceService.getAppliedBindingForSession(activeLease.recordingId);
 
+  if (activeLease.phase === 'terminal') {
+    if (!activeLease.surfaceBinding)
+      throw new Error('Terminal recording source binding is incomplete.');
+    storeVideoSurfaceSession({
+      applied: appliedBinding?.applied ?? null,
+      generation: activeLease.surfaceBinding.generation,
+      recordingId: activeLease.recordingId,
+      sourceReady: false,
+      sourceVideoHeight: null,
+      sourceVideoWidth: null,
+      streamInstanceId: activeLease.surfaceBinding.streamInstanceId,
+      tabId: appliedBinding?.tabId ?? activeLease.recordingTabId,
+    });
+    return;
+  }
+
   if (abandonedRecordingStopped) {
     if (captureSurfaceService.hasSessionLease(activeLease.recordingId)) {
       throw new Error(

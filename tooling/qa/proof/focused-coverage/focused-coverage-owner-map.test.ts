@@ -15,6 +15,18 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it('keeps offscreen lifecycle recovery and saved-result proof despite the runtime export mapping', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/background/media/video/runtime/handlers/state';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/offscreen-lifecycle.ts`)).toEqual([
+    `${root}/offscreen-lifecycle.project-export.test.ts`,
+    `${root}/offscreen-lifecycle.ready.test.ts`,
+    `${root}/offscreen-lifecycle.saved-replay.test.ts`,
+    `${root}/offscreen-lifecycle.test.ts`,
+    `${root}/recording-state.terminal-recovery.test.ts`,
+  ]);
+});
+
 it('keeps the sender policy on its dedicated focused owner suite', async () => {
   const module = await importOwnerMap();
 

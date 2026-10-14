@@ -206,4 +206,14 @@ Gallery prepares one complete native interval, including original Cuts, within t
 
 On pagehide or explicit disable, outgoing recording documents publish their final observation snapshot through the existing runtime message transport. They publish before the old tab response channel disappears. The background recording owner admits only its current recording UUID and top source-tab document. The existing telemetry aggregator deduplicates stable phase/fact identities when navigation also returns the same snapshot. Observation seconds count active recording time rather than document age.
 
-Descriptors retain original document timestamps for media projection. Pause/stop release observers even if finalization fails. 
+Descriptors retain original document timestamps for media projection. Pause/stop release observers even if finalization fails.
+
+## Recording completion
+
+Commanded Stop records terminal intent in the existing browser-session lease before dispatch to offscreen. Version2 terminal entries retain the source binding, disposition, outcome and remaining cleanup step. Existing version1 prepared and active entries remain readable.
+
+Terminal intent does not prove successful cleanup. Confirmed offscreen completion permits surface cleanup, camera-grant cleanup and lease removal, in that order. Background publishes IDLE only after those steps complete. Concurrent event and ACK consumers share the pending completion. A retry resumes the remaining cleanup steps.
+
+Terminal recovery projects STOPPING with an error. It never restores active recording from terminal evidence. The original trusted popup can retry Stop with its unexpired capability. Terminal authority does not permit pause, resume, settings changes or camera control after grant revocation.
+
+Unknown offscreen state cannot prove successful deletion. Offscreen retains the exact terminal outcome for repeated commands within its lifetime. Missing or failed evidence does not become success through an idle Stop. Terminal evidence remains for the browser session after capability expiry, without extending control authority. Explicit local-data erasure contains failed or unknown terminal state through the existing recovery owner. It verifies offscreen termination, drains side effects, and removes verified surface and lease authority before storage erasure. Ordinary Stop cannot use this erasure recovery.

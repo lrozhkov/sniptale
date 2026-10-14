@@ -95,6 +95,7 @@ function createDeferred<T>() {
 
 it('restores the lease when conditional cleanup loses a late-activation race', async () => {
   const remove = createDeferred<void>();
+  const entered = createDeferred<void>();
   const shouldClear = vi.fn(() => true);
 
   await issuePreparedVideoRecordingLease({
@@ -107,23 +108,29 @@ it('restores the lease when conditional cleanup loses a late-activation race', a
     streamInstanceId: null,
   });
   browserStorageSessionSetMock.mockClear();
-  browserStorageSessionRemoveMock.mockReturnValueOnce(remove.promise);
+  browserStorageSessionRemoveMock.mockImplementationOnce(() => {
+    entered.resolve();
+    return remove.promise;
+  });
 
   const cleanup = clearActiveVideoRecordingLease('recording-1', { shouldClear });
-  await Promise.resolve();
+  await entered.promise;
 
   shouldClear.mockReturnValue(false);
   remove.resolve();
   await cleanup;
 
-  expect(browserStorageSessionRemoveMock).toHaveBeenCalledWith(storageKey);
-  expect(browserStorageSessionSetMock).toHaveBeenCalledWith({
-    [storageKey]: expect.objectContaining({
-      controlToken: 'control-token-1',
-      recordingId: 'recording-1',
-      version: 1,
-    }),
-  });
+  expect(browserStorageSessionRemoveMock).toHaveBeenCalledWith(storageKey, expect.anything());
+  expect(browserStorageSessionSetMock).toHaveBeenCalledWith(
+    {
+      [storageKey]: expect.objectContaining({
+        controlToken: 'control-token-1',
+        recordingId: 'recording-1',
+        version: 1,
+      }),
+    },
+    expect.anything()
+  );
   expect(
     validateRecordingControlCapability({
       controlToken: 'control-token-1',
@@ -135,6 +142,7 @@ it('restores the lease when conditional cleanup loses a late-activation race', a
 
 it('preserves a newer lease when stale conditional cleanup resumes after retry', async () => {
   const remove = createDeferred<void>();
+  const entered = createDeferred<void>();
   const shouldClear = vi.fn(() => true);
 
   await issuePreparedVideoRecordingLease({
@@ -146,35 +154,42 @@ it('preserves a newer lease when stale conditional cleanup resumes after retry',
     recordingId: 'recording-1',
     streamInstanceId: null,
   });
-  browserStorageSessionRemoveMock.mockReturnValueOnce(remove.promise);
+  browserStorageSessionRemoveMock.mockImplementationOnce(() => {
+    entered.resolve();
+    return remove.promise;
+  });
 
   const cleanup = clearActiveVideoRecordingLease('recording-1', { shouldClear });
-  await Promise.resolve();
+  await entered.promise;
 
   getVideoRecordingIdMock.mockReturnValue('recording-2');
   vi.mocked(crypto.randomUUID).mockReturnValueOnce(secondControlToken);
-  await issuePreparedVideoRecordingLease({
+  const next = issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.SCREEN,
     ownerSenderUrl,
-  });
-  await activateVideoRecordingLease({
-    generation: 1,
-    recordingId: 'recording-2',
-    streamInstanceId: null,
   });
   browserStorageSessionSetMock.mockClear();
 
   shouldClear.mockReturnValue(false);
   remove.resolve();
   await cleanup;
-
-  expect(browserStorageSessionSetMock).toHaveBeenCalledWith({
-    [storageKey]: expect.objectContaining({
-      controlToken: secondControlToken,
-      recordingId: 'recording-2',
-      version: 1,
-    }),
+  await next;
+  await activateVideoRecordingLease({
+    generation: 1,
+    recordingId: 'recording-2',
+    streamInstanceId: null,
   });
+
+  expect(browserStorageSessionSetMock).toHaveBeenCalledWith(
+    {
+      [storageKey]: expect.objectContaining({
+        controlToken: secondControlToken,
+        recordingId: 'recording-2',
+        version: 1,
+      }),
+    },
+    expect.anything()
+  );
   expect(
     validateRecordingControlCapability({
       controlToken: secondControlToken,

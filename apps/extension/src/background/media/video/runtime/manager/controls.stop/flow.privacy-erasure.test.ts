@@ -4,6 +4,8 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-contracts/runtime-messaging/mock';
 
 const {
+  completeVideoRecordingMock,
+  updateTerminalMock,
   beginVideoRecordingStopMock,
   finishVideoRecordingStopMock,
   getVideoRecordingRuntimeStateMock,
@@ -16,6 +18,8 @@ const {
   setVideoRecordingRuntimeStateMock,
   getVideoSurfaceSessionMock,
 } = vi.hoisted(() => ({
+  completeVideoRecordingMock: vi.fn(),
+  updateTerminalMock: vi.fn(),
   beginVideoRecordingStopMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
   getVideoRecordingRuntimeStateMock: vi.fn(),
@@ -59,7 +63,12 @@ vi.mock('../../../capture-surface', async (importOriginal) => ({
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: vi.fn(),
+  getActiveVideoRecordingLeaseSnapshot: vi.fn(() => null),
+  updateVideoRecordingTerminal: updateTerminalMock,
   ensureActiveVideoRecordingLeaseHydrated: vi.fn(() => Promise.resolve(null)),
+}));
+vi.mock('../../recording-completion', () => ({
+  completeVideoRecording: completeVideoRecordingMock,
 }));
 vi.mock('./effects', () => ({
   quiesceViewportEmulationForPrivacyErasure: vi.fn(),
@@ -71,6 +80,11 @@ import { stopRecordingForPrivacyErasure } from './flow';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  completeVideoRecordingMock.mockResolvedValue(undefined);
+  updateTerminalMock.mockImplementation(async (_binding, terminal) => ({
+    phase: 'terminal',
+    terminal,
+  }));
   getVideoRecordingRuntimeStateMock.mockReturnValue({
     status: VideoRecordingStatus.RECORDING,
     countdownEndsAt: null,
@@ -120,7 +134,7 @@ it('accepts privacy erasure stop only after the offscreen recorder settles', asy
 
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
   expect(sendRuntimeMessageMock.mock.invocationCallOrder[0]).toBeLessThan(
-    releaseVideoCaptureSurfaceMock.mock.invocationCallOrder[0]!
+    completeVideoRecordingMock.mock.invocationCallOrder[0]!
   );
   expect(runStopSideEffectsMock).toHaveBeenCalledWith(
     { mode: CaptureMode.TAB, shouldResetImmediately: false, tabId: 9 },

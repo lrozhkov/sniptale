@@ -47,6 +47,8 @@ const STOP_RECORDING_TIMEOUT_MS = 10_000;
 let pendingRecordingStart: Promise<void> | null = null;
 let pendingRecordingStop: Promise<RecordingStopOutcome> | null = null;
 let activeRecordingBinding: RecordingSourceBinding | null = null;
+let terminalRecording: { binding: RecordingSourceBinding; outcome: RecordingStopOutcome } | null =
+  null;
 let pendingDataPreparation: {
   binding: RecordingSourceBinding;
   abort: AbortController;
@@ -95,7 +97,10 @@ export function startRecording(
   params: Parameters<typeof startRecordingImpl>[0],
   prepareData?: () => Promise<void>
 ): Promise<void> {
-  if (pendingRecordingStart || hasActiveRecordingSession()) {
+  if (terminalRecording?.outcome.result === 'terminal-failure') {
+    return Promise.reject(new Error('Recording cleanup failed. Local data cleanup is required.'));
+  }
+  if (pendingRecordingStart || pendingRecordingStop || hasActiveRecordingSession()) {
     return Promise.reject(new Error(translate('background.runtime.recordingAlreadyRunning')));
   }
 
@@ -112,6 +117,7 @@ export function startRecording(
     streamInstanceId: params.streamInstanceId,
   };
   activeRecordingBinding = binding;
+  terminalRecording = null;
   const work = startRecordingAfterPendingPublication(params, binding, previousBinding, prepareData);
   const tracked = work.finally(() => {
     if (pendingRecordingStart === tracked) {
@@ -389,8 +395,15 @@ export function stopRecording(
   binding: RecordingSourceBinding,
   discard = false
 ): Promise<RecordingStopOutcome> {
+  if (
+    terminalRecording &&
+    matchesRecordingFrameClockBinding(terminalRecording.binding, binding) &&
+    (!activeRecordingBinding || matchesActiveRecordingBinding(binding))
+  ) {
+    return Promise.resolve(terminalRecording.outcome);
+  }
   try {
-    assertActiveRecordingBinding(binding, { allowIdleStop: true });
+    assertActiveRecordingBinding(binding);
   } catch (error) {
     return Promise.reject(error);
   }
@@ -398,13 +411,23 @@ export function stopRecording(
     pendingDataPreparation.cancelled = true;
     pendingDataPreparation.abort.abort(new Error('Recording preparation cancelled'));
     cancelRecordingBegin();
-    return Promise.resolve({ result: 'stopped' });
+    const outcome: RecordingStopOutcome = { result: 'stopped' };
+    terminalRecording = { binding: { ...binding }, outcome };
+    return Promise.resolve(outcome);
   }
   if (pendingRecordingStop) {
     return pendingRecordingStop;
   }
 
-  const work = stopRecordingOnce(discard);
+  const work = stopRecordingOnce(discard)
+    .catch((error: unknown): RecordingStopOutcome => {
+      if (error instanceof PostRecordPublicationError) throw error;
+      return { result: 'terminal-failure', error: 'Recording cleanup failed.' };
+    })
+    .then((outcome) => {
+      terminalRecording = { binding: { ...binding }, outcome };
+      return outcome;
+    });
   const tracked = work.finally(() => {
     if (pendingRecordingStop === tracked) {
       pendingRecordingStop = null;
@@ -487,13 +510,9 @@ function matchesActiveRecordingBinding(binding: RecordingSourceBinding): boolean
   );
 }
 
-function assertActiveRecordingBinding(
-  binding: RecordingSourceBinding,
-  options: { allowIdleStop?: boolean } = {}
-): void {
+function assertActiveRecordingBinding(binding: RecordingSourceBinding): void {
   if (!activeRecordingBinding) {
     if (recordingContext.matchesSourceBinding(binding)) return;
-    if (options.allowIdleStop && !pendingRecordingStart && !hasActiveRecordingSession()) return;
     throw new Error('Recording source binding is unavailable');
   }
   if (!matchesActiveRecordingBinding(binding)) {

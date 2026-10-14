@@ -7,6 +7,21 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
   ...VIDEO_RECORDING_LEASE_OWNER_MAPPINGS,
   ...VIDEO_RECORDING_RUNTIME_ROUTING_OWNER_MAPPINGS,
   {
+    owner: 'background-video-offscreen-lifecycle',
+    productionFile:
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ts',
+    exclusive: true,
+    reason:
+      'The lifecycle owner requires its ready, export, saved-result and terminal recovery tests.',
+    testFiles: [
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.project-export.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ready.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.saved-replay.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts',
+    ],
+  },
+  {
     owner: 'background-video-capture-surface-session',
     productionPrefix: 'apps/extension/src/background/media/video/capture-surface/',
     exclusive: true,

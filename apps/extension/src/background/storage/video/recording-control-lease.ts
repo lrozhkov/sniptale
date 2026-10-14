@@ -1,25 +1,37 @@
 import { browserStorage } from '../../../composition/persistence/infrastructure/browser-storage';
+import type { PersistenceMutationPermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import { isStringEnumValue } from '@sniptale/runtime-contracts/validation/string-literals';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
 const ACTIVE_RECORDING_LEASE_KEY = 'video-active-recording-lease';
 const RECORDING_LEASE_TTL_MS = 12 * 60 * 60 * 1000;
 
-export type VideoRecordingControlLease = {
+export type RecordingTerminalProgress = {
+  discard: boolean;
+  outcome: 'unknown' | 'stopped' | 'failed';
+  cleanupStep: 'surface' | 'camera-grant' | 'lease';
+};
+
+type RecordingLeaseIdentity = {
   captureMode: CaptureMode;
   controlToken: string;
   cropRegion: { x: number; y: number; width: number; height: number } | null;
   expiresAt: number;
   ownerSenderUrl: string;
-  phase: 'prepared' | 'active';
   recordingId: string;
   recordingTabId: number | null;
   surfaceBinding: { generation: number; streamInstanceId: string } | null;
   viewportPresetId: string | null;
 };
 
+export type VideoRecordingControlLease = RecordingLeaseIdentity &
+  (
+    | { phase: 'prepared' | 'active'; terminal?: never }
+    | { phase: 'terminal'; terminal: RecordingTerminalProgress }
+  );
+
 type PersistedLeaseRecord = VideoRecordingControlLease & {
-  version: 1;
+  version: 1 | 2;
 };
 
 export type PersistedLeaseInspection =
@@ -41,21 +53,21 @@ function parsePersistedLease(value: unknown, now = Date.now()): VideoRecordingCo
     return null;
   }
   const cropRegion = value['cropRegion'] ?? null;
+  const phase = parseLeasePhase(value);
 
   if (
-    value['version'] !== 1 ||
+    !phase ||
     !isCaptureMode(value['captureMode']) ||
     typeof value['controlToken'] !== 'string' ||
     !isCropRegion(cropRegion) ||
     typeof value['expiresAt'] !== 'number' ||
     !Number.isFinite(value['expiresAt']) ||
     typeof value['ownerSenderUrl'] !== 'string' ||
-    (value['phase'] !== 'prepared' && value['phase'] !== 'active') ||
     typeof value['recordingId'] !== 'string' ||
     !isValidRecordingTabId(value['recordingTabId']) ||
     !isSurfaceBinding(value['surfaceBinding']) ||
     !(value['viewportPresetId'] === undefined || isNullableString(value['viewportPresetId'])) ||
-    value['expiresAt'] <= now
+    (phase.phase !== 'terminal' && value['expiresAt'] <= now)
   ) {
     return null;
   }
@@ -66,12 +78,39 @@ function parsePersistedLease(value: unknown, now = Date.now()): VideoRecordingCo
     cropRegion,
     expiresAt: value['expiresAt'],
     ownerSenderUrl: value['ownerSenderUrl'],
-    phase: value['phase'],
+    ...phase,
     recordingId: value['recordingId'],
     recordingTabId: value['recordingTabId'],
     surfaceBinding: value['surfaceBinding'],
     viewportPresetId: value['viewportPresetId'] ?? null,
   };
+}
+
+function parseLeasePhase(
+  value: Record<string, unknown>
+):
+  | { phase: 'prepared' | 'active'; terminal?: never }
+  | { phase: 'terminal'; terminal: RecordingTerminalProgress }
+  | null {
+  const phase = value['phase'];
+  if (value['version'] === 1 && (phase === 'prepared' || phase === 'active')) {
+    return value['terminal'] === undefined ? { phase } : null;
+  }
+  const terminal = value['terminal'];
+  if (value['version'] !== 2 || phase !== 'terminal' || !isRecord(terminal)) return null;
+  const discard = terminal['discard'];
+  const outcome = terminal['outcome'];
+  const cleanupStep = terminal['cleanupStep'];
+  if (
+    typeof discard !== 'boolean' ||
+    (outcome !== 'unknown' && outcome !== 'stopped' && outcome !== 'failed') ||
+    (cleanupStep !== 'surface' && cleanupStep !== 'camera-grant' && cleanupStep !== 'lease') ||
+    (outcome !== 'stopped' && cleanupStep !== 'surface') ||
+    value['surfaceBinding'] === null ||
+    !isSurfaceBinding(value['surfaceBinding'])
+  )
+    return null;
+  return { phase, terminal: { discard, outcome, cleanupStep } };
 }
 
 function isValidRecordingTabId(value: unknown): value is number | null {
@@ -122,7 +161,7 @@ function isSurfaceBinding(
 }
 
 function createPersistedLease(lease: VideoRecordingControlLease): PersistedLeaseRecord {
-  return { ...lease, version: 1 };
+  return { ...lease, version: lease.phase === 'terminal' ? 2 : 1 };
 }
 
 export function canPersistVideoRecordingLease(): boolean {
@@ -169,18 +208,24 @@ export async function readPersistedLease(): Promise<VideoRecordingControlLease |
   return inspection.status === 'entry' ? inspection.lease : null;
 }
 
-export async function removePersistedLease(): Promise<void> {
+export async function removePersistedLease(permit?: PersistenceMutationPermit): Promise<void> {
   if (canPersistVideoRecordingLease()) {
-    await browserStorage.session.remove(ACTIVE_RECORDING_LEASE_KEY);
+    if (permit) await browserStorage.session.remove(ACTIVE_RECORDING_LEASE_KEY, permit);
+    else await browserStorage.session.remove(ACTIVE_RECORDING_LEASE_KEY);
   }
 }
 
-export async function persistLease(lease: VideoRecordingControlLease): Promise<void> {
+export async function persistLease(
+  lease: VideoRecordingControlLease,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   if (!canPersistVideoRecordingLease()) {
     return;
   }
 
-  await browserStorage.session.set({
+  const values = {
     [ACTIVE_RECORDING_LEASE_KEY]: createPersistedLease(lease),
-  });
+  };
+  if (permit) await browserStorage.session.set(values, permit);
+  else await browserStorage.session.set(values);
 }

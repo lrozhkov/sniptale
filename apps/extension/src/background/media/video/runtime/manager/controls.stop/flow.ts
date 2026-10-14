@@ -25,12 +25,16 @@ import { getVideoSurfaceSession } from '../../../capture-surface';
 import {
   clearActiveVideoRecordingLease,
   ensureActiveVideoRecordingLeaseHydrated,
+  getActiveVideoRecordingLeaseSnapshot,
+  updateVideoRecordingTerminal,
 } from '../../../recording-control-lease';
 import {
   requestBoundOffscreenRecordingStop,
   type RecordingSourceBinding,
 } from '../../../offscreen-recording-stop';
 import { readStoredVideoPostRecordResult } from '../../../../../storage/video/post-record-result';
+
+import { completeVideoRecording } from '../../recording-completion';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
 
@@ -124,15 +128,29 @@ async function sendStopSignals(
   let terminalError: string | null;
 
   try {
-    const acknowledgement = await requestBoundOffscreenRecordingStop(sourceBinding, discard);
+    const existing = getActiveVideoRecordingLeaseSnapshot();
+    if (existing?.phase === 'terminal' && existing.terminal.outcome === 'stopped') {
+      await completeVideoRecording(recordingId);
+      return { result: 'accepted' };
+    }
+    if (existing?.phase === 'terminal' && existing.terminal.outcome === 'failed') {
+      throw new Error('Recording cleanup failed. Local data cleanup is required.');
+    }
+    const intent = await updateVideoRecordingTerminal(sourceBinding, {
+      discard,
+      outcome: 'unknown',
+      cleanupStep: 'surface',
+    });
+    const acknowledgement = await requestBoundOffscreenRecordingStop(
+      sourceBinding,
+      intent.phase === 'terminal' ? intent.terminal.discard : discard
+    );
     terminalError = acknowledgement.terminalError;
     onGeometry?.(acknowledgement.recordingPointTransform);
   } catch (error) {
     if (await hasCommittedPostRecordResult(recordingId)) {
       if (isCurrentVideoRecordingId(recordingId)) {
-        finishVideoRecordingStop();
-        resetCompletedVideoRecordingSession(recordingId ?? undefined);
-        resetVideoRecordingRuntimeState();
+        await completeVideoRecording(recordingId);
         logger.warn('Recovered committed recording completion after stop response loss', {
           recordingId,
         });
@@ -151,15 +169,17 @@ async function sendStopSignals(
     }
     const failedStopState = getVideoRecordingRuntimeState();
     finishVideoRecordingStop();
+    const terminal = getActiveVideoRecordingLeaseSnapshot()?.phase === 'terminal';
     if (
+      !terminal &&
       previousState.status === VideoRecordingStatus.PREPARING &&
       failedStopState.status === VideoRecordingStatus.STOPPING
     ) {
       restoreVideoRecordingOffscreenStartPending();
     }
     setVideoRecordingRuntimeState({
-      status: previousState.status,
-      countdownEndsAt: previousState.countdownEndsAt,
+      status: terminal ? VideoRecordingStatus.STOPPING : previousState.status,
+      countdownEndsAt: terminal ? null : previousState.countdownEndsAt,
       error: error instanceof Error ? error.message : String(error),
     });
     if (failureLogging === 'fixed') {
@@ -170,30 +190,35 @@ async function sendStopSignals(
     return { error: error instanceof Error ? error.message : String(error), result: 'failed' };
   }
 
-  logger.log('Stop commands sent; runtime state reset is deferred until offscreen confirms stop');
+  if (!isCurrentVideoRecordingId(recordingId)) return { result: 'accepted' };
   try {
-    await releaseVideoCaptureSurface(recordingId);
+    if (terminalError !== null) {
+      const lease = getActiveVideoRecordingLeaseSnapshot();
+      const terminal = await updateVideoRecordingTerminal(sourceBinding, {
+        discard: lease?.phase === 'terminal' ? lease.terminal.discard : discard,
+        outcome: 'failed',
+        cleanupStep: 'surface',
+      });
+      if (!isCurrentVideoRecordingId(recordingId)) return { result: 'accepted' };
+      if (terminal.phase === 'terminal' && terminal.terminal.outcome === 'stopped') {
+        await completeVideoRecording(recordingId);
+        return { result: 'accepted' };
+      }
+      finishVideoRecordingStop();
+      setVideoRecordingRuntimeState({
+        status: VideoRecordingStatus.STOPPING,
+        error: terminalError,
+      });
+      return { error: terminalError, result: 'failed' };
+    }
+    await completeVideoRecording(recordingId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (isCurrentVideoRecordingId(recordingId)) {
       finishVideoRecordingStop();
-      setVideoRecordingRuntimeState({
-        status: previousState.status,
-        countdownEndsAt: previousState.countdownEndsAt,
-        error: message,
-      });
+      setVideoRecordingRuntimeState({ status: VideoRecordingStatus.STOPPING, error: message });
     }
-    logger.error('Failed to restore capture surface after stop', error);
     return { error: message, result: 'failed' };
-  }
-  if (terminalError !== null) {
-    if (isCurrentVideoRecordingId(recordingId)) {
-      finishVideoRecordingStop();
-      resetCompletedVideoRecordingSession(recordingId ?? undefined);
-      resetVideoRecordingRuntimeState();
-    }
-    await clearActiveVideoRecordingLease(recordingId ?? undefined);
-    return { error: terminalError, result: 'failed' };
   }
   return { result: 'accepted' };
 }

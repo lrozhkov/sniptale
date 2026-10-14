@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   reassert: vi.fn(),
   releaseApplied: vi.fn(),
   stopOffscreen: vi.fn(),
+  updateTerminal: vi.fn(),
 }));
 
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -25,6 +26,7 @@ vi.mock('./recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./recording-control-lease')>()),
   clearActiveVideoRecordingLease: mocks.clearActiveLease,
   ensureActiveVideoRecordingLeaseHydrated: mocks.ensureActiveLeaseHydrated,
+  updateVideoRecordingTerminal: mocks.updateTerminal,
 }));
 vi.mock('./offscreen-recording-stop', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./offscreen-recording-stop')>()),
@@ -86,9 +88,28 @@ beforeEach(() => {
   mocks.recoverCaptureSurfaces.mockResolvedValue(undefined);
   mocks.releaseApplied.mockResolvedValue(undefined);
   mocks.stopOffscreen.mockResolvedValue({ terminalError: null });
+  mocks.updateTerminal.mockResolvedValue(undefined);
 });
 
 describe('window-only video capture-surface recovery', () => {
+  it('retains a terminal surface for explicit cleanup without restarting capture or repeating Stop', async () => {
+    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(
+      activeLease({
+        phase: 'terminal',
+        terminal: { discard: true, outcome: 'stopped', cleanupStep: 'surface' },
+      })
+    );
+    mocks.getAppliedBindingForSession.mockReturnValueOnce(binding);
+    await recoverVideoCaptureSurfaceOnStartup();
+    expect(mocks.reassert).not.toHaveBeenCalled();
+    expect(mocks.stopOffscreen).not.toHaveBeenCalled();
+    expect(mocks.clearActiveLease).not.toHaveBeenCalled();
+    expect(getVideoSurfaceSession(applied.sessionId)).toMatchObject({
+      applied,
+      sourceReady: false,
+    });
+  });
+
   it('recovers no recording without issuing an unbound stop', async () => {
     await recoverVideoCaptureSurfaceOnStartup();
     const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0]?.liveSessionIds;
@@ -273,6 +294,69 @@ describe('window-only recovered recording cleanup', () => {
       { generation: 4, recordingId: applied.sessionId, streamInstanceId: 'stream-1' },
       true
     );
+  });
+
+  it.each(['unknown', 'stopped', 'failed'] as const)(
+    'preserves terminal %s evidence before abandoned window restore',
+    async (outcome) => {
+      const lease = {
+        ...activeLease(),
+        phase: 'terminal' as const,
+        terminal: { discard: false, outcome, cleanupStep: 'surface' as const },
+      };
+      const restore = stopBoundRecordingBeforeAbandonedStackRestore(lease, [
+        {
+          generation: 4,
+          owner: 'video',
+          sessionId: applied.sessionId,
+          tabId: 9,
+          target: 'window',
+        },
+      ]);
+      if (outcome === 'failed') {
+        await expect(restore).rejects.toThrow('capture surface remains retained');
+      } else {
+        await expect(restore).resolves.toBe(true);
+      }
+      if (outcome === 'unknown') {
+        expect(mocks.stopOffscreen).toHaveBeenCalledWith(
+          { generation: 4, recordingId: applied.sessionId, streamInstanceId: 'stream-1' },
+          false
+        );
+        expect(mocks.updateTerminal).toHaveBeenCalledWith(
+          { generation: 4, recordingId: applied.sessionId, streamInstanceId: 'stream-1' },
+          { discard: false, outcome: 'stopped', cleanupStep: 'surface' }
+        );
+      } else {
+        expect(mocks.stopOffscreen).not.toHaveBeenCalled();
+        expect(mocks.updateTerminal).not.toHaveBeenCalled();
+      }
+      expect(mocks.clearActiveLease).not.toHaveBeenCalled();
+    }
+  );
+
+  it('retains the abandoned window when terminal evidence cannot be persisted', async () => {
+    mocks.updateTerminal.mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(
+      stopBoundRecordingBeforeAbandonedStackRestore(
+        {
+          ...activeLease(),
+          phase: 'terminal',
+          terminal: { discard: true, outcome: 'unknown', cleanupStep: 'surface' },
+        },
+        [
+          {
+            generation: 4,
+            owner: 'video',
+            sessionId: applied.sessionId,
+            tabId: 9,
+            target: 'window',
+          },
+        ]
+      )
+    ).rejects.toThrow('storage unavailable');
+    expect(mocks.clearActiveLease).not.toHaveBeenCalled();
+    expect(mocks.releaseApplied).not.toHaveBeenCalled();
   });
 
   it('validates the durable window preset and source identities exactly', () => {

@@ -188,3 +188,41 @@ it('distinguishes verified absence from unavailable lease storage', async () => 
   browserStorageSessionIsAvailableMock.mockReturnValueOnce(false);
   await expect(inspectPersistedLease()).resolves.toEqual({ status: 'unavailable' });
 });
+
+it.each(['unknown', 'stopped', 'failed'])(
+  'retains exact terminal %s evidence across worker storage reads',
+  async (outcome) => {
+    const lease = createLeaseSnapshot({
+      captureMode: CaptureMode.TAB,
+      ownerSenderUrl: 'chrome-extension://test/popup.html',
+      recordingId: 'recording-terminal',
+      recordingTabId: 42,
+      surfaceBinding: { generation: 3, streamInstanceId: 'source-terminal' },
+    });
+    const terminal = { discard: true, outcome, cleanupStep: 'surface' };
+    browserStorageSessionGetMock.mockResolvedValue({
+      [storageKey]: { ...lease, phase: 'terminal', terminal, version: 2 },
+    });
+    await expect(readPersistedLease()).resolves.toEqual({ ...lease, phase: 'terminal', terminal });
+  }
+);
+
+it.each([
+  { discard: true, outcome: 'unknown', cleanupStep: 'lease' },
+  { discard: true, outcome: 'failed', cleanupStep: 'camera-grant' },
+  { discard: true, outcome: 'success', cleanupStep: 'surface' },
+  { discard: 'true', outcome: 'stopped', cleanupStep: 'surface' },
+  { discard: true, outcome: 'stopped', cleanupStep: 'done' },
+])('rejects invalid terminal progress before recovery: %j', async (terminal) => {
+  const lease = createLeaseSnapshot({
+    captureMode: CaptureMode.TAB,
+    ownerSenderUrl: 'chrome-extension://test/popup.html',
+    recordingId: 'recording-terminal',
+    recordingTabId: 42,
+    surfaceBinding: { generation: 3, streamInstanceId: 'source-terminal' },
+  });
+  browserStorageSessionGetMock.mockResolvedValue({
+    [storageKey]: { ...lease, phase: 'terminal', terminal, version: 2 },
+  });
+  await expect(inspectPersistedLease()).resolves.toEqual({ status: 'invalid' });
+});

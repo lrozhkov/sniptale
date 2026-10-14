@@ -12,6 +12,7 @@ const {
   startRecordingMock,
   stopRecordingMock,
   validateRecordingControlCapabilityMock,
+  validateTerminalStopMock,
 } = vi.hoisted(() => ({
   cancelRecordingStartMock: vi.fn(),
   ensureMediaHubStorageHeadroomMock: vi.fn(),
@@ -24,6 +25,7 @@ const {
   startRecordingMock: vi.fn(),
   stopRecordingMock: vi.fn(),
   validateRecordingControlCapabilityMock: vi.fn(),
+  validateTerminalStopMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -51,6 +53,7 @@ vi.mock('../../recording-control-lease', async (importOriginal) => ({
   ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
   getActiveVideoRecordingLeaseSnapshot: getActiveVideoRecordingLeaseSnapshotMock,
   validateRecordingControlCapability: validateRecordingControlCapabilityMock,
+  validateTerminalRecordingStopCapability: validateTerminalStopMock,
 }));
 vi.mock('../sender-policy', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../sender-policy')>()),
@@ -115,6 +118,38 @@ beforeEach(() => {
   startRecordingMock.mockResolvedValue({ result: 'started', recordingId: 'recording-1' });
   cancelRecordingStartMock.mockResolvedValue({ result: 'cancelled-before-active' });
   validateRecordingControlCapabilityMock.mockReturnValue(true);
+  validateTerminalStopMock.mockReturnValue(false);
+});
+
+it('admits terminal cleanup only for Stop from the trusted popup', async () => {
+  validateRecordingControlCapabilityMock.mockReturnValue(false);
+  validateTerminalStopMock.mockReturnValue(true);
+  stopRecordingMock.mockResolvedValue({ result: 'accepted' });
+  const sendResponse = vi.fn();
+  routeVideoControlMessage({
+    message: { type: VideoMessageType.STOP_RECORDING, ...controlCapability },
+    sender,
+    sendResponse,
+  });
+  await flushAsync();
+  expect(stopRecordingMock).toHaveBeenCalledOnce();
+  routeVideoControlMessage({
+    message: { type: VideoMessageType.PAUSE_RECORDING, ...controlCapability },
+    sender,
+    sendResponse,
+  });
+  await flushAsync();
+  expect(sendResponse).toHaveBeenLastCalledWith(expect.objectContaining({ success: false }));
+  resolveTrustedPopupRuntimeSenderUrlMock.mockReturnValue(null);
+  resolveTrustedCameraRecorderRuntimeSenderUrlMock.mockReturnValue('camera-url');
+  routeVideoControlMessage({
+    message: { type: VideoMessageType.STOP_RECORDING, ...controlCapability },
+    sender: { url: 'camera-url' },
+    sendResponse,
+  });
+  await flushAsync();
+  expect(stopRecordingMock).toHaveBeenCalledOnce();
+  expect(sendResponse).toHaveBeenLastCalledWith(expect.objectContaining({ success: false }));
 });
 
 it('rejects start recording from non-popup senders before storage and manager side effects', () => {

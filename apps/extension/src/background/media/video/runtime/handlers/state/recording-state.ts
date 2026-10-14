@@ -17,11 +17,9 @@ import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/messa
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   getVideoRecordingRuntimeState,
-  resetVideoRecordingRuntimeState,
   setVideoRecordingRuntimeState,
 } from '../../session-state/service/runtime-state-service';
 import {
-  finishVideoRecordingStop,
   getVideoRecordingId,
   getVideoRecordingCaptureMode,
   isVideoRecordingStopInProgress,
@@ -29,21 +27,17 @@ import {
   getVideoRecordingTabId,
   isCurrentVideoRecordingId,
   markVideoRecordingPreparationSettled,
-  resetCompletedVideoRecordingSession,
   setControlledCursorDisplaySurface,
   setControlledCursorVerifiedMode,
 } from '../../../session-state';
 import {
-  clearActiveVideoRecordingLease,
   getActiveVideoRecordingLeaseSnapshot,
   ensureActiveVideoRecordingLeaseHydrated,
   restoreCurrentRecordingFromLease,
 } from '../../../recording-control-lease';
-import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
-import { resetRecordingTabId } from '../../manager';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { createAsyncLifecycleRoute, HANDLED_ASYNC_RESULT, type RouteResult } from '../shared';
-import { releaseVideoCaptureSurface } from '../../../capture-surface';
+import { completeVideoRecording } from '../../recording-completion';
 
 export {
   handleAcknowledgePostRecordResult,
@@ -52,16 +46,23 @@ export {
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeRouterHandlers' });
 
-async function isCurrentRecordingLifecycleEvent(message: {
-  recordingId?: string;
-}): Promise<boolean> {
+async function isCurrentRecordingLifecycleEvent(
+  message: { recordingId?: string },
+  allowTerminal = false
+): Promise<boolean> {
+  if (
+    !allowTerminal &&
+    (isVideoRecordingStopInProgress() ||
+      getActiveVideoRecordingLeaseSnapshot()?.phase === 'terminal')
+  )
+    return false;
   const recordingId = getVideoRecordingId();
   if (recordingId && message.recordingId === recordingId) {
     return true;
   }
 
   if (message.recordingId && (await restoreCurrentRecordingFromLease(message.recordingId))) {
-    return true;
+    return allowTerminal || getActiveVideoRecordingLeaseSnapshot()?.phase !== 'terminal';
   }
 
   if (!recordingId || message.recordingId !== recordingId) {
@@ -161,6 +162,7 @@ async function handleOffscreenRecordingStartedIfCurrent(message?: {
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
   if (!(await synchronizeExactRecordingHistory(message, 'start'))) return;
+  if (!canPublishLiveRecordingState(message.recordingId)) return;
   clearRecordingStartActivationWatchdog(message.recordingId);
   markVideoRecordingPreparationSettled();
   if (message?.cursorCaptureMode) {
@@ -198,18 +200,10 @@ export function handleOffscreenRecordingStopped(
 async function handleOffscreenRecordingStoppedIfCurrent(message?: {
   recordingId?: string;
 }): Promise<void> {
-  if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
+  if (!message || !(await isCurrentRecordingLifecycleEvent(message, true))) {
     return;
   }
-  await releaseVideoCaptureSurface(message.recordingId);
-  if (isCurrentVideoRecordingId(message.recordingId)) {
-    finishVideoRecordingStop();
-    resetCompletedVideoRecordingSession(message.recordingId);
-    resetRecordingTabId();
-    resetVideoRecordingRuntimeState();
-  }
-  await clearCameraRecorderControlGrant(message.recordingId);
-  await clearActiveVideoRecordingLease(message.recordingId);
+  if (message.recordingId) await completeVideoRecording(message.recordingId);
 }
 
 export function handleOffscreenRecordingPaused(
@@ -233,6 +227,7 @@ async function handleOffscreenRecordingPausedIfCurrent(message?: {
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
   if (!(await synchronizeExactRecordingHistory(message, 'pause'))) return;
+  if (!canPublishLiveRecordingState(message.recordingId)) return;
   logger.log('Recording paused');
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.PAUSED });
 }
@@ -258,8 +253,17 @@ async function handleOffscreenRecordingResumedIfCurrent(message?: {
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
   if (!(await synchronizeExactRecordingHistory(message, 'resume'))) return;
+  if (!canPublishLiveRecordingState(message.recordingId)) return;
   logger.log('Recording resumed');
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.RECORDING });
+}
+
+function canPublishLiveRecordingState(recordingId: string | undefined): boolean {
+  return (
+    isCurrentVideoRecordingId(recordingId) &&
+    !isVideoRecordingStopInProgress() &&
+    getActiveVideoRecordingLeaseSnapshot()?.phase !== 'terminal'
+  );
 }
 
 async function synchronizeExactRecordingHistory(
