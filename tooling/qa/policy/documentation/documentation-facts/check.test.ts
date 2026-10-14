@@ -100,3 +100,45 @@ it('keeps missing authored consumers advisory and limited to the current diff', 
   );
   expect(collectDocumentationProseAdvisories({ rootDir: root, targetFiles: [] })).toEqual([]);
 });
+
+it('does not classify retained content versions as the current database version', () => {
+  const root = createFixture();
+  writeFile(
+    root,
+    'docs/architecture/persistence-contracts.md',
+    '[generated project facts](../engineering/project-facts.md)\n\n' +
+      'They remove only admitted owned rows and units with no references from current or retained versions. ' +
+      'A first admitted legacy or format1 mutation may baseline all valid retained versions atomically.\n'
+  );
+  expect(
+    collectDocumentationProseAdvisories({
+      rootDir: root,
+      targetFiles: ['docs/architecture/persistence-contracts.md'],
+    })
+  ).toEqual([]);
+});
+
+it.each([
+  'The current physical database version is 29.',
+  'The current DB_VERSION is 29.',
+  'The current database version29 requires admission.',
+])('reports a current persistence version claim: %s', (claim) => {
+  const root = createFixture();
+  writeFile(
+    root,
+    'docs/architecture/persistence-contracts.md',
+    `[generated project facts](../engineering/project-facts.md)\n\n${claim}\n`
+  );
+  expect(
+    collectDocumentationProseAdvisories({
+      rootDir: root,
+      targetFiles: ['docs/architecture/persistence-contracts.md'],
+    })
+  ).toEqual([
+    expect.objectContaining({
+      rule: 'documentation-prose-drift',
+      file: 'docs/architecture/persistence-contracts.md',
+    }),
+  ]);
+  expect(collectDocumentationFactViolations({ rootDir: root })).toEqual([]);
+});

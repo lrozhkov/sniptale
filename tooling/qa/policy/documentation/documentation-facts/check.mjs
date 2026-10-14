@@ -48,8 +48,10 @@ function matchesForbiddenFact(source, kind) {
   if (kind === 'persistence-current-version') {
     return lines.some((line) => {
       const currentIndex = line.indexOf('current');
-      const versionIndex = line.indexOf('version', currentIndex);
-      if (currentIndex < 0 || versionIndex < 0) return false;
+      if (currentIndex < 0) return false;
+      const versionMatch = /version(?!s\b)/u.exec(line.slice(currentIndex));
+      if (!versionMatch) return false;
+      const versionIndex = currentIndex + versionMatch.index;
       return /\d/u.test(line.slice(versionIndex, versionIndex + 48));
     });
   }
