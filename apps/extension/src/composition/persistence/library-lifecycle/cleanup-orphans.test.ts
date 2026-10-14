@@ -1,3 +1,7 @@
+vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
+  recoverScenarioAssetPublications: vi.fn().mockResolvedValue(0),
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -57,7 +61,7 @@ beforeEach(() => {
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
 });
 
-it('deletes an expired orphan project-asset blob and never schedules a library asset', async () => {
+it('retains expired project-asset bytes in Trash and never schedules a library asset', async () => {
   const temporary = {
     createdAt: 1,
     duration: null,
@@ -116,7 +120,7 @@ it('deletes an expired orphan project-asset blob and never schedules a library a
     deletedCount: 1,
     deletedIds: [temporary.id],
   });
-  expect(deletes).toHaveBeenCalledWith('project_assets', 'orphan');
+  expect(deletes).not.toHaveBeenCalled();
 
   persistenceMocks.listMediaLibrary.mockResolvedValue([
     { ...temporary, lifecycle: createLibraryLifecycle('library', 1) },

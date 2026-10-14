@@ -91,7 +91,7 @@ it('does not apply guessed retention when settings are unavailable', async () =>
   await maintainLibraryAssets(new AbortController().signal);
   expect(drafts).not.toHaveBeenCalled();
   expect(trash).not.toHaveBeenCalled();
-  expect(collect).toHaveBeenCalledOnce();
+  expect(collect).not.toHaveBeenCalled();
 });
 
 it.each(['reported', 'thrown'] as const)(
@@ -128,4 +128,14 @@ it('refreshes advisory relationships after background indexing completes', async
   usageIndex.mockResolvedValueOnce(true);
   await maintainLibraryAssets(new AbortController().signal);
   expect(publish).toHaveBeenCalledWith('sync', []);
+});
+
+it('retains unverified data after project retention maintenance fails', async () => {
+  drafts.mockRejectedValueOnce(new Error('legacy graph unavailable'));
+  await expect(maintainLibraryAssets(new AbortController().signal)).resolves.toBeUndefined();
+  expect(trash).not.toHaveBeenCalled();
+  expect(collect).not.toHaveBeenCalled();
+  expect(log).toHaveBeenCalledWith(
+    expect.objectContaining({ operation: 'drafts', code: 'failed' })
+  );
 });

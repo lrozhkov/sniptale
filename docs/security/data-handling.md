@@ -22,6 +22,8 @@ An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_
 
 ## Retention
 
+Temporary material expiry moves eligible roots to Trash without releasing bytes. Maintenance repairs retained project sources before expiry. Failure or an uncertain dependency graph retains unverified data. Automatic Trash deletion remains a separate opt-in operation with its own retention period.
+
 Accepted project mutations retain primary Library sources and recording mirrors permanently in the same transaction. Accepted current, historical and recovery resources retain their Library origins. Rejected attachments do not promote sources. Source Trash and project Trash remain separate metadata.
 
 - Retain page content or user media only for an explicit product feature and an owner registered in the storage inventory.

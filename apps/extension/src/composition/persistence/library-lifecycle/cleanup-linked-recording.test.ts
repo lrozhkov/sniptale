@@ -1,3 +1,7 @@
+vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
+  recoverScenarioAssetPublications: vi.fn().mockResolvedValue(0),
+}));
 import { expect, it, vi } from 'vitest';
 
 vi.mock('./project-retention', () => ({

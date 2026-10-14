@@ -28,7 +28,8 @@ export class StaleTrashItemError extends Error {
   }
 }
 
-function withTrashLock<T>(operation: () => Promise<T>): Promise<T> {
+/** Serialize lifecycle admission with existing Trash move, restore and purge operations. */
+export function runWithLibraryTrashMutation<T>(operation: () => Promise<T>): Promise<T> {
   if (typeof navigator !== 'undefined' && navigator.locks)
     return navigator.locks.request(TRASH_LOCK, { mode: 'exclusive' }, operation);
   if (typeof chrome !== 'undefined')
@@ -92,7 +93,7 @@ async function mutateTrash(
 ): Promise<void> {
   if (!Number.isFinite(now) || now < 0) throw new Error('Invalid Trash mutation time.');
   if (targets.length === 0) return;
-  await withTrashLock(() =>
+  await runWithLibraryTrashMutation(() =>
     runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(
         [
@@ -173,7 +174,7 @@ export function runWithTrashedStoredItem<T>(
   expectedTrashedAt: number,
   operation: () => Promise<T>
 ): Promise<T> {
-  return withTrashLock(async () => {
+  return runWithLibraryTrashMutation(async () => {
     await runWithIndexedDbMutation(async (db) => {
       const entry = parseTarget(
         target,
@@ -194,7 +195,7 @@ export function runWithStoredItemLifecycle<T>(
   expected: Pick<LibraryLifecycle, 'updatedAt' | 'trashedAt'>,
   operation: () => Promise<T>
 ): Promise<T> {
-  return withTrashLock(async () => {
+  return runWithLibraryTrashMutation(async () => {
     if (
       !Number.isFinite(expected.updatedAt) ||
       expected.updatedAt < 0 ||

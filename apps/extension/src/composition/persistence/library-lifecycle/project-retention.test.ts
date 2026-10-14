@@ -1,3 +1,4 @@
+import { materializeWorkspaceStorage } from '../review-workspaces/storage-format';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
@@ -23,7 +24,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({ runWithIndexedDbMutati
 
 import { repairTemporaryProjectLifecycles } from './project-retention';
 
-function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
+function createProjectStores(options: { failScenarioPut?: boolean; failReviewPut?: boolean } = {}) {
   const video = {
     ...createVideoProjectEntry({ id: 'video-1' }),
     lifecycle: createLibraryLifecycle('temporary', 10),
@@ -50,6 +51,9 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
     ['project_assets', new Map<string, unknown>()],
     ['scenario_assets', new Map<string, unknown>()],
     ['recordings', new Map<string, unknown>()],
+    ['image_workspaces', new Map<string, unknown>()],
+    ['video_workspaces', new Map<string, unknown>()],
+    ['video_workspace_history', new Map<string, unknown>()],
   ]);
   const abort = vi.fn();
   runWithIndexedDbMutation.mockImplementation(async (effect) => {
@@ -69,11 +73,22 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
           getAll: async (id: string) =>
             [...(pending.get(name)?.values() ?? [])]
               .filter(isRecord)
-              .filter((row) => row['projectId'] === id),
+              .filter(
+                (row) =>
+                  row[name === 'video_workspace_history' ? 'aggregateId' : 'projectId'] === id
+              ),
+          getAllKeys: async (id: string) =>
+            [...(pending.get(name)?.values() ?? [])].flatMap((row) =>
+              isRecord(row) && row['aggregateId'] === id && typeof row['ordinal'] === 'number'
+                ? [[id, row['ordinal']]]
+                : []
+            ),
         }),
         delete: async (key: IDBValidKey) => pending.get(name)?.delete(JSON.stringify(key)),
         put: async (entry: {
           id?: string;
+          aggregateId?: string;
+          ordinal?: number;
           projectId?: string;
           revision?: number;
           unitId?: string;
@@ -81,16 +96,24 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
           if (name === 'scenario_projects' && options.failScenarioPut) {
             throw new Error('scenario write failed');
           }
-          pending
-            .get(name)
-            ?.set(
-              name === 'scenario_project_units'
-                ? JSON.stringify([entry.projectId, entry.unitId, entry.revision])
-                : name === 'scenario_project_history'
-                  ? JSON.stringify([entry.projectId, entry.revision])
-                  : entry.id!,
-              entry
-            );
+          if (name === 'video_workspaces' && options.failReviewPut)
+            throw new Error('review write failed');
+          let key = entry.id!;
+          switch (name) {
+            case 'video_workspace_history':
+              key = JSON.stringify([entry.aggregateId, entry.ordinal]);
+              break;
+            case 'video_workspaces':
+              key = entry.aggregateId!;
+              break;
+            case 'scenario_project_units':
+              key = JSON.stringify([entry.projectId, entry.unitId, entry.revision]);
+              break;
+            case 'scenario_project_history':
+              key = JSON.stringify([entry.projectId, entry.revision]);
+              break;
+          }
+          pending.get(name)?.set(key, entry);
         },
       }),
     };
@@ -266,10 +289,10 @@ it('promotes legacy review auxiliary origins without promoting an unrelated draf
   });
 });
 
-it.fails.each(['image', 'review'] as const)(
+it.each(['image', 'review', 'review-missing', 'review-failure'] as const)(
   'repairs the primary Library root of a saved legacy %s project',
   async (kind) => {
-    const { persisted } = createProjectStores();
+    const { persisted } = createProjectStores({ failReviewPut: kind === 'review-failure' });
     const recording = betaV1Fixture.records.recordings[0]!;
     const media =
       kind === 'image'
@@ -319,12 +342,45 @@ it.fails.each(['image', 'review'] as const)(
       persisted.set('video_workspaces', new Map([[media.id, workspace]]));
     }
     const before = structuredClone(workspace);
+    if (kind === 'review-missing') {
+      persisted.get('media_library')!.delete(media.id);
+      await repairTemporaryProjectLifecycles(100);
+      expect(persisted.get('media_library')!.has(media.id)).toBe(false);
+      expect(persisted.get('video_workspaces')!.get(media.id)).toEqual(before);
+      return;
+    }
+    if (kind === 'review-failure') {
+      const allBefore = structuredClone(persisted);
+      await expect(repairTemporaryProjectLifecycles(100)).rejects.toThrow('review write failed');
+      expect(persisted).toEqual(allBefore);
+      return;
+    }
     await repairTemporaryProjectLifecycles(100);
     expect(persisted.get('media_library')!.get(media.id)).toMatchObject({
       lifecycle: { storageClass: 'library' },
     });
-    expect(
-      persisted.get(kind === 'image' ? 'image_workspaces' : 'video_workspaces')!.get(media.id)
-    ).toEqual(before);
+    if (kind === 'image') expect(persisted.get('image_workspaces')!.get(media.id)).toEqual(before);
+    else {
+      if (!isRecord(before)) throw new Error('Missing fixture workspace');
+      const repaired = materializeWorkspaceStorage(
+        persisted.get('video_workspaces')!.get(media.id),
+        [...persisted.get('video_workspace_history')!.values()]
+      );
+      expect(repaired).toEqual(
+        expect.objectContaining({
+          ...before,
+          formatVersion: 3,
+          revision: 2,
+          updatedAt: 100,
+          project: {
+            name: media.filename,
+            lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+          },
+        })
+      );
+      const after = structuredClone(persisted);
+      expect(await repairTemporaryProjectLifecycles(200)).toBe(0);
+      expect(persisted).toEqual(after);
+    }
   }
 );

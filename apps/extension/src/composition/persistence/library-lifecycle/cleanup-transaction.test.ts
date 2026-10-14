@@ -112,7 +112,7 @@ it('does not begin lifecycle cleanup while retained image workspace journals can
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
 });
 
-it('removes standalone media dependency graphs and aggregate sidecars atomically', async () => {
+it('moves standalone media to Trash without deleting dependency graphs or sidecars', async () => {
   const lifecycle = createLibraryLifecycle('temporary', 1);
   const createMedia = (
     id: string,
@@ -198,18 +198,10 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
     deletedCount: 2,
     deletedIds: [recordingMedia.id, projectAssetMedia.id],
   });
-  expect(deletes).toHaveBeenCalledWith('recordings', recording.id);
-  for (const id of [recordingMedia.id, projectAssetMedia.id]) {
-    expect(deletes).toHaveBeenCalledWith('video_workspaces', id);
-    expect(deletes).toHaveBeenCalledWith('video_workspace_drafts', id);
-  }
-  expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
-  expect(deletes).toHaveBeenCalledWith('project_assets', 'asset-1');
-  expect(deletes).toHaveBeenCalledWith('asset_refs', createProjectAssetEntry().assetId);
-  expect(deletes).toHaveBeenCalledWith('image_workspaces', recordingMedia.id);
-  expect(deletes).toHaveBeenCalledWith('image_workspaces', projectAssetMedia.id);
-  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', recordingMedia.id]);
-  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', projectAssetMedia.id]);
+  expect(deletes).not.toHaveBeenCalled();
+  expect(valuesByStore.get('recordings')!.get(recording.id)).toEqual(recording);
+  expect(valuesByStore.get('project_assets')!.has('asset-1')).toBe(true);
+  expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
 
 it('retains legacy project graphs and linked media when clearing drafts', async () => {
@@ -570,7 +562,7 @@ it.each(['scenario-snapshot', 'video-snapshot', 'review-audio'] as const)(
   }
 );
 
-it('reclaims private auxiliary bytes when their standalone temporary review root expires', async () => {
+it('retains the primary review root and its private auxiliary bytes during expiry', async () => {
   const { createMediaLibraryEntry } = await import('../projects/index.test-support');
   const media = createMediaLibraryEntry({
     id: 'expired',
@@ -640,6 +632,8 @@ it('reclaims private auxiliary bytes when their standalone temporary review root
     })
   );
   await cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY });
-  expect(rows.get('project_assets')?.has('private-music')).toBe(false);
-  expect(rows.get('asset_refs')?.has('private-body')).toBe(false);
+  expect(rows.get('project_assets')?.has('private-music')).toBe(true);
+  expect(rows.get('asset_refs')?.has('private-body')).toBe(true);
+  expect(rows.get('media_library')!.get(media.id)).toEqual(media);
+  expect(rows.get('video_workspaces')!.get(media.id)).toEqual(review);
 });

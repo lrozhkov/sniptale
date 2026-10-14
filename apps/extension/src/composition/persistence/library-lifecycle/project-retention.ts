@@ -1,3 +1,7 @@
+import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { promoteReferencedMediaLifecycles } from './promotion';
 import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { promoteReviewSourceLifecycles } from '../review-workspaces/new-reference-admission';
@@ -8,6 +12,7 @@ import {
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
+  IMAGE_WORKSPACES_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -22,11 +27,12 @@ import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseScenarioProjectEntry } from '../scenario/read-guards';
 import { promoteLibraryLifecycle } from './contracts';
 
-/** Repairs legacy draft project roots without changing their documents or revisions. */
+/** Repairs retained project sources and admits legacy metadata without changing content history. */
 export async function repairTemporaryProjectLifecycles(now = Date.now()): Promise<number> {
   return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        IMAGE_WORKSPACES_STORE,
         VIDEO_PROJECTS_STORE,
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_HISTORY_STORE,
@@ -75,18 +81,50 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         const entry = parseScenarioProjectEntry(raw);
         if (entry) await promoteScenarioSourceLifecycles(tx, entry, now);
       }
-      for (const raw of await createVideoWorkspaceStore(tx).getAll()) {
+      for (const raw of await tx.objectStore(IMAGE_WORKSPACES_STORE).getAll()) {
+        const workspace = parseImageWorkspaceEntry(raw);
+        if (!workspace) continue;
+        const media = parseMediaLibraryEntry(
+          await stores.mediaLibraryStore.get(workspace.aggregateId)
+        );
+        if (media?.lifecycle?.storageClass === 'temporary') repaired += 1;
+        await promoteReferencedMediaLifecycles({
+          mediaIds: new Set([workspace.aggregateId]),
+          mediaStore: stores.mediaLibraryStore,
+          recordingStore: stores.recordingStore,
+          now,
+        });
+      }
+      const workspaces = createVideoWorkspaceStore(tx);
+      for (const raw of await workspaces.getAll()) {
         const workspace = parseVideoWorkspace(raw);
-        if (workspace)
-          await promoteReviewSourceLifecycles(
-            workspace,
-            {
-              assets: stores.projectAssetStore,
-              media: stores.mediaLibraryStore,
-              recordings: stores.recordingStore,
-            },
-            { assets: new Map(), libraryAudioClaims: [] }
-          );
+        if (!workspace) continue;
+        const media = parseMediaLibraryEntry(
+          await stores.mediaLibraryStore.get(workspace.aggregateId)
+        );
+        await promoteReferencedMediaLifecycles({
+          mediaIds: new Set([workspace.aggregateId]),
+          mediaStore: stores.mediaLibraryStore,
+          recordingStore: stores.recordingStore,
+          now,
+        });
+        if (media && !workspace.project) {
+          await workspaces.put({
+            ...materializeVideoWorkspaceProject(workspace, media.filename),
+            revision: workspace.revision + 1,
+            updatedAt: Math.max(now, workspace.updatedAt),
+          });
+          repaired += 1;
+        } else if (media?.lifecycle?.storageClass === 'temporary') repaired += 1;
+        await promoteReviewSourceLifecycles(
+          workspace,
+          {
+            assets: stores.projectAssetStore,
+            media: stores.mediaLibraryStore,
+            recordings: stores.recordingStore,
+          },
+          { assets: new Map(), libraryAudioClaims: [] }
+        );
       }
       await tx.done;
       return repaired;

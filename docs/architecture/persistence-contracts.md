@@ -198,6 +198,12 @@ Guides/tours admit image and audio resources, not direct video, Web or HTML sour
 
 ## Dependencies and deletion
 
+Explicit maintenance recovers accepted publication journals before project retention repair and expiry. Repair retains primary Image and quick-edit sources and recording mirrors. It materializes missing quick-edit project metadata through the existing workspace storage adapter. This admission advances the workspace revision once and preserves source identity, content history, recovery and Trash. Repeated repair preserves the admitted workspace. Missing source roots remain missing.
+
+Expiry moves an unused temporary Library root to Trash at the actual admission time. It preserves source rows, sidecars, owners, references and bytes. It creates no physical-delete intent. The existing Trash and durable lifecycle locks serialize admission with restore and source mutation. The transaction checks fresh lifecycle values and authoritative project dependencies. Unknown review evidence and any retained primary workspace prevent expiry.
+
+Disabled expiry still permits retention repair. It leaves active temporary materials unchanged. Restoring a temporary root starts a complete new retention window. Trash cleanup has its own opt-in policy and retention period. Gallery defers later destructive maintenance if retention maintenance fails. Background startup uses the same recovery, repair and expiry sequence.
+
 Gallery’s informational project usage reads native IndexedDB indexes. These include `usageReferenceKeys` (multiEntry) on video projects and review workspaces, and `originMediaId` on private project assets. They also include `borrowedMediaId`/`galleryAssetId` on scenario children.
 
 Derived document keys include current and retained history/recovery references and update in the same transaction as their owner document, including restore and detach. Imported keys are never authoritative. Lifecycle-only raw rewrites preserve them. Parsed rewrites recompute them.
@@ -220,7 +226,7 @@ Confirmed purge locks and revalidates the graph, removes admitted non-primary us
 
 Order project locks deterministically. Fixed domain codes provide feedback without logging source content or record identifiers.
 
-Unattended expiry and cancellation never detach adopted project state. Parent removal preserves independent outputs and externally used private resources. Scenario child replacement/prune/removal rehomes representations still used by montages before unlinking them. Manual purge, expiry and parent/archive cleanup recursively release private auxiliaries against the final graph, including nested review history. Published or external consumers remain.
+Unattended expiry and cancellation never detach adopted project state. Parent removal preserves independent outputs and externally used private resources. Scenario child replacement/prune/removal rehomes representations still used by montages before unlinking them. Manual purge and parent/archive cleanup recursively release private auxiliaries against the final graph, including nested review history. Published or external consumers remain.
 
 Related invalid documents, missing sources and ambiguous locators retain data. Unrelated invalid presentation metadata may be skipped only when checked dependency locators prove disjointness. The version-2 montage envelope checks origin, base recording and every source independently of rendering metadata. Unsupported versions, legacy template markers and unknown/missing source slots do not prove disjointness.
 
@@ -280,7 +286,7 @@ Publishing an ordinary scenario autosave into its current disposable buffer reta
 | Trash/restore | `library-lifecycle/trash` |
 | Confirmed material purge | `media-library/delete-cascade`, `delete-cascade.sources` |
 | Montage/scenario parent removal | `projects/index.delete`, `scenario/aggregate-cleanup` |
-| Expiry/temporary cleanup | `library-lifecycle/cleanup`, same dependency/private-release rules |
+| Expiry/temporary cleanup | `library-lifecycle/cleanup`, Trash admission without byte release |
 | Lower recording/export/Web deletion | Source compatibility APIs, exact source and zero-consumer policy |
 | Scenario HTML catalogue | `scenario/projects/exports`, `export-artifacts` |
 | Archive material/project roots | v6 `root-publication`, domain backup participants |

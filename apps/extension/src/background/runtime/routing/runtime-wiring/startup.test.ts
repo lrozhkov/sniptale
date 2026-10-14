@@ -5,7 +5,6 @@ const migrateCalloutSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => tru
 const migrateStepBadgeSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
 const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
 const cleanupDrafts = vi.hoisted(() => vi.fn(async () => undefined));
-const repairTemporaryProjectLifecycles = vi.hoisted(() => vi.fn(async () => 0));
 const recoverPendingVideoRecordingCameraPeerCleanup = vi.hoisted(() => vi.fn(async () => true));
 const loadSettings = vi.hoisted(() =>
   vi.fn(async () => ({
@@ -23,7 +22,6 @@ vi.mock('../../../../composition/persistence/library-lifecycle', async (importOr
     typeof import('../../../../composition/persistence/library-lifecycle')
   >()),
   cleanupDrafts,
-  repairTemporaryProjectLifecycles,
 }));
 
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
@@ -151,7 +149,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   );
 });
 
-it('does not schedule draft cleanup when automatic cleanup is disabled', async () => {
+it('runs retention maintenance with expiry disabled when automatic cleanup is disabled', async () => {
   loadSettings.mockResolvedValueOnce({
     localStoragePolicy: {
       cleanupEnabled: false,
@@ -165,18 +163,19 @@ it('does not schedule draft cleanup when automatic cleanup is disabled', async (
   await flushMicrotasks();
   await flushMicrotasks();
 
-  expect(repairTemporaryProjectLifecycles).toHaveBeenCalled();
-  expect(cleanupDrafts).not.toHaveBeenCalled();
+  expect(cleanupDrafts).toHaveBeenCalledWith({
+    policy: expect.objectContaining({ cleanupEnabled: false }),
+  });
 });
 
-it('does not start draft cleanup if project retention repair fails', async () => {
-  repairTemporaryProjectLifecycles.mockRejectedValueOnce(new Error('repair unavailable'));
+it('reports a failure from the shared retention maintenance sequence', async () => {
+  cleanupDrafts.mockRejectedValueOnce(new Error('repair unavailable'));
   cleanupDrafts.mockClear();
   runStartupMaintenance(createModeState(), logger);
   await flushMicrotasks();
   await flushMicrotasks();
 
-  expect(cleanupDrafts).not.toHaveBeenCalled();
+  expect(cleanupDrafts).toHaveBeenCalled();
   expect(logger.warn).toHaveBeenCalledWith(
     'Project retention or draft cleanup failed',
     expect.objectContaining({ message: 'repair unavailable' })

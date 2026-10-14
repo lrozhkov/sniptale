@@ -1,3 +1,9 @@
+import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
+import { restoreStoredItemsFromTrash } from './trash';
+vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
+  recoverScenarioAssetPublications: vi.fn().mockResolvedValue(0),
+}));
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import { beforeEach, expect, it, vi } from 'vitest';
 
@@ -73,7 +79,7 @@ beforeEach(() => {
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
 });
 
-it('expires image aggregates from the root lifecycle and removes their sidecars', async () => {
+it('moves an expired image root to Trash and preserves its sidecars', async () => {
   const now = 40 * day;
   const media = {
     createdAt: 1,
@@ -96,12 +102,14 @@ it('expires image aggregates from the root lifecycle and removes their sidecars'
   };
   persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
   const deletes = vi.fn();
+  const put = vi.fn();
   persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
     effect({
       transaction: vi.fn(() => ({
         done: Promise.resolve(),
         objectStore: vi.fn((name: string) => ({
           delete: vi.fn((id: string) => deletes(name, id)),
+          put,
           get: vi.fn(async () => (name === 'media_library' ? media : undefined)),
           index: vi.fn(() => ({
             getAll: vi.fn(async () => []),
@@ -117,8 +125,13 @@ it('expires image aggregates from the root lifecycle and removes their sidecars'
     deletedCount: 1,
     deletedIds: [media.id],
   });
-  expect(deletes).toHaveBeenCalledWith('image_workspaces', media.id);
-  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', media.id]);
+  expect(deletes).not.toHaveBeenCalled();
+  expect(put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ...media,
+      lifecycle: { ...media.lifecycle, trashedAt: now },
+    })
+  );
 });
 
 it.each([
@@ -391,7 +404,7 @@ it('cancels candidate deletion when discovery completes after cancellation', asy
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
 });
 
-it.fails('moves a seven-day unused recording to Trash without source deletion or physical intent', async () => {
+it('moves a seven-day unused recording to Trash without source deletion or physical intent', async () => {
   const now = 1 + 7 * day;
   const recording = {
     ...betaV1Fixture.records.recordings[0]!,
@@ -464,4 +477,116 @@ it.fails('moves a seven-day unused recording to Trash without source deletion or
   expect(rows.get('recordings')!.get(recording.id)).toMatchObject({ assetId: recording.assetId });
   expect(rows.get('asset_refs')!.has(recording.assetId)).toBe(true);
   expect(rows.get('asset_operations')!.size).toBe(0);
+});
+
+it('uses actual Trash admission, preserves duplicate admission and renews expiry after restore', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  const media = {
+    ...betaV1Fixture.records.media_library[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const recording = {
+    ...betaV1Fixture.records.recordings[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  fixture.rows.get('media_library')!.set(media.id, media);
+  fixture.rows.get('recordings')!.set(recording.id, recording);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) =>
+    operation(fixture.database)
+  );
+  persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+  const expire = (now: number, enabled = true) =>
+    cleanupDrafts({
+      now,
+      policy: {
+        ...DEFAULT_LOCAL_STORAGE_POLICY,
+        cleanupEnabled: enabled,
+        videoDraftRetentionDays: 7,
+      },
+    });
+  expect((await expire(1 + 7 * day - 1)).deletedCount).toBe(0);
+  expect((await expire(1 + 7 * day, false)).deletedCount).toBe(0);
+  expect((await expire(1 + 7 * day)).deletedCount).toBe(1);
+  const admitted = structuredClone(fixture.rows);
+  expect((await expire(1 + 40 * day)).deletedCount).toBe(0);
+  expect(fixture.rows).toEqual(admitted);
+  await restoreStoredItemsFromTrash([{ kind: 'media', id: media.id }], 1 + 41 * day);
+  expect((await expire(1 + 48 * day - 1)).deletedCount).toBe(0);
+  expect((await expire(1 + 48 * day)).deletedCount).toBe(1);
+  expect(fixture.rows.get('media_library')!.get(media.id)).toMatchObject({
+    lifecycle: { trashedAt: 1 + 48 * day },
+  });
+  expect(fixture.rows.get('recordings')!.get(recording.id)).toEqual(recording);
+  expect(fixture.rows.get('asset_operations')!.size).toBe(0);
+});
+
+it.each(['image', 'review', 'unknown-review', 'write-failure'] as const)(
+  'retains the fresh source graph during expiry (%s)',
+  async (state) => {
+    const fixture = createReviewWorkspaceStoreFixture(
+      (store) => state === 'write-failure' && store === 'media_library'
+    );
+    const media = {
+      ...betaV1Fixture.records.media_library[0]!,
+      lifecycle: createLibraryLifecycle('temporary', 1),
+    };
+    const recording = {
+      ...betaV1Fixture.records.recordings[0]!,
+      lifecycle: createLibraryLifecycle('temporary', 1),
+    };
+    fixture.rows.get('media_library')!.set(media.id, media);
+    fixture.rows.get('recordings')!.set(recording.id, recording);
+    if (state === 'image')
+      fixture.rows.get('image_workspaces')!.set(media.id, { unreadable: true });
+    if (state === 'review')
+      fixture.rows.get('video_workspaces')!.set(media.id, { aggregateId: media.id });
+    if (state === 'unknown-review')
+      fixture.rows.get('video_workspaces')!.set('unknown', { unreadable: true });
+    persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+    persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) =>
+      operation(fixture.database)
+    );
+    const before = structuredClone(fixture.rows);
+    const result = cleanupDrafts({ now: 1 + 7 * day, policy: DEFAULT_LOCAL_STORAGE_POLICY });
+    if (state === 'write-failure') await expect(result).rejects.toThrow();
+    else expect((await result).deletedCount).toBe(0);
+    expect(fixture.rows).toEqual(before);
+  }
+);
+
+it('starts the full Trash window when delayed admission resumes', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  const media = {
+    ...betaV1Fixture.records.media_library[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const recording = {
+    ...betaV1Fixture.records.recordings[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  fixture.rows.get('media_library')!.set(media.id, media);
+  fixture.rows.get('recordings')!.set(recording.id, recording);
+  persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(1 + 7 * day);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) => {
+    clock.mockReturnValue(1 + 47 * day);
+    return operation(fixture.database);
+  });
+  try {
+    await expect(
+      cleanupDrafts({
+        policy: {
+          ...DEFAULT_LOCAL_STORAGE_POLICY,
+          cleanupEnabled: true,
+          videoDraftRetentionDays: 7,
+        },
+      })
+    ).resolves.toEqual({ deletedCount: 1, deletedIds: [media.id] });
+    expect(fixture.rows.get('media_library')!.get(media.id)).toMatchObject({
+      lifecycle: { trashedAt: 1 + 47 * day },
+    });
+    expect(fixture.rows.get('asset_operations')!.size).toBe(0);
+  } finally {
+    clock.mockRestore();
+  }
 });

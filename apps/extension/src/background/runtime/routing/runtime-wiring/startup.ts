@@ -1,8 +1,5 @@
 import { ensurePersistentStorage } from '../../../../composition/persistence/infrastructure/indexed-db/core';
-import {
-  cleanupDrafts,
-  repairTemporaryProjectLifecycles,
-} from '../../../../composition/persistence/library-lifecycle';
+import { cleanupDrafts } from '../../../../composition/persistence/library-lifecycle';
 import {
   loadSettings,
   removeRetiredSynchronizedSettings,
@@ -52,13 +49,8 @@ export function runStartupMaintenance(
     logger.warn('Failed to request persistent storage', error);
   });
 
-  repairTemporaryProjectLifecycles()
-    .then(() => loadSettings())
-    .then((settings) =>
-      settings.localStoragePolicy.cleanupEnabled
-        ? cleanupDrafts({ policy: settings.localStoragePolicy })
-        : undefined
-    )
+  loadSettings()
+    .then((settings) => cleanupDrafts({ policy: settings.localStoragePolicy }))
     .catch((error) => {
       logger.warn('Project retention or draft cleanup failed', error);
     });

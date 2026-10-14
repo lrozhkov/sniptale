@@ -123,6 +123,7 @@ export async function maintainLibraryAssets(
         durationMs: Math.round(performance.now() - started),
       });
       if (!signal.aborted) logger.debug('Library maintenance deferred');
+      if (operation === 'drafts') return;
     }
   }
 }
