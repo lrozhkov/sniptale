@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, EyeOff, Shapes } from 'lucide-react';
+import { Eye, EyeOff, Sticker } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type {
   ReviewAnnotationEffect,
@@ -179,7 +179,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
     <ReviewTrackRow
       muted={!props.enabled}
       label={translate('gallery.videoReview.annotationEffects')}
-      icon={<Shapes size={14} aria-hidden />}
+      icon={<Sticker size={14} aria-hidden />}
       controls={
         <ReviewButton
           label={translate('gallery.videoReview.annotationEffectsEnabled')}
@@ -202,7 +202,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
           'relative mt-1 rounded bg-[var(--sniptale-color-surface-hover)]',
           props.drawing
             ? [
-                'cursor-crosshair touch-none focus-visible:outline focus-visible:outline-2',
+                'cursor-inherit touch-none focus-visible:outline focus-visible:outline-2',
                 'focus-visible:outline-[var(--sniptale-color-accent)]',
               ].join(' ')
             : '',
@@ -390,7 +390,6 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
                 });
               }}
               onPointerDown={(event) => {
-                if (props.drawing) return;
                 event.stopPropagation();
                 if (props.busy || event.button !== 0 || drag.current) return;
                 const edge =
@@ -491,7 +490,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               }}
             >
               <ReviewTimelineLabel
-                icon={<Shapes size={12} aria-hidden />}
+                icon={<Sticker size={12} aria-hidden />}
                 name={name}
                 value={value}
               />

@@ -204,10 +204,11 @@ export function useReviewAnnotationEffects(
     draft.current = null;
     setGesture(null);
   };
-  const add = (choice: Choice) => {
-    if (draft.current) return;
+  const add = (choice: Choice): Promise<string | null> => {
+    if (draft.current) return Promise.resolve(null);
+    let createdId: string | null = null;
     const instanceId = crypto.randomUUID();
-    void execute(async (owner, controller) => {
+    return execute(async (owner, controller) => {
       failedChoice.current = choice;
       try {
         const id = await acquire({
@@ -218,6 +219,7 @@ export function useReviewAnnotationEffects(
         });
         if (active(owner, controller)) {
           failedChoice.current = null;
+          createdId = id;
           owner.select({ kind: 'annotation-effect', id });
         }
       } catch (error) {
@@ -225,6 +227,7 @@ export function useReviewAnnotationEffects(
         const admitted = currentLane()?.instances.find(({ id }) => id === instanceId);
         if (admitted) {
           failedChoice.current = null;
+          createdId = admitted.id;
           owner.select({ kind: 'annotation-effect', id: admitted.id });
           setFailure('save');
         } else if (
@@ -236,7 +239,7 @@ export function useReviewAnnotationEffects(
         } else setFailure('acquisition');
         throw error;
       }
-    });
+    }).then(() => createdId);
   };
   const change = (id: string, patch: Patch) => {
     if (draft.current) return;
@@ -358,7 +361,7 @@ export function useReviewAnnotationEffects(
     },
     retry: () => {
       if (draft.current) void commitGesture();
-      else if (failure === 'acquisition' && failedChoice.current) add(failedChoice.current);
+      else if (failure === 'acquisition' && failedChoice.current) return add(failedChoice.current);
       else if (failure === 'save')
         void execute(async (owner) => {
           await owner.session.saveBuffered();

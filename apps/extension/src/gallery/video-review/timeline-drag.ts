@@ -84,8 +84,9 @@ export function reviewPlaneLane(
   target: EventTarget | null,
   focusEnabled: boolean,
   originalEnabled: boolean,
-  sourceEnabled = false
-): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' | 'gap' | 'ruler' {
+  sourceEnabled = false,
+  annotationEnabled = false
+): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' | 'gap' | 'ruler' | 'annotation' {
   if (!(target instanceof Element)) return 'gap';
   if (target.closest('[data-ui="gallery.videoReview.ruler"]')) return 'ruler';
   if (focusEnabled && target.closest('[data-ui="gallery.videoReview.editBlock"]')) return 'seek';
@@ -98,12 +99,9 @@ export function reviewPlaneLane(
     return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';
   if (target.closest('[data-ui="gallery.videoReview.zoomLane"]'))
     return focusEnabled ? 'focus' : 'seek';
-  if (
-    target.closest(
-      '[data-ui="gallery.videoReview.textTrack"],[data-ui="gallery.videoReview.annotationEffectsLane"]'
-    )
-  )
-    return 'seek';
+  if (target.closest('[data-ui="gallery.videoReview.annotationEffectsLane"]'))
+    return annotationEnabled ? 'annotation' : 'seek';
+  if (target.closest('[data-ui="gallery.videoReview.textTrack"]')) return 'seek';
   if (target.closest('[data-ui="gallery.videoReview.sourceLane"]'))
     return sourceEnabled && !focusEnabled && !originalEnabled ? 'source' : 'seek';
   return 'gap';
@@ -161,6 +159,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         hit === 'control' ||
         hit === 'item' ||
         hit === 'original' ||
+        hit === 'annotation' ||
         hit === 'gap'
       )
         return;

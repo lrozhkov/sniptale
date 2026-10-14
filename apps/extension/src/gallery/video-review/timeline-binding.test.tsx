@@ -200,7 +200,7 @@ function BindingHarness({
   );
 }
 
-it('chooses an ephemeral source-qualified type before drawing without writing the selected range', async () => {
+it('retains a refused choice, completes one placement and ignores an old activation result', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
@@ -219,7 +219,9 @@ it('chooses an ephemeral source-qualified type before drawing without writing th
   const root = createRoot(host);
   const loaded = resource('addition-source');
   const replacement = resource('replacement-source');
-  const add = vi.fn<ReturnType<typeof useReviewEditorState>['annotationEffects']['add']>();
+  const add = vi
+    .fn<ReturnType<typeof useReviewEditorState>['annotationEffects']['add']>()
+    .mockResolvedValue(null);
   let current: ReturnType<typeof useReviewEditorState> | undefined;
   const trigger = () =>
     host.querySelector<HTMLButtonElement>(
@@ -262,20 +264,24 @@ it('chooses an ephemeral source-qualified type before drawing without writing th
     expect(add).not.toHaveBeenCalled();
     expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
     expect(trigger().getAttribute('aria-pressed')).toBe('true');
-    const lane = host.querySelector<HTMLDivElement>(
-      '[data-ui="gallery.videoReview.annotationEffectsLane"]'
-    )!;
-    vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 200, 400, 32));
     let captured = false;
-    Object.assign(lane, {
-      setPointerCapture: () => {
-        captured = true;
-      },
-      hasPointerCapture: () => captured,
-      releasePointerCapture: () => {
-        captured = false;
-      },
-    });
+    const currentLane = () => {
+      const node = host.querySelector<HTMLDivElement>(
+        '[data-ui="gallery.videoReview.annotationEffectsLane"]'
+      )!;
+      vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 200, 400, 32));
+      Object.assign(node, {
+        setPointerCapture: () => {
+          captured = true;
+        },
+        hasPointerCapture: () => captured,
+        releasePointerCapture: () => {
+          captured = false;
+        },
+      });
+      return node;
+    };
+    let lane = currentLane();
     for (const [type, x] of [
       ['pointerdown', 100],
       ['pointermove', 300],
@@ -308,6 +314,49 @@ it('chooses an ephemeral source-qualified type before drawing without writing th
       await act(async () => lane.dispatchEvent(event));
     }
     expect(add).toHaveBeenCalledTimes(2);
+    let completeOld: (id: string) => void = () => {};
+    add.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          completeOld = resolve;
+        })
+    );
+    await act(async () =>
+      lane.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      )
+    );
+    expect(add).toHaveBeenCalledTimes(3);
+    await act(async () => trigger().click());
+    await act(async () => trigger().click());
+    await act(async () => selector().click());
+    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+    await act(async () => completeOld('old-instance'));
+    expect(trigger().getAttribute('aria-pressed')).toBe('true');
+    lane = currentLane();
+    expect(lane.isConnected).toBe(true);
+    expect(lane.getAttribute('tabindex')).toBe('0');
+    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
+    add.mockResolvedValueOnce('new-instance');
+    await act(async () =>
+      lane.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      )
+    );
+    expect(add).toHaveBeenCalledTimes(4);
+    expect(trigger().getAttribute('aria-pressed')).toBe('false');
+    expect(selector()).toBeNull();
+    lane = currentLane();
+    await act(async () =>
+      lane.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      )
+    );
+    expect(add).toHaveBeenCalledTimes(4);
+    await act(async () => trigger().click());
+    await act(async () => selector().click());
+    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+    lane = currentLane();
     for (const [type, x] of [
       ['pointerdown', 100],
       ['pointermove', 250],
@@ -329,7 +378,7 @@ it('chooses an ephemeral source-qualified type before drawing without writing th
     await act(async () =>
       lane.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 250, button: 0 }))
     );
-    expect(add).toHaveBeenCalledTimes(2);
+    expect(add).toHaveBeenCalledTimes(4);
     await act(async () => trigger().click());
     expect(selector().textContent).toContain(
       translate('gallery.videoReview.annotationEffectsChoose')

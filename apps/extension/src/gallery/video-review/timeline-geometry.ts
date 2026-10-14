@@ -147,7 +147,7 @@ function revealBoundary(
 /** Tool activation reveals its lane through the existing vertical viewport, preserving horizontal position. */
 export function useReviewToolLaneNavigation(
   viewport: RefObject<HTMLDivElement | null>,
-  tools: { focus: boolean; original: boolean; source: boolean }
+  tools: { focus: boolean; original: boolean; source: boolean; annotation?: boolean }
 ) {
   const active = tools.focus
     ? 'focus'
@@ -155,10 +155,13 @@ export function useReviewToolLaneNavigation(
       ? 'original'
       : tools.source
         ? 'source'
-        : null;
+        : tools.annotation
+          ? 'annotation'
+          : null;
   useEffect(() => {
     if (!active || !viewport.current) return;
     const selectors = {
+      annotation: '[data-ui="gallery.videoReview.annotationEffectsLane"]',
       focus: '[data-ui="gallery.videoReview.zoomLane"]',
       original: '[data-original-audio-lane]',
       source: '[data-ui="gallery.videoReview.sourceLane"]',
@@ -167,8 +170,10 @@ export function useReviewToolLaneNavigation(
     if (!lane) return;
     const bounds = viewport.current.getBoundingClientRect();
     const rect = lane.getBoundingClientRect();
-    if (rect.top < bounds.top || rect.bottom > bounds.bottom)
-      viewport.current.scrollTop += rect.top - bounds.top - 4;
+    const ruler = viewport.current.querySelector('[data-ui="gallery.videoReview.rulerRow"]');
+    const visibleTop = bounds.top + (ruler?.getBoundingClientRect().height ?? 0);
+    if (rect.top < visibleTop || rect.bottom > bounds.bottom)
+      viewport.current.scrollTop += rect.top - visibleTop - 4;
   }, [active, viewport]);
   return active;
 }

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
@@ -27,7 +28,7 @@ import {
   Focus,
   PanelsTopLeft,
   Volume2,
-  SquarePlus,
+  Sticker,
   RotateCw,
 } from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
@@ -414,6 +415,9 @@ function ReviewAnnotationToolControl(props: {
 }) {
   const { tool, busy, admit } = props;
   const hint = annotationTypeHint(tool);
+  const requiredId = useId();
+  const required =
+    tool.phase === 'ready' && !tool.pending && !tool.value && tool.options.length > 0;
   return (
     <ReviewToolGroup
       active={tool.active}
@@ -435,12 +439,13 @@ function ReviewAnnotationToolControl(props: {
           admit(() => tool.onToggle(node));
         }}
       >
-        <SquarePlus size={16} aria-hidden />
+        <Sticker size={16} aria-hidden />
       </ReviewButton>
       {tool.active ? (
         <>
           <ProductSelect
             aria-label={translate('gallery.videoReview.annotationEffectsChoose')}
+            aria-describedby={required ? requiredId : undefined}
             dataUi="gallery.videoReview.annotationType"
             controlSize="sm"
             className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -452,6 +457,14 @@ function ReviewAnnotationToolControl(props: {
             disabled={busy || tool.pending || tool.phase !== 'ready' || !tool.options.length}
             onChange={(value) => admit(() => tool.onChoose(value))}
           />
+          {required ? (
+            <span id={requiredId} className="-ml-1 text-[var(--sniptale-color-danger)]">
+              <span aria-hidden="true">*</span>
+              <span className="sr-only">
+                {translate('gallery.videoReview.annotationEffectsRequired')}
+              </span>
+            </span>
+          ) : null}
           <ReviewAnnotationToolFeedback {...props} hint={hint} />
         </>
       ) : null}

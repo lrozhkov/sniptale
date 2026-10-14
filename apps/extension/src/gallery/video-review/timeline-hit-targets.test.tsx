@@ -549,28 +549,35 @@ it('reveals only the active tool lane vertically and preserves horizontal scroll
   const { host, props } = renderTimeline({
     zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
     audioTrack: <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />,
+    annotationEffectsTrack: <ActualAnnotationLane />,
     playbackRange: { start: 1, end: 3 },
   });
   const viewport = host.querySelector<HTMLElement>(
     '[data-ui="gallery.videoReview.timelineViewport"]'
   )!;
   viewport.scrollLeft = 400;
+  const ruler = host.querySelector('[data-ui="gallery.videoReview.rulerRow"]')!;
+  Object.assign(ruler, { getBoundingClientRect: () => new DOMRect(0, 100, 800, 28) });
   Object.assign(viewport, { getBoundingClientRect: () => new DOMRect(0, 100, 800, 100) });
   const source = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
   const focus = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomLane"]')!;
+  const annotation = host.querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')!;
   const audio = host.querySelector<HTMLElement>('[data-original-audio-lane]')!;
   for (const [lane, top] of [
     [source, 300],
     [focus, 400],
     [audio, 500],
+    [annotation, 600],
   ] as const)
     Object.assign(lane, { getBoundingClientRect: () => new DOMRect(120, top, 600, 40) });
   renderTimeline({ ...props, onFocusRangeCommit: vi.fn() });
-  expect(viewport.scrollTop).toBe(296);
+  expect(viewport.scrollTop).toBe(268);
   renderTimeline({ ...props, sourceRangeTool: true });
-  expect(viewport.scrollTop).toBe(492);
+  expect(viewport.scrollTop).toBe(436);
   renderTimeline({ ...props, originalRangeTool: true });
-  expect(viewport.scrollTop).toBe(888);
+  expect(viewport.scrollTop).toBe(804);
+  renderTimeline({ ...props, annotationTool: true });
+  expect(viewport.scrollTop).toBe(1272);
   expect(viewport.scrollLeft).toBe(400);
   expect(props.onSelect).not.toHaveBeenCalled();
   expect(props.onSeek).not.toHaveBeenCalled();
@@ -630,4 +637,26 @@ it('orders action-history controls by navigation, filtering, then applying effec
   expect(controls[2]!.querySelector('svg')?.classList.contains('lucide-eye-off')).toBe(true);
   act(() => controls[2]!.click());
   expect(toggle).toHaveBeenCalledOnce();
+});
+
+it('offers the annotation placement cursor only when ready and reveals its active lane', () => {
+  renderTimeline({
+    annotationTool: true,
+    annotationDrawing: true,
+    annotationEffectsTrack: <ActualAnnotationLane />,
+  });
+  const plane = planeWithMetrics(host);
+  const lane = host.querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')!;
+  expect(host.querySelector('[data-active-tool-lane="annotation"]')).not.toBeNull();
+  hoverAt(lane, 200);
+  expect(plane.style.cursor).toContain('4 16, cell');
+  hoverAt(host.querySelector('[data-ui="gallery.videoReview.trackHeader"]')!, 200);
+  expect(plane.style.cursor).toBe('default');
+  renderTimeline({
+    annotationTool: true,
+    annotationDrawing: false,
+    annotationEffectsTrack: <ActualAnnotationLane />,
+  });
+  hoverAt(lane, 200);
+  expect(plane.style.cursor).toBe('default');
 });

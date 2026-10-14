@@ -107,6 +107,8 @@ async function discardedResourceProbe(aggregateId: string) {
     await import('../../../../apps/extension/src/composition/persistence/projects/read-guards');
   const { parseAssetRef, readAssetFile, MissingAssetObjectError } =
     await import('../../../../apps/extension/src/composition/persistence/assets');
+  const { deleteVideoWorkspaceProject } =
+    await import('../../../../apps/extension/src/composition/persistence/review-workspaces/project-commands');
   const { deleteMediaAssetWithProjectCascade } =
     await import('../../../../apps/extension/src/composition/persistence/media-library/delete-cascade');
   const db = await initDB();
@@ -182,6 +184,7 @@ async function discardedResourceProbe(aggregateId: string) {
       )
     ).every(Boolean);
   const branchBytesReleased = await bytesAbsent();
+  await deleteVideoWorkspaceProject(aggregateId, branch.workspace.revision);
   await deleteMediaAssetWithProjectCascade(aggregateId, []);
   const parentPurged = (await db.get(MEDIA_LIBRARY_STORE, aggregateId)) === undefined;
   const purgeBytesAbsent = await bytesAbsent();

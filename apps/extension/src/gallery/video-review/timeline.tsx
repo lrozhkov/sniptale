@@ -48,6 +48,8 @@ type TimelineProps = {
   busy?: boolean;
   playbackRange?: ReviewPlaybackRange | null | undefined;
   onPlaybackRange?: ((range: ReviewPlaybackRange | null) => void) | undefined;
+  annotationTool?: boolean;
+  annotationDrawing?: boolean;
   sourceRangeTool?: boolean;
   sourceRangeKind?: 'cut' | 'speed' | undefined;
   duration: number;
@@ -116,6 +118,7 @@ export function ReviewTimeline(props: TimelineProps) {
     focus: !!props.onFocusRangeCommit,
     original: !!props.originalRangeTool,
     source: !!props.sourceRangeTool,
+    annotation: !!props.annotationTool,
   });
   const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
   const hover = useReviewTimelineHover({
@@ -125,6 +128,7 @@ export function ReviewTimeline(props: TimelineProps) {
     gutter,
     width,
     zoom,
+    annotationEnabled: !!props.annotationDrawing,
     focusEnabled: !!props.onFocusRangeCommit,
     originalEnabled: !!props.originalRangeTool,
     sourceRangeTool: !!props.sourceRangeTool,

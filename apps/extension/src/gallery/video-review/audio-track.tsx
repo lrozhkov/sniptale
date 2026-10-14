@@ -21,7 +21,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { Mic, Plus, Volume2, VolumeX, AudioLines } from 'lucide-react';
+import { Mic, Plus, Volume2, VolumeX, AudioLines, Music } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditAudioClip,
@@ -189,7 +189,13 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     <ReviewTrackRow
       muted={props.clips.length > 0 && props.clips.every((clip) => clip.muted)}
       label={props.label}
-      icon={<AudioLines size={14} aria-hidden="true" />}
+      icon={
+        props.lane === 'music' ? (
+          <Music size={14} aria-hidden />
+        ) : (
+          <AudioLines size={14} aria-hidden />
+        )
+      }
       controls={props.trailing}
     >
       <div

@@ -25,12 +25,18 @@ const templates = [
   { ru: 'Угловой фокус', en: 'Corner focus' },
 ] as const;
 
-async function drawInterval(page: Page, lane: Locator, start: number, end: number) {
+async function drawInterval(
+  page: Page,
+  lane: Locator,
+  start: number,
+  end: number,
+  checkCursor = false
+) {
   await lane.scrollIntoViewIfNeeded();
   await expect(lane).toBeInViewport();
   const bounds = await lane.boundingBox();
   if (!bounds) throw new Error('Annotation lane is absent');
-  const y = await lane.evaluate((node) => {
+  const y = await lane.evaluate((node, start) => {
     const bounds = node.getBoundingClientRect();
     let top = Math.max(0, bounds.top),
       bottom = Math.min(innerHeight, bounds.bottom);
@@ -43,10 +49,17 @@ async function drawInterval(page: Page, lane: Locator, start: number, end: numbe
       bottom = Math.min(bottom, clip.bottom);
       if (style.position === 'fixed') break;
     }
-    if (bottom - top < 2) throw new Error('Annotation lane has no visible hit area');
-    return (top + bottom) / 2;
-  });
+    const x = bounds.x + (bounds.width * start) / 12;
+    for (let y = Math.ceil(top) + 1; y < bottom - 1; y += 1) {
+      if (document.elementFromPoint(x, y) === node) return y;
+    }
+    throw new Error('Annotation lane has no visible empty placement area');
+  }, start);
   await page.mouse.move(bounds.x + (bounds.width * start) / 12, y);
+  if (checkCursor)
+    await expect
+      .poll(() => lane.evaluate((node) => getComputedStyle(node).cursor))
+      .toContain('4 16, cell');
   await page.mouse.down();
   await page.mouse.move(bounds.x + (bounds.width * end) / 12, y, { steps: 8 });
   await page.mouse.up();
@@ -67,7 +80,11 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
   const open = async () => {
     await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
   };
   const settings = async () => {
@@ -215,6 +232,7 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     );
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(1);
     expect(JSON.stringify(await workspace())).toBe(durableBeforeAdd);
+    await button('gallery.videoReview.annotationEffectsAdd').click();
     await typeSelector.click();
     await page.getByRole('option', { name: templates[0].ru, exact: true }).click();
     expect(JSON.stringify(await workspace())).toBe(durableBeforeAdd);
@@ -247,7 +265,11 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     await button('gallery.videoReview.undo').click();
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(0);
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await button('gallery.videoReview.redo').click();
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(1);
@@ -515,6 +537,9 @@ for (const variant of [
         const toggle = button('gallery.videoReview.annotationEffectsAdd');
         if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
         const selector = button('gallery.videoReview.annotationEffectsChoose');
+        await expect(selector).toHaveAttribute('aria-describedby', /.+/);
+        await expect(lane).toBeInViewport();
+        await expect(dialog.locator('[data-active-tool-lane="annotation"]')).toHaveCount(1);
         const before = (await workspace())!.cursor;
         await selector.click();
         const choice = page.getByRole('option', { name: template[variant.locale], exact: true });
@@ -546,8 +571,13 @@ for (const variant of [
           await selector.click();
           await page.getByRole('option', { name: template[variant.locale], exact: true }).click();
         }
-        await drawInterval(page, lane, 1, 7);
-        await expect(selector).toHaveText(template[variant.locale]);
+        await drawInterval(page, lane, 1, 7, true);
+        await expect(selector).toHaveCount(0);
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+        await expect(button('gallery.videoReview.pointerTool')).toHaveAttribute(
+          'aria-pressed',
+          'true'
+        );
         await expect(plates).toHaveCount(index + 1);
         await expect(
           dialog.locator('[data-ui="gallery.videoReview.annotationInspector"]')

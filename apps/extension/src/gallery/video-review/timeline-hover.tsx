@@ -3,7 +3,7 @@ import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { reviewTimeLabel } from './controls';
 import { planeTime, reviewPlaneLane } from './timeline-drag';
 
-type HoverLane = 'source' | 'focus' | 'original' | 'seek' | 'ruler';
+type HoverLane = 'annotation' | 'source' | 'focus' | 'original' | 'seek' | 'ruler';
 type Hover = { time: number; x: number; snapped: boolean; lane: HoverLane };
 export type ReviewPlacementHints = Partial<
   Record<'source' | 'focus' | 'original', string | undefined>
@@ -15,6 +15,7 @@ type HoverOptions = {
   gutter: number;
   width: number;
   zoom: number;
+  annotationEnabled?: boolean;
   focusEnabled: boolean;
   originalEnabled: boolean;
   sourceRangeTool: boolean;
@@ -43,6 +44,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
       options.gutter,
       options.width,
       options.busy,
+      options.annotationEnabled,
       options.focusEnabled,
       options.originalEnabled,
       options.sourceRangeTool,
@@ -71,7 +73,8 @@ export function useReviewTimelineHover(options: HoverOptions) {
         event.target,
         options.focusEnabled,
         options.originalEnabled,
-        options.sourceRangeTool
+        options.sourceRangeTool,
+        options.annotationEnabled
       );
     if (hit === 'control' || hit === 'item') {
       setHover(null);

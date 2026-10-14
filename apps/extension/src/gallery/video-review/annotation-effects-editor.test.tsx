@@ -190,7 +190,11 @@ it('explains an unsupported catalog choice without admitting an instance or retr
   const { acquire, choice } = setup();
   acquire.mockRejectedValueOnce(new ReviewAnnotationAcquisitionError('unsupported-kind'));
   const before = structuredClone(session.getSnapshot().snapshot.workspace);
-  await settle(() => editor.add(choice));
+  let result: unknown;
+  await settle(() => {
+    result = editor.add(choice);
+  });
+  expect(await result).toBeNull();
   expect(editor.failure).toBe('unsupported');
   expect(editor.pending).toBe(false);
   expect(session.getSnapshot().snapshot.workspace).toEqual(before);
@@ -298,14 +302,16 @@ it('blocks duplicate acquisition while pending and retries an admitted Save with
   const { choice, save, acquire, select } = setup();
   session.setAutosaveEnabled(true);
   save.mockRejectedValueOnce(new Error('Quota')).mockRejectedValueOnce(new Error('Still quota'));
+  let result: unknown;
   await settle(() => {
-    editor.add(choice);
+    result = editor.add(choice);
     editor.add(choice);
   });
   expect(acquire).toHaveBeenCalledOnce();
   expect(editor.failure).toBe('save');
   expect(editor.lane?.instances).toHaveLength(2);
   const id = editor.lane!.instances[1]!.id;
+  expect(await result).toBe(id);
   expect(select).toHaveBeenLastCalledWith({ kind: 'annotation-effect', id });
   expect(session.getSnapshot().dirty).toBe(true);
   await settle(() => editor.retry());
@@ -333,7 +339,11 @@ it('retries an unadmitted choice and refuses all mutations while another editor 
   await settle(() => editor.add(choice));
   expect(editor.failure).toBe('acquisition');
   expect(editor.lane?.instances).toHaveLength(1);
-  await settle(() => editor.retry());
+  let retried: unknown;
+  await settle(() => {
+    retried = editor.retry();
+  });
+  expect(await retried).toBe(editor.lane?.instances[1]?.id);
   expect(editor.failure).toBeNull();
   expect(editor.lane?.instances).toHaveLength(2);
 });

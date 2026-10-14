@@ -193,11 +193,11 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "ReviewTimelineBinding",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when conditional timeline/lane/picker wiring owns mutation, retention or a request lifecycle instead of injected commands. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "93f078e8665d0a2c8a80fb7e72e1cf5fc39b2e7950d08f64ec42984d2b774e13",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "3c5a14c4f78e8dd72d822311f9d7c456193250d1482760b77a60b4610d1073c4",
       "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
-      "reason": "tool-noise: Seven outer statements create one source-to-timeline projection and existing focus/annotation placement hooks, then return the unified timeline/toolbar/lane/picker JSX. New conditional props select eligible advanced annotation UI and translate typed unsupported failure. Deferred admission, acquisition and mutation remain injected. Counted branches describe view eligibility; they create no state/effect/recovery owner in this component. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: Seven outer statements compose existing projection and injected placement commands. Two additional view props expose annotation readiness; conditional JSX does not add mutation or recovery authority. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-15"
     },
     {
       "rule": "structural-file-risk",
@@ -292,11 +292,11 @@
       "file": "apps/extension/src/gallery/video-review/annotation-effects-editor.ts",
       "symbol": "useReviewAnnotationEffects",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when session-bound annotation admission, draft, completion or recovery becomes a separate queue/state/resource authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "384f7362d9ca8842a9c45886e231a70b380fbd7d33392d822eb5248ffa56d6ce",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "7296bc67fde08c8a03cf845f7866224cb0003a7bd5ae8a685eade14b78a1f32c",
       "signatureHash": "349ce5baa868ad5597c6e89dbdc69124b461033b8430575ae2cac5a0ae80700c",
-      "reason": "tool-noise: One disposable command adapter owns current draft, admitted operation controller and completion Promise for the same session. add/change/duplicate/gesture/flush/retry all converge through execute/mutate and the existing session/advanced-content queue; this hook owns no durable writer or resource retention. Source replacement/unmount cancels that same receiver. Separating capture, pending and retry closures would distribute the single admission/draft lifetime; outer cyclomatic four and nesting one do not evidence that defect. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: One disposable session-bound annotation command receiver owns admission, acquisition and retry. The result now reports the admitted instance identity; no new writer, resource lifetime or recovery authority is added. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-15"
     },
     {
       "rule": "structural-file-risk",
@@ -402,11 +402,11 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when timeline composition/transient placement adds a command queue, resource authority or independent captured drag. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "de59280aac5351c9e52f04b0cc96eb55582eb175b238e6ad22a1f88efd11a8ae",
-      "signatureHash": "5c37390e64e844b00a30bcc2160ab812344334b77084b22edb837c922034ec91",
-      "reason": "tool-noise: The existing binding composes source selection, projected lanes, toolbar and track controls. New useAnnotationPlacement owns only transient anchor/source placement and calls the existing command; catalog subscription is a separate existing hook, while lane capture and durable/session authority remain in their owners. Ref aliases point to the same current props/source identity. No independent writer or queue is added, and file growth is explicit optional-lane/picker wiring. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "750949c949f7fdf49459fcac0678a2d79aa58b91faf8a8d11a43864f40657980",
+      "signatureHash": "881bc98ded6d3566e50e9b7685fcff7bb1dfd6ecaf89070beb0ec52d12b299ee",
+      "reason": "tool-noise: The file composes one source timeline and its transient placement state. Cohesion is 0.97 and the score is unchanged. The candidate adds no durable writer, queue, public export or gesture authority. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-15"
     },
     {
       "rule": "structural-file-risk",
@@ -726,6 +726,28 @@
       "reviewDate": "2026-10-14",
       "astHash": "23509c01a3edab57321202633f9d1282c3e348f4384801ba9d2a822e97c70a99",
       "signatureHash": "42da8291ea00a57fec6e48fc16eed95959ed93fffc6f812d6aeca846b95569e9"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline-binding.test.tsx",
+      "symbol": "it callback",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One mounted placement lifecycle covers refusal, late completion, reactivation and successful completion with controlled promises and shared cleanup. The statement increase extends the same lifecycle fixture, not an independent test owner. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-15",
+      "astHash": "0c1710ea01def71673fb3fe61cd829cd836249539c7ca50f3fa67d1a168c6485",
+      "signatureHash": "4bd833e688236b8c036afdb49f63adf0e750f7446aac250c82600d04b76483fb"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
+      "symbol": "useAnnotationPlacement",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One source-qualified transient placement lifecycle owns activation and completion. An activation epoch prevents an old completion from clearing a new tool activation. Durable command ordering remains with the injected command owner. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-15",
+      "astHash": "7a5882e3d6a5b41af34878f06acb83084f90615a3baae4f9f32d7db5952d885b",
+      "signatureHash": "872869ad5b97480d588609844cee9f1ec3fca95bb4b5b08f2b4c7c839af874ba"
     }
   ]
 }

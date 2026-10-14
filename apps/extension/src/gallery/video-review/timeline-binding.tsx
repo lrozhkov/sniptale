@@ -203,6 +203,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   return (
     <>
       <ReviewTimeline
+        annotationTool={annotation.tool.active}
+        annotationDrawing={annotation.drawing}
         annotationEffectsTrack={
           features.annotationEffectsTrackVisible && props.annotationEffects ? (
             <ReviewAnnotationEffectsTrack
@@ -352,6 +354,7 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
   const [enabled, setEnabled] = useState(false);
   const [selected, setSelected] = useState('');
   const anchor = useRef<HTMLElement | null>(null);
+  const activation = useRef(0);
   const advanced = props.advanced.ui.mode === 'advanced';
   const active =
     enabled && advanced && !props.editing.mode && !props.audio.originalTool && !props.zoom.drawing;
@@ -382,6 +385,7 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
   const latest = useRef({ props, active, selected, choice, phase: catalog.phase });
   latest.current = { props, active, selected, choice, phase: catalog.phase };
   const clear = useCallback(() => {
+    activation.current += 1;
     latest.current.active = false;
     latest.current.selected = '';
     setEnabled(false);
@@ -395,7 +399,12 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
       if (cancellation.current === clear) cancellation.current = null;
     };
   }, [props.annotationToolCancellation, clear]);
-  useEffect(clear, [props.annotationSourceId, clear]);
+  useEffect(() => {
+    clear();
+    return () => {
+      activation.current += 1;
+    };
+  }, [props.annotationSourceId, clear]);
   useEffect(() => {
     if (!advanced || props.editing.mode || props.audio.originalTool || props.zoom.drawing) clear();
   }, [advanced, props.editing.mode, props.audio.originalTool, props.zoom.drawing, clear]);
@@ -414,6 +423,19 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
   }, [active, clear]);
+  const finishPlacement = (result: Promise<string | null> | undefined) => {
+    const epoch = activation.current;
+    const sourceId = props.annotationSourceId;
+    void result?.then((id) => {
+      if (
+        id &&
+        activation.current === epoch &&
+        latest.current.active &&
+        latest.current.props.annotationSourceId === sourceId
+      )
+        clear();
+    });
+  };
   const place = (range: { start: number; end?: number }, node: HTMLElement) => {
     const current = latest.current;
     const owner = current.props;
@@ -434,13 +456,15 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
       owner.editing.exporter.phase !== 'idle'
     )
       return;
-    owner.annotationEffects.add({
-      catalog: current.choice.catalog,
-      documentId: current.choice.documentId,
-      ...range,
-      locale,
-      plane: { width, height },
-    });
+    finishPlacement(
+      owner.annotationEffects.add({
+        catalog: current.choice.catalog,
+        documentId: current.choice.documentId,
+        ...range,
+        locale,
+        plane: { width, height },
+      })
+    );
   };
   return {
     drawing: active && catalog.phase === 'ready' && !!choice && !props.annotationEffects?.pending,
@@ -472,7 +496,7 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
       onReload: () => {
         void catalog.reload();
       },
-      onRetry: () => props.annotationEffects?.retry(),
+      onRetry: () => finishPlacement(props.annotationEffects?.retry()),
       onToggle: (node: HTMLElement) => {
         anchor.current = node;
         props.editing.setCutting(false);

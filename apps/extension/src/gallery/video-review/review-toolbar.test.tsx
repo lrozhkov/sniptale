@@ -97,10 +97,19 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
       host.querySelector<HTMLButtonElement>(
         `[aria-label="${translate('gallery.videoReview.annotationEffectsChoose')}"]`
       )!;
+    tool.value = '';
+    await render('advanced');
+    const description = selector().getAttribute('aria-describedby');
+    expect(description).not.toBeNull();
+    expect(document.getElementById(description!)?.textContent).toContain(
+      translate('gallery.videoReview.annotationEffectsRequired')
+    );
+    expect(selector().hasAttribute('aria-required')).toBe(false);
     tool.phase = 'loading';
     tool.options = [];
     await render('advanced');
     expect(selector().disabled).toBe(true);
+    expect(selector().hasAttribute('aria-describedby')).toBe(false);
     expect(selector().textContent).toContain(
       translate('gallery.videoReview.annotationEffectsLoading')
     );

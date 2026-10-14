@@ -37,6 +37,8 @@
 
 /* Mark the sticky lane header so tool guidance never covers authored items. */
 :is(
+    [data-active-tool-lane='annotation']
+      [data-review-track-muted]:has([data-ui='gallery.videoReview.annotationEffectsLane']),
     [data-active-tool-lane='source']
       [data-review-track-muted]:has([data-ui='gallery.videoReview.sourceLane']),
     [data-active-tool-lane='focus']

@@ -125,7 +125,7 @@ it('draws with source-edge magnets and Alt bypass, clamping a final click within
 });
 
 it.each(['body', 'start', 'end'])(
-  'creates an overlapping interval when Add starts on an existing %s',
+  'edits the existing %s instead of placing another annotation while Add is active',
   (target) => {
     const place = vi.fn();
     const lane = render({ drawing: true, onPlace: place });
@@ -133,13 +133,13 @@ it.each(['body', 'start', 'end'])(
     const node =
       target === 'body' ? plate : plate.querySelector(`[data-annotation-effect-edge="${target}"]`)!;
     pointer(node, 'pointerdown', 200);
-    pointer(lane, 'pointermove', 600);
-    pointer(lane, 'pointerup', 600);
-    expect(place).toHaveBeenCalledExactlyOnceWith({ start: 2, end: 6 }, lane);
-    expect(begin).not.toHaveBeenCalled();
-    expect(preview).not.toHaveBeenCalled();
-    expect(commit).not.toHaveBeenCalled();
-    expect(select).not.toHaveBeenCalled();
+    pointer(plate, 'pointermove', 600);
+    pointer(plate, 'pointerup', 600);
+    expect(place).not.toHaveBeenCalled();
+    expect(begin).toHaveBeenCalledWith('first');
+    expect(preview).toHaveBeenCalled();
+    expect(commit).toHaveBeenCalledOnce();
+    expect(select).toHaveBeenCalledWith('first');
   }
 );
 

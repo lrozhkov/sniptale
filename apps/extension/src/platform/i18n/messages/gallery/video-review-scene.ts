@@ -57,6 +57,10 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   captions: { ru: 'Текст в видео', en: 'Text in video' },
   annotationEffects: { ru: 'Аннотации', en: 'Annotations' },
   annotationEffectsAdd: { ru: 'Добавить аннотацию', en: 'Add annotation' },
+  annotationEffectsRequired: {
+    ru: 'Выберите тип аннотации, чтобы добавить её.',
+    en: 'Choose an annotation type before placing it.',
+  },
   annotationEffectsChoose: { ru: 'Выберите аннотацию', en: 'Choose an annotation' },
   annotationEffectsDraw: {
     ru: 'Выделите интервал на дорожке аннотаций',
