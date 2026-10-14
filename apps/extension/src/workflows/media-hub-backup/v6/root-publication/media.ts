@@ -1,3 +1,8 @@
+import {
+  createLibraryLifecycle,
+  promoteLibraryLifecycle,
+} from '../../../../composition/persistence/library-lifecycle/contracts';
+import { promoteReviewSourceLifecycles } from '../../../../composition/persistence/review-workspaces/new-reference-admission';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import { freezeScenarioMediaRepresentations } from '../../../../composition/persistence/scenario/library-publication';
 import { sameMediaSource } from '../../../../composition/persistence/media-library/dependencies';
@@ -216,6 +221,15 @@ function prepareRecording(args: {
     args.metadata.recording && recordingId
       ? parseRecordingEntry({
           ...args.metadata.recording.entry,
+          ...(args.metadata.videoReview
+            ? {
+                lifecycle: promoteLibraryLifecycle(
+                  args.metadata.recording.entry.lifecycle ??
+                    createLibraryLifecycle('library', args.metadata.recording.entry.createdAt),
+                  Date.now()
+                ),
+              }
+            : {}),
           assetId: args.original.ref.assetId,
           id: recordingId,
           mimeType: args.original.ref.mimeType,
@@ -353,7 +367,17 @@ async function prepareMediaRoot(args: {
     args.metadata,
     args.strategy === 'duplicate' && (await hasMediaSourceConflict(args.metadata))
   );
-  const restoredEntry = rebaseTemporaryLifecycle(targetEntry);
+  const acceptedEntry =
+    args.metadata.workspace || args.metadata.videoReview
+      ? {
+          ...targetEntry,
+          lifecycle: promoteLibraryLifecycle(
+            targetEntry.lifecycle ?? createLibraryLifecycle('library', targetEntry.updatedAt),
+            Date.now()
+          ),
+        }
+      : targetEntry;
+  const restoredEntry = rebaseTemporaryLifecycle(acceptedEntry);
   const restoredSource =
     restoredEntry.source.kind === 'stored-asset'
       ? { kind: 'stored-asset' as const, assetId: original.ref.assetId }
@@ -495,12 +519,22 @@ async function publishPreparedMedia(args: {
   if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
   await publishProjectVideo(args.prepared, args.stores);
   await publishMediaReviewAssets(args.prepared.reviewAssets, args.stores);
-  if (args.prepared.videoReview)
+  if (args.prepared.videoReview) {
+    await promoteReviewSourceLifecycles(
+      args.prepared.videoReview.workspace,
+      {
+        assets: args.stores.projectAssets,
+        media: args.stores.media,
+        recordings: args.stores.recordings,
+      },
+      { assets: new Map(), libraryAudioClaims: [] }
+    );
     await putVideoReviewRestore({
       review: args.prepared.videoReview,
       workspaces: args.stores.videoWorkspaces,
       drafts: args.stores.videoDrafts,
     });
+  }
   if (args.prepared.recording) {
     await putRecordingBackupRestore({
       entry: args.prepared.recording,

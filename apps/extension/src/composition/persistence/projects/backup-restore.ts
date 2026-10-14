@@ -1,3 +1,7 @@
+import {
+  promoteReviewPrimarySourceLifecycles,
+  promoteReviewSourceLifecycles,
+} from '../review-workspaces/new-reference-admission';
 import type { IDBPTransaction } from 'idb';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import { promoteProjectSourceLifecycles } from './new-reference-admission';
@@ -305,6 +309,29 @@ async function publishProjectSidecars(
   if (root.presentation) await stores.presentations.put(root.presentation);
 }
 
+async function retainRestoredReviewSources(
+  root: PreparedVideoProjectArchiveRoot,
+  tx: RestoreTransaction
+): Promise<void> {
+  const stores = {
+    assets: tx.objectStore(PROJECT_ASSETS_STORE),
+    media: tx.objectStore(MEDIA_LIBRARY_STORE),
+    recordings: tx.objectStore(STORE_NAME),
+  };
+  for (const item of [...root.assets, ...root.exports]) {
+    if (item.reusePublished || !item.videoReview) continue;
+    await promoteReviewPrimarySourceLifecycles(
+      item.videoReview.workspace.aggregateId,
+      stores,
+      Date.now()
+    );
+    await promoteReviewSourceLifecycles(item.videoReview.workspace, stores, {
+      assets: new Map(),
+      libraryAudioClaims: [],
+    });
+  }
+}
+
 export async function putVideoProjectBackupRestore(args: {
   operation: PhysicalDeleteAssetOperation;
   root: PreparedVideoProjectArchiveRoot;
@@ -355,6 +382,7 @@ export async function putVideoProjectBackupRestore(args: {
   await publishProjectAssets(args.root, args.stores);
   await publishProjectExports(args.root, args.stores);
   await publishProjectSidecars(args.root, args.stores);
+  await retainRestoredReviewSources(args.root, args.tx);
   await promoteProjectSourceLifecycles(
     args.root.entry.project,
     {

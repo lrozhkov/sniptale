@@ -19,7 +19,7 @@ it('does not recreate a purged original image on the first editor save', async (
 const mocks = getImageMutationMocks();
 
 it.each(['temporary', 'library'] as const)(
-  'creates local images in the configured %s category',
+  'retains accepted local Image projects with the %s category configured',
   async (storageClass) => {
     mocks.loadSettings.mockResolvedValue({
       localStoragePolicy: { defaultDestination: storageClass },
@@ -33,14 +33,14 @@ it.each(['temporary', 'library'] as const)(
     expect(puts.media).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: 'new-image',
-        lifecycle: expect.objectContaining({ storageClass }),
+        lifecycle: expect.objectContaining({ storageClass: 'library', savedAt: 10 }),
       })
     );
   }
 );
 
 it.each(['temporary', 'library'] as const)(
-  'preserves an existing %s image without loading category settings',
+  'retains an existing %s image without loading category settings',
   async (storageClass) => {
     const media = {
       ...root(0),
@@ -57,28 +57,30 @@ it.each(['temporary', 'library'] as const)(
     expect(mocks.loadSettings).not.toHaveBeenCalled();
     expect(puts.media).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        lifecycle: expect.objectContaining({ storageClass, savedAt: media.lifecycle.savedAt }),
+        lifecycle: expect.objectContaining({
+          storageClass: 'library',
+          savedAt: storageClass === 'library' ? 2 : 10,
+        }),
       })
     );
   }
 );
 
-it('fails before staging new bytes when category settings cannot be read', async () => {
-  const assets = await import('../assets');
+it('accepts a new Image project when category settings cannot be read', async () => {
   mocks.loadSettings.mockRejectedValue(new Error('unavailable'));
-  installTransaction({ sourceId: 'new-image' });
-  await expect(
-    commitImageWorkspace({
-      aggregateId: 'new-image',
-      document: createEditorDocumentFixture(),
-      expectedRevision: 0,
-    })
-  ).rejects.toThrow('unavailable');
-  expect(assets.writeBlobToAsset).not.toHaveBeenCalled();
-  expect(assets.createAssetPublicationJournal).not.toHaveBeenCalled();
+  const puts = installTransaction({ sourceId: 'new-image' });
+  await commitImageWorkspace({
+    aggregateId: 'new-image',
+    document: createEditorDocumentFixture(),
+    expectedRevision: 0,
+  });
+  expect(mocks.loadSettings).not.toHaveBeenCalled();
+  expect(puts.media).toHaveBeenLastCalledWith(
+    expect.objectContaining({ lifecycle: expect.objectContaining({ storageClass: 'library' }) })
+  );
 });
 
-it('replays the chosen category after settings change, without another policy read', async () => {
+it('replays permanent project admission after settings change', async () => {
   const assets = await import('../assets');
   const puts = installTransaction({ sourceId: 'new-image' });
   mocks.loadSettings.mockResolvedValue({ localStoragePolicy: { defaultDestination: 'library' } });
@@ -103,7 +105,7 @@ it('replays the chosen category after settings change, without another policy re
   );
 });
 
-it.each([undefined, 'delete', null])(
+it.each([undefined, 'temporary', 'library', 'delete', null])(
   'validates creation policy on replay: %s',
   async (initialStorageClass) => {
     const assets = await import('../assets');
@@ -120,11 +122,15 @@ it.each([undefined, 'delete', null])(
     const journal = await vi.mocked(assets.createAssetPublicationJournal).mock.results[0]!.value;
     const replay = { ...journal, payload: { ...journal.payload, initialStorageClass } };
     mocks.loadSettings.mockClear();
-    if (initialStorageClass === undefined) {
+    if (
+      initialStorageClass === undefined ||
+      initialStorageClass === 'temporary' ||
+      initialStorageClass === 'library'
+    ) {
       await imageWorkspacePublicationAdapter.publish(replay);
       expect(puts.media).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          lifecycle: expect.objectContaining({ storageClass: 'temporary' }),
+          lifecycle: expect.objectContaining({ storageClass: 'library' }),
         })
       );
     } else {

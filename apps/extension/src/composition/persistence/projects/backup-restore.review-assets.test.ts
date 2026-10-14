@@ -1,3 +1,6 @@
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import type { MediaLibraryEntry } from '../media-library/contracts';
+import type { StoredProjectAssetEntry } from './contracts';
 import { createVideoProjectRestoreTransaction } from './index.test-support';
 import { expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
@@ -332,3 +335,92 @@ it.each(['video', 'review'] as const)(
     expect(target.refs.delete).not.toHaveBeenCalled();
   }
 );
+
+it('retains nested quick-edit Library origins outside the montage placement graph', async () => {
+  const target = stores();
+  const origin: MediaLibraryEntry = {
+    id: 'origin-music',
+    kind: 'audio',
+    filename: 'music.mp3',
+    originalFilename: 'music.mp3',
+    source: { kind: 'stored-asset', assetId: 'origin-object' },
+    mimeType: 'audio/mpeg',
+    size: 4,
+    duration: 1,
+    width: null,
+    height: null,
+    createdAt: 1,
+    updatedAt: 1,
+    tags: [],
+    sourceUrl: null,
+    sourceTitle: null,
+    sourceFavicon: null,
+    lifecycle: { ...createLibraryLifecycle('temporary', 1), trashedAt: 3 },
+  };
+  const media = new Map<string, MediaLibraryEntry>([[origin.id, origin]]);
+  const assets = new Map<string, StoredProjectAssetEntry>();
+  target.media.get = vi.fn(async (key: IDBValidKey) => media.get(String(key)));
+  target.media.put = vi.fn(async (value: MediaLibraryEntry) => {
+    media.set(value.id, value);
+  });
+  target.assets.get = vi.fn(async (key: IDBValidKey) => assets.get(String(key)));
+  target.assets.put = vi.fn(async (value: StoredProjectAssetEntry) => {
+    assets.set(value.id, value);
+  });
+  const workspace = {
+    ...reviewWorkspace('project-asset:project-asset-1', 'restored-music'),
+    source: { duration: 10, width: 1920, height: 1080, size: 1024, mimeType: 'video/webm' },
+  };
+  const ref = (assetId: string, mimeType: string, size: number) => ({
+    assetId,
+    mimeType,
+    size,
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+    sha256: null,
+  });
+  await putVideoProjectBackupRestore({
+    operation: physicalDeleteOperation(),
+    strategy: 'replace',
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    root: {
+      entry: createVideoProjectEntryWithMediaClip({ id: 'project' }),
+      exports: [],
+      assets: [
+        {
+          entry: {
+            id: 'project-asset-1',
+            assetId: 'source-object',
+            createdAt: 1,
+            mimeType: 'video/webm',
+            size: 1024,
+          },
+          filename: 'source.webm',
+          ref: ref('source-object', 'video/webm', 1024),
+          videoReview: { workspace, draft: null },
+        },
+        {
+          entry: {
+            id: 'restored-music',
+            assetId: 'music-object',
+            createdAt: 1,
+            mimeType: 'audio/mpeg',
+            size: 4,
+            originMediaId: origin.id,
+          },
+          filename: 'music.mp3',
+          ref: ref('music-object', 'audio/mpeg', 4),
+          publishToLibrary: false,
+        },
+      ],
+    },
+  });
+  expect(media.get(origin.id)).toMatchObject({
+    lifecycle: { storageClass: 'library', trashedAt: 3 },
+    source: origin.source,
+  });
+  expect(target.videoWorkspaces.put).toHaveBeenCalledWith(
+    expect.objectContaining({ aggregateId: workspace.aggregateId })
+  );
+});

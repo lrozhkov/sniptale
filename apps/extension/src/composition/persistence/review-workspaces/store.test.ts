@@ -35,6 +35,7 @@ import {
   readVideoWorkspace,
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
+  saveVideoWorkspaceSnapshot,
 } from './store';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 
@@ -585,7 +586,7 @@ it('authors new presentation defaults once and never installs them on legacy reo
   expect((await openVideoWorkspace(id, source)).workspace.advanced.presentation).toBeUndefined();
 });
 
-it.fails.each(['create', 'reopen'] as const)(
+it.each(['create', 'reopen'] as const)(
   'retains the primary quick-edit source and recording atomically on %s',
   async (mode) => {
     if (mode === 'reopen') await openVideoWorkspace(id, source);
@@ -606,5 +607,189 @@ it.fails.each(['create', 'reopen'] as const)(
       assetId: recording.assetId,
       lifecycle: { storageClass: 'library' },
     });
+  }
+);
+
+it('rolls back primary promotion when initial workspace publication fails', async () => {
+  const media = betaV1Fixture.records.media_library[0]!;
+  const recording = betaV1Fixture.records.recordings[0]!;
+  rows
+    .get('media_library')!
+    .set(id, { ...media, lifecycle: createLibraryLifecycle('temporary', 1) });
+  rows
+    .get('recordings')!
+    .set(recording.id, { ...recording, lifecycle: createLibraryLifecycle('temporary', 1) });
+  const before = structuredClone(rows);
+  harness.failure = true;
+  await expect(openVideoWorkspace(id, source)).rejects.toThrow();
+  expect(rows).toEqual(before);
+});
+
+it.each([1, 2] as const)(
+  'keeps read-only legacy format %s and materializes one permanent project on explicit reopen',
+  async (formatVersion) => {
+    const opened = await openVideoWorkspace(id, source);
+    const { project: _project, ...legacy } = opened.workspace;
+    replaceLegacyWorkspaceFixture(rows, id, {
+      ...legacy,
+      formatVersion,
+      ...(formatVersion === 2
+        ? {
+            baseline: {
+              annotations: [],
+              edits: [],
+              canvasComments: [],
+              advancedContent: reviewAdvancedContentBaseline(legacy.advanced),
+            },
+          }
+        : {}),
+    });
+    const before = structuredClone(rows);
+    expect((await readVideoWorkspace(id))?.workspace.project).toBeUndefined();
+    expect(rows).toEqual(before);
+    const reopened = await openVideoWorkspace(id, source);
+    expect(reopened.workspace).toMatchObject({
+      formatVersion: formatVersion === 2 ? 4 : 3,
+      revision: legacy.revision + 1,
+      history: legacy.history,
+      sourceAssetId: legacy.sourceAssetId,
+      project: { name: 'beta-v1.webm', lifecycle: { storageClass: 'library' } },
+    });
+    expect(await openVideoWorkspace(id, source)).toEqual(reopened);
+  }
+);
+
+it('refuses a new quick-edit project on a trashed source without implicit restore or promotion', async () => {
+  const media = betaV1Fixture.records.media_library[0]!;
+  rows
+    .get('media_library')!
+    .set(id, { ...media, lifecycle: { ...createLibraryLifecycle('temporary', 1), trashedAt: 3 } });
+  const before = structuredClone(rows);
+  await expect(openVideoWorkspace(id, source)).rejects.toMatchObject({ code: 'missing-media' });
+  expect(rows).toEqual(before);
+});
+
+it('materializes legacy metadata and consumes recovery in one workspace revision', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedRevision: 1,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedDraftRevision: null,
+    annotation,
+    before: null,
+  });
+  const { project: _project, ...legacy } = opened.workspace;
+  replaceLegacyWorkspaceFixture(rows, id, { ...legacy, formatVersion: 1 });
+  const result = await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedRevision: 1,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedDraftRevision: 1,
+    annotation: null,
+    before: null,
+  });
+  expect(result.draft).toBeNull();
+  expect(result.workspace).toMatchObject({
+    revision: 2,
+    formatVersion: 3,
+    project: { lifecycle: { storageClass: 'library' } },
+  });
+});
+
+it('preserves authoritative project name and Trash when a buffered content snapshot contains different metadata', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const project = {
+    name: 'Retained name',
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 3 },
+  };
+  replaceLegacyWorkspaceFixture(rows, id, { ...opened.workspace, project });
+  const snapshot = await saveVideoWorkspaceSnapshot({
+    aggregateId: id,
+    expectedRevision: 1,
+    expectedDraftRevision: null,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    workspace: {
+      ...opened.workspace,
+      project: {
+        name: 'Buffer name',
+        lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2 },
+      },
+    },
+    draft: null,
+  });
+  expect(snapshot.workspace.project).toEqual(project);
+  expect((await readVideoWorkspace(id))?.workspace.project).toEqual(project);
+});
+
+it.each(['legacy', 'metadata', 'rollback'] as const)(
+  'retains external Library origins on explicit reopen (%s)',
+  async (mode) => {
+    let failPublication = false;
+    const fixture = createReviewWorkspaceStoreFixture(
+      (storeName) => failPublication && storeName === 'video_workspaces'
+    );
+    rows = fixture.rows;
+    harness.database.mockResolvedValue(fixture.database);
+    const opened = await openVideoWorkspace(id, source);
+    const { project, ...legacy } = opened.workspace;
+    const workspace = {
+      ...legacy,
+      ...(mode === 'metadata' ? { project } : { formatVersion: 1 }),
+      advanced: {
+        ...legacy.advanced,
+        audio: {
+          ...legacy.advanced.audio,
+          music: [
+            {
+              id: 'music',
+              assetId: 'project-asset:music',
+              timelineStart: 0,
+              sourceOffset: 0,
+              duration: 1,
+              volume: 1,
+              muted: false,
+              fadeIn: 0,
+              fadeOut: 0,
+            },
+          ],
+        },
+      },
+    };
+    replaceLegacyWorkspaceFixture(rows, id, workspace);
+    rows.get('project_assets')!.set('music', {
+      id: 'music',
+      assetId: 'music-bytes',
+      originMediaId: 'origin',
+      mimeType: 'audio/mpeg',
+      size: 4,
+      createdAt: 1,
+    });
+    rows.get('media_library')!.set('origin', {
+      ...betaV1Fixture.records.media_library[0]!,
+      id: 'origin',
+      kind: 'audio',
+      mimeType: 'audio/mpeg',
+      source: { kind: 'stored-asset', assetId: 'origin-bytes' },
+      size: 4,
+      duration: 1,
+      width: null,
+      height: null,
+      lifecycle: { ...createLibraryLifecycle('temporary', 1), trashedAt: 3 },
+    });
+    expect((await readVideoWorkspace(id))?.workspace.advanced.audio.music).toHaveLength(1);
+    const before = structuredClone(rows);
+    failPublication = mode === 'rollback';
+    if (failPublication) {
+      await expect(openVideoWorkspace(id, source)).rejects.toThrow();
+      expect(rows).toEqual(before);
+    } else {
+      const reopened = await openVideoWorkspace(id, source);
+      expect(reopened.workspace.advanced.audio.music).toEqual(workspace.advanced.audio.music);
+      expect(rows.get('media_library')!.get('origin')).toMatchObject({
+        lifecycle: { storageClass: 'library', trashedAt: 3 },
+      });
+      expect(await openVideoWorkspace(id, source)).toEqual(reopened);
+    }
   }
 );

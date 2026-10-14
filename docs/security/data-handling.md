@@ -22,6 +22,8 @@ An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_
 
 ## Retention
 
+Accepted project mutations retain primary Library sources and recording mirrors permanently in the same transaction. Accepted current, historical and recovery resources retain their Library origins. Rejected attachments do not promote sources. Source Trash and project Trash remain separate metadata.
+
 - Retain page content or user media only for an explicit product feature and an owner registered in the storage inventory.
 - Keep durable media bytes in immutable OPFS objects. Keep identity, ownership, lifecycle, and publication state in IndexedDB.
 - Publish an OPFS object and its IndexedDB graph atomically through the persistence-transition owner.

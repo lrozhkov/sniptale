@@ -1,3 +1,5 @@
+import { materializeVideoWorkspaceProject } from './project-metadata';
+import type { MediaLibraryEntry } from '../media-library/contracts';
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
@@ -38,6 +40,7 @@ import {
   areNewReviewSourcesAvailable,
   readReviewReadySources,
   promoteReviewSourceLifecycles,
+  promoteReviewPrimarySourceLifecycles,
   verifyReviewAnnotationEffectSources,
 } from './new-reference-admission';
 import {
@@ -194,7 +197,8 @@ async function mutate<T>(
   operation: (
     tx: WriteTransaction,
     prepared: ReviewReadySources,
-    physicalDelete: PhysicalDeleteAssetOperation
+    physicalDelete: PhysicalDeleteAssetOperation,
+    media: MediaLibraryEntry
   ) => Promise<T>,
   admitsSources = false,
   effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[]
@@ -212,7 +216,15 @@ async function mutate<T>(
         );
         if (!media || !media.mimeType.startsWith('video/'))
           throw new VideoWorkspaceError('missing-media');
-        const result = await operation(tx, prepared, physicalDelete);
+        await promoteReviewPrimarySourceLifecycles(
+          aggregateId,
+          {
+            media: tx.objectStore(MEDIA_LIBRARY_STORE),
+            recordings: tx.objectStore(STORE_NAME),
+          },
+          Date.now()
+        );
+        const result = await operation(tx, prepared, physicalDelete, media);
         if (physicalDelete.assetIds.length || physicalDelete.privateSources?.length)
           await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
         await tx.done;
@@ -268,7 +280,7 @@ export async function openVideoWorkspace(
 ): Promise<VideoWorkspaceSnapshot> {
   const source = parseReviewSource(sourceValue);
   if (!source) throw new VideoWorkspaceError('invalid');
-  return mutate(aggregateId, async (tx) => {
+  return mutate(aggregateId, async (tx, prepared, _physicalDelete, media) => {
     if (
       expectedSourceAssetId !== undefined &&
       expectedSourceAssetId !== (await readSourceAssetId(tx, aggregateId))
@@ -278,10 +290,31 @@ export async function openVideoWorkspace(
     if (existing) {
       if (JSON.stringify(existing.snapshot.workspace.source) !== JSON.stringify(source))
         throw new VideoWorkspaceError('changed-source');
-      return existing.snapshot;
+      await promoteReviewSourceLifecycles(
+        existing.snapshot.workspace,
+        {
+          assets: tx.objectStore(PROJECT_ASSETS_STORE),
+          media: tx.objectStore(MEDIA_LIBRARY_STORE),
+          recordings: tx.objectStore(STORE_NAME),
+        },
+        prepared
+      );
+      const retained = materializeVideoWorkspaceProject(
+        existing.snapshot.workspace,
+        media.filename
+      );
+      if (existing.snapshot.workspace.project) return existing.snapshot;
+      const updated = {
+        ...retained,
+        revision: retained.revision + 1,
+        updatedAt: Math.max(Date.now(), retained.updatedAt),
+      };
+      await replaceWorkspaceStorage(tx, updated, indexedWorkspace(updated).usageReferenceKeys);
+      return { ...existing.snapshot, workspace: updated };
     }
+    if (media.lifecycle?.trashedAt !== undefined) throw new VideoWorkspaceError('missing-media');
     const now = Date.now();
-    const workspace = parseVideoWorkspace({
+    const legacy = parseVideoWorkspace({
       aggregateId,
       formatVersion: 1,
       source,
@@ -297,7 +330,8 @@ export async function openVideoWorkspace(
       createdAt: now,
       updatedAt: now,
     });
-    if (!workspace) throw new VideoWorkspaceError('invalid');
+    if (!legacy) throw new VideoWorkspaceError('invalid');
+    const workspace = materializeVideoWorkspaceProject(legacy, media.filename);
     await replaceWorkspaceStorage(tx, workspace, indexedWorkspace(workspace).usageReferenceKeys);
     return { workspace, draft: null };
   });
@@ -359,7 +393,16 @@ async function writePreparedWorkspace(
   physicalDelete: PhysicalDeleteAssetOperation,
   prepared: ReviewReadySources
 ): Promise<VideoWorkspace> {
-  const compacted = compactVideoWorkspaceHistory(encoded);
+  const media = parseMediaLibraryEntry(
+    await tx.objectStore(MEDIA_LIBRARY_STORE).get(encoded.aggregateId)
+  );
+  if (!media) throw new VideoWorkspaceError('missing-media');
+  const retained: VideoWorkspace = {
+    ...encoded,
+    formatVersion: encoded.formatVersion === 2 || encoded.formatVersion === 4 ? 4 : 3,
+    project: materializeVideoWorkspaceProject(previous, media.filename).project,
+  };
+  const compacted = compactVideoWorkspaceHistory(retained);
   const next = compacted.workspace;
   if (
     !(await areNewReviewSourcesAvailable(
@@ -685,16 +728,17 @@ export async function saveVideoWorkspaceDraft(args: {
       await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
       // Advancing the workspace revision prevents an old writer matching a recreated draft.
       return {
-        workspace: snapshot.draft
-          ? await putWorkspace(
-              tx,
-              snapshot.workspace,
-              snapshot.workspace,
-              storage,
-              'cursor',
-              physicalDelete
-            )
-          : snapshot.workspace,
+        workspace:
+          snapshot.draft || !snapshot.workspace.project
+            ? await putWorkspace(
+                tx,
+                snapshot.workspace,
+                snapshot.workspace,
+                storage,
+                'cursor',
+                physicalDelete
+              )
+            : snapshot.workspace,
         draft: null,
       };
     }
@@ -710,7 +754,17 @@ export async function saveVideoWorkspaceDraft(args: {
     );
     if (!draft) throw new VideoWorkspaceError('invalid');
     await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).put(draft);
-    return { ...snapshot, draft };
+    const workspace = snapshot.workspace.project
+      ? snapshot.workspace
+      : await putWorkspace(
+          tx,
+          snapshot.workspace,
+          snapshot.workspace,
+          storage,
+          'cursor',
+          physicalDelete
+        );
+    return { workspace, draft };
   });
 }
 

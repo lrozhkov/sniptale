@@ -348,6 +348,23 @@ export async function areNewReviewSourcesAvailable(
   return true;
 }
 
+/** Retain the primary Library source and its recording mirror in the accepted transaction. */
+export async function promoteReviewPrimarySourceLifecycles(
+  aggregateId: string,
+  stores: {
+    media: Parameters<typeof promoteReferencedMediaLifecycles>[0]['mediaStore'];
+    recordings: Parameters<typeof promoteReferencedMediaLifecycles>[0]['recordingStore'];
+  },
+  now: number
+): Promise<void> {
+  await promoteReferencedMediaLifecycles({
+    mediaIds: new Set([aggregateId]),
+    mediaStore: stores.media,
+    recordingStore: stores.recordings,
+    now,
+  });
+}
+
 /** Promote retained external sources only inside the accepted workspace transaction. */
 export async function promoteReviewSourceLifecycles(
   workspace: VideoWorkspace,

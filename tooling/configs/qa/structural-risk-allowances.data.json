@@ -539,6 +539,17 @@
       "reviewDate": "2026-10-14",
       "astHash": "1c78cd78d0f8d7182c0e6068ec7d39174dbeeb9bb427684e4231f458e5bee2a8",
       "signatureHash": "d7eedef8ad30f228812a1c1dfd6213c1bd5617c0ae6336b72ea201f8ef198fee"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
+      "symbol": "<file>",
+      "owner": "extension:composition:persistence:review-workspaces",
+      "reason": "tool-noise: The file owns one accepted workspace mutation protocol. All content, cursor, typing, recovery and buffer writes share source identity, CAS, strict transaction, abort and post-commit cleanup. Retention adds primary-source promotion and authoritative project metadata to that same protocol. Pure metadata, parsing, physical history storage and resource admission already have separate owners. The finding is the 800-line threshold with score2 and unchanged authority metrics; extracting transaction fragments would distribute one writer. Independent read-only boundary research confirmed Keep. Final architecture review must validate this exact body. Explicit reopen also promotes admitted external origins before either return in the same transaction; failed-first proof covers legacy and existing metadata, with rollback.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess a new state authority, runtime, independent transaction or recovery policy. Remove when structural analysis models this cohesive transaction owner.",
+      "reviewDate": "2026-10-14",
+      "astHash": "80c2dd0e81dfa7e2d612f6630b9b9cc91f056472295c6fe271080d85b81e0b0a",
+      "signatureHash": "ff8c68cb0e8b86daca47585aeecefb99bbbf0d6c5797a913f7ad64bf9c3328c8"
     }
   ]
 }

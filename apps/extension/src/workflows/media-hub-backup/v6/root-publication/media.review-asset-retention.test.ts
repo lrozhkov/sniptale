@@ -1,3 +1,4 @@
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import {
   workspaceStorageHead,
@@ -740,3 +741,58 @@ it.each(['canonical', 'borrowed'] as const)(
     expect(tables.get('asset_refs')!.get(oldRef.assetId)).toEqual(oldRef);
   }
 );
+
+it('retains a remapped Library origin when standalone restore accepts private review history resources', async () => {
+  const base = portableMetadata(true);
+  const metadata = {
+    ...base,
+    reviewAssets: base.reviewAssets.map((item) =>
+      item.entry.id === 'music'
+        ? {
+            ...item,
+            entry: { ...item.entry, originMediaId: 'archived-origin' },
+            publishToLibrary: false,
+          }
+        : item
+    ),
+  };
+  const tables = installDatabase(metadata);
+  const origin = {
+    ...base.entry,
+    id: 'origin-music',
+    kind: 'audio',
+    mimeType: 'audio/mpeg',
+    size: 10,
+    duration: 1,
+    width: null,
+    height: null,
+    source: { kind: 'stored-asset', assetId: 'origin-music-object' },
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  tables.get('media_library')!.set(origin.id, origin);
+  const result = await mediaLibraryRootPublisher.publish({
+    envelope: {
+      descriptor: {
+        rootKind: 'media',
+        mediaSubtype: 'library-item',
+        rootId: metadata.entry.id,
+        metadataPath: '_sniptale/metadata/media/export-e.json',
+        objectCount: 4,
+        totalBytes: 36,
+      },
+      metadata: portableJson(metadata),
+      objects: [],
+    },
+    journal,
+    session: {
+      ...session('replace'),
+      rootIdMap: { 'media:library-item:archived-origin': origin.id },
+    },
+    staged: stagedObjects(),
+  });
+  expect(result.imported).toBe(true);
+  expect(tables.get('media_library')!.get(origin.id)).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+    source: origin.source,
+  });
+});

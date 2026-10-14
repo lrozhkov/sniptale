@@ -1,3 +1,6 @@
+import { createReviewWorkspaceStoreFixture } from '../../../../composition/persistence/review-workspaces/store.test-support';
+import { createQuickEditAdvancedState } from '../../../../features/video/review/advanced/defaults';
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
@@ -571,4 +574,94 @@ describe('media v6 web snapshot role validation', () => {
       ).rejects.toThrow(message);
     }
   );
+});
+
+it('retains imported quick-edit recording and mirror without clearing source Trash', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  mocks.runMutation.mockImplementation(async (callback) => callback(fixture.database));
+  const id = 'recording:restored';
+  const lifecycle = { ...createLibraryLifecycle('temporary', 1), trashedAt: 3 };
+  const result = await mediaLibraryRootPublisher.publish({
+    envelope: {
+      descriptor: {
+        rootKind: 'media',
+        mediaSubtype: 'library-item',
+        rootId: id,
+        metadataPath: '_sniptale/metadata/media/recording%3Arestored.json',
+        objectCount: 1,
+        totalBytes: 6,
+      },
+      objects: [],
+      metadata: portableJson({
+        entry: {
+          id,
+          kind: 'recording',
+          filename: 'restored.webm',
+          originalFilename: 'restored.webm',
+          source: { kind: 'recording', recordingId: 'restored' },
+          mimeType: 'video/webm',
+          size: 6,
+          duration: 2,
+          width: 640,
+          height: 360,
+          createdAt: 1,
+          updatedAt: 2,
+          lifecycle,
+          tags: [],
+          sourceUrl: null,
+          sourceTitle: null,
+          sourceFavicon: null,
+        },
+        originalObjectId: 'original',
+        recording: {
+          entry: {
+            id: 'restored',
+            filename: 'restored.webm',
+            mimeType: 'video/webm',
+            size: 6,
+            createdAt: 1,
+            lifecycle,
+          },
+        },
+        videoReview: {
+          workspace: {
+            aggregateId: id,
+            formatVersion: 1,
+            source: { duration: 2, width: 640, height: 360, mimeType: 'video/webm', size: 6 },
+            revision: 1,
+            history: [],
+            cursor: 0,
+            advanced: createQuickEditAdvancedState(),
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          draft: null,
+        },
+      }),
+    },
+    journal,
+    session: { ...session, currentRoot: `media:library-item:${id}` },
+    staged: [
+      {
+        objectId: 'original',
+        ref: {
+          assetId: 'restored-source',
+          createdAt: 1,
+          location: { kind: 'opfs', objectKey: 'objects/restored-source' },
+          mimeType: 'video/webm',
+          sha256: null,
+          size: 6,
+        },
+      },
+    ],
+  });
+  expect(result.imported).toBe(true);
+  expect(fixture.rows.get('media_library')!.get(id)).toMatchObject({
+    lifecycle: { storageClass: 'library', trashedAt: 3 },
+  });
+  expect(fixture.rows.get('recordings')!.get('restored')).toMatchObject({
+    assetId: 'restored-source',
+    lifecycle: { storageClass: 'library', trashedAt: 3 },
+  });
+  expect(fixture.rows.get('asset_refs')!.has('restored-source')).toBe(true);
 });

@@ -74,7 +74,7 @@ it('saves scenario Library image edits without replacing the stored source', asy
     imageContentState: 'edited',
     updatedAt: 10,
     workspaceRevision: 2,
-    lifecycle: { ...media.lifecycle, updatedAt: 10 },
+    lifecycle: createLibraryLifecycle('library', 10),
   });
   await expect(
     commitImageWorkspace({ aggregateId: media.id, document, expectedRevision: 1 })
@@ -636,7 +636,7 @@ it('rejects stale-editor copy id collisions before writing any aggregate owner',
   expect(puts.presentation).not.toHaveBeenCalled();
 });
 
-it.fails('keeps an accepted Image project and its original permanently', async () => {
+it('keeps an accepted Image project and its original permanently', async () => {
   const media = root(0);
   const before = structuredClone(media);
   const puts = installTransaction({ media });
@@ -653,4 +653,18 @@ it.fails('keeps an accepted Image project and its original permanently', async (
     })
   );
   expect(media).toEqual(before);
+});
+
+it('refuses a new Image project on a trashed source without changing any owner', async () => {
+  const media = { ...root(0), lifecycle: { ...root(0).lifecycle, trashedAt: 5 } };
+  const puts = installTransaction({ media });
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document: createEditorDocumentFixture(),
+      expectedRevision: 0,
+    })
+  ).rejects.toMatchObject({ name: 'ImageAggregateNotFoundError' });
+  expect(puts.media).not.toHaveBeenCalled();
+  expect(puts.workspace).not.toHaveBeenCalled();
 });

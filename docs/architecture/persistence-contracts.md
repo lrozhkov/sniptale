@@ -28,7 +28,7 @@ Quick-edit logical formats 3 and 4 require project names and permanent lifecycle
 
 Formats 1 and 2 remain readable without project metadata. Their physical formats remain 2 and 3. Reading does not materialize project metadata.
 
-Project metadata stays outside content Undo/Redo history. Canonical workspace writers and portable restore preserve it. Admission rejects missing or invalid metadata and mixed logical/physical envelopes. Additive admission preserves existing heads, operations, recovery and source bytes. The [generated project facts](../engineering/project-facts.md) identify the current database version. Earlier writers cannot admit this database. The archive layout provides a separate admission fence.
+Project metadata stays outside content Undo/Redo history. Content saves preserve metadata from the currently admitted workspace, including buffered saves. Canonical workspace writers and portable restore preserve it. Admission rejects missing or invalid metadata and mixed logical/physical envelopes. Additive admission preserves existing heads, operations, recovery and source bytes. The [generated project facts](../engineering/project-facts.md) identify the current database version. Earlier writers cannot admit this database. The archive layout provides a separate admission fence.
 
 Document autosave adapters in Gallery, Scenario, Montage and standalone Image consume the data-only `features/autosave/policy.ts`: 1000 ms idle delay and 5000 ms maximum pending age. These are request deadlines while the page runtime is available. An acquired write, suspension, conflict or browser termination can delay or prevent completion. Timer publication does not seal an Undo action. Existing document owners retain serialized writes, latest-version acknowledgements, CAS and explicit save/discard authority.
 
@@ -133,6 +133,12 @@ Do not fix or reset on read. Gallery may offer retry for blocked or insufficient
 ## Change proof
 
 For a database or domain version change, update the registry, retained source fixture, target fixture, and contiguous descriptor. Prove deterministic output, interruption and rerun, quota handling, backup or refusal, and affected runtime and UI behavior.
+
+Accepted Image commits create or promote permanent Library roots in the workspace transaction. Category settings apply to incidental captures, not accepted Image projects. Quick-edit mutations retain the primary Library source and recording mirror in their original transaction. Failed admission, CAS or publication rolls back promotion.
+
+Explicit quick-edit create or reopen materializes project metadata through the existing workspace owner. Read-only recovery does not materialize it. Existing project names and independent Trash markers survive content mutations. A new project on a trashed source requires explicit source restoration.
+
+Archive publication retains accepted Image and quick-edit sources before temporary lifecycle rebasing. It preserves their source Trash markers. Accepted review resources also retain remapped Library origins, including resources outside the montage placement graph. Reused published sidecars retain their existing admission authority.
 
 ## Gallery trash
 
