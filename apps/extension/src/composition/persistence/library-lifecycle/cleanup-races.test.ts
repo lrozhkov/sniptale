@@ -1,3 +1,4 @@
+import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('./project-retention', () => ({
@@ -66,6 +67,7 @@ const day = 24 * 60 * 60 * 1000;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  persistenceMocks.runWithIndexedDbMutation.mockReset();
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
@@ -387,4 +389,79 @@ it('cancels candidate deletion when discovery completes after cancellation', asy
     cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal, now: 40 * day })
   ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
+});
+
+it.fails('moves a seven-day unused recording to Trash without source deletion or physical intent', async () => {
+  const now = 1 + 7 * day;
+  const recording = {
+    ...betaV1Fixture.records.recordings[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const media = {
+    ...betaV1Fixture.records.media_library[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const rows = new Map<string, Map<string, unknown>>([
+    ['media_library', new Map([[media.id, media]])],
+    ['recordings', new Map([[recording.id, recording]])],
+    ['asset_operations', new Map()],
+    [
+      'asset_refs',
+      new Map([
+        [
+          recording.assetId,
+          {
+            assetId: recording.assetId,
+            size: recording.size,
+            mimeType: recording.mimeType,
+            location: { kind: 'opfs', objectKey: 'objects/retained-recording' },
+            sha256: null,
+            createdAt: 1,
+          },
+        ],
+      ]),
+    ],
+  ]);
+  persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
+    effect({
+      transaction: () => ({
+        done: Promise.resolve(),
+        abort: vi.fn(),
+        objectStore: (name: string) => {
+          let values = rows.get(name);
+          if (!values) {
+            values = new Map();
+            rows.set(name, values);
+          }
+          const owned = values;
+          return {
+            get: async (id: string) => owned.get(id),
+            getAll: async () => [...owned.values()],
+            delete: async (key: IDBValidKey) => owned.delete(String(key)),
+            put: async (value: { id?: string; assetId?: string; operationId?: string }) => {
+              const key = value.id ?? value.operationId ?? value.assetId;
+              if (!key) throw new Error('Missing fixture row identity.');
+              owned.set(key, value);
+            },
+            index: () => ({
+              getAll: async () => [],
+              getAllKeys: async () => [],
+              count: async () => 0,
+            }),
+          };
+        },
+      }),
+    })
+  );
+  await cleanupDrafts({
+    now,
+    policy: { ...DEFAULT_LOCAL_STORAGE_POLICY, cleanupEnabled: true, videoDraftRetentionDays: 7 },
+  });
+  expect(rows.get('media_library')!.get(media.id)).toMatchObject({
+    lifecycle: { storageClass: 'temporary', trashedAt: now },
+  });
+  expect(rows.get('recordings')!.get(recording.id)).toMatchObject({ assetId: recording.assetId });
+  expect(rows.get('asset_refs')!.has(recording.assetId)).toBe(true);
+  expect(rows.get('asset_operations')!.size).toBe(0);
 });

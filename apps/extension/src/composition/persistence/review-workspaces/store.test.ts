@@ -1,3 +1,4 @@
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
@@ -583,3 +584,27 @@ it('authors new presentation defaults once and never installs them on legacy reo
   });
   expect((await openVideoWorkspace(id, source)).workspace.advanced.presentation).toBeUndefined();
 });
+
+it.fails.each(['create', 'reopen'] as const)(
+  'retains the primary quick-edit source and recording atomically on %s',
+  async (mode) => {
+    if (mode === 'reopen') await openVideoWorkspace(id, source);
+    const media = betaV1Fixture.records.media_library[0]!;
+    const recording = betaV1Fixture.records.recordings[0]!;
+    rows
+      .get('media_library')!
+      .set(id, { ...media, lifecycle: createLibraryLifecycle('temporary', 1) });
+    rows
+      .get('recordings')!
+      .set(recording.id, { ...recording, lifecycle: createLibraryLifecycle('temporary', 1) });
+    const snapshot = await openVideoWorkspace(id, source);
+    expect(snapshot.workspace.history).toEqual([]);
+    expect(rows.get('media_library')!.get(id)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
+    expect(rows.get('recordings')!.get(recording.id)).toMatchObject({
+      assetId: recording.assetId,
+      lifecycle: { storageClass: 'library' },
+    });
+  }
+);

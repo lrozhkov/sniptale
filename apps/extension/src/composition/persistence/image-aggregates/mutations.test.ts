@@ -635,3 +635,22 @@ it('rejects stale-editor copy id collisions before writing any aggregate owner',
   expect(puts.workspace).not.toHaveBeenCalled();
   expect(puts.presentation).not.toHaveBeenCalled();
 });
+
+it.fails('keeps an accepted Image project and its original permanently', async () => {
+  const media = root(0);
+  const before = structuredClone(media);
+  const puts = installTransaction({ media });
+  await commitImageWorkspace({
+    aggregateId: media.id,
+    document: createEditorDocumentFixture(),
+    expectedRevision: 0,
+  });
+  expect(puts.media).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      id: media.id,
+      blob: media.blob,
+      lifecycle: expect.objectContaining({ storageClass: 'library' }),
+    })
+  );
+  expect(media).toEqual(before);
+});

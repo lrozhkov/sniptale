@@ -1,3 +1,6 @@
+import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { materializeScenarioUnitStorage } from '../scenario/storage-units';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
@@ -262,3 +265,66 @@ it('promotes legacy review auxiliary origins without promoting an unrelated draf
     lifecycle: { storageClass: 'temporary' },
   });
 });
+
+it.fails.each(['image', 'review'] as const)(
+  'repairs the primary Library root of a saved legacy %s project',
+  async (kind) => {
+    const { persisted } = createProjectStores();
+    const recording = betaV1Fixture.records.recordings[0]!;
+    const media =
+      kind === 'image'
+        ? createMediaLibraryEntry({
+            id: 'legacy-image',
+            lifecycle: createLibraryLifecycle('temporary', 1),
+          })
+        : {
+            ...betaV1Fixture.records.media_library[0]!,
+            lifecycle: createLibraryLifecycle('temporary', 1),
+          };
+    persisted.get('media_library')!.set(media.id, media);
+    let workspace: unknown;
+    if (kind === 'image') {
+      workspace = {
+        aggregateId: media.id,
+        createdAt: 1,
+        updatedAt: 1,
+        revision: 1,
+        sourceTitle: null,
+        sourceUrl: null,
+        document: createPersistedEditorDocumentFixture(createEditorDocumentFixture()),
+      };
+      persisted.set('image_workspaces', new Map([[media.id, workspace]]));
+    } else {
+      persisted
+        .get('recordings')!
+        .set(recording.id, { ...recording, lifecycle: createLibraryLifecycle('temporary', 1) });
+      workspace = {
+        aggregateId: media.id,
+        formatVersion: 1,
+        sourceAssetId: recording.assetId,
+        source: {
+          duration: media.duration ?? 1,
+          width: media.width ?? 640,
+          height: media.height ?? 360,
+          size: media.size,
+          mimeType: media.mimeType,
+        },
+        revision: 1,
+        cursor: 0,
+        history: [],
+        advanced: createQuickEditAdvancedState(),
+        createdAt: 1,
+        updatedAt: 1,
+      };
+      persisted.set('video_workspaces', new Map([[media.id, workspace]]));
+    }
+    const before = structuredClone(workspace);
+    await repairTemporaryProjectLifecycles(100);
+    expect(persisted.get('media_library')!.get(media.id)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
+    expect(
+      persisted.get(kind === 'image' ? 'image_workspaces' : 'video_workspaces')!.get(media.id)
+    ).toEqual(before);
+  }
+);

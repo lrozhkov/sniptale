@@ -41,9 +41,9 @@ let video = createVideoProjectEntryWithMediaClip();
 let extraMedia: MediaLibraryEntry | null;
 
 beforeEach(() => {
-  mocks.initDB.mockClear();
-  mocks.videos.mockClear();
-  mocks.scenarios.mockClear();
+  mocks.initDB.mockReset();
+  mocks.videos.mockReset();
+  mocks.scenarios.mockReset();
   extraMedia = null;
   media = {
     id: 'project-asset:original',
@@ -348,4 +348,25 @@ it('cleans up advisory event, focus and visibility subscriptions when the inspec
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it.fails('includes the saved quick-edit workspace as its recording primary project', async () => {
+  media = {
+    ...media,
+    id: 'recording:primary',
+    kind: 'recording',
+    source: { kind: 'recording', recordingId: 'primary' },
+    filename: 'primary.webm',
+    mimeType: 'video/webm',
+    width: 640,
+    height: 360,
+    duration: 2,
+  };
+  childRows = [];
+  mocks.videos.mockResolvedValue([]);
+  mocks.scenarios.mockResolvedValue([]);
+  reviewRows = [reviewWorkspace(media.id)];
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([
+    { id: media.id, kind: 'review', name: media.filename, primary: true },
+  ]);
 });
