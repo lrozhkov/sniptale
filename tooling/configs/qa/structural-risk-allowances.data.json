@@ -215,11 +215,11 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence",
-      "reason": "tool-noise: The existing single-owner review workspace fixture crosses800lines solely through the new history-store mock constant and replacing five intentional legacy/corrupt raw writes with the same fixture helper. No test case, effect, independent state receiver or recovery authority was added here; score2 delta0 and cohesion1.00. The helper clears only own auxiliary history before each existing legacy seed, preserving the assertions. Main inspected the complete diff; fresh independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any new independent test cluster, writer, effect, state receiver or recovery policy. Remove when the analyzer models this cohesive fixture shape. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-11",
-      "astHash": "2a307837d2e2cce4fae6a50c3e6b19a3ecde5d62bfdf75be4294b0cac2952179",
-      "signatureHash": "6b46a4caa5d000de8df094f7efc38e178347409429c224a8c690a3f971d9e494"
+      "reason": "tool-noise: One review workspace fixture owns the storage receiver. Crop cases extend stale-write, quota-retry, restore and history checks through that same fixture. They add no production writer or independent recovery authority. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-14",
+      "astHash": "3f3ae7f6cdff64e1f27a566915fd86ca08d128e52778bc91c05dd09ebd1e9639",
+      "signatureHash": "b327e93b8e7ed0284582f4dfb3249f64ac9b0107b37a2552656a373c887b99f2"
     },
     {
       "rule": "structural-file-risk",
@@ -325,11 +325,11 @@
       "file": "apps/extension/src/gallery/video-review/annotation-effects-overlay.tsx",
       "symbol": "ReviewAnnotationOverlay",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when annotation capture/deferred admission/cancellation separates into another gesture owner or begins painting effect pixels. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "f84fc36b5f631389b29da92da9dfd3100d6362bd53db03f182a875c868245f5b",
-      "signatureHash": "9ff2c8374fcb0d121f033de4d217ba70fe1b6d0ef821e38c2f7eea94b9923956",
-      "reason": "tool-noise: After extracting canonical move/resize/rotate/anchor math to the existing geometry owner, this component retains one pointer capture, deferred-note admission, Escape/unmount cancellation and accessible SVG body/handle view. Effect pixels remain in the prepared compositor. All handles use the same drag ref and injected editor transaction; no resource/read/storage authority is created. Further lifecycle splitting would distribute cancellation/capture. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: One annotation overlay composes projection, clipping and gesture presentation for the same scene. The crop polygon extends the existing clip. Gesture admission, history and cleanup remain with their existing owners. No additional state authority is introduced. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-14",
+      "astHash": "088e13f14a040cdf583444e242aa76c66138c346cc7d687614fddda6fe3f7002",
+      "signatureHash": "9ff2c8374fcb0d121f033de4d217ba70fe1b6d0ef821e38c2f7eea94b9923956"
     },
     {
       "rule": "structural-function-risk",
@@ -600,11 +600,11 @@
       "file": "apps/extension/src/gallery/video-review/advanced-panels.tsx",
       "symbol": "ReviewSceneProperties",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One JSX composition orders optional scene sections and existing callbacks. It has one owner, one statement, no effects, and no state. Cursor content and caption order belong to this same composition. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
-      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
+      "reason": "tool-noise: One JSX composition orders scene sections and passes existing callbacks. The crop preview is another input to the existing canvas section. This function has no state, effects or write authority. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-10-14",
-      "astHash": "1e1c5b3141de793da3c81557c76892514ef143013ee5e9db7d0c0dfecbc7662b",
-      "signatureHash": "193c8c884f40405183884ba9f371ac911cedd8f5de8047ddd30b087a99e0555e"
+      "astHash": "c18726787019e0f6b003415e2d5d1dc913aa24d3e089ceb3d1b109beed195146",
+      "signatureHash": "49151e8ba8e59b7ca5b176b41bea902f3e30299bec03c3cd045e34adbb54a23e"
     },
     {
       "rule": "structural-file-risk",
@@ -682,6 +682,50 @@
       "reviewDate": "2026-10-14",
       "astHash": "d48b4784281767e67983ca30e54fb0047362a8c8780b4707ce68a62ec00c9fbd",
       "signatureHash": "1a1dba716a2d0591fa996693eababda783a93ae14fad5488be468867e18bdb43"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/review/advanced/scene.ts",
+      "symbol": "<file>",
+      "owner": "extension:features:video-review",
+      "reason": "tool-noise: This is the canonical scene geometry and camera algebra owner. Crop transforms use the existing layout and source coordinate contract. The file has no UI, I/O, persistence or resource lifetime. Its helpers change with the same projection contract. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-14",
+      "astHash": "b3bfd4e08731d54338a2db5e4216ce2a2e04d98aad7274872514c83690362619",
+      "signatureHash": "ac85b7bd27e76539dba10ee4e48a88fe9b0bad560b7b6a8d98ee6db384706542"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/source-crop-editor.tsx",
+      "symbol": "ReviewSourceCropEditor",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One local crop draft owns pointer and keyboard editing, cancellation and confirmation. Existing hooks own source decoding and frame lifetime. Canvas painting presents the original frame and draft rectangle. Apply calls the injected scene callback; this component owns no document writer or export rendering. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-14",
+      "astHash": "7972d4a7d91f4bcb3a42dda6e02c94c5edaaced1eae5c434e21d3c56487876f5",
+      "signatureHash": "d7b954208329e9f5235a9184e3d76c0d0957abad21eda3a5d4189a399caee2b3"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/zoom-preview.tsx",
+      "symbol": "ReviewZoomPreview",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One zoom preview composes the existing frame, camera and control adapters. Crop mapping keeps gestures in original source coordinates. Decoding, durable mutation and camera planning remain in their existing owners. The candidate adds no independent state or effect authority. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-14",
+      "astHash": "d1b9261c253d6923a16c76039aba901c3dd2fbe08b5b0d37bf9f4e7cad576a7e",
+      "signatureHash": "2c5bddcbc824701cf5da03cab1bafd77125d4c41b6d7a93d0784345d25f40123"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/scene-inspector.tsx",
+      "symbol": "ReviewCanvasSettings",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One canvas settings owner composes aspect, resolution and crop controls. The local editing flag and focus-restoration refs describe one editor lifetime. Closing the crop editor restores its trigger; geometry remains in the canonical canvas helper and durable writes remain injected callbacks. No independent decoder, writer or recovery authority is added. Main inspection established this boundary; final architecture review must validate the exact correction.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any independent editor lifetime, state, effect, writer or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-14",
+      "astHash": "23509c01a3edab57321202633f9d1282c3e348f4384801ba9d2a822e97c70a99",
+      "signatureHash": "42da8291ea00a57fec6e48fc16eed95959ed93fffc6f812d6aeca846b95569e9"
     }
   ]
 }

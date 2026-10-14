@@ -602,18 +602,19 @@ export function resolvePreviewRenderAllocation(
     background: background.cache,
     scene: {
       transitionRaster: transition ? input.sourceBacking : null,
-      windowRaster: input.assets.headerBitmap
-        ? reviewWindowRasterBacking({
-            windowRect: layout.windowRect,
-            sourceWidth: scene.source.width,
-            magnify: clickLens,
-          })
-        : null,
+      windowRaster:
+        input.assets.headerBitmap || layout.sourceCrop
+          ? reviewWindowRasterBacking({
+              windowRect: layout.windowRect,
+              sourceWidth: scene.source.width * (layout.sourceCrop?.width ?? 1),
+              magnify: clickLens,
+            })
+          : null,
       clickLens,
       motionPass:
         !layout.spatial &&
         !input.cameraTransform &&
-        quickEditMotionBlurCameras(scene.zoomRegions, input.resultTime).length > 1
+        quickEditMotionBlurCameras(scene.zoomRegions, input.resultTime, scene).length > 1
           ? backing
           : null,
       spatial: focus.spatial,

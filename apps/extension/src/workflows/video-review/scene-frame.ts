@@ -8,6 +8,7 @@ import {
   computeQuickEditSpatialRasterLayout,
   computeQuickEditWindowTransform,
   computeQuickEditVideoTransform,
+  quickEditVisibleVideoTransform,
   type computeQuickEditSceneLayout,
 } from '../../features/video/review/advanced/scene';
 import type {
@@ -58,13 +59,14 @@ export function drawReviewSceneFrame(
     else drawReviewSceneExposure(context, args, raster);
     args.drawOverlays?.(raster);
   };
-  if (args.headerImage && args.layout.windowRect)
+  if ((args.headerImage || args.layout.sourceCrop) && args.layout.windowRect)
     withReviewWindowRaster(
       {
-        header: args.headerImage,
+        header: args.headerImage ?? undefined,
         resources: args.resources,
         backing: args.windowRasterBacking,
         videoRect: args.layout.videoRect,
+        visibleVideoRect: args.layout.visibleVideoRect,
         windowRect: args.layout.windowRect,
         draw: args.sample.draw,
       },
@@ -226,7 +228,7 @@ export function drawReviewSceneComments(
   const draw = () => {
     context.save();
     try {
-      clipReviewScene(context, layout, background);
+      clipReviewSceneContent(context, layout, background);
       drawReviewComments(context, comments, {
         attachment: 'content',
         canvas,
@@ -257,6 +259,22 @@ export function drawReviewSceneComments(
   } finally {
     context.restore();
   }
+}
+
+/** Content overlays cannot reopen pixels outside the selected source area. */
+export function clipReviewSceneContent(
+  context: CanvasRenderingContext2D,
+  layout: Parameters<typeof clipReviewScene>[1] & {
+    sourceCrop?: import('../../features/video/review/advanced/types').QuickEditRect;
+  },
+  background: QuickEditAdvancedState['background']
+) {
+  clipReviewScene(context, layout, background);
+  if (!layout.sourceCrop) return;
+  const visible = quickEditVisibleVideoTransform(layout);
+  context.beginPath();
+  context.rect(visible.x, visible.y, visible.width, visible.height);
+  context.clip();
 }
 
 export function clipReviewScene(

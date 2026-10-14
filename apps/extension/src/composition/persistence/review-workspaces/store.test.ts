@@ -303,20 +303,40 @@ it('refuses edits against replaced original bytes without deleting the old sessi
 
 it('rejects a stale tab after restore even when imported history has the same numeric revision', async () => {
   const opened = await openVideoWorkspace(id, source);
+  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
+  const restoredCanvas = {
+    width: 360,
+    height: 360,
+    crop: { x: 0.1, y: 0, width: 0.5625, height: 1 },
+  };
   rows.get('recordings')!.set('beta-v1-recording', {
     ...betaV1Fixture.records.recordings[0],
     assetId: 'restored-local',
   });
-  replaceLegacyWorkspaceFixture(rows, id, { ...opened.workspace, sourceAssetId: 'restored-local' });
+  replaceLegacyWorkspaceFixture(rows, id, {
+    ...opened.workspace,
+    sourceAssetId: 'restored-local',
+    advanced: { ...opened.workspace.advanced, canvas: restoredCanvas },
+  });
   await expect(
     commitVideoWorkspace({
       aggregateId: id,
       expectedRevision: 1,
       expectedSourceAssetId: 'beta-v1-recording-asset',
-      operation,
+      operation: {
+        id: 'stale-crop',
+        at: 1,
+        target: 'advancedContent',
+        before,
+        after: {
+          ...before,
+          canvas: { ...restoredCanvas, crop: { ...restoredCanvas.crop, x: 0.3 } },
+        },
+      },
     })
   ).rejects.toMatchObject({ code: 'conflict' });
   expect((await readVideoWorkspace(id))?.workspace.history).toEqual([]);
+  expect((await readVideoWorkspace(id))?.workspace.advanced.canvas).toEqual(restoredCanvas);
 });
 
 it('refuses to create a session for a replaced file loaded before opening the editor', async () => {
@@ -793,3 +813,44 @@ it.each(['legacy', 'metadata', 'rollback'] as const)(
     }
   }
 );
+
+it('preserves crop history across stale writers, quota refusal, retry, undo and reopen', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
+  const canvas = { width: 360, height: 360, crop: { x: 0.2, y: 0, width: 0.5625, height: 1 } };
+  const args = {
+    aggregateId: id,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedRevision: opened.workspace.revision,
+    operation: {
+      id: 'crop',
+      at: 1,
+      target: 'advancedContent' as const,
+      before,
+      after: { ...before, canvas },
+    },
+  };
+  harness.failure = true;
+  await expect(commitVideoWorkspace(args)).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect(await readVideoWorkspace(id)).toEqual(opened);
+  harness.failure = false;
+  const saved = await commitVideoWorkspace(args);
+  await expect(commitVideoWorkspace(args)).rejects.toMatchObject({ code: 'conflict' });
+  const reopened = await openVideoWorkspace(id, source);
+  expect(reopened.workspace.history).toHaveLength(1);
+  expect(reopened.workspace.history[0]).toMatchObject({ after: { canvas } });
+  const undone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedRevision: saved.workspace.revision,
+    direction: 'undo',
+  });
+  expect(undone.workspace.cursor).toBe(0);
+  const redone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(redone.workspace.history).toEqual(saved.workspace.history);
+});

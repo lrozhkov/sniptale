@@ -106,6 +106,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
 
 /** Scene controls are independent of the selected zoom and its property panel. */
 export function ReviewSceneProperties(props: {
+  cropPreview?: { file: File; time: number } | undefined;
   cursorPath?: ReactNode;
   focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
   background: QuickEditAdvancedState['background'];
@@ -152,6 +153,7 @@ export function ReviewSceneProperties(props: {
               icon: Scan,
               content: (
                 <ReviewCanvasSettings
+                  cropPreview={props.cropPreview}
                   source={props.source}
                   canvas={props.canvas}
                   onChange={props.onCanvas}

@@ -215,7 +215,11 @@ export function resolveReviewSceneOutput(
   });
   const output = resolveVideoExportDimensions(scene.width, scene.height, resolution);
   const scale = output.width / base.width;
-  const canvas = { width: output.width, height: base.height * scale };
+  const canvas = {
+    width: output.width,
+    height: base.height * scale,
+    ...(settings.canvas?.crop ? { crop: settings.canvas.crop } : {}),
+  };
   const background = settings.background.enabled
     ? {
         ...settings.background,

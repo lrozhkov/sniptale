@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveVideoTargetBitrate,
   VideoQuality,
+  VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
-import { resolveReviewRenderBitrate, resolveReviewOutputProfile } from './render-settings';
+import {
+  resolveReviewSceneOutput,
+  resolveReviewRenderBitrate,
+  resolveReviewOutputProfile,
+} from './render-settings';
 import type { ReviewMediaIndex } from './media-index';
 
 const index: ReviewMediaIndex = {
@@ -225,4 +230,18 @@ describe('rational selected output rate', () => {
     expect(result.rate).not.toEqual({ numerator: 30000, denominator: 1001 });
     expect(Math.abs(result.fps - measured)).toBeLessThanOrEqual(1e-9);
   });
+});
+
+it('retains the source crop when an export resolution scales the canvas', () => {
+  const canvas = {
+    width: 1080,
+    height: 1920,
+    crop: { x: 0.3, y: 0, width: 0.31640625, height: 1 },
+  };
+  const scene = resolveReviewSceneOutput(
+    { width: 1920, height: 1080 },
+    { canvas, background: { enabled: false } },
+    VideoResolutionPreset.P720
+  );
+  expect(scene.canvas.crop).toEqual(canvas.crop);
 });

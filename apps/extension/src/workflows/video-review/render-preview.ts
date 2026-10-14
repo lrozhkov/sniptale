@@ -234,7 +234,7 @@ async function prepareAssets(
     );
     const joined = reviewWindowRasterBacking({
       windowRect: layout.windowRect,
-      sourceWidth: scene.source.width,
+      sourceWidth: scene.source.width * (layout.sourceCrop?.width ?? 1),
       magnify,
     });
     const backing = {
@@ -242,7 +242,7 @@ async function prepareAssets(
       height: Math.max(
         1,
         Math.ceil(
-          (layout.videoRect.y - layout.windowRect.y) *
+          ((layout.visibleVideoRect ?? layout.videoRect).y - layout.windowRect.y) *
             (magnify ? joined.width / layout.windowRect.width : 1)
         )
       ),
@@ -405,14 +405,14 @@ async function drawPreparedFrame(
           spatialRenderer: assets.spatial,
           windowRasterBacking: reviewWindowRasterBacking({
             windowRect: request.layout.windowRect,
-            sourceWidth: scene.source.width,
+            sourceWidth: scene.source.width * (request.layout.sourceCrop?.width ?? 1),
             magnify: evaluateReviewClicks(scene.clicks, frame.resultTime).some(
               (click) => (click.lens?.scale ?? 1) > 1
             ),
           }),
           motionBlur: frame.cameraTransform
             ? undefined
-            : quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime),
+            : quickEditMotionBlurCameras(scene.zoomRegions, frame.resultTime, scene),
           drawOverlays: (windowRaster) =>
             drawReviewSceneOverlays({
               scene: drawScene,

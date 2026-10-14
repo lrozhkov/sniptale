@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { quickEditVisibleVideoTransform } from '../../features/video/review/advanced/scene';
 import { drawReviewClicks } from '../../workflows/video-review/render-click-animation';
 import {
   evaluateReviewClicks,
@@ -20,6 +21,8 @@ export function ReviewClickOverlay(props: {
   window?:
     | {
         videoRect: Parameters<typeof drawReviewClicks>[2];
+        visibleVideoRect?: Parameters<typeof drawReviewClicks>[2] | undefined;
+        sourceCrop?: Parameters<typeof drawReviewClicks>[2] | undefined;
         windowRect: Parameters<typeof drawReviewClicks>[2];
         transform?: Parameters<typeof drawReviewClicks>[2];
       }
@@ -39,19 +42,35 @@ export function ReviewClickOverlay(props: {
       const candidate = getFrame?.();
       const frame =
         candidate instanceof HTMLVideoElement && candidate.readyState < 2 ? null : candidate;
-      const draw = (source?: Parameters<typeof drawReviewClicks>[5]) =>
-        drawReviewClicks(context, frames, props.video!, props.sourceWidth, props.clip!, source);
+      const draw = (source?: Parameters<typeof drawReviewClicks>[5]) => {
+        context.save();
+        try {
+          if (props.window?.sourceCrop) {
+            const visible = quickEditVisibleVideoTransform({
+              videoTransform: props.video!,
+              sourceCrop: props.window.sourceCrop,
+            });
+            context.beginPath();
+            context.rect(visible.x, visible.y, visible.width, visible.height);
+            context.clip();
+          }
+          drawReviewClicks(context, frames, props.video!, props.sourceWidth, props.clip!, source);
+        } finally {
+          context.restore();
+        }
+      };
       const magnify = frames.some((click) => (click.lens?.scale ?? 1) > 1);
-      if (frame && props.headerImage && props.window && magnify) {
+      if (frame && (props.headerImage || props.window?.sourceCrop) && props.window && magnify) {
         const window = props.window;
         withReviewWindowRaster(
           {
-            header: props.headerImage,
+            header: props.headerImage ?? undefined,
             videoRect: window.videoRect,
+            visibleVideoRect: window.visibleVideoRect,
             windowRect: window.windowRect,
             backing: reviewWindowRasterBacking({
               windowRect: window.windowRect,
-              sourceWidth: props.sourceWidth,
+              sourceWidth: props.sourceWidth * (props.window.sourceCrop?.width ?? 1),
               magnify,
             }),
             draw: (target, x, y, width, height) => target.drawImage(frame, x, y, width, height),

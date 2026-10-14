@@ -220,6 +220,7 @@ export function ReviewInspectorBinding({
         selectionHasSections={hasSelectionSections(state)}
         scene={
           <ReviewScenePropertiesBinding
+            file={resource.file}
             state={state}
             source={resource.source}
             audio={audio}
@@ -467,11 +468,13 @@ function focusRecordedAction(
 
 /** Scene controls share busy admission and the existing scene/audio writers. */
 function ReviewScenePropertiesBinding({
+  file,
   state,
   source,
   audio,
   onJoinPreview,
 }: {
+  file: File;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   state: InspectorState;
   source: LoadedReview['source'];
@@ -480,6 +483,7 @@ function ReviewScenePropertiesBinding({
   const { busy, editing } = state;
   return (
     <ReviewSceneProperties
+      cropPreview={{ file, time: state.time }}
       cursorPath={
         <ReviewCursorPathSettings
           path={state.cursorFocusPath}
@@ -643,7 +647,13 @@ function ReviewSelectionBinding({
               video: video.current,
               camera: evaluateQuickEditCameraAtTime(
                 state.features.zoomRegions,
-                state.timeline.sceneOutputTime
+                state.timeline.sceneOutputTime,
+                {
+                  source: resource.source,
+                  canvas: state.features.canvas,
+                  background: state.features.background,
+                  windowHeader: state.features.windowHeader,
+                }
               ),
             }
           : undefined

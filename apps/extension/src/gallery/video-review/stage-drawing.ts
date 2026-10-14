@@ -11,6 +11,7 @@ export function useReviewDrawingPlane(args: {
   inverseProjection?: QuickEditHomography | undefined;
   drawing: boolean;
   content: { x: number; y: number; width: number; height: number };
+  crop?: ReviewRegion | undefined;
   region: ReviewRegion | undefined;
   onRegion(value: ReviewRegion): void;
   pause(): void;
@@ -58,6 +59,17 @@ export function useReviewDrawingPlane(args: {
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (!args.drawing || event.button !== 0) return;
       start.current = normalizeVideoPoint(planePoint(event), args.content);
+      if (
+        start.current &&
+        args.crop &&
+        (start.current.x < args.crop.x ||
+          start.current.x > args.crop.x + args.crop.width ||
+          start.current.y < args.crop.y ||
+          start.current.y > args.crop.y + args.crop.height)
+      ) {
+        start.current = null;
+        return;
+      }
       moving.current = null;
       const target = event.target;
       const corner =

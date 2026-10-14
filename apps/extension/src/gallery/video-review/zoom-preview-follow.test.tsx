@@ -83,7 +83,10 @@ it.each([2, 4])('uses the retained camera slice after a cut at paused time %s', 
     )
   );
   await act(async () => Promise.resolve());
-  const expected = evaluateQuickEditCameraAtTime(regions, time);
+  const expected = evaluateQuickEditCameraAtTime(regions, time, {
+    source: { width: 640, height: 360 },
+    background: state.background,
+  });
   const shown = paint.mock.lastCall![0].camera;
   expect(shown.centerX).toBeCloseTo(expected.centerX);
   expect(shown.centerY).toBeCloseTo(expected.centerY);

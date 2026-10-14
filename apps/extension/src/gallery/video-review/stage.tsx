@@ -59,7 +59,7 @@ import {
   type computeQuickEditSceneLayout,
   computeQuickEditSpatialWindow,
   computeQuickEditSceneSize,
-  computeQuickEditWindowTransform,
+  computeQuickEditSourceWindowTransform,
   computeQuickEditSceneCamera,
 } from '../../features/video/review/advanced/scene';
 import type {
@@ -138,8 +138,9 @@ function useStageInteractionGeometry(
   // A source-rounded SVG in a differently shaped img box otherwise gains internal letterboxing.
   const headerDisplayHeight = sceneLayout
     ? Math.round(
-        (((sceneLayout.videoRect.y - sceneLayout.windowRect.y) * props.source.width) /
-          sceneLayout.videoRect.width) *
+        ((((sceneLayout.visibleVideoRect ?? sceneLayout.videoRect).y - sceneLayout.windowRect.y) *
+          props.source.width) /
+          (sceneLayout.visibleVideoRect ?? sceneLayout.videoRect).width) *
           1e6
       ) / 1e6
     : undefined;
@@ -161,6 +162,7 @@ function useStageInteractionGeometry(
       ? quickEditPlaneProjection(window, window, sceneLayout.spatial)
       : undefined;
   const plane = useReviewDrawingPlane({
+    crop: sceneLayout?.sourceCrop,
     inverseProjection: projection
       ? (invertQuickEditProjection(projection) ?? undefined)
       : undefined,
@@ -440,6 +442,7 @@ function ReviewStageNativeEffects({
     <>
       {(!props.drawing || sceneLayout?.spatial) && props.scene && sceneLayout ? (
         <ReviewMotionBlurPreview
+          scene={{ ...props.scene, source: props.source }}
           focus={props.scene.focus}
           camera={props.scene.camera}
           layout={sceneLayout}
@@ -527,7 +530,7 @@ function ReviewStageContent({
         attachment="content"
         visualMode={manual ? 'handles' : undefined}
         onPreviewPosition={onCommentPreview}
-        clip={projection ? overlayClip : undefined}
+        clip={projection || sceneLayout?.sourceCrop ? overlayClip : undefined}
         projection={projection}
         output={size}
         source={props.source}
@@ -539,7 +542,7 @@ function ReviewStageContent({
           clip={overlayClip}
           output={size}
           selectedId={props.zoom?.region.id}
-          video={computeQuickEditWindowTransform(sceneLayout)}
+          video={computeQuickEditSourceWindowTransform(sceneLayout)}
         />
       ) : null}
       {props.cursorPath && sceneLayout && !projection ? (
@@ -550,6 +553,16 @@ function ReviewStageContent({
             top: sceneLayout.videoTransform.y,
             width: sceneLayout.videoTransform.width,
             height: sceneLayout.videoTransform.height,
+            clipPath: sceneLayout.sourceCrop
+              ? `inset(${[
+                  sceneLayout.sourceCrop.y,
+                  1 - sceneLayout.sourceCrop.x - sceneLayout.sourceCrop.width,
+                  1 - sceneLayout.sourceCrop.y - sceneLayout.sourceCrop.height,
+                  sceneLayout.sourceCrop.x,
+                ]
+                  .map((value) => `${value * 100}%`)
+                  .join(' ')})`
+              : undefined,
           }}
         >
           <ReviewCursorPathOverlay
@@ -569,6 +582,7 @@ function ReviewStageContent({
       ) : null}
       {props.zoom && zoomLayout ? (
         <ReviewStageFocusControl
+          scene={props.scene ? { ...props.scene, source: props.source } : undefined}
           projection={projection}
           key={props.zoom.region.id}
           focus={props.zoom}

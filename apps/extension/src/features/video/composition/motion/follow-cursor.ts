@@ -544,7 +544,8 @@ function buildCameraZoneSpans(
     const transition = transitions[index];
     if (transition) {
       const duration = transition.duration * factor;
-      const start = Math.max(input.start, transition.boundary - duration * anticipation);
+      // A new visible visit cannot anticipate a transition into the preceding hidden interval.
+      const start = Math.max(cursor, transition.boundary - duration * anticipation);
       const end = start + duration;
       const nextBoundary =
         next && zones[index + 2]?.segmentId === next.segmentId

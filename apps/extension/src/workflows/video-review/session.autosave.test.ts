@@ -527,3 +527,32 @@ it('publishes only the committed mutation projection and keeps injected adapter 
   expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
   expect(session.getSnapshot().document).toBe(document);
 });
+
+it('retains a crop after save refusal and retries one durable content change', async () => {
+  const { session, deps } = setup();
+  session.setAutosaveEnabled(false);
+  const canvas = { width: 360, height: 360, crop: { x: 0.2, y: 0, width: 0.5625, height: 1 } };
+  const content = { ...session.getSnapshot().document.advancedContent, canvas };
+  session.stageAutosave(
+    'content',
+    () => ({
+      change: { kind: 'content', content },
+      acknowledge: () => undefined,
+      fail: () => undefined,
+    }),
+    { delay: 250 }
+  );
+  await session.flush();
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(
+    new DOMException('Full', 'QuotaExceededError')
+  );
+  await expect(session.saveBuffered()).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect(session.getSnapshot().document.advancedContent.canvas).toEqual(canvas);
+  expect(session.getSnapshot().dirty).toBe(true);
+  await session.saveBuffered();
+  expect(session.getSnapshot().dirty).toBe(false);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await session.reload();
+  expect(session.getSnapshot().document.advancedContent.canvas).toEqual(canvas);
+  await session.dispose();
+});

@@ -122,10 +122,11 @@ export async function loadReviewWindowHeader(
 
 /** One source plane lets filtering cross the header/video join. Caller releases the scratch lease. */
 export function createReviewWindowRaster(args: {
-  header: CanvasImageSource;
+  header?: CanvasImageSource | undefined;
   backing?: { width: number; height: number } | undefined;
   resources?: RenderResources | undefined;
   videoRect: QuickEditRect;
+  visibleVideoRect?: QuickEditRect | undefined;
   windowRect: QuickEditRect;
   draw(
     context: CanvasRenderingContext2D,
@@ -144,7 +145,11 @@ export function createReviewWindowRaster(args: {
     throw new Error('Invalid window raster backing.');
   const width =
     args.backing?.width ??
-    ('width' in args.header && typeof args.header.width === 'number' && args.header.width > 0
+    (!args.visibleVideoRect &&
+    args.header &&
+    'width' in args.header &&
+    typeof args.header.width === 'number' &&
+    args.header.width > 0
       ? args.header.width
       : args.windowRect.width);
   const scale = width / args.windowRect.width;
@@ -173,14 +178,25 @@ export function createReviewWindowRaster(args: {
       context.globalCompositeOperation = 'source-over';
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
-      const headerHeight = (args.videoRect.y - args.windowRect.y) * scaleY;
-      context.drawImage(args.header, 0, 0, width, headerHeight);
+      const visible = args.visibleVideoRect ?? args.videoRect;
+      const headerHeight = (visible.y - args.windowRect.y) * scaleY;
+      if (args.header) context.drawImage(args.header, 0, 0, width, headerHeight);
       // Sum coverage at the shared edge without backing transparent source pixels.
       context.globalCompositeOperation = 'lighter';
+      if (args.visibleVideoRect) {
+        context.beginPath();
+        context.rect(
+          (visible.x - args.windowRect.x) * scale,
+          headerHeight,
+          visible.width * scale,
+          visible.height * scaleY
+        );
+        context.clip();
+      }
       args.draw(
         context,
         (args.videoRect.x - args.windowRect.x) * scale,
-        headerHeight,
+        (args.videoRect.y - args.windowRect.y) * scaleY,
         args.videoRect.width * scale,
         args.videoRect.height * scaleY
       );

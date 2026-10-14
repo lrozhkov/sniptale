@@ -39,3 +39,13 @@ Treat missing, malformed, metadata-only, and stale telemetry as unavailable. Do 
 The background runtime commits matching offscreen progress and terminal events to the project-export ledger before it forwards them to the editor owner. Serialize these transitions with export start/cancel admission. Ignore superseded jobs and late progress after terminal state.
 
 The offscreen document supplies rendering events through runtime messages. It cannot write Chrome session storage. A completed editor notification must therefore never be the only evidence of completion while the admission ledger remains running.
+
+## Quick-review source crop
+
+The advanced canvas owner stores an optional normalized source rectangle. The scene owner derives its aspect from the selected canvas and preserves its center within source bounds. Resolution changes with the same aspect retain the rectangle. The derived rectangle contains at least one source pixel where the aspect permits this.
+
+`videoRect` and `videoTransform` retain original source coordinates. They can extend beyond the visible cropped window. `visibleVideoRect` describes the cropped video before camera motion. `windowRect` includes that rectangle and the window header. The original decorated window remains the coordinate basis for authored focus objects and manual camera targets.
+
+The existing scene renderer clips source pixels before camera, perspective, blur, and magnification passes. Content objects use the source projection and crop boundary. Viewport objects and separate webcam frames retain their existing geometry. Camera planning clips disposable observations at crop entry and exit. It preserves separate visible visits and never changes stored events or paths.
+
+The crop editor keeps a local draft and commits once on Apply. Cancel and Escape discard that draft. The editor uses the existing frame decoder at the time selected when the editor opens. Crop changes use the existing workspace queue and history.

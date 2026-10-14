@@ -22,7 +22,8 @@ import {
   type WorkingZoneCameraBoundaries,
 } from '../../composition/motion/follow-cursor';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
-import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
+import type { QuickEditCameraTransform, QuickEditZoomRegion, QuickEditRect } from './types';
+import { fitQuickEditSourceCrop } from './canvas';
 
 export interface ReviewCursorFacts {
   cursorTrack: VideoProjectCursorTrack | null;
@@ -153,7 +154,62 @@ export function reviewCameraPlanObservations(region: QuickEditZoomRegion): Follo
       });
     }
   }
-  return frames;
+  const scene = context.scene;
+  const crop = scene?.canvas?.crop;
+  return crop && scene
+    ? cropCameraObservations(frames, fitQuickEditSourceCrop(scene.source, scene.canvas!, crop))
+    : frames;
+}
+
+/** Clip native linear observations without joining separate visible visits across discarded pixels. */
+function cropCameraObservations(frames: readonly FollowCursorFrame[], crop: QuickEditRect) {
+  const result: FollowCursorFrame[] = [];
+  let visit = 0;
+  let previousEnd = -Infinity;
+  let previousSegment = '';
+  for (let index = 0; index < frames.length; index++) {
+    const a = frames[index]!;
+    const next = frames[index + 1];
+    const b = next?.segmentId === a.segmentId ? next : a;
+    const from = a.actual ?? a;
+    const to = b.actual ?? b;
+    let low = 0,
+      high = 1;
+    for (const axis of ['x', 'y'] as const) {
+      const start = crop[axis];
+      const end = start + (axis === 'x' ? crop.width : crop.height);
+      const delta = to[axis] - from[axis];
+      if (delta === 0) {
+        if (from[axis] < start || from[axis] > end) high = -1;
+      } else {
+        const left = (start - from[axis]) / delta;
+        const right = (end - from[axis]) / delta;
+        low = Math.max(low, Math.min(left, right));
+        high = Math.min(high, Math.max(left, right));
+      }
+    }
+    if (low > high) continue;
+    const startTime = a.time + (b.time - a.time) * low;
+    if (previousSegment !== a.segmentId || Math.abs(previousEnd - startTime) > 1e-9) visit++;
+    const segmentId = `${a.segmentId}:crop:${visit}`;
+    for (const fraction of [low, high]) {
+      const mix = (left: number, right: number) => left + (right - left) * fraction;
+      const time = mix(a.time, b.time);
+      if (result.at(-1)?.time === time && result.at(-1)?.segmentId === segmentId) continue;
+      const { actual: _actual, ...base } = a;
+      result.push({
+        ...base,
+        time,
+        segmentId,
+        x: mix(a.x, b.x),
+        y: mix(a.y, b.y),
+        ...(a.actual && b.actual ? { actual: { x: mix(from.x, to.x), y: mix(from.y, to.y) } } : {}),
+      });
+    }
+    previousEnd = a.time + (b.time - a.time) * high;
+    previousSegment = a.segmentId;
+  }
+  return result;
 }
 
 /** Admit native facts and sparse authoring against the exact consuming renderer geometry. */
@@ -181,7 +237,7 @@ export function resolveReviewCursorCameraPlan(
     cached = new Map();
     geometries.set(geometry, cached);
   }
-  const signature = `${region.start}:${region.end}:${region.transform.scale}:${context.path.smoothing}:${context.path.sensitivity}`;
+  const signature = `${region.start}:${region.end}:${region.transform.scale}:${region.transform.centerX}:${region.transform.centerY}:${context.path.smoothing}:${context.path.sensitivity}`;
   const key = `${region.id}:${JSON.stringify(boundaries)}`;
   const previous = cached.get(key);
   if (previous?.signature === signature) return previous.plan;
@@ -196,8 +252,22 @@ export function resolveReviewCursorCameraPlan(
     policy,
     ...boundaries,
     fallback: {
-      x: (region.transform.centerX * region.transform.scale - 0.5) * geometry.window.width,
-      y: (region.transform.centerY * region.transform.scale - 0.5) * geometry.window.height,
+      x:
+        Math.max(
+          0,
+          Math.min(
+            region.transform.scale - 1,
+            region.transform.centerX * region.transform.scale - 0.5
+          )
+        ) * geometry.window.width,
+      y:
+        Math.max(
+          0,
+          Math.min(
+            region.transform.scale - 1,
+            region.transform.centerY * region.transform.scale - 0.5
+          )
+        ) * geometry.window.height,
     },
   });
   cached.set(key, { signature, plan });

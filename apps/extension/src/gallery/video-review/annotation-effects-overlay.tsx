@@ -256,6 +256,19 @@ export function ReviewAnnotationOverlay({
   }, [geometry]);
   const rx = (5 * geometry.viewport.width) / Math.max(1, size.width),
     ry = (5 * geometry.viewport.height) / Math.max(1, size.height);
+  const crop = geometry.clip.crop;
+  const cropClip = crop
+    ? [
+        { x: crop.x, y: crop.y },
+        { x: crop.x + crop.width, y: crop.y },
+        { x: crop.x + crop.width, y: crop.y + crop.height },
+        { x: crop.x, y: crop.y + crop.height },
+      ]
+        .map((point) => projectQuickEditPoint(geometry.clip.projection, point))
+        .filter((point) => point !== null)
+        .map((point) => `${point.x},${point.y}`)
+        .join(' ')
+    : null;
   return (
     <svg
       data-ui="gallery.videoReview.annotationOverlay"
@@ -286,6 +299,11 @@ export function ReviewAnnotationOverlay({
         <clipPath id={clipId}>
           <polygon points={clip} />
         </clipPath>
+        {cropClip ? (
+          <clipPath id={`${clipId}-crop`}>
+            <polygon points={cropClip} clipPath={`url(#${clipId})`} />
+          </clipPath>
+        ) : null}
       </defs>
       {binding.editor.previewLane?.instances.map((instance) => {
         const document = documents.get(instance.snapshotId);
@@ -330,7 +348,11 @@ export function ReviewAnnotationOverlay({
         return (
           <g
             key={instance.id}
-            clipPath={instance.attachment === 'content' ? `url(#${clipId})` : undefined}
+            clipPath={
+              instance.attachment === 'content'
+                ? `url(#${clipId}${cropClip ? '-crop' : ''})`
+                : undefined
+            }
           >
             <polygon
               data-annotation-id={instance.id}

@@ -304,7 +304,7 @@ function reserveCaptionComments(
         const start = boundaries[index]!,
           end = boundaries[index + 1]!;
         const cameras = [start, (start + end) / 2, end].map((time) =>
-          evaluateQuickEditCameraAtTime(scene.zoomRegions, time)
+          evaluateQuickEditCameraAtTime(scene.zoomRegions, time, { ...scene, output })
         );
         if (comment.attachment === 'content' && cameras.some((camera) => camera.spatial)) {
           // Projected comments ride the spatial raster. Its moving crop is conservative.

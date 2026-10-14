@@ -146,6 +146,18 @@ function reviewNativeVideoGeometry(
     transformOrigin: '0 0',
     transform,
     maxWidth: 'none',
+    ...(layout.sourceCrop
+      ? {
+          clipPath: `inset(${[
+            layout.sourceCrop.y,
+            1 - layout.sourceCrop.x - layout.sourceCrop.width,
+            1 - layout.sourceCrop.y - layout.sourceCrop.height,
+            layout.sourceCrop.x,
+          ]
+            .map((value) => `${value * 100}%`)
+            .join(' ')})`,
+        }
+      : {}),
   };
   return {
     container: {
@@ -174,11 +186,15 @@ function ReviewWindowHeader({
   transform: string;
 }) {
   if (!header.image || !layout) return null;
+  const visible = layout.visibleVideoRect ?? layout.videoRect;
+  const x = visible.x - layout.videoRect.x;
+  const y = visible.y - layout.videoRect.y;
+  const headerTransform = layout.sourceCrop ? `${transform} translate(${x}px, ${y}px)` : transform;
   const common = {
     position: 'absolute' as const,
     left: 0,
     top: 0,
-    width: layout.videoRect.width,
+    width: visible.width,
     transformOrigin: '0 0',
     pointerEvents: 'none' as const,
   };
@@ -190,7 +206,7 @@ function ReviewWindowHeader({
           ...common,
           height: 2,
           background: header.joinColor,
-          transform: `${transform} translateY(-1px)`,
+          transform: `${headerTransform} translateY(-1px)`,
         }}
       />
       <img
@@ -199,9 +215,9 @@ function ReviewWindowHeader({
         draggable={false}
         style={{
           ...common,
-          height: layout.videoRect.y - layout.windowRect.y,
+          height: visible.y - layout.windowRect.y,
           // Layout-sized zooming rounds each edge separately and rerasterizes the SVG each frame.
-          transform: `${transform} translateY(-100%)`,
+          transform: `${headerTransform} translateY(-100%)`,
           maxWidth: 'none',
         }}
       />

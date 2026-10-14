@@ -88,12 +88,20 @@ export function paintReviewExportScene({
     comments: burned,
     sourceTime: sourceTime,
     cameraScale: camera.scale,
-    motionBlur: blurEnabled ? quickEditMotionBlurCameras(scene.zoomRegions, resultTime) : undefined,
+    motionBlur: blurEnabled
+      ? quickEditMotionBlurCameras(scene.zoomRegions, resultTime, {
+          source: scene.sourceSize,
+          canvas: scene.baseCanvas ?? canvas,
+          background: scene.background,
+          windowHeader: scene.windowHeader,
+          output: canvas,
+        })
+      : undefined,
     sceneScale: scene.sceneScale ?? 1,
     windowRasterBacking: magnify
       ? reviewWindowRasterBacking({
           windowRect: layout.windowRect,
-          sourceWidth: scene.sourceSize.width,
+          sourceWidth: scene.sourceSize.width * (layout.sourceCrop?.width ?? 1),
           magnify,
         })
       : undefined,

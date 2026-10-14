@@ -82,10 +82,11 @@ export function paintZoomPreview(
         targetContext.fillRect(x, y, width, height);
       }
     };
-    if (args.headerImage) {
+    if (args.headerImage || args.layout.sourceCrop) {
       const raster = createReviewWindowRaster({
-        header: args.headerImage,
+        header: args.headerImage ?? undefined,
         videoRect: args.layout.videoRect,
+        visibleVideoRect: args.layout.visibleVideoRect,
         windowRect: args.layout.windowRect,
         draw: drawVideo,
       });

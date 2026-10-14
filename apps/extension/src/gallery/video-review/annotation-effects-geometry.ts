@@ -7,6 +7,7 @@ import {
   computeQuickEditSceneCamera,
   computeQuickEditSpatialRasterLayout,
   computeQuickEditSpatialWindow,
+  quickEditVisibleVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import {
   invertQuickEditProjection,
@@ -33,6 +34,7 @@ export interface ReviewAnnotationGeometry {
   viewportToContent: QuickEditHomography;
   clip: {
     rect: { x: number; y: number; width: number; height: number };
+    crop?: { x: number; y: number; width: number; height: number };
     radius: number;
     projection: QuickEditHomography;
   };
@@ -89,6 +91,7 @@ export function createReviewAnnotationGeometry(
     viewportToContent: inverse,
     clip: {
       rect: motion.windowClip,
+      ...(raster.sourceCrop ? { crop: quickEditVisibleVideoTransform(raster) } : {}),
       radius: input.background.enabled
         ? ((input.background.layout.cornerRadius * input.output.width) / authoredWidth) *
           motion.scale

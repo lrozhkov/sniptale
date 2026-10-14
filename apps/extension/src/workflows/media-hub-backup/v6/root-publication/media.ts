@@ -276,20 +276,24 @@ function prepareSnapshot(args: {
   return snapshot;
 }
 
+// Gallery thumbnails are 320×180; 8 MiB allows legacy encodings and bounds the byte copy.
+const MAX_RESTORED_THUMBNAIL_BYTES = 8 * 1024 * 1024;
+
 async function prepareThumbnail(args: {
   mediaId: string;
   metadata: PortableMedia;
   objects: StagedObjectMap;
 }): Promise<MediaThumbnailEntry | null> {
   if (!args.metadata.thumbnail) return null;
-  const file = await readAssetFile(
-    requireObject(args.objects, args.metadata.thumbnail.objectId).ref,
-    `${args.mediaId}-thumbnail`
-  );
+  const ref = requireObject(args.objects, args.metadata.thumbnail.objectId).ref;
+  if (ref.size > MAX_RESTORED_THUMBNAIL_BYTES)
+    throw new Error('Restored media thumbnail exceeds the 8 MiB limit.');
+  const file = await readAssetFile(ref, `${args.mediaId}-thumbnail`);
   const thumbnail = parseMediaThumbnailEntry({
     ...args.metadata.thumbnail,
     assetId: args.mediaId,
-    blob: file,
+    // Restore cleanup deletes the staging file after publication.
+    blob: new Blob([await file.arrayBuffer()], { type: file.type }),
   });
   if (!thumbnail) throw new Error('Restored media thumbnail is invalid.');
   return thumbnail;

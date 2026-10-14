@@ -2,11 +2,19 @@ import { fitQuickEditZoomTransitions } from './zoom';
 import { motionBlurSamples } from '../../composition/motion/blur';
 import { quickEditFocusType } from './focus-layout';
 import { evaluateQuickEditCameraAtTime, sampleQuickEditFocusAtTime } from './scene';
-import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
+import type {
+  QuickEditCameraSceneInput,
+  QuickEditCameraTransform,
+  QuickEditZoomRegion,
+} from './types';
 
 /** One source raster, sampled camera exposure. Outgoing Zoom owns blur across its link. */
-export function quickEditMotionBlurCameras(regions: readonly QuickEditZoomRegion[], time: number) {
-  const camera = evaluateQuickEditCameraAtTime(regions, time);
+export function quickEditMotionBlurCameras(
+  regions: readonly QuickEditZoomRegion[],
+  time: number,
+  scene?: QuickEditCameraSceneInput
+) {
+  const camera = evaluateQuickEditCameraAtTime(regions, time, scene);
   const single = [{ camera, alpha: 1 }];
   const phase = sampleQuickEditFocusAtTime(
     regions.filter((region) => quickEditFocusType(region) === 'zoom'),
@@ -32,7 +40,7 @@ export function quickEditMotionBlurCameras(regions: readonly QuickEditZoomRegion
   // Stay on the represented side of a hard region boundary; never blur a jump into another focus.
   const samples = motionBlurSamples(time, setting.strength, start, Math.max(start, end - 1e-9));
   const frames = samples.map((sample) => ({
-    camera: evaluateQuickEditCameraAtTime(regions, sample.time),
+    camera: evaluateQuickEditCameraAtTime(regions, sample.time, scene),
     alpha: sample.alpha,
   }));
   return frames.some((frame) => !sameQuickEditCamera(frame.camera, camera)) ? frames : single;

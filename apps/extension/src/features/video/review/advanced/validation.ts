@@ -568,6 +568,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   )
     return null;
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
+  if (canvas?.crop && !supportsAdvancedSchema(raw['schemaVersion'], 21)) return null;
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
   if (raw['watermark'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 5))
@@ -660,7 +661,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].some(
       (known) => known >= firstHistorical && version === known
     )
   );

@@ -27,6 +27,7 @@ import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
 import { windowHeaderGeometry } from '../../../browser-frame/header';
 import { fitVideoRect } from '../geometry';
+import { fitQuickEditSourceCrop } from './canvas';
 import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
@@ -116,6 +117,41 @@ function compatibleReviewCameraPhases(left: QuickEditZoomRegion, right: QuickEdi
   return true;
 }
 
+/** Map an authored window target into the cropped window without changing persisted coordinates. */
+export function quickEditCropCamera(
+  camera: QuickEditCameraTransform,
+  scene: QuickEditCameraSceneInput | undefined,
+  inverse = false
+): QuickEditCameraTransform {
+  if (!scene?.canvas?.crop) return camera;
+  const layout = computeQuickEditSceneLayout({
+    ...scene,
+    output: scene.output ?? computeQuickEditSceneSize(scene),
+    camera: QUICK_EDIT_IDENTITY_CAMERA,
+  });
+  const header = scene.windowHeader
+    ? windowHeaderGeometry(scene.windowHeader, scene.source).height
+    : 0;
+  const sourceHeader = (header * layout.videoRect.width) / scene.source.width;
+  const original = {
+    ...layout.videoRect,
+    y: layout.videoRect.y - sourceHeader,
+    height: layout.videoRect.height + sourceHeader,
+  };
+  const from = inverse ? layout.windowRect : original;
+  const to = inverse ? original : layout.windowRect;
+  return {
+    ...camera,
+    centerX: (from.x + camera.centerX * from.width - to.x) / to.width,
+    centerY: (from.y + camera.centerY * from.height - to.y) / to.height,
+  };
+}
+
+function croppedCameraRegion(region: QuickEditZoomRegion, scene?: QuickEditCameraSceneInput) {
+  const transform = quickEditCropCamera(region.transform, scene ?? region.cursorFocus?.scene);
+  return transform === region.transform ? region : { ...region, transform };
+}
+
 /** Coordinate compatible adjacent cameras from provisional endpoints, without recursive neighbor evaluation. */
 export function resolveReviewSceneCameraPlan(
   regions: readonly QuickEditZoomRegion[],
@@ -147,14 +183,14 @@ export function resolveReviewSceneCameraPlan(
     if (owner.cursorFocus?.path.mode === 'follow') {
       const ownerGeometry = resolveReviewCameraGeometry(regions, owner, scene);
       if (!ownerGeometry) return undefined;
-      const plan = resolveReviewCursorCameraPlan(owner, ownerGeometry);
+      const plan = resolveReviewCursorCameraPlan(croppedCameraRegion(owner, scene), ownerGeometry);
       if (plan.status === 'conflict')
         return { ...plan, interval: { start: region.start, end: region.end }, time };
       return plan.targetScale === region.transform.scale
         ? evaluateWorkingZoneCameraBoundary(plan, time)
         : undefined;
     }
-    const translation = cameraTranslation(owner.transform);
+    const translation = cameraTranslation(croppedCameraRegion(owner, scene).transform);
     return {
       pan: { x: translation.x * geometry.window.width, y: translation.y * geometry.window.height },
       velocity: { x: 0, y: 0 },
@@ -169,7 +205,7 @@ export function resolveReviewSceneCameraPlan(
   if (outgoing && 'status' in outgoing) return outgoing;
   if (incoming) boundaries.incoming = incoming;
   if (outgoing) boundaries.outgoing = outgoing;
-  return resolveReviewCursorCameraPlan(region, geometry, boundaries);
+  return resolveReviewCursorCameraPlan(croppedCameraRegion(region, scene), geometry, boundaries);
 }
 
 function evaluateReviewSceneFollow(
@@ -182,7 +218,7 @@ function evaluateReviewSceneFollow(
   return evaluateReviewFollowCursor(
     region,
     time,
-    camera,
+    quickEditCropCamera(camera, scene ?? region.cursorFocus?.scene),
     resolveReviewCameraGeometry(regions, region, scene),
     resolveReviewSceneCameraPlan(regions, region, scene) ?? undefined
   );
@@ -404,7 +440,15 @@ export function resolveReviewCameraGeometry(
 export function computeQuickEditSceneSize(input: Omit<SceneInput, 'output' | 'camera'>) {
   const base = input.canvas ?? input.source;
   const content = computeQuickEditContentRect(base, input.background);
-  const fitted = fitVideoRect(content, input.source);
+  const crop = input.canvas?.crop
+    ? fitQuickEditSourceCrop(input.source, base, input.canvas.crop)
+    : undefined;
+  const fitted = fitVideoRect(
+    content,
+    crop
+      ? { width: input.source.width * crop.width, height: input.source.height * crop.height }
+      : input.source
+  );
   const headerHeight = input.windowHeader
     ? Math.ceil(
         (windowHeaderGeometry(input.windowHeader, input.source).height * fitted.width) /
@@ -435,17 +479,33 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     { width: input.output.width, height: input.output.height - headerHeight },
     background
   );
-  const fitted = fitVideoRect(content, input.source);
-  const videoRect = {
+  const crop = input.canvas?.crop
+    ? fitQuickEditSourceCrop(input.source, base, input.canvas.crop)
+    : undefined;
+  const fitted = fitVideoRect(
+    content,
+    crop
+      ? { width: input.source.width * crop.width, height: input.source.height * crop.height }
+      : input.source
+  );
+  const visibleVideoRect = {
     x: content.x + fitted.x,
     y: content.y + fitted.y + headerHeight,
     width: fitted.width,
     height: fitted.height,
   };
+  const videoRect = crop
+    ? {
+        x: visibleVideoRect.x - (crop.x * visibleVideoRect.width) / crop.width,
+        y: visibleVideoRect.y - (crop.y * visibleVideoRect.height) / crop.height,
+        width: visibleVideoRect.width / crop.width,
+        height: visibleVideoRect.height / crop.height,
+      }
+    : visibleVideoRect;
   const windowRect = {
-    ...videoRect,
-    y: videoRect.y - headerHeight,
-    height: videoRect.height + headerHeight,
+    ...visibleVideoRect,
+    y: visibleVideoRect.y - headerHeight,
+    height: visibleVideoRect.height + headerHeight,
   };
   return {
     ...(input.camera.spatial ? { spatial: input.camera.spatial } : {}),
@@ -457,7 +517,29 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     },
     windowRect,
     videoRect,
+    ...(crop
+      ? {
+          sourceCrop: crop,
+          visibleVideoRect,
+          sourceHeaderRatio: input.windowHeader
+            ? windowHeaderGeometry(input.windowHeader, input.source).height / input.source.width
+            : 0,
+        }
+      : {}),
     videoTransform: computeQuickEditVideoTransform({ videoRect, windowRect, camera: input.camera }),
+  };
+}
+
+/** Focus objects retain the original decorated-window coordinates after source cropping. */
+export function computeQuickEditSourceWindowTransform(
+  layout: Parameters<typeof computeQuickEditWindowTransform>[0] & { sourceHeaderRatio?: number }
+): QuickEditRect {
+  if (layout.sourceHeaderRatio === undefined) return computeQuickEditWindowTransform(layout);
+  const header = layout.sourceHeaderRatio * layout.videoTransform.width;
+  return {
+    ...layout.videoTransform,
+    y: layout.videoTransform.y - header,
+    height: layout.videoTransform.height + header,
   };
 }
 
@@ -507,6 +589,23 @@ export function quickEditContentPointToCanvas(
     x: videoTransform.x + point.x * videoTransform.width,
     y: videoTransform.y + point.y * videoTransform.height,
   };
+}
+
+/** The selected source area remains a hard boundary after camera movement. */
+export function quickEditVisibleVideoTransform(layout: {
+  videoTransform: QuickEditRect;
+  sourceCrop?: QuickEditRect;
+}): QuickEditRect {
+  const video = layout.videoTransform;
+  const crop = layout.sourceCrop;
+  return crop
+    ? {
+        x: video.x + crop.x * video.width,
+        y: video.y + crop.y * video.height,
+        width: video.width * crop.width,
+        height: video.height * crop.height,
+      }
+    : video;
 }
 
 /** Inverse mapping for canvas drags; points outside the video have no content coordinate. */

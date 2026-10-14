@@ -37,5 +37,8 @@ it('retains defaults and local camera policy through native serialization and hi
 
 it('continues reading the released schema nineteen without inserting new policy', () => {
   const previous = { ...createQuickEditAdvancedContent(), schemaVersion: 19 };
-  expect(loadQuickEditAdvancedContentState(previous)).toEqual({ ...previous, schemaVersion: 20 });
+  expect(loadQuickEditAdvancedContentState(previous)).toEqual({
+    ...previous,
+    schemaVersion: createQuickEditAdvancedContent().schemaVersion,
+  });
 });

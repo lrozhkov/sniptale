@@ -10,10 +10,12 @@ import { evaluateQuickEditBordersAtTime } from '../../features/video/review/adva
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import {
   computeQuickEditSceneLayout,
+  quickEditCropCamera,
   computeQuickEditSpatialWindow,
   computeQuickEditSpatialRasterLayout,
   computeQuickEditSceneSize,
   computeQuickEditWindowTransform,
+  computeQuickEditSourceWindowTransform,
   computeQuickEditSceneCamera,
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
@@ -87,6 +89,32 @@ function snapPreviewRect(rect: ReviewRegion): ReviewRegion {
 
 function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout>[0]) {
   const layout = computeQuickEditSceneLayout(input);
+  if (layout.sourceCrop && layout.visibleVideoRect) {
+    const visibleVideoRect = snapPreviewRect(layout.visibleVideoRect);
+    const crop = layout.sourceCrop;
+    const videoRect = {
+      x: visibleVideoRect.x - (crop.x * visibleVideoRect.width) / crop.width,
+      y: visibleVideoRect.y - (crop.y * visibleVideoRect.height) / crop.height,
+      width: visibleVideoRect.width / crop.width,
+      height: visibleVideoRect.height / crop.height,
+    };
+    const windowRect = {
+      ...visibleVideoRect,
+      y: Math.round(layout.windowRect.y),
+      height: visibleVideoRect.y + visibleVideoRect.height - Math.round(layout.windowRect.y),
+    };
+    return {
+      ...layout,
+      videoRect,
+      visibleVideoRect,
+      windowRect,
+      videoTransform: computeQuickEditVideoTransform({
+        videoRect,
+        windowRect,
+        camera: input.camera,
+      }),
+    };
+  }
   const videoRect = snapPreviewRect(layout.videoRect);
   const windowRect = {
     ...videoRect,
@@ -132,7 +160,10 @@ function resolveStageGeometry(
         camera:
           props.zoom.region.spotlight || props.zoom.region.border
             ? (props.scene?.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 })
-            : props.zoom.region.transform,
+            : quickEditCropCamera(
+                props.zoom.region.transform,
+                props.scene ? { ...props.scene, source: props.source } : undefined
+              ),
       })
     : null;
   const backgroundPaint = props.scene?.background.enabled
@@ -178,7 +209,7 @@ function resolveStageDecorations(
     ? {
         ...scene.focus,
         output: size,
-        video: computeQuickEditWindowTransform(sceneLayout),
+        video: computeQuickEditSourceWindowTransform(sceneLayout),
         scale: scale * scene.camera.scale,
       }
     : null;
@@ -211,6 +242,8 @@ export function resolveReviewClickRaster(
       transform: undefined,
       window: {
         videoRect: layout.videoRect,
+        visibleVideoRect: layout.visibleVideoRect,
+        sourceCrop: layout.sourceCrop,
         windowRect: layout.windowRect,
         transform: computeQuickEditWindowTransform(layout),
       },
@@ -224,6 +257,8 @@ export function resolveReviewClickRaster(
     transform: { scale, x: clip.rect.x - scale * base.x, y: clip.rect.y - scale * base.y },
     window: {
       videoRect: raster.videoRect,
+      visibleVideoRect: raster.visibleVideoRect,
+      sourceCrop: raster.sourceCrop,
       windowRect: raster.windowRect,
       transform: computeQuickEditWindowTransform(raster),
     },

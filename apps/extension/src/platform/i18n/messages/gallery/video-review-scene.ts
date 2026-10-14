@@ -1,6 +1,17 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSceneMessages = defineMessageSource({
+  sourceCropMode: { ru: 'Область видео', en: 'Video area' },
+  sourceCropFit: { ru: 'Вписать целиком', en: 'Fit whole video' },
+  sourceCropEnable: { ru: 'Кадрировать', en: 'Crop' },
+  sourceCropEdit: { ru: 'Настроить область', en: 'Adjust crop' },
+  sourceCropArea: {
+    ru: 'Область исходника. Перемещайте рамку или используйте клавиши со стрелками.',
+    en: 'Source area. Drag the frame or use the arrow keys.',
+  },
+  sourceCropSize: { ru: 'Размер области', en: 'Area size' },
+  sourceCropReset: { ru: 'Сбросить область', en: 'Reset area' },
+  sourceCropApply: { ru: 'Применить', en: 'Apply' },
   annotationSourceMissing: {
     ru: 'Исходник аннотации недоступен',
     en: 'Annotation source unavailable',

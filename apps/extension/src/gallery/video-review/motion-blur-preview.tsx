@@ -19,6 +19,9 @@ import type {
 import { drawReviewSceneFrame } from '../../workflows/video-review/scene-frame';
 
 type Props = {
+  scene?:
+    | import('../../features/video/review/advanced/types').QuickEditCameraSceneInput
+    | undefined;
   /** Target mini-preview already paints its spatial base; only temporal exposure adds a pass. */
   hasSpatialBase?: boolean;
   focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
@@ -39,10 +42,13 @@ export function ReviewMotionBlurPreview(props: Props) {
   if (
     (!enabled && !props.camera.spatial) ||
     !focus ||
-    !sameQuickEditCamera(props.camera, evaluateQuickEditCameraAtTime(focus.regions, focus.time))
+    !sameQuickEditCamera(
+      props.camera,
+      evaluateQuickEditCameraAtTime(focus.regions, focus.time, props.scene)
+    )
   )
     return null;
-  const passes = quickEditMotionBlurCameras(focus.regions, focus.time);
+  const passes = quickEditMotionBlurCameras(focus.regions, focus.time, props.scene);
   return passes.length > 1 || (props.camera.spatial && !props.hasSpatialBase) ? (
     <MotionBlurCanvas {...props} passes={passes} />
   ) : null;

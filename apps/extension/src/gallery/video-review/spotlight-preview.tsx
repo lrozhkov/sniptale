@@ -5,7 +5,7 @@ import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/a
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import {
   computeQuickEditSceneCamera,
-  computeQuickEditWindowTransform,
+  computeQuickEditSourceWindowTransform,
 } from '../../features/video/review/advanced/scene';
 import type {
   QuickEditBackgroundSettings,
@@ -61,7 +61,7 @@ export function ReviewSpotlightPreview(props: {
     regions,
     time: framing ? region.start : (props.focus?.time ?? (region.start + region.end) / 2),
     output: props.output,
-    video: computeQuickEditWindowTransform(props.layout),
+    video: computeQuickEditSourceWindowTransform(props.layout),
     scale: props.scale * props.camera.scale,
   };
   const motion = computeQuickEditSceneCamera(props.layout, props.background ?? { enabled: false });
@@ -120,7 +120,7 @@ export function ReviewSpotlightPreview(props: {
             region.border ? 'gallery.videoReview.focusBorder' : 'gallery.videoReview.focusSpotlight'
           )}
           output={props.output}
-          video={computeQuickEditWindowTransform(props.layout)}
+          video={computeQuickEditSourceWindowTransform(props.layout)}
           disabled={props.disabled}
           onChange={(area) => props.onChange(patchArea(area))}
           onPreview={(area) => {

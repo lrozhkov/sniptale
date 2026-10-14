@@ -1,6 +1,12 @@
+import { createReviewWorkingZoneCameraGeometry } from './camera-geometry';
+import { fitQuickEditSourceCrop } from './canvas';
 import { expect, it } from 'vitest';
-import { evaluateWorkingZoneCameraBoundary } from '../../composition/motion/follow-cursor';
 import {
+  evaluateWorkingZoneCameraBoundary,
+  planWorkingZoneCamera,
+} from '../../composition/motion/follow-cursor';
+import {
+  computeQuickEditSceneLayout,
   resolveReviewSceneCameraPlan,
   resolveReviewCameraConflicts,
   evaluateQuickEditCameraAtTime,
@@ -10,6 +16,7 @@ import {
   resolveCameraFollowPolicy,
 } from '../../project/camera/cursor-policy';
 import type { QuickEditZoomRegion } from './types';
+import { reviewCameraPlanObservations } from './cursor-focus-path';
 
 it('rejects a fragment inside a link gap when its captured pointer leaves the admitted output', () => {
   const focus = {
@@ -188,4 +195,196 @@ it('keeps a nominal discontinuity when short-camera fitting changes adjacent pha
   expect(plan?.status).toBe('ready');
   if (plan?.status === 'ready')
     expect(plan.discontinuities).toContainEqual({ time: 0.5, reason: 'nominal' });
+});
+
+it('retains crop crossings as separate visible visits and ignores wholly discarded observations', () => {
+  const scene = {
+    source: { width: 1000, height: 600 },
+    canvas: { width: 500, height: 600, crop: { x: 0.25, y: 0, width: 0.5, height: 1 } },
+    background: { enabled: false as const },
+  };
+  const path = {
+    version: 1 as const,
+    mode: 'follow' as const,
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold' as const,
+    segments: [
+      {
+        id: 'native',
+        start: 0,
+        end: 4,
+        binding: { kind: 'project' as const },
+        keys: [0.1, 0.5, 0.9, 0.5, 0.1].map((x, time) => ({
+          id: String(time),
+          time,
+          x,
+          y: 0.5,
+          anchor: 'movement' as const,
+          interpolation: 'linear' as const,
+        })),
+      },
+    ],
+  };
+  const region: QuickEditZoomRegion = {
+    id: 'crop',
+    start: 0,
+    end: 4,
+    transform: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    cursorFocus: {
+      path,
+      observed: path,
+      scene,
+      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') }),
+    },
+  };
+  const before = structuredClone(region);
+  const observations = reviewCameraPlanObservations(region);
+  expect(new Set(observations.map((point) => point.segmentId)).size).toBe(2);
+  expect(observations[0]?.time).toBeCloseTo(0.375, 10);
+  expect(observations.at(-1)?.time).toBeCloseTo(3.625, 10);
+  expect(
+    observations.every(
+      (point) => point.actual!.x >= 0.25 - 1e-12 && point.actual!.x <= 0.75 + 1e-12
+    )
+  ).toBe(true);
+  expect(resolveReviewCameraConflicts([region], scene)).toEqual([]);
+  expect(region).toEqual(before);
+  const outside = structuredClone(region);
+  for (const segment of outside.cursorFocus!.path.segments)
+    for (const key of segment.keys) key.x = 0.1;
+  outside.cursorFocus!.observed = outside.cursorFocus!.path;
+  expect(reviewCameraPlanObservations(outside)).toEqual([]);
+  expect(resolveReviewCameraConflicts([outside], scene)).toEqual([]);
+});
+
+it('starts a camera transition after crop re-entry without joining the hidden interval', () => {
+  const source = { width: 2120, height: 1080 };
+  const output = { width: 720, height: 1280 };
+  const canvas = { ...output, crop: fitQuickEditSourceCrop(source, output) };
+  const background = {
+    enabled: true as const,
+    type: 'solid' as const,
+    color: '#ffffffff',
+    zoomBehavior: 'window' as const,
+    layout: { padding: 40, cornerRadius: 12 },
+  };
+  const region: QuickEditZoomRegion = {
+    id: 'return',
+    start: 1.5441898864809083,
+    end: 10.481582780480613,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'ease-in-out', duration: 0.3 },
+    exit: { type: 'ease-in-out', duration: 0.3 },
+  };
+  const policy = resolveCameraFollowPolicy({
+    defaults: {
+      zoneSize: 0.3,
+      transitionDuration: 1.5,
+      marginFraction: 0.08,
+      minimumHoldDuration: 0.35,
+      minimumScale: 1.35,
+      preservePointer: true,
+      allowExpansion: true,
+    },
+  });
+  const layout = computeQuickEditSceneLayout({
+    source,
+    canvas,
+    output,
+    background,
+    camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+  });
+  const geometry = createReviewWorkingZoneCameraGeometry({
+    output,
+    window: layout.windowRect,
+    video: layout.videoRect,
+    cornerRadius: 12,
+    background,
+    region,
+    topology: [region],
+    policy,
+  });
+  // Reduced native observations retain the actual and preferred pointer positions at re-entry.
+  const samples = [
+    [
+      1.7348641509278766,
+      0.3565566475164171,
+      0.2656142590564628,
+      1,
+      0.3567216981132076,
+      0.26559676136774385,
+      'one',
+    ],
+    [
+      5.286686792454067,
+      0.3020253823788935,
+      0.5472520541828956,
+      4,
+      0.3567216981132076,
+      0.45057471264367815,
+      'two',
+    ],
+    [
+      5.710856553147563,
+      0.28865295288652953,
+      0.5690104166666666,
+      1.9855465366107774,
+      0.46328125000000003,
+      0.44904214559386973,
+      'two',
+    ],
+    [
+      6.144189886480895,
+      0.4825152683300728,
+      0.43598545251382054,
+      2.680288370599281,
+      0.4635931108089911,
+      0.44904214559386973,
+      'two',
+    ],
+    [
+      6.744189886480893,
+      0.4704818234125116,
+      0.44646366944777693,
+      1.904659452364169,
+      0.467578125,
+      0.44904214559386973,
+      'two',
+    ],
+    [
+      7.283599999994039,
+      0.5575187053415264,
+      0.5015716091114307,
+      1,
+      0.59921875,
+      0.5187739463601533,
+      'two',
+    ],
+  ] as const;
+  const frames = samples.map(([time, x, y, preferenceWeight, actualX, actualY, segmentId]) => ({
+    time,
+    x,
+    y,
+    preferenceWeight,
+    actual: { x: actualX, y: actualY },
+    segmentId,
+  }));
+  const plan = planWorkingZoneCamera({
+    frames,
+    start: region.start,
+    end: region.end,
+    targetScale: 2,
+    policy,
+    geometry,
+  });
+  expect(plan.status).toBe('ready');
+  if (plan.status !== 'ready') return;
+  expect(
+    plan.spans
+      .filter((span) => span.segmentId === 'two')
+      .every((span) => span.start >= samples[1][0])
+  ).toBe(true);
 });

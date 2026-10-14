@@ -2,7 +2,11 @@ import type { QuickEditHomography } from '../../features/video/review/advanced/s
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
-import { computeQuickEditWindowTransform } from '../../features/video/review/advanced/scene';
+import {
+  computeQuickEditSourceWindowTransform,
+  computeQuickEditSceneCamera,
+  quickEditCropCamera,
+} from '../../features/video/review/advanced/scene';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { translate } from '../../platform/i18n';
@@ -20,6 +24,9 @@ export type ReviewStageFocus = {
 
 /** Direct scene manipulation uses the same normalized area and camera gesture as the inspector. */
 export function ReviewStageFocusControl(props: {
+  scene?:
+    | import('../../features/video/review/advanced/types').QuickEditCameraSceneInput
+    | undefined;
   projection?: QuickEditHomography | undefined;
   focus: ReviewStageFocus;
   layout: ZoomPreviewLayout;
@@ -27,47 +34,60 @@ export function ReviewStageFocusControl(props: {
   behindTargets?: boolean;
 }) {
   const { focus, layout, output } = props;
+  const camera = quickEditCropCamera(focus.region.transform, props.scene);
+  const authored = (patch: QuickEditZoomRegionPatch) => {
+    const mapped = quickEditCropCamera({ ...camera, ...patch }, props.scene, true);
+    return { ...patch, centerX: mapped.centerX, centerY: mapped.centerY };
+  };
   const gesture = useReviewCameraGesture({
     pointerProjection: props.projection ? { matrix: props.projection, output } : undefined,
-    camera: focus.region.transform,
+    camera,
     videoRect: { ...layout.windowRect, x: 0, y: 0 },
     output: layout.windowRect,
     view: 'result',
-    onCommit: focus.onChange,
-    onPreview: focus.onPreview,
+    onCommit: (patch) => focus.onChange(authored(patch)),
+    onPreview: (patch) => focus.onPreview(patch ? authored(patch) : null),
     onInteract: focus.onInteract,
   });
+  const clip = layout.sourceCrop
+    ? computeQuickEditSceneCamera(layout, props.scene?.background ?? { enabled: false }).windowClip
+    : undefined;
+  const clipPath = clip
+    ? `inset(${clip.y}px ${output.width - clip.x - clip.width}px ${output.height - clip.y - clip.height}px ${clip.x}px)`
+    : undefined;
   const overlay = focus.region.spotlight ?? focus.region.border;
   if (overlay)
     return (
-      <ReviewFocusArea
-        projection={props.projection}
-        area={overlay.area}
-        label={translate(
-          focus.region.border
-            ? 'gallery.videoReview.focusBorder'
-            : 'gallery.videoReview.focusSpotlight'
-        )}
-        output={output}
-        video={computeQuickEditWindowTransform(layout)}
-        onInteract={focus.onInteract}
-        onPreview={(area) =>
-          focus.onPreview(
-            area
-              ? focus.region.border
+      <div className="pointer-events-none absolute inset-0" style={{ clipPath }}>
+        <ReviewFocusArea
+          projection={props.projection}
+          area={overlay.area}
+          label={translate(
+            focus.region.border
+              ? 'gallery.videoReview.focusBorder'
+              : 'gallery.videoReview.focusSpotlight'
+          )}
+          output={output}
+          video={computeQuickEditSourceWindowTransform(layout)}
+          onInteract={focus.onInteract}
+          onPreview={(area) =>
+            focus.onPreview(
+              area
+                ? focus.region.border
+                  ? { border: { ...focus.region.border, area } }
+                  : { spotlight: { ...focus.region.spotlight!, area } }
+                : null
+            )
+          }
+          onChange={(area) =>
+            focus.onChange(
+              focus.region.border
                 ? { border: { ...focus.region.border, area } }
                 : { spotlight: { ...focus.region.spotlight!, area } }
-              : null
-          )
-        }
-        onChange={(area) =>
-          focus.onChange(
-            focus.region.border
-              ? { border: { ...focus.region.border, area } }
-              : { spotlight: { ...focus.region.spotlight!, area } }
-          )
-        }
-      />
+            )
+          }
+        />
+      </div>
     );
   return (
     <div

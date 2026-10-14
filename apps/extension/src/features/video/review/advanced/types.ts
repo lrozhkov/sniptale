@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 20;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 21;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -71,7 +71,7 @@ export interface QuickEditRect {
 /** Authored scene geometry plus the actual consuming output size. */
 export type QuickEditCameraSceneInput = {
   output?: { width: number; height: number };
-  canvas?: { width: number; height: number } | undefined;
+  canvas?: QuickEditCanvasSize | undefined;
   source: { width: number; height: number };
   background: QuickEditBackgroundSettings;
   windowHeader?: QuickEditWindowHeader | undefined;
@@ -265,6 +265,8 @@ export type QuickEditWindowHeader = import('../../../browser-frame/header').Wind
 export interface QuickEditCanvasSize {
   width: number;
   height: number;
+  /** Static source-normalized crop. Omission retains the complete source. */
+  crop?: QuickEditRect;
 }
 
 export interface QuickEditAudioState {

@@ -681,4 +681,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 24, to: 25 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 29,
+    toDatabaseVersion: 30,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Source crop workspace stores are unavailable.');
+      return undefined;
+    },
+  },
 ];

@@ -37,8 +37,9 @@ import {
   resolveReviewSceneCameraPlan,
   resolveReviewCameraConflicts,
   computeQuickEditSpatialWindow,
-  computeQuickEditWindowTransform,
+  computeQuickEditSourceWindowTransform,
   computeQuickEditSceneLayout,
+  quickEditCropCamera,
   computeQuickEditSceneSize,
 } from '../../features/video/review/advanced/scene';
 import {
@@ -164,6 +165,10 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const spatialInteractive =
     interactive && props.spatialEdit?.enabled !== false && !props.spatialEdit?.region.dormant;
   const background = props.background;
+  const authoredCenter = (patch: { centerX: number; centerY: number; scale?: number }) => {
+    const mapped = quickEditCropCamera({ ...camera, ...patch }, props, true);
+    return { ...patch, centerX: mapped.centerX, centerY: mapped.centerY };
+  };
   const surface = {
     background,
     headerImage: header.image,
@@ -236,11 +241,13 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
             key={region.id}
             previewScale={previewScale}
             view={view}
-            onCenter={props.onChange}
+            onCenter={(patch) => props.onChange(authoredCenter(patch))}
+            onPreview={(patch) => props.onPreview?.(patch ? authoredCenter(patch) : null)}
           />
         )}
         {!overlay && (view === 'result' || playback) ? (
           <ReviewMotionBlurPreview
+            scene={props}
             hasSpatialBase={view === 'result'}
             focus={props.focus}
             camera={camera}
@@ -501,7 +508,7 @@ function resolvePreviewCamera(props: ZoomPreviewProps) {
   if (props.region.spotlight || props.region.border)
     return { scale: 1, centerX: 0.5, centerY: 0.5 };
   if (props.playback) return props.playback.camera;
-  const target = quickEditSpatialTargetCamera(props.region);
+  const target = quickEditCropCamera(quickEditSpatialTargetCamera(props.region), props);
   const time = props.focus?.time ?? (props.region.start + props.region.end) / 2;
   const effective = props.focus?.regions.find(
     (region) =>
@@ -544,7 +551,7 @@ function ZoomResultOverlays(props: {
     regions: props.focus?.regions ?? [props.region],
     time: props.focus?.time ?? (props.region.start + props.region.end) / 2,
     output: props.output,
-    video: computeQuickEditWindowTransform(props.layout),
+    video: computeQuickEditSourceWindowTransform(props.layout),
     scale: props.scale,
   };
   const motion = computeQuickEditSceneCamera(props.layout, props.background);

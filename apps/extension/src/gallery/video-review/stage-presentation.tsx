@@ -83,11 +83,16 @@ function stagePresentationScene(
 }
 
 /** Paused target editing overrides interpolation only when its camera actually differs. */
-function pausedCameraOverride(scene: PresentationProps['scene'], playing: boolean) {
+function pausedCameraOverride(
+  scene: PresentationProps['scene'],
+  playing: boolean,
+  source: ReviewSource
+) {
   if (playing || !scene) return undefined;
   const evaluated = evaluateQuickEditCameraAtTime(
     scene.focus?.regions ?? [],
-    scene.focus?.time ?? 0
+    scene.focus?.time ?? 0,
+    { ...scene, source }
   );
   return sameQuickEditCamera(scene.camera, evaluated) ? undefined : scene.camera;
 }
@@ -132,7 +137,11 @@ export function useStagePresentation(
     pausedSourceTime: props.comments?.time ?? props.video.current?.currentTime ?? 0,
     pausedResultTime: props.scene?.focus?.time ?? 0,
     sourceToResult: props.preview?.sourceToResult ?? ((time) => time),
-    cameraTransform: pausedCameraOverride(props.scene, props.preview?.playing ?? false),
+    cameraTransform: pausedCameraOverride(
+      props.scene,
+      props.preview?.playing ?? false,
+      props.source
+    ),
     cut: props.cutPreview,
     webcam: props.webcam,
   });

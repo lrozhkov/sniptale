@@ -22,6 +22,7 @@ import {
   computeQuickEditSceneLayout,
   quickEditCanvasPointToContent,
   quickEditContentPointToCanvas,
+  quickEditVisibleVideoTransform,
 } from '../../features/video/review/advanced/scene';
 
 type VideoRect = { x: number; y: number; width: number; height: number };
@@ -280,8 +281,21 @@ export function ReviewCommentOverlay(props: {
       background: props.background,
       camera: props.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 },
     });
-  const clip = props.projection ? props.clip?.rect : null;
+  const clip = props.projection || layout.sourceCrop ? props.clip?.rect : null;
   const radius = props.clip?.radius ?? 0;
+  const visible = quickEditVisibleVideoTransform(layout);
+  const cropClip = layout.sourceCrop
+    ? `polygon(${[
+        { x: visible.x, y: visible.y },
+        { x: visible.x + visible.width, y: visible.y },
+        { x: visible.x + visible.width, y: visible.y + visible.height },
+        { x: visible.x, y: visible.y + visible.height },
+      ]
+        .map((point) => (props.projection ? projectQuickEditPoint(props.projection, point) : point))
+        .filter((point) => point !== null)
+        .map((point) => `${point.x}px ${point.y}px`)
+        .join(',')})`
+    : undefined;
   return (
     <div
       style={
@@ -306,26 +320,31 @@ export function ReviewCommentOverlay(props: {
         .map((comment) => {
           const content = comment.attachment === 'content';
           return (
-            <OverlayComment
+            <div
               key={comment.id}
-              visualMode={props.visualMode}
-              onPreviewPosition={props.onPreviewPosition}
-              projection={content ? props.projection : undefined}
-              comment={comment}
-              resolvedText={canvasCommentText(comment, props.annotations ?? [])}
-              videoTransform={content ? layout.videoTransform : null}
-              scale={
-                (props.output.width / Math.max(1, props.source.width)) *
-                (content ? (props.camera?.scale ?? 1) : 1)
-              }
-              layer={content ? 5 : 9}
-              selected={comment.id === props.selectedId}
-              busy={props.busy}
-              output={props.output}
-              sourceTime={props.time}
-              onSelect={() => props.onSelect(comment.id)}
-              onMove={props.onMove}
-            />
+              className="pointer-events-none absolute inset-0"
+              style={content && cropClip ? { clipPath: cropClip } : undefined}
+            >
+              <OverlayComment
+                visualMode={props.visualMode}
+                onPreviewPosition={props.onPreviewPosition}
+                projection={content ? props.projection : undefined}
+                comment={comment}
+                resolvedText={canvasCommentText(comment, props.annotations ?? [])}
+                videoTransform={content ? layout.videoTransform : null}
+                scale={
+                  (props.output.width / Math.max(1, props.source.width)) *
+                  (content ? (props.camera?.scale ?? 1) : 1)
+                }
+                layer={content ? 5 : 9}
+                selected={comment.id === props.selectedId}
+                busy={props.busy}
+                output={props.output}
+                sourceTime={props.time}
+                onSelect={() => props.onSelect(comment.id)}
+                onMove={props.onMove}
+              />
+            </div>
           );
         })}
     </div>
