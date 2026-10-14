@@ -5,18 +5,19 @@ import {
   cameraFollowMotionLimits,
   cameraFollowPreset,
   applyCameraFollowPreset,
+  parseCameraFollowSettings,
 } from './cursor-policy';
 import {
   createCameraTrajectory,
   cameraTrajectoryDynamics,
 } from '../../composition/motion/camera-trajectory';
 
-it('keeps legacy movement coefficients when only zone size is overridden', () => {
+it('keeps Calm movement when only zone size is overridden', () => {
   const inherited = resolveCameraFollowPolicy({ legacySensitivity: 0.7 });
   const overridden = resolveCameraFollowPolicy({
     override: { ...inherited.settings, zoneSize: 0.8 },
   });
-  expect(overridden.legacy).toEqual(inherited.legacy);
+  expect(cameraFollowPreset(overridden.settings)).toBe('calm');
 });
 
 it('inherits defaults, gives a region override priority and restores inheritance after reset', () => {
@@ -84,26 +85,39 @@ it('changes movement presets without changing zone size or increasing nominal zo
   expect(speeds[1]).toBeLessThan(speeds[2]!);
   expect(
     settings.every(
-      (value) => value.zoneSize === 0.55 && !value.allowExpansion && value.minimumScale === 1
+      (value) => value.zoneSize === 0.55 && value.allowExpansion && value.minimumScale === 1
     )
   ).toBe(true);
 });
 
-it('keeps legacy sensitivity in a distinct preset without assigning it to grouping or path smoothing', () => {
-  const slow = resolveCameraFollowPolicy({ legacySensitivity: 0 });
-  const fast = resolveCameraFollowPolicy({ legacySensitivity: 1 });
-  expect(slow.source).toBe('legacy');
-  expect(fast.legacy!.speed).toBeGreaterThan(slow.legacy!.speed);
-  expect(fast.settings.marginFraction).toBeGreaterThan(slow.settings.marginFraction);
-  expect(fast.settings.zoneSize).toBe(slow.settings.zoneSize);
-  expect(() => resolveCameraFollowPolicy({ legacySensitivity: NaN })).toThrow(
-    'between zero and one'
-  );
+it('resolves old paths to Calm with enabled defaults without retaining legacy dynamics', () => {
+  const oldPath = resolveCameraFollowPolicy({ legacySensitivity: 0 });
+  expect(oldPath.settings).toEqual(createCameraFollowSettings('calm'));
+  expect(oldPath.settings).toMatchObject({ preservePointer: true, allowExpansion: true });
+  expect(resolveCameraFollowPolicy({ legacySensitivity: 1 }).settings).toEqual(oldPath.settings);
+});
+
+it('normalizes only obsolete movement and preserves explicit modern and independent choices', () => {
+  const modern = {
+    ...createCameraFollowSettings('fast'),
+    transitionDuration: 0.42,
+    allowExpansion: false,
+  };
+  expect(resolveCameraFollowPolicy({ defaults: modern }).settings).toEqual(modern);
+  const old = { ...modern, legacySensitivity: 0.7, zoneSize: 0.8 };
+  const before = structuredClone(old);
+  expect(resolveCameraFollowPolicy({ defaults: old }).settings).toEqual({
+    ...applyCameraFollowPreset(old, 'calm'),
+    zoneSize: 0.8,
+    allowExpansion: false,
+  });
+  expect(old).toEqual(before);
 });
 
 it('replaces legacy movement with a named preset while preserving independent camera choices', () => {
   const settings = {
-    ...resolveCameraFollowPolicy({ legacySensitivity: 0.7 }).settings,
+    ...createCameraFollowSettings(),
+    legacySensitivity: 0.7,
     zoneSize: 0.8,
     preservePointer: false,
     allowExpansion: true,
@@ -123,4 +137,15 @@ it('replaces legacy movement with a named preset while preserving independent ca
   expect(cameraFollowPreset(calm)).toBe('calm');
   expect(cameraFollowPreset({ ...calm, transitionDuration: 0.7 })).toBe('custom');
   expect(settings).toEqual(before);
+});
+
+it('admits saved modern and legacy settings while rejecting invalid persistence values', () => {
+  const saved = { ...createCameraFollowSettings('fast'), legacySensitivity: 0.7 };
+  expect(parseCameraFollowSettings(saved)).toEqual(saved);
+  expect(parseCameraFollowSettings(createCameraFollowSettings())).toEqual(
+    createCameraFollowSettings()
+  );
+  expect(parseCameraFollowSettings(null)).toBeNull();
+  expect(parseCameraFollowSettings({ ...saved, zoneSize: Number.NaN })).toBeNull();
+  expect(parseCameraFollowSettings({ ...saved, legacySensitivity: 2 })).toBeNull();
 });

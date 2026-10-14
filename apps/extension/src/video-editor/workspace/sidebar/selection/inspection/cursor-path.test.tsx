@@ -254,7 +254,6 @@ it('fine tangent tuning retains source endpoints and global policy tuning stays 
   act(() =>
     root.render(<InspectCursorPathSettings project={useVideoEditorStore.getState().project!} />)
   );
-  const beforePolicy = useVideoEditorStore.getState().project!;
   inspectorNumber('videoEditor.sidebar.cameraZoneSize', '80');
   expect(useVideoEditorStore.getState().project!.cursorFocusPath).toMatchObject({
     smoothing: 0.8,
@@ -263,7 +262,7 @@ it('fine tangent tuning retains source endpoints and global policy tuning stays 
   const policyProject = useVideoEditorStore.getState().project!;
   expect(policyProject.cameraFollowDefaults).toMatchObject({
     zoneSize: 0.8,
-    legacySensitivity: beforePolicy.cursorFocusPath!.sensitivity,
+    transitionDuration: 0.65,
   });
   expect(policyProject.version).toBe(4);
   expect(policyProject.cursorTrack).toEqual(project.cursorTrack);
@@ -278,3 +277,24 @@ it('fine tangent tuning retains source endpoints and global policy tuning stays 
     policyProject.cameraFollowDefaults
   );
 });
+
+it.each([true, false])(
+  'keeps path and camera locks independent inside one disclosure (camera locked: %s)',
+  (cameraLocked) => {
+    const { project } = editableInspector();
+    project.utilityLanes = {
+      actions: { visible: true, locked: !cameraLocked },
+      camera: { visible: true, locked: cameraLocked },
+    };
+    useVideoEditorStore.getState().setProject(project);
+    act(() => root.render(<InspectCursorPathSettings project={project} />));
+    const smoothing = host.querySelector<HTMLInputElement>(
+      'input[aria-label="videoEditor.sidebar.cursorFocusSmoothing"]'
+    )!;
+    const duration = host.querySelector<HTMLInputElement>(
+      'input[aria-label="videoEditor.sidebar.cameraTransitionDuration"]'
+    )!;
+    expect(smoothing.matches(':disabled')).toBe(!cameraLocked);
+    expect(duration.matches(':disabled')).toBe(cameraLocked);
+  }
+);

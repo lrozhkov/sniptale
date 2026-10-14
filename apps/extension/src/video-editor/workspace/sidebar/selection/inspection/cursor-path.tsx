@@ -1,3 +1,5 @@
+import { SegmentedRow } from '../../../../../ui/compact-inspector-controls';
+import type { ReactNode } from 'react';
 import {
   applyCameraFollowPreset,
   cameraFollowPreset,
@@ -199,16 +201,29 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
     });
   return (
     <fieldset className="m-0 min-w-0 border-0 p-0" data-ui="cursorFocusPath.settings">
-      <SelectInput
-        disabled={locked}
-        label={translate('videoEditor.sidebar.cursorFocusMode')}
-        value={path.mode}
-        options={[
-          { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
-          { value: 'follow', label: translate('videoEditor.sidebar.cursorFocusFollow') },
-        ]}
-        onChange={(mode) => change({ ...path, mode })}
-      />
+      <div className="min-w-0 space-y-1.5">
+        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {translate('videoEditor.sidebar.cursorFocusMode')}
+        </span>
+        <SegmentedRow
+          columns={2}
+          ariaLabel={translate('videoEditor.sidebar.cursorFocusMode')}
+          value={path.mode}
+          options={[
+            {
+              value: 'fixed',
+              label: translate('videoEditor.sidebar.cursorFocusFixed'),
+              disabled: locked,
+            },
+            {
+              value: 'follow',
+              label: translate('videoEditor.sidebar.cursorFocusFollow'),
+              disabled: locked,
+            },
+          ]}
+          onChange={(mode) => change({ ...path, mode })}
+        />
+      </div>
       <InspectCameraFollowSettings
         global
         settings={
@@ -230,11 +245,6 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
             );
           })
         }
-      />
-      <InspectorDetails
-        preferenceId="cursor-path-policy"
-        icon={SlidersHorizontal}
-        label={translate('videoEditor.sidebar.framingFineTune')}
       >
         <NumberInput
           disabled={locked}
@@ -246,7 +256,8 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
           scrub={false}
           onChange={(smoothing) => change({ ...path, smoothing })}
         />
-      </InspectorDetails>
+      </InspectCameraFollowSettings>
+
       <InspectorActionButton compact disabled={locked} onClick={() => change(undefined)}>
         {translate('videoEditor.sidebar.cursorFocusReset')}
       </InspectorActionButton>
@@ -394,6 +405,7 @@ function CursorInspectorActions({
 /** Existing inspector controls edit policy through the document history callback. */
 export function InspectCameraFollowSettings(props: {
   global?: boolean;
+  children?: ReactNode;
   settings: CameraFollowSettings;
   inherited: boolean;
   legacySensitivity: number;
@@ -402,16 +414,15 @@ export function InspectCameraFollowSettings(props: {
 }) {
   const settings = props.settings;
   const label = (key: Parameters<typeof translate>[0]) => translate(key);
-  const update = (patch: Partial<CameraFollowSettings>, movement = false) => {
-    const { legacySensitivity: legacy, ...current } = settings;
-    props.onChange({
-      ...current,
-      ...(!movement && legacy !== undefined ? { legacySensitivity: legacy } : {}),
-      ...patch,
-    });
-  };
+  const update = (patch: Partial<CameraFollowSettings>) =>
+    props.onChange({ ...settings, ...patch });
   const number = (
-    name: 'transitionDuration' | 'marginFraction' | 'minimumHoldDuration' | 'minimumScale',
+    name:
+      | 'zoneSize'
+      | 'transitionDuration'
+      | 'marginFraction'
+      | 'minimumHoldDuration'
+      | 'minimumScale',
     key: Parameters<typeof translate>[0],
     min: number,
     max: number,
@@ -427,12 +438,7 @@ export function InspectCameraFollowSettings(props: {
       step={factor === 100 ? 1 : 0.05}
       unit={unit}
       disabled={props.disabled ?? false}
-      onChange={(value) =>
-        update(
-          { [name]: value / factor },
-          name === 'transitionDuration' || name === 'minimumHoldDuration'
-        )
-      }
+      onChange={(value) => update({ [name]: value / factor })}
     />
   );
   const toggle = (
@@ -452,58 +458,60 @@ export function InspectCameraFollowSettings(props: {
     </div>
   );
   return (
-    <fieldset
-      disabled={props.disabled}
-      className="m-0 min-w-0 space-y-2 border-0 p-0"
-      data-ui="cameraFollow.settings"
-    >
-      <p className="text-xs">
-        {label(
-          props.global
-            ? 'videoEditor.sidebar.cameraDefaults'
-            : props.inherited
-              ? 'videoEditor.sidebar.cameraInherited'
-              : 'videoEditor.sidebar.cameraOverride'
-        )}
-      </p>
-      <SliderField
-        label={label('videoEditor.sidebar.cameraZoneSize')}
-        value={settings.zoneSize * 100}
-        min={10}
-        max={100}
-        step={1}
-        onChange={(value) => update({ zoneSize: value / 100 })}
-      />
-      <p className="text-xs">{label('videoEditor.sidebar.cameraZoneHints')}</p>
-      <SelectInput
-        label={label('videoEditor.sidebar.cameraMovement')}
-        value={cameraFollowPreset(settings)}
-        options={[
-          { value: 'legacy', label: label('videoEditor.sidebar.cameraLegacy') },
-          { value: 'calm', label: label('videoEditor.sidebar.cameraCalm') },
-          { value: 'balanced', label: label('videoEditor.sidebar.cameraBalanced') },
-          { value: 'fast', label: label('videoEditor.sidebar.cameraFast') },
-          { value: 'custom', label: label('videoEditor.sidebar.cameraCustom'), disabled: true },
-        ]}
-        onChange={(preset) => {
-          if (preset === 'legacy')
-            props.onChange({
-              ...settings,
-              ...resolveCameraFollowPolicy({ legacySensitivity: props.legacySensitivity }).settings,
-              zoneSize: settings.zoneSize,
-              preservePointer: settings.preservePointer,
-              allowExpansion: settings.allowExpansion,
-              minimumScale: settings.minimumScale,
-            });
-          else if (preset !== 'custom') props.onChange(applyCameraFollowPreset(settings, preset));
-        }}
-      />
-      {toggle('preservePointer', 'videoEditor.sidebar.cameraPreservePointer')}
-      {toggle('allowExpansion', 'videoEditor.sidebar.cameraAllowExpansion')}
+    <fieldset className="m-0 min-w-0 space-y-2 border-0 p-0" data-ui="cameraFollow.settings">
+      <div className="min-w-0 space-y-1.5">
+        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {label('videoEditor.sidebar.cameraZoneSize')}
+        </span>
+        <SegmentedRow
+          ariaLabel={label('videoEditor.sidebar.cameraZoneSize')}
+          value={String(settings.zoneSize)}
+          options={[
+            { value: '0.3', label: label('videoEditor.sidebar.cameraZoneSmall') },
+            { value: '0.55', label: label('videoEditor.sidebar.cameraZoneMedium') },
+            { value: '0.8', label: label('videoEditor.sidebar.cameraZoneLarge') },
+          ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
+          onChange={(value) =>
+            update({ zoneSize: value === '0.3' ? 0.3 : value === '0.55' ? 0.55 : 0.8 })
+          }
+        />
+      </div>
+      <div className="min-w-0 space-y-1.5">
+        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {label('videoEditor.sidebar.cameraMovement')}
+        </span>
+        <SegmentedRow
+          ariaLabel={label('videoEditor.sidebar.cameraMovement')}
+          value={cameraFollowPreset(settings)}
+          options={[
+            { value: 'calm', label: label('videoEditor.sidebar.cameraCalm') },
+            { value: 'balanced', label: label('videoEditor.sidebar.cameraBalanced') },
+            { value: 'fast', label: label('videoEditor.sidebar.cameraFast') },
+          ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
+          onChange={(preset) => {
+            if (preset === 'calm' || preset === 'balanced' || preset === 'fast')
+              props.onChange(applyCameraFollowPreset(settings, preset));
+          }}
+        />
+      </div>
       <InspectorDetails
         label={label('videoEditor.sidebar.framingFineTune')}
+        icon={SlidersHorizontal}
         preferenceId="camera-follow-advanced"
       >
+        {props.children}
+        <SliderField
+          label={label('videoEditor.sidebar.cameraZoneSize')}
+          value={settings.zoneSize * 100}
+          min={10}
+          max={100}
+          step={1}
+          disabled={props.disabled ?? false}
+          onChange={(value) => update({ zoneSize: value / 100 })}
+        />
+        {toggle('preservePointer', 'videoEditor.sidebar.cameraPreservePointer')}
+        {toggle('allowExpansion', 'videoEditor.sidebar.cameraAllowExpansion')}
+
         {number(
           'transitionDuration',
           'videoEditor.sidebar.cameraTransitionDuration',

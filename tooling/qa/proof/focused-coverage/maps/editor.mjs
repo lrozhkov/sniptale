@@ -1,5 +1,12 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-review-inspector-binding',
+    productionFile: 'apps/extension/src/gallery/video-review/inspector-binding.tsx',
+    reason:
+      'The modal integration suite exercises inspector composition, note/report actions, selection and ordered close/recovery through the real binding.',
+    testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
+  },
+  {
     owner: 'gallery-review-preview-presentation-session',
     productionFile: 'apps/extension/src/gallery/video-review/preview-presentation-session.ts',
     reason:

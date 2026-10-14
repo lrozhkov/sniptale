@@ -3,7 +3,16 @@ import { ReviewButton } from './controls';
 import { ReviewPresentationBinding } from './presentation-binding';
 import { ReviewWatermarkInspector } from './watermark-inspector';
 import type { ComponentProps } from 'react';
-import { Scan, Wallpaper, Stamp, AudioLines, PanelTop, Clapperboard, Captions } from 'lucide-react';
+import {
+  Scan,
+  Wallpaper,
+  Stamp,
+  AudioLines,
+  PanelTop,
+  Clapperboard,
+  Captions,
+  Navigation,
+} from 'lucide-react';
 import { ReviewCaptionSceneControls } from './caption-controls';
 import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
@@ -97,6 +106,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
 
 /** Scene controls are independent of the selected zoom and its property panel. */
 export function ReviewSceneProperties(props: {
+  cursorPath?: ReactNode;
   focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
   background: QuickEditAdvancedState['background'];
   onPreviewBackground?(background: QuickEditAdvancedState['background'] | null): void;
@@ -136,22 +146,6 @@ export function ReviewSceneProperties(props: {
         ) : null}
         <ReviewInspectorSections
           sections={[
-            ...(props.onCaptions
-              ? [
-                  {
-                    id: 'captions',
-                    label: translate('gallery.videoReview.captions'),
-                    icon: Captions,
-                    content: (
-                      <ReviewCaptionSceneControls
-                        settings={props.captions}
-                        onChange={props.onCaptions}
-                        disabled={props.busy}
-                      />
-                    ),
-                  },
-                ]
-              : []),
             {
               id: 'canvas',
               label: translate('gallery.videoReview.canvas'),
@@ -215,6 +209,22 @@ export function ReviewSceneProperties(props: {
                   },
                 ]
               : []),
+            ...(props.onCaptions
+              ? [
+                  {
+                    id: 'captions',
+                    label: translate('gallery.videoReview.captions'),
+                    icon: Captions,
+                    content: (
+                      <ReviewCaptionSceneControls
+                        settings={props.captions}
+                        onChange={props.onCaptions}
+                        disabled={props.busy}
+                      />
+                    ),
+                  },
+                ]
+              : []),
             ...(props.hasOriginalAudio || props.audio.voiceover.length || props.audio.music.length
               ? [
                   {
@@ -229,6 +239,16 @@ export function ReviewSceneProperties(props: {
                         onLaneVolume={props.onLaneVolume}
                       />
                     ),
+                  },
+                ]
+              : []),
+            ...(props.cursorPath
+              ? [
+                  {
+                    id: 'cursor-path',
+                    label: translate('videoEditor.sidebar.cursorFocusPathTitle'),
+                    icon: Navigation,
+                    content: props.cursorPath,
                   },
                 ]
               : []),

@@ -71,7 +71,7 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
     ru: 'Добавьте аннотацию над таймлайном',
     en: 'Add an annotation above the timeline',
   },
-  captionsEnabled: { ru: 'Показывать текст', en: 'Show text' },
+  captionsEnabled: { ru: 'Включить субтитры', en: 'Enable subtitles' },
   captionStyle: { ru: 'Стиль текста', en: 'Text style' },
   captionInherit: { ru: 'Стиль сцены', en: 'Use scene style' },
   captionPosition: { ru: 'Положение', en: 'Position' },

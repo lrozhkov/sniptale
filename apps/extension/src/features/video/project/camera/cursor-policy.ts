@@ -18,8 +18,6 @@ export interface CameraFollowSettings {
 export interface ResolvedCameraFollowPolicy {
   settings: CameraFollowSettings;
   source: 'defaults' | 'override' | 'legacy';
-  /** Retain the meaning of existing source-normalized speed and margin coefficients. */
-  legacy?: { sensitivity: number; speed: number; acceleration: number; response: number };
 }
 
 /** Admit persisted policy without converting legacy coefficients or accepting partial settings. */
@@ -69,13 +67,13 @@ const PRESETS = {
 
 /** Construct independent defaults. Presets change movement, without changing grouping or zoom. */
 export function createCameraFollowSettings(
-  preset: CameraFollowPreset = 'balanced'
+  preset: CameraFollowPreset = 'calm'
 ): CameraFollowSettings {
   return {
     zoneSize: 0.55,
     ...PRESETS[preset],
     preservePointer: true,
-    allowExpansion: false,
+    allowExpansion: true,
     minimumScale: 1,
   };
 }
@@ -106,40 +104,21 @@ export function applyCameraFollowPreset(
   return { ...current, ...PRESETS[preset] };
 }
 
-/** Resolve the local override before defaults. Reads never rewrite legacy path fields. */
+/** Resolve saved custom values; obsolete movement uses Calm without writing project data. */
 export function resolveCameraFollowPolicy(input: {
   defaults?: CameraFollowSettings;
   override?: CameraFollowSettings;
   legacySensitivity?: number;
 }): ResolvedCameraFollowPolicy {
   const saved = input.override ?? input.defaults;
-  if (saved)
-    return {
-      settings: { ...saved },
-      source: input.override ? 'override' : 'defaults',
-      ...(saved.legacySensitivity !== undefined
-        ? { legacy: legacyMotion(saved.legacySensitivity) }
-        : {}),
-    };
-  const sensitivity = input.legacySensitivity ?? 0.5;
   return {
-    settings: {
-      ...createCameraFollowSettings(),
-      legacySensitivity: sensitivity,
-      // Legacy movement began at 55–80% of the visible half-frame. Keep that edge margin.
-      marginFraction: 0.5 - (0.55 + 0.25 * (1 - sensitivity)) / 2,
-      transitionDuration: 1 / 8,
-      minimumHoldDuration: 0.12,
-    },
-    source: 'legacy',
-    legacy: legacyMotion(sensitivity),
+    settings: saved
+      ? saved.legacySensitivity === undefined
+        ? { ...saved }
+        : applyCameraFollowPreset(saved, 'calm')
+      : createCameraFollowSettings(),
+    source: input.override ? 'override' : input.defaults ? 'defaults' : 'legacy',
   };
-}
-
-function legacyMotion(sensitivity: number) {
-  if (!Number.isFinite(sensitivity) || sensitivity < 0 || sensitivity > 1)
-    throw new Error('Legacy camera sensitivity must be between zero and one.');
-  return { sensitivity, speed: 0.8 + 1.2 * sensitivity, acceleration: 4, response: 8 };
 }
 
 /** Derive coupled screen limits from one transition duration, in output pixels and seconds. */
@@ -153,15 +132,6 @@ export function cameraFollowMotionLimits(
     minimumScale: number;
   }
 ) {
-  if (policy.legacy) {
-    const diagonal =
-      Math.hypot(geometry.windowWidth, geometry.windowHeight) * geometry.minimumScale;
-    return {
-      speed: policy.legacy.speed * diagonal,
-      acceleration: policy.legacy.acceleration * diagonal,
-      jerk: policy.legacy.acceleration * policy.legacy.response * diagonal,
-    };
-  }
   const diagonal = Math.hypot(geometry.viewportWidth, geometry.viewportHeight);
   const duration = policy.settings.transitionDuration;
   return {

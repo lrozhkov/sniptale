@@ -594,6 +594,72 @@
       "reviewDate": "2026-10-14",
       "astHash": "027483aa394dded96010f899829a0efecc3748824a1cc46de34eb2c338e276c0",
       "signatureHash": "d20553052c92f825c5d86b199747dc39e36550dd32e40a3cdcd57efa7ec23938"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/advanced-panels.tsx",
+      "symbol": "ReviewSceneProperties",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One JSX composition orders optional scene sections and existing callbacks. It has one owner, one statement, no effects, and no state. Cursor content and caption order belong to this same composition. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
+      "reviewDate": "2026-10-14",
+      "astHash": "1e1c5b3141de793da3c81557c76892514ef143013ee5e9db7d0c0dfecbc7662b",
+      "signatureHash": "193c8c884f40405183884ba9f371ac911cedd8f5de8047ddd30b087a99e0555e"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: Existing point and scene controls delegate geometry to authoring/evaluator owners and movement to cursor-policy. Writes remain callbacks. The unchanged score counts pure updateCursorFocusKey as state. No new effect or state authority exists. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
+      "reviewDate": "2026-10-14",
+      "astHash": "c3cdc05458b9dabc3d149a42e03b6f3c2fb3f96466fcaeca3dabf9d0c9ef38a7",
+      "signatureHash": "6194a1483b99453888c395b35503f1db1816fa7526d9fe89df23f7486084499b"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/cursor-path-overlay.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One DOM/root/path fixture serves cursor overlay and inspector assertions. afterEach unmounts and removes it. The unchanged score counts test setup as effects. New assertions use the same fixture lifetime. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
+      "reviewDate": "2026-10-14",
+      "astHash": "a68b66171796a8d3642313b30a5a3c9c2dfa75667dfd8184417f736cf037e88e",
+      "signatureHash": "60a99b2d8b656cad91602100ee09a62a9465199b7a43beb5ad81395f80735993"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/inspector-binding.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: The candidate removes a forwarding scene binding and passes identical callbacks through the existing scene properties binding. Existing session, audio, and navigation receivers retain their responsibilities. State and effect counts are unchanged. No writer or recovery authority moves. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
+      "reviewDate": "2026-10-14",
+      "astHash": "9d7389ea5942d9c54a977cb28f10738a9c54cc2257867d725aaf6aec9e5a311b",
+      "signatureHash": "5e72e5fe4c4cdb9486008e262b9117573e1a2fc972045dde2e706196d968db41"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: Existing editing, playback, and selection ports retain authority. Policy controls use existing callbacks. SegmentedRow adds a UI import owner, not an authority. Path and camera locks remain independent, with deterministic disabled-inheritance proof. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
+      "reviewDate": "2026-10-14",
+      "astHash": "853c774b9077405f6dfbbd52e6fb1b017a32219b15a073bd578609e8115a35e2",
+      "signatureHash": "6a731b079f4e31277952ca58b4119d51f93d29e1e7a280b367531ff6f4b4bd23"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+      "symbol": "useCursorInspector",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: This body is unchanged against HEAD. It coordinates selected-key navigation, authoring, and existing history admission. Mutation refusal precedes override selection. Its collaborators implement one cursor operation without competing ownership. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
+      "reviewDate": "2026-10-14",
+      "astHash": "54139137938fd7d1dda459a12e8a0b47661cc36e7f1d06958ad9f6933f19eada",
+      "signatureHash": "7b093ca8674fcf934f6533a94cc38154b607d0bd19b619253aafb0f6b69857f1"
     }
   ]
 }

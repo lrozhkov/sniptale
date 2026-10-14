@@ -4223,3 +4223,110 @@ test('Gallery downloads a compact summary while retaining a dense recorded traje
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+for (const variant of [
+  { locale: 'ru', theme: 'light', width: 1280, height: 560 },
+  { locale: 'en', theme: 'dark', width: 1920, height: 900 },
+] as const) {
+  test(`scene camera segments and fine tuning (${variant.locale})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await page.setViewportSize({ width: variant.width, height: variant.height });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+        .click();
+      const sections = dialog.locator('section.review-inspector-section');
+      const order = await sections.evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('data-section'))
+      );
+      expect(order.at(-1)).toBe('cursor-path');
+      expect(order.indexOf('captions')).toBeGreaterThan(order.indexOf('watermark'));
+      expect(order.indexOf('captions')).toBeLessThan(order.indexOf('audio'));
+      await expect(
+        dialog.getByRole('switch', { name: label('gallery.videoReview.captionsEnabled') })
+      ).toBeAttached();
+      const settings = dialog.locator('[data-ui="cursorFocusPath.settings"]');
+      await settings.scrollIntoViewIfNeeded();
+      const mode = settings.getByRole('group', {
+        name: label('videoEditor.sidebar.cursorFocusMode'),
+        exact: true,
+      });
+      await mode
+        .getByRole('button', { name: label('videoEditor.sidebar.cursorFocusFixed'), exact: true })
+        .click();
+      await expect(
+        mode.getByRole('button', {
+          name: label('videoEditor.sidebar.cursorFocusFixed'),
+          exact: true,
+        })
+      ).toHaveAttribute('aria-pressed', 'true');
+      await mode
+        .getByRole('button', { name: label('videoEditor.sidebar.cursorFocusFollow'), exact: true })
+        .click();
+      const movement = settings.getByRole('group', {
+        name: label('videoEditor.sidebar.cameraMovement'),
+        exact: true,
+      });
+      await expect(movement.getByRole('button')).toHaveCount(3);
+      await expect(
+        movement.getByRole('button', { name: label('videoEditor.sidebar.cameraCalm'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
+      await movement
+        .getByRole('button', { name: label('videoEditor.sidebar.cameraFast'), exact: true })
+        .click();
+      await settings
+        .getByRole('button', { name: label('videoEditor.sidebar.cameraZoneLarge'), exact: true })
+        .click();
+      const fine = settings.locator('details');
+      await expect(fine).toHaveCount(1);
+      await fine.locator('summary').click();
+      await expect(
+        fine.getByRole('switch', { name: label('videoEditor.sidebar.cameraPreservePointer') })
+      ).toHaveAttribute('aria-checked', 'true');
+      await expect(
+        fine.getByRole('switch', { name: label('videoEditor.sidebar.cameraAllowExpansion') })
+      ).toHaveAttribute('aria-checked', 'true');
+      const duration = fine.getByRole('textbox', {
+        name: label('videoEditor.sidebar.cameraTransitionDuration'),
+        exact: true,
+      });
+      await duration.fill('0.42');
+      await duration.press('Enter');
+      await expect(movement.locator('[aria-pressed="true"]')).toHaveCount(0);
+      await expect(
+        fine.getByRole('textbox', {
+          name: label('videoEditor.sidebar.cursorFocusSmoothing'),
+          exact: true,
+        })
+      ).toBeAttached();
+      await fine.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('scene-camera-fine.png'), fullPage: false });
+      await fine.locator('summary').click();
+      await settings.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('scene-camera-segments.png'),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

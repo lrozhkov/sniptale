@@ -357,7 +357,7 @@ it('tangent and policy numeric commits retain endpoints and use their independen
   const geometryCalls = onChange.mock.calls.length;
   commitCursorNumber('videoEditor.sidebar.cameraZoneSize', '80');
   expect(onPolicyChange).toHaveBeenLastCalledWith(
-    expect.objectContaining({ zoneSize: 0.8, legacySensitivity: 0.5 })
+    expect.objectContaining({ zoneSize: 0.8, transitionDuration: 0.65 })
   );
   expect(onChange).toHaveBeenCalledTimes(geometryCalls);
 });
@@ -646,3 +646,49 @@ it.each([2, 0.989])(
     ).toBeGreaterThanOrEqual(24);
   }
 );
+
+it('offers three movement presets, keeps custom edits unselected and shares one fine-tune disclosure', () => {
+  const onPolicyChange = vi.fn();
+  const onChange = vi.fn();
+  const renderSettings = (
+    settings?: import('../../features/video/project/camera/cursor-policy').CameraFollowSettings
+  ) =>
+    act(() =>
+      root.render(
+        <ReviewCursorPathSettings
+          path={path}
+          disabled={false}
+          onChange={onChange}
+          onPolicyChange={onPolicyChange}
+          cameraFollowDefaults={settings}
+        />
+      )
+    );
+  renderSettings();
+  const movement = () =>
+    host.querySelector('[role="group"][aria-label="videoEditor.sidebar.cameraMovement"]')!;
+  expect(movement().querySelectorAll('button')).toHaveLength(3);
+  expect(movement().querySelector('[aria-pressed="true"]')?.textContent).toBe(
+    'videoEditor.sidebar.cameraCalm'
+  );
+  expect(host.querySelectorAll('details')).toHaveLength(1);
+  expect(
+    host
+      .querySelector('details')!
+      .querySelector('input[aria-label="videoEditor.sidebar.cursorFocusSmoothing"]')
+  ).not.toBeNull();
+  expect(
+    host
+      .querySelector('[aria-label="videoEditor.sidebar.cameraAllowExpansion"]')
+      ?.getAttribute('aria-checked')
+  ).toBe('true');
+  const fast = Array.from(movement().querySelectorAll('button')).find(
+    (button) => button.textContent === 'videoEditor.sidebar.cameraFast'
+  )!;
+  act(() => fast.click());
+  renderSettings(onPolicyChange.mock.lastCall![0]);
+  commitCursorNumber('videoEditor.sidebar.cameraTransitionDuration', '0.42');
+  renderSettings(onPolicyChange.mock.lastCall![0]);
+  expect(movement().querySelector('[aria-pressed="true"]')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+});

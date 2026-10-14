@@ -219,9 +219,9 @@ export function ReviewInspectorBinding({
         selectionPreferenceScope={state.activeSelection.kind}
         selectionHasSections={hasSelectionSections(state)}
         scene={
-          <ReviewSceneBinding
+          <ReviewScenePropertiesBinding
             state={state}
-            resource={resource}
+            source={resource.source}
             audio={audio}
             onJoinPreview={onJoinPreview}
           />
@@ -480,6 +480,15 @@ function ReviewScenePropertiesBinding({
   const { busy, editing } = state;
   return (
     <ReviewSceneProperties
+      cursorPath={
+        <ReviewCursorPathSettings
+          path={state.cursorFocusPath}
+          cameraFollowDefaults={state.advanced.cameraFollowDefaults}
+          onPolicyChange={state.setCameraFollowDefaults}
+          disabled={busy || state.playing || editing.exporter.phase !== 'idle'}
+          onChange={state.setCursorFocusPath}
+        />
+      }
       focus={{ advanced: state.advanced, time: state.timeline.sceneOutputTime }}
       background={state.advanced.background}
       canvas={state.advanced.canvas}
@@ -713,33 +722,5 @@ function hasSelectionSections(state: InspectorState): boolean {
         'webcam-position',
         'annotation-effect',
       ].includes(state.activeSelection.kind))
-  );
-}
-function ReviewSceneBinding({
-  state,
-  resource,
-  audio,
-  onJoinPreview,
-}: Pick<
-  Parameters<typeof ReviewInspectorBinding>[0],
-  'state' | 'resource' | 'audio' | 'onJoinPreview'
->) {
-  const { busy, editing } = state;
-  return (
-    <>
-      <ReviewCursorPathSettings
-        path={state.cursorFocusPath}
-        cameraFollowDefaults={state.advanced.cameraFollowDefaults}
-        onPolicyChange={state.setCameraFollowDefaults}
-        disabled={busy || state.playing || editing.exporter.phase !== 'idle'}
-        onChange={state.setCursorFocusPath}
-      />
-      <ReviewScenePropertiesBinding
-        state={state}
-        source={resource.source}
-        audio={audio}
-        onJoinPreview={onJoinPreview}
-      />
-    </>
   );
 }

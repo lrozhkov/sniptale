@@ -11,13 +11,20 @@ import { ReviewInspectorBinding } from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { translate } from '../../platform/i18n';
 
+const sceneProbe = vi.hoisted(() => ({ enabled: false }));
+vi.mock('./advanced-panels', () => ({
+  ReviewSceneProperties: (props: { cursorPath: ReactNode }) => <div>{props.cursorPath}</div>,
+  ReviewAdvancedPanels: () => null,
+}));
 vi.mock('./inspector', () => ({
   ReviewInspector: (props: {
+    scene: ReactNode;
     speech: ReactNode;
     actionHistory: ReactNode;
     children: ReactNode;
   }) => (
     <div>
+      {sceneProbe.enabled ? props.scene : null}
       {props.speech}
       {props.actionHistory}
       {props.children}
@@ -218,7 +225,39 @@ it('joins every editor buffer for either recognition source and guards related-t
     expect(
       host.querySelector<HTMLFieldSetElement>('[data-ui="cursorFocusPath.inspector"]')!.disabled
     ).toBe(true);
+
+    sceneProbe.enabled = true;
+    const setPolicy = vi.fn();
+    const sceneProps = {
+      ...cursorProps,
+      resource: { ...cursorProps.resource, source: { width: 320, height: 180, duration: 4 } },
+      state: {
+        ...cursorProps.state,
+        watermark: {},
+        backgroundImport: {},
+        setCameraFollowDefaults: setPolicy,
+        features: { background: advanced.background },
+      },
+    } as unknown as ComponentProps<typeof ReviewInspectorBinding>;
+    await act(async () => root.render(<ReviewInspectorBinding {...sceneProps} />));
+    const scene = host.querySelector('[data-ui="cursorFocusPath.settings"]')!;
+    const fast = Array.from(scene.querySelectorAll('button')).find(
+      (node) => node.textContent === translate('videoEditor.sidebar.cameraFast')
+    )!;
+    await act(async () => fast.click());
+    expect(setPolicy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ transitionDuration: 0.2 })
+    );
+    await act(async () =>
+      root.render(
+        <ReviewInspectorBinding {...sceneProps} state={{ ...sceneProps.state, playing: true }} />
+      )
+    );
+    expect(
+      host.querySelector<HTMLFieldSetElement>('[data-ui="cursorFocusPath.settings"]')!.disabled
+    ).toBe(true);
   } finally {
+    sceneProbe.enabled = false;
     await act(async () => root.unmount());
     host.remove();
     vi.unstubAllGlobals();
