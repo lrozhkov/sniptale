@@ -22,6 +22,7 @@ import type {
 } from '../../features/video/review/types';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 import { useReviewCommentActions } from './use-review-comments';
+import type { ReviewPlaybackRange } from './playback-range';
 import type { useReviewComposer } from './use-session';
 import type { LoadedReview } from './use-session';
 import type { useReviewAdvanced } from './use-advanced';
@@ -62,6 +63,7 @@ export function useReviewEditorWiring(args: {
   setActiveSelection: Dispatch<SetStateAction<ReviewSelection>>;
   clearAnnotation: Dispatch<SetStateAction<ReviewAnnotation | null>>;
   time: number;
+  playbackRange: ReviewPlaybackRange | null;
   timelineDuration: number;
   beforeAction?: ReviewBeforeAction;
   busy: boolean;
@@ -88,6 +90,8 @@ export function useReviewEditorWiring(args: {
   );
   const comments = useReviewCommentActions({
     composer: args.composer,
+    time: args.time,
+    playbackRange: args.playbackRange,
     video: args.video,
     seek: args.seek,
     setSelection: args.setTimelineSelection,
@@ -230,7 +234,7 @@ function useWiredReviewShortcuts(
     },
     pointTool: () => selectReviewPointer(args, audio, cancelAnnotationTool),
     remove: removeSelection,
-    addComment: () => comments.add(args.timelineSelection),
+    addComment: () => comments.add(),
     toggleCut: () => {
       if (audio.originalRangeSelected && args.activeSelection.kind === 'none') return;
       cancelAnnotationTool();

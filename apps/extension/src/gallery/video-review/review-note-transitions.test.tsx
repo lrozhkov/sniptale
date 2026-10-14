@@ -287,3 +287,85 @@ it.each(['success', 'cancel', 'failure'] as const)(
     }
   }
 );
+
+it.each(['toolbar', 'shortcut'] as const)(
+  'anchors %s Notes to the ruler range, then the playhead with action history hidden',
+  async (entry) => {
+    const fixture = createEditorFixture(integration);
+    const add = async () => {
+      if (entry === 'toolbar') await fixture.click('addComment');
+      else
+        await act(async () =>
+          fixture.key(new KeyboardEvent('keydown', { key: 'm', code: 'KeyM' }))
+        );
+    };
+    try {
+      await act(async () =>
+        fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+      );
+      await fixture.click('telemetry');
+      await fixture.selectRulerRange(1, 3);
+      await add();
+      await fixture.fill('Ruler note');
+      await fixture.click('save');
+      expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+        target: 'annotation',
+        after: { anchor: { kind: 'range', start: 1, end: 3 } },
+      });
+      expect(fixture.host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
+      const marker = fixture.host.querySelector<HTMLButtonElement>(
+        '[data-ui="gallery.videoReview.sourceLane"] button[title="Ruler note"]'
+      )!;
+      expect(marker).not.toBeNull();
+      await act(async () => marker.click());
+      await fixture.click('clearPlaybackRange');
+      await fixture.selectRulerRange(2, 2);
+      await add();
+      await fixture.fill('Playhead note');
+      await fixture.click('save');
+      expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+        target: 'annotation',
+        after: { anchor: { kind: 'point', time: 2 } },
+      });
+    } finally {
+      await fixture.cleanup();
+    }
+  }
+);
+
+it('retains the requested playhead while admission finishes the previous draft', async () => {
+  const fixture = createEditorFixture(integration);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.selectRulerRange(2, 2);
+    await fixture.click('addComment');
+    await fixture.fill('Previous draft');
+    const commit = integration.commit.getMockImplementation()!;
+    integration.commit.mockImplementationOnce(async (...args) => {
+      await gate;
+      return commit(...args);
+    });
+    await fixture.click('addComment');
+    const video = fixture.host.querySelector('video')!;
+    await act(async () => {
+      video.currentTime = 3;
+      video.dispatchEvent(new Event('timeupdate'));
+    });
+    await act(async () => release());
+    await fixture.fill('Captured request');
+    await fixture.click('save');
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'annotation',
+      after: { text: 'Captured request', anchor: { kind: 'point', time: 2 } },
+    });
+  } finally {
+    release();
+    await fixture.cleanup();
+  }
+});

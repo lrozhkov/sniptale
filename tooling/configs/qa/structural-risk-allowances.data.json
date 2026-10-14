@@ -781,6 +781,17 @@
       "astHash": "78d094280a565097c22da64467e3da50530386cc305394738828ca9aac669026",
       "signatureHash": "87143ee24131e5cbf70420ce35f93fb72b737b02cfa2b4277707e314038213b4",
       "removalCondition": "Remove on exact AST or signature change. Reassess another mutation queue, snapshot authority, resource owner or receipt/recovery authority. Remove when the analyzer distinguishes these single-session receivers."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-review-wiring.ts",
+      "symbol": "useReviewEditorWiring",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: The existing editor wiring hook adds source time and playback range to its existing comment owner. It retains one annotation-tool cancellation ref and delegates comment, audio, text, history, and export operations to their existing owners. The changed code introduces no writer, resource lifetime or recovery authority. Splitting this binding would forward the same dependencies. Main inspected the exact diff and owner calls; final independent architecture review must validate this classification.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess a new writer, state receiver, effect or recovery lifetime. Remove when the analyzer distinguishes this composition boundary.",
+      "reviewDate": "2026-10-15",
+      "astHash": "ce52107deb52ae2ef5d4bb5e7316262c2af317392b31149c297d584118c7e44a",
+      "signatureHash": "38263a7aced3b88e90affb445767a21322348102623dac291a84ea9ed94cb28c"
     }
   ]
 }

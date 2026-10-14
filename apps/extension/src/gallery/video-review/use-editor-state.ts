@@ -67,6 +67,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     run,
     composer,
     beforeAction: core.beforeAction,
+    playbackRange: core.playbackRange,
     video,
     seek,
     setTimelineSelection: setSelection,
@@ -437,17 +438,8 @@ function assembleReviewEditorState(
   core: ReturnType<typeof useReviewEditorCore>,
   wiring: ReturnType<typeof useReviewEditorWiring>
 ) {
-  const {
-    snapshot,
-    composer,
-    advancedState,
-    selection,
-    selected,
-    hovered,
-    setActiveSelection,
-    time,
-    cuts,
-  } = core;
+  const { snapshot, composer, advancedState, selected, hovered, setActiveSelection, time, cuts } =
+    core;
   const { audio, text, canvasComments, comments, telemetry, projected } = wiring;
   return {
     ...core,
@@ -492,8 +484,7 @@ function assembleReviewEditorState(
         setActiveSelection({ kind: 'annotation', id: annotation.id });
       });
     },
-    add: (marker?: ReviewTelemetryMarker) =>
-      core.beforeAction(() => comments.add(selection, marker)),
+    add: (marker?: ReviewTelemetryMarker) => core.beforeAction(() => comments.add(marker)),
     displayRegion: reviewRegion(
       time,
       composer.annotation,

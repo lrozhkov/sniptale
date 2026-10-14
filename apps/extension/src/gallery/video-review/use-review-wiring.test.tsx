@@ -90,6 +90,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     setActiveSelection,
     clearAnnotation: vi.fn(),
     time: 1,
+    playbackRange: null,
     timelineDuration: 4,
     busy: false,
     canStart: () => true,
@@ -179,7 +180,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     expect(session.flush).toHaveBeenCalledTimes(2);
     expect(session.history.mock.calls.map(([direction]) => direction)).toEqual(['undo', 'redo']);
     expect(setTimelineSelection).toHaveBeenCalledWith({ kind: 'point', time: 1 });
-    expect(comments.add).toHaveBeenCalledWith(args.timelineSelection);
+    expect(comments.add).toHaveBeenCalledWith();
     expect(cuts.toggle).toHaveBeenCalledWith('cut');
     expect(args.zoom.setDrawing).toHaveBeenCalledTimes(3);
     expect(args.zoom.setDrawing).toHaveBeenLastCalledWith(false);

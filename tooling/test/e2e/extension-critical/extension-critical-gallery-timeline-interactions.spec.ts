@@ -131,6 +131,49 @@ async function inspectTrackControls(
   await expect(source).toHaveAttribute('data-review-track-locked', 'false');
 }
 
+async function inspectNotes(page: Page, dialog: Locator, locale: 'ru' | 'en', basic: boolean) {
+  const button = (key: Parameters<typeof translate>[0]) =>
+    dialog.getByRole('button', { name: translate(key, locale), exact: true }).first();
+  await button('gallery.videoReview.trackSettings').click();
+  await dialog.locator('[data-review-track="actions"] [role="switch"]').uncheck();
+  await button('gallery.videoReview.trackSettings').click();
+  if (basic) await button('gallery.videoReview.advancedEditing').click();
+  await expect(dialog.locator('[data-ui="gallery.videoReview.historyTrack"]')).toHaveCount(0);
+  const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+  const duration = Number(await ruler.getAttribute('aria-valuemax'));
+  await gesture(page, ruler, 0.4, 0.6);
+  await button('gallery.videoReview.addComment').click();
+  const field = dialog.getByRole('textbox', {
+    name: translate('gallery.videoReview.commentText', locale),
+    exact: true,
+  });
+  await field.fill('Ruler note');
+  await button('gallery.videoReview.save').click();
+  const readNote = async () => {
+    const workspace = await readNativeReviewWorkspace(page, 'recording:beta-v1-recording');
+    const operation = workspace?.history.filter((item) => item.target === 'annotation').at(-1);
+    return operation?.target === 'annotation' ? operation.after : null;
+  };
+  await expect.poll(readNote).toMatchObject({ text: 'Ruler note', anchor: { kind: 'range' } });
+  const note = await readNote();
+  if (note?.anchor.kind !== 'range') throw new Error('Saved range note is absent');
+  expect(note.anchor.start).toBeCloseTo(duration * 0.4, 1);
+  expect(note.anchor.end).toBeCloseTo(duration * 0.6, 1);
+  await dialog
+    .locator('[data-ui="gallery.videoReview.sourceLane"] button[title="Ruler note"]')
+    .click();
+  await button('gallery.videoReview.clearPlaybackRange').click();
+  await gesture(page, ruler, 0.7);
+  await dialog.locator('[data-ui="gallery.videoReview.timePlane"]').focus();
+  await page.keyboard.press('m');
+  await field.fill('Playhead note');
+  await button('gallery.videoReview.save').click();
+  await expect.poll(readNote).toMatchObject({ text: 'Playhead note', anchor: { kind: 'point' } });
+  const point = await readNote();
+  if (point?.anchor.kind !== 'point') throw new Error('Saved point note is absent');
+  expect(point.anchor.time).toBeCloseTo(duration * 0.7, 1);
+}
+
 async function inspectWorkspaceColor(
   page: Page,
   dialog: Locator,
@@ -346,6 +389,11 @@ for (const variant of [
             )?.advanced.ui.workspaceColors
         )
         .toEqual({ [variant.theme]: '#123456ff' });
+      await inspectNotes(page, dialog, variant.locale, variant.width === 1920);
+      await page.screenshot({
+        path: info.outputPath('notes-range-and-point.png'),
+        fullPage: false,
+      });
       await page.reload();
       await page
         .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
@@ -354,6 +402,10 @@ for (const variant of [
         .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(workspaceSurface).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+      await dialog
+        .locator('[data-ui="gallery.videoReview.sourceLane"] button[title="Ruler note"]')
+        .click();
+      await expect(dialog.getByText('Ruler note', { exact: true }).first()).toBeVisible();
       if (variant.width < 1280) {
         const scroll = dialog.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
         expect(await scroll.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
