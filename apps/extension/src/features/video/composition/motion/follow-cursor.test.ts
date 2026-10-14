@@ -117,7 +117,7 @@ it('working-zone planner exposes a typed conflict instead of clamping an impossi
     start: 0,
     end: 0.01,
     targetScale: 4,
-    policy,
+    policy: { ...policy, settings: { ...policy.settings, allowExpansion: false } },
     geometry,
   });
   expect(plan.status).toBe('conflict');

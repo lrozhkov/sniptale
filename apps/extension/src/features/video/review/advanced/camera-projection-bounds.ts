@@ -18,8 +18,11 @@ const range = (low: number, high = low): Range => {
 const plus = (a: Range, b: Range) => range(a[0] + b[0], a[1] + b[1]);
 const negative = (a: Range): Range => [-a[1], -a[0]];
 const times = (a: Range, b: Range) => {
-  const products = [a[0] * b[0], a[0] * b[1], a[1] * b[0], a[1] * b[1]];
-  return range(Math.min(...products), Math.max(...products));
+  const p0 = a[0] * b[0],
+    p1 = a[0] * b[1],
+    p2 = a[1] * b[0],
+    p3 = a[1] * b[1];
+  return range(Math.min(p0, p1, p2, p3), Math.max(p0, p1, p2, p3));
 };
 const constant = (value: number): ProjectionJet => ({ value: [value, value], derivatives: zeros });
 const boxed = (value: Range): ProjectionJet => ({ value, derivatives: zeros });
@@ -272,7 +275,7 @@ function unrotatedOutputCoordinate(
   );
   return add(
     constant(windowRect[axis]),
-    subtract(multiply(jets.scale, source), jets.translation(axis))
+    subtract(multiply(jets.scale, source), axis === 'x' ? jets.tx : jets.ty)
   );
 }
 
@@ -290,12 +293,15 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
     const arc = axis === 'rotateZ' ? ((delta + 540) % 360) - 180 : delta;
     return multiply(constant(Math.PI / 180), add(constant(start), multiply(constant(arc), g)));
   };
-  const sx = sine(angle('rotateX')),
-    cx = cosine(angle('rotateX'));
-  const sy = sine(angle('rotateY')),
-    cy = cosine(angle('rotateY'));
-  const sz = sine(angle('rotateZ')),
-    cz = cosine(angle('rotateZ'));
+  const ax = angle('rotateX'),
+    ay = angle('rotateY'),
+    az = angle('rotateZ');
+  const sx = sine(ax),
+    cx = cosine(ax);
+  const sy = sine(ay),
+    cy = cosine(ay);
+  const sz = sine(az),
+    cz = cosine(az);
   const r00 = multiply(cz, cy),
     r01 = subtract(multiply(multiply(cz, sy), sx), multiply(sz, cx));
   const r10 = multiply(sz, cy),
@@ -315,16 +321,6 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
   );
   const inverseDenominator = reciprocal(denominator);
   if (!inverseDenominator) return null;
-  const center = (origin: number, size: number, translation: ProjectionJet) =>
-    add(subtract(constant(origin), multiply(weight, translation)), multiply(k, constant(size / 2)));
-  const outX = add(
-    center(windowRect.x, windowRect.width, tx),
-    multiply(multiply(k, add(multiply(r00, x), multiply(r01, y))), inverseDenominator)
-  );
-  const outY = add(
-    center(windowRect.y, windowRect.height, ty),
-    multiply(multiply(k, add(multiply(r10, x), multiply(r11, y))), inverseDenominator)
-  );
   if (
     input.perspective.rotateX === 0 &&
     input.perspective.rotateY === 0 &&
@@ -342,6 +338,16 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
       outY: unrotatedOutputCoordinate(input, motion, jets, 'y'),
     };
   }
+  const center = (origin: number, size: number, translation: ProjectionJet) =>
+    add(subtract(constant(origin), multiply(weight, translation)), multiply(k, constant(size / 2)));
+  const outX = add(
+    center(windowRect.x, windowRect.width, tx),
+    multiply(multiply(k, add(multiply(r00, x), multiply(r01, y))), inverseDenominator)
+  );
+  const outY = add(
+    center(windowRect.y, windowRect.height, ty),
+    multiply(multiply(k, add(multiply(r10, x), multiply(r11, y))), inverseDenominator)
+  );
   return { qx, qy, outX, outY, denominator };
 }
 

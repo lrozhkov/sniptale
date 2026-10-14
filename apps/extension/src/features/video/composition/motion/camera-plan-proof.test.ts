@@ -52,6 +52,69 @@ const hold: CameraPlanSpan = {
 };
 
 describe('continuous camera admission', () => {
+  it('bounds observation lookup work for a dense captured path', () => {
+    let reads = 0;
+    const observations = Array.from({ length: 512 }, (_, index) => ({
+      get time() {
+        reads++;
+        return index / 511;
+      },
+      segmentId: 'source',
+      actual: { x: 300 + index / 512, y: 200 },
+    }));
+    expect(
+      proveCameraPlan({
+        spans: [hold],
+        observations,
+        geometry,
+        targetScale: 2,
+        preservePointer: true,
+        limits,
+      })
+    ).toEqual({ status: 'proven' });
+    // The generous operation budget rejects repeated full scans without a wall-clock threshold.
+    expect(reads).toBeLessThan(512 * 100);
+  });
+
+  it.each([
+    [0, 0.5, 0.5, 1],
+    [0.5, 1, 0, 0.5],
+  ])('preserves first/last neighbors for observation times %j', (...times) => {
+    const observations = times.map((time, index) => ({
+      time,
+      segmentId: 'source',
+      actual: { x: 300 + index, y: 200 },
+    }));
+    let checked = 0;
+    expect(
+      proveCameraPlan({
+        spans: [hold],
+        observations,
+        targetScale: 2,
+        preservePointer: true,
+        limits,
+        geometry: {
+          ...geometry,
+          clearanceBounds(input) {
+            const left = observations.findLast(({ time }) => time <= input.start);
+            const right = observations.find(({ time }) => time >= input.end);
+            if (left && right) {
+              const at = (time: number) => {
+                const progress =
+                  right.time > left.time ? (time - left.time) / (right.time - left.time) : 0;
+                return { x: left.actual.x + (right.actual.x - left.actual.x) * progress, y: 200 };
+              };
+              expect(input.actual).toEqual({ from: at(input.start), to: at(input.end) });
+            } else expect(input.actual).toBeUndefined();
+            checked++;
+            return geometry.clearanceBounds(input);
+          },
+        },
+      })
+    ).toEqual({ status: 'proven' });
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it('admits a held pose with a continuously contained native pointer', () => {
     expect(
       proveCameraPlan({

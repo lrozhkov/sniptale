@@ -186,20 +186,58 @@ function cameraProofCells(
   return intervals;
 }
 
+function indexObservations(observations: readonly CameraActualObservation[]) {
+  const segments = new Map<string, { points: CameraActualObservation[]; ordered: boolean }>();
+  for (const point of observations) {
+    let segment = segments.get(point.segmentId);
+    if (!segment) {
+      segment = { points: [], ordered: true };
+      segments.set(point.segmentId, segment);
+    }
+    const previous = segment.points.at(-1);
+    segment.ordered &&= Number.isFinite(point.time) && (!previous || previous.time <= point.time);
+    segment.points.push(point);
+  }
+  return segments;
+}
+
+function observationBound(
+  observations: readonly CameraActualObservation[],
+  time: number,
+  upper: boolean
+) {
+  let low = 0;
+  let high = observations.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    const value = observations[middle]!.time;
+    if (value < time || (upper && value === time)) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
 export function proveCameraPlan(input: CameraPlanProofInput): CameraPlanProofResult {
   const tolerance = input.pixelTolerance ?? 0.5;
   const confirmed = compactObservationHolds(input.observations);
+  const segments = indexObservations(confirmed);
   let remaining =
     input.maximumCells ??
     Math.max(4096, 16 * (confirmed.length + input.spans.length + input.geometry.breaks.length));
   for (const span of input.spans) {
-    const observations = confirmed.filter((item) => item.segmentId === span.segmentId);
+    const segment = segments.get(span.segmentId);
+    const observations = segment?.points ?? [];
     const intervals = cameraProofCells(span, observations, input.geometry.breaks);
     while (intervals.length) {
       const cell = intervals.pop()!;
       if (--remaining < 0) return { status: 'conflict', reason: 'unproven', time: cell.start };
-      const left = observations.findLast(({ time }) => time <= cell.start);
-      const right = observations.find(({ time }) => time >= cell.end);
+      // Retain first/last duplicate semantics and the existing behavior for unordered input.
+      const left = segment?.ordered
+        ? observations[observationBound(observations, cell.start, true) - 1]
+        : observations.findLast(({ time }) => time <= cell.start);
+      const right = segment?.ordered
+        ? observations[observationBound(observations, cell.end, false)]
+        : observations.find(({ time }) => time >= cell.end);
       const actual = actualInterval(left, right, cell.start, cell.end);
       const bounds = input.geometry.clearanceBounds({
         start: cell.start,
