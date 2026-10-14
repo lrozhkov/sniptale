@@ -61,3 +61,19 @@ Prove transitive consumers of a changed shared contract. For parser changes, app
 Use exact owner-direct tests only if the machine owner mapping is complete and the change-risk report admits them. Otherwise, use transitive affected-test discovery. Test cost does not reduce required coverage.
 
 For an escaped defect, add failing proof before the fix. Record why existing proof missed the defect. Add a deterministic guard only if the same defect family is machine-detectable without heuristic debt.
+
+
+### Persistence concurrency
+
+For each persistence change, record these cases in the scope manifest:
+
+- Parallel writers.
+- Delayed writes after deletion or restore.
+- Recreation of the same identity.
+- Command retry after failure or refusal.
+
+Record each applicable invariant with its test file and test name in the scope manifest. Give a supported-flow reason for each inapplicable case. The reviewer checks this selection.
+
+Include opening, recovery, and queued writes in the writer lifetime. Control their ordering in tests instead of using timing delays. Test deletion and recreation together when they can reuse an identity or revision.
+
+Keep the tests in existing affected-test discovery or the focused owner map. Prove that checkpoint selects and executes them. Do not create a second scenario registry.

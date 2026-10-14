@@ -63,3 +63,10 @@ Correlation uses the task ID plus an explicit workflow ID or a deterministic can
 A failed full gate still seals available diagnostic evidence. Timeout handling writes best-effort incremental evidence before external cleanup.
 
 Use the operator handbook's [focused diagnostics](operator-handbook.md#focused-diagnostics) after a wrapper failure.
+
+
+Failed checks print bounded source locations in the initial blocker summary. For unit failures, the test name identifies the scenario and invariant. The assertion adds the failure reason. The summary includes the test file and a quoted Vitest reproduction command.
+
+Unlocated failures do not receive invented locations or commands. Full output remains in the sanitized run log.
+
+Persistence concurrency tests use the existing affected-test discovery and focused owner map. Reviewers check scenario selection and reasons for inapplicable cases. Checkpoint controls test execution.

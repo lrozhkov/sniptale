@@ -315,3 +315,29 @@ it('routes the guide page to semantic document and persistence interaction proof
     )
   ).toEqual(['apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx']);
 });
+
+it.each([
+  'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
+  'apps/extension/src/composition/persistence/review-workspaces/store.ts',
+  'apps/extension/src/composition/persistence/assets/resource-sessions.ts',
+  'apps/extension/src/workflows/video-review/session.ts',
+  'apps/extension/src/workflows/video-review/session-durable-access.ts',
+])('retains the actual delayed-writer regression for %s', async (file) => {
+  const module = await importOwnerMap();
+  expect(module.resolveMappedCoverageOwnerTests(file)).toContain(
+    'apps/extension/src/workflows/video-review/session.project-purge.test.ts'
+  );
+});
+
+it('retains pending-opening, cancellation and disposal proof for the Gallery reader owner', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests('apps/extension/src/gallery/video-review/use-session.ts')
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.loaded.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.resources.test.tsx',
+    ])
+  );
+});

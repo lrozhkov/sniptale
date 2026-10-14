@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 
-import { formatObservedRunSummary, normalizeObservedStep } from './output.mjs';
+import {
+  formatObservedRunSummary,
+  formatObservedBlocker,
+  normalizeObservedStep,
+} from './output.mjs';
 
 it('normalizes a failure into stable control/problem IDs with remediation detail', () => {
   const normalized = normalizeObservedStep({
@@ -280,4 +284,100 @@ it('bounds locations and rejects invalid line numbers without losing the final t
     file: 'src/a.ts',
     line: 1,
   });
+});
+
+it('shows the failed invariant, scenario, test file and reproduction command in the blocker', () => {
+  const file = 'apps/extension/src/workflows/video-review/session.project-purge.test.ts';
+  const text = formatObservedBlocker({
+    label: 'Unit tests',
+    status: 'failed',
+    summary: 'failed',
+    stdout:
+      ` FAIL  ${file} > no deleted text returns: delayed writer, purge and recreation\n` +
+      'AssertionError: Deleted project text must not return: expected draft to be null',
+  });
+  expect(text).toContain('no deleted text returns: delayed writer, purge and recreation');
+  expect(text).toContain('Deleted project text must not return');
+  expect(text).toContain(file);
+  expect(text).toContain(`npm exec vitest run -- --maxWorkers=1 '${file}'`);
+});
+
+it('bounds blocker detail and quotes reproduction paths without creating shell substitutions', () => {
+  const file = "src/it's $(secret).test.ts";
+  const text = formatObservedBlocker({
+    label: 'Unit tests',
+    status: 'failed',
+    stdout: Array.from(
+      { length: 9 },
+      (_, i) => ` FAIL  ${file} > case ${i}\nAssertionError: invariant ${i}`
+    ).join('\n'),
+  });
+  expect(text).toContain('case 0');
+  expect(text).not.toContain('case 8');
+  expect(text).toContain("'src/it'\"'\"'s $(secret).test.ts'");
+  expect(text.match(/npm exec vitest/gu)).toHaveLength(1);
+});
+
+it('keeps unlocated failures honest and includes located non-test blockers', () => {
+  expect(
+    formatObservedBlocker({ label: 'Unit tests', status: 'failed', stderr: 'crashed' })
+  ).not.toContain('Reproduce:');
+  expect(
+    formatObservedBlocker({
+      label: 'Test coverage',
+      status: 'failed',
+      violations: [{ file: 'src/store.ts', line: 4, message: 'Branch coverage below threshold' }],
+    })
+  ).toContain('src/store.ts:4: Branch coverage below threshold');
+});
+
+it('sanitizes a complete secret before shortening diagnostic text', () => {
+  const secret = 'private-complete-value';
+  const text = formatObservedBlocker(
+    {
+      label: 'Unit tests',
+      status: 'failed',
+      stdout: ` FAIL  src/store.test.ts > ${'a'.repeat(790)}${secret}\nAssertionError: invariant`,
+    },
+    (value) => value.replaceAll(secret, '<redacted>')
+  );
+  expect(text).not.toContain('private-');
+  expect(text).toContain('<redacted>');
+});
+
+it('redacts complete sensitive paths before shell quoting reproduction commands', () => {
+  const secret = "private'complete-value";
+  const sanitize = (value: string) => value.replaceAll(secret, '<redacted>');
+  const text = sanitize(
+    formatObservedBlocker(
+      {
+        label: 'Unit tests',
+        status: 'failed',
+        stdout: ` FAIL  src/${secret}.test.ts > invariant\nAssertionError: preserved`,
+      },
+      sanitize
+    )
+  );
+  expect(text).toContain(
+    "Reproduce: npm exec vitest run -- --maxWorkers=1 'src/<redacted>.test.ts'"
+  );
+  expect(text).not.toContain('private');
+  expect(text).not.toContain('complete-value');
+});
+
+it('omits reproduction commands when configured redaction changes shell syntax', () => {
+  const sanitize = (value: string) => value.replaceAll("'\"'", '<redacted>');
+  const text = sanitize(
+    formatObservedBlocker(
+      {
+        label: 'Unit tests',
+        status: 'failed',
+        stdout:
+          " FAIL  src/a'$(printf injected)'b'c.test.ts > invariant\nAssertionError: preserved",
+      },
+      sanitize
+    )
+  );
+  expect(text).not.toContain('Reproduce: npm exec');
+  expect(text).toContain('Reproduction command omitted because redaction changes shell syntax.');
 });

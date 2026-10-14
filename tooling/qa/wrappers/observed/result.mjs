@@ -1,6 +1,7 @@
 import { collectQaResultSteps } from '../../composition/catalog/contract.mjs';
 import {
   hasCanonicalAdvisoryLog,
+  formatObservedBlocker,
   normalizeObservedStep,
   renderObservedStepLog,
 } from './output.mjs';
@@ -86,7 +87,9 @@ export function recordObservedResult(session, result, verbose, contract) {
     const summary =
       [
         'Blockers:',
-        ...blockers.map((step) => `- ${step.label}: ${step.summary || step.detail || step.status}`),
+        ...blockers.map((step) =>
+          formatObservedBlocker(step, (value) => session.sanitizeConsoleOutput(value))
+        ),
       ].join('\n') + '\n';
     process.stdout.write(session.sanitizeConsoleOutput(summary));
     session.writeLog(summary);

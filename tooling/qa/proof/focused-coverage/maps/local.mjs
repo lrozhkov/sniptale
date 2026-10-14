@@ -1,5 +1,50 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-project-concurrency',
+    productionFile:
+      'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-workspace-concurrency',
+    productionFile: 'apps/extension/src/composition/persistence/review-workspaces/store.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+    ],
+  },
+  {
+    owner: 'asset-reader-concurrency',
+    productionFile: 'apps/extension/src/composition/persistence/assets/resource-sessions.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-session-concurrency',
+    productionFile: 'apps/extension/src/workflows/video-review/session.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: ['apps/extension/src/workflows/video-review/session.project-purge.test.ts'],
+  },
+  {
+    owner: 'review-loading-concurrency',
+    productionFile: 'apps/extension/src/gallery/video-review/use-session.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.loaded.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.resources.test.tsx',
+    ],
+  },
+  {
     owner: 'background-review-audio-authorization',
     productionFile: 'apps/extension/src/background/ai/audio/authorization.ts',
     reason:
@@ -28,6 +73,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'The session suites exercise source/revision CAS, autosave, reset, retained history, speech receipts and annotation acquisition through the owning session.',
     testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/workflows/video-review/session.test.ts',
       'apps/extension/src/workflows/video-review/session.autosave.test.ts',
       'apps/extension/src/workflows/video-review/session.reset.test.ts',

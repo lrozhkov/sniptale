@@ -375,3 +375,36 @@ it.each(['block-new-file-no-owner', 'block-invalid-owner-map'])(
     expect(resolveProof).not.toHaveBeenCalled();
   }
 );
+
+it.each([
+  [
+    'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
+    'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+  ],
+  [
+    'apps/extension/src/gallery/video-review/use-session.ts',
+    'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+  ],
+])(
+  'checkpoint executes concurrency proof for %s and propagates its failure',
+  async (owner, testFile) => {
+    const module = await importFresh<typeof import('./test-steps.mjs')>(
+      './test-steps.mjs',
+      import.meta.url
+    );
+    const stdout = ` FAIL  ${testFile} > deleted content must not return after recreation\nAssertionError: stale writer admitted`;
+    const execute = vi.fn(async () => ({ status: 1, stdout, stderr: '' }));
+    const steps = await module.runFocusedUnitTests(
+      { codeFiles: [owner], targetFiles: [owner] },
+      { runUnitTestsImpl: execute, maxWorkers: 1 }
+    );
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({ directFiles: expect.arrayContaining([testFile]) })
+    );
+    expect(steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'Unit tests', status: 'failed', stdout }),
+      ])
+    );
+  }
+);

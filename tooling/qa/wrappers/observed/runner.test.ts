@@ -338,6 +338,8 @@ describe('observed wrapper console output', () => {
                 'old output\n'.repeat(5000),
                 'safe\r::add-mask::private-fixture',
                 '\r::error private-fixture\nAssertionError: expected true',
+                '\n FAIL  src/persistence.test.ts > deleted content stays deleted after recreation\n',
+                'AssertionError: delayed writer admitted private-fixture',
               ].join(''),
             },
           ],
@@ -346,6 +348,16 @@ describe('observed wrapper console output', () => {
     });
     const stdout = writes.join('');
     expect(stdout).toContain('[Unit tests: failure output tail]');
+    expect(stdout).toContain(
+      'src/persistence.test.ts: deleted content stays deleted after recreation'
+    );
+    expect(stdout).toContain('AssertionError: delayed writer admitted <redacted>');
+    expect(stdout).toContain(
+      "Reproduce: npm exec vitest run -- --maxWorkers=1 'src/persistence.test.ts'"
+    );
+    expect(stdout.indexOf('Reproduce:')).toBeLessThan(
+      stdout.indexOf('[Unit tests: failure output tail]')
+    );
     expect(stdout).toContain('| AssertionError: expected true');
     expect(stdout).toContain('| ::error <redacted>');
     expect(stdout).toContain('| ::add-mask::<redacted>');
