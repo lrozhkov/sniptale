@@ -20,7 +20,7 @@ import {
   assertV6ObjectPath,
   MEDIA_HUB_BACKUP_LAYOUT,
   MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
-  MEDIA_HUB_BACKUP_SHARED_LAYOUT,
+  isSharedBackupLayout,
 } from './layout';
 import { parseBackupSharedObjects } from './shared-objects';
 import { parsePortableGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
@@ -250,23 +250,21 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
     value['version'] === MEDIA_HUB_BACKUP_VERSION &&
     value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT &&
     value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT &&
-    value['layout'] !== MEDIA_HUB_BACKUP_SHARED_LAYOUT
+    !isSharedBackupLayout(value['layout'])
   ) {
     throw new Error('Unsupported media backup v6 layout. Create a new backup with this version.');
   }
   assertExactKeys(
     value,
     ['archiveId', 'catalogs', 'exportedAt', 'format', 'layout', 'privacy', 'totals', 'version'],
-    value['layout'] === MEDIA_HUB_BACKUP_SHARED_LAYOUT
-      ? ['galleryViews', 'sharedObjects']
-      : ['galleryViews']
+    isSharedBackupLayout(value['layout']) ? ['galleryViews', 'sharedObjects'] : ['galleryViews']
   );
   if (
     value['format'] !== MEDIA_HUB_BACKUP_FORMAT ||
     value['version'] !== MEDIA_HUB_BACKUP_VERSION ||
     (value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT &&
       value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT &&
-      value['layout'] !== MEDIA_HUB_BACKUP_SHARED_LAYOUT)
+      !isSharedBackupLayout(value['layout']))
   ) {
     throw new Error('Unsupported media backup format.');
   }
@@ -275,7 +273,7 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
   }
   const totals = value['totals'];
   if (
-    value['layout'] === MEDIA_HUB_BACKUP_SHARED_LAYOUT &&
+    isSharedBackupLayout(value['layout']) &&
     (parseSafeInteger(totals['objects'], 'total objects') > MAX_MEDIA_ARCHIVE_ENTRIES ||
       parseSafeInteger(totals['bytes'], 'total bytes') > MAX_MEDIA_ARCHIVE_INFLATED_BYTES)
   )
@@ -307,7 +305,7 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
       ? {}
       : { galleryViews: parsePortableGallerySavedViews(value['galleryViews']) }),
     layout: value['layout'],
-    ...(value['layout'] === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+    ...(isSharedBackupLayout(value['layout'])
       ? { sharedObjects: parseBackupSharedObjects(value['sharedObjects']) }
       : {}),
     privacy: parsePrivacyFlags(value['privacy']),

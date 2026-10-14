@@ -5,6 +5,7 @@ import type {
   ReviewDocument,
 } from '../../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../../features/video/review/advanced/types';
+import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 import type { ReviewTextTypingTarget } from '../../../features/video/review/text-types';
 
 /** One bounded active field group; writeId acknowledges only its latest immutable capture. */
@@ -15,11 +16,19 @@ export interface VideoWorkspaceTyping {
   writeId: string;
 }
 
+/** Project metadata stays outside content Undo/Redo history. */
+export interface VideoWorkspaceProject {
+  name: string;
+  lifecycle: LibraryLifecycle & { storageClass: 'library'; savedAt: number };
+}
+
 /** Durable review history for one library media identity; the document is derived by replay. */
 export interface VideoWorkspace {
   aggregateId: string;
-  formatVersion: 1 | 2;
-  /** Format 2 retains the complete document immediately before the first remaining operation. */
+  formatVersion: 1 | 2 | 3 | 4;
+  /** Formats 3 and 4 require permanent project metadata. Formats 1 and 2 are legacy. */
+  project?: VideoWorkspaceProject;
+  /** Formats 2 and 4 retain the complete document immediately before the first remaining operation. */
   baseline?: ReviewDocument;
   typing?: VideoWorkspaceTyping;
   source: ReviewSource;

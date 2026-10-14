@@ -109,7 +109,11 @@ export function parseVideoWorkspaceTyping(
     return null;
   const operationId = value['operationId'];
   if (operationId === null) {
-    if (workspace.formatVersion !== 2 || workspace.history.length !== 0) return null;
+    if (
+      (workspace.formatVersion !== 2 && workspace.formatVersion !== 4) ||
+      workspace.history.length !== 0
+    )
+      return null;
   } else {
     const tail = workspace.history.at(-1);
     if (
@@ -154,7 +158,7 @@ export function prepareVideoWorkspaceTyping(
     const baseline = { ...document, advancedContent: change.after };
     return {
       ...workspace,
-      formatVersion: 2,
+      formatVersion: workspace.project ? 4 : 2,
       baseline,
       history: [],
       cursor: 0,
@@ -181,7 +185,7 @@ export function prepareVideoWorkspaceTyping(
   ];
   return {
     ...workspace,
-    formatVersion: 2,
+    formatVersion: workspace.project ? 4 : 2,
     baseline: replayReviewHistory([], 0, workspace.source, reviewDocumentBaseline(workspace)),
     history,
     cursor: history.length,

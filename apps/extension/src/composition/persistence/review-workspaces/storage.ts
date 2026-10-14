@@ -104,7 +104,7 @@ function unchangedStoredHistory(storage: WorkspaceStorageRead, previous: VideoWo
   const { head, logical } = storage;
   return (
     isRecord(head) &&
-    head['formatVersion'] === 2 &&
+    (head['formatVersion'] === 2 || head['formatVersion'] === 4) &&
     head['historyLength'] === previous.history.length &&
     isRecord(logical) &&
     storageValueEqual(logical['history'], previous.history) &&
@@ -120,8 +120,8 @@ async function writeCompleteWorkspaceDelta(
   const { storage, previous, workspace, mode, usageReferenceKeys } = args;
   if (
     !isRecord(storage.head) ||
-    storage.head['formatVersion'] !== 3 ||
-    workspace.formatVersion !== 2 ||
+    (storage.head['formatVersion'] !== 3 && storage.head['formatVersion'] !== 5) ||
+    (workspace.formatVersion !== 2 && workspace.formatVersion !== 4) ||
     (mode === 'replace' && args.retentionStart === undefined)
   )
     return false;

@@ -61,7 +61,7 @@ export function compactVideoWorkspaceHistory(workspace: VideoWorkspace) {
   );
   const next: VideoWorkspace = {
     ...workspace,
-    formatVersion: 2,
+    formatVersion: workspace.project ? 4 : 2,
     baseline,
     advanced: {
       ...baseline.advancedContent,

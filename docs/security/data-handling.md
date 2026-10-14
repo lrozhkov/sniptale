@@ -59,11 +59,13 @@ Only successful rendering records an observation. Unavailable storage or coordin
 
 ## Import and export
 
-Media backup payload layouts `library-folders-v2` and `library-folders-v3` treat authored strings as text rather than binary signatures. Canonical domain owners check resource roles and portable references. Image-document Canvas source/background/blur slots still require declared object references. Restrict PNG window-header transport to the existing normalized PNG/64-pixel decoration profile. Import revalidates the declared JSON/PNG inventory, MIME, UTF-8 and expanded metadata limits directly in the ZIP before runtime staging.
+Media backup payload layouts `library-folders-v2`, `library-folders-v3` and `library-folders-v4` treat authored strings as text rather than binary signatures. Canonical domain owners check resource roles and portable references. Image-document Canvas source/background/blur slots still require declared object references. Restrict PNG window-header transport to the existing normalized PNG/64-pixel decoration profile. Import revalidates the declared JSON/PNG inventory, MIME, UTF-8 and expanded metadata limits directly in the ZIP before runtime staging.
+
+Quick-edit project metadata requires archive layout `library-folders-v4`. Older readers reject this layout before staging or root publication. Current readers reject project metadata in legacy layouts. V4 retains the V3 resource profile, direct anchors and bounded shared-object checks.
 
 Opaque legacy review recovery retains its existing owner policy. Backup diagnostics contain fixed failure reason/phase and bounded byte metrics, without user content, object identities or raw exceptions. Scenario HTML archive references use the MIME essence `text/html` while preserving the immutable UTF-8 body.
 
-Admit V3 shared entries through an explicit table and a matching direct physical anchor. Import checks exact logical roles and inventory, SHA256 over actual streamed bytes, size and MIME before staging. It rejects undeclared/unused table rows, alias chains and future layouts. Scope export deduplication to one explicit backup. Preserve selected readable files and independent logical identities.
+Admit V3 and V4 shared entries through an explicit table and a matching direct physical anchor. Import checks exact logical roles and inventory, SHA256 over actual streamed bytes, size and MIME before staging. It rejects undeclared/unused table rows, alias chains and future layouts. Scope export deduplication to one explicit backup. Preserve selected readable files and independent logical identities.
 
 Do not create a global content index. JSON compression does not relax expanded or decoded favicon budgets. Staging and rollback remain scoped to individual roots.
 

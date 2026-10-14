@@ -66,7 +66,7 @@ export function reviewDurableWorkspaceAccess(
       const operation = saved.workspace.history.find((operation) => operation.id === id);
       if (
         !operation &&
-        saved.workspace.formatVersion === 2 &&
+        (saved.workspace.formatVersion === 2 || saved.workspace.formatVersion === 4) &&
         saved.workspace.revision !== baseRevision
       )
         throw new Error('stale');

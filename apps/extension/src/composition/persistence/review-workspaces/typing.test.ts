@@ -163,3 +163,21 @@ it('rejects forged tail and baseline-only markers before mutation', () => {
   ).toBeNull();
   expect(parseVideoWorkspace({ ...candidate, cursor: 0 })).toBeNull();
 });
+
+it('preserves project metadata when typing upgrades a legacy baseline and continues the same group', () => {
+  const input: VideoWorkspace = {
+    ...initial(),
+    formatVersion: 3,
+    project: {
+      name: 'Named project',
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 3 },
+    },
+  };
+  const first = edit(input, 'One', false);
+  const second = edit(first.candidate, 'Final', true);
+  const admitted = parseVideoWorkspace(second.candidate);
+  expect(admitted?.formatVersion).toBe(4);
+  expect(admitted?.project).toEqual(input.project);
+  expect(admitted?.history).toHaveLength(1);
+  expect(withoutVideoWorkspaceTyping(admitted!).project).toEqual(input.project);
+});

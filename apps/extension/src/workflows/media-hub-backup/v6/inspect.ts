@@ -15,7 +15,11 @@ import {
   type MediaHubBackupManifestV6,
 } from './contracts';
 import { assertV6MetadataPath, MANIFEST_PATH } from './layout';
-import { MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT, MEDIA_HUB_BACKUP_SHARED_LAYOUT } from './layout';
+import {
+  MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  isSharedBackupLayout,
+  assertReviewProjectLayout,
+} from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertBackupByteBudget } from './errors';
 import { MAX_EXPANDED_ARCHIVE_METADATA_BYTES } from './contracts';
@@ -164,13 +168,14 @@ async function inspectRoot(args: {
   }
   const decoded =
     args.manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT ||
-    args.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+    isSharedBackupLayout(args.manifest.layout)
       ? await decodeBackupMetadata(args.reader, envelope)
       : { envelope, expandedBytes: 0 };
   args.state.expandedBytes += decoded.expandedBytes;
   assertBackupByteBudget(args.state.expandedBytes, MAX_EXPANDED_ARCHIVE_METADATA_BYTES, 'read');
   assertArchiveRootMetadataIdentity(args.descriptor, decoded.envelope.metadata);
-  if (args.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT)
+  assertReviewProjectLayout(decoded.envelope.metadata, args.manifest.layout);
+  if (isSharedBackupLayout(args.manifest.layout))
     await assertArchiveRootObjectInventory(
       decoded.envelope,
       args.reader,

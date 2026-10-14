@@ -304,3 +304,72 @@ it('rejects stale compact gain in unapplied redo and leaves raw history intact',
   });
   expect(raw).toEqual(original);
 });
+
+it.each([3, 4])(
+  'admits permanent project metadata in logical format %s without modifying input',
+  (formatVersion) => {
+    const raw = {
+      ...workspace(),
+      formatVersion,
+      ...(formatVersion === 4
+        ? {
+            baseline: {
+              annotations: [],
+              edits: [],
+              canvasComments: [],
+              advancedContent: createQuickEditAdvancedContent(),
+            },
+          }
+        : {}),
+      project: {
+        name: 'Retained project',
+        lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 3 },
+      },
+    };
+    const before = structuredClone(raw);
+    const admitted = inspectVideoWorkspace(raw);
+    expect(admitted.failure).toBeNull();
+    expect(admitted.workspace?.project).toEqual(raw.project);
+    expect(inspectVideoWorkspace(admitted.workspace).workspace).toEqual(admitted.workspace);
+    expect(raw).toEqual(before);
+  }
+);
+
+it.each([
+  undefined,
+  null,
+  { name: '', lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 } },
+  { name: 'x'.repeat(257), lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 } },
+  { name: 'Project', lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 } },
+  { name: 'Project', lifecycle: { storageClass: 'library', savedAt: null, updatedAt: 1 } },
+  { name: 'Project', lifecycle: { storageClass: 'library', savedAt: -1, updatedAt: 1 } },
+  { name: 'Project', lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: -1 } },
+  {
+    name: 'Project',
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1, trashedAt: -1 },
+  },
+])('rejects invalid project metadata without exposing values in diagnostics', (project) => {
+  const raw = { ...workspace(), formatVersion: 3, project };
+  const before = structuredClone(raw);
+  const result = inspectVideoWorkspace(raw);
+  expect(result.workspace).toBeNull();
+  expect(result.failure).toMatchObject({ check: 'project-metadata', reason: 'invalid' });
+  expect(JSON.stringify(result.failure)).not.toContain('Project');
+  expect(raw).toEqual(before);
+});
+
+it.each([1, 2, 5])(
+  'refuses project metadata in legacy or future logical format %s',
+  (formatVersion) => {
+    expect(
+      inspectVideoWorkspace({
+        ...workspace(),
+        formatVersion,
+        project: {
+          name: 'Project',
+          lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+        },
+      }).workspace
+    ).toBeNull();
+  }
+);

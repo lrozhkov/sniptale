@@ -2,12 +2,12 @@ import { createReviewAdvancedContentOperation } from '../../../features/video/re
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { VideoWorkspace } from './contracts';
 
-/** Physical v2 stores legacy logical v1; physical v3 stores a complete logical v2 baseline. */
+/** Physical 2/3 stores logical 1/2. Physical 4/5 stores logical 3/4 with project metadata. */
 export type VideoWorkspaceHead = Omit<
   VideoWorkspace,
   'formatVersion' | 'history' | 'advanced' | 'effectSnapshots' | 'baseline'
 > & {
-  formatVersion: 2 | 3;
+  formatVersion: 2 | 3 | 4 | 5;
   historyStart?: number;
   historyLength: number;
   usageReferenceKeys: string[];
@@ -33,11 +33,18 @@ export type VideoWorkspaceHistoryRow =
 
 /** Reconstructs unknown logical input without admitting history or repairing stored evidence. */
 export function materializeWorkspaceStorage(head: unknown, rows: readonly unknown[]): unknown {
-  if (!isRecord(head) || (head['formatVersion'] !== 2 && head['formatVersion'] !== 3)) {
+  if (
+    !isRecord(head) ||
+    (head['formatVersion'] !== 2 &&
+      head['formatVersion'] !== 3 &&
+      head['formatVersion'] !== 4 &&
+      head['formatVersion'] !== 5)
+  ) {
     return rows.length ? { aggregateId: isRecord(head) ? head['aggregateId'] : undefined } : head;
   }
   const count = head['historyLength'];
-  const complete = head['formatVersion'] === 3;
+  const complete = head['formatVersion'] === 3 || head['formatVersion'] === 5;
+  const hasProject = head['formatVersion'] === 4 || head['formatVersion'] === 5;
   const start = complete ? head['historyStart'] : 0;
   if (
     typeof head['aggregateId'] !== 'string' ||
@@ -95,7 +102,7 @@ export function materializeWorkspaceStorage(head: unknown, rows: readonly unknow
   if (complete && (!isRecord(document) || !isRecord(document['advancedContent']))) return head;
   return {
     ...envelope,
-    formatVersion: complete ? 2 : 1,
+    formatVersion: hasProject ? (complete ? 4 : 3) : complete ? 2 : 1,
     advanced:
       complete && isRecord(document) && isRecord(document['advancedContent'])
         ? {
@@ -128,8 +135,15 @@ export function workspaceStorageHead(
   } = workspace;
   return {
     ...envelope,
-    formatVersion: workspace.formatVersion === 2 ? 3 : 2,
-    ...(workspace.formatVersion === 2 ? { historyStart } : {}),
+    formatVersion:
+      workspace.formatVersion === 4
+        ? 5
+        : workspace.formatVersion === 3
+          ? 4
+          : workspace.formatVersion === 2
+            ? 3
+            : 2,
+    ...(workspace.formatVersion === 2 || workspace.formatVersion === 4 ? { historyStart } : {}),
     historyLength: history.length,
     usageReferenceKeys,
   };
@@ -153,7 +167,7 @@ export function workspaceStorageBaselineRow(workspace: VideoWorkspace): VideoWor
   return {
     aggregateId: workspace.aggregateId,
     ordinal: 0,
-    ...(workspace.formatVersion === 2 && workspace.baseline
+    ...((workspace.formatVersion === 2 || workspace.formatVersion === 4) && workspace.baseline
       ? {
           baseline: workspace.baseline,
           ui: workspace.advanced.ui,

@@ -27,7 +27,10 @@ import {
   MANIFEST_PATH,
   MEDIA_HUB_BACKUP_LAYOUT,
   MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
-  MEDIA_HUB_BACKUP_SHARED_LAYOUT,
+  isSharedBackupLayout,
+  MEDIA_HUB_BACKUP_PROJECT_LAYOUT,
+  hasReviewProjectMetadata,
+  assertReviewProjectLayout,
   type MediaHubBackupLayout,
 } from './layout';
 import { encodeBackupMetadata } from './metadata-transport';
@@ -188,23 +191,32 @@ export async function exportMediaHubBackupV6(args: {
     report();
     if (
       args.plan.manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT ||
-      args.plan.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+      isSharedBackupLayout(args.plan.manifest.layout)
     ) {
       const roots: MediaHubBackupRootInventoryItem[] = [];
       let expandedBytes = 0;
+      let layout = args.plan.manifest.layout;
       for (const [index, item] of args.plan.roots.entries()) {
         throwIfAborted(args.signal);
-        const encoded = await encodeBackupMetadata(item, index + 1, args.signal);
+        const payload = await item.load(args.signal);
+        const encoded = await encodeBackupMetadata(
+          { ...item, load: async () => payload },
+          index + 1,
+          args.signal
+        );
+        if (hasReviewProjectMetadata(payload.metadata)) layout = MEDIA_HUB_BACKUP_PROJECT_LAYOUT;
         expandedBytes += encoded.expandedBytes;
         assertBackupByteBudget(expandedBytes, MAX_EXPANDED_ARCHIVE_METADATA_BYTES, 'encode');
         roots.push(encoded.item);
       }
-      args = { ...args, plan: buildMediaHubBackupExportPlanV6({ ...args.plan.manifest, roots }) };
+      args = {
+        ...args,
+        plan: buildMediaHubBackupExportPlanV6({ ...args.plan.manifest, layout, roots }),
+      };
     }
-    const shared =
-      args.plan.manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT
-        ? await prepareSharedBackupExport(args.plan.roots, args.signal)
-        : null;
+    const shared = isSharedBackupLayout(args.plan.manifest.layout)
+      ? await prepareSharedBackupExport(args.plan.roots, args.signal)
+      : null;
     if (shared) args.plan.manifest = { ...args.plan.manifest, sharedObjects: shared.sharedObjects };
     const manifestText = JSON.stringify(args.plan.manifest);
     assertBackupByteBudget(
@@ -223,6 +235,7 @@ export async function exportMediaHubBackupV6(args: {
     for (const [index, item] of args.plan.roots.entries()) {
       throwIfAborted(args.signal);
       const payload = await item.load(args.signal);
+      assertReviewProjectLayout(payload.metadata, args.plan.manifest.layout);
       const prepared = shared?.roots[index];
       const envelope =
         prepared?.metadata ??

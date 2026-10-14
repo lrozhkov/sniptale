@@ -35,7 +35,11 @@ import {
 import { verifyMediaHubRestoreResume } from './restore-session';
 import { stageArchiveRootObjects, type StagedArchiveObject } from './staging';
 import { assertArchiveRootMetadataIdentity } from './root-codecs/root-identity';
-import { MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT, MEDIA_HUB_BACKUP_SHARED_LAYOUT } from './layout';
+import {
+  MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  isSharedBackupLayout,
+  assertReviewProjectLayout,
+} from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertArchiveRootObjectInventory } from './root-codecs/object-inventory';
 
@@ -120,12 +124,12 @@ async function loadEnvelope(
     throw new Error('Media backup root descriptor changed after preflight.');
   }
   const decoded =
-    manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT ||
-    manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT
+    manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT || isSharedBackupLayout(manifest.layout)
       ? (await decodeBackupMetadata(reader, envelope, signal)).envelope
       : envelope;
   assertArchiveRootMetadataIdentity(descriptor, decoded.metadata);
-  if (manifest.layout === MEDIA_HUB_BACKUP_SHARED_LAYOUT)
+  assertReviewProjectLayout(decoded.metadata, manifest.layout);
+  if (isSharedBackupLayout(manifest.layout))
     await assertArchiveRootObjectInventory(decoded, reader, manifest.sharedObjects ?? []);
   return decoded;
 }

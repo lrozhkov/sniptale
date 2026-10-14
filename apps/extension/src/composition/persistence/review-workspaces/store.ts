@@ -509,7 +509,8 @@ export async function commitVideoWorkspaceWithProjection(args: CommitVideoWorksp
         effectSnapshots
       );
       const next =
-        isRecord(storage.head) && storage.head['formatVersion'] === 3
+        isRecord(storage.head) &&
+        (storage.head['formatVersion'] === 3 || storage.head['formatVersion'] === 5)
           ? await writePreparedWorkspace(
               tx,
               workspace,

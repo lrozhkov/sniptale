@@ -67,9 +67,13 @@ it('enumerates orphan evidence and refuses replacement without rewriting it', as
   expect(fixture.rows).toEqual(before);
 });
 
-it.each(['cursor', 'branch', 'replace', 'rollover'] as const)(
-  'reads back the complete %s delta and preserves foreign evidence',
-  async (kind) => {
+it.each(
+  ([2, 4] as const).flatMap((formatVersion) =>
+    (['cursor', 'branch', 'replace', 'rollover'] as const).map((kind) => ({ formatVersion, kind }))
+  )
+)(
+  'reads back $kind in format $formatVersion and preserves project metadata and foreign evidence',
+  async ({ formatVersion, kind }) => {
     const operation = (id: string, time: number): ReviewOperation => ({
       id,
       at: time,
@@ -81,7 +85,20 @@ it.each(['cursor', 'branch', 'replace', 'rollover'] as const)(
     const second = operation('second', 2);
     const previous: VideoWorkspace = {
       ...workspace,
-      formatVersion: 2,
+      formatVersion,
+      ...(formatVersion === 4
+        ? {
+            project: {
+              name: 'Retained project',
+              lifecycle: {
+                storageClass: 'library' as const,
+                savedAt: 1,
+                updatedAt: 2,
+                trashedAt: 3,
+              },
+            },
+          }
+        : {}),
       history: [first, second],
       cursor: kind === 'branch' ? 1 : 2,
       baseline: {

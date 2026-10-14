@@ -1,3 +1,4 @@
+import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import type { VideoWorkspace } from './contracts';
@@ -91,3 +92,68 @@ it('leaves invalid retained redo to the full logical admission owner', () => {
   ];
   expect(parseVideoWorkspace(materializeWorkspaceStorage(head, rows))).toBeNull();
 });
+
+it.each([3, 4] as const)(
+  'roundtrips logical project format %s through its own physical head without changing rows',
+  (formatVersion) => {
+    const input: VideoWorkspace = {
+      ...workspace,
+      formatVersion,
+      ...(formatVersion === 4
+        ? {
+            baseline: {
+              annotations: [],
+              edits: [],
+              canvasComments: [],
+              advancedContent: reviewAdvancedContentBaseline(workspace.advanced),
+            },
+          }
+        : {}),
+      project: {
+        name: 'Saved edit',
+        lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 3 },
+      },
+    };
+    const head = workspaceStorageHead(input, ['indexed:v1']);
+    expect(head.formatVersion).toBe(formatVersion + 1);
+    expect(head.project).toEqual(input.project);
+    const rows = workspaceStorageRows(input);
+    const before = structuredClone({ head, rows });
+    expect(parseVideoWorkspace(materializeWorkspaceStorage(head, rows))).toEqual(input);
+    expect({ head, rows }).toEqual(before);
+    expect(
+      parseVideoWorkspace(materializeWorkspaceStorage({ ...head, formatVersion: 6 }, rows))
+    ).toBeNull();
+    expect(
+      parseVideoWorkspace(materializeWorkspaceStorage({ ...head, project: undefined }, rows))
+    ).toBeNull();
+  }
+);
+
+it.each([2, 4] as const)(
+  'refuses mixed physical format %s evidence even when its inline document looks valid',
+  (formatVersion) => {
+    const project = {
+      name: 'Project',
+      lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1 },
+    };
+    const mixed = {
+      ...workspaceStorageHead(workspace, []),
+      formatVersion,
+      ...(formatVersion === 4 ? { project } : {}),
+      history: workspace.history,
+      advanced: workspace.advanced,
+      baseline: {
+        annotations: [],
+        edits: [],
+        canvasComments: [],
+        advancedContent: reviewAdvancedContentBaseline(workspace.advanced),
+      },
+    };
+    const before = structuredClone(mixed);
+    expect(
+      parseVideoWorkspace(materializeWorkspaceStorage(mixed, workspaceStorageRows(workspace)))
+    ).toBeNull();
+    expect(mixed).toEqual(before);
+  }
+);

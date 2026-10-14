@@ -609,3 +609,50 @@ it('roundtrips compact source gain and retained resources through portable backu
       .audio.original.muted
   ).toBe(false);
 });
+
+it.each([3, 4] as const)(
+  'preserves format %s project name and independent Trash during physical backup and remapped publication',
+  async (formatVersion) => {
+    const input: VideoWorkspace = {
+      ...workspace,
+      formatVersion,
+      ...(formatVersion === 4
+        ? {
+            baseline: {
+              annotations: [],
+              edits: [],
+              canvasComments: [],
+              advancedContent: reviewAdvancedContentBaseline(workspace.advanced),
+            },
+          }
+        : {}),
+      project: {
+        name: 'Named retained edit',
+        lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 3 },
+      },
+    };
+    const review = await readVideoReviewForBackup({
+      aggregateId: input.aggregateId,
+      sourceAssetId: input.sourceAssetId,
+      db: snapshotDatabase(workspaceStorageHead(input, []), draft, workspaceStorageRows(input)),
+    });
+    expect(review?.workspace.project).toEqual(input.project);
+    const restored = prepareVideoReviewRestore({
+      review: review!,
+      sourceAggregateId: input.aggregateId,
+      targetAggregateId: 'recording:remapped',
+      sourceAssetId: 'remapped-source',
+    });
+    const rows = { put: vi.fn() };
+    await putVideoReviewRestore({
+      review: restored,
+      workspaces: rows,
+      drafts: { put: vi.fn(), delete: vi.fn() },
+    });
+    expect(restored.workspace.project).toEqual(input.project);
+    expect(restored.workspace.history).toEqual(input.history);
+    expect(rows.put).toHaveBeenCalledWith(
+      expect.objectContaining({ project: input.project, aggregateId: 'recording:remapped' })
+    );
+  }
+);

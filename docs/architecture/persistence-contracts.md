@@ -1,14 +1,16 @@
 # Persistence contracts
 
-Explicit media backup v6 now writes `library-folders-v3`. Readers retain `library-folders-v1` and `library-folders-v2` admission. Payload envelopes reference one declared JSON payload and bounded PNG objects for authored video-review and montage window-header favicons. Review history, including redo, and opaque legacy recovery keep their logical formats. Check JSON and favicon transport objects directly from ZIP.
+Explicit media backup v6 writes `library-folders-v4` when the admitted inventory includes quick-edit project metadata. Readers retain layouts `library-folders-v1`, `library-folders-v2` and `library-folders-v3`. V4 uses the V3 shared-object profile and resource limits. Legacy layouts cannot carry project metadata.
+
+Payload envelopes reference one declared JSON payload and bounded PNG objects for authored video-review and montage window-header favicons. Review history, including redo, and opaque legacy recovery keep their logical formats. Check JSON and favicon transport objects directly from ZIP.
 
 Exclude them from OPFS staging, ready journals, retained asset IDs and Library publication.
 
-Canonical root publishers retain their existing mutation and resource authority. This requires no database migration. Envelope/manifest/catalog JSON has a 4 MiB bound. Each expanded root has a 128 MiB bound, including repeated favicon hydration and JSON sidecars. Expanded archive metadata has a 512 MiB bound.
+Canonical root publishers retain their existing mutation and resource authority. This archive transport does not change database stores. Envelope/manifest/catalog JSON has a 4 MiB bound. Each expanded root has a 128 MiB bound, including repeated favicon hydration and JSON sidecars. Expanded archive metadata has a 512 MiB bound.
 
 Depth remains 64 and the existing ZIP entry/byte profiles remain authoritative. Domain text bounds and the Scenario history owner bound remain independent. Out-of-profile exports refuse without truncating local history. Old clients refuse an unsupported layout at the manifest discriminator before restore.
 
-V3 has an explicit bounded `sharedObjects` table with physical path, SHA256, size and MIME. Each shared reference preserves its root-local object ID and filename and names only a table row. A row must have one admitted direct root reference as its physical anchor and at least one shared consumer. Inspection admits each typed domain resource role, the exact physical inventory, and each shared reference separately. It hashes each shared entry once before staging.
+V3 and V4 have an explicit bounded `sharedObjects` table with physical path, SHA256, size and MIME. Each shared reference preserves its root-local object ID and filename and names only a table row. A row must have one admitted direct root reference as its physical anchor and at least one shared consumer. Inspection admits each typed domain resource role, the exact physical inventory, and each shared reference separately. It hashes each shared entry once before staging.
 
 Undeclared or unused rows, alias chains, missing anchors and conflicting size/MIME/digests refuse before mutation. Export hashes actual immutable bytes through one operation-local registry after payload encoding. Selected readable files remain even when equal, while internal copies may reuse their declared entry. JSON payloads and sidecars use ZIP compression. Expanded limits remain unchanged.
 
@@ -22,6 +24,12 @@ Keep one database because recording publication commits recording metadata, medi
 
 ## Admission and migration
 
+Quick-edit logical formats 3 and 4 require project names and permanent lifecycles, including independent Trash admission times. Format 3 uses the legacy advanced baseline. Format 4 retains the complete document baseline. Physical formats 4 and 5 store these logical formats.
+
+Formats 1 and 2 remain readable without project metadata. Their physical formats remain 2 and 3. Reading does not materialize project metadata.
+
+Project metadata stays outside content Undo/Redo history. Canonical workspace writers and portable restore preserve it. Admission rejects missing or invalid metadata and mixed logical/physical envelopes. Additive admission preserves existing heads, operations, recovery and source bytes. The [generated project facts](../engineering/project-facts.md) identify the current database version. Earlier writers cannot admit this database. The archive layout provides a separate admission fence.
+
 Document autosave adapters in Gallery, Scenario, Montage and standalone Image consume the data-only `features/autosave/policy.ts`: 1000 ms idle delay and 5000 ms maximum pending age. These are request deadlines while the page runtime is available. An acquired write, suspension, conflict or browser termination can delay or prevent completion. Timer publication does not seal an Undo action. Existing document owners retain serialized writes, latest-version acknowledgements, CAS and explicit save/discard authority.
 
 Hidden/pagehide requests are advisory. Beforeunload guards dirty state and never disposes the writer. Pageshow and visibility restoration recheck the live generation.
@@ -30,7 +38,7 @@ Montage controlled transitions lease the mounted writer's latest barrier through
 
 Embedded Image retains Scenario as the sole durable Apply owner.
 
-Ordinary Gallery append still reads and admits the complete native head, baseline, current and redo history, source identity and resource closure in its existing transaction. Physical format3 appends reuse unchanged canonical values only from that fresh private read. They check the new operation and changed fields. They encode only rows actually written. Legacy conversion and explicit replacements keep full candidate admission.
+Ordinary Gallery append still reads and admits the complete native head, baseline, current and redo history, source identity and resource closure in its existing transaction. Physical format3 and format5 appends reuse unchanged canonical values only from that fresh private read. They check the new operation and changed fields. They encode only rows actually written. Legacy conversion and explicit replacements keep full candidate admission.
 
 After transaction completion, the default session adapter receives an explicit transient document projection from the same successful mutation. Thus, its ACK does not replay retained history again. Plain read/commit snapshots keep their existing shape. Injected adapters without that capability retain strict replay. The implementation uses no cross-read trusted cache or stored validation flag.
 

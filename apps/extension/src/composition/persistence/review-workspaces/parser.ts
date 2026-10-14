@@ -1,3 +1,4 @@
+import { parseLibraryLifecycle } from '../library-lifecycle/parser';
 import { isDiscardedHeaderChange, replayStoredReviewHistory } from './legacy-header-history';
 import { parseVideoWorkspaceTyping, withoutVideoWorkspaceTyping } from './typing';
 import { pruneReviewAnnotationEffectSnapshots } from './asset-refs';
@@ -28,12 +29,13 @@ import type {
   ReviewSource,
 } from '../../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../../features/video/review/advanced/types';
-import type { VideoWorkspace, VideoWorkspaceDraft } from './contracts';
+import type { VideoWorkspace, VideoWorkspaceDraft, VideoWorkspaceProject } from './contracts';
 
 /** Safe parser location and invariant codes; no retained document values. */
 export type VideoWorkspaceDiagnostic = {
   check:
     | 'workspace-envelope'
+    | 'project-metadata'
     | 'source-metadata'
     | 'history-operation'
     | 'history-replay'
@@ -179,6 +181,33 @@ function validEffectSnapshotClosure(
   );
 }
 
+function parseWorkspaceProject(value: unknown): VideoWorkspaceProject | null {
+  if (
+    !isRecord(value) ||
+    typeof value['name'] !== 'string' ||
+    value['name'].trim().length === 0 ||
+    value['name'].length > 256 ||
+    !isRecord(value['lifecycle'])
+  )
+    return null;
+  const lifecycle = parseLibraryLifecycle(value['lifecycle'], {
+    storageClass: 'library',
+    updatedAt: 0,
+  });
+  if (
+    !lifecycle ||
+    lifecycle.storageClass !== 'library' ||
+    lifecycle.savedAt === null ||
+    !timestamp(lifecycle.savedAt) ||
+    !timestamp(lifecycle.updatedAt)
+  )
+    return null;
+  return {
+    name: value['name'],
+    lifecycle: { ...lifecycle, storageClass: 'library', savedAt: lifecycle.savedAt },
+  };
+}
+
 /** Rejects corrupt history, including invalid operations in the unapplied redo suffix. */
 function parseWorkspace(
   value: unknown,
@@ -186,7 +215,12 @@ function parseWorkspace(
 ): { workspace: VideoWorkspace; document: ReviewDocument } | null {
   if (
     !isRecord(value) ||
-    (value['formatVersion'] !== 1 && value['formatVersion'] !== 2) ||
+    'historyLength' in value ||
+    'historyStart' in value ||
+    (value['formatVersion'] !== 1 &&
+      value['formatVersion'] !== 2 &&
+      value['formatVersion'] !== 3 &&
+      value['formatVersion'] !== 4) ||
     !aggregateId(value['aggregateId']) ||
     !aggregateId(value['sourceAssetId']) ||
     !revision(value['revision']) ||
@@ -200,17 +234,22 @@ function parseWorkspace(
     value['cursor'] > value['history'].length
   )
     return null;
+  const hasProject = value['formatVersion'] === 3 || value['formatVersion'] === 4;
+  const project = hasProject ? parseWorkspaceProject(value['project']) : undefined;
+  if (project === null || (!hasProject && 'project' in value)) {
+    report({ check: 'project-metadata', reason: 'invalid' });
+    return null;
+  }
+  const complete = value['formatVersion'] === 2 || value['formatVersion'] === 4;
   const source = parseReviewSource(value['source']);
   if (!source) {
     report({ check: 'source-metadata', reason: 'invalid' });
     return null;
   }
-  const completeBaseline =
-    value['formatVersion'] === 2
-      ? parseReviewDocumentBaseline(value['baseline'], source.duration)
-      : undefined;
-  if (completeBaseline === null || (value['formatVersion'] === 1 && 'baseline' in value))
-    return null;
+  const completeBaseline = complete
+    ? parseReviewDocumentBaseline(value['baseline'], source.duration)
+    : undefined;
+  if (completeBaseline === null || (!complete && 'baseline' in value)) return null;
   const admitted = parseWorkspaceHistory(value['history'], source, report);
   if (!admitted) return null;
   const parsed = parseWorkspaceDocument({
@@ -237,6 +276,7 @@ function parseWorkspace(
   const workspace: VideoWorkspace = {
     aggregateId: value['aggregateId'],
     formatVersion: value['formatVersion'],
+    ...(project ? { project } : {}),
     ...(completeBaseline ? { baseline: completeBaseline } : {}),
     source,
     sourceAssetId: value['sourceAssetId'],

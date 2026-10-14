@@ -121,3 +121,20 @@ it('rejects a malformed complete baseline even when its first operation would re
     }).workspace
   ).toBeNull();
 });
+
+it('retains project metadata through compaction and complete baseline admission', () => {
+  const input = {
+    ...createHistoryRetentionWorkspace({ fragments: 4, cursor: 600 }),
+    formatVersion: 3,
+    project: {
+      name: 'Permanent project',
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 3 },
+    },
+  };
+  const admitted = inspectVideoWorkspace(input);
+  if (!admitted.workspace) throw new Error('Invalid project fixture');
+  const compacted = compactVideoWorkspaceHistory(admitted.workspace);
+  expect(compacted.start).toBeGreaterThan(0);
+  expect(compacted.workspace.formatVersion).toBe(4);
+  expect(inspectVideoWorkspace(compacted.workspace).workspace?.project).toEqual(input.project);
+});

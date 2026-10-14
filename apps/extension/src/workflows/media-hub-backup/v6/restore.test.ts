@@ -164,17 +164,28 @@ beforeEach(() => {
   mocks.restoreGalleryViews.mockResolvedValue([]);
 });
 
-it('keeps v2 JSON transport out of staging and ready journals before root publication', async () => {
+it.each([
+  'library-folders-v1',
+  'library-folders-v2',
+  'library-folders-v3',
+  'library-folders-v4',
+] as const)('keeps %s transport out of staging and publishes legacy roots', async (layout) => {
   const output = createArchiveMemorySink();
   await exportMediaHubBackupV6({
     plan: buildMediaHubBackupExportPlanV6({
-      layout: 'library-folders-v2',
+      layout,
       roots: [
         {
           descriptor,
           load: async () => ({
             metadata: {
-              entry: { id: 'one', source: { kind: 'screenshot' }, tags: [] },
+              entry: {
+                id: 'one',
+                source: { kind: 'screenshot' },
+                tags: [],
+                mimeType: object.mimeType,
+                size: object.size,
+              },
               originalObjectId: object.objectId,
             },
             objects: [{ ref: object, blob: new Blob(['media']) }],
