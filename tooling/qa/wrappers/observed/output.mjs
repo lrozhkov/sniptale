@@ -89,7 +89,10 @@ function structuredLocations(step) {
     line: null,
     message: String(failure),
   }));
-  const advisories = (step.advisories ?? []).map((finding) => {
+  const advisoryFindings = ['failed', 'blocked'].includes(step.status)
+    ? []
+    : (step.advisories ?? []);
+  const advisories = advisoryFindings.map((finding) => {
     const id = finding.id ?? finding.family ?? finding.rule ?? 'advisory';
     const reason = finding.reason ?? finding.message ?? 'review requested';
     return {

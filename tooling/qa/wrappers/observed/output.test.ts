@@ -381,3 +381,32 @@ it('omits reproduction commands when configured redaction changes shell syntax',
   expect(text).not.toContain('Reproduce: npm exec');
   expect(text).toContain('Reproduction command omitted because redaction changes shell syntax.');
 });
+
+it.each(['failed', 'blocked'])(
+  'keeps advisory findings out of %s blocker counts and failure locations',
+  (status) => {
+    const step = {
+      label: 'Structural risk',
+      status,
+      violations: Array.from({ length: 6 }, (_, index) => ({
+        file: `src/blocker-${index}.ts`,
+        message: 'owner violation',
+      })),
+      advisories: Array.from({ length: 43 }, (_, index) => ({
+        file: `src/watch-${index}.ts`,
+        reason: 'watch only',
+      })),
+    };
+    const summary = formatObservedBlocker(step);
+    expect(summary).toContain('src/blocker-5.ts');
+    expect(summary).not.toContain('more in the run log');
+    expect(summary).not.toContain('watch only');
+    const normalized = normalizeObservedStep(step).observation;
+    expect(normalized.diagnostic?.locations).toHaveLength(6);
+    expect(normalized.log).toContain('src/watch-42.ts');
+    expect(
+      normalizeObservedStep({ ...step, status: 'ok', violations: [] }).observation.diagnostic
+        ?.locations
+    ).toHaveLength(43);
+  }
+);
