@@ -23,7 +23,13 @@ function buildSelectedBackupScope(
   items: GalleryItem[]
 ): NonNullable<MediaHubBackupExportOptions['selected']> {
   return {
-    mediaAssetIds: items.filter(isGalleryMediaItem).map((item) => item.entityId ?? item.id),
+    mediaAssetIds: [
+      ...new Set(
+        items
+          .filter((item) => isGalleryMediaItem(item) || item.type === 'quick-edit-project')
+          .map((item) => item.entityId ?? item.id)
+      ),
+    ],
     scenarioProjectIds: items.filter(isGalleryScenarioItem).map((item) => item.entityId),
     videoProjectIds: items.filter(isGalleryVideoProjectItem).map((item) => item.entityId),
   };

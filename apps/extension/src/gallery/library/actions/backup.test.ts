@@ -588,3 +588,24 @@ describe('gallery backup actions', () => {
     verifyFailedBackupImportReportsPartialResult
   );
 });
+
+it('maps a selected quick-edit and its source to one media root without montage identity', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const { createSelectedBackupExportOptions } = await import('./backup');
+  const project = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const source = createMediaItem({ id: 'source', entityId: 'source' });
+  expect(createSelectedBackupExportOptions([project, source])?.selected).toEqual({
+    mediaAssetIds: ['source'],
+    scenarioProjectIds: [],
+    videoProjectIds: [],
+  });
+});

@@ -438,3 +438,54 @@ it('matches guide and tour folders to document thumbnails and distinguishes edit
   expect(getGalleryFolderIcon('video-project')).not.toBe(getGalleryFolderIcon('recording'));
   expect(getGalleryFolderIcon('scenario')).toBe(BookOpen);
 });
+
+it('shares a quick-edit thumbnail within the snapshot and releases it when the snapshot changes', async () => {
+  const { GalleryThumbnailProvider } = await import('./thumbnail-provider');
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const item = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  getMediaThumbnailMock.mockResolvedValue({
+    blob: new Blob(['thumbnail']),
+    width: 320,
+    height: 180,
+  });
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => {
+    root?.render(
+      <GalleryThumbnailProvider snapshot={[item]}>
+        <MediaThumb item={item} />
+        <MediaThumb item={item} />
+      </GalleryThumbnailProvider>
+    );
+  });
+  await flushEffects();
+  expect(container.querySelectorAll('img')).toHaveLength(2);
+  expect(getMediaThumbnailMock).toHaveBeenCalledTimes(1);
+  act(() => {
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(revokeObjectURLMock).not.toHaveBeenCalled();
+  const updated = { ...item, workspaceRevision: 2 };
+  act(() => {
+    root?.render(
+      <GalleryThumbnailProvider snapshot={[updated]}>
+        <MediaThumb item={updated} />
+      </GalleryThumbnailProvider>
+    );
+  });
+  await flushEffects();
+  expect(getMediaThumbnailMock).toHaveBeenCalledTimes(2);
+  expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:thumb');
+  expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:thumb');
+});

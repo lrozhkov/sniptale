@@ -31,7 +31,11 @@ function isMetadataEditable(item: PreviewPanelProps['item']) {
 }
 
 function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
-  if (!isGalleryVideoProjectItem(item) || !item.unavailableReason) return null;
+  if (
+    (!isGalleryVideoProjectItem(item) && item.type !== 'quick-edit-project') ||
+    !item.unavailableReason
+  )
+    return null;
   const reasonKey =
     item.unavailableReason === 'unsupported-engine1'
       ? 'gallery.preview.unavailableUnsupportedProject'

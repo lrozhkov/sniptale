@@ -107,14 +107,17 @@ function projectUsageFromSnapshot(
   }
 
   for (const workspace of reviewWorkspaces) {
-    if (workspace.aggregateId === mediaId) continue;
+    const primary = workspace.aggregateId === mediaId;
     const attached = reviewWorkspaceUsesMedia(workspace, media);
-    if (attached) {
+    if (primary || attached) {
       usage.push({
         id: workspace.aggregateId,
         kind: 'review',
-        name: mediaById.get(workspace.aggregateId)?.filename ?? root.filename,
-        primary: false,
+        name:
+          workspace.project?.name ??
+          mediaById.get(workspace.aggregateId)?.filename ??
+          root.filename,
+        primary,
       });
     }
   }

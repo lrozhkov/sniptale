@@ -114,7 +114,7 @@ it('finds required recordings without clips and drops old keys when a project ch
   ];
   expect(await readIndexedProjectUsage(media.id)).toEqual([]);
 });
-it('finds review auxiliary audio through private provenance and excludes its own workspace', async () => {
+it('finds auxiliary review audio and its own primary workspace without duplicates', async () => {
   rows['project_assets'] = [createProjectAssetEntry({ id: 'private', originMediaId: media.id })];
   const advanced = createQuickEditAdvancedState();
   advanced.audio.music.push({
@@ -150,6 +150,7 @@ it('finds review auxiliary audio through private provenance and excludes its own
   );
   rows['video_workspace_history'] = physical.flatMap(workspaceStorageRows);
   expect(await readIndexedProjectUsage(media.id)).toEqual([
+    { id: media.id, kind: 'review', name: media.filename, primary: true },
     { id: 'other', kind: 'review', name: media.filename, primary: false },
   ]);
 });

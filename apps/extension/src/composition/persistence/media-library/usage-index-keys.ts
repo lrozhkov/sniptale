@@ -4,7 +4,7 @@ import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import { videoSourceReferences } from './dependencies';
 
 export const USAGE_REFERENCE_INDEX = 'usageReferenceKeys';
-export const USAGE_INDEX_MARKER = 'indexed:v1';
+export const USAGE_INDEX_MARKER = 'indexed:v2';
 
 /** Typed locators distinguish Library identities, private resources and recording origins. */
 export function usageReferenceKey(kind: string, id: string): string {
@@ -37,6 +37,7 @@ export function withReviewWorkspaceUsage<T extends object>(
   const workspace = parseVideoWorkspace(value);
   const keys = new Set([USAGE_INDEX_MARKER]);
   if (workspace) {
+    keys.add(usageReferenceKey('library-asset', workspace.aggregateId));
     for (const ref of collectReviewAssetReferences(workspace)) {
       if (ref.startsWith('project-asset:'))
         keys.add(usageReferenceKey('project-asset', ref.slice('project-asset:'.length)));

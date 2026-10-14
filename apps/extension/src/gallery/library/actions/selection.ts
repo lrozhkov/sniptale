@@ -26,6 +26,8 @@ import {
 import { listMediaAssetProjectUsageBatch } from '../../../composition/persistence/media-library/usage';
 
 function splitSelectableTargets(targets: GalleryItem[]) {
+  if (targets.some((item) => item.type === 'quick-edit-project'))
+    throw createGalleryUserFacingActionError(translate('gallery.preview.projectUnavailable'));
   return {
     media: targets.filter(isGalleryMediaItem),
     scenarios: targets.filter(isGalleryScenarioItem),
@@ -35,6 +37,8 @@ function splitSelectableTargets(targets: GalleryItem[]) {
 }
 
 function trashTarget(item: GalleryItem): LibraryTrashTarget {
+  if (item.type === 'quick-edit-project')
+    throw createGalleryUserFacingActionError(translate('gallery.preview.projectUnavailable'));
   if (isGalleryScenarioExportItem(item)) return { kind: 'scenario-export', id: item.entityId };
   if (isGalleryScenarioItem(item)) return { kind: 'scenario-project', id: item.entityId };
   if (isGalleryVideoProjectItem(item)) return { kind: 'video-project', id: item.entityId };

@@ -195,7 +195,7 @@ function PreviewMediaContent(
     return <PreviewScenarioStage item={props.item} trashMode={Boolean(props.trashMode)} />;
   }
 
-  if (isGalleryVideoProjectItem(props.item)) {
+  if (isGalleryVideoProjectItem(props.item) || props.item.type === 'quick-edit-project') {
     return (
       <div
         data-ui="gallery.preview.project-thumbnail"

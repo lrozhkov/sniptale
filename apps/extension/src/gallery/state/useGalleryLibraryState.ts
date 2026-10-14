@@ -227,6 +227,11 @@ function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | und
       areRecordingGroupViewsEqual(left.recordingGroupView, right.recordingGroupView)
     );
   }
+  if (left.type === 'quick-edit-project') {
+    return (
+      right.type === 'quick-edit-project' && left.unavailableReason === right.unavailableReason
+    );
+  }
   if (isGalleryScenarioItem(left)) {
     return (
       isGalleryScenarioItem(right) &&

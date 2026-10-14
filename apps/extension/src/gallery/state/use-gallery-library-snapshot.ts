@@ -1,3 +1,4 @@
+import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
 import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import {
   listMediaThumbnailIds,
@@ -34,14 +35,21 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
 }> {
   const settings = await loadSettings().catch(() => null);
   const policy = settings?.localStoragePolicy ?? DEFAULT_LOCAL_STORAGE_POLICY;
-  const [mediaItems, scenarioProjects, thumbnailIds, videoProjects, presentations] =
-    await Promise.all([
-      runStorageStartupPhase('gallery-media-list', listMediaLibrary),
-      runStorageStartupPhase('gallery-scenario-list', listScenarioProjectSummaries),
-      runStorageStartupPhase('gallery-thumbnail-list', listMediaThumbnailIds),
-      runStorageStartupPhase('gallery-video-project-list', listVideoProjects),
-      runStorageStartupPhase('gallery-presentations', listAggregatePresentations),
-    ]);
+  const [
+    mediaItems,
+    scenarioProjects,
+    thumbnailIds,
+    videoProjects,
+    presentations,
+    quickEditProjects,
+  ] = await Promise.all([
+    runStorageStartupPhase('gallery-media-list', listMediaLibrary),
+    runStorageStartupPhase('gallery-scenario-list', listScenarioProjectSummaries),
+    runStorageStartupPhase('gallery-thumbnail-list', listMediaThumbnailIds),
+    runStorageStartupPhase('gallery-video-project-list', listVideoProjects),
+    runStorageStartupPhase('gallery-presentations', listAggregatePresentations),
+    runStorageStartupPhase('gallery-quick-edit-project-list', listVideoWorkspaceSummaries),
+  ]);
   const scenarioExportsByProject = await runStorageStartupPhase('gallery-scenario-exports', () =>
     loadScenarioExportsByProject(scenarioProjects.map((project) => project.id))
   );
@@ -52,6 +60,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
     ),
     nextItems: createGalleryItems({
       mediaItems,
+      quickEditProjects,
       presentations,
       scenarioExportsByProjectId: new Map(scenarioExportsByProject),
       scenarioProjects,

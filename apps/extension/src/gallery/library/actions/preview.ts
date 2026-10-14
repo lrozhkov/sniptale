@@ -4,6 +4,7 @@ import { getMediaAssetBlob } from '../../../composition/persistence/media-librar
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import {
+  openGalleryPage,
   openScenarioEditorPage,
   openVideoEditorPage,
   openWebSnapshotViewerPage,
@@ -58,6 +59,12 @@ export function getPreviewMetadataValues(
 }
 
 export function openInEditor(item: GalleryItem) {
+  if (item.type === 'quick-edit-project') {
+    if (canOpenGalleryProject(item))
+      void openGalleryPage({ mediaId: item.entityId, quickEdit: true });
+    return;
+  }
+
   if (isGalleryScenarioItem(item)) {
     if (!canOpenGalleryProject(item)) return;
     void openScenarioEditorPage(item.entityId);

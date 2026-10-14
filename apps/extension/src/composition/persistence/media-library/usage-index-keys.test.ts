@@ -47,6 +47,7 @@ it('indexes current, undo, redo and recovery review references, including disabl
   expect(new Set(result.usageReferenceKeys)).toEqual(
     new Set([
       USAGE_INDEX_MARKER,
+      usageReferenceKey('library-asset', 'review'),
       ...['current', 'recovery', 'after'].map((id) => usageReferenceKey('project-asset', id)),
     ])
   );

@@ -16,11 +16,17 @@ const PROJECT_ACTION_CLASS_NAME = [
 
 /** Concise project content and availability, without treating projects as encoded files. */
 export function getGalleryProjectSummary(item: GalleryItem): string | null {
-  if (item.type !== 'scenario' && item.type !== 'video-project') return null;
+  if (
+    item.type !== 'scenario' &&
+    item.type !== 'video-project' &&
+    item.type !== 'quick-edit-project'
+  )
+    return null;
   if (item.lifecycle?.trashedAt !== undefined)
     return translate('gallery.preview.restoreProjectFirst');
   if (!canOpenGalleryProject(item)) return translate('gallery.preview.projectUnavailable');
-  if (item.type === 'scenario') return translate('gallery.preview.editableProject');
+  if (item.type === 'scenario' || item.type === 'quick-edit-project')
+    return translate('gallery.preview.editableProject');
   return [
     `${translate('gallery.preview.clips')}: ${item.project.clipCount}`,
     `${translate('gallery.preview.tracks')}: ${item.project.trackCount}`,
@@ -33,7 +39,12 @@ export function GalleryProjectOpenAction(props: {
   layout?: 'grid' | 'list';
   onOpen: (item: GalleryItem) => void;
 }) {
-  if (props.item.type !== 'scenario' && props.item.type !== 'video-project') return null;
+  if (
+    props.item.type !== 'scenario' &&
+    props.item.type !== 'video-project' &&
+    props.item.type !== 'quick-edit-project'
+  )
+    return null;
   if (props.item.lifecycle?.trashedAt !== undefined) return null;
   const available = canOpenGalleryProject(props.item);
   const iconOnly = props.layout === 'grid';

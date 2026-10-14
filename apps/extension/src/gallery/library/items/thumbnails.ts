@@ -1,3 +1,4 @@
+import { getMediaThumbnail } from '../../../composition/persistence/media-library/index.library';
 import type { MediaThumbnailEntry } from '../../../composition/persistence/media-library/contracts';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import type { GalleryItem } from './types';
@@ -37,6 +38,10 @@ export async function ensureGalleryItemThumbnail(
   item: GalleryItem,
   signal?: AbortSignal
 ): Promise<MediaThumbnailEntry | undefined> {
+  if (item.type === 'quick-edit-project') {
+    const thumbnail = await getMediaThumbnail(item.entityId);
+    return thumbnail ? { ...thumbnail, assetId: item.id } : undefined;
+  }
   if (item.type === 'scenario' || item.type === 'video-project') {
     const blob = await getGalleryProjectCover(item, signal);
     return blob

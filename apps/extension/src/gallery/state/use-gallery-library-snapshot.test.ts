@@ -28,6 +28,10 @@ const {
   repairTemporaryProjectLifecyclesMock: vi.fn().mockResolvedValue(0),
 }));
 
+vi.mock('../../composition/persistence/review-workspaces/summaries', () => ({
+  listVideoWorkspaceSummaries: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('../../composition/persistence/library-lifecycle/project-retention', () => ({
   repairTemporaryProjectLifecycles: repairTemporaryProjectLifecyclesMock,
 }));
@@ -147,6 +151,7 @@ describe('loadGalleryLibrarySnapshot', () => {
     expect(createGalleryItemsMock).toHaveBeenCalledWith({
       mediaItems,
       presentations: [],
+      quickEditProjects: [],
       scenarioExportsByProjectId: new Map([
         ['project-1', [scenarioExports[0]]],
         ['project-2', [scenarioExports[1]]],

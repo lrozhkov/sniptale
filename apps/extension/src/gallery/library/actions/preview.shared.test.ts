@@ -29,6 +29,7 @@ const {
   browserTabsCreateMock,
   writeBrowserClipboardItemsMock,
   buildEditorUrlMock,
+  openGalleryPageMock,
   openScenarioEditorPageMock,
   openVideoEditorPageMock,
 } = vi.hoisted(() => ({
@@ -50,6 +51,7 @@ const {
     }
     return `chrome-extension://test/apps/extension/src/editor/index.html?${params.toString()}`;
   }),
+  openGalleryPageMock: vi.fn(),
   openScenarioEditorPageMock: vi.fn(),
   openVideoEditorPageMock: vi.fn(),
 }));
@@ -92,6 +94,7 @@ vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
 
 vi.mock('../../../platform/navigation/extension-pages/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/navigation/extension-pages/index')>()),
+  openGalleryPage: openGalleryPageMock,
   openScenarioEditorPage: openScenarioEditorPageMock,
   openVideoEditorPage: openVideoEditorPageMock,
   openWebSnapshotViewerPage: vi.fn(),
@@ -449,4 +452,26 @@ it('reports unavailable saved HTML without regenerating or downloading the curre
   expect(banner).toHaveBeenCalledWith(expect.stringContaining(item.filename));
   expect(anchorClickSpy).not.toHaveBeenCalled();
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+});
+
+it('opens the saved quick-edit identity and refuses unavailable or trashed cards', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const item = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  openInEditor(item);
+  expect(openGalleryPageMock).toHaveBeenCalledExactlyOnceWith({
+    mediaId: 'source',
+    quickEdit: true,
+  });
+  openInEditor({ ...item, unavailableReason: 'missing-source' as const });
+  openInEditor({ ...item, lifecycle: { ...item.lifecycle!, trashedAt: 2 } });
+  expect(openGalleryPageMock).toHaveBeenCalledTimes(1);
 });

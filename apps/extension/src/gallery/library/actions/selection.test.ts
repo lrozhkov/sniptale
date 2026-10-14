@@ -410,3 +410,48 @@ it('prepares all selected media through one fresh batch and repeats only on a ne
   expect(listMediaAssetProjectUsageBatchMock).toHaveBeenCalledTimes(2);
   expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  'refuses quick-edit destructive commands before mutations (mixed=%s)',
+  async (mixed) => {
+    vi.clearAllMocks();
+    const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+    const project = createQuickEditProjectGalleryItem({
+      aggregateId: 'source',
+      name: 'Saved edit',
+      createdAt: 1,
+      updatedAt: 1,
+      revision: 1,
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+      source: null,
+      unavailableReason: null,
+    });
+    const source = createMediaItem({ id: 'source', entityId: 'source' });
+    const targets = mixed ? [source, project] : [project];
+    const before = structuredClone(targets);
+    const selectedIds = new Set(targets.map((item) => item.id));
+    const { controller } = createController({
+      selectedItems: targets,
+      selectedIds,
+      previewItem: project,
+    });
+    await createDeleteManyAction(controller)(targets, runBusyAction);
+    const request = controller.state.storage.deletionRequest!;
+    await expect(request.moveToTrash!()).rejects.toThrow();
+    await expect(request.preparePermanent()).rejects.toThrow();
+    await expect(createRestoreTrashAction(controller)(targets, runBusyAction)).rejects.toThrow();
+    for (const mutation of [
+      moveLibraryItemsToTrashMock,
+      restoreLibraryTrashItemsMock,
+      deleteMediaLibraryAssetsBatchSafelyMock,
+      deletePersistedVideoProjectMock,
+      deleteScenarioProjectRecordMock,
+      deleteExportMock,
+    ])
+      expect(mutation).not.toHaveBeenCalled();
+    expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
+    expect(controller.state.selection.selectedIds).toEqual(selectedIds);
+    expect(controller.state.preview.session.item).toEqual(project);
+    expect(targets).toEqual(before);
+  }
+);

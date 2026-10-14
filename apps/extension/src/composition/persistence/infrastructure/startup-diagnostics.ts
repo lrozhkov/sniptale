@@ -31,6 +31,7 @@ type StorageStartupPhase =
   | 'gallery-thumbnail-list'
   | 'gallery-storage-estimate'
   | 'gallery-video-project-list'
+  | 'gallery-quick-edit-project-list'
   | 'gallery-presentations'
   | 'gallery-scenario-exports';
 

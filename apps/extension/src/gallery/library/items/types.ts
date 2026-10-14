@@ -1,3 +1,4 @@
+import type { VideoWorkspaceSummary } from '../../../composition/persistence/review-workspaces/summaries';
 import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   ImageContentState,
@@ -89,11 +90,30 @@ export interface GalleryVideoProjectItem extends GalleryItemBase {
   width: number;
 }
 
+export interface GalleryQuickEditProjectItem extends GalleryItemBase {
+  duration: number;
+  entityId: string;
+  height: number;
+  kind: 'video-project';
+  mimeType: 'application/x-sniptale-video-project';
+  project: VideoWorkspaceSummary;
+  type: 'quick-edit-project';
+  unavailableReason: VideoWorkspaceSummary['unavailableReason'];
+  width: number;
+}
+
+export function isGalleryQuickEditProjectItem(
+  item: GalleryItem
+): item is GalleryQuickEditProjectItem {
+  return item.type === 'quick-edit-project';
+}
+
 export type GalleryItem =
   | GalleryMediaItem
   | GalleryScenarioItem
   | GalleryScenarioExportItem
-  | GalleryVideoProjectItem;
+  | GalleryVideoProjectItem
+  | GalleryQuickEditProjectItem;
 
 export function isGalleryMediaItem(item: GalleryItem): item is GalleryMediaItem {
   return item.type === 'media';
@@ -120,7 +140,8 @@ export function isGallerySelectableItem(item: GalleryItem): boolean {
     item.type === 'media' ||
     item.type === 'scenario' ||
     item.type === 'scenario-export' ||
-    item.type === 'video-project'
+    item.type === 'video-project' ||
+    item.type === 'quick-edit-project'
   );
 }
 
@@ -142,5 +163,8 @@ export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem
 export function canOpenGalleryProject(item: GalleryItem): boolean {
   if (item.lifecycle?.trashedAt !== undefined) return false;
   if (item.type === 'scenario') return item.project.availability === 'available';
-  return item.type === 'video-project' && item.unavailableReason === null;
+  return (
+    (item.type === 'video-project' || item.type === 'quick-edit-project') &&
+    item.unavailableReason === null
+  );
 }

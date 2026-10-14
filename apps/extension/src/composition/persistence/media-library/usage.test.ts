@@ -162,11 +162,13 @@ function reviewWorkspace(aggregateId: string): VideoWorkspace {
   };
 }
 
-it('does not treat the media own quick-edit workspace as an external consumer', async () => {
+it('reports the media own quick-edit workspace as a primary consumer', async () => {
   childRows = [];
   mocks.videos.mockResolvedValue([]);
   reviewRows = [reviewWorkspace(media.id)];
-  expect(await listMediaAssetProjectUsage(media.id)).toEqual([]);
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([
+    { id: media.id, kind: 'review', name: media.filename, primary: true },
+  ]);
 });
 
 it('reports a quick-edit audio consumer without marking it primary', async () => {
@@ -350,7 +352,7 @@ it('cleans up advisory event, focus and visibility subscriptions when the inspec
   }
 });
 
-it.fails('includes the saved quick-edit workspace as its recording primary project', async () => {
+it('includes the saved quick-edit workspace as its recording primary project', async () => {
   media = {
     ...media,
     id: 'recording:primary',

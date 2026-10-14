@@ -141,13 +141,15 @@ async function projectUsageFromMatches(args: {
       });
   }
   for (const workspace of reviews.map(parseVideoWorkspace)) {
-    if (!workspace || !reviewWorkspaceUsesMedia(workspace, media)) continue;
+    if (!workspace) continue;
+    const primary = workspace.aggregateId === root.id;
+    if (!primary && !reviewWorkspaceUsesMedia(workspace, media)) continue;
     const owner = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, workspace.aggregateId));
     result.set(`review:${workspace.aggregateId}`, {
       id: workspace.aggregateId,
       kind: 'review',
-      name: owner?.filename ?? root.filename,
-      primary: false,
+      name: workspace.project?.name ?? owner?.filename ?? root.filename,
+      primary,
     });
   }
   return [...result.values()];

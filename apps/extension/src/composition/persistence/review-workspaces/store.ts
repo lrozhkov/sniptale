@@ -113,7 +113,10 @@ function beginWriteTransaction(db: Database) {
 type WriteTransaction = ReturnType<typeof beginWriteTransaction>;
 
 function indexedWorkspace(workspace: VideoWorkspace) {
-  const keys = new Set([USAGE_INDEX_MARKER]);
+  const keys = new Set([
+    USAGE_INDEX_MARKER,
+    usageReferenceKey('library-asset', workspace.aggregateId),
+  ]);
   for (const ref of collectReviewAssetReferences(workspace)) {
     if (ref.startsWith('project-asset:'))
       keys.add(usageReferenceKey('project-asset', ref.slice('project-asset:'.length)));

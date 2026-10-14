@@ -193,7 +193,8 @@ function buildGalleryPreviewActions(
   const previewItem = controller.state.preview.session.item;
   const disabledReason = getCommandPaletteDisabledContextReason();
   const projectUnavailable =
-    previewItem?.type === 'video-project' && previewItem.unavailableReason !== null;
+    (previewItem?.type === 'video-project' || previewItem?.type === 'quick-edit-project') &&
+    previewItem.unavailableReason !== null;
   const imageAggregate =
     previewItem !== null &&
     isGalleryMediaItem(previewItem) &&

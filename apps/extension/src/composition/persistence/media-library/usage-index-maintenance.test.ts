@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { maintainProjectUsageIndex } from './usage-index-maintenance';
-import { USAGE_INDEX_MARKER } from './usage-index-keys';
+import { USAGE_INDEX_MARKER, usageReferenceKey } from './usage-index-keys';
 const mocks = vi.hoisted(() => ({ initDB: vi.fn(), mutate: vi.fn(), ready: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
@@ -99,7 +99,7 @@ it('indexes an admitted physical head without rewriting its baseline or retained
     ],
   });
   if (!workspace) throw new Error('Invalid physical maintenance fixture');
-  const head = workspaceStorageHead(workspace, []);
+  const head = workspaceStorageHead(workspace, ['indexed:v1']);
   const history = workspaceStorageRows(workspace);
   const before = structuredClone(history);
   const writes = vi.fn();
@@ -133,7 +133,10 @@ it('indexes an admitted physical head without rewriting its baseline or retained
   expect(await maintainProjectUsageIndex(new AbortController().signal)).toBe(true);
   expect(writes).toHaveBeenCalledExactlyOnceWith({
     ...head,
-    usageReferenceKeys: [USAGE_INDEX_MARKER],
+    usageReferenceKeys: [
+      USAGE_INDEX_MARKER,
+      usageReferenceKey('library-asset', workspace.aggregateId),
+    ],
   });
   expect(history).toEqual(before);
 });
