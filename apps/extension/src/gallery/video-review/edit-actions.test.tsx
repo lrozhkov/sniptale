@@ -233,6 +233,22 @@ it('offers independent initial downloads and shows actionable processing failure
       root.render(
         <ReviewEditActions
           {...props}
+          advancedBlockers={['camera-follow']}
+          cameraConflicts={[
+            { regionId: 'zoom', interval: { start: 1.5, end: 4 }, time: 2, reason: 'dynamics' },
+          ]}
+        />
+      )
+    );
+    expect(host.textContent).toContain(translate('gallery.videoReview.cameraConflictDynamics'));
+    expect(host.textContent).not.toContain(translate('gallery.videoReview.cameraFollowConflict'));
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportBlockers"]')?.textContent
+    ).toContain('0:02');
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
           available
           hasEdits
           advancedBlockers={['action-audio-resource']}
@@ -377,6 +393,7 @@ it('applies export frame rate and quality options without adding section divider
     progress: 0,
     failed: false,
     blocked: [],
+    cameraConflicts: [],
     result: null,
     completion: null,
     dismissCompletion: vi.fn(),

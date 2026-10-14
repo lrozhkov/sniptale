@@ -196,7 +196,7 @@ it('does not invent a rendered cursor constraint when its skin is hidden', () =>
   ).not.toHaveProperty('viewport');
 });
 
-it('bounds full nominal screen motion for a held zone and scales the bounds with the actual output', () => {
+it('keeps held-zone follow motion zero during authored zoom at both output sizes', () => {
   const { project, region, policy } = fixture();
   const make = (factor: number) =>
     createProjectWorkingZoneCameraGeometry({
@@ -220,7 +220,7 @@ it('bounds full nominal screen motion for a held zone and scales the bounds with
     targetScale: 2,
     pan: { minX: 100, maxX: 100, minY: 100, maxY: 100 },
   })!;
-  expect(original.speed).toBeGreaterThan(0);
+  expect(original).toEqual({ speed: 0, acceleration: 0, jerk: 0 });
   expect(doubled.speed).toBeCloseTo(original.speed * 2, 6);
   expect(doubled.acceleration).toBeCloseTo(original.acceleration * 2, 6);
 });
@@ -237,4 +237,31 @@ it('advertises the actual retained animation boundaries against the outside iden
     bindings: new Map(),
   });
   expect(geometry.discontinuities?.(selected.scale)).toEqual(expect.arrayContaining([0, 3]));
+});
+
+it('retains phase cross acceleration for a moving follow pan during linear zoom', () => {
+  const { project, region, policy } = fixture();
+  const geometry = createProjectWorkingZoneCameraGeometry({
+    project,
+    region: { ...region, easing: VideoTemporalEasing.LINEAR },
+    policy,
+    connectedIn: false,
+    connectedOut: false,
+    bindings: new Map(),
+  });
+  const motion = geometry.motionBounds({
+    start: 0.2,
+    end: 0.2,
+    targetScale: 2,
+    pan: { minX: 6, maxX: 6, minY: 8, maxY: 8 },
+    trajectory: {
+      start: 0,
+      end: 1,
+      controls: Array.from({ length: 6 }, (_, index) => ({ x: index * 6, y: index * 8 })),
+    },
+  })!;
+  // Linear pan has speed 50; the .6-second zoom phase contributes 2 * phase' * pan'.
+  expect(motion.speed).toBeCloseTo(50 / 3, 6);
+  expect(motion.acceleration).toBeCloseTo(100 / 0.6, 6);
+  expect(motion.jerk).toBeCloseTo(0, 6);
 });

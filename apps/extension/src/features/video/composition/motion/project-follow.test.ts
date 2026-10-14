@@ -90,15 +90,16 @@ it('keeps empty coverage at the authored base pose without manufacturing capture
   expect(camera.focusPoint).toEqual(region.focusPoint);
 });
 
-it('returns a typed conflict for a fast authored zoom before any rendering resources are acquired', () => {
+it('admits a fast authored zoom toward a held zone without changing authoring', () => {
   const { project, region } = fixture();
   const fast = { ...region, scale: 4, zoomInDuration: 0.01 };
   const changed = { ...project, motionRegions: [fast] };
+  const before = structuredClone(changed);
   expect(resolveProjectCursorCameraPlan(changed, fast)).toMatchObject({
-    status: 'conflict',
-    reason: 'dynamics',
-    interval: { start: 0, end: 3 },
+    status: 'ready',
+    targetScale: 4,
   });
+  expect(changed).toEqual(before);
 });
 
 it.each([VideoMotionFocusMode.MANUAL, VideoMotionFocusMode.CURSOR])(

@@ -38,6 +38,7 @@ export interface CameraProofGeometry {
     targetScale: number;
     preservePointer?: boolean;
   }): CameraProjectionProof | null;
+  /** Bound added follow motion, including nominal-phase cross terms, without limiting authored zoom itself. */
   motionBounds(input: {
     start: number;
     end: number;

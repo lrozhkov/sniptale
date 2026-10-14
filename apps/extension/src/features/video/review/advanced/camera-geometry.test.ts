@@ -137,12 +137,18 @@ it('admits a held activity center throughout authored entry and exit using actua
   if (plan.status === 'ready') expect(plan.spans).toHaveLength(1);
 });
 
-it('refuses an excessively fast nominal zoom even when its working zone requires no pan', () => {
-  const calm = resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') });
+it('admits authored zoom toward a held off-center zone independently of follow speed', () => {
+  const calm = resolveCameraFollowPolicy({
+    defaults: {
+      ...createCameraFollowSettings('calm'),
+      transitionDuration: 1.5,
+      minimumScale: 1.35,
+    },
+  });
   const selected = {
     ...region,
     transform: { scale: 2, centerX: 0.75, centerY: 0.75 },
-    enter: { type: 'ease-in-out' as const, duration: 0.1 },
+    enter: { type: 'ease-in-out' as const, duration: 0.3 },
   };
   const geometry = createReviewWorkingZoneCameraGeometry({
     output,
@@ -157,7 +163,7 @@ it('refuses an excessively fast nominal zoom even when its working zone requires
   const frames = [0, 1, 2, 3].map((time) => ({ time, x: 0.75, y: 0.75, segmentId: 'source' }));
   expect(
     planWorkingZoneCamera({ frames, start: 0, end: 3, targetScale: 2, policy: calm, geometry })
-  ).toMatchObject({ status: 'conflict', reason: 'dynamics' });
+  ).toMatchObject({ status: 'ready' });
 });
 
 it('preserves disabled entry/exit phases for linked source cameras', () => {

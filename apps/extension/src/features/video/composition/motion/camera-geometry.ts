@@ -487,41 +487,30 @@ export function createProjectWorkingZoneCameraGeometry(input: {
         },
       };
     },
-    motionBounds({ start, end, trajectory, pan, targetScale }) {
+    motionBounds({ start, end, trajectory }) {
+      if (!trajectory) return { speed: 0, acceleration: 0, jerk: 0 };
       const curve = phase.at((start + end) / 2);
-      const g = [0, 1, 2, 3].map((order) =>
-        scalarBounds(curve, start, end, order === 0 ? 0 : order === 1 ? 1 : order === 2 ? 2 : 3)
+      const g = [0, 1, 2].map((order) =>
+        scalarBounds(curve, start, end, order === 0 ? 0 : order === 1 ? 1 : 2)
       );
-      const axis = (size: number, axis: 'x' | 'y') => {
-        const p: Range[] = [axis === 'x' ? [pan.minX, pan.maxX] : [pan.minY, pan.maxY]];
-        for (const order of [1, 2, 3] as const) {
-          const bounds = trajectory ? cameraTrajectoryBounds(trajectory, start, end, order) : null;
-          p.push(
-            bounds
-              ? axis === 'x'
-                ? [bounds.minX, bounds.maxX]
-                : [bounds.minY, bounds.maxY]
-              : [0, 0]
-          );
-        }
-        const offset = subtract([0, (targetScale - 1) * size], p[0]!);
+      const derivatives = ([1, 2, 3] as const).map((order) =>
+        cameraTrajectoryBounds(trajectory, start, end, order)
+      );
+      const axis = (axis: 'x' | 'y') => {
+        const p: Range[] = derivatives.map((bounds) =>
+          axis === 'x' ? [bounds.minX, bounds.maxX] : [bounds.minY, bounds.maxY]
+        );
         return [
-          subtract(product(g[1]!, offset), product(g[0]!, p[1]!)),
-          subtract(
-            subtract(product(g[2]!, offset), multiply(product(g[1]!, p[1]!), 2)),
+          product(g[0]!, p[0]!),
+          sum(multiply(product(g[1]!, p[0]!), 2), product(g[0]!, p[1]!)),
+          sum(
+            sum(multiply(product(g[2]!, p[0]!), 3), multiply(product(g[1]!, p[1]!), 3)),
             product(g[0]!, p[2]!)
-          ),
-          subtract(
-            subtract(
-              subtract(product(g[3]!, offset), multiply(product(g[2]!, p[1]!), 3)),
-              multiply(product(g[1]!, p[2]!), 3)
-            ),
-            product(g[0]!, p[3]!)
           ),
         ];
       };
-      const x = axis(window.width, 'x'),
-        y = axis(window.height, 'y');
+      const x = axis('x'),
+        y = axis('y');
       const norm = (order: number) =>
         Math.hypot(Math.max(...x[order]!.map(Math.abs)), Math.max(...y[order]!.map(Math.abs)));
       return { speed: norm(0), acceleration: norm(1), jerk: norm(2) };

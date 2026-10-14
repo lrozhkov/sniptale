@@ -629,6 +629,30 @@ function scheduleCameraZones(
   };
 }
 
+function mergeCompatibleCameraZones(
+  input: WorkingZoneCameraInput,
+  zones: PlannedCameraZone[],
+  preferences: readonly FollowCursorFrame[]
+) {
+  const candidates = zones
+    .slice(1)
+    .flatMap((right, index) => {
+      const left = zones[index]!;
+      return left.segmentId === right.segmentId
+        ? [{ index, distance: Math.hypot(left.pan.x - right.pan.x, left.pan.y - right.pan.y) }]
+        : [];
+    })
+    .sort((a, b) => a.distance - b.distance || a.index - b.index);
+  for (const { index } of candidates) {
+    const merged = mergeCameraWorkingZones(zones[index]!, zones[index + 1]!, preferences);
+    const fit = fitCameraZone(input, merged, preferences);
+    if (!fit.pan) continue;
+    zones.splice(index, 2, { ...merged, pan: fit.pan });
+    return true;
+  }
+  return false;
+}
+
 function planWorkingZoneCameraAtScale(input: WorkingZoneCameraInput): WorkingZoneCameraPlan {
   validateCameraInput(input);
   const { geometry, frames } = input;
@@ -669,7 +693,12 @@ function planWorkingZoneCameraAtScale(input: WorkingZoneCameraInput): WorkingZon
       discontinuities,
       fallback
     );
-  return scheduleCameraZones(input, zones, discontinuities);
+  let plan = scheduleCameraZones(input, zones, discontinuities);
+  // Spatial zone size is a preference. Coalesce proven compatible visits when their transitions cannot fit.
+  while (plan.status === 'conflict' && mergeCompatibleCameraZones(input, zones, preferences)) {
+    plan = scheduleCameraZones(input, zones, discontinuities);
+  }
+  return plan;
 }
 
 /** Seek, preview, and export evaluate the same pre-admitted spans without further containment changes. */

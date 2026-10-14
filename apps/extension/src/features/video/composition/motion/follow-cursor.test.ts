@@ -124,6 +124,39 @@ it('working-zone planner exposes a typed conflict instead of clamping an impossi
   expect(evaluateWorkingZoneCamera(plan, 0)).toEqual(evaluateWorkingZoneCamera(plan, 0.01));
 });
 
+it('coalesces compatible short visits when their requested transitions overlap', () => {
+  const selected = resolveCameraFollowPolicy({
+    defaults: {
+      ...createCameraFollowSettings('calm'),
+      zoneSize: 0.1,
+      transitionDuration: 1.5,
+      minimumHoldDuration: 0,
+      allowExpansion: false,
+    },
+  });
+  const frames = [0.4, 0.55, 0.4, 0.55, 0.4].map((x, index) => ({
+    time: index * 0.25,
+    x,
+    y: 0.5,
+    actual: { x, y: 0.5 },
+    segmentId: 'one',
+  }));
+  const plan = planWorkingZoneCamera({
+    frames,
+    start: 0,
+    end: 1,
+    targetScale: 2,
+    policy: selected,
+    geometry,
+  });
+  expect(plan.status).toBe('ready');
+  if (plan.status === 'ready') {
+    expect(plan.targetScale).toBe(2);
+    expect(plan.spans).toHaveLength(1);
+    expect(plan.spans[0]?.kind).toBe('hold');
+  }
+});
+
 it('working-zone planner expands only with explicit permission and within its scale bound', () => {
   const frames = [
     { time: 0, x: 0.1, y: 0.5, actual: { x: 0, y: 0.5 }, segmentId: 'one' },

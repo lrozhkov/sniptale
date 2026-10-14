@@ -160,10 +160,10 @@
       "file": "apps/extension/src/gallery/video-review/use-export.ts",
       "symbol": "useReviewExport",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: After extracting pure presentation-duration planning, this155-line hook has score1delta0,19statements,cyclomatic7,cognitive6 andnesting1. It binds one active export controller, mounted state and completion generation to the existing export workflow. Publication/asset rollback remain workflow-owned. The remaining threshold is function length including the returned UI command surface; extracting another closure would split the same cancellation/completion authority. Main inspected the current body; independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "05caf0b89a7fb88e23d34a832bbf8c10220a3c64b212fc14ee1fb26c1106ddc8",
+      "reason": "tool-noise: This hook binds one export operation to the existing page lifetime. The change retains typed camera diagnostics in the existing context-bound blocker state. The workflow still owns publication and cleanup. Extracting another closure would divide the same cancellation and completion authority.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new state authority, effect, recovery policy, or independent responsibility. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-14",
+      "astHash": "698f7281f8a1d9285835906c1d5cd2e7a75244c85fb746ff2180bea0008d3645",
       "signatureHash": "841a0d40ac2ae0acb87a977b29e6352ec88d32c7a3313450773a1b773b6c9638"
     },
     {
@@ -660,6 +660,28 @@
       "reviewDate": "2026-10-14",
       "astHash": "54139137938fd7d1dda459a12e8a0b47661cc36e7f1d06958ad9f6933f19eada",
       "signatureHash": "7b093ca8674fcf934f6533a94cc38154b607d0bd19b619253aafb0f6b69857f1"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/advanced/camera-projection-bounds.test.ts",
+      "symbol": "describe callback",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This callback groups projection bounds tests with one shared geometry fixture. It owns no runtime state or effects. The added cases compare follow derivatives with rendered positions. Splitting the callback only to reduce its length would separate the same mathematical contract.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new state authority, effect, recovery policy, or independent responsibility. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-14",
+      "astHash": "48a8d6cbdf746ed5cf12a39fe13a77130572bb22c21b5cd6f7d628e9d0d03abc",
+      "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/edit-actions.tsx",
+      "symbol": "ReviewEditActions",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This component renders one export panel from supplied state and callbacks. The change displays typed camera diagnostics in the existing blocker section. It adds no state, effect, writer, or recovery owner. Conditional JSX causes the structural score.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new state authority, effect, recovery policy, or independent responsibility. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-14",
+      "astHash": "d48b4784281767e67983ca30e54fb0047362a8c8780b4707ce68a62ec00c9fbd",
+      "signatureHash": "1a1dba716a2d0591fa996693eababda783a93ae14fad5488be468867e18bdb43"
     }
   ]
 }

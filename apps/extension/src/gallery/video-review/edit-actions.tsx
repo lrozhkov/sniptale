@@ -21,6 +21,8 @@ import {
 import { Scissors, Download, FileVideo, Gauge, MousePointer2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
+import type { QuickEditCameraConflict } from '../../features/video/review/advanced/scene';
+import { formatPreciseTime } from '../../composition/library-preview/time-format';
 import {
   reviewIconButtonClassName,
   ReviewButton,
@@ -60,6 +62,18 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
 };
 
 const plain = reviewIconButtonClassName;
+
+const CAMERA_REASON_LABEL: Record<
+  QuickEditCameraConflict['reason'],
+  Parameters<typeof translate>[0]
+> = {
+  dynamics: 'gallery.videoReview.cameraConflictDynamics',
+  pose: 'gallery.videoReview.cameraConflictPose',
+  raster: 'gallery.videoReview.cameraConflictRaster',
+  viewport: 'gallery.videoReview.cameraConflictViewport',
+  projection: 'gallery.videoReview.cameraConflictProjection',
+  unproven: 'gallery.videoReview.cameraConflictUnproven',
+};
 
 /** The timeline owns the editing tools; a drag applies the current tool directly. */
 export function ReviewTimelineTools(props: {
@@ -206,6 +220,7 @@ export function ReviewEditActions(props: {
   fragmentAction?: ReactNode;
   audioUnavailable?: boolean;
   advancedBlockers?: readonly QuickEditExportReason[] | null;
+  cameraConflicts?: readonly QuickEditCameraConflict[];
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
@@ -325,10 +340,28 @@ export function ReviewEditActions(props: {
         </p>
       ) : null}
       {hasBlockers ? (
-        <p role="status" className="text-xs">
+        <div
+          role="status"
+          className="space-y-1 text-xs"
+          data-ui="gallery.videoReview.exportBlockers"
+        >
           {translate('gallery.videoReview.exportAdvancedUnavailable')}{' '}
-          {props.advancedBlockers!.map((blocker) => translate(REASON_LABEL[blocker])).join(' · ')}
-        </p>
+          {props
+            .advancedBlockers!.filter(
+              (reason) => reason !== 'camera-follow' || !props.cameraConflicts?.length
+            )
+            .map((blocker) => translate(REASON_LABEL[blocker]))
+            .join(' · ')}
+          {props.cameraConflicts?.map((conflict) => (
+            <p key={`${conflict.regionId}:${conflict.time}:${conflict.reason}`}>
+              {translate('gallery.videoReview.cameraConflictLocation')
+                .replace('{start}', formatPreciseTime(conflict.interval.start))
+                .replace('{end}', formatPreciseTime(conflict.interval.end))
+                .replace('{time}', formatPreciseTime(conflict.time))}{' '}
+              {translate(CAMERA_REASON_LABEL[conflict.reason])}
+            </p>
+          ))}
+        </div>
       ) : null}
     </div>
   );
@@ -625,6 +658,7 @@ export function ReviewInspectorActions({
               ? exportPlan.reasons
               : exporter.blocked
         }
+        cameraConflicts={exporter.cameraConflicts}
         onExport={onExport}
         onCancel={exporter.cancel}
         onDownload={exporter.download}

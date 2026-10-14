@@ -347,6 +347,33 @@ it('allows recovery from unavailable export settings after the profile changes',
   }
 });
 
+it('retains camera conflict location and permits retry after settings change', async () => {
+  const fixture = setup();
+  const conflicts = [
+    { regionId: 'zoom', interval: { start: 1.5, end: 4 }, time: 2, reason: 'dynamics' as const },
+  ];
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    mocks.export.mockRejectedValueOnce(
+      new QuickEditExportUnavailable(['camera-follow'], [], conflicts)
+    );
+    await act(async () => fixture.hook.start());
+    expect(fixture.hook.cameraConflicts).toEqual(conflicts);
+    expect(fixture.hook.blocked).toEqual(['camera-follow']);
+    await act(async () => fixture.hook.setRenderSettings({ frameRate: 30, quality: 'HIGH' }));
+    expect(fixture.hook.cameraConflicts).toEqual([]);
+    mocks.export.mockResolvedValueOnce({
+      file: new File(['copy'], 'copy.webm'),
+      receipt: { filename: 'copy.webm', mediaId: 'copy' },
+    });
+    await act(async () => fixture.hook.start());
+    expect(fixture.hook.completion).not.toBeNull();
+    expect(fixture.hook.blocked).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
 it.each([false, true])(
   'clears recovered asset failure while preserving other blockers (%s)',
   async (encoderFailure) => {

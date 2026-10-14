@@ -347,8 +347,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
     en: 'Exported copy added to the gallery.',
   },
   exportAdvancedUnavailable: {
-    ru: 'Экспорт недоступен: текущий экспортёр не применяет расширенные эффекты, чтобы не выдать исходник за результат.',
-    en: 'Export is unavailable: the current exporter cannot apply advanced effects and will not pass the original off as the result.',
+    ru: 'Экспорт недоступен при текущих настройках.',
+    en: 'Export is unavailable with the current settings.',
   },
   exportBlockerZoom: { ru: 'фокусировка', en: 'focus' },
   exportBlockerBackground: { ru: 'фон', en: 'background' },

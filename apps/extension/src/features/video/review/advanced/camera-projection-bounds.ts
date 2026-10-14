@@ -8,6 +8,10 @@ type Derivatives = readonly [Range, Range, Range];
 interface ProjectionJet {
   value: Range;
   derivatives: Derivatives;
+  // Nominal derivatives freeze pan at its current pose. Follow terms contain at least one pan derivative.
+  // Propagate those terms algebraically: subtracting two interval bounds loses their correlation.
+  nominal?: Derivatives;
+  follow?: Derivatives;
 }
 const ZERO: Range = [0, 0];
 const zeros: Derivatives = [ZERO, ZERO, ZERO];
@@ -27,6 +31,16 @@ const times = (a: Range, b: Range) => {
 const constant = (value: number): ProjectionJet => ({ value: [value, value], derivatives: zeros });
 const boxed = (value: Range): ProjectionJet => ({ value, derivatives: zeros });
 const stationary = (a: ProjectionJet) => a.derivatives === zeros;
+const sumDerivatives = (a: Derivatives, b: Derivatives): Derivatives => [
+  plus(a[0], b[0]),
+  plus(a[1], b[1]),
+  plus(a[2], b[2]),
+];
+const negativeDerivatives = (a: Derivatives): Derivatives => [
+  negative(a[0]),
+  negative(a[1]),
+  negative(a[2]),
+];
 const add = (a: ProjectionJet, b: ProjectionJet): ProjectionJet =>
   stationary(a) && stationary(b)
     ? boxed(plus(a.value, b.value))
@@ -37,6 +51,12 @@ const add = (a: ProjectionJet, b: ProjectionJet): ProjectionJet =>
           plus(a.derivatives[1], b.derivatives[1]),
           plus(a.derivatives[2], b.derivatives[2]),
         ],
+        ...(a.follow || b.follow
+          ? {
+              nominal: sumDerivatives(a.nominal ?? a.derivatives, b.nominal ?? b.derivatives),
+              follow: sumDerivatives(a.follow ?? zeros, b.follow ?? zeros),
+            }
+          : {}),
       };
 const negate = (a: ProjectionJet): ProjectionJet =>
   stationary(a)
@@ -48,6 +68,12 @@ const negate = (a: ProjectionJet): ProjectionJet =>
           negative(a.derivatives[1]),
           negative(a.derivatives[2]),
         ],
+        ...(a.follow
+          ? {
+              nominal: negativeDerivatives(a.nominal ?? a.derivatives),
+              follow: negativeDerivatives(a.follow),
+            }
+          : {}),
       };
 const subtract = (a: ProjectionJet, b: ProjectionJet) => add(a, negate(b));
 const binomial = [[1], [1, 1], [1, 2, 1], [1, 3, 3, 1]];
@@ -71,7 +97,35 @@ function multiply(a: ProjectionJet, b: ProjectionJet): ProjectionJet {
   return {
     value: times(a.value, b.value),
     derivatives: [derivatives[0]!, derivatives[1]!, derivatives[2]!],
+    ...(a.follow || b.follow ? followProduct(a, b) : {}),
   };
+}
+
+function followProduct(a: ProjectionJet, b: ProjectionJet) {
+  const nominal = multiply(
+    { value: a.value, derivatives: a.nominal ?? a.derivatives },
+    { value: b.value, derivatives: b.nominal ?? b.derivatives }
+  ).derivatives;
+  const an = [a.value, ...(a.nominal ?? a.derivatives)];
+  const bv = [b.value, ...b.derivatives];
+  const follow: Range[] = [];
+  for (let order = 1; order <= 3; order++) {
+    let derivative = ZERO;
+    for (let index = 0; index <= order; index++) {
+      const coefficient = binomial[order]![index]!;
+      const da = index > 0 ? a.follow?.[index - 1] : undefined;
+      const db = order > index ? b.follow?.[order - index - 1] : undefined;
+      if (da)
+        derivative = plus(
+          derivative,
+          times([coefficient, coefficient], times(da, bv[order - index]!))
+        );
+      if (db)
+        derivative = plus(derivative, times([coefficient, coefficient], times(an[index]!, db)));
+    }
+    follow.push(derivative);
+  }
+  return { nominal, follow: [follow[0]!, follow[1]!, follow[2]!] as Derivatives };
 }
 
 function unary(a: ProjectionJet, value: Range, derivatives: Derivatives): ProjectionJet {
@@ -88,6 +142,26 @@ function unary(a: ProjectionJet, value: Range, derivatives: Derivatives): Projec
         times(g3, times(times(a1, a1), a1))
       ),
     ],
+    ...(a.follow ? followUnary(a, value, derivatives) : {}),
+  };
+}
+
+function followUnary(a: ProjectionJet, value: Range, derivatives: Derivatives) {
+  const n = a.nominal ?? a.derivatives;
+  const d = a.follow!;
+  const f = a.derivatives;
+  const [g1, g2, g3] = derivatives;
+  const follow: Derivatives = [
+    times(g1, d[0]),
+    plus(times(g1, d[1]), times(g2, times(d[0], plus(f[0], n[0])))),
+    plus(
+      plus(times(g1, d[2]), times([3, 3], times(g2, plus(times(d[0], f[1]), times(n[0], d[1]))))),
+      times(g3, times(d[0], plus(plus(times(f[0], f[0]), times(f[0], n[0])), times(n[0], n[0]))))
+    ),
+  ];
+  return {
+    nominal: unary({ value: a.value, derivatives: n }, value, derivatives).derivatives,
+    follow,
   };
 }
 
@@ -127,7 +201,8 @@ function trajectoryJet(
   trajectory: CameraTrajectory,
   axis: 'x' | 'y',
   start: number,
-  end: number
+  end: number,
+  follow = false
 ): ProjectionJet {
   const values = [0, 1, 2, 3].map((order) => {
     const bounds = cameraTrajectoryBounds(
@@ -139,7 +214,11 @@ function trajectoryJet(
     return axis === 'x' ? range(bounds.minX, bounds.maxX) : range(bounds.minY, bounds.maxY);
   });
   const derivatives: Derivatives = [values[1]!, values[2]!, values[3]!];
-  return { value: values[0]!, derivatives };
+  return {
+    value: values[0]!,
+    derivatives,
+    ...(follow ? { nominal: zeros, follow: derivatives } : {}),
+  };
 }
 
 export interface QuickEditCameraProjectionInterval {
@@ -198,7 +277,13 @@ function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boo
         : boxed([phaseBounds!.minX, phaseBounds!.maxX]);
   const pan = (axis: 'x' | 'y') =>
     motion && input.trajectory
-      ? trajectoryJet(input.trajectory, axis, input.start, input.end)
+      ? trajectoryJet(
+          input.trajectory,
+          axis,
+          input.start,
+          input.end,
+          typeof input.phase !== 'number'
+        )
       : boxed(axis === 'x' ? [input.pan.minX, input.pan.maxX] : [input.pan.minY, input.pan.maxY]);
   const startScale = input.from?.scale ?? 1;
   const translation = (axis: 'x' | 'y') => {
@@ -401,15 +486,18 @@ export function boundQuickEditCameraProjection(
   };
 }
 
-/** Bound total final screen movement, including authored nominal zoom and follow pan. */
+/** Bound added follow movement, including its cross derivatives with authored nominal phases. */
 export function boundQuickEditCameraMotion(input: QuickEditCameraProjectionInterval) {
-  if (!input.trajectory && typeof input.phase === 'number')
-    return { speed: 0, acceleration: 0, jerk: 0 };
+  if (!input.trajectory) return { speed: 0, acceleration: 0, jerk: 0 };
   const result = projectInterval(input, true);
   if (!result) return null;
   const norm = (order: 0 | 1 | 2) => {
-    const x = result.outX.derivatives[order];
-    const y = result.outY.derivatives[order];
+    const x = (
+      typeof input.phase === 'number' ? result.outX.derivatives : (result.outX.follow ?? zeros)
+    )[order];
+    const y = (
+      typeof input.phase === 'number' ? result.outY.derivatives : (result.outY.follow ?? zeros)
+    )[order];
     return Math.hypot(
       Math.max(Math.abs(x[0]), Math.abs(x[1])),
       Math.max(Math.abs(y[0]), Math.abs(y[1]))

@@ -29,7 +29,11 @@ import type { LoadedReview } from './use-session';
 import type { ReviewAnchor } from '../../features/video/review/types';
 import { createReviewExportDiagnostics } from '../../workflows/video-review/export-diagnostics';
 
-type ReviewExportBlocker = { context: string; reasons: readonly QuickEditExportReason[] };
+type ReviewExportBlocker = {
+  context: string;
+  reasons: readonly QuickEditExportReason[];
+  cameraConflicts?: QuickEditExportUnavailable['cameraConflicts'];
+};
 
 type ExportResult = Awaited<ReturnType<typeof exportReviewedVideo>>;
 
@@ -303,7 +307,11 @@ export function useReviewExport(resource: LoadedReview) {
       diagnostics.reportFailure(error);
       if (error instanceof QuickEditExportUnavailable) {
         if (mounted.current && !controller.signal.aborted)
-          setBlocked({ context: attemptContext, reasons: error.reasons });
+          setBlocked({
+            context: attemptContext,
+            reasons: error.reasons,
+            cameraConflicts: error.cameraConflicts,
+          });
       } else if (mounted.current && !controller.signal.aborted) feedback.setFailed(true);
     } finally {
       active.current = null;
@@ -321,6 +329,7 @@ export function useReviewExport(resource: LoadedReview) {
     timeEstimate,
     failed: feedback.failed,
     blocked: blocked?.context === context ? blocked.reasons : null,
+    cameraConflicts: blocked?.context === context ? (blocked.cameraConflicts ?? []) : [],
     checkingCodecs,
     sizeEstimate: sizeEstimate.status,
     setSizeEstimateVisible: sizeEstimate.setVisible,

@@ -84,6 +84,34 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
     ru: 'Камера: движение и кадрирование несовместимы. Измените скорость, разрешите расширение или выберите фиксированную камеру.',
     en: 'Camera movement conflicts with framing. Change the speed, allow wider framing, or select a fixed camera.',
   },
+  cameraConflictLocation: {
+    ru: 'Камера {start}–{end}, конфликт в {time}.',
+    en: 'Camera {start}–{end}, conflict at {time}.',
+  },
+  cameraConflictDynamics: {
+    ru: 'Слежение требует слишком быстрого движения. Выберите более быстрое движение камеры или уменьшите приближение.',
+    en: 'Following requires faster movement. Select a faster camera movement preset or reduce zoom.',
+  },
+  cameraConflictPose: {
+    ru: 'Положение камеры выходит за границы сцены. Измените кадрирование приближения.',
+    en: 'The camera position is outside the scene. Adjust the zoom framing.',
+  },
+  cameraConflictRaster: {
+    ru: 'Указатель выходит за видимую область видео. Уменьшите приближение или измените кадрирование.',
+    en: 'The pointer leaves the visible video. Reduce zoom or adjust framing.',
+  },
+  cameraConflictViewport: {
+    ru: 'Указатель выходит за границы кадра. Уменьшите приближение или измените кадрирование.',
+    en: 'The pointer leaves the frame. Reduce zoom or adjust framing.',
+  },
+  cameraConflictProjection: {
+    ru: 'Невозможно построить проекцию камеры. Уменьшите наклон перспективы.',
+    en: 'The camera projection is invalid. Reduce perspective tilt.',
+  },
+  cameraConflictUnproven: {
+    ru: 'Не удалось проверить весь путь камеры. Уменьшите приближение или упростите движение.',
+    en: 'The complete camera path could not be verified. Reduce zoom or simplify movement.',
+  },
   captionConflict: {
     ru: 'Текст не помещается или перекрывает другие элементы',
     en: 'Text does not fit or overlaps other elements',
