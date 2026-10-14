@@ -12,7 +12,11 @@ vi.mock(
 );
 
 const completionMock = vi.hoisted(() => vi.fn());
-vi.mock('../../recording-completion', () => ({ completeVideoRecording: completionMock }));
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  completeVideoRecording: completionMock,
+  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));
 
 const {
   finalizeRecordingDiagnosticsMock,
@@ -116,8 +120,7 @@ vi.mock('../../../manager/start-activation-watchdog', async (importOriginal) => 
 }));
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
-  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
 }));
 vi.mock('../../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-surface')>()),

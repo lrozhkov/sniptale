@@ -1,3 +1,4 @@
+import { installBackgroundRuntimeMessagingMock } from '../../../../routing-contracts/runtime-messaging/mock';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock(
@@ -86,6 +87,7 @@ vi.mock('../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session-state')>()),
   finishVideoRecordingStop: finishVideoRecordingStopMock,
   getVideoRecordingId: getVideoRecordingIdMock,
+  setVideoRecordingTabId: resetRecordingTabIdMock,
   isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
     recordingId != null && getVideoRecordingIdMock() === recordingId,
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
@@ -104,8 +106,7 @@ vi.mock('../../manager/start-activation-watchdog', async (importOriginal) => ({
 }));
 vi.mock('../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../recording-control-lease')>()),
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
-  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
 }));
 vi.mock('../../../../storage/video/post-record-result', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../storage/video/post-record-result')>()),
@@ -150,6 +151,11 @@ async function expectAcceptedLifecycleResponse(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  installBackgroundRuntimeMessagingMock({
+    sendRuntimeMessage: sendRuntimeMessageMock,
+    sendTabMessage: vi.fn().mockResolvedValue(undefined),
+  });
   markOffscreenDocumentReadyMock.mockReturnValue(true);
   getVideoRecordingRuntimeStateMock.mockReturnValue({
     status: VideoRecordingStatus.IDLE,
@@ -221,14 +227,15 @@ it('handles offscreen lifecycle routes through the state owner', async () => {
     handled: true,
     keepChannelOpen: true,
   });
-  await flushAsyncRoute();
+  await expectAcceptedLifecycleResponse(sendResponse);
   expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('rec-1');
-  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('boom', {
-    recordingId: 'rec-1',
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: VideoMessageType.RECORDING_START_FAILED,
+    error: 'boom',
   });
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
   expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
-  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
   await expectAcceptedLifecycleResponse(sendResponse);
 
   expect(handleOffscreenError({ error: 'export-boom', phase: 'export' }, sendResponse)).toEqual({
@@ -238,7 +245,7 @@ it('handles offscreen lifecycle routes through the state owner', async () => {
   await flushAsyncRoute();
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
   expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
-  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
   await expectAcceptedLifecycleResponse(sendResponse);
 
   expect(createUnhandledRouteResult()).toEqual({
@@ -246,3 +253,8 @@ it('handles offscreen lifecycle routes through the state owner', async () => {
     keepChannelOpen: false,
   });
 });
+
+vi.mock('../recording-completion', async (original) => ({
+  ...(await original<typeof import('../recording-completion')>()),
+  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));

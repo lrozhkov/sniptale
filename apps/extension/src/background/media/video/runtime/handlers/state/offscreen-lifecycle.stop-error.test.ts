@@ -41,7 +41,6 @@ vi.mock('../../../session-state', async (importOriginal) => ({
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
-  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
 }));
 vi.mock('../../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../camera-recorder-control')>()),
@@ -70,7 +69,7 @@ beforeEach(() => {
   clearCameraRecorderControlGrantMock.mockResolvedValue(true);
 });
 
-it('clears completed session state for current stop-phase offscreen errors', async () => {
+it('retains authority when a stop error has no recoverable source binding', async () => {
   const sendResponse = createSendResponse();
 
   expect(
@@ -84,11 +83,16 @@ it('clears completed session state for current stop-phase offscreen errors', asy
   });
   await flushAsyncRoute();
 
-  expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
-  expect(resetCompletedVideoRecordingSessionMock).toHaveBeenCalledWith('rec-1');
-  expect(resetRecordingTabIdMock).toHaveBeenCalledOnce();
-  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
-  expect(clearCameraRecorderControlGrantMock).toHaveBeenCalledWith('rec-1');
-  expect(sendResponse).toHaveBeenLastCalledWith({ success: true, result: 'accepted' });
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
+  expect(clearCameraRecorderControlGrantMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenLastCalledWith({ success: false, error: 'Internal error' });
 });
+
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));

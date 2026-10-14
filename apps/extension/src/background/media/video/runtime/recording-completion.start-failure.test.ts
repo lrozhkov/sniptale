@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import { installBackgroundRuntimeMessagingMock } from '../../../../routing-contracts/runtime-messaging/mock';
+import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 
 const {
   getVideoRecordingTabIdMock,
@@ -37,8 +37,8 @@ const {
   runBestEffortMock: vi.fn(),
 }));
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 
@@ -55,21 +55,21 @@ vi.mock('@sniptale/foundation/best-effort', async (importOriginal) => ({
   runBestEffort: runBestEffortMock,
 }));
 
-vi.mock('../../../../../platform/runtime-messaging', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/runtime-messaging')>()),
+vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/runtime-messaging')>()),
   sendRuntimeMessage: sendRuntimeMessageMock,
   sendTabMessage: sendTabMessageMock,
 }));
 
-vi.mock('../session-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../session-state')>()),
+vi.mock('./session-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./session-state')>()),
   getVideoRecordingRuntimeState: getVideoRecordingRuntimeStateMock,
   resetVideoRecordingRuntimeState: resetVideoRecordingRuntimeStateMock,
   setVideoRecordingRuntimeState: setVideoRecordingRuntimeStateMock,
 }));
 
-vi.mock('../../session-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../session-state')>()),
+vi.mock('../session-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../session-state')>()),
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
   getVideoRecordingId: getVideoRecordingIdMock,
   isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
@@ -78,13 +78,13 @@ vi.mock('../../session-state', async (importOriginal) => ({
   resetVideoRecordingStartSession: resetVideoRecordingStartSessionMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
-vi.mock('../../capture-surface', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../capture-surface')>()),
+vi.mock('../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capture-surface')>()),
   cancelVideoSourceReadyWait: cancelVideoSourceReadyWaitMock,
   releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
 }));
 
-import { notifyRecordingStartFailed } from './controls.start-failure';
+import { notifyRecordingStartFailed } from './recording-completion';
 
 beforeEach(() => {
   vi.clearAllMocks();

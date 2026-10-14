@@ -1,8 +1,8 @@
 export {
   ensureActiveVideoRecordingLeaseHydrated,
   reconcileVideoRecordingLeaseOnStartup,
-} from './video/recording-control-lease';
-export { recoverVideoCaptureSurfaceOnStartup } from './video/capture-surface';
+} from './video/runtime/recording-completion';
+export { recoverVideoCaptureSurfaceOnStartup } from './video/capture-surface/recovery';
 export { startRecording } from './video/manager';
 export { handleRegionSelectionNavigationStart } from './video/ui/region-selection';
 export {

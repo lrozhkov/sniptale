@@ -59,14 +59,16 @@ import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/v
 import {
   activateVideoRecordingLease,
   clearActiveVideoRecordingLease,
-  ensureActiveVideoRecordingLeaseHydrated,
   getActiveVideoRecordingLeaseSnapshot,
-  hydrateActiveVideoRecordingLease,
   issuePreparedVideoRecordingLease,
   resetActiveVideoRecordingLeaseForTests,
-  restoreCurrentRecordingFromLease,
   validateRecordingControlCapability,
 } from './recording-control-lease';
+import {
+  ensureActiveVideoRecordingLeaseHydrated,
+  hydrateActiveVideoRecordingLease,
+  restoreCurrentRecordingFromLease,
+} from './runtime/recording-completion';
 
 const storageKey = 'video-active-recording-lease';
 const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
@@ -430,7 +432,7 @@ it('retires an expired cached active lease instead of restoring stale runtime au
   expect(getActiveVideoRecordingLeaseSnapshot()).toBeNull();
   expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
-  expect(browserStorageSessionGetMock).toHaveBeenCalledOnce();
+  expect(browserStorageSessionGetMock).not.toHaveBeenCalled();
 });
 
 it('does not hydrate A when B becomes current while its durable lease is loading', async () => {

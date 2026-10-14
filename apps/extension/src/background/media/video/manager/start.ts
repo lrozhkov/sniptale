@@ -1,3 +1,7 @@
+import {
+  rollbackRecordingStart,
+  stopRecordingSourceForStartFailure,
+} from '../runtime/recording-completion';
 // Video Manager - orchestrates recording start across capture sources.
 
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -14,24 +18,19 @@ import {
   beginVideoRecordingPreparation,
   hasActiveVideoRecordingSession,
   isVideoRecordingPreparationInProgress,
-  resetVideoRecordingStartSession,
-  clearVideoRecordingOffscreenStartDispatched,
   setVideoRecordingId,
 } from '../session-state';
-import { resetVideoRecordingRuntimeState } from '../runtime/session-state';
+
 import { initializeRecordingContext } from './recording-context.prepare';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { sanitizeRecordingSettings } from './start-settings';
 import { acquireMediaMutationPermit } from '../../../mutation-exclusion/media-activity';
 import { finalizeAcceptedRecordingStart, type RecordingStartResult } from './start-delivery';
-import { releaseVideoCaptureSurface, waitForVideoCaptureSurfaceRecovery } from '../capture-surface';
-import {
-  clearActiveVideoRecordingLease,
-  issuePreparedVideoRecordingLease,
-} from '../recording-control-lease';
+import { releaseVideoCaptureSurface } from '../capture-surface';
+import { waitForVideoCaptureSurfaceRecovery } from '../capture-surface/recovery';
+import { issuePreparedVideoRecordingLease } from '../recording-control-lease';
 import {
   RecordingStartCleanupFailure,
-  requestBoundOffscreenRecordingStop,
   requiresRecordingAuthorityRetention,
   type RecordingSourceBinding,
 } from '../offscreen-recording-stop';
@@ -43,12 +42,6 @@ import {
 } from './start-failure';
 
 const logger = createLogger({ namespace: 'BackgroundVideoManager' });
-
-function rollbackRecordingStartState(): void {
-  setVideoRecordingId(null);
-  resetVideoRecordingStartSession();
-  resetVideoRecordingRuntimeState();
-}
 
 async function disposePreparedMultiSourceStreams(
   captureMode: CaptureMode,
@@ -142,9 +135,12 @@ async function startRecordingWithPermit(
   const sanitizedSettings = sanitizeRecordingSettings(settings, captureMode);
 
   beginVideoRecordingPreparation(captureMode, sanitizedSettings, viewportPresetId);
+  const recordingId = crypto.randomUUID();
+  setVideoRecordingId(recordingId);
 
   try {
     return await executeRecordingStart({
+      recordingId,
       captureMode,
       ownerSenderUrl,
       settings: sanitizedSettings,
@@ -160,6 +156,7 @@ async function startRecordingWithPermit(
         : classifyCaptureSurfaceStartFailure(error);
     try {
       await notifyRecordingStartFailed(failureCode ?? errorMessage, {
+        recordingId,
         ...(failureCode ? { diagnosticCode: failureCode } : {}),
         retainAuthority: requiresRecordingAuthorityRetention(error),
       });
@@ -178,6 +175,7 @@ async function startRecordingWithPermit(
 }
 
 async function executeRecordingStart(props: {
+  recordingId: string;
   captureMode: CaptureMode;
   ownerSenderUrl: string;
   settings: VideoRecordingSettings;
@@ -190,12 +188,11 @@ async function executeRecordingStart(props: {
     throw new Error('No tab ID');
   }
 
-  const recordingId = crypto.randomUUID();
+  const recordingId = props.recordingId;
   let preparedContextRequiresDisposal = false;
   let cleanupAttempted = false;
   let preparedBindingPersisted = false;
   let sourceBinding: RecordingSourceBinding | null = null;
-  setVideoRecordingId(recordingId);
   logger.log('Starting recording', { captureMode });
 
   try {
@@ -211,7 +208,7 @@ async function executeRecordingStart(props: {
     });
     if (!context) {
       await releaseVideoCaptureSurface(recordingId);
-      rollbackRecordingStartState();
+      rollbackRecordingStart(recordingId);
       return { result: 'cancelled' };
     }
     preparedContextRequiresDisposal = true;
@@ -244,7 +241,7 @@ async function executeRecordingStart(props: {
         sourceBinding,
       });
       await releaseVideoCaptureSurface(recordingId);
-      rollbackRecordingStartState();
+      rollbackRecordingStart(recordingId);
       return { result: 'cancelled' };
     }
 
@@ -264,7 +261,7 @@ async function executeRecordingStart(props: {
         sourceBinding,
       });
       await releaseVideoCaptureSurface(recordingId);
-      rollbackRecordingStartState();
+      rollbackRecordingStart(recordingId);
       return { result: 'cancelled' };
     }
 
@@ -308,9 +305,7 @@ async function cleanupFailedRecordingStart(args: {
     await disposePreparedMultiSourceStreams(args.captureMode, args.settings);
   }
   try {
-    await requestBoundOffscreenRecordingStop(args.sourceBinding, true);
-    await clearActiveVideoRecordingLease(args.sourceBinding.recordingId);
-    clearVideoRecordingOffscreenStartDispatched();
+    await stopRecordingSourceForStartFailure(args.sourceBinding);
   } catch (cleanupError) {
     throw new RecordingStartCleanupFailure(args.primaryError, cleanupError);
   }

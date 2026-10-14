@@ -1,9 +1,7 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getVideoRecordingId, getVideoRecordingTabId } from '../../../session-state';
-import {
-  markVideoCaptureSurfaceTabClosed,
-  waitForVideoCaptureSurfaceRecovery,
-} from '../../../capture-surface';
+import { markVideoCaptureSurfaceTabClosed } from '../../../capture-surface';
+import { waitForVideoCaptureSurfaceRecovery } from '../../../capture-surface/recovery';
 import { stopRecording } from '../controls.stop';
 import {
   ensureVideoRecordingSurfaceLeaseHydrated,

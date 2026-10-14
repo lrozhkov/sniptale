@@ -20,7 +20,6 @@ import {
   setVideoRecordingRuntimeState,
 } from '../../session-state/service/runtime-state-service';
 import {
-  getVideoRecordingId,
   getVideoRecordingCaptureMode,
   isVideoRecordingStopInProgress,
   setRecordingFrameClock,
@@ -30,14 +29,15 @@ import {
   setControlledCursorDisplaySurface,
   setControlledCursorVerifiedMode,
 } from '../../../session-state';
-import {
-  getActiveVideoRecordingLeaseSnapshot,
-  ensureActiveVideoRecordingLeaseHydrated,
-  restoreCurrentRecordingFromLease,
-} from '../../../recording-control-lease';
+import { getActiveVideoRecordingLeaseSnapshot } from '../../../recording-control-lease';
+import { ensureActiveVideoRecordingLeaseHydrated } from '../../recording-completion';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { createAsyncLifecycleRoute, HANDLED_ASYNC_RESULT, type RouteResult } from '../shared';
-import { completeVideoRecording } from '../../recording-completion';
+import {
+  completeVideoRecording,
+  isCurrentRecordingLifecycleEvent,
+  canPublishLiveRecordingState,
+} from '../../recording-completion';
 
 export {
   handleAcknowledgePostRecordResult,
@@ -45,36 +45,6 @@ export {
 } from './recording-state-response';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeRouterHandlers' });
-
-async function isCurrentRecordingLifecycleEvent(
-  message: { recordingId?: string },
-  allowTerminal = false
-): Promise<boolean> {
-  if (
-    !allowTerminal &&
-    (isVideoRecordingStopInProgress() ||
-      getActiveVideoRecordingLeaseSnapshot()?.phase === 'terminal')
-  )
-    return false;
-  const recordingId = getVideoRecordingId();
-  if (recordingId && message.recordingId === recordingId) {
-    return true;
-  }
-
-  if (message.recordingId && (await restoreCurrentRecordingFromLease(message.recordingId))) {
-    return allowTerminal || getActiveVideoRecordingLeaseSnapshot()?.phase !== 'terminal';
-  }
-
-  if (!recordingId || message.recordingId !== recordingId) {
-    logger.warn('Ignoring stale offscreen recording lifecycle event', {
-      currentRecordingId: recordingId,
-      eventRecordingId: message.recordingId,
-    });
-    return false;
-  }
-
-  return true;
-}
 
 export function handleRecordingTabId(
   sendResponse: ResponseSender,
@@ -127,7 +97,8 @@ async function updateRecordingDurationIfCurrent(message: {
     return;
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
-  setVideoRecordingRuntimeState({ duration: Number(message.duration) || 0 });
+  if (canPublishLiveRecordingState(message.recordingId))
+    setVideoRecordingRuntimeState({ duration: Number(message.duration) || 0 });
 }
 
 export function handleOffscreenRecordingStarted(
@@ -256,14 +227,6 @@ async function handleOffscreenRecordingResumedIfCurrent(message?: {
   if (!canPublishLiveRecordingState(message.recordingId)) return;
   logger.log('Recording resumed');
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.RECORDING });
-}
-
-function canPublishLiveRecordingState(recordingId: string | undefined): boolean {
-  return (
-    isCurrentVideoRecordingId(recordingId) &&
-    !isVideoRecordingStopInProgress() &&
-    getActiveVideoRecordingLeaseSnapshot()?.phase !== 'terminal'
-  );
 }
 
 async function synchronizeExactRecordingHistory(

@@ -16,10 +16,8 @@ import {
   isAuthorizedCameraRecorderDocument,
   restoreAuthorizedCameraRecorderDocument,
 } from '../../camera-recorder-control';
-import {
-  getActiveVideoRecordingLeaseSnapshot,
-  ensureActiveVideoRecordingLeaseHydrated,
-} from '../../../recording-control-lease';
+import { getActiveVideoRecordingLeaseSnapshot } from '../../../recording-control-lease';
+import { ensureActiveVideoRecordingLeaseHydrated } from '../../recording-completion';
 import {
   resolveTrustedCameraRecorderRuntimeSenderUrl,
   resolveTrustedPopupRuntimeSenderUrl,

@@ -5,10 +5,9 @@ import {
 import { isViewportPresetAllowedForVideoCaptureMode } from '../../../../features/viewport-presets/video-recording-policy';
 import {
   clearActiveVideoRecordingLease,
-  updateVideoRecordingTerminal,
-  type ensureActiveVideoRecordingLeaseHydrated,
+  type ensureVideoRecordingLeaseCache,
 } from '../recording-control-lease';
-import { requestBoundOffscreenRecordingStop } from '../offscreen-recording-stop';
+import { confirmRecordingSourceStoppedForRecovery } from '../runtime/recording-completion';
 import { deleteVideoSurfaceSession, getVideoSurfaceSession } from './session-registry';
 import { releaseAppliedVideoCaptureSurface } from './release-applied';
 
@@ -18,16 +17,8 @@ export type VideoCaptureSurfacePageAccessVerifier = (
 ) => Promise<void>;
 
 type RecoveredVideoRecordingLease = NonNullable<
-  Awaited<ReturnType<typeof ensureActiveVideoRecordingLeaseHydrated>>
+  Awaited<ReturnType<typeof ensureVideoRecordingLeaseCache>>
 >;
-
-async function requestOffscreenStopAcknowledgement(binding: {
-  generation: number;
-  recordingId: string;
-  streamInstanceId: string;
-}): Promise<void> {
-  await requestBoundOffscreenRecordingStop(binding, true);
-}
 
 async function releaseRecoveredAppliedSurface(
   binding: AppliedCaptureSurfaceBinding,
@@ -50,28 +41,13 @@ export async function stopBoundRecordingBeforeAbandonedStackRestore(
     (surface) => surface.owner === 'video' && surface.sessionId === activeLease.recordingId
   );
   if (!containsBoundRecording) return false;
-  if (activeLease.phase === 'terminal' && activeLease.terminal.outcome === 'stopped') return true;
-  if (activeLease.phase === 'terminal' && activeLease.terminal.outcome === 'failed') {
-    throw new Error('Recording cleanup failed. The capture surface remains retained.');
-  }
   if (!activeLease.surfaceBinding) {
     throw new Error('Recovered recording source binding is incomplete before surface cleanup');
   }
-  const binding = {
+  await confirmRecordingSourceStoppedForRecovery({
     recordingId: activeLease.recordingId,
     ...activeLease.surfaceBinding,
-  };
-  if (activeLease.phase === 'terminal') {
-    const result = await requestBoundOffscreenRecordingStop(binding, activeLease.terminal.discard);
-    if (result.terminalError) throw new Error('Recording cleanup remains incomplete.');
-    await updateVideoRecordingTerminal(binding, {
-      ...activeLease.terminal,
-      outcome: 'stopped',
-      cleanupStep: 'surface',
-    });
-  } else {
-    await requestOffscreenStopAcknowledgement(binding);
-  }
+  });
   return true;
 }
 
@@ -99,7 +75,7 @@ export async function stopPreparedRecoveredRecording(
   if (!activeLease.surfaceBinding) {
     throw new Error('Recovered prepared recording source binding is incomplete');
   }
-  await requestOffscreenStopAcknowledgement({
+  await confirmRecordingSourceStoppedForRecovery({
     recordingId: activeLease.recordingId,
     ...activeLease.surfaceBinding,
   });
@@ -126,7 +102,7 @@ export async function stopInvalidRecoveredRecording(
       ? { recordingId, ...persistedBinding }
       : null;
   if (!binding) throw new Error('Recovered recording source binding is incomplete');
-  await requestOffscreenStopAcknowledgement(binding);
+  await confirmRecordingSourceStoppedForRecovery(binding);
   if (appliedBinding) {
     await releaseRecoveredAppliedSurface(appliedBinding, pageAccessVerifier);
   }

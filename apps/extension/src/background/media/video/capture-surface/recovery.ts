@@ -2,7 +2,7 @@
 import { getCaptureSurfaceService, recoverCaptureSurfaces } from '../../../capture-surface';
 import {
   clearActiveVideoRecordingLease,
-  ensureActiveVideoRecordingLeaseHydrated,
+  ensureVideoRecordingLeaseCache,
 } from '../recording-control-lease';
 import {
   deleteVideoSurfaceSession,
@@ -42,7 +42,7 @@ async function reconcileRecoveredTabOutput(session: VideoSurfaceSession): Promis
 async function recoverVideoCaptureSurfaceInternal(
   pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier
 ): Promise<void> {
-  const activeLeasePromise = ensureActiveVideoRecordingLeaseHydrated();
+  const activeLeasePromise = ensureVideoRecordingLeaseCache();
   let abandonedRecordingStopped = false;
   const recoveryPromise = recoverCaptureSurfaces({
     beforeAbandonedRestore: (surface) =>

@@ -46,7 +46,7 @@ const {
 vi.mock('../video/recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
 }));
 vi.mock('../video/content-surface/surface-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/content-surface/surface-lease')>()),

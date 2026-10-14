@@ -210,6 +210,10 @@ Descriptors retain original document timestamps for media projection. Pause/stop
 
 ## Recording completion
 
+`background/media/video/runtime/recording-completion.ts` owns Stop admission, terminal outcomes, recovery projection, retries, and publication of IDLE. Start rollback, activation timers, and lifecycle routes submit results to this owner. They do not independently clear an accepted Stop. The lease module serializes storage mutations and supplies cache snapshots. Offscreen performs recorder cleanup. The popup displays the resulting runtime state.
+
+Legacy lease removal fails if Stop owns the recording. If Stop starts during pending removal, the lease module restores the removed lease before returning failure. Confirmed completion, an authorized durable saved result, and verified local-data erasure supply explicit deletion authority. Start cleanup joins an existing Stop operation. A failed cleanup retains the original identity and permits no rollback to IDLE.
+
 Commanded Stop records terminal intent in the existing browser-session lease before dispatch to offscreen. Version2 terminal entries retain the source binding, disposition, outcome and remaining cleanup step. Existing version1 prepared and active entries remain readable.
 
 Terminal intent does not prove successful cleanup. Confirmed offscreen completion permits surface cleanup, camera-grant cleanup and lease removal, in that order. Background publishes IDLE only after those steps complete. Concurrent event and ACK consumers share the pending completion. A retry resumes the remaining cleanup steps.

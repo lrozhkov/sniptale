@@ -171,21 +171,6 @@
     },
     {
       "delta": 5,
-      "file": "apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.ts",
-      "id": "structural-function-risk.3cf9dcbfc338",
-      "line": 94,
-      "message": "sendStopSignals: score=5, delta=5, delta-kind=new, lines=103, statements=58, cyclomatic=21, cognitive=31, nesting=3, recovery=2, params=2, effects=0, state=1, owners=1, cohesion=1.00",
-      "profile": "default",
-      "reason": "score=5, delta=5, delta-kind=new, lines=103, statements=58, cyclomatic=21, cognitive=31, nesting=3, recovery=2, params=2, effects=0, state=1, owners=1, cohesion=1.00",
-      "remediationHint": "Name cohesive decision or recovery steps without breaking the transaction boundary. Extract only behavior with an independent reason to change.",
-      "rule": "structural-function-risk",
-      "score": 5,
-      "severity": "attention",
-      "symbol": "sendStopSignals",
-      "noiseId": "noise.structural-risk.cohesive-reviewed-owners"
-    },
-    {
-      "delta": 5,
       "file": "apps/extension/src/background/routing-contracts/capabilities/content-action/sender-binding.ts",
       "id": "structural-function-risk.f4d57bd0910a",
       "line": 17,

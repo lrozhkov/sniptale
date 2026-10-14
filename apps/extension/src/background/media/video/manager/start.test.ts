@@ -1,3 +1,12 @@
+const completionBoundary = vi.hoisted(() => ({
+  cleanup: vi.fn().mockResolvedValue(undefined),
+  rollback: vi.fn(),
+}));
+vi.mock('../runtime/recording-completion', async (original) => ({
+  ...(await original<typeof import('../runtime/recording-completion')>()),
+  stopRecordingSourceForStartFailure: completionBoundary.cleanup,
+  rollbackRecordingStart: completionBoundary.rollback,
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 const {
@@ -127,9 +136,7 @@ function startRecordingFromPopup(
 }
 
 function expectFullStartRollback() {
-  expect(setVideoRecordingIdMock).toHaveBeenLastCalledWith(null);
-  expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
-  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
+  expect(completionBoundary.rollback).toHaveBeenCalledWith('recording-1');
 }
 
 function verifiesDuplicateStartWhilePreparing() {
@@ -162,6 +169,7 @@ function verifiesPreparationFailureKeepsPresetIdentity() {
     );
     expect(setVideoRecordingIdMock).toHaveBeenCalledWith('recording-1');
     expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('mode blocked', {
+      recordingId: 'recording-1',
       retainAuthority: false,
     });
     expect(runCountdownMock).not.toHaveBeenCalled();

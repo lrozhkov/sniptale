@@ -25,7 +25,7 @@ vi.mock('../../capture-surface', async (importOriginal) => ({
 vi.mock('./recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./recording-control-lease')>()),
   clearActiveVideoRecordingLease: mocks.clearActiveLease,
-  ensureActiveVideoRecordingLeaseHydrated: mocks.ensureActiveLeaseHydrated,
+  ensureVideoRecordingLeaseCache: mocks.ensureActiveLeaseHydrated,
   updateVideoRecordingTerminal: mocks.updateTerminal,
 }));
 vi.mock('./offscreen-recording-stop', async (importOriginal) => ({
@@ -37,12 +37,12 @@ vi.mock('./capture-surface/release-applied', async (importOriginal) => ({
   releaseAppliedVideoCaptureSurface: mocks.releaseApplied,
 }));
 
+import { getVideoSurfaceSession } from './capture-surface';
 import {
   deferVideoCaptureSurfaceWorkUntilRecovery,
-  getVideoSurfaceSession,
   recoverVideoCaptureSurfaceOnStartup,
-  waitForVideoCaptureSurfaceRecovery,
-} from './capture-surface';
+} from './capture-surface/recovery';
+import { waitForVideoCaptureSurfaceRecovery } from './capture-surface/recovery';
 import {
   isRecoveredPresetBindingValid,
   prepareAbandonedVideoSurfaceRestore,
@@ -93,7 +93,7 @@ beforeEach(() => {
 
 describe('window-only video capture-surface recovery', () => {
   it('retains a terminal surface for explicit cleanup without restarting capture or repeating Stop', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(
       activeLease({
         phase: 'terminal',
         terminal: { discard: true, outcome: 'stopped', cleanupStep: 'surface' },
@@ -118,7 +118,7 @@ describe('window-only video capture-surface recovery', () => {
   });
 
   it('clears a current-window recording lease that has no surface binding', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(
       activeLease({ surfaceBinding: null, viewportPresetId: null })
     );
     await recoverVideoCaptureSurfaceOnStartup();
@@ -127,7 +127,7 @@ describe('window-only video capture-surface recovery', () => {
   });
 
   it('rehydrates and reasserts a valid browser-window preset binding', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(activeLease());
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(activeLease());
     mocks.getAppliedBindingForSession.mockReturnValueOnce(binding);
 
     await recoverVideoCaptureSurfaceOnStartup();
@@ -147,7 +147,7 @@ describe('window-only video capture-surface recovery', () => {
 
   it('stops and releases a prepared recording instead of reviving it', async () => {
     const lease = activeLease({ phase: 'prepared' });
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(lease);
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(lease);
     mocks.getAppliedBindingForSession.mockReturnValueOnce(binding);
 
     await recoverVideoCaptureSurfaceOnStartup();
@@ -161,7 +161,7 @@ describe('window-only video capture-surface recovery', () => {
   });
 
   it('stops an active recording whose durable window binding is missing', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(activeLease());
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(activeLease());
 
     await recoverVideoCaptureSurfaceOnStartup();
 
@@ -171,7 +171,7 @@ describe('window-only video capture-surface recovery', () => {
   });
 
   it('recovers current-window recording identity without a preset lease', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(activeLease({ viewportPresetId: null }));
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(activeLease({ viewportPresetId: null }));
 
     await recoverVideoCaptureSurfaceOnStartup();
 
@@ -185,7 +185,7 @@ describe('window-only video capture-surface recovery', () => {
 
   it('clears recording authority after bound abandoned-stack cleanup', async () => {
     const lease = activeLease();
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(lease);
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(lease);
     mocks.recoverCaptureSurfaces.mockImplementationOnce(async (options) => {
       await options.beforeAbandonedStackRestore([
         {
@@ -205,7 +205,7 @@ describe('window-only video capture-surface recovery', () => {
   });
 
   it('fails closed when abandoned stack cleanup leaves surface authority behind', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(activeLease());
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(activeLease());
     mocks.hasSessionLease.mockReturnValueOnce(true);
     mocks.recoverCaptureSurfaces.mockImplementationOnce(async (options) => {
       await options.beforeAbandonedStackRestore([
@@ -226,12 +226,12 @@ describe('window-only video capture-surface recovery', () => {
       'retains capture-surface authority'
     );
 
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(null);
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(null);
     await recoverVideoCaptureSurfaceOnStartup();
   });
 
   it('stops a recovered recording when native window reassertion fails', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce(activeLease());
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(activeLease());
     mocks.getAppliedBindingForSession.mockReturnValueOnce(binding);
     mocks.reassert.mockRejectedValueOnce(new Error('window changed'));
 
@@ -262,6 +262,9 @@ describe('window-only video capture-surface recovery', () => {
 });
 
 describe('window-only recovered recording cleanup', () => {
+  beforeEach(() => {
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue(activeLease());
+  });
   it('requires no page preparation before restoring an abandoned window', async () => {
     await expect(
       prepareAbandonedVideoSurfaceRestore(
@@ -304,6 +307,7 @@ describe('window-only recovered recording cleanup', () => {
         phase: 'terminal' as const,
         terminal: { discard: false, outcome, cleanupStep: 'surface' as const },
       };
+      mocks.ensureActiveLeaseHydrated.mockResolvedValue(lease);
       const restore = stopBoundRecordingBeforeAbandonedStackRestore(lease, [
         {
           generation: 4,
@@ -336,6 +340,11 @@ describe('window-only recovered recording cleanup', () => {
   );
 
   it('retains the abandoned window when terminal evidence cannot be persisted', async () => {
+    mocks.ensureActiveLeaseHydrated.mockResolvedValue({
+      ...activeLease(),
+      phase: 'terminal',
+      terminal: { discard: true, outcome: 'unknown', cleanupStep: 'surface' },
+    });
     mocks.updateTerminal.mockRejectedValueOnce(new Error('storage unavailable'));
     await expect(
       stopBoundRecordingBeforeAbandonedStackRestore(

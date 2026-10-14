@@ -1,4 +1,4 @@
-export { notifyRecordingStartFailed } from './controls.start-failure';
+export { notifyRecordingStartFailed } from '../recording-completion';
 export { pauseRecording, resumeRecording } from './controls.pause-resume';
 export { updateRecordingSettings } from './controls.settings';
 export {
@@ -6,4 +6,4 @@ export {
   OVERLAY_RESTORE_RETRY_DELAYS_MS,
   stopRecording,
   stopRecordingForPrivacyErasure,
-} from './controls.stop';
+} from '../recording-completion';

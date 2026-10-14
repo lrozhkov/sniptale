@@ -117,8 +117,3 @@ export {
   cancelVideoSourceReadyWait,
   waitForVideoSourceReady,
 } from './source-handshake';
-export {
-  deferVideoCaptureSurfaceWorkUntilRecovery,
-  recoverVideoCaptureSurfaceOnStartup,
-  waitForVideoCaptureSurfaceRecovery,
-} from './recovery';

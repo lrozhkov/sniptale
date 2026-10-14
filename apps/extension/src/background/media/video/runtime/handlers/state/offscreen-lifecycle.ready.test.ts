@@ -1,3 +1,5 @@
+const sendRuntimeMessageMock = vi.hoisted(() => vi.fn());
+import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-contracts/runtime-messaging/mock';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
@@ -58,7 +60,6 @@ vi.mock('../../../../../offscreen-document/service', async (importOriginal) => (
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
-  restoreCurrentRecordingFromLease: vi.fn(() => false),
 }));
 vi.mock('../../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../camera-recorder-control')>()),
@@ -77,6 +78,11 @@ async function flushAsyncRoute() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  installBackgroundRuntimeMessagingMock({
+    sendRuntimeMessage: sendRuntimeMessageMock,
+    sendTabMessage: vi.fn().mockResolvedValue(undefined),
+  });
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
   getVideoRecordingIdMock.mockReturnValue('rec-1');
   translateMock.mockImplementation((key: string) => `t:${key}`);
@@ -108,10 +114,21 @@ it('uses the translated fallback for start failures without an error string', as
 
   expect(translateMock).toHaveBeenCalledWith('background.runtime.recordingError');
   expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('rec-1');
-  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
-    't:background.runtime.recordingError',
-    { recordingId: 'rec-1' }
-  );
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: VideoMessageType.RECORDING_START_FAILED,
+    error: 't:background.runtime.recordingError',
+  });
   expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 });
+
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  restoreCurrentRecordingFromLease: vi.fn(() => false),
+}));
+
+vi.mock('../../session-state', async (original) => ({
+  ...(await original<typeof import('../../session-state')>()),
+  resetVideoRecordingRuntimeState: vi.fn(),
+  setVideoRecordingRuntimeState: vi.fn(),
+}));

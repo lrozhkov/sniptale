@@ -46,7 +46,6 @@ vi.mock('../../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-surface')>()),
   markVideoCaptureSurfaceTabClosed: markTabClosedMock,
   releaseVideoCaptureSurface: releaseSurfaceMock,
-  waitForVideoCaptureSurfaceRecovery: waitForRecoveryMock,
 }));
 
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
@@ -139,3 +138,8 @@ it('retains durable recovery authority when offscreen stop is not accepted', asy
   expect(releaseSurfaceMock).not.toHaveBeenCalled();
   expect(clearActiveLeaseMock).not.toHaveBeenCalled();
 });
+
+vi.mock('../../../capture-surface/recovery', async (original) => ({
+  ...(await original<typeof import('../../../capture-surface/recovery')>()),
+  waitForVideoCaptureSurfaceRecovery: waitForRecoveryMock,
+}));

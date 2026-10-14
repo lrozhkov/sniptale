@@ -1,22 +1,12 @@
-import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   tryRunWithPersistenceMutationPermit,
   type PersistenceMutationPermit,
 } from '../../../../composition/persistence/infrastructure/mutation-barrier';
-import {
-  CaptureMode,
-  VideoRecordingStatus,
-  type VideoRecordingRuntimeState,
-} from '@sniptale/runtime-contracts/video/types/types';
-import {
-  getVideoRecordingRuntimeState,
-  setVideoRecordingRuntimeState,
-} from '../runtime/session-state';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   getVideoRecordingId,
+  isVideoRecordingStopInProgress,
   getVideoRecordingTabId,
-  setVideoRecordingId,
-  setVideoRecordingTabId,
 } from '../session-state';
 import {
   canPersistVideoRecordingLease,
@@ -27,8 +17,6 @@ import {
   type VideoRecordingControlLease,
   type RecordingTerminalProgress,
 } from '../../../storage/video/recording-control-lease';
-
-const logger = createLogger({ namespace: 'BackgroundVideoRecordingLease' });
 
 let activeLease: VideoRecordingControlLease | null = null;
 let hydrationPromise: Promise<VideoRecordingControlLease | null> | null = null;
@@ -58,20 +46,6 @@ function getUnexpiredActiveLease(): VideoRecordingControlLease | null {
     leaseHydrated = true;
   }
   return activeLease;
-}
-
-function hydrateSessionFromLease(lease: VideoRecordingControlLease): void {
-  setVideoRecordingId(lease.recordingId);
-  setVideoRecordingTabId(lease.recordingTabId);
-  setVideoRecordingRuntimeState({
-    captureMode: lease.captureMode,
-    cropRegion: lease.cropRegion,
-    countdownEndsAt: null,
-    error: lease.phase === 'terminal' ? 'Recording cleanup is incomplete.' : null,
-    status:
-      lease.phase === 'terminal' ? VideoRecordingStatus.STOPPING : VideoRecordingStatus.RECORDING,
-    viewportPresetId: lease.viewportPresetId,
-  } satisfies Partial<VideoRecordingRuntimeState>);
 }
 
 export async function issuePreparedVideoRecordingLease(args: {
@@ -152,7 +126,15 @@ async function resolveLeaseToClear(
 
 export async function clearActiveVideoRecordingLease(
   recordingId?: string,
-  options: { shouldClear?: () => boolean } = {}
+  options: {
+    shouldClear?: () => boolean;
+    authority?:
+      | 'confirmed-completion'
+      | 'cancelled-before-dispatch'
+      | 'durable-saved-result'
+      | 'verified-erasure';
+    binding?: { generation: number; streamInstanceId: string };
+  } = {}
 ): Promise<void> {
   return mutateLease(async (permit) => {
     const leaseToClear = await resolveLeaseToClear(recordingId);
@@ -160,11 +142,39 @@ export async function clearActiveVideoRecordingLease(
       return;
     }
 
-    if (options.shouldClear && !options.shouldClear()) {
-      return;
-    }
+    const canRemove = (): boolean => {
+      if (options.authority === 'verified-erasure' || options.authority === 'durable-saved-result')
+        return true;
+      if (options.authority === 'confirmed-completion') {
+        return Boolean(
+          leaseToClear?.phase === 'terminal' &&
+          leaseToClear.terminal.outcome === 'stopped' &&
+          leaseToClear.terminal.cleanupStep === 'lease' &&
+          options.binding &&
+          leaseToClear.surfaceBinding?.generation === options.binding.generation &&
+          leaseToClear.surfaceBinding.streamInstanceId === options.binding.streamInstanceId
+        );
+      }
+      if (leaseToClear?.phase === 'terminal') return false;
+      return (
+        options.authority === 'cancelled-before-dispatch' ||
+        !isVideoRecordingStopInProgress() ||
+        getVideoRecordingId() !== leaseToClear?.recordingId
+      );
+    };
+    if (!canRemove()) throw new Error('Recording cleanup retains authority for the accepted Stop.');
+    if (options.shouldClear && !options.shouldClear()) return;
 
     await removePersistedLease(permit);
+
+    // Stop can be admitted while the browser storage removal is pending.
+    if (!canRemove()) {
+      if (leaseToClear) {
+        await persistLease(leaseToClear, permit);
+        activeLease = leaseToClear;
+      }
+      throw new Error('Recording cleanup retains authority for the accepted Stop.');
+    }
 
     if (options.shouldClear && !options.shouldClear()) {
       if (activeLease && activeLease.recordingId !== leaseToClear?.recordingId) {
@@ -185,7 +195,7 @@ export async function clearActiveVideoRecordingLease(
   });
 }
 
-export async function hydrateActiveVideoRecordingLease(): Promise<VideoRecordingControlLease | null> {
+export async function hydrateVideoRecordingLeaseCache(): Promise<VideoRecordingControlLease | null> {
   const revision = leaseRevision;
   const lease = await readPersistedLease();
   if (revision !== leaseRevision) return getUnexpiredActiveLease();
@@ -198,52 +208,20 @@ export async function hydrateActiveVideoRecordingLease(): Promise<VideoRecording
   }
 
   activeLease = lease;
-  if (lease.phase !== 'prepared') hydrateSessionFromLease(lease);
   return lease;
 }
 
-export async function ensureActiveVideoRecordingLeaseHydrated(): Promise<VideoRecordingControlLease | null> {
+export async function ensureVideoRecordingLeaseCache(): Promise<VideoRecordingControlLease | null> {
   const lease = getUnexpiredActiveLease();
   if (lease) {
-    if (
-      lease.phase !== 'prepared' &&
-      getVideoRecordingRuntimeState().status === VideoRecordingStatus.IDLE
-    ) {
-      hydrateSessionFromLease(lease);
-    }
     return lease;
   }
   if (leaseHydrated) return null;
 
-  hydrationPromise ??= hydrateActiveVideoRecordingLease().finally(() => {
+  hydrationPromise ??= hydrateVideoRecordingLeaseCache().finally(() => {
     hydrationPromise = null;
   });
   return hydrationPromise;
-}
-
-export async function restoreCurrentRecordingFromLease(recordingId: string): Promise<boolean> {
-  const revision = leaseRevision;
-  const currentRecordingId = getVideoRecordingId();
-  if (currentRecordingId !== null && currentRecordingId !== recordingId) {
-    return false;
-  }
-
-  const lease = getUnexpiredActiveLease() ?? (await readPersistedLease());
-  if (revision !== leaseRevision) return false;
-  const recordingIdAfterHydration = getVideoRecordingId();
-  if (
-    (recordingIdAfterHydration !== null && recordingIdAfterHydration !== recordingId) ||
-    !lease ||
-    lease.recordingId !== recordingId ||
-    lease.phase === 'prepared'
-  ) {
-    return false;
-  }
-
-  activeLease = lease;
-  leaseHydrated = true;
-  hydrateSessionFromLease(lease);
-  return true;
 }
 
 export function validateRecordingControlCapability(args: {
@@ -335,7 +313,7 @@ export async function requireActiveVideoRecordingSourceBinding(): Promise<{
   recordingId: string;
   streamInstanceId: string;
 }> {
-  const lease = getUnexpiredActiveLease() ?? (await ensureActiveVideoRecordingLeaseHydrated());
+  const lease = getUnexpiredActiveLease() ?? (await ensureVideoRecordingLeaseCache());
   if (!lease || lease.phase !== 'active' || !lease.surfaceBinding) {
     throw new Error('Active recording source binding is unavailable');
   }
@@ -352,10 +330,4 @@ export function resetActiveVideoRecordingLeaseForTests(): void {
   leaseHydrated = false;
   leaseRevision += 1;
   mutationQueue = Promise.resolve();
-}
-
-export function reconcileVideoRecordingLeaseOnStartup(): void {
-  ensureActiveVideoRecordingLeaseHydrated().catch((error) => {
-    logger.warn('Failed to hydrate active recording lease on startup', error);
-  });
 }

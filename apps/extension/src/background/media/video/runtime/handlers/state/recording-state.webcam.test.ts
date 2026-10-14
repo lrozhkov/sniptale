@@ -39,8 +39,7 @@ vi.mock('../../../manager/start-activation-watchdog', async (importOriginal) => 
 
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
-  ensureActiveVideoRecordingLeaseHydrated: vi.fn().mockResolvedValue(null),
-  restoreCurrentRecordingFromLease: vi.fn().mockResolvedValue(false),
+  ensureVideoRecordingLeaseCache: vi.fn().mockResolvedValue(null),
 }));
 
 import { handleOffscreenRecordingStarted } from './recording-state';
@@ -99,3 +98,8 @@ it('stores actual webcam settings from current recording started events', async 
   });
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 });
+
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  restoreCurrentRecordingFromLease: vi.fn().mockResolvedValue(false),
+}));

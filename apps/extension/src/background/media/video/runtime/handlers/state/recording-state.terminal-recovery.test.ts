@@ -1,3 +1,14 @@
+vi.mock('../../../manager/recording-context.prepare', async (original) => ({
+  ...(await original<typeof import('../../../manager/recording-context.prepare')>()),
+  initializeRecordingContext: boundary.prepareContext,
+}));
+vi.mock('../../../manager/flow', async (original) => ({
+  ...(await original<typeof import('../../../manager/flow')>()),
+  finalizeRecordingStart: boundary.finalizeStart,
+  runCountdown: boundary.countdown,
+  beginPreparedRecording: boundary.beginPrepared,
+}));
+import { startRecording } from '../../../manager/start';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-contracts/runtime-messaging/mock';
@@ -5,6 +16,10 @@ import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/v
 import { runWithExclusivePersistenceMutationPermit } from '../../../../../../composition/persistence/infrastructure/mutation-barrier';
 
 const boundary = vi.hoisted(() => ({
+  prepareContext: vi.fn(),
+  finalizeStart: vi.fn(),
+  countdown: vi.fn(),
+  beginPrepared: vi.fn(),
   get: vi.fn(),
   set: vi.fn(),
   remove: vi.fn(),
@@ -57,7 +72,6 @@ vi.mock('../../../../../../platform/runtime-messaging', async (original) => ({
 import {
   activateVideoRecordingLease,
   clearActiveVideoRecordingLease,
-  hydrateActiveVideoRecordingLease,
   issuePreparedVideoRecordingLease,
   resetActiveVideoRecordingLeaseForTests,
   updateVideoRecordingTerminal,
@@ -65,9 +79,11 @@ import {
   validateRecordingControlCapability,
   validateTerminalRecordingStopCapability,
 } from '../../../recording-control-lease';
+import { hydrateActiveVideoRecordingLease } from '../../recording-completion';
 import {
   beginVideoRecordingPreparation,
   markVideoRecordingPreparationSettled,
+  markVideoRecordingOffscreenStartDispatched,
   getVideoRecordingId,
   finishVideoRecordingStop,
   isVideoRecordingStopInProgress,
@@ -89,8 +105,14 @@ import {
   handleOffscreenRecordingResumed,
 } from './recording-state';
 import { completeVideoRecording } from '../../recording-completion';
-import { stopRecording } from '../../manager/controls.stop/flow';
+import { stopRecording } from '../../recording-completion';
 import { handleOffscreenError } from './offscreen-lifecycle';
+
+import {
+  scheduleRecordingStartActivationWatchdog,
+  clearRecordingStartActivationWatchdog,
+} from '../../../manager/start-activation-watchdog';
+import { RECORDING_START_ACTIVATION_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
 
 let stored: Record<string, unknown>;
 const recordingId = 'terminal-recording-a';
@@ -696,4 +718,162 @@ it('retains discard failure when runtime error arrives before terminal intent co
   expect(isVideoRecordingStopInProgress()).toBe(false);
   expect(boundary.clearGrant).not.toHaveBeenCalled();
   expect(boundary.remove).not.toHaveBeenCalled();
+});
+
+it('retains failed Stop authority when an admitted activation watchdog finishes', async () => {
+  vi.useFakeTimers();
+  try {
+    beginVideoRecordingPreparation(CaptureMode.CAMERA, DEFAULT_VIDEO_SETTINGS, null);
+    await start(CaptureMode.CAMERA);
+    markVideoRecordingOffscreenStartDispatched();
+    const release = deferred();
+    boundary.requestStop.mockImplementationOnce(async () => {
+      await release.promise;
+      return { terminalError: 'Staging cleanup failed', recordingPointTransform: null };
+    });
+    scheduleRecordingStartActivationWatchdog(recordingId);
+    await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
+    expect(stored['video-active-recording-lease']).toMatchObject({
+      phase: 'terminal',
+      terminal: { outcome: 'unknown', discard: true },
+    });
+    await expect(stopRecording(true)).resolves.toEqual({ result: 'already-stopping' });
+    release.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(stored['video-active-recording-lease']).toMatchObject({
+      phase: 'terminal',
+      terminal: { outcome: 'failed', discard: true },
+    });
+    expect(boundary.requestStop).toHaveBeenCalledTimes(1);
+    expect(boundary.remove).not.toHaveBeenCalled();
+    expect(getVideoRecordingId()).toBe(recordingId);
+    expect(getVideoRecordingRuntimeState().status).toBe(VideoRecordingStatus.STOPPING);
+  } finally {
+    clearRecordingStartActivationWatchdog();
+    vi.useRealTimers();
+  }
+});
+
+it('retains authority when Stop is admitted during pending legacy lease removal', async () => {
+  await start(CaptureMode.CAMERA);
+  const entered = deferred();
+  const release = deferred();
+  boundary.remove.mockImplementationOnce(async (key: string) => {
+    entered.resolve();
+    await release.promise;
+    delete stored[key];
+  });
+  const legacy = clearActiveVideoRecordingLease(recordingId).then(
+    () => 'cleared',
+    () => 'retained'
+  );
+  await entered.promise;
+  boundary.requestStop.mockResolvedValueOnce({
+    terminalError: 'Staging cleanup failed',
+    recordingPointTransform: null,
+  });
+  const stopping = stopRecording(true);
+  release.resolve();
+  const legacyResult = await legacy;
+  await stopping;
+  expect(legacyResult).toBe('retained');
+  expect(stored['video-active-recording-lease']).toMatchObject({
+    phase: 'terminal',
+    terminal: { outcome: 'failed', discard: true },
+  });
+  expect(getVideoRecordingId()).toBe(recordingId);
+});
+
+it.each(['activation', 'countdown'] as const)(
+  'retains accepted Stop when the original %s continuation finishes',
+  async (phase) => {
+    const entered = deferred();
+    const release = deferred();
+    const grantEntered = deferred();
+    const grantRelease = deferred();
+    boundary.prepareContext.mockImplementationOnce(async () => {
+      setVideoRecordingTabId(17);
+      return {
+        captureMode: CaptureMode.TAB,
+        captureSource: { mode: CaptureMode.TAB, streamId: 'prepared-stream' },
+        generation: 1,
+        settings: DEFAULT_VIDEO_SETTINGS,
+        surface: null,
+        tabId: 17,
+        viewport: null,
+        viewportPresetId: null,
+      };
+    });
+    boundary.finalizeStart.mockImplementationOnce(async () => {
+      markVideoRecordingOffscreenStartDispatched();
+    });
+    boundary.countdown.mockImplementationOnce(async () => {
+      if (phase === 'countdown') {
+        entered.resolve();
+        await release.promise;
+        return false;
+      }
+      return true;
+    });
+    boundary.beginPrepared.mockImplementationOnce(async () => {
+      entered.resolve();
+      await release.promise;
+    });
+    if (phase === 'activation') {
+      boundary.requestStop.mockResolvedValueOnce({
+        terminalError: 'Staging cleanup failed',
+        recordingPointTransform: null,
+      });
+    } else {
+      boundary.clearGrant.mockImplementationOnce(async () => {
+        grantEntered.resolve();
+        await grantRelease.promise;
+        throw new Error('Grant removal refused');
+      });
+    }
+    const starting = startRecording(
+      17,
+      DEFAULT_VIDEO_SETTINGS,
+      CaptureMode.TAB,
+      null,
+      'chrome-extension://test/popup.html'
+    );
+    await entered.promise;
+    const expectedId = getVideoRecordingId();
+    const stopping = stopRecording(true);
+    if (phase === 'activation') await stopping;
+    else await grantEntered.promise;
+    release.resolve();
+    if (phase === 'countdown') {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(getVideoRecordingId()).toBe(expectedId);
+      expect(getVideoRecordingRuntimeState().status).toBe(VideoRecordingStatus.STOPPING);
+      grantRelease.resolve();
+    }
+    await expect(stopping).resolves.toMatchObject({ result: 'failed' });
+    await expect(starting).resolves.toMatchObject({ result: 'failed' });
+    expect(boundary.requestStop).toHaveBeenCalledTimes(1);
+    expect(boundary.remove).not.toHaveBeenCalled();
+    expect(getVideoRecordingId()).toBe(expectedId);
+    expect(stored['video-active-recording-lease']).toMatchObject({
+      recordingId: expectedId,
+      phase: 'terminal',
+      terminal: { discard: true, outcome: phase === 'activation' ? 'failed' : 'stopped' },
+    });
+  }
+);
+
+it('returns to IDLE when an admitted start has no required tab identity', async () => {
+  await expect(
+    startRecording(
+      undefined,
+      DEFAULT_VIDEO_SETTINGS,
+      CaptureMode.TAB,
+      null,
+      'chrome-extension://test/popup.html'
+    )
+  ).resolves.toMatchObject({ result: 'failed', error: 'No tab ID' });
+  expect(getVideoRecordingId()).toBeNull();
+  expect(getVideoRecordingRuntimeState().status).toBe(VideoRecordingStatus.IDLE);
+  expect(boundary.requestStop).not.toHaveBeenCalled();
 });

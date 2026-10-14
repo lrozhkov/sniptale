@@ -7,7 +7,7 @@ const { cancelRecordingStartFromOwner, overlayRetryDelaysFromOwner, stopRecordin
     stopRecordingFromOwner: vi.fn(),
   }));
 
-vi.mock('./controls.stop/flow', () => ({
+vi.mock('../recording-completion', () => ({
   cancelRecordingStart: cancelRecordingStartFromOwner,
   OVERLAY_RESTORE_RETRY_DELAYS_MS: overlayRetryDelaysFromOwner,
   stopRecording: stopRecordingFromOwner,

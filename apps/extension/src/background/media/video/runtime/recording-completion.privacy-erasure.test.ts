@@ -1,10 +1,14 @@
+vi.mock('./camera-recorder-control', async (original) => ({
+  ...(await original<typeof import('./camera-recorder-control')>()),
+  clearCameraRecorderControlGrant: vi.fn().mockResolvedValue(undefined),
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-contracts/runtime-messaging/mock';
+import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 
 const {
-  completeVideoRecordingMock,
+  leaseMock,
   updateTerminalMock,
   beginVideoRecordingStopMock,
   finishVideoRecordingStopMock,
@@ -18,7 +22,7 @@ const {
   setVideoRecordingRuntimeStateMock,
   getVideoSurfaceSessionMock,
 } = vi.hoisted(() => ({
-  completeVideoRecordingMock: vi.fn(),
+  leaseMock: vi.fn(),
   updateTerminalMock: vi.fn(),
   beginVideoRecordingStopMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
@@ -36,13 +40,13 @@ const {
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ error: loggerErrorMock, log: vi.fn(), warn: vi.fn() }),
 }));
-vi.mock('../../session-state', () => ({
+vi.mock('./session-state', () => ({
   getVideoRecordingRuntimeState: getVideoRecordingRuntimeStateMock,
   resetVideoRecordingRuntimeState: vi.fn(),
   setVideoRecordingRuntimeState: setVideoRecordingRuntimeStateMock,
 }));
-vi.mock('../../../session-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../session-state')>()),
+vi.mock('../session-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../session-state')>()),
   beginVideoRecordingStop: beginVideoRecordingStopMock,
   finishVideoRecordingStop: finishVideoRecordingStopMock,
   getVideoRecordingCountdownSessionId: vi.fn(() => null),
@@ -55,36 +59,39 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
     recordingId != null && getVideoRecordingIdMock() === recordingId,
 }));
-vi.mock('../../../capture-surface', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+vi.mock('../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capture-surface')>()),
   getVideoSurfaceSession: getVideoSurfaceSessionMock,
   releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
 }));
-vi.mock('../../../recording-control-lease', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
+vi.mock('../recording-control-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../recording-control-lease')>()),
   clearActiveVideoRecordingLease: vi.fn(),
-  getActiveVideoRecordingLeaseSnapshot: vi.fn(() => null),
+  getActiveVideoRecordingLeaseSnapshot: leaseMock,
   updateVideoRecordingTerminal: updateTerminalMock,
-  ensureActiveVideoRecordingLeaseHydrated: vi.fn(() => Promise.resolve(null)),
+  ensureVideoRecordingLeaseCache: leaseMock,
 }));
-vi.mock('../../recording-completion', () => ({
-  completeVideoRecording: completeVideoRecordingMock,
-}));
-vi.mock('./effects', () => ({
+vi.mock('./manager/controls.stop/effects', () => ({
   quiesceViewportEmulationForPrivacyErasure: vi.fn(),
   runStopSideEffects: runStopSideEffectsMock,
   waitForStopSideEffects: vi.fn(),
 }));
 
-import { stopRecordingForPrivacyErasure } from './flow';
+import { stopRecordingForPrivacyErasure } from './recording-completion';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  completeVideoRecordingMock.mockResolvedValue(undefined);
-  updateTerminalMock.mockImplementation(async (_binding, terminal) => ({
-    phase: 'terminal',
-    terminal,
-  }));
+  leaseMock.mockReturnValue(null);
+  updateTerminalMock.mockImplementation(async (_binding, terminal) => {
+    const lease = {
+      recordingId: 'recording-1',
+      surfaceBinding: { generation: 2, streamInstanceId: 'stream-instance-1' },
+      phase: 'terminal',
+      terminal,
+    };
+    leaseMock.mockReturnValue(lease);
+    return lease;
+  });
   getVideoRecordingRuntimeStateMock.mockReturnValue({
     status: VideoRecordingStatus.RECORDING,
     countdownEndsAt: null,
@@ -132,9 +139,9 @@ it('accepts privacy erasure stop only after the offscreen recorder settles', asy
 
   await expect(stopRecordingForPrivacyErasure()).resolves.toEqual({ result: 'accepted' });
 
-  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
   expect(sendRuntimeMessageMock.mock.invocationCallOrder[0]).toBeLessThan(
-    completeVideoRecordingMock.mock.invocationCallOrder[0]!
+    releaseVideoCaptureSurfaceMock.mock.invocationCallOrder[0]!
   );
   expect(runStopSideEffectsMock).toHaveBeenCalledWith(
     { mode: CaptureMode.TAB, shouldResetImmediately: false, tabId: 9 },

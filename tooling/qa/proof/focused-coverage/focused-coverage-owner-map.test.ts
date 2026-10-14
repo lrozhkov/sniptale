@@ -22,6 +22,7 @@ it('keeps offscreen lifecycle recovery and saved-result proof despite the runtim
     `${root}/offscreen-lifecycle.project-export.test.ts`,
     `${root}/offscreen-lifecycle.ready.test.ts`,
     `${root}/offscreen-lifecycle.saved-replay.test.ts`,
+    `${root}/offscreen-lifecycle.stop-error.test.ts`,
     `${root}/offscreen-lifecycle.test.ts`,
     `${root}/recording-state.terminal-recovery.test.ts`,
   ]);
@@ -350,6 +351,19 @@ it('retains pending-opening, cancellation and disposal proof for the Gallery rea
       'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
       'apps/extension/src/gallery/video-review/use-session.loaded.test.tsx',
       'apps/extension/src/gallery/video-review/use-session.resources.test.tsx',
+    ])
+  );
+});
+
+it('keeps actual Stop and startup concurrency proof on the completion owner', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/background/media/video';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/runtime/recording-completion.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/runtime/handlers/state/recording-state.terminal-recovery.test.ts`,
+      `${root}/runtime/recording-completion.stop.test.ts`,
+      `${root}/manager/start-owner.test.ts`,
+      `${root}/capture-surface.recovery.window-only.test.ts`,
     ])
   );
 });

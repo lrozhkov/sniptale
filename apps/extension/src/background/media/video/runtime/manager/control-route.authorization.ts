@@ -3,11 +3,11 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoControlMessage } from '../../../../../contracts/video/types/messages';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
 import {
-  ensureActiveVideoRecordingLeaseHydrated,
   getActiveVideoRecordingLeaseSnapshot,
   validateRecordingControlCapability,
   validateTerminalRecordingStopCapability,
 } from '../../recording-control-lease';
+import { ensureActiveVideoRecordingLeaseHydrated } from '../recording-completion';
 import { restoreAuthorizedCameraRecorderDocument } from '../camera-recorder-control';
 import { waitForVideoCaptureSurfaceRecovery } from '../../capture-surface/recovery';
 import {

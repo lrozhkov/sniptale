@@ -160,7 +160,7 @@ export const PRIVACY_ERASURE_OWNER_MAPPINGS = [
     reason: 'Privacy stop logging drops raw transport errors and recording metadata.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/failure-logging.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',
+      'apps/extension/src/background/media/video/runtime/recording-completion.privacy-erasure.test.ts',
     ],
   },
   ...PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS,
