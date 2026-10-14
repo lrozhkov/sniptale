@@ -61,3 +61,27 @@ it('preserves theme workspace colors, rejects malformed colors, and leaves legac
     ).toBeNull();
   }
 });
+
+it('roundtrips lane masters and locks without adding defaults to legacy UI', () => {
+  const state = createQuickEditAdvancedState();
+  expect(loadQuickEditAdvancedState(state)?.ui.lockedTracks).toBeUndefined();
+  const ui = {
+    ...state.ui,
+    lockedTracks: { source: true, text: false },
+    tracks: {
+      ...state.ui.tracks,
+      text: false,
+      originalAudio: false,
+      music: true,
+      voiceover: false,
+    },
+  };
+  expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify({ ...state, ui })))?.ui).toEqual(ui);
+  expect(loadQuickEditAdvancedState({ ...state, ui: { ...ui, lockedTracks: [] } })).toBeNull();
+  expect(
+    loadQuickEditAdvancedState({ ...state, ui: { ...ui, lockedTracks: { source: 'yes' } } })
+  ).toBeNull();
+  expect(
+    loadQuickEditAdvancedState({ ...state, ui: { ...ui, tracks: { ...ui.tracks, music: 1 } } })
+  ).toBeNull();
+});

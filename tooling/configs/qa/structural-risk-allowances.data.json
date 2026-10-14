@@ -73,9 +73,9 @@
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess if this owner acquires another state authority or independent operation. Remove when the analyzer recognizes this cohesive boundary.",
-      "astHash": "9014945003e7bde436726efe371b93e3e975e6814a60d7444464aaf4121c150d",
+      "astHash": "fc3aafa65e6f5bf014e9b621ff58957d375b92e27cf9629fae08c0c3ed23c10d",
       "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e",
-      "reason": "tool-noise: ReviewEditor binds workspace color style and existing UI save/reset commands. Theme and preview stay in workspace-color; durable changes stay in useReviewAdvanced/session. Another view wrapper would only forward these bindings. Read-only workspace_color_structural_diagnosis independently confirmed Keep. Complete-candidate architecture review remains required.",
+      "reason": "tool-noise: The editor adds only a setTrackLocked binding. Existing hooks retain persistence, navigation, waveform, import, panel and preview ownership. Another wrapper would forward the same bindings. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -105,11 +105,11 @@
       "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:platform",
-      "reason": "tool-noise: This file is the typed static RU/EN Gallery Video Review message catalog. It has no state, effects, runtime authority or branching; its consumers retain one public locale contract. Independently changing speech vocabulary already has its own source, alongside spatial and keyboard vocabularies. Composing that source adds two lines to the existing 799-line catalog, crossing the800-line cap with unchanged score2/delta0 and cohesion1.00. Further splitting unrelated literals or removing whitespace solely to cross the threshold would not resolve an ownership defect.",
+      "reason": "tool-noise: Five static RU/EN message entries extend the existing typed catalog. There are no effects, state authorities, runtime branches or new message owner. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess new behavior, state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-07",
-      "astHash": "553153ca932eaf6ba48de51a5e59ded167c172b0ce20124592362a287e3164b6",
-      "signatureHash": "7af0c082c0ed47e99926dd9ddaf8170ac6f6b2c23d3e3105cb8b860b32778ec0"
+      "reviewDate": "2026-10-15",
+      "astHash": "2ed8271f182577347bd7c9e3626ed8aee9659b14bfa5ec820dc31017d32e7382",
+      "signatureHash": "8eadb2acc969b6433bcd1d7c34b623e67e962a2a739520d7c469a7dc86dd7989"
     },
     {
       "rule": "structural-function-risk",
@@ -138,11 +138,11 @@
       "file": "apps/extension/src/gallery/video-review/review.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The added39-line Scene/Basic integration test uses the same real VideoReview session fixture and existing decoder/persistence mocks as the other tests. It crosses the800-line cap at810lines with unchangedscore4/delta0 andcohesion1.00. There is no independent fixture lifecycle, durable writer or recovery authority. Moving only this test would duplicate the existing mocks or introduce a forwarding test fixture without resolving an ownership defect. The actual test clicks the Scene audio-fade control, asserts durable history and verifies Basic suppresses UI without dropping settings. Keep this one integration fixture; independent architecture review must validate the exact classification.",
+      "reason": "tool-noise: Actual-button, settings/Notes and Undo/Redo row-output assertions share the existing integration mocks, createEditorFixture and cleanup. They exercise the same editor/session boundary with no independent fixture lifecycle. Independent diagnosis and final review accepted this fixture boundary; corrected-candidate review must validate the added history assertions. Fresh corrected-candidate architecture review remains required.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess a new fixture lifecycle, independent authority or mixed recovery. Remove when the analyzer recognizes cohesive tests sharing one integration fixture. Independent architecture review must inspect the classification.",
-      "reviewDate": "2026-10-08",
-      "astHash": "52d265648a04c3d0e4050495371a7428111eb1a8b5a719fe8d6cb0099e953f15",
-      "signatureHash": "d380ad731b1acca991b4ed9f9bec4d352770cd06d1fce01ecf98f89a30c3a202"
+      "reviewDate": "2026-10-15",
+      "astHash": "c6328062071df8b4de1c61cc8e1ac565338ad64555d2863db784988f0cc5db4f",
+      "signatureHash": "a411df1f8a4dd05950d634461348210539321a3a0a91a54138e7774cc24654d9"
     },
     {
       "rule": "structural-file-risk",
@@ -194,9 +194,9 @@
       "symbol": "ReviewTimelineBinding",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "f2f84d04e1b92a2b9e46bb32dcc87083f1e01aff5d59bd159c1ffc4cc6711f65",
+      "astHash": "59731c9624bf88fe6d00c527c90e30bca72ab07735bc04c026a6df1359678153",
       "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
-      "reason": "tool-noise: One source-to-timeline composition passes source identity to reset the disposable guide lifetime. Seven outer statements and injected command ownership remain unchanged. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: The provider connects existing placement tools, common row chrome and injected commands. Configuration and density are disposable presentation state. Cancellation clears existing gesture owners before the session command. No new writer or resource receiver appears. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -215,10 +215,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence",
-      "reason": "tool-noise: Workspace color restore and competing UI writer cases share the existing isolated transactional fixture. Mock control and case-local advanced values are not product state authorities. Read-only workspace_color_structural_diagnosis independently confirmed Keep. Complete-candidate architecture review remains required.",
+      "reason": "tool-noise: The durable Undo/Redo/start case shares the existing transactional fixture and failure switch. Refusal, retry, retained locks and reopen exercise the same workspace mutation protocol. No separate fixture lifecycle or production authority is introduced. Independent track_controls_structural_diagnosis inspected this correction. Fresh corrected-candidate architecture review remains required.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess if this owner acquires another state authority or independent operation. Remove when the analyzer recognizes this cohesive boundary.",
       "reviewDate": "2026-10-15",
-      "astHash": "21e0353304bd8705c504791aa3c825d285c7d85be2ccf71c489b305f4832c960",
+      "astHash": "03673157f2e057914d6bafafe3a566af7bac7327605264f883614632f1c560f9",
       "signatureHash": "b327e93b8e7ed0284582f4dfb3249f64ac9b0107b37a2552656a373c887b99f2"
     },
     {
@@ -293,9 +293,9 @@
       "symbol": "useReviewAnnotationEffects",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "7296bc67fde08c8a03cf845f7866224cb0003a7bd5ae8a685eade14b78a1f32c",
+      "astHash": "5c98d5d412ba07f28e87922e737d569c46b1b53ce1a307e40d9aa0a1546d16ad",
       "signatureHash": "349ce5baa868ad5597c6e89dbdc69124b461033b8430575ae2cac5a0ae80700c",
-      "reason": "tool-noise: One disposable session-bound annotation command receiver owns admission, acquisition and retry. The result now reports the admitted instance identity; no new writer, resource lifetime or recovery authority is added. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: The enabled command uses the existing execute admission, pending/failure and cancellation lifetime. It delegates master publication to session.setTrackControl and adds no resource owner or writer. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -337,9 +337,9 @@
       "symbol": "ReviewAnnotationEffectsTrack",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "5d85bcf11f8887d7ba081f323dbb02f09e3f2d0591ffb517164d243f74c0467c",
+      "astHash": "ed90f9d0c98e8e88cc4f643a92dcd7662af7267b4601e8e5d9342da0b6134781",
       "signatureHash": "fdc66e6782295ab2c2d3ce1464a54f9fe32bc714d5d4d20100f0fc95e3f7d488",
-      "reason": "tool-noise: One captured source-clock annotation gesture retains begin, preview, commit, cancellation and recovery. The added pure eligibility expression publishes an accepted resize edge to the visual owner and crosses the cyclomatic threshold; it creates no new gesture receiver or durable writer. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: One drag receiver owns capture, deferred admission, preview, completion and cancellation. Lock checks preserve selection and return before gesture creation. Nested plate callbacks use that same receiver and injected commands. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -348,9 +348,9 @@
       "symbol": "ReviewAnnotationEffectsTrack.props.instances.map callback",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "69d31f88e93441ea742d95f5d1a8ea6d14140ebf6134f02ce259a818d0e63c64",
+      "astHash": "6f582448b9397489a3ac256bce93d4f5b84aeac57cb803054c181ccc91486f66",
       "signatureHash": "d8427a2f080e07cab8e2e1b9281c95636919bebb648e95170ef07bda38814baf",
-      "reason": "tool-noise: One accessible annotation plate uses the enclosing lane gesture and injected commands. Initial preview and resize-guide suppression remain parts of that gesture; the callback adds no effect or state authority. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: One drag receiver owns capture, deferred admission, preview, completion and cancellation. Lock checks preserve selection and return before gesture creation. Nested plate callbacks use that same receiver and injected commands. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -403,9 +403,9 @@
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "cfe818f08dea239c33fd271675329529aa818fd60694e91dc5f638b6349e406c",
-      "signatureHash": "881bc98ded6d3566e50e9b7685fcff7bb1dfd6ecaf89070beb0ec52d12b299ee",
-      "reason": "tool-noise: One source timeline composition retains its placement state and injected consumers. Passing source identity adds no writer, queue, export or gesture authority; score and cohesion remain unchanged. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "astHash": "cd29a254926c929da3a7b35be86f729f7018f5611151356c0d282a9081e19360",
+      "signatureHash": "418e85bf5dc567bc2a34e4a84bd51169a0d66dc2fffd55e97beb75697efecb0c",
+      "reason": "tool-noise: The provider connects existing placement tools, common row chrome and injected commands. Configuration and density are disposable presentation state. Cancellation clears existing gesture owners before the session command. No new writer or resource receiver appears. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -545,11 +545,11 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence:review-workspaces",
-      "reason": "tool-noise: The file owns one accepted workspace mutation protocol. All content, cursor, typing, recovery and buffer writes share source identity, CAS, strict transaction, abort and post-commit cleanup. Retention adds primary-source promotion and authoritative project metadata to that same protocol. Pure metadata, parsing, physical history storage and resource admission already have separate owners. The finding is the 800-line threshold with score2 and unchanged authority metrics; extracting transaction fragments would distribute one writer. Independent read-only boundary research confirmed Keep. Final architecture review must validate this exact body. Explicit reopen also promotes admitted external origins before either return in the same transaction; failed-first proof covers legacy and existing metadata, with rollback. STEP5 adds the primary Library identity to the existing derived usage keys. It adds no writer, transaction, state authority or effect family; score and authority metrics remain unchanged. Reassess this exact body in the STEP5 architecture review.",
+      "reason": "tool-noise: The cursor-only candidate is replaced by a shared pure cursor/master candidate. Source identity, CAS admission, strict transaction, validation, commit/abort and cleanup remain in the existing store protocol. The helper creates no writer or independent transaction authority. Independent track_controls_structural_diagnosis inspected this correction. Fresh corrected-candidate architecture review remains required.",
       "removalCondition": "Remove when the exact body or signature changes. Reassess a new state authority, runtime, independent transaction or recovery policy. Remove when structural analysis models this cohesive transaction owner.",
-      "reviewDate": "2026-10-14",
-      "astHash": "d4500ae243c0fe02592cf31987fa38a384c728c02f837b856aed676f13548fcf",
-      "signatureHash": "ff8c68cb0e8b86daca47585aeecefb99bbbf0d6c5797a913f7ad64bf9c3328c8"
+      "reviewDate": "2026-10-15",
+      "astHash": "9092965c52cbb284922de199d4968d193c7eda9b2f652c7bcffe54ceda0d09d6",
+      "signatureHash": "0d394a6f4302cc17c058195d5d41f56c7919e652c64a8628c0e7a5c267fbb155"
     },
     {
       "rule": "structural-file-risk",
@@ -765,11 +765,22 @@
       "file": "apps/extension/src/gallery/video-review/timeline-selection.tsx",
       "symbol": "ReviewEditBlock",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One source-edit gesture owns preview, constraints, admission, capture and commit. The accepted boundary is published to the visual owner. Capture loss reuses cancellation; splitting the handle lifecycle would distribute one gesture authority. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: One source-edit gesture retains preview, snapping, deferred admission, pointer capture, commit and cancellation. The lock check preserves selection and prevents gesture creation. Splitting handles would distribute this lifecycle. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15",
-      "astHash": "7cfcf6118a3a8802d98518fea22aab141f4b22da576061633a35aa04b1a374be",
+      "astHash": "b1fc848f095347a1d7048e010223cd415cae2b44d65711d15313280e91bbeb61",
       "signatureHash": "fd59fc6afaa92347b04814e3e530f199aec4064d901d506858f175f5e7668800"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/session.ts",
+      "symbol": "<file>",
+      "owner": "extension:workflows:video-review",
+      "reason": "tool-noise: One session owns the ordered mutation queue, buffer, authoritative snapshot/document, receipt recovery and disposal. Track admission uses that authority. Pure lane classification and annotation resource retention remain separate. Analyzer signals include repeated this receivers, bound methods and attempt/receipt records of this session, not independent writers. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-15",
+      "astHash": "78d094280a565097c22da64467e3da50530386cc305394738828ca9aac669026",
+      "signatureHash": "87143ee24131e5cbf70420ce35f93fb72b737b02cfa2b4277707e314038213b4",
+      "removalCondition": "Remove on exact AST or signature change. Reassess another mutation queue, snapshot authority, resource owner or receipt/recovery authority. Remove when the analyzer distinguishes these single-session receivers."
     }
   ]
 }

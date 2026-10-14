@@ -1,3 +1,4 @@
+import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { reviewCursorFocusTimelineKeys } from '../../features/video/project/cursor-focus-path/timeline';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { deleteCursorFocusKey } from '../../features/video/project/cursor-focus-path/authoring';
@@ -112,7 +113,7 @@ export function useReviewEditorWiring(args: {
     setAudio: args.advancedState.setAudio,
     timelineDuration: args.timelineDuration,
     sourceDuration: args.sourceDuration,
-    voiceoverEnabled: args.advanced.ui.mode === 'advanced' && args.advanced.ui.tracks.audio,
+    voiceoverEnabled: resolveQuickEditEffectiveFeatures(args.advanced).voiceoverApplied,
     edits: args.document.edits,
     selectedOriginalId:
       args.activeSelection.kind === 'original-audio' ? args.activeSelection.id : null,

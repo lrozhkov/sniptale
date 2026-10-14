@@ -210,3 +210,21 @@ it('checks queued target edits and rejects foreign receipt objects', async () =>
   );
   expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
 });
+
+it('refuses late speech after locking but acknowledges an accepted receipt after a later lock', async () => {
+  const { session, deps } = createRecognitionFixture(2);
+  const changes = publication(session);
+  const receipt = session.createSpeechPublicationReceipt();
+  await session.setTrackControl('originalAudio', { locked: true });
+  await expect(session.publishSpeechTranscripts(changes, receipt)).rejects.toThrow('originalAudio');
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  expect(session.getSnapshot()).toMatchObject({ error: null, pending: 0 });
+  await session.setTrackControl('originalAudio', { locked: false });
+  await session.publishSpeechTranscripts(changes, receipt);
+  await session.setTrackControl('originalAudio', { locked: true });
+  await session.publishSpeechTranscripts(changes, receipt);
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.lockedTracks?.originalAudio).toBe(
+    true
+  );
+});

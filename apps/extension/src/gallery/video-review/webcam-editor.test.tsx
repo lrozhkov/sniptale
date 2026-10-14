@@ -10,6 +10,7 @@ import {
   type QuickEditWebcam,
 } from '../../features/video/review/advanced/webcam';
 import type { ReviewOperation, ReviewSelection } from '../../features/video/review/types';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { attachReviewWebcam } from '../../workflows/video-review/webcam-source';
@@ -68,7 +69,13 @@ function setup(webcam?: QuickEditWebcam, trackVisible?: boolean) {
     commitVideoWorkspace: commit,
     commitVideoWorkspaceWithProjection: async (args) =>
       committedEditorFixtureProjection(await commit(args)),
-    saveVideoWorkspaceSnapshot: async () => snapshot(),
+    saveVideoWorkspaceSnapshot: async (args) => {
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace) throw new Error('Invalid workspace');
+      Object.assign(advanced, workspace.advanced);
+      history.splice(0, history.length, ...workspace.history);
+      return snapshot();
+    },
     saveVideoWorkspaceDraft: async () => snapshot(),
     readVideoWorkspace: async () => snapshot(),
     moveVideoWorkspaceHistory: async () => snapshot(),
@@ -342,7 +349,7 @@ it('keeps crop local to the selected point and moves that point through the hist
 });
 
 it('reveals a new attachment even when an earlier camera lane preference was hidden', async () => {
-  const { session, saveAdvanced } = setup(undefined, false);
+  const { session } = setup(undefined, false);
   await act(async () => {});
   await act(async () => editor.toggle());
   expect(editor.camera?.enabled).toBe(true);
@@ -350,17 +357,5 @@ it('reveals a new attachment even when an earlier camera lane preference was hid
     'project-asset:camera'
   );
   expect(io.attach).toHaveBeenCalledOnce();
-  await act(async () => {
-    await vi.waitFor(
-      () =>
-        expect(saveAdvanced).toHaveBeenCalledWith(
-          expect.objectContaining({
-            advanced: expect.objectContaining({
-              ui: expect.objectContaining({ tracks: expect.objectContaining({ webcam: true }) }),
-            }),
-          })
-        ),
-      { timeout: 2500 }
-    );
-  });
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.webcam).toBe(true);
 });

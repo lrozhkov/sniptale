@@ -1,3 +1,6 @@
+import { cancelReviewTimelineGestures } from './timeline-drag';
+import { ReviewTrackControlsProvider } from './track-row';
+import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import {
   ReviewZoomLane,
   ReviewAudioLane as ReviewAudioLaneBinding,
@@ -89,7 +92,8 @@ type TimelineBindingProps = {
   setSelection(value: ReviewAnchor): void;
   advanced: QuickEditAdvancedState;
   onToggleActions?: (() => void) | undefined;
-  setTrackVisibility(track: 'actions' | 'zoom' | 'audio' | 'webcam', visible: boolean): void;
+  setTrackVisibility(track: Exclude<QuickEditTrack, 'source'> | 'audio', visible: boolean): void;
+  setTrackLocked?(track: QuickEditTrack, locked: boolean): void;
   setMode(mode: 'basic' | 'advanced'): void;
   telemetryAvailable: boolean;
   time: number;
@@ -192,6 +196,7 @@ function ReviewTimelineToolsBinding(
 /** One timeline binding: tools, zoom track, edit lanes, and the selection contract. */
 export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const [compact, setCompact] = useState(false);
+  const [configuring, setConfiguring] = useState(false);
   const projection = useMemo(
     () => createTrackProjection(props.source.duration, props.edits),
     [props.source.duration, props.edits]
@@ -201,13 +206,41 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const focus = useFocusPlacement(props, projection);
   const annotation = useAnnotationPlacement(props);
   return (
-    <>
+    <ReviewTrackControlsProvider
+      value={{
+        ui: props.advanced.ui,
+        configuring: features.mode === 'advanced' && configuring,
+        busy: props.busy,
+        unavailable: {
+          webcam: !props.webcam?.available,
+          originalAudio:
+            props.editing.exporter.index !== null && !props.editing.exporter.index.audioCodec,
+        },
+        setEnabled: (track, enabled) =>
+          (props.beforeAction ?? ((action) => action()))(() =>
+            track === 'webcam' && enabled && !props.advanced.webcam
+              ? void props.webcam?.toggle()
+              : props.setTrackVisibility(track, enabled)
+          ),
+        setLocked: (track, locked) => {
+          cancelReviewTimelineGestures();
+          focus.clear();
+          annotation.clear();
+          (props.beforeAction ?? ((action) => action()))(() =>
+            props.setTrackLocked?.(track, locked)
+          );
+        },
+      }}
+    >
       <ReviewTimeline
+        actionsTrackVisible={
+          (features.mode === 'advanced' && configuring) || features.actionsTrackVisible
+        }
         sourceId={props.annotationSourceId}
         annotationTool={annotation.tool.active}
         annotationDrawing={annotation.drawing}
         annotationEffectsTrack={
-          features.annotationEffectsTrackVisible && props.annotationEffects ? (
+          features.mode === 'advanced' && props.annotationEffects ? (
             <ReviewAnnotationEffectsTrack
               key={JSON.stringify([props.annotationSourceId, annotation.tool.value])}
               instances={props.advanced.annotationEffects?.instances ?? []}
@@ -282,13 +315,14 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
         trackControls={
           <ReviewTimelineTrackControls
+            settings={{ active: configuring, toggle: () => setConfiguring((value) => !value) }}
             props={props}
             webcamVisible={features.webcamTrackVisible}
             density={{ compact, onToggle: () => setCompact((value) => !value) }}
           />
         }
         webcamTrack={
-          features.webcamTrackVisible && props.webcam ? (
+          features.mode === 'advanced' && props.webcam ? (
             <ReviewWebcamTrack
               compact={compact}
               editor={props.webcam}
@@ -298,7 +332,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           ) : null
         }
 
-        {...(features.zoomTrackVisible
+        {...(features.mode === 'advanced'
           ? {
               zoomTrack: (
                 <ReviewZoomLane
@@ -345,7 +379,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           (props.beforeAction ?? ((action) => action()))(() => props.onComment(note))
         }
       />
-    </>
+    </ReviewTrackControlsProvider>
   );
 }
 
@@ -696,14 +730,17 @@ function reviewCursorPlacementHints(props: TimelineBindingProps, focus: string |
 function ReviewTimelineTrackControls({
   props,
   webcamVisible,
+  settings,
   density,
 }: {
   props: TimelineBindingProps;
   webcamVisible: boolean;
+  settings: { active: boolean; toggle(): void };
   density: { compact: boolean; onToggle(): void };
 }) {
   return (
     <ReviewTrackControls
+      settings={settings}
       density={density}
       webcam={
         props.webcam
@@ -763,8 +800,8 @@ function reviewTimelineAudioTrack(
   features: ReturnType<typeof resolveQuickEditEffectiveFeatures>,
   projection: ReviewTrackProjection
 ) {
-  return features.audioTrackVisible ||
-    (features.mode === 'advanced' && props.editing.exporter.index === null) ||
+  return features.mode === 'advanced' ||
+    features.audioTrackVisible ||
     !!props.editing.exporter.index?.audioCodec
     ? {
         audioTrack: (
@@ -780,7 +817,7 @@ function reviewTimelineAudioTrack(
               });
             }}
             onSelectSpeed={props.editing.select}
-            showAddedAudio={features.audioTrackVisible}
+            showAddedAudio={features.mode === 'advanced'}
             hasOriginalAudio={
               props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
             }

@@ -238,7 +238,7 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
   }
 });
 
-it('keeps all compact lane switches quiet while preserving active and focus states', async () => {
+it('keeps track settings quiet while preserving active and focus states', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -247,10 +247,12 @@ it('keeps all compact lane switches quiet while preserving active and focus stat
   advanced.ui.tracks.zoom = true;
   advanced.ui.tracks.audio = true;
   const setTrackVisibility = vi.fn();
+  const toggle = vi.fn();
   try {
     await act(async () =>
       root.render(
         <ReviewTrackControls
+          settings={{ active: true, toggle }}
           advanced={advanced}
           busy={false}
           setMode={vi.fn()}
@@ -259,31 +261,23 @@ it('keeps all compact lane switches quiet while preserving active and focus stat
         />
       )
     );
-    for (const [label, track] of [
-      ['zoomTrack', 'zoom'],
-      ['audioTrack', 'audio'],
-    ] as const) {
-      const button = host.querySelector<HTMLButtonElement>(
-        `[aria-label="${translate(`gallery.videoReview.${label}`)}"]`
-      )!;
-      expect(button.className).not.toContain('enabled:hover:!border-');
-      expect(button.className).toContain('enabled:hover:!text-');
-      expect(button.className).toContain('focus-visible:ring-2');
-      expect(button.getAttribute('aria-pressed')).toBe('true');
-      await act(async () => button.click());
-      expect(setTrackVisibility).toHaveBeenCalledWith(track, false);
-    }
+    const button = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.trackSettings')}"]`
+    )!;
+    expect(button.className).not.toContain('enabled:hover:!border-');
+    expect(button.className).toContain('enabled:hover:!text-');
+    expect(button.className).toContain('focus-visible:ring-2');
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => button.click());
+    expect(toggle).toHaveBeenCalledOnce();
     const mode = host.querySelector<HTMLButtonElement>(
       `[aria-label="${translate('gallery.videoReview.advancedEditing')}"]`
     )!;
     expect(mode.className).not.toContain('enabled:hover:!border-');
-    const history = host.querySelector<HTMLButtonElement>(
-      `[aria-label="${translate('gallery.videoReview.telemetry')}"]`
-    )!;
-    expect(history.className).not.toContain('enabled:hover:!border-');
-    expect(history.className).toContain('focus-visible:ring-2');
-    await act(async () => history.click());
-    expect(setTrackVisibility).toHaveBeenLastCalledWith('actions', false);
+    expect(
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.telemetry')}"]`)
+    ).toBeNull();
+    expect(setTrackVisibility).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

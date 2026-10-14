@@ -13,6 +13,11 @@ import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  trackSettings: { ru: 'Настройка дорожек', en: 'Track settings' },
+  trackEnabled: { ru: 'Включено', en: 'Enabled' },
+  trackLock: { ru: 'Заблокировать', en: 'Lock' },
+  trackUnlock: { ru: 'Разблокировать', en: 'Unlock' },
+  trackUnavailable: { ru: 'Исходный поток отсутствует', en: 'Source stream is unavailable' },
   ...galleryVideoReviewHistoryMessages,
   ...galleryVideoReviewAnimationMessages,
   ...galleryVideoReviewActionAudioMessages,

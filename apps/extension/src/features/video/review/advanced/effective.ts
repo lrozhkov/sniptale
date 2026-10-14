@@ -1,3 +1,4 @@
+import { reviewTrackEnabled } from './track-controls';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import { windowHeaderGeometry } from '../../../browser-frame/header';
 import {
@@ -26,6 +27,10 @@ interface QuickEditEffectiveFeatures {
   actionsTrackVisible: boolean;
   zoomTrackVisible: boolean;
   audioTrackVisible: boolean;
+  textTrackVisible: boolean;
+  originalAudioTrackVisible: boolean;
+  voiceoverTrackVisible: boolean;
+  musicTrackVisible: boolean;
   webcamTrackVisible: boolean;
   annotationEffectsTrackVisible: boolean;
   /** In-frame comments follow the advanced-mode overlay visibility control. */
@@ -57,6 +62,10 @@ export function resolveQuickEditEffectiveFeatures(
     actionsTrackVisible: state.ui.tracks.actions,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
+    textTrackVisible: advanced && reviewTrackEnabled(state.ui, 'text'),
+    originalAudioTrackVisible: reviewTrackEnabled(state.ui, 'originalAudio'),
+    voiceoverTrackVisible: advanced && reviewTrackEnabled(state.ui, 'voiceover'),
+    musicTrackVisible: advanced && reviewTrackEnabled(state.ui, 'music'),
     webcamTrackVisible: advanced && !!state.webcam && state.ui.tracks.webcam !== false,
     webcamApplied: advanced && !!state.webcam?.enabled && state.ui.tracks.webcam !== false,
     annotationEffectsTrackVisible: advanced && state.ui.tracks.annotationEffects !== false,
@@ -71,6 +80,7 @@ export function resolveQuickEditEffectiveFeatures(
         (state.watermark?.mode === 'image' && !!state.watermark.image)),
     captionsApplied:
       advanced &&
+      reviewTrackEnabled(state.ui, 'text') &&
       !!state.captions?.enabled &&
       !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim()),
     presentationApplied: advanced && hasPresentationEffects(state),
@@ -78,9 +88,9 @@ export function resolveQuickEditEffectiveFeatures(
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
-    originalAudioApplied: true,
-    voiceoverApplied: advanced && state.ui.tracks.audio,
-    musicApplied: advanced && state.ui.tracks.audio,
+    originalAudioApplied: reviewTrackEnabled(state.ui, 'originalAudio'),
+    voiceoverApplied: advanced && reviewTrackEnabled(state.ui, 'voiceover'),
+    musicApplied: advanced && reviewTrackEnabled(state.ui, 'music'),
   };
 }
 
@@ -137,7 +147,10 @@ export function resolveQuickEditEffectiveState(
       features.presentationApplied && state.presentation
         ? resolvePresentationSettings(state.presentation)
         : undefined,
-    originalAudio: resolveOriginalSourceAudio(state.audio, features.voiceoverApplied),
+    originalAudio: {
+      ...resolveOriginalSourceAudio(state.audio, features.voiceoverApplied),
+      ...(!features.originalAudioApplied ? { muted: true } : {}),
+    },
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
       state.audio.voiceoverSegments
@@ -321,7 +334,7 @@ export function resolveQuickEditExportPlan(args: {
   if (features.musicApplied && effective.music.length > 0) audio.push('music');
   if (features.actionsApplied && args.actionAudioPresent) audio.push('action-audio');
   if (
-    args.advanced.audio.original.muted ||
+    effective.originalAudio.muted ||
     args.advanced.audio.original.volume !== 1 ||
     effective.originalAudio.ranges?.some(
       (range) =>

@@ -193,9 +193,9 @@ export async function buildReviewExportClipPlan(
       entries,
       buffers,
       ...(action ? { action } : {}),
-      originalVolume: args.advanced.audio.original.volume,
+      originalVolume: effective.originalAudio.volume,
       ...(effective.originalAudio.ranges ? { originalRanges: effective.originalAudio.ranges } : {}),
-      originalMuted: args.advanced.audio.original.muted,
+      originalMuted: effective.originalAudio.muted,
     };
   } catch (error) {
     const primary =

@@ -1,3 +1,4 @@
+import * as sceneCamera from '../../features/video/review/advanced/scene';
 import { quickEditAudioSourceKey } from '../../features/video/review/advanced/audio-plan';
 import { createReviewExportFixture as fixture } from './export-lifecycle.test-support';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -40,6 +41,11 @@ it('rejects a camera plan conflict before audio acquisition, staging, or publica
     ],
   };
   args.index.processedVideoCodec = 'vp8';
+  const conflict = vi
+    .spyOn(sceneCamera, 'resolveReviewCameraConflicts')
+    .mockReturnValueOnce([
+      { regionId: 'too-fast', interval: { start: 0, end: 2 }, time: 0, reason: 'viewport' },
+    ]);
   const before = structuredClone(args.snapshot);
   await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
     reasons: ['camera-follow'],
@@ -50,6 +56,7 @@ it('rejects a camera plan conflict before audio acquisition, staging, or publica
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
   expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
   expect(args.snapshot).toEqual(before);
+  conflict.mockRestore();
 });
 
 it('routes annotation-only fragments with immutable workspace sources and the full main clock', async () => {
@@ -636,3 +643,26 @@ it('copies Basic video with source gain while ignoring stored external audio', a
     vi.unstubAllGlobals();
   }
 });
+
+it.each([false, true])(
+  'mutes disabled original audio in actual export without changing stored gain (fragment %s)',
+  async (fragment) => {
+    const { args, deps } = fixture();
+    args.snapshot.workspace.advanced.ui.tracks.originalAudio = false;
+    const before = structuredClone(args.snapshot);
+    await exportReviewedVideo(
+      {
+        ...args,
+        destination: 'download',
+        ...(fragment ? { selection: { kind: 'range' as const, start: 0, end: 2 } } : {}),
+      },
+      deps
+    );
+    expect(deps.writeReviewPackets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exportAudio: expect.objectContaining({ originalMuted: true, originalVolume: 1 }),
+      })
+    );
+    expect(args.snapshot).toEqual(before);
+  }
+);

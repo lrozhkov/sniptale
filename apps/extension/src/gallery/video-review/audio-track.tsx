@@ -1,3 +1,5 @@
+import { reviewTrackGestureLocked } from './track-row';
+import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
@@ -160,6 +162,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     if (current?.node.hasPointerCapture(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
   }, []);
+  useReviewGestureCancellation(cancelDrag);
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       const current = drag.current;
@@ -200,6 +203,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
   const rowCount = Math.max(1, ...[...rows.values()].map((row) => row + 1));
   return (
     <ReviewTrackRow
+      track={props.lane}
       muted={props.clips.length > 0 && props.clips.every((clip) => clip.muted)}
       label={props.label}
       icon={
@@ -383,6 +387,10 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
     onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0 || props.busy) return;
       event.stopPropagation();
+      if (reviewTrackGestureLocked(event.currentTarget)) {
+        props.onSelect(clip.id);
+        return;
+      }
       const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(clip.id));
       const edge =
         event.target instanceof Element
@@ -528,7 +536,15 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           busy={props.busy}
           onOriginal={props.onOriginal}
         />
-      ) : null}
+      ) : (
+        <ReviewTrackRow
+          placeholder
+          track="originalAudio"
+          label={translate('gallery.videoReview.audioOriginal')}
+        >
+          <div className="h-8" />
+        </ReviewTrackRow>
+      )}
       {props.showAddedAudio !== false ? (
         <ReviewClipLanes
           beforeAction={props.beforeAction}

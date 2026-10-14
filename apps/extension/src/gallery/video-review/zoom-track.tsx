@@ -1,3 +1,4 @@
+import { reviewTrackGestureLocked } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import {
   packQuickEditFocusRows,
@@ -213,6 +214,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   }, [edits, time, toOutputTime, duration]);
   return (
     <ReviewTrackRow
+      track="zoom"
       muted={props.enabled === false}
       label={translate('gallery.videoReview.zoomTrack')}
       icon={<Focus size={14} aria-hidden="true" />}
@@ -515,6 +517,10 @@ function ReviewZoomRegionBlock(
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
+    if (reviewTrackGestureLocked(event.currentTarget)) {
+      props.onSelect(region.id);
+      return;
+    }
     const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(region.id));
     const target = event.target;
     const edge =

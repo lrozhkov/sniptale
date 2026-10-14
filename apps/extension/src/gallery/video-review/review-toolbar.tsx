@@ -23,8 +23,7 @@ import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import {
   Activity,
-  AudioLines,
-  Camera,
+  Settings2,
   Focus,
   PanelsTopLeft,
   Volume2,
@@ -276,6 +275,7 @@ function ReviewModeControl(props: {
 /** Compact lane switches live in the sticky gutter beside the time ruler. */
 export function ReviewTrackControls(props: {
   density?: { compact: boolean; onToggle(): void };
+  settings?: { active: boolean; toggle(): void };
   webcam?: { available: boolean; enabled: boolean; toggle(): void } | undefined;
   advanced: QuickEditAdvancedState;
   telemetryAvailable: boolean;
@@ -290,7 +290,7 @@ export function ReviewTrackControls(props: {
     <fieldset
       disabled={props.busy}
       data-ui="gallery.videoReview.trackControls"
-      className="flex items-center gap-1"
+      className="flex w-full items-center justify-end gap-1"
     >
       {features.mode === 'advanced' ? (
         <>
@@ -300,37 +300,14 @@ export function ReviewTrackControls(props: {
             setMode={props.setMode}
             compact
           />
-          <ReviewHistoryTrackControl {...props} compact />
-        </>
-      ) : null}
-      {features.mode === 'advanced' ? (
-        <>
           <ReviewButton
-            label={translate('gallery.videoReview.zoomTrack')}
-            aria-pressed={features.zoomTrackVisible}
+            label={translate('gallery.videoReview.trackSettings')}
+            aria-pressed={props.settings?.active ?? false}
             className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
-            onClick={() => props.setTrackVisibility('zoom', !advanced.ui.tracks.zoom)}
+            onClick={props.settings?.toggle}
           >
-            <Focus size={14} aria-hidden="true" />
+            <Settings2 size={14} aria-hidden />
           </ReviewButton>
-          <ReviewButton
-            label={translate('gallery.videoReview.audioTrack')}
-            aria-pressed={features.audioTrackVisible}
-            className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
-            onClick={() => props.setTrackVisibility('audio', !advanced.ui.tracks.audio)}
-          >
-            <AudioLines size={14} aria-hidden="true" />
-          </ReviewButton>
-          {props.webcam?.available ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.webcam')}
-              aria-pressed={props.webcam.enabled}
-              className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
-              onClick={props.webcam.toggle}
-            >
-              <Camera size={14} aria-hidden />
-            </ReviewButton>
-          ) : null}
         </>
       ) : null}
       {props.density ? <ReviewTrackHeightButton {...props.density} /> : null}

@@ -94,11 +94,17 @@ it.each(['overlays', 'zoom', 'audio', 'annotationEffects'] as const)(
       if (toggle === 'overlays') updated.ui.overlaysVisible = !updated.ui.overlaysVisible;
       else updated.ui.tracks[toggle] = !updated.ui.tracks[toggle];
       await act(async () => {
-        await resource.session.saveAdvanced(updated);
+        if (toggle === 'overlays') await resource.session.saveAdvanced(updated);
+        else
+          await resource.session.setTrackControl(toggle, {
+            enabled: updated.ui.tracks[toggle] !== false,
+          });
         root.render(<Harness />);
       });
       expect(resource.session.getSnapshot().snapshot.workspace.revision).toBe(1);
-      expect(resource.session.getSnapshot().document).toEqual(originalDocument);
+      expect(resource.session.getSnapshot().document.annotations).toEqual(
+        originalDocument.annotations
+      );
       expect(state.status?.kind).toBe('pending');
       adaptive = true;
       await act(async () => root.render(<Harness />));
@@ -109,7 +115,9 @@ it.each(['overlays', 'zoom', 'audio', 'annotationEffects'] as const)(
       await act(async () => root.render(<Harness />));
       await act(async () => vi.advanceTimersByTimeAsync(1000));
       expect(mocks.estimate).toHaveBeenCalledTimes(2);
-      expect(mocks.estimate.mock.lastCall?.[0].advanced.ui).toEqual(updated.ui);
+      expect(mocks.estimate.mock.lastCall?.[0].advanced.ui).toEqual(
+        resource.session.getSnapshot().snapshot.workspace.advanced.ui
+      );
       expect(state.status?.kind).toBe('ready');
       adaptive = true;
       await act(async () => root.render(<Harness />));

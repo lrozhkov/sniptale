@@ -62,6 +62,58 @@ beforeEach(() => {
   harness.database.mockResolvedValue(fixture.database);
 });
 
+it('moves masters with durable Undo, Redo and start while retaining locks and retrying refusal', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
+  const disabled = { ...before, actionsEnabled: false };
+  const saved = await saveVideoWorkspaceSnapshot({
+    aggregateId: id,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedRevision: opened.workspace.revision,
+    expectedDraftRevision: null,
+    workspace: {
+      ...opened.workspace,
+      advanced: {
+        ...opened.workspace.advanced,
+        ui: { ...opened.workspace.advanced.ui, lockedTracks: { actions: true } },
+      },
+      history: [
+        { id: 'off', at: 1, target: 'advancedContent', before, after: disabled },
+        { id: 'on', at: 2, target: 'advancedContent', before: disabled, after: before },
+      ],
+      cursor: 2,
+    },
+    draft: null,
+  });
+  const request = {
+    aggregateId: id,
+    expectedSourceAssetId: saved.workspace.sourceAssetId,
+    expectedRevision: saved.workspace.revision,
+    direction: 'undo' as const,
+  };
+  harness.failure = true;
+  await expect(moveVideoWorkspaceHistory(request)).rejects.toThrow();
+  expect(await readVideoWorkspace(id)).toEqual(saved);
+  harness.failure = false;
+  const undone = await moveVideoWorkspaceHistory(request);
+  expect(undone.workspace.advanced.ui.tracks.actions).toBe(false);
+  const redone = await moveVideoWorkspaceHistory({
+    ...request,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(redone.workspace.advanced.ui.tracks.actions).toBe(true);
+  const start = await moveVideoWorkspaceHistory({
+    ...request,
+    expectedRevision: redone.workspace.revision,
+    direction: 'start',
+  });
+  expect(start.workspace.cursor).toBe(0);
+  expect(start.workspace.advanced.ui.tracks.actions).toBe(true);
+  expect(start.workspace.advanced.ui.lockedTracks?.actions).toBe(true);
+  expect((await openVideoWorkspace(id, source)).workspace).toEqual(start.workspace);
+});
+
 it('reopens exactly one durable history and rejects missing, malformed or changed media', async () => {
   const opened = await openVideoWorkspace(id, source);
   expect(opened.workspace.revision).toBe(1);
@@ -319,7 +371,12 @@ it('rejects a stale tab after restore even when imported history has the same nu
     advanced: {
       ...opened.workspace.advanced,
       canvas: restoredCanvas,
-      ui: { ...opened.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },
+      ui: {
+        ...opened.workspace.advanced.ui,
+        workspaceColors: { dark: '#123456ff' },
+        lockedTracks: { source: true },
+        tracks: { ...opened.workspace.advanced.ui.tracks, originalAudio: false },
+      },
     },
   });
   await expect(
@@ -877,6 +934,8 @@ it('preserves workspace colors against a parallel stale UI writer and through re
     ui: {
       ...opened.workspace.advanced.ui,
       workspaceColors: { light: '#abcdefff', dark: '#123456ff' },
+      lockedTracks: { source: true, music: true },
+      tracks: { ...opened.workspace.advanced.ui.tracks, originalAudio: false, music: true },
     },
   };
   const request = {
@@ -890,6 +949,6 @@ it('preserves workspace colors against a parallel stale UI writer and through re
     saveVideoWorkspaceAdvanced({ ...request, advanced: opened.workspace.advanced })
   ).rejects.toMatchObject({ code: 'conflict' });
   const reopened = await openVideoWorkspace(id, source);
-  expect(reopened.workspace.advanced.ui.workspaceColors).toEqual(advanced.ui.workspaceColors);
+  expect(reopened.workspace.advanced.ui).toEqual(advanced.ui);
   expect(reopened.workspace.history).toEqual([]);
 });

@@ -1,4 +1,5 @@
 import { materializeVideoWorkspaceProject } from './project-metadata';
+import { moveReviewWorkspaceCursor } from './history-cursor';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import {
   buildPhysicalDeleteOperation,
@@ -665,7 +666,7 @@ export async function moveVideoWorkspaceHistory(args: {
       workspace: await putWorkspace(
         tx,
         snapshot.workspace,
-        { ...snapshot.workspace, cursor },
+        moveReviewWorkspaceCursor(snapshot.workspace, cursor),
         storage,
         'cursor',
         physicalDelete

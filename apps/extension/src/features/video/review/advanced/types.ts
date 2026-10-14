@@ -3,12 +3,27 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 22;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 23;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
 
+export type QuickEditTrack =
+  | 'source'
+  | 'actions'
+  | 'zoom'
+  | 'text'
+  | 'annotationEffects'
+  | 'webcam'
+  | 'originalAudio'
+  | 'voiceover'
+  | 'music';
+
 export interface QuickEditTrackVisibility {
+  text?: boolean;
+  originalAudio?: boolean;
+  voiceover?: boolean;
+  music?: boolean;
   actions: boolean;
   webcam?: boolean;
   annotationEffects?: boolean;
@@ -23,6 +38,7 @@ export interface QuickEditUiState {
   /** First entry reveals editing lanes; later mode switches preserve their settings. */
   advancedTracksInitialized?: boolean;
   tracks: QuickEditTrackVisibility;
+  lockedTracks?: Partial<Record<QuickEditTrack, boolean>>;
   /** Editor-only overlay display; the data and the export flag are untouched. */
   overlaysVisible: boolean;
 }

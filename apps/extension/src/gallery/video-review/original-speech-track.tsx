@@ -1,3 +1,4 @@
+import { reviewTrackGestureLocked } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { Captions, List, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -43,6 +44,7 @@ export function ReviewTextTrack(props: TextTrackProps) {
   const duration = Math.max(0.01, props.editor.projection.duration);
   return (
     <ReviewTrackRow
+      track="text"
       label={translate('gallery.videoReview.textTrack')}
       icon={<Captions size={14} aria-hidden />}
       controls={
@@ -172,6 +174,10 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
   const start = (event: React.PointerEvent<HTMLDivElement>, fragment: ReviewTextFragment) => {
     if (props.busy || event.button !== 0) return;
     event.stopPropagation();
+    if (reviewTrackGestureLocked(event.currentTarget)) {
+      props.onSelect(fragment.id);
+      return;
+    }
     const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
     if (!bounds || bounds.width <= 0) return;
     const edge =

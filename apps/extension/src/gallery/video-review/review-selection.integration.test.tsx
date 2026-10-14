@@ -21,6 +21,7 @@ const integration = vi.hoisted(() => ({
   history: vi.fn(),
   read: vi.fn(),
   advanced: vi.fn(),
+  snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
 }));
@@ -44,6 +45,7 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   >()),
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
+  saveVideoWorkspaceSnapshot: integration.snapshot,
   commitVideoWorkspace: integration.commit,
   commitVideoWorkspaceWithProjection: async (
     args: Parameters<typeof commitVideoWorkspaceWithProjection>[0]

@@ -74,7 +74,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
   const toggle = async () => {
     if (!latest.current.allowed() || acquisition.busy()) return;
     if (!camera) return acquisition.attach();
-    mutate((current) => ({ ...current, enabled: !current.enabled }));
+    await latest.current.advanced.setTrackVisibility('webcam', !camera.enabled);
     if (!camera.enabled) choose({ kind: 'webcam' });
   };
   const selectedPosition = camera?.positions.find(
@@ -263,7 +263,8 @@ function useReviewWebcamAcquisition(
           },
         });
       if (!abort.signal.aborted && !recoverAssetId) {
-        latest.current.advanced.setTrackVisibility('webcam', true);
+        if (latest.current.advanced.advanced.ui.tracks.webcam === false)
+          await latest.current.advanced.setTrackVisibility('webcam', true);
         latest.current.select({ kind: 'webcam' });
       }
     } catch {

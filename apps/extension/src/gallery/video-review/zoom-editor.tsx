@@ -297,6 +297,7 @@ function applyZoomCommit(
 }
 
 type ZoomEditorArgs = {
+  setEnabled?(enabled: boolean): void;
   setZoom(update: (zoom: ZoomState) => ZoomState): void;
   zoom: ZoomState;
   timelineDuration: number;
@@ -500,7 +501,10 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
       ),
     preview,
     previewRegion,
-    toggleEnabled: () => args.setZoom((zoom) => ({ ...zoom, enabled: !zoom.enabled })),
+    toggleEnabled: () =>
+      args.setEnabled
+        ? args.setEnabled(!args.zoom.enabled)
+        : args.setZoom((zoom) => ({ ...zoom, enabled: !zoom.enabled })),
   };
 }
 

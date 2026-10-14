@@ -519,11 +519,12 @@ function reviewAdvancedControls(
         advancedState.setMode(mode);
       }),
     setTrackVisibility: advancedState.setTrackVisibility,
+    setTrackLocked: advancedState.setTrackLocked,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setWorkspaceColor: advancedState.setWorkspaceColor,
     setKeyAnimations: advancedState.setKeyAnimations,
     setActionAudio: advancedState.setActionAudio,
-    setActionsEnabled: advancedState.setActionsEnabled,
+    setActionsEnabled: (enabled: boolean) => advancedState.setTrackVisibility('actions', enabled),
     setClickAnimations: advancedState.setClickAnimations,
     setBackground: advancedState.setBackground,
     backgroundPreview: advancedState.backgroundPreview,

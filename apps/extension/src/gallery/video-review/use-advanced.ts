@@ -1,6 +1,10 @@
+import { useTrackControlRequests } from './use-track-control-requests';
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type {
+  QuickEditAdvancedState,
+  QuickEditTrack,
+} from '../../features/video/review/advanced/types';
 import { useReviewAdvancedContent } from './use-advanced-content';
 import { useReviewSnapshot } from './use-session';
 
@@ -71,9 +75,22 @@ export function useReviewAdvanced(session: Session) {
     },
     [session]
   );
+  const controls = useTrackControlRequests({
+    prepare: async () => {
+      contentState.endTyping();
+      await contentState.flush();
+      await flush();
+    },
+    execute: async (...request) => {
+      await session.setTrackControl(...request);
+      currentRef.current = session.getSnapshot().snapshot.workspace.advanced;
+    },
+    mounted,
+  });
   useRecoveryLifecycle(flush, mounted);
   const reset = useCallback(() => {
     generation.current += 1;
+    controls.reset();
     session.cancelAutosave('advanced');
     pending.current = null;
     currentRef.current = session.getSnapshot().snapshot.workspace.advanced;
@@ -83,7 +100,7 @@ export function useReviewAdvanced(session: Session) {
       setOptimistic(null);
       setSaveFailed(false);
     }
-  }, [contentState, session]);
+  }, [contentState, controls, session]);
   const content = contentState.content;
   const advanced = useMemo<QuickEditAdvancedState>(() => {
     const {
@@ -117,12 +134,19 @@ export function useReviewAdvanced(session: Session) {
         : null,
     previewBackground: (value: QuickEditAdvancedState['background'] | null) =>
       setBackgroundGesture(value ? { session, base: content.background, value } : null),
-    saveFailed: saveFailed || contentState.saveFailed,
-    pending: optimistic !== null || contentState.pending,
+    saveFailed: saveFailed || contentState.saveFailed || controls.failed,
+    pending: optimistic !== null || contentState.pending || controls.pending,
     endTyping: contentState.endTyping,
-    retry: () => Promise.all([flush(), contentState.flush()]),
+    retry: async () => {
+      if (controls.failed) await controls.retry();
+      else await Promise.all([flush(), contentState.flush()]);
+    },
     ...reviewAdvancedUiCommands(stage, () => currentRef.current, contentState.commands),
+    setTrackVisibility: (track: Exclude<QuickEditTrack, 'source'> | 'audio', enabled: boolean) =>
+      controls.change(track, { enabled }),
+    setTrackLocked: (track: QuickEditTrack, locked: boolean) => controls.change(track, { locked }),
     flush: async () => {
+      await controls.drain();
       contentState.endTyping();
       await flush();
       await contentState.flush();
@@ -157,17 +181,6 @@ function reviewAdvancedUiCommands(
             ? { ...current.ui.tracks, zoom: true, audio: true }
             : current.ui.tracks,
         },
-      }));
-    },
-    setTrackVisibility: (track: 'actions' | 'zoom' | 'audio' | 'webcam', visible: boolean) => {
-      if (track === 'actions' && current().ui.mode === 'advanced')
-        commands.setActionsEnabled(visible);
-      if (track === 'zoom') commands.setZoom((zoom) => ({ ...zoom, enabled: visible }));
-      if (track === 'webcam')
-        commands.setWebcam((camera) => (camera ? { ...camera, enabled: visible } : camera));
-      stage((current) => ({
-        ...current,
-        ui: { ...current.ui, tracks: { ...current.ui.tracks, [track]: visible } },
       }));
     },
     setWorkspaceColor: (theme: 'light' | 'dark', color: string | null) =>

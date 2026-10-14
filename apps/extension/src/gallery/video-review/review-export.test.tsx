@@ -16,6 +16,7 @@ const integration = vi.hoisted(() => ({
   history: vi.fn(),
   read: vi.fn(),
   advanced: vi.fn(),
+  snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
   openGallery: vi.fn(async () => undefined),
@@ -45,6 +46,7 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (original
   ...(await original<typeof import('../../composition/persistence/review-workspaces/store')>()),
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
+  saveVideoWorkspaceSnapshot: integration.snapshot,
   commitVideoWorkspace: integration.commit,
   commitVideoWorkspaceWithProjection: async (
     args: Parameters<
@@ -149,7 +151,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await fixture.click('exportSection');
     expect(fixture.button('cancelExport').disabled).toBe(false);
     expect(fixture.button('undo').disabled).toBe(true);
-    for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack'])
+    for (const label of ['advancedEditing', 'trackSettings'])
       expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();

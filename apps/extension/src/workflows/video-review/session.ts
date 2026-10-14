@@ -1,3 +1,12 @@
+import { VideoWorkspaceError } from '../../composition/persistence/review-workspaces/store';
+import {
+  assertReviewTracksEditable,
+  changedReviewContentTracks,
+  changedReviewDocumentTracks,
+  ReviewTrackLockedError,
+  withReviewTrackEnabled,
+} from '../../features/video/review/advanced/track-controls';
+import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import { reviewSessionPersistence } from './session-durable-access';
 import { createReviewAutosaveCaptures } from './session-autosave-captures';
 import type {
@@ -34,7 +43,10 @@ import type {
   ReviewAnnotationEffectSnapshot,
 } from '../../features/video/review/annotation-effects/types';
 import type { QuickEditAdvancedContent } from '../../features/video/review/advanced/types';
-import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
+import {
+  loadQuickEditAdvancedContentState,
+  loadQuickEditAdvancedState,
+} from '../../features/video/review/advanced/validation';
 import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
 import { collectReviewAssetReferences } from '../../composition/persistence/review-workspaces/asset-refs';
@@ -117,7 +129,10 @@ class VideoReviewSession {
       },
       capture: (key) => this.captures.capture(key),
       commit: (captured) => this.commitAutosaveCapture(captured),
-      classifyFailure: (error) => (failureCode(error) === 'storage' ? 'retry' : 'stop'),
+      classifyFailure: (error) =>
+        error instanceof ReviewTrackLockedError || failureCode(error) === 'storage'
+          ? 'retry'
+          : 'stop',
     });
   }
 
@@ -135,6 +150,8 @@ class VideoReviewSession {
       setAutosaveEnabled: this.setAutosaveEnabled.bind(this),
       subscribe: this.subscribe.bind(this),
       saveAdvanced: this.saveAdvanced.bind(this),
+      setTrackControl: this.setTrackControl.bind(this),
+      assertContentEditable: this.assertContentEditable.bind(this),
       saveDraft: this.saveDraft.bind(this),
       commit: this.commit.bind(this),
       applyAnnotationEffect: this.applyAnnotationEffect.bind(this),
@@ -168,6 +185,7 @@ class VideoReviewSession {
   ) {
     let attempt = this.typingAttempts.get(captured);
     if (!attempt) {
+      this.assertContentEditable(this.state.document.advancedContent, content);
       const change = parseVideoWorkspaceTypingChange({
         ...typing,
         at: Date.now(),
@@ -247,6 +265,9 @@ class VideoReviewSession {
   ) {
     try {
       if (this.disposed) throw new Error('Review session is closed.');
+      if (local?.kind === 'advanced')
+        local = { ...local, advanced: this.prepareAdvancedUi(local.advanced) };
+      if (local) this.assertLocalEditable(local);
       if (local && (!this.state.autosaveEnabled || (this.state.dirty && local.kind !== 'reset'))) {
         const snapshot = applyLocalReviewChange(this.state.snapshot, local);
         this.state = {
@@ -301,6 +322,7 @@ class VideoReviewSession {
       }
       return snapshot;
     } catch (error) {
+      if (error instanceof ReviewTrackLockedError) throw error;
       this.failedHistory = local?.kind === 'history';
       if (!speechSaveKey || !this.state.error || this.failedSpeechSave === speechSaveKey)
         this.failedSpeechSave = speechSaveKey;
@@ -416,7 +438,14 @@ class VideoReviewSession {
           if (recovered) return recovered;
         }
         // Admission uses the current queue state; a target changed while waiting cannot be overwritten.
-        prepareReviewSpeechPublication(this.state.snapshot, this.state.document, captured, receipt);
+        const prepared = prepareReviewSpeechPublication(
+          this.state.snapshot,
+          this.state.document,
+          captured,
+          receipt
+        );
+        if (prepared)
+          this.assertLocalEditable({ kind: 'commit', operation: prepared, consumeDraft: false });
         await this.persistBuffer();
         const operation = prepareReviewSpeechPublication(
           this.state.snapshot,
@@ -477,7 +506,7 @@ class VideoReviewSession {
           () =>
             this.deps.saveVideoWorkspaceAdvanced({
               ...reviewWriteIdentity(this.state.snapshot),
-              advanced: change.advanced,
+              advanced: this.prepareAdvancedUi(change.advanced),
             }),
           change
         );
@@ -533,13 +562,104 @@ class VideoReviewSession {
     };
   }
 
+  private assertContentEditable(before: QuickEditAdvancedContent, after: QuickEditAdvancedContent) {
+    if (!Object.values(this.state.snapshot.workspace.advanced.ui.lockedTracks ?? {}).some(Boolean))
+      return;
+    assertReviewTracksEditable(
+      this.state.snapshot.workspace.advanced.ui,
+      changedReviewContentTracks(before, after)
+    );
+  }
+
+  private assertLocalEditable(change: LocalReviewChange) {
+    if (change.kind === 'history' || change.kind === 'draft') return;
+    const ui = this.state.snapshot.workspace.advanced.ui;
+    if (!Object.values(ui.lockedTracks ?? {}).some(Boolean)) return;
+    const next = applyLocalReviewChange(this.state.snapshot, change);
+    assertReviewTracksEditable(
+      ui,
+      changedReviewDocumentTracks(this.state.document, projectReviewWorkspace(next))
+    );
+  }
+
+  /** Callers drain accepted field captures before enqueueing a lane control transition. */
+  private setTrackControl(
+    track: QuickEditTrack | 'audio',
+    control: { enabled: boolean } | { locked: boolean }
+  ) {
+    return this.enqueue(async () => {
+      let next = this.state.snapshot;
+      const current = { ...next.workspace.advanced, ...this.state.document.advancedContent };
+      if ('enabled' in control) {
+        if (track === 'source') return next;
+        const advanced = withReviewTrackEnabled(current, track, control.enabled);
+        const { ui: _ui, recoveryV1: _recovery, ...content } = advanced;
+        const operation = createReviewAdvancedContentOperation({
+          id: crypto.randomUUID(),
+          at: Date.now(),
+          before: this.state.document.advancedContent,
+          after: content,
+        });
+        if (operation)
+          next = applyLocalReviewChange(next, { kind: 'commit', operation, consumeDraft: false });
+        next = {
+          ...next,
+          workspace: {
+            ...next.workspace,
+            advanced: { ...next.workspace.advanced, ui: advanced.ui },
+          },
+        };
+      } else {
+        if (track === 'audio') throw new Error('A grouped audio lock is not supported.');
+        next = {
+          ...next,
+          workspace: {
+            ...next.workspace,
+            advanced: {
+              ...next.workspace.advanced,
+              ui: {
+                ...current.ui,
+                lockedTracks: { ...current.ui.lockedTracks, [track]: control.locked },
+              },
+            },
+          },
+        };
+      }
+      this.state = {
+        ...this.state,
+        snapshot: next,
+        document: projectReviewWorkspace(next),
+        dirty: true,
+      };
+      return this.state.autosaveEnabled ? this.persistBuffer() : next;
+    });
+  }
+
+  /** Delayed chrome captures cannot overwrite lane controls owned by ordered session commands. */
+  private prepareAdvancedUi(raw: unknown) {
+    const advanced = loadQuickEditAdvancedState(raw);
+    if (!advanced) throw new VideoWorkspaceError('invalid');
+    const current = this.state.snapshot.workspace.advanced.ui;
+    const { lockedTracks: _capturedLocks, ...ui } = advanced.ui;
+    const firstEntry =
+      current.mode === 'basic' && ui.mode === 'advanced' && !current.advancedTracksInitialized;
+    return {
+      ...advanced,
+      ui: {
+        ...ui,
+        ...(current.lockedTracks ? { lockedTracks: current.lockedTracks } : {}),
+        tracks: firstEntry ? advanced.ui.tracks : current.tracks,
+      },
+    };
+  }
+
   private saveAdvanced(advanced: unknown) {
     const captured = structuredClone(advanced);
     return this.enqueue(
       () =>
         this.deps.saveVideoWorkspaceAdvanced({
           ...reviewWriteIdentity(this.state.snapshot),
-          advanced: captured,
+          advanced: this.prepareAdvancedUi(captured),
         }),
       { kind: 'advanced', advanced: captured }
     );
@@ -603,6 +723,10 @@ class VideoReviewSession {
         consumeDraft: false,
         effectSnapshots: [captured.snapshot],
       });
+      assertReviewTracksEditable(
+        this.state.snapshot.workspace.advanced.ui,
+        changedReviewDocumentTracks(this.state.document, projectReviewWorkspace(snapshot))
+      );
       this.annotationResources.admit(
         resources,
         new Set(captured.snapshot.assets.map((asset) => asset.assetId))
@@ -717,6 +841,7 @@ class VideoReviewSession {
   private commitDurable(operation: ReviewOperation, onAttempt?: (revision: number) => void) {
     const captured = structuredClone(operation);
     return this.enqueue(async () => {
+      this.assertLocalEditable({ kind: 'commit', operation: captured, consumeDraft: false });
       await this.persistBuffer();
       onAttempt?.(this.state.snapshot.workspace.revision);
       const baseRevision = this.state.snapshot.workspace.revision;

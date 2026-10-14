@@ -1,3 +1,5 @@
+import { moveReviewWorkspaceCursor } from '../../composition/persistence/review-workspaces/history-cursor';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
@@ -38,6 +40,7 @@ interface EditorFixtureIntegration {
   history: ReturnType<typeof vi.fn>;
   read: ReturnType<typeof vi.fn>;
   advanced: ReturnType<typeof vi.fn>;
+  snapshot?: ReturnType<typeof vi.fn>;
   download: ReturnType<typeof vi.fn>;
   export: ReturnType<typeof vi.fn>;
 }
@@ -156,6 +159,17 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
       return structuredClone(snapshot);
     }
   );
+  integration.snapshot?.mockImplementation(
+    async (args: { workspace: unknown; draft: VideoWorkspaceSnapshot['draft'] }) => {
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace) throw new Error('Invalid fixture workspace.');
+      snapshot = {
+        workspace: { ...workspace, revision: snapshot.workspace.revision + 1 },
+        draft: args.draft,
+      };
+      return structuredClone(snapshot);
+    }
+  );
   integration.commit.mockImplementation(
     async (args: Parameters<typeof commitVideoWorkspace>[0]) => {
       snapshot = {
@@ -179,11 +193,12 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
       snapshot = {
         ...snapshot,
         workspace: {
-          ...snapshot.workspace,
-          cursor:
+          ...moveReviewWorkspaceCursor(
+            snapshot.workspace,
             args.direction === 'start'
               ? 0
-              : snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1),
+              : snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1)
+          ),
           revision: snapshot.workspace.revision + 1,
         },
       };

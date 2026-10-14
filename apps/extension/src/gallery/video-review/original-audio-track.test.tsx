@@ -421,7 +421,8 @@ it('shows zero master volume as muted and restores actual playback through posit
     const video = f.host.querySelector('video')!;
     const volume = f.host.querySelector<HTMLInputElement>(
       `input[aria-label="${translate('gallery.videoReview.sourceAudioVolume')}"]`
-    )!;
+    );
+    expect(volume).toBeNull();
     act(() => f.editor.setOriginal({ volume: 0 }));
     expect(video.muted).toBe(true);
     expect(control.getAttribute('aria-pressed')).toBe('false');
@@ -430,24 +431,15 @@ it('shows zero master volume as muted and restores actual playback through posit
     expect(video.volume).toBe(0.4);
     act(() => control.click());
     expect(video.muted).toBe(true);
-    expect(volume.value).toBe('0');
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(volume, '70');
-      volume.dispatchEvent(new Event('input', { bubbles: true }));
-      volume.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    act(() => volume.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    act(() => f.editor.setOriginal({ volume: 0.7, muted: false }));
     expect(control.getAttribute('aria-pressed')).toBe('true');
-    expect(volume.value).toBe('70');
     expect(video.muted).toBe(false);
     expect(video.volume).toBe(0.7);
     act(() => control.click());
     expect(control.title).toBe(translate('gallery.videoReview.restoreSourceAudio'));
     expect(f.lane.dataset['audioMuted']).toBe('true');
-    expect(volume.value).toBe('0');
     act(() => control.click());
     expect(video.volume).toBe(0.7);
-    expect(volume.value).toBe('70');
     expect(control.title).toBe(translate('gallery.videoReview.muteSourceAudio'));
     act(() => f.editor.setOriginal({ volume: 0 }));
     act(() => control.click());

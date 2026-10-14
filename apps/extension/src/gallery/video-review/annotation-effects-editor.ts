@@ -297,7 +297,11 @@ export function useReviewAnnotationEffects(
     add,
     change,
     enabled: (enabled: boolean) => {
-      if (!draft.current) void mutate((lane) => ({ enabled, instances: lane?.instances ?? [] }));
+      if (!draft.current)
+        void execute(async (owner) => {
+          await owner.flush();
+          await owner.session.setTrackControl('annotationEffects', { enabled });
+        });
     },
     remove: (id: string) => {
       if (draft.current) cancelGesture();

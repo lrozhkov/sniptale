@@ -248,6 +248,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
                   : undefined
               }
               setTrackVisibility={state.setTrackVisibility}
+              setTrackLocked={state.setTrackLocked}
               setMode={state.setMode}
               telemetryAvailable={state.projected.markers.length > 0}
               time={state.time}

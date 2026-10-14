@@ -1,3 +1,4 @@
+import { reviewTrackGestureLocked } from './track-row';
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Camera, Eye, EyeOff, Settings2 } from 'lucide-react';
@@ -51,7 +52,17 @@ export function ReviewWebcamTrack(props: {
       drag.current?.admission.cancel();
     };
   }, []);
-  if (!camera) return null;
+  if (!camera)
+    return (
+      <ReviewTrackRow
+        placeholder
+        track="webcam"
+        label={translate('gallery.videoReview.webcam')}
+        icon={<Camera size={14} aria-hidden />}
+      >
+        <div className="h-8" />
+      </ReviewTrackRow>
+    );
   const admit = props.beforeAction ?? ((action: () => void) => action());
   const timeAt = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -69,6 +80,7 @@ export function ReviewWebcamTrack(props: {
   };
   return (
     <ReviewTrackRow
+      track="webcam"
       muted={!camera.enabled}
       label={translate('gallery.videoReview.webcam')}
       icon={<Camera size={14} aria-hidden />}
@@ -103,6 +115,10 @@ export function ReviewWebcamTrack(props: {
             (event.target instanceof Element && event.target.closest('button'))
           )
             return;
+          if (reviewTrackGestureLocked(event.currentTarget)) {
+            editor.select({ kind: 'webcam' });
+            return;
+          }
           const start = timeAt(event);
           const admission = deferReviewGesture(props.beforeAction, () =>
             editor.select({ kind: 'webcam' })

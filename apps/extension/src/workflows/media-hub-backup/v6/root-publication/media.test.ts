@@ -688,7 +688,16 @@ it('retains imported quick-edit recording and mirror without clearing source Tra
             cursor: 0,
             advanced: {
               ...createQuickEditAdvancedState(),
-              ui: { ...createQuickEditAdvancedState().ui, workspaceColors: { dark: '#123456ff' } },
+              ui: {
+                ...createQuickEditAdvancedState().ui,
+                workspaceColors: { dark: '#123456ff' },
+                lockedTracks: { source: true },
+                tracks: {
+                  ...createQuickEditAdvancedState().ui.tracks,
+                  originalAudio: false,
+                  music: true,
+                },
+              },
             },
             createdAt: 1,
             updatedAt: 2,
@@ -727,6 +736,12 @@ it('retains imported quick-edit recording and mirror without clearing source Tra
     id
   );
   expect(restored.logical).toMatchObject({
-    advanced: { ui: { workspaceColors: { dark: '#123456ff' } } },
+    advanced: {
+      ui: {
+        workspaceColors: { dark: '#123456ff' },
+        lockedTracks: { source: true },
+        tracks: { originalAudio: false, music: true },
+      },
+    },
   });
 });

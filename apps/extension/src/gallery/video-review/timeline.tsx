@@ -11,7 +11,7 @@ import type { ReviewClickAnimation } from '../../features/video/review/advanced/
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity, Search, Filter, Eye, EyeOff, Clock } from 'lucide-react';
+import { Activity, Search, Filter, Eye, EyeOff } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
@@ -88,6 +88,7 @@ type TimelineProps = {
   selectedCursorFocusId?: string;
   onCursorFocusKey?(key: CursorFocusTimelineKey): void;
   onAddCursorFocusKey?(time: number): void;
+  actionsTrackVisible?: boolean;
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
 };
@@ -99,7 +100,7 @@ export function ReviewTimeline(props: TimelineProps) {
   const { viewport, gutter, width } = useReviewTimelineGeometry(
     audioVisible,
     zoomVisible,
-    props.markers.length
+    props.actionsTrackVisible === false ? 0 : props.markers.length
   );
   const { zoom, navigation, navigate, onZoom, wheelTarget } = useReviewTimelineNavigation(props, {
     viewport,
@@ -249,10 +250,13 @@ export function ReviewTimeline(props: TimelineProps) {
 
 /** The small viewport budget includes transport, sticky ruler, all history rows and scrollbar. */
 function reviewTimelineHeightClass(
-  props: Pick<TimelineProps, 'fillHeight' | 'markers' | 'onAddCursorFocusKey'>
+  props: Pick<
+    TimelineProps,
+    'fillHeight' | 'markers' | 'onAddCursorFocusKey' | 'actionsTrackVisible'
+  >
 ) {
   if (props.fillHeight) return 'h-full';
-  return props.markers.length || props.onAddCursorFocusKey
+  return props.actionsTrackVisible !== false && (props.markers.length || props.onAddCursorFocusKey)
     ? 'max-h-[max(160px,min(42dvh,calc(100dvh-420px)))]'
     : 'max-h-[min(42dvh,calc(100dvh-420px))]';
 }
@@ -263,6 +267,7 @@ function ReviewTimelineEvents(
     TimelineProps,
     | 'markers'
     | 'captureCapabilities'
+    | 'actionsTrackVisible'
     | 'cursorFocusKeys'
     | 'selectedCursorFocusId'
     | 'onCursorFocusKey'
@@ -286,38 +291,15 @@ function ReviewTimelineEvents(
   const markers = animatedOnly
     ? props.markers.filter((marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id))
     : props.markers;
-  return props.markers.length || props.onAddCursorFocusKey ? (
+  return props.actionsTrackVisible !== false &&
+    (props.markers.length || props.onAddCursorFocusKey) ? (
     <ReviewTrackRow
+      track="actions"
       muted={props.actionsEnabled === false}
       label={translate('gallery.videoReview.telemetry')}
       icon={<Activity size={14} aria-hidden="true" />}
       controls={
         <>
-          {props.captureCapabilities?.timing?.mode === 'approximate' ? (
-            <span
-              data-ui="history.timing"
-              role="status"
-              title={
-                props.captureCapabilities.timing.accuracyMs === null
-                  ? translate('gallery.videoReview.historyTimingUnknown')
-                  : translate('gallery.videoReview.historyTimingApproximate').replace(
-                      '{accuracy}',
-                      String(Math.ceil(props.captureCapabilities.timing.accuracyMs))
-                    )
-              }
-              aria-label={
-                props.captureCapabilities.timing.accuracyMs === null
-                  ? translate('gallery.videoReview.historyTimingUnknown')
-                  : translate('gallery.videoReview.historyTimingApproximate').replace(
-                      '{accuracy}',
-                      String(Math.ceil(props.captureCapabilities.timing.accuracyMs))
-                    )
-              }
-              className="inline-flex shrink-0 items-center text-[var(--sniptale-color-text-secondary)]"
-            >
-              <Clock size={14} aria-hidden="true" />
-            </span>
-          ) : null}
           <ReviewButton
             label={translate('gallery.videoReview.historyOpen')}
             className={reviewIconButtonClassName}

@@ -209,7 +209,7 @@ it('propagates an advanced save failure as a session error', async () => {
     moveVideoWorkspaceHistory: vi.fn(async () => snapshot),
   };
   const session = createVideoReviewSession(snapshot, deps);
-  await expect(session.saveAdvanced({ broken: true })).rejects.toEqual({ code: 'invalid' });
+  await expect(session.saveAdvanced({ broken: true })).rejects.toMatchObject({ code: 'invalid' });
   expect(session.getSnapshot()).toMatchObject({ error: 'invalid', pending: 0 });
 });
 
@@ -597,4 +597,92 @@ it('keeps source mute autosave payload independent of unchanged text and preserv
   expect(reopened.getSnapshot().document.advancedContent.audio.original.muted).toBe(true);
   expect(reopened.getSnapshot().document.advancedContent.text).toEqual(unchangedText);
   expect(stored.workspace.history).toHaveLength(1);
+});
+
+it.each([true, false])(
+  'refuses locked lane commands before writes and keeps Notes usable (autosave %s)',
+  async (autosave) => {
+    const snapshot = initial();
+    snapshot.workspace.advanced.ui.lockedTracks = { source: true, originalAudio: true };
+    const write = vi.fn(async () => snapshot);
+    const session = createVideoReviewSession(snapshot, {
+      readVideoWorkspace: async () => snapshot,
+      commitVideoWorkspace: write,
+      saveVideoWorkspaceAdvanced: write,
+      saveVideoWorkspaceDraft: write,
+      saveVideoWorkspaceSnapshot: write,
+      moveVideoWorkspaceHistory: write,
+    });
+    session.setAutosaveEnabled(autosave);
+    const audio: ReviewOperation = {
+      id: 'gain',
+      at: 2,
+      target: 'sourceAudio',
+      before: { muted: false, volume: 1 },
+      after: { muted: true, volume: 1 },
+    };
+    await expect(session.commit(audio)).rejects.toThrow('originalAudio');
+    const attempted = vi.fn();
+    await expect(session.commitDurable(audio, attempted)).rejects.toThrow('originalAudio');
+    expect(attempted).not.toHaveBeenCalled();
+    const before = session.getSnapshot().document.advancedContent;
+    await expect(
+      session.commit({
+        id: 'compound',
+        at: 3,
+        target: 'advancedContent',
+        before,
+        after: {
+          ...before,
+          actionsEnabled: false,
+          audio: { ...before.audio, original: { ...before.audio.original, volume: 0.5 } },
+        },
+      })
+    ).rejects.toThrow('originalAudio');
+    expect(session.getSnapshot().document.advancedContent).toEqual(before);
+    expect(write).not.toHaveBeenCalled();
+    expect(session.getSnapshot()).toMatchObject({ error: null, pending: 0, dirty: false });
+    await session.commit({
+      id: 'note',
+      at: 3,
+      target: 'annotation',
+      before: null,
+      after: annotation,
+    });
+    expect(session.getSnapshot().error).toBeNull();
+    if (!autosave) expect(session.getSnapshot().document.annotations).toEqual([annotation]);
+    await session.flush();
+  }
+);
+
+it('changes a master and its legacy flag atomically while retaining locked content and Undo', async () => {
+  const snapshot = initial();
+  snapshot.workspace.advanced.ui.mode = 'advanced';
+  const write = vi.fn(async () => snapshot);
+  const session = createVideoReviewSession(snapshot, {
+    readVideoWorkspace: async () => snapshot,
+    commitVideoWorkspace: write,
+    saveVideoWorkspaceAdvanced: write,
+    saveVideoWorkspaceDraft: write,
+    saveVideoWorkspaceSnapshot: write,
+    moveVideoWorkspaceHistory: write,
+  });
+  session.setAutosaveEnabled(false);
+  await session.setTrackControl('actions', { locked: true });
+  await session.setTrackControl('actions', { enabled: false });
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui).toMatchObject({
+    lockedTracks: { actions: true },
+    tracks: { actions: false },
+  });
+  expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(false);
+  await session.setTrackControl('actions', { enabled: true });
+  expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(true);
+  await session.history('undo');
+  expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(false);
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.actions).toBe(false);
+  await session.history('redo');
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.actions).toBe(true);
+  expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(true);
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.lockedTracks?.actions).toBe(true);
+  expect(write).not.toHaveBeenCalled();
 });

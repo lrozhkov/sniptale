@@ -15,6 +15,7 @@ import type { VideoWorkspaceSnapshot } from '../../composition/persistence/revie
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type { ReviewOperation } from '../../features/video/review/types';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
@@ -45,7 +46,14 @@ function setup(initial = createQuickEditAdvancedState()) {
     draft: null,
   });
   const deps = {
-    saveVideoWorkspaceSnapshot: vi.fn(async () => build()),
+    saveVideoWorkspaceSnapshot: vi.fn(async (args: { workspace: unknown }) => {
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace) throw new Error('Workspace is invalid.');
+      workspaceAdvanced = workspace.advanced;
+      history = workspace.history;
+      revision += 1;
+      return build();
+    }),
     saveVideoWorkspaceDraft: vi.fn(async () => build()),
     commitVideoWorkspace: vi.fn(async (args: { operation: unknown }) => {
       const operation = parseReviewOperation(args.operation, 4);
@@ -458,8 +466,6 @@ it('keeps disabled lanes visible, preserves settings, and top-level hide/show re
   const { session } = setup();
   act(() => {
     advanced.setMode('advanced');
-    advanced.setTrackVisibility('actions', true);
-    advanced.setTrackVisibility('zoom', true);
     advanced.setClickAnimations(() => patchReviewClicks([], ['click'], { effect: 'ripple' }));
     advanced.setWebcam(() =>
       createQuickEditWebcam(
@@ -485,17 +491,17 @@ it('keeps disabled lanes visible, preserves settings, and top-level hide/show re
   expect(advanced.advanced.actionsEnabled).toBe(false);
   expect(advanced.advanced.zoom.enabled).toBe(false);
   act(() => advanced.setMode('basic'));
-  act(() => advanced.setTrackVisibility('actions', false));
-  act(() => advanced.setTrackVisibility('actions', true));
+  await act(async () => advanced.setTrackVisibility('actions', false));
+  await act(async () => advanced.setTrackVisibility('actions', true));
   await act(async () => advanced.flush());
   expect(advanced.advanced.actionsEnabled).toBe(false);
   act(() => advanced.setMode('advanced'));
   await act(async () => advanced.flush());
   for (const track of ['actions', 'zoom', 'webcam'] as const) {
-    act(() => advanced.setTrackVisibility(track, false));
+    await act(async () => advanced.setTrackVisibility(track, false));
     await act(async () => advanced.flush());
     expect(advanced.advanced.ui.tracks[track]).toBe(false);
-    act(() => advanced.setTrackVisibility(track, true));
+    await act(async () => advanced.setTrackVisibility(track, true));
     await act(async () => advanced.flush());
     expect(advanced.advanced.ui.tracks[track]).toBe(true);
   }
@@ -617,4 +623,51 @@ it('keeps effective content identity through transport-only rerenders and invali
   expect(authored).not.toBe(before);
   fixture.rerender();
   expect(advanced.advanced).toBe(authored);
+});
+
+it('drains accepted edits before a control, retries atomically, and rejects stale chrome control values', async () => {
+  const { session, deps } = setup();
+  act(() => advanced.setMode('advanced'));
+  await act(async () => advanced.flush());
+  const stale = structuredClone(session.getSnapshot().snapshot.workspace.advanced);
+  act(() =>
+    advanced.setClickAnimations(() => patchReviewClicks([], ['click'], { effect: 'ripple' }))
+  );
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(
+    new DOMException('Retry save', 'QuotaExceededError')
+  );
+  await act(async () => advanced.setTrackVisibility('actions', false));
+  expect(advanced.saveFailed).toBe(true);
+  await expect(advanced.flush()).rejects.toThrow('Retry save');
+  expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(1);
+  const historyLength = session.getSnapshot().snapshot.workspace.history.length;
+  await act(async () => advanced.retry());
+  expect(advanced.saveFailed).toBe(false);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(historyLength);
+  expect(advanced.advanced.ui.tracks.actions).toBe(false);
+  await act(async () => advanced.setTrackLocked('actions', true));
+  await act(async () => session.saveAdvanced(stale));
+  expect(advanced.advanced.ui).toMatchObject({
+    tracks: { actions: false },
+    lockedTracks: { actions: true },
+  });
+  act(() => advanced.setClickAnimations(() => []));
+  expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(1);
+  expect(advanced.pending).toBe(false);
+});
+
+it('discards a failed control on Reload and permits flush without replaying it', async () => {
+  const { session, deps } = setup();
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Control save failed'));
+  await act(async () => advanced.setTrackVisibility('actions', false));
+  expect(advanced.saveFailed).toBe(true);
+  await act(async () => {
+    await session.reload();
+    advanced.reset();
+  });
+  expect(advanced.saveFailed).toBe(false);
+  await act(async () => advanced.flush());
+  await act(async () => advanced.retry());
+  expect(advanced.advanced.ui.tracks.actions).toBe(true);
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
 });

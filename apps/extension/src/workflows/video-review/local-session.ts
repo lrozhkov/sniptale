@@ -1,4 +1,5 @@
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { moveReviewWorkspaceCursor } from '../../composition/persistence/review-workspaces/history-cursor';
 import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
@@ -128,19 +129,10 @@ export function applyLocalReviewChange(
           );
     if (change.annotation !== null && !draft) throw new Error('Invalid review draft');
   } else if (change.kind === 'history') {
-    workspace = {
-      ...withoutVideoWorkspaceTyping(workspace),
-      cursor:
-        change.direction === 'start'
-          ? 0
-          : Math.max(
-              0,
-              Math.min(
-                workspace.history.length,
-                workspace.cursor + (change.direction === 'undo' ? -1 : 1)
-              )
-            ),
-    };
+    workspace = moveReviewWorkspaceCursor(
+      workspace,
+      change.direction === 'start' ? 0 : workspace.cursor + (change.direction === 'undo' ? -1 : 1)
+    );
   } else {
     const merged = change.effectSnapshots
       ? mergeReviewAnnotationEffectSnapshots(

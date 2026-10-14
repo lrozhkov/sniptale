@@ -61,6 +61,76 @@ async function inspectResizeGuide(page: Page, dialog: Locator) {
   return guide;
 }
 
+async function inspectTrackControls(
+  page: Page,
+  dialog: Locator,
+  locale: 'ru' | 'en',
+  screenshotPath: string
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const settings = dialog.getByRole('button', {
+    name: label('gallery.videoReview.trackSettings'),
+    exact: true,
+  });
+  await settings.click();
+  for (const track of [
+    'source',
+    'actions',
+    'zoom',
+    'text',
+    'annotationEffects',
+    'webcam',
+    'originalAudio',
+    'voiceover',
+    'music',
+  ]) {
+    await expect(dialog.locator(`[data-review-track="${track}"]`)).toHaveCount(1);
+  }
+  const camera = dialog.locator('[data-review-track="webcam"] [role="switch"]');
+  await expect(camera).toBeDisabled();
+  await expect(camera).not.toBeChecked();
+  const textToggle = dialog.locator('[data-review-track="text"] [role="switch"]');
+  await textToggle.uncheck();
+  await settings.click();
+  await expect(dialog.locator('[data-review-track="text"]')).toHaveCount(0);
+  await settings.click();
+  await dialog.locator('[data-review-track="text"] [role="switch"]').check();
+  await expect(dialog.locator('[data-review-track="text"] [role="switch"]')).toBeChecked();
+  await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
+  await dialog.locator('[data-review-track="music"]').scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: screenshotPath.replace('.png', '-audio.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
+  await settings.click();
+  const source = dialog.locator('[data-review-track="source"]');
+  const lock = source.getByRole('button', {
+    name: `${label('gallery.videoReview.trackLock')}: ${label('gallery.videoReview.sourceVideo')}`,
+    exact: true,
+  });
+  const historyBefore = (
+    await readNativeReviewWorkspace(page, `recording:${betaV1Fixture.records.recordings[0]!.id}`)
+  )?.history.length;
+  const guide = await inspectResizeGuide(page, dialog);
+  await lock.focus();
+  await lock.press('Enter');
+  await expect(guide).toHaveCount(0);
+  await page.mouse.up();
+  await expect(source).toHaveAttribute('data-review-track-locked', 'true');
+  expect(
+    (await readNativeReviewWorkspace(page, `recording:${betaV1Fixture.records.recordings[0]!.id}`))
+      ?.history.length
+  ).toBe(historyBefore);
+  await source
+    .getByRole('button', {
+      name: `${label('gallery.videoReview.trackUnlock')}: ${label('gallery.videoReview.sourceVideo')}`,
+      exact: true,
+    })
+    .click();
+  await expect(source).toHaveAttribute('data-review-track-locked', 'false');
+}
+
 async function inspectWorkspaceColor(
   page: Page,
   dialog: Locator,
@@ -252,6 +322,12 @@ for (const variant of [
         path: info.outputPath('source-tools-and-ruler.png'),
         fullPage: false,
       });
+      await inspectTrackControls(
+        page,
+        dialog,
+        variant.locale,
+        info.outputPath('track-settings.png')
+      );
       const workspaceSurface = await inspectWorkspaceColor(
         page,
         dialog,

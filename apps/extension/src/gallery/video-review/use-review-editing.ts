@@ -32,6 +32,9 @@ export function useReviewEditingTools(args: {
 }) {
   const zoom = useReviewZoomEditor({
     setZoom: args.advancedState.setZoom,
+    setEnabled: (enabled) => {
+      void args.advancedState.setTrackVisibility('zoom', enabled);
+    },
     zoom: args.zoom,
     timelineDuration: args.timelineDuration,
     timeMap: buildReviewTimeMap(args.sourceDuration, args.edits),

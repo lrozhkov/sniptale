@@ -1,3 +1,4 @@
+import { reviewTrackGestureLocked } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Sticker } from 'lucide-react';
@@ -189,6 +190,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
   }, [props.drawing]);
   return (
     <ReviewTrackRow
+      track="annotationEffects"
       muted={!props.enabled}
       label={translate('gallery.videoReview.annotationEffects')}
       icon={<Sticker size={14} aria-hidden />}
@@ -235,7 +237,14 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
           (props.beforeAction ?? ((action) => action()))(() => props.onPlace?.({ start }, node));
         }}
         onPointerDown={(event) => {
-          if (!props.drawing || props.busy || event.button !== 0 || drag.current) return;
+          if (
+            !props.drawing ||
+            props.busy ||
+            event.button !== 0 ||
+            drag.current ||
+            reviewTrackGestureLocked(event.currentTarget)
+          )
+            return;
           event.preventDefault();
           event.stopPropagation();
           const bounds = event.currentTarget.getBoundingClientRect();
@@ -404,6 +413,10 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               onPointerDown={(event) => {
                 event.stopPropagation();
                 if (props.busy || event.button !== 0 || drag.current) return;
+                if (reviewTrackGestureLocked(event.currentTarget)) {
+                  props.onSelect(instance.id);
+                  return;
+                }
                 const edge =
                   event.target instanceof Element
                     ? event.target

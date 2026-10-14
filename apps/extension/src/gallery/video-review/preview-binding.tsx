@@ -1,3 +1,4 @@
+import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { useMemo } from 'react';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -175,7 +176,7 @@ function useReviewCaptionPreview(
     [state.source.duration, state.snapshot.document.edits]
   );
   const captions =
-    state.advanced.ui.mode === 'advanced' && state.advanced.captions?.enabled
+    resolveQuickEditEffectiveFeatures(state.advanced).captionsApplied && state.advanced.captions
       ? {
           document: state.advanced.text,
           settings: state.advanced.captions,

@@ -1,5 +1,6 @@
+import { reviewTrackGestureLocked } from './track-row';
+import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
-import { NumericValueField } from '../../ui/compact-inspector-controls';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
@@ -68,6 +69,7 @@ export function ReviewOriginalAudioTrack(props: {
   });
   return (
     <ReviewTrackRow
+      track="originalAudio"
       muted={muted}
       label={translate('gallery.videoReview.audioOriginal')}
       icon={
@@ -191,23 +193,6 @@ function OriginalAudioControls(props: {
           <Captions size={14} aria-hidden="true" />
         </ReviewButton>
       ) : null}
-      <NumericValueField
-        label={translate('gallery.videoReview.sourceAudioVolume')}
-        unit="%"
-        value={muted ? 0 : Math.round(props.original.volume * 100)}
-        min={0}
-        max={200}
-        step={1}
-        precision={0}
-        disabled={props.busy}
-        className="!h-7 !w-20"
-        onPreviewValue={() => undefined}
-        onCommitValue={(value) =>
-          (props.beforeAction ?? ((action) => action()))(() =>
-            props.onOriginal({ volume: value / 100 })
-          )
-        }
-      />
       <ReviewButton
         label={translate(
           muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
@@ -325,6 +310,10 @@ function useOriginalAudioGesture(
         event.preventDefault();
         const at = position(event);
         const id = item?.dataset['audioId'];
+        if (reviewTrackGestureLocked(event.currentTarget)) {
+          if (id) props.editor.selectOriginal(id);
+          return;
+        }
         const edge = item?.dataset['audioEdge'];
         const range =
           props.editor.originalRanges?.find((item) => item.id === id) ??
@@ -448,6 +437,10 @@ function useOriginalAudioGestureLifetime(props: {
     if (current.node.hasPointerCapture?.(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
   }, [drag]);
+  useReviewGestureCancellation(() => {
+    discard();
+    resetPreview();
+  });
   useEffect(() => {
     const current = drag.current;
     if (!current || canCommit(current.id ? 'item' : 'range')) return;

@@ -1,3 +1,4 @@
+import { reviewTrackGestureLocked } from './track-row';
 import type { ReviewBeforeAction } from './note-transitions';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
@@ -42,11 +43,35 @@ type CapturedPointerDrag = {
   pointerId: number;
 };
 
+const cancelTimelineGesturesEvent = 'sniptale:cancel-review-timeline-gestures';
+
+/** Lane control transitions cancel transient gestures before draining accepted edits. */
+export function cancelReviewTimelineGestures() {
+  window.dispatchEvent(new Event(cancelTimelineGesturesEvent));
+}
+
+/** Uses the existing gesture owner's cancellation, including pointer release. */
+export function useReviewGestureCancellation(cancel: () => void) {
+  useEffect(() => {
+    window.addEventListener(cancelTimelineGesturesEvent, cancel);
+    return () => window.removeEventListener(cancelTimelineGesturesEvent, cancel);
+  });
+}
+
 /** Escape owns cancellation and pointer release for one active timeline-item drag. */
 export function useReviewDragEscape<T extends CapturedPointerDrag>(
   drag: MutableRefObject<T | null>,
   resetPreview: () => void
 ) {
+  useReviewGestureCancellation(() => {
+    const current = drag.current;
+    if (!current) return;
+    drag.current = null;
+    current.admission?.cancel();
+    resetPreview();
+    if (current.node.hasPointerCapture(current.pointerId))
+      current.node.releasePointerCapture(current.pointerId);
+  });
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       const current = drag.current;
@@ -94,6 +119,7 @@ export function reviewPlaneLane(
   if (target.closest('[data-ui="gallery.videoReview.editBlock"],[data-audio-id],[role="button"]'))
     return 'item';
   if (target.closest('[data-dragging="true"]')) return 'item';
+  if (reviewTrackGestureLocked(target)) return 'seek';
   const audio = target.closest('[data-ui="gallery.videoReview.audioLane"]');
   if (audio)
     return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';
@@ -282,6 +308,7 @@ function useReviewPlaneDragLifetime(props: {
     release(current);
     restore(current);
   };
+  useReviewGestureCancellation(cancel);
   useEffect(() => {
     const current = drag.current;
     if (current && !canAdmit(current)) cancel();

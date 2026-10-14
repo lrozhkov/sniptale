@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { VideoReviewLoadError } from '../../workflows/video-review/source';
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -26,6 +27,7 @@ const integration = vi.hoisted(() => ({
   history: vi.fn(),
   read: vi.fn(),
   advanced: vi.fn(),
+  snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
 }));
@@ -49,6 +51,7 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   >()),
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
+  saveVideoWorkspaceSnapshot: integration.snapshot,
   commitVideoWorkspace: integration.commit,
   commitVideoWorkspaceWithProjection: async (
     args: Parameters<
@@ -614,7 +617,7 @@ it('ignores the comment shortcut while report copying disables the comment contr
 
 it('toggles the persisted advanced mode and restores it after reopening the editor', async () => {
   const fixture = createEditorFixture(integration);
-  const { root, button, click } = fixture;
+  const { root, host, button, click } = fixture;
   try {
     await act(async () =>
       root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
@@ -623,8 +626,8 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
     await click('advancedEditing');
     expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('true');
-    expect(button('zoomTrack').getAttribute('aria-pressed')).toBe('true');
-    expect(button('audioTrack').getAttribute('aria-pressed')).toBe('true');
+    expect(button('trackSettings').getAttribute('aria-pressed')).toBe('false');
+    expect(host.querySelector('[data-review-track="zoom"]')).not.toBeNull();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
     expect(fixture.snapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
@@ -652,7 +655,7 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
       );
       expect(reopenedButton('advancedEditing').getAttribute('aria-pressed')).toBe('false');
       await act(async () => reopenedButton('advancedEditing').click());
-      expect(reopenedButton('zoomTrack').getAttribute('aria-pressed')).toBe('true');
+      expect(reopenedButton('trackSettings').getAttribute('aria-pressed')).toBe('false');
     } finally {
       await act(async () => reopenedRoot.unmount());
       reopenedHost.remove();
@@ -792,6 +795,93 @@ it('connects Scene presentation controls to the real session and suppresses them
     await fixture.click('advancedEditing');
     expect(inspector()).toBeNull();
     expect(audioFade()).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it.each(['basic', 'advanced'] as const)(
+  'hides and restores the actual action-history lane from its %s control',
+  async (mode) => {
+    const fixture = createEditorFixture(integration);
+    try {
+      await act(async () =>
+        fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+      );
+      if (mode === 'advanced') await fixture.click('advancedEditing');
+      const lane = () => fixture.host.querySelector('[data-ui="gallery.videoReview.historyTrack"]');
+      expect(lane()).not.toBeNull();
+      const toggleHistory = async () => {
+        if (mode === 'basic') return fixture.click('telemetry');
+        await fixture.click('trackSettings');
+        const toggle = fixture.host.querySelector<HTMLButtonElement>(
+          '[data-review-track="actions"] [role="switch"]'
+        );
+        expect(toggle).not.toBeNull();
+        await act(async () => toggle!.click());
+        await fixture.click('trackSettings');
+      };
+      await toggleHistory();
+      expect(lane(), 'Disabled action history must remove its actual timeline row').toBeNull();
+      await toggleHistory();
+      expect(lane()).not.toBeNull();
+      if (mode === 'advanced') {
+        const applied = () =>
+          resolveQuickEditEffectiveFeatures({
+            ...fixture.snapshot.workspace.advanced,
+            ...committedEditorFixtureProjection(fixture.snapshot).document.advancedContent,
+          }).actionsApplied;
+        await fixture.click('undo');
+        expect(lane()).toBeNull();
+        expect(applied()).toBe(false);
+        await fixture.click('redo');
+        expect(lane()).not.toBeNull();
+        expect(applied()).toBe(true);
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  }
+);
+
+it('lists every lane in settings, retains unavailable streams off, and preserves Notes under source lock', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('trackSettings');
+    const row = (track: string) => fixture.host.querySelector(`[data-review-track="${track}"]`);
+    for (const track of [
+      'source',
+      'actions',
+      'zoom',
+      'text',
+      'annotationEffects',
+      'webcam',
+      'originalAudio',
+      'voiceover',
+      'music',
+    ]) {
+      expect(row(track), track).not.toBeNull();
+    }
+    const webcam = row('webcam')!.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(webcam.disabled).toBe(true);
+    expect(webcam.getAttribute('aria-checked')).toBe('false');
+    expect(row('source')!.querySelector('[role="switch"]')).toBeNull();
+    const sourceLock = row('source')!.querySelector<HTMLButtonElement>(
+      '[aria-label^="gallery.videoReview.trackLock:"]'
+    )!;
+    await act(async () => sourceLock.click());
+    expect(fixture.snapshot.workspace.advanced.ui.lockedTracks?.source).toBe(true);
+    await fixture.click('trackSettings');
+    expect(row('webcam')).toBeNull();
+    await fixture.click('addComment');
+    await fixture.fill('Note on a locked source');
+    await fixture.click('save');
+    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');
+    expect(fixture.snapshot.workspace.advanced.ui.lockedTracks?.source).toBe(true);
   } finally {
     await fixture.cleanup();
   }

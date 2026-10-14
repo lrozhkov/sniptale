@@ -102,11 +102,20 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
     typeof value['actions'] !== 'boolean' ||
     typeof value['zoom'] !== 'boolean' ||
     typeof value['audio'] !== 'boolean' ||
+    ['text', 'originalAudio', 'voiceover', 'music'].some(
+      (key) => value[key] !== undefined && typeof value[key] !== 'boolean'
+    ) ||
     (value['webcam'] !== undefined && typeof value['webcam'] !== 'boolean') ||
     (value['annotationEffects'] !== undefined && typeof value['annotationEffects'] !== 'boolean')
   )
     return null;
   return {
+    ...(typeof value['text'] === 'boolean' ? { text: value['text'] } : {}),
+    ...(typeof value['originalAudio'] === 'boolean'
+      ? { originalAudio: value['originalAudio'] }
+      : {}),
+    ...(typeof value['voiceover'] === 'boolean' ? { voiceover: value['voiceover'] } : {}),
+    ...(typeof value['music'] === 'boolean' ? { music: value['music'] } : {}),
     actions: value['actions'],
     zoom: value['zoom'],
     audio: value['audio'],
@@ -133,8 +142,33 @@ function parseWorkspaceColors(value: unknown): QuickEditUiState['workspaceColors
   return colors;
 }
 
+function parseLockedTracks(value: unknown): QuickEditUiState['lockedTracks'] | null {
+  if (value === undefined) return {};
+  if (!isRecord(value) || Array.isArray(value)) return null;
+  const locks: NonNullable<QuickEditUiState['lockedTracks']> = {};
+  for (const track of [
+    'source',
+    'actions',
+    'zoom',
+    'text',
+    'annotationEffects',
+    'webcam',
+    'originalAudio',
+    'voiceover',
+    'music',
+  ] as const) {
+    const locked = value[track];
+    if (locked === undefined) continue;
+    if (typeof locked !== 'boolean') return null;
+    locks[track] = locked;
+  }
+  return locks;
+}
+
 function parseUiState(value: unknown): QuickEditUiState | null {
   if (!isRecord(value) || (value['mode'] !== 'basic' && value['mode'] !== 'advanced')) return null;
+  const lockedTracks = parseLockedTracks(value['lockedTracks']);
+  if (!lockedTracks) return null;
   const initialized = value['advancedTracksInitialized'];
   if (initialized !== undefined && typeof initialized !== 'boolean') return null;
   const workspaceColors = parseWorkspaceColors(value['workspaceColors']);
@@ -144,6 +178,7 @@ function parseUiState(value: unknown): QuickEditUiState | null {
   // Pre-overlay workspaces omit the display toggle; missing or invalid falls back on.
   return {
     ...(value['workspaceColors'] === undefined ? {} : { workspaceColors }),
+    ...(value['lockedTracks'] === undefined ? {} : { lockedTracks }),
     mode: value['mode'],
     ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
@@ -680,7 +715,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].some(
       (known) => known >= firstHistorical && version === known
     )
   );
