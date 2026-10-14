@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -85,7 +86,13 @@ function setup(
       original: audio.original,
     });
     return (
-      <>
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
+        duration={10}
+      >
         <video ref={playback.video} />
         <ReviewOriginalAudioTrack
           beforeAction={beforeAction}
@@ -99,7 +106,7 @@ function setup(
           onSelectSpeed={onSelectSpeed}
         />
         <ReviewOriginalAudioInspector audio={editor} duration={10} speedMuted />
-      </>
+      </ReviewTimelineResizeGuide>
     );
   }
   act(() => root.render(<Harness />));
@@ -215,7 +222,9 @@ it('draws in source time, trims both edges, cancels gestures and follows a linke
     expect(f.editor.selectedOriginal!.start).toBe(1);
     f.send('pointerdown', 500, range().querySelector('[data-audio-edge="end"]')!);
     f.send('pointermove', 600);
+    expect(f.host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('600px');
     f.send('pointerup', 600);
+    expect(f.host.querySelector('[data-resizing]')).toBeNull();
     expect(f.editor.selectedOriginal!.end).toBe(6);
     for (const cancel of ['pointercancel', 'lostpointercapture', 'Escape']) {
       f.send('pointerdown', 100, range().querySelector('[data-audio-edge="start"]')!);
@@ -225,6 +234,7 @@ it('draws in source time, trims both edges, cancels gestures and follows a linke
           document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Escape' }))
         );
       else f.send(cancel, 0);
+      expect(f.host.querySelector('[data-resizing]')).toBeNull();
       f.send('pointerup', 0);
       expect(f.editor.selectedOriginal!.start).toBe(1);
     }

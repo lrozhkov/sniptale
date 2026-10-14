@@ -1,3 +1,4 @@
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
@@ -139,6 +140,18 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
   } | null>(null);
   const dropTarget = useAudioLaneDrop(props);
   const drag = useRef<AudioDragState | null>(null);
+  const boundary = drag.current;
+  const boundaryRange = preview ? reviewVoiceoverRange(preview.clip) : null;
+  useReviewResizeBoundary(
+    boundary,
+    boundary &&
+      boundary.edge !== 'move' &&
+      boundaryRange &&
+      props.clips.some((clip) => clip.id === boundary.id)
+      ? (props.projection?.source(boundaryRange[boundary.edge], boundary.edge) ??
+          boundaryRange[boundary.edge])
+      : null
+  );
   const cancelDrag = useCallback(() => {
     const current = drag.current;
     drag.current = null;
@@ -390,6 +403,7 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
         pointerId: event.pointerId,
         node: event.currentTarget,
       };
+      props.onPreview({ clip, guide: null });
       event.currentTarget.setPointerCapture(event.pointerId);
     },
     onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -471,11 +485,12 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
               );
       props.onPreview({
         clip: next,
-        guide: snapped.candidate,
+        guide: current.edge === 'move' ? snapped.candidate : null,
       });
     },
     onPointerUp: props.onCommit,
     onPointerCancel: props.onCancel,
+    onLostPointerCapture: props.onCancel,
   };
 }
 

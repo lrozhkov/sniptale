@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -39,21 +40,29 @@ function renderLane(args: {
 }) {
   act(() => {
     root.render(
-      <ReviewSourceLane
-        beforeAction={args.beforeAction}
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
         duration={10}
-        time={args.time}
-        selection={args.selection}
-        annotations={[]}
-        edits={args.edits}
-        boundaries={args.boundaries ?? [0, 2, 4, 6, 8, 10]}
-        {...(args.snapToKeyframes ? { snapToKeyframes: true } : {})}
-        onEdit={vi.fn()}
-        onChangeEdit={args.onChangeEdit}
-        onSeek={vi.fn()}
-        onSelect={vi.fn()}
-        onComment={vi.fn()}
-      />
+      >
+        <ReviewSourceLane
+          beforeAction={args.beforeAction}
+          duration={10}
+          time={args.time}
+          selection={args.selection}
+          annotations={[]}
+          edits={args.edits}
+          boundaries={args.boundaries ?? [0, 2, 4, 6, 8, 10]}
+          {...(args.snapToKeyframes ? { snapToKeyframes: true } : {})}
+          onEdit={vi.fn()}
+          onChangeEdit={args.onChangeEdit}
+          onSeek={vi.fn()}
+          onSelect={vi.fn()}
+          onComment={vi.fn()}
+        />
+      </ReviewTimelineResizeGuide>
     );
   });
   const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
@@ -119,7 +128,9 @@ it('moves and resizes edit blocks once per gesture, cancelling transient geometr
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 0, end: 4 });
   await event(lane.end, 'pointerdown', 400);
   await event(block, 'pointermove', 605);
+  expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('600px');
   await event(block, 'pointerup', 605);
+  expect(host.querySelector('[data-resizing]')).toBeNull();
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6 });
   change.mockClear();
   await event(block, 'pointerdown', 200);

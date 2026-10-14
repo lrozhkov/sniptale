@@ -1,3 +1,4 @@
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Sticker } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
@@ -90,6 +91,17 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
   latest.current = props;
   const [preview, setPreview] = useState<(Range & { id: string | null }) | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
+  const boundary = drag.current;
+  useReviewResizeBoundary(
+    boundary,
+    boundary &&
+      boundary.ready &&
+      !boundary.ended &&
+      (boundary.edge === 'start' || boundary.edge === 'end') &&
+      props.instances.some((instance) => instance.id === boundary.id)
+      ? boundary.after[boundary.edge]
+      : null
+  );
   const reset = () => {
     setPreview(null);
     setGuide(null);
@@ -417,7 +429,10 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
                 current.admission = deferReviewGesture(props.beforeAction, () => {
                   props.onSelect(instance.id);
                   current.ready = props.onBegin(instance.id);
-                  if (current.ready) props.onPreview(current.after);
+                  if (current.ready) {
+                    props.onPreview(current.after);
+                    setPreview({ id: instance.id, ...current.after });
+                  }
                 });
                 event.currentTarget.setPointerCapture(event.pointerId);
               }}
@@ -477,7 +492,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
                 next = boundedRange(current.before, current.edge, requested, props.duration);
                 current.after = next;
                 setPreview({ id: instance.id, ...next });
-                setGuide(snap.candidate);
+                setGuide(current.edge === 'move' ? snap.candidate : null);
                 if (current.ready) props.onPreview(next);
               }}
               onPointerUp={(event) => {

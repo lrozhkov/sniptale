@@ -1,3 +1,4 @@
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
@@ -100,7 +101,20 @@ function ReviewEditBlock(
     setDragEdge(null);
     onSnap(null);
   });
+  const boundary = drag.current;
+  useReviewResizeBoundary(
+    boundary,
+    boundary && boundary.edge !== 'move' ? boundary.range[boundary.edge] : null
+  );
   const committing = useRef(false);
+  const cancel = () => {
+    if (!drag.current) return;
+    drag.current.admission.cancel();
+    drag.current = null;
+    setDragEdge(null);
+    setPreview(null);
+    onSnap(null);
+  };
   const range = preview ?? edit;
   const { name, value, caption, covered, position } = reviewEditPresentation(edit, props.edits);
   const selected = props.selectedEditId === edit.id;
@@ -153,7 +167,7 @@ function ReviewEditBlock(
           current: edit,
           keyframeMove: !!props.snapToKeyframes,
         });
-        onSnap(snapped.guide);
+        onSnap(current.edge === 'move' ? snapped.guide : null);
         if (snapped.start < snapped.end) {
           current.range = { start: snapped.start, end: snapped.end };
           setPreview(current.range);
@@ -181,13 +195,8 @@ function ReviewEditBlock(
           }
         });
       }}
-      onPointerCancel={() => {
-        drag.current?.admission.cancel();
-        drag.current = null;
-        setDragEdge(null);
-        setPreview(null);
-        onSnap(null);
-      }}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
     >
       <button
         type="button"

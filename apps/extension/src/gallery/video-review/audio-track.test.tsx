@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -78,25 +79,33 @@ const renderTrack = (
 ) => {
   act(() => {
     root.render(
-      <ReviewAudioTrack
-        beforeAction={beforeAction}
-        onOpenMusic={onOpenMusic}
-        projection={projection}
-        waveforms={waveforms}
-        assets={assets}
-        hasOriginalAudio={hasOriginalAudio}
-        audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
-        snapTimes={snapTimes}
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
         duration={10}
-        selectedId={null}
-        busy={busy}
-        onSelect={onSelect}
-        onMoveClip={onMoveClip}
-        onTrimClip={onTrimClip}
-        onOriginal={onOriginal}
-        onImportFile={onImportFile}
-        onRecordVoiceover={onRecordVoiceover}
-      />
+      >
+        <ReviewAudioTrack
+          beforeAction={beforeAction}
+          onOpenMusic={onOpenMusic}
+          projection={projection}
+          waveforms={waveforms}
+          assets={assets}
+          hasOriginalAudio={hasOriginalAudio}
+          audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
+          snapTimes={snapTimes}
+          duration={10}
+          selectedId={null}
+          busy={busy}
+          onSelect={onSelect}
+          onMoveClip={onMoveClip}
+          onTrimClip={onTrimClip}
+          onOriginal={onOriginal}
+          onImportFile={onImportFile}
+          onRecordVoiceover={onRecordVoiceover}
+        />
+      </ReviewTimelineResizeGuide>
     );
   });
   for (const block of host.querySelectorAll('[data-audio-id]'))
@@ -328,7 +337,9 @@ it('trims the right edge through its drag handle', async () => {
     );
   await send('pointerdown', edge, 0);
   await send('pointermove', edge, 100);
+  expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('600px');
   await send('pointerup', block, 100);
+  expect(host.querySelector('[data-resizing]')).toBeNull();
   expect(onTrimClip).toHaveBeenCalledWith('voiceover', 'a1', 'end', 6, undefined);
 });
 

@@ -116,6 +116,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
 /** Preview marker stays above the sticky ruler (z-40) and never captures input. */
 export function ReviewTimelineHoverGuide(props: {
   hover: Hover | null;
+  resizing?: boolean;
   viewport: RefObject<HTMLDivElement | null>;
   gutter: number;
   width: number;
@@ -125,16 +126,20 @@ export function ReviewTimelineHoverGuide(props: {
   const viewportRight =
     (props.viewport.current?.scrollLeft ?? 0) +
     (props.viewport.current?.clientWidth ?? props.gutter + props.width);
+  if (hover.x < (props.viewport.current?.scrollLeft ?? 0) + props.gutter || hover.x > viewportRight)
+    return null;
   return (
     <div
       data-ui="gallery.videoReview.hoverTime"
+      data-resizing={props.resizing ? 'true' : undefined}
       aria-hidden="true"
       data-snapped={hover.snapped ? 'true' : undefined}
-      className="pointer-events-none absolute bottom-2 top-0 z-[41] w-px bg-[var(--sniptale-color-accent-emphasis)]/70"
+      className="pointer-events-none absolute bottom-2 top-0 z-[41] w-px
+        bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_60%,transparent)]"
       style={{ left: hover.x }}
     >
       <span
-        className="absolute top-0 whitespace-nowrap rounded bg-[var(--sniptale-color-surface-panel)]
+        className="sticky top-0 block w-max whitespace-nowrap rounded bg-[var(--sniptale-color-surface-panel)]
           px-1 text-[11px] text-[var(--sniptale-color-text-primary)] shadow-sm"
         style={{
           transform:

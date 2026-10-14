@@ -1,3 +1,4 @@
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
 import { useState } from 'react';
@@ -20,11 +21,7 @@ import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewTelemetryStrip } from './timeline-telemetry';
 import { useReviewTimelinePlaneDrag } from './timeline-drag';
-import {
-  ReviewTimelineHoverGuide,
-  useReviewTimelineHover,
-  type ReviewPlacementHints,
-} from './timeline-hover';
+import { useReviewTimelineHover, type ReviewPlacementHints } from './timeline-hover';
 import {
   useReviewTimelineGeometry,
   useReviewTimelineNavigation,
@@ -34,6 +31,7 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  sourceId?: string | undefined;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
   onOpenHistory?: (() => void) | undefined;
@@ -203,43 +201,46 @@ export function ReviewTimeline(props: TimelineProps) {
             gutter={gutter}
             width={Math.max(1, width * zoom)}
           />
-          <ReviewTimelineHoverGuide
+          <ReviewTimelineResizeGuide
+            key={props.sourceId}
             hover={hover.hover}
             viewport={viewport}
             gutter={gutter}
-            width={width}
-          />
-          <ReviewRulerRow
-            controls={props.trackControls}
-            interaction={ruler.interaction}
-            time={props.time}
-            duration={props.duration}
-            gutter={gutter}
             width={Math.max(1, width * zoom)}
-          />
-          <div inert={props.busy}>
-            <ReviewTimelineEvents {...props} width={width} zoom={zoom} />
-            <ReviewSourceLane
-              {...props}
-              drawingRange={plane.sourcePreview}
-              drawingKind={props.sourceRangeKind}
-              rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
-              snapToKeyframes={!!props.boundaries}
+            duration={props.duration}
+          >
+            <ReviewRulerRow
+              controls={props.trackControls}
+              interaction={ruler.interaction}
+              time={props.time}
+              duration={props.duration}
+              gutter={gutter}
+              width={Math.max(1, width * zoom)}
             />
-          </div>
-          <ReviewPlayhead
-            time={props.time}
-            duration={props.duration}
-            gutter={gutter}
-            width={Math.max(1, width * zoom)}
-          />
-          <div inert={props.busy}>
-            {props.zoomTrack}
-            {props.webcamTrack}
-            {props.textTrack}
-            {props.annotationEffectsTrack}
-            {props.audioTrack}
-          </div>
+            <div inert={props.busy}>
+              <ReviewTimelineEvents {...props} width={width} zoom={zoom} />
+              <ReviewSourceLane
+                {...props}
+                drawingRange={plane.sourcePreview}
+                drawingKind={props.sourceRangeKind}
+                rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
+                snapToKeyframes={!!props.boundaries}
+              />
+            </div>
+            <ReviewPlayhead
+              time={props.time}
+              duration={props.duration}
+              gutter={gutter}
+              width={Math.max(1, width * zoom)}
+            />
+            <div inert={props.busy}>
+              {props.zoomTrack}
+              {props.webcamTrack}
+              {props.textTrack}
+              {props.annotationEffectsTrack}
+              {props.audioTrack}
+            </div>
+          </ReviewTimelineResizeGuide>
         </div>
       </div>
     </section>

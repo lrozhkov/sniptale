@@ -61,10 +61,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline.tsx",
       "symbol": "ReviewTimeline",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This154-line timeline owns one measured time plane and captured range-selection gesture, including Escape restoration, pointer release, zoom and ruler/lane composition. It has8 statements, cyclomatic3, cognitive2, nesting1 and no recovery or durable state authority. The sole attention signal is JSX/function length after adding cancellation; moving its capture or restoration into another owner only to lower line count would distribute one gesture lifetime. Existing independent toolbar/source-lane modules already separate their actual change reasons. Exact cancellation now passes snap=false to the same existing playback owner;154lines/8statements/CC3/cognitive2 and all authority boundaries remain unchanged. Prior independent architecture review accepted this shape; the exact callback correction needs renewed review.",
-      "removalCondition": "Remove when this exact body or signature changes; reassess any new gesture, durable writer, runtime boundary or independent recovery. Remove when the analyzer models the documented cohesive JSX/gesture lifetime. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-09-06",
-      "astHash": "8e0fb95ad721a34198331fa05f0e3381d962ec1089a3282d379408f60636892c",
+      "reason": "tool-noise: One measured timeline composes ruler, lanes and playhead inside a source-qualified visual provider. The provider owns only the disposable guide; existing range gestures and commands retain their owners. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-15",
+      "astHash": "ad58efc3f200017a53041e73ab7c340eda62f25cf90f715bbf98baca1f4e4302",
       "signatureHash": "99bc8f53332cdb91cb2856b5f298ed8492021b86e698d8380c534924bc6d9bdc"
     },
     {
@@ -193,10 +193,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "ReviewTimelineBinding",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "3c5a14c4f78e8dd72d822311f9d7c456193250d1482760b77a60b4610d1073c4",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "f2f84d04e1b92a2b9e46bb32dcc87083f1e01aff5d59bd159c1ffc4cc6711f65",
       "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
-      "reason": "tool-noise: Seven outer statements compose existing projection and injected placement commands. Two additional view props expose annotation readiness; conditional JSX does not add mutation or recovery authority. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: One source-to-timeline composition passes source identity to reset the disposable guide lifetime. Seven outer statements and injected command ownership remain unchanged. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -336,22 +336,22 @@
       "file": "apps/extension/src/gallery/video-review/annotation-effects-track.tsx",
       "symbol": "ReviewAnnotationEffectsTrack",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when lane source-clock drag/admission/cancellation gains a second capture receiver or overlap rows become persistent order. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "b340e2b3ef807cbf5946d0fd06175ce180861a29cee884dccf6be9760a09c03b",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "5d85bcf11f8887d7ba081f323dbb02f09e3f2d0591ffb517164d243f74c0467c",
       "signatureHash": "fdc66e6782295ab2c2d3ce1464a54f9fe32bc714d5d4d20100f0fc95e3f7d488",
-      "reason": "tool-noise: The lane owns one captured source-clock drag for draw/move/trim, with shared deferred note admission, release/Escape/teardown and transient range/guide. Overlap packing and label maps are disposable render derivations, not compositing order or durable state. All plates use that same drag receiver and injected begin/preview/commit/cancel commands; separating gesture callbacks into plate-local authorities would weaken the single-drag invariant. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: One captured source-clock annotation gesture retains begin, preview, commit, cancellation and recovery. The added pure eligibility expression publishes an accepted resize edge to the visual owner and crosses the cyclomatic threshold; it creates no new gesture receiver or durable writer. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-15"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/annotation-effects-track.tsx",
       "symbol": "ReviewAnnotationEffectsTrack.props.instances.map callback",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when plate/edge markup gains an independent mutable gesture, listener, request or recovery lifetime. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "2eed8b0a53550c574f941d7b99cabbcab0c8a43786d561526253aec2ebabf824",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "69d31f88e93441ea742d95f5d1a8ea6d14140ebf6134f02ce259a818d0e63c64",
       "signatureHash": "d8427a2f080e07cab8e2e1b9281c95636919bebb648e95170ef07bda38814baf",
-      "reason": "tool-noise: This callback returns one accessible plate with name, duration, bounds and two resize handles. It uses the enclosing lane drag ref, one finish callback and injected admission/commands; keyboard/pointer paths share that transaction. It has no effects, state, transport or recovery lifetime of its own. The length is JSX and the explicit hit-edge callbacks, not an independent mutable plate owner. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: One accessible annotation plate uses the enclosing lane gesture and injected commands. Initial preview and resize-guide suppression remain parts of that gesture; the callback adds no effect or state authority. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reviewDate": "2026-10-15"
     },
     {
       "rule": "structural-function-risk",
@@ -402,10 +402,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "750949c949f7fdf49459fcac0678a2d79aa58b91faf8a8d11a43864f40657980",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "cfe818f08dea239c33fd271675329529aa818fd60694e91dc5f638b6349e406c",
       "signatureHash": "881bc98ded6d3566e50e9b7685fcff7bb1dfd6ecaf89070beb0ec52d12b299ee",
-      "reason": "tool-noise: The file composes one source timeline and its transient placement state. Cohesion is 0.97 and the score is unchanged. The candidate adds no durable writer, queue, public export or gesture authority. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: One source timeline composition retains its placement state and injected consumers. Passing source identity adds no writer, queue, export or gesture authority; score and cohesion remain unchanged. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -748,6 +748,28 @@
       "reviewDate": "2026-10-15",
       "astHash": "7a5882e3d6a5b41af34878f06acb83084f90615a3baae4f9f32d7db5952d885b",
       "signatureHash": "872869ad5b97480d588609844cee9f1ec3fca95bb4b5b08f2b4c7c839af874ba"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/audio-track.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One audio-track fixture adds the real guide provider and accepted-edge assertions. File score is unchanged and cohesion is 1.00; the candidate adds no independent fixture lifecycle. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-15",
+      "astHash": "2b04ee8072f7a7341adcd63a91cbdf798e401395266b7b9f272e6e5b675c916f",
+      "signatureHash": "5db2d10abfe2d70bcd3e2a3e835001c5484a5f1995470afc8acd983f1e7ca443"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline-selection.tsx",
+      "symbol": "ReviewEditBlock",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One source-edit gesture owns preview, constraints, admission, capture and commit. The accepted boundary is published to the visual owner. Capture loss reuses cancellation; splitting the handle lifecycle would distribute one gesture authority. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-15",
+      "astHash": "7cfcf6118a3a8802d98518fea22aab141f4b22da576061633a35aa04b1a374be",
+      "signatureHash": "fd59fc6afaa92347b04814e3e530f199aec4064d901d506858f175f5e7668800"
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import {
   packQuickEditFocusRows,
   quickEditFocusType,
@@ -183,6 +184,17 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
     setPreview(null);
     setGuide(null);
   });
+  const boundary = drag.current;
+  useReviewResizeBoundary(
+    boundary,
+    boundary &&
+      boundary.edge !== 'move' &&
+      props.regions.some((region) => region.id === boundary.id)
+      ? (boundary.range.sourceAnchor?.[boundary.edge] ??
+          props.projection?.source(boundary.range[boundary.edge], boundary.edge) ??
+          boundary.range[boundary.edge])
+      : null
+  );
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : region;
   const shownRegions = props.regions.map((region) => ({ ...region, ...shownRange(region) }));
@@ -493,6 +505,13 @@ function ReviewZoomRegionBlock(
   const locale = useAppLocale();
   const scaleLabel = `${formatNumber(region.transform.scale, { maximumFractionDigits: 1 }, locale)}×`;
   const tone = reviewTimelineItemTone(props.selected, 'focus');
+  const cancel = () => {
+    if (!props.drag.current) return;
+    props.drag.current.admission.cancel();
+    props.drag.current = null;
+    onPreview(null);
+    onGuide(null);
+  };
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
@@ -512,12 +531,13 @@ function ReviewZoomRegionBlock(
         (props.projection?.duration ?? duration),
       width: event.currentTarget.parentElement!.getBoundingClientRect().width,
       edge: edge === 'start' || edge === 'end' ? edge : 'move',
-      range: { start: region.start, end: region.end },
+      range: props.range,
       length: region.end - region.start,
       moved: false,
       node: event.currentTarget,
       pointerId: event.pointerId,
     };
+    onPreview(props.drag.current.range);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   return (
@@ -542,7 +562,7 @@ function ReviewZoomRegionBlock(
         if (!current || current.width <= 0) return;
         current.moved ||= Math.abs(event.clientX - current.x) > 3;
         const next = projectFocusDrag(props, current, event.clientX - current.x, event.shiftKey);
-        onGuide(next.guide);
+        onGuide(current.edge === 'move' ? next.guide : null);
         if (next.start < next.end) {
           const { guide: _guide, ...range } = next;
           current.range = range;
@@ -568,12 +588,8 @@ function ReviewZoomRegionBlock(
               : props.onDragCommit(current.id, current.range, current.edge)
           );
       }}
-      onPointerCancel={() => {
-        props.drag.current?.admission.cancel();
-        props.drag.current = null;
-        onPreview(null);
-        onGuide(null);
-      }}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();

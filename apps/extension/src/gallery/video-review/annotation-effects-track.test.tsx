@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -43,23 +44,31 @@ afterEach(async () => {
 function render(overrides: Partial<Parameters<typeof ReviewAnnotationEffectsTrack>[0]> = {}) {
   act(() =>
     root.render(
-      <ReviewAnnotationEffectsTrack
-        instances={[item('first'), item('second', 2, 3)]}
-        snapshots={[]}
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
         duration={10}
-        time={7}
-        enabled={false}
-        busy={false}
-        selectedId="first"
-        snapTimes={[5]}
-        onEnabled={enabled}
-        onSelect={select}
-        onBegin={begin}
-        onPreview={preview}
-        onCommit={commit}
-        onCancel={cancel}
-        {...overrides}
-      />
+      >
+        <ReviewAnnotationEffectsTrack
+          instances={[item('first'), item('second', 2, 3)]}
+          snapshots={[]}
+          duration={10}
+          time={7}
+          enabled={false}
+          busy={false}
+          selectedId="first"
+          snapTimes={[5]}
+          onEnabled={enabled}
+          onSelect={select}
+          onBegin={begin}
+          onPreview={preview}
+          onCommit={commit}
+          onCancel={cancel}
+          {...overrides}
+        />
+      </ReviewTimelineResizeGuide>
     )
   );
   const lane = host.querySelector<HTMLDivElement>(
@@ -222,8 +231,11 @@ it('trims through overlap and Escape cancels without committing', () => {
   pointer(block.querySelector('[data-annotation-effect-edge="end"]')!, 'pointerdown', 400);
   pointer(block, 'pointermove', 500);
   expect(preview).toHaveBeenLastCalledWith({ start: 1, end: 5 });
+  expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('500px');
+  expect(lane.querySelector('[data-annotation-effect-guide]')).toBeNull();
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   pointer(block, 'pointerup', 500);
+  expect(host.querySelector('[data-resizing]')).toBeNull();
   expect(cancel).toHaveBeenCalledTimes(1);
   expect(commit).not.toHaveBeenCalled();
 });

@@ -1,3 +1,4 @@
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { NumericValueField } from '../../ui/compact-inspector-controls';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
@@ -286,6 +287,19 @@ function useOriginalAudioGesture(
 ) {
   const drag = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
+  const boundary = preview;
+  useReviewResizeBoundary(
+    boundary?.admission ?? null,
+    boundary?.edge &&
+      boundary.edge !== 'move' &&
+      (props.editor?.originalRanges ?? props.original.ranges ?? []).some(
+        (range) => range.id === boundary.id
+      )
+      ? boundary.edge === 'start'
+        ? boundary.from
+        : boundary.to
+      : null
+  );
   const lifetime = useOriginalAudioGestureLifetime({
     drag,
     drawing: !!props.editor?.originalTool,

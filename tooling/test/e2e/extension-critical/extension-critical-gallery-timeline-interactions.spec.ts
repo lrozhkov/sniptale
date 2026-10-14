@@ -18,6 +18,49 @@ async function gesture(page: Page, lane: Locator, start: number, end?: number) {
   await page.mouse.up();
 }
 
+async function inspectResizeGuide(page: Page, dialog: Locator) {
+  const block = dialog.locator('[data-ui="gallery.videoReview.editBlock"]').first();
+  const edge = block.locator('[data-edge="end"]');
+  await edge.scrollIntoViewIfNeeded();
+  const box = await edge.boundingBox();
+  if (!box) throw new Error('Source resize handle is absent');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 24, box.y + box.height / 2, { steps: 3 });
+  const guide = dialog.locator('[data-ui="gallery.videoReview.hoverTime"][data-resizing]');
+  await expect(guide).toBeVisible();
+  const bounds = await block.boundingBox();
+  const marker = await guide.boundingBox();
+  if (!bounds || !marker) throw new Error('Resize geometry is absent');
+  expect(Math.abs(marker.x - bounds.x - bounds.width)).toBeLessThanOrEqual(1);
+  const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  await viewport.evaluate((node) => {
+    node.scrollTop = 60;
+  });
+  const viewportBox = await viewport.boundingBox();
+  const labelBox = await guide.locator('span').boundingBox();
+  if (!viewportBox || !labelBox) throw new Error('Resize label is absent');
+  expect(labelBox.y).toBeGreaterThanOrEqual(viewportBox.y - 1);
+  expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(viewportBox.y + viewportBox.height + 1);
+  const colors = await guide.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.backgroundColor =
+      'color-mix(in srgb, var(--sniptale-color-text-primary) 60%, transparent)';
+    node.append(probe);
+    const expected = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const playhead = document.querySelector('[data-ui="gallery.videoReview.playhead"]')!;
+    return {
+      actual: getComputedStyle(node).backgroundColor,
+      expected,
+      playhead: getComputedStyle(playhead).backgroundColor,
+    };
+  });
+  expect(colors.actual).toBe(colors.expected);
+  expect(colors.actual).not.toBe(colors.playhead);
+  return guide;
+}
+
 for (const variant of [
   { width: 1280, height: 560, theme: 'light', locale: 'ru' },
   { width: 1280, height: 560, theme: 'dark', locale: 'en' },
@@ -147,6 +190,11 @@ for (const variant of [
       await expect(source.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(0);
       await button('gallery.videoReview.redo').click();
       await expect(source.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(1);
+      const guide = await inspectResizeGuide(page, dialog);
+      await page.screenshot({ path: info.outputPath('resize-guide.png'), fullPage: false });
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      await expect(guide).toHaveCount(0);
       await page.screenshot({
         path: info.outputPath('source-tools-and-ruler.png'),
         fullPage: false,

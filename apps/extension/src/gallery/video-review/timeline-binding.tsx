@@ -203,6 +203,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   return (
     <>
       <ReviewTimeline
+        sourceId={props.annotationSourceId}
         annotationTool={annotation.tool.active}
         annotationDrawing={annotation.drawing}
         annotationEffectsTrack={

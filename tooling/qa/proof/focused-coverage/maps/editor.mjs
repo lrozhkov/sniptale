@@ -1,5 +1,12 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-review-timeline-binding',
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-binding.tsx',
+    reason:
+      'Modal integration exercises source tools, focus, tracks and audio through the real timeline binding.',
+    testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
+  },
+  {
     owner: 'gallery-review-inspector-binding',
     productionFile: 'apps/extension/src/gallery/video-review/inspector-binding.tsx',
     reason:

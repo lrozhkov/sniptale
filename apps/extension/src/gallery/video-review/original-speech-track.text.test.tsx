@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -65,14 +66,22 @@ function Fixture({
     pause: vi.fn(),
   });
   return (
-    <ReviewTextTrack
-      editor={editor}
-      busy={busy}
-      compact={compact}
-      selectedId="text"
-      onSelect={select}
-      onOpenDocument={open}
-    />
+    <ReviewTimelineResizeGuide
+      hover={null}
+      viewport={{ current: null }}
+      gutter={0}
+      width={1000}
+      duration={10}
+    >
+      <ReviewTextTrack
+        editor={editor}
+        busy={busy}
+        compact={compact}
+        selectedId="text"
+        onSelect={select}
+        onOpenDocument={open}
+      />
+    </ReviewTimelineResizeGuide>
   );
 }
 beforeEach(() => {
@@ -174,7 +183,9 @@ it('trims by handles, supports keyboard selection and opens the one track docume
   const block = prepare();
   await pointer(block.querySelector('[data-text-edge="end"]')!, 'pointerdown', 400);
   await pointer(block, 'pointermove', 500);
+  expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('500px');
   await pointer(block, 'pointerup', 500);
+  expect(host.querySelector('[data-resizing]')).toBeNull();
   expect(current.fragments[0]).toMatchObject({ start: 1, end: 2.5 });
   await pointer(block.querySelector('[data-text-edge="start"]')!, 'pointerdown', 200);
   await pointer(block, 'pointermove', 300);

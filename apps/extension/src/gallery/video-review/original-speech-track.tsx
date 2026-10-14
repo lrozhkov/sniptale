@@ -1,3 +1,4 @@
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { Captions, List, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ReviewTextFragment } from '../../features/video/review/text-document';
@@ -104,6 +105,7 @@ export function ReviewTextTrack(props: TextTrackProps) {
               onPointerMove={gesture.move}
               onPointerUp={gesture.finish}
               onPointerCancel={gesture.cancel}
+              onLostPointerCapture={gesture.cancel}
             >
               <span className="flex h-full items-center">
                 <span className="block min-w-0 truncate">
@@ -142,6 +144,17 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
   } | null>(null);
   const [preview, setPreview] = useState<ReviewTextFragment | null>(null);
   const previewRef = useRef<ReviewTextFragment | null>(null);
+  const boundary = drag.current;
+  const boundaryRange = preview ? props.editor.sourceInterval(preview) : null;
+  useReviewResizeBoundary(
+    boundary,
+    boundary &&
+      boundary.edge !== 'move' &&
+      boundaryRange &&
+      props.editor.document.fragments.some((fragment) => fragment.id === boundary.base.id)
+      ? boundaryRange[boundary.edge]
+      : null
+  );
   const clearPreview = () => {
     previewRef.current = null;
     setPreview(null);
@@ -175,6 +188,8 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
       pointerId: event.pointerId,
       admission: deferReviewGesture(props.beforeAction, () => props.onSelect(fragment.id)),
     };
+    previewRef.current = fragment;
+    setPreview(fragment);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const move = (event: React.PointerEvent<HTMLDivElement>) => {

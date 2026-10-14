@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -68,25 +69,33 @@ function renderTrack(
 ) {
   act(() => {
     root.render(
-      <ReviewZoomTrack
-        beforeAction={overrides?.beforeAction}
-        duration={overrides?.duration ?? 10}
-        compact={overrides?.compact}
-        {...(time === null ? { time: null } : { time })}
-        regions={regions}
-        edits={overrides?.edits ?? edits}
-        toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
-        projection={overrides?.projection}
-        selectedId={null}
-        onSelect={vi.fn()}
-        onDragCommit={onDragCommit}
-        {...(overrides?.enabled === undefined ? {} : { enabled: overrides.enabled })}
-        {...(overrides?.onLink ? { onLink: overrides.onLink } : {})}
-        {...(overrides?.onSelectLink ? { onSelectLink: overrides.onSelectLink } : {})}
-        {...(overrides?.linkSelectedId !== undefined
-          ? { linkSelectedId: overrides.linkSelectedId }
-          : {})}
-      />
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
+        duration={10}
+      >
+        <ReviewZoomTrack
+          beforeAction={overrides?.beforeAction}
+          duration={overrides?.duration ?? 10}
+          compact={overrides?.compact}
+          {...(time === null ? { time: null } : { time })}
+          regions={regions}
+          edits={overrides?.edits ?? edits}
+          toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
+          projection={overrides?.projection}
+          selectedId={null}
+          onSelect={vi.fn()}
+          onDragCommit={onDragCommit}
+          {...(overrides?.enabled === undefined ? {} : { enabled: overrides.enabled })}
+          {...(overrides?.onLink ? { onLink: overrides.onLink } : {})}
+          {...(overrides?.onSelectLink ? { onSelectLink: overrides.onSelectLink } : {})}
+          {...(overrides?.linkSelectedId !== undefined
+            ? { linkSelectedId: overrides.linkSelectedId }
+            : {})}
+        />
+      </ReviewTimelineResizeGuide>
     );
   });
   const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomLane"]')!;
@@ -277,7 +286,8 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   // Trim the start edge of the second region onto the first region's boundary (8px magnet).
   await track.event(startEdge, 'pointerdown', 400);
   await track.event(second, 'pointermove', 195);
-  expect(document.querySelector('[data-zoom-guide]')).not.toBeNull();
+  expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('200px');
+  expect(document.querySelector('[data-zoom-guide]')).toBeNull();
   await track.event(second, 'pointerup', 195);
   expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
   expect(document.querySelector('[data-zoom-guide]')).toBeNull();
@@ -317,7 +327,14 @@ for (const width of [1000, 4000]) {
       expect(Number.parseFloat(block.style.left)).toBeCloseTo(
         edge === 'start' ? 40 - 2400 / width : 20
       );
+      const visibleEdge =
+        Number.parseFloat(block.style.left) +
+        (edge === 'end' ? Number.parseFloat(block.style.width) : 0);
+      expect(
+        Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+      ).toBeCloseTo(visibleEdge * 10);
       await track.event(block, 'pointerup', edge === 'start' ? width : -width, true);
+      expect(host.querySelector('[data-resizing]')).toBeNull();
       const range = commit.mock.calls[0]![1];
       expect(range.end - range.start).toBeCloseTo(240 / width);
       expect(edge === 'start' ? range.end : range.start).toBe(edge === 'start' ? 4 : 2);
@@ -354,6 +371,9 @@ it('keeps a cut-boundary fixed end and speed-projected minimum consistent with t
   await track.event(block, 'pointermove', 900, true);
   expect(Number.parseFloat(block.style.width)).toBeCloseTo(2.4);
   expect(Number.parseFloat(block.style.left)).toBeCloseTo(37.6);
+  expect(
+    Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+  ).toBeCloseTo(376);
   await track.event(block, 'pointerup', 900, true);
   expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start', {
     start: 3.76,
