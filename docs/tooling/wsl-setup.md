@@ -80,6 +80,22 @@ npm run qa:e2e:install:deps
 
 `xvfb` supplies a display when WSL has none. The package scripts install Playwright browsers under `.playwright-browsers/`.
 
+## Native window recording acceptance
+
+The discard acceptance spec requires a window manager for real X11 window capture. Bare Xvfb does not supply the window state that Chromium requires. Install `twm` and `x11-utils` if the display has no window manager. Use this command after `npm run qa:e2e:build`:
+
+```bash
+printf '%s\n' 'RandomPlacement' 'NoGrabServer' 'NoTitle' 'TitleFont "fixed"' 'MenuFont "fixed"' 'IconFont "fixed"' 'ResizeFont "fixed"' 'IconManagerFont "fixed"' > /tmp/sniptale-twmrc
+PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers SNIPTALE_EXTENSION_BUILD_DIR=.tmp/e2e-builds/test PLAYWRIGHT_HEADLESS=0 xvfb-run -a sh -c '
+  LC_ALL=C twm -f /tmp/sniptale-twmrc &
+  wm_pid=$!
+  trap "kill $wm_pid 2>/dev/null || true" EXIT
+  npm exec playwright test -- tooling/test/e2e/extension-critical/extension-critical-recording-discard.spec.ts --workers=1
+'
+```
+
+The spec checks the actual capture surface and distinct window identities. It waits for native X11 titles before Chromium selects the next window. Camera cases use a separate browser profile with test devices.
+
 ## Resource overrides
 
 Inspect available resources with `nproc`, `lscpu`, and `free -h`. Use the [operator resource overrides](operator-handbook.md#commands) only after you measure contention. Machine policy checks and clamps the values.

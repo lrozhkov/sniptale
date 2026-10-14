@@ -22,6 +22,8 @@ type LaunchExtensionBrowserOptions = {
   viewport?: ViewportSize;
   extensionBuildDir?: string;
   userDataDir?: string;
+  fakeMediaDevices?: boolean;
+  windowCaptureTitle?: string;
 };
 
 async function ensurePage(context: BrowserContext): Promise<Page> {
@@ -43,7 +45,7 @@ function resolveExtensionPath(extensionBuildDir?: string): string {
   );
 }
 
-function getChromiumLaunchArgs(): string[] {
+function getChromiumLaunchArgs(options: LaunchExtensionBrowserOptions): string[] {
   return [
     '--no-sandbox',
     '--no-first-run',
@@ -55,8 +57,15 @@ function getChromiumLaunchArgs(): string[] {
     '--disable-crashpad',
     '--disable-breakpad',
     '--enable-unsafe-extension-debugging',
-    '--auto-select-desktop-capture-source=Entire screen',
-    '--auto-select-screen-capture-source',
+    ...(options.windowCaptureTitle
+      ? [`--auto-select-window-capture-source-by-title=${options.windowCaptureTitle}`]
+      : [
+          '--auto-select-desktop-capture-source=Entire screen',
+          '--auto-select-screen-capture-source',
+        ]),
+    ...(options.fakeMediaDevices
+      ? ['--use-fake-device-for-media-stream=fps=30', '--use-fake-ui-for-media-stream']
+      : []),
   ];
 }
 
@@ -113,7 +122,7 @@ export async function launchExtensionBrowser(
     context = await chromium.launchPersistentContext(userDataDir, {
       viewport,
       deviceScaleFactor: 1,
-      args: getChromiumLaunchArgs(),
+      args: getChromiumLaunchArgs(options),
       channel: 'chromium',
       headless: process.env.PLAYWRIGHT_HEADLESS !== '0',
       ignoreDefaultArgs: ['--disable-extensions'],

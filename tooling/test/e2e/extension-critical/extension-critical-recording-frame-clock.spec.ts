@@ -15,7 +15,13 @@ import type { RecordingFrameClockAnchor } from '../../../../apps/extension/src/c
 import { resolveBrowserViewport } from '../support/browser-viewport';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 
-const POPUP_PATH = 'apps/extension/src/popup/index.html';
+import {
+  sendRuntimeMessage,
+  openRealPopup,
+  triggerExtensionAction,
+  sendRuntimeMessageInTarget,
+  evaluateInTarget,
+} from '../support/recording-action';
 interface NativeFramePair {
   sourceTimestampUs: number;
   chosenTimestampUs: number;
@@ -59,177 +65,6 @@ interface DecodedVideo {
   height: number;
   frames: DecodedFrame[];
   keys: number[];
-}
-
-function sendRuntimeMessage(page: Page, message: unknown): Promise<unknown> {
-  return page.evaluate(async (payload) => {
-    const runtimePayload =
-      typeof payload === 'object' && payload !== null && !Array.isArray(payload)
-        ? {
-            ...payload,
-            __sniptaleRuntimeFreshness: {
-              issuedAtEpochMs: Date.now(),
-              nonce: crypto.randomUUID(),
-            },
-          }
-        : payload;
-    return chrome.runtime.sendMessage(runtimePayload);
-  }, message);
-}
-
-async function openRealPopup(context: BrowserContext, extensionId: string): Promise<Page> {
-  const popup = await context.newPage();
-  await popup.goto(`chrome-extension://${extensionId}/${POPUP_PATH}`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await popup.locator('[data-ui="popup.app.root"]').waitFor({ state: 'visible' });
-  return popup;
-}
-
-async function triggerExtensionAction(
-  context: BrowserContext,
-  extensionId: string,
-  targetPage: Page
-): Promise<string> {
-  const browser = context.browser();
-  if (!browser) throw new Error('Extension context has no browser owner');
-  const session = await browser.newBrowserCDPSession();
-  try {
-    const tabTargets = (await session.send('Target.getTargets', {
-      filter: [{ type: 'tab', exclude: false }, { exclude: true }],
-    })) as { targetInfos?: { targetId?: string; type?: string; url?: string }[] };
-    const targetId = tabTargets.targetInfos?.find(
-      (candidate) => candidate.type === 'tab' && candidate.url === targetPage.url()
-    )?.targetId;
-    if (!targetId) throw new Error('Action target tab is unavailable');
-    const existingTargets = (await session.send('Target.getTargets')) as {
-      targetInfos?: { targetId?: string }[];
-    };
-    const existingTargetIds = new Set(
-      existingTargets.targetInfos?.flatMap((candidate) =>
-        candidate.targetId ? [candidate.targetId] : []
-      ) ?? []
-    );
-
-    await session.send('Extensions.triggerAction', { id: extensionId, targetId });
-    const popupUrl = `chrome-extension://${extensionId}/${POPUP_PATH}`;
-    await expect
-      .poll(async () => {
-        const actionTargets = (await session.send('Target.getTargets')) as {
-          targetInfos?: { targetId?: string; type?: string; url?: string }[];
-        };
-        return (
-          actionTargets.targetInfos?.find(
-            (candidate) =>
-              candidate.type === 'page' &&
-              candidate.url === popupUrl &&
-              candidate.targetId !== undefined &&
-              !existingTargetIds.has(candidate.targetId)
-          )?.targetId ?? null
-        );
-      })
-      .not.toBeNull();
-    const actionTargets = (await session.send('Target.getTargets')) as {
-      targetInfos?: { targetId?: string; type?: string; url?: string }[];
-    };
-    const actionPopupTargetId = actionTargets.targetInfos?.find(
-      (candidate) =>
-        candidate.type === 'page' &&
-        candidate.url === popupUrl &&
-        candidate.targetId !== undefined &&
-        !existingTargetIds.has(candidate.targetId)
-    )?.targetId;
-    if (!actionPopupTargetId) throw new Error('Triggered action popup target is unavailable');
-    return actionPopupTargetId;
-  } finally {
-    await session.detach().catch(() => undefined);
-  }
-}
-
-async function sendRuntimeMessageInTarget(
-  context: BrowserContext,
-  targetId: string,
-  message: unknown
-) {
-  const serializedMessage = JSON.stringify(message);
-  return evaluateInTarget(
-    context,
-    targetId,
-    `(async () => chrome.runtime.sendMessage({ ...${serializedMessage}, ` +
-      '__sniptaleRuntimeFreshness: { issuedAtEpochMs: Date.now(), ' +
-      'nonce: crypto.randomUUID() } }))()'
-  );
-}
-
-async function evaluateInTarget(
-  context: BrowserContext,
-  targetId: string,
-  expression: string
-): Promise<unknown> {
-  const browser = context.browser();
-  if (!browser) throw new Error('Extension context has no browser owner');
-  const session = await browser.newBrowserCDPSession();
-  let attachedSessionId: string | null = null;
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const attached = (await session.send('Target.attachToTarget', {
-      flatten: false,
-      targetId,
-    })) as { sessionId: string };
-    attachedSessionId = attached.sessionId;
-    const evaluationResponse = new Promise<{
-      error?: unknown;
-      result?: { exceptionDetails?: unknown; result?: { value?: unknown } };
-    }>((resolve) => {
-      const onMessage = (event: { message: string; sessionId: string }) => {
-        if (event.sessionId !== attached.sessionId) return;
-        const response = JSON.parse(event.message) as {
-          error?: unknown;
-          id?: number;
-          result?: { exceptionDetails?: unknown; result?: { value?: unknown } };
-        };
-        if (response.id !== 1) return;
-        session.off('Target.receivedMessageFromTarget', onMessage);
-        resolve(response);
-      };
-      session.on('Target.receivedMessageFromTarget', onMessage);
-    });
-    await session.send('Target.sendMessageToTarget', {
-      message: JSON.stringify({
-        id: 1,
-        method: 'Runtime.evaluate',
-        params: {
-          awaitPromise: false,
-          expression,
-          returnByValue: true,
-        },
-      }),
-      sessionId: attached.sessionId,
-    });
-    const evaluated = await Promise.race([
-      evaluationResponse,
-      new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error('CDP runtime reply timed out')), 10000);
-      }),
-    ]);
-    if (evaluated.error) {
-      throw new Error(`Action popup CDP evaluation failed: ${JSON.stringify(evaluated.error)}`);
-    }
-    if (evaluated.result?.exceptionDetails) {
-      throw new Error(
-        `Action popup runtime message failed: ${JSON.stringify(evaluated.result.exceptionDetails)}`
-      );
-    }
-    return evaluated.result?.result?.value;
-  } finally {
-    clearTimeout(timeout);
-    if (attachedSessionId) {
-      await session
-        .send('Target.detachFromTarget', { sessionId: attachedSessionId })
-        .catch(() => undefined);
-    }
-    await session.detach().catch(() => undefined);
-  }
 }
 
 async function countDurableRecordings(page: Page): Promise<number> {
@@ -533,23 +368,28 @@ for (const { resolution, fault, crop } of [
       const faultWorldId = fault
         ? await refuseContentCalibration(context, target, extensionId)
         : null;
-      await sendRuntimeMessageInTarget(context, actionTarget, {
-        type: 'START_RECORDING',
-        captureMode: crop ? CaptureMode.TAB_CROP : CaptureMode.TAB,
-        tabId,
-        viewportPresetId: null,
-        settings: {
-          ...DEFAULT_VIDEO_SETTINGS,
-          outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, resolution },
-          qualityProfileId: null,
-          controlledCursorCaptureEnabled: false,
-          countdownSeconds: fault ? 3 : 0,
-          microphoneEnabled: false,
-          sourceCount: 1,
-          systemAudioEnabled: false,
-          webcamEnabled: false,
+      await sendRuntimeMessageInTarget(
+        context,
+        actionTarget,
+        {
+          type: 'START_RECORDING',
+          captureMode: crop ? CaptureMode.TAB_CROP : CaptureMode.TAB,
+          tabId,
+          viewportPresetId: null,
+          settings: {
+            ...DEFAULT_VIDEO_SETTINGS,
+            outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, resolution },
+            qualityProfileId: null,
+            controlledCursorCaptureEnabled: false,
+            countdownSeconds: fault ? 3 : 0,
+            microphoneEnabled: false,
+            sourceCount: 1,
+            systemAudioEnabled: false,
+            webcamEnabled: false,
+          },
         },
-      });
+        false
+      );
       if (crop) {
         await target.locator('#sniptale-region-selector-root').waitFor();
         await target.bringToFront();
