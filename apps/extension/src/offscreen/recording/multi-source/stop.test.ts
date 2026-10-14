@@ -6,6 +6,13 @@ import { createMultiSourceLifecycle, type MultiSourceSession } from './state';
 import { setActiveMultiSourceSession } from './state';
 import { stopMultiSourceSession } from './stop';
 import { createTrackedStream } from './media-stream.test-support';
+import { sendRuntimeMessage } from '../../../platform/runtime-messaging';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+
+vi.mock('../../../platform/runtime-messaging', async (original) => ({
+  ...(await original<typeof import('../../../platform/runtime-messaging')>()),
+  sendRuntimeMessage: vi.fn().mockResolvedValue({ success: true }),
+}));
 
 function createArtifact(id: string): FinalizedRecordingStagingArtifact {
   const file = new File(['media'], `${id}.webm`, { type: 'video/webm' });
@@ -83,6 +90,36 @@ it('aborts staging instead of finalizing a discarded artifact set', async () => 
 
   expect(session.staging.abort).toHaveBeenCalledOnce();
   expect(finalizeSession).not.toHaveBeenCalled();
+});
+
+// Remove fails when discard notification is implemented.
+it.fails('notifies background once after discarded staging drains, including concurrent stop callers', async () => {
+  vi.mocked(sendRuntimeMessage).mockClear();
+  const session = createSession();
+  let release!: () => void;
+  let entered!: () => void;
+  const drained = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const aborting = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  vi.mocked(session.staging.abort).mockImplementation(async () => {
+    entered();
+    await drained;
+  });
+  setActiveMultiSourceSession(session);
+  const params = { discard: true, finalizeSession: vi.fn(), session };
+  const first = stopMultiSourceSession(params);
+  const second = stopMultiSourceSession(params);
+  await aborting;
+  expect(sendRuntimeMessage).not.toHaveBeenCalled();
+  release();
+  await Promise.all([first, second]);
+  expect(sendRuntimeMessage).toHaveBeenCalledExactlyOnceWith({
+    type: VideoMessageType.OFFSCREEN_RECORDING_STOPPED,
+    recordingId: session.recordingId,
+  });
 });
 
 it('releases only the recording-owned webcam lease during normal stop', async () => {
