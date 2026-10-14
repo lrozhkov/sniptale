@@ -65,7 +65,7 @@ export function completeVideoRecording(recordingId: string): Promise<void> {
     .catch((error: unknown) => {
       if (isCurrentVideoRecordingId(recordingId)) {
         finishVideoRecordingStop();
-        setVideoRecordingRuntimeState({
+        publishRecordingCompletionState({
           status: VideoRecordingStatus.STOPPING,
           error: 'Recording cleanup is incomplete.',
         });
@@ -101,7 +101,7 @@ async function completeRecording(recordingId: string): Promise<void> {
   }
   let step = terminal.terminal.cleanupStep;
   if (!isCurrentVideoRecordingId(recordingId)) return;
-  setVideoRecordingRuntimeState({ status: VideoRecordingStatus.STOPPING, error: null });
+  publishRecordingCompletionState({ status: VideoRecordingStatus.STOPPING, error: null });
   if (step === 'surface') {
     await releaseVideoCaptureSurface(recordingId);
     if (!isCurrentVideoRecordingId(recordingId)) return;
@@ -167,7 +167,7 @@ async function completeEarlyStop(): Promise<RecordingStopResult> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (isCurrentVideoRecordingId(recordingId)) {
-      setVideoRecordingRuntimeState({ error: message });
+      publishRecordingCompletionState({ error: message });
     }
     logger.error('Failed to restore capture surface after early stop', error);
     return { error: message, result: 'failed' };
@@ -199,7 +199,7 @@ async function sendStopSignals(
   if (!recordingId) {
     const error = 'Recording source binding is unavailable';
     finishVideoRecordingStop();
-    setVideoRecordingRuntimeState({ error });
+    publishRecordingCompletionState({ error });
     return { error, result: 'failed' };
   }
   const sourceBinding = await resolveRecordingSourceBinding(recordingId);
@@ -210,10 +210,10 @@ async function sendStopSignals(
   if (!sourceBinding) {
     const error = 'Recording source binding is unavailable';
     finishVideoRecordingStop();
-    setVideoRecordingRuntimeState({ error });
+    publishRecordingCompletionState({ error });
     return { error, result: 'failed' };
   }
-  setVideoRecordingRuntimeState({
+  publishRecordingCompletionState({
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: null,
@@ -282,7 +282,7 @@ async function reconcileStopDeliveryFailure(
   ) {
     restoreVideoRecordingOffscreenStartPending();
   }
-  setVideoRecordingRuntimeState({
+  publishRecordingCompletionState({
     status: terminal ? VideoRecordingStatus.STOPPING : previousState.status,
     countdownEndsAt: terminal ? null : previousState.countdownEndsAt,
     error: error instanceof Error ? error.message : String(error),
@@ -316,7 +316,7 @@ async function settleStopAcknowledgement(
         return { result: 'accepted' };
       }
       finishVideoRecordingStop();
-      setVideoRecordingRuntimeState({
+      publishRecordingCompletionState({
         status: VideoRecordingStatus.STOPPING,
         error: terminalError,
       });
@@ -327,7 +327,7 @@ async function settleStopAcknowledgement(
     const message = error instanceof Error ? error.message : String(error);
     if (isCurrentVideoRecordingId(recordingId)) {
       finishVideoRecordingStop();
-      setVideoRecordingRuntimeState({ status: VideoRecordingStatus.STOPPING, error: message });
+      publishRecordingCompletionState({ status: VideoRecordingStatus.STOPPING, error: message });
     }
     return { error: message, result: 'failed' };
   }
@@ -502,7 +502,7 @@ export async function notifyRecordingStartFailed(
     setVideoRecordingId(null);
     resetVideoRecordingStartSession();
     resetVideoRecordingRuntimeState();
-    setVideoRecordingRuntimeState({ error });
+    publishRecordingCompletionState({ error });
   }
 
   runBestEffort(
@@ -564,7 +564,7 @@ export function reconcileVideoRecordingLeaseOnStartup(): void {
 function hydrateSessionFromLease(lease: VideoRecordingControlLease): void {
   setVideoRecordingId(lease.recordingId);
   setVideoRecordingTabId(lease.recordingTabId);
-  setVideoRecordingRuntimeState({
+  publishRecordingCompletionState({
     captureMode: lease.captureMode,
     cropRegion: lease.cropRegion,
     countdownEndsAt: null,
@@ -632,7 +632,7 @@ async function retainFailedRecordingCompletion(recordingId: string): Promise<voi
   if (!isCurrentVideoRecordingId(recordingId)) return;
   if (terminal.phase === 'terminal' && terminal.terminal.outcome === 'stopped') return;
   finishVideoRecordingStop();
-  setVideoRecordingRuntimeState({
+  publishRecordingCompletionState({
     status: VideoRecordingStatus.STOPPING,
     error: 'Recording cleanup failed. Local data cleanup is required.',
   });
@@ -731,7 +731,7 @@ export async function failRecordingStartAfterTimeout(
     throw new Error('Recording start cleanup source binding is unavailable.');
   }
   await stopRecordingSourceForStartFailure({ recordingId, ...lease.surfaceBinding });
-  if (getVideoRecordingId() === null) setVideoRecordingRuntimeState({ error });
+  if (getVideoRecordingId() === null) publishRecordingCompletionState({ error });
 }
 
 /** Confirms the source outcome before recovery restores a surface. Does not restore that surface here. */
@@ -784,4 +784,22 @@ export function finishSavedRecording(recordingId: string): void {
   resetCompletedVideoRecordingSession(recordingId);
   setVideoRecordingTabId(null);
   resetVideoRecordingRuntimeState();
+}
+
+/** Projects terminal authority for consumers without granting cleanup authority. */
+export function getRecordingCompletionState(): Exclude<
+  VideoRecordingRuntimeState['completion'],
+  undefined
+> {
+  const lease = getActiveVideoRecordingLeaseSnapshot();
+  if (lease?.phase !== 'terminal' || !isCurrentVideoRecordingId(lease.recordingId)) return null;
+  return {
+    discard: lease.terminal.discard,
+    outcome: lease.terminal.outcome,
+    pending: isVideoRecordingStopInProgress(),
+  };
+}
+
+function publishRecordingCompletionState(patch: Partial<VideoRecordingRuntimeState>): void {
+  setVideoRecordingRuntimeState({ ...patch, completion: getRecordingCompletionState() });
 }

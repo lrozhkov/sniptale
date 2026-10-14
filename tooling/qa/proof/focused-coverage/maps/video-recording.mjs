@@ -5,6 +5,21 @@ import { POPUP_RECORDING_OWNER_MAPPINGS } from './popup-recording.mjs';
 
 export const VIDEO_RECORDING_OWNER_MAPPINGS = [
   {
+    owner: 'background-video-recording-state-response',
+    productionFile:
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state-response.ts',
+    exclusive: true,
+    reason:
+      'State responses require completion recovery, capability, post-record, and clock proof.',
+    testFiles: [
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.clock.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/camera-recorder-registration.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/root.test.ts',
+    ],
+  },
+  {
     owner: 'background-video-recording-completion',
     productionFile: 'apps/extension/src/background/media/video/runtime/recording-completion.ts',
     exclusive: true,

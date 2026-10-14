@@ -165,3 +165,15 @@ it('sends start-cancellation with the recording control capability', async () =>
   });
   expect(setRecordingErrorMock).toHaveBeenCalledWith(null);
 });
+
+it('returns distinct accepted, refused and unknown Stop outcomes', async () => {
+  sendRuntimeMessageMock
+    .mockReset()
+    .mockResolvedValueOnce({ success: true, result: 'accepted' })
+    .mockResolvedValueOnce({ success: false, result: 'failed', error: 'cleanup incomplete' })
+    .mockRejectedValueOnce(new Error('response lost'));
+  await renderHarness();
+  await expect(getStopHandler()({ discard: true })).resolves.toBe('accepted');
+  await expect(getStopHandler()({ discard: true })).resolves.toBe('failed');
+  await expect(getStopHandler()({ discard: true })).resolves.toBe('unknown');
+});

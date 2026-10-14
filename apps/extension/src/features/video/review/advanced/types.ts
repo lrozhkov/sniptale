@@ -61,6 +61,22 @@ export interface QuickEditSpatialFrame {
   focus: readonly { settings: QuickEditDepthOfField; weight: number }[];
 }
 
+export interface QuickEditRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Authored scene geometry plus the actual consuming output size. */
+export type QuickEditCameraSceneInput = {
+  output?: { width: number; height: number };
+  canvas?: { width: number; height: number } | undefined;
+  source: { width: number; height: number };
+  background: QuickEditBackgroundSettings;
+  windowHeader?: QuickEditWindowHeader | undefined;
+};
+
 /** Camera target normalized over the whole window (video plus optional header), excluding background. */
 export interface QuickEditCameraTransform {
   /** Evaluated only; storage parsers discard this renderer state. */
@@ -106,7 +122,7 @@ export interface QuickEditZoomRegion {
   followCursor?: boolean;
   /** Disposable render context, dropped by storage admission. */
   cursorFocus?: {
-    scene?: import('./scene').QuickEditCameraSceneInput;
+    scene?: QuickEditCameraSceneInput;
     policy?: import('../../project/camera/cursor-policy').ResolvedCameraFollowPolicy;
     sourceFrame?: { headerHeight: number; height: number };
     path: import('../../project/cursor-focus-path/types').CursorFocusPath;

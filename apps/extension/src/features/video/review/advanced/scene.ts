@@ -31,15 +31,11 @@ import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
   QuickEditZoomRegion,
-  QuickEditWindowHeader,
+  QuickEditRect,
+  QuickEditCameraSceneInput,
 } from './types';
 
-export interface QuickEditRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+export type { QuickEditRect, QuickEditCameraSceneInput } from './types';
 
 type QuickEditPoint = { x: number; y: number };
 
@@ -72,18 +68,9 @@ export function computeQuickEditContentRect(
   };
 }
 
-type SceneInput = {
+type SceneInput = Omit<QuickEditCameraSceneInput, 'output'> & {
   output: { width: number; height: number };
-  canvas?: { width: number; height: number } | undefined;
-  source: { width: number; height: number };
-  background: QuickEditBackgroundSettings;
-  windowHeader?: QuickEditWindowHeader | undefined;
   camera: QuickEditCameraTransform;
-};
-
-/** Authored scene geometry plus the actual consuming output size. */
-export type QuickEditCameraSceneInput = Omit<SceneInput, 'camera' | 'output'> & {
-  output?: { width: number; height: number };
 };
 
 export interface QuickEditCameraConflict {

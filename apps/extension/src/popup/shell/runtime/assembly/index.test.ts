@@ -14,6 +14,7 @@ it('projects only the Video route runtime surface', () => {
     {
       handlePauseResume: handler,
       handleStartRecording: handler,
+      handleRefreshRecordingState: vi.fn().mockResolvedValue(undefined),
       handleStop: handler,
       handleToggleMicrophone: handler,
       handleToggleWebcam: handler,

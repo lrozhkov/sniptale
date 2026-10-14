@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
@@ -17,15 +17,32 @@ import { IDLE_RECORDING_STATE } from '../../recording/video/copy';
 export function useVideoRouteRuntime(options: {
   capabilities: ActiveTabCapabilities;
   initialMode?: CaptureMode;
-}): PopupVideoRuntimeStateSlice & { isReady: boolean; setIsReady(ready: boolean): void } {
+}): PopupVideoRuntimeStateSlice & {
+  isReady: boolean;
+  setIsReady(ready: boolean): void;
+  getRecordingRevision(): number;
+} {
   const [isReady, setIsReady] = useState(false);
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
   const [videoCaptureMode, setVideoCaptureMode] = useState(options.initialMode ?? CaptureMode.TAB);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [videoSettings, setVideoSettings] = useState(DEFAULT_VIDEO_SETTINGS);
-  const [recordingControlCapability, setRecordingControlCapability] =
+  const [recordingControlCapability, updateRecordingControlCapability] =
     useState<RecordingControlCapability | null>(null);
-  const [recordingState, setRecordingState] = useState(IDLE_RECORDING_STATE);
+  const [recordingState, updateRecordingState] = useState(IDLE_RECORDING_STATE);
+  const recordingRevision = useRef(0);
+  const getRecordingRevision = useCallback(() => recordingRevision.current, []);
+  const setRecordingState = useCallback<typeof updateRecordingState>((update) => {
+    recordingRevision.current += 1;
+    updateRecordingState(update);
+  }, []);
+  const setRecordingControlCapability = useCallback<typeof updateRecordingControlCapability>(
+    (update) => {
+      recordingRevision.current += 1;
+      updateRecordingControlCapability(update);
+    },
+    []
+  );
   const [startError, setStartError] = useState<string | null>(null);
   const [isStartPending, setIsStartPending] = useState(false);
   const [microphoneDevices, setMicrophoneDevices] = useState<MicrophoneOption[]>([]);
@@ -117,5 +134,5 @@ export function useVideoRouteRuntime(options: {
     if (isReady) void refreshGalleryStatus();
   }, [isReady, refreshGalleryStatus]);
 
-  return { ...state, isReady, setIsReady };
+  return { ...state, isReady, setIsReady, getRecordingRevision };
 }

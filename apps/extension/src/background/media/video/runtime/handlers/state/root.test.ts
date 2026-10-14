@@ -279,6 +279,7 @@ async function verifyRecordingStateLifecycle(sendResponse: ReturnType<typeof cre
     recordingHealth: 'healthy',
     success: true,
     state: {
+      completion: null,
       status: VideoRecordingStatus.IDLE,
       duration: 0,
     },

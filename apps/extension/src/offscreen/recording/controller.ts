@@ -153,12 +153,16 @@ async function startRecordingAfterPendingPublication(
     } else {
       await startRecordingImpl(params, runtimeMessaging);
     }
-    if (!hasActiveRecordingSession() && matchesActiveRecordingBinding(binding)) {
+    if (
+      !pendingRecordingStop &&
+      !hasActiveRecordingSession() &&
+      matchesActiveRecordingBinding(binding)
+    ) {
       activeRecordingBinding = null;
     }
   } catch (error) {
     if (prepareData) cancelRecordingBegin();
-    if (matchesActiveRecordingBinding(binding)) {
+    if (!pendingRecordingStop && matchesActiveRecordingBinding(binding)) {
       activeRecordingBinding = previousBindingRetired ? null : previousBinding;
     }
     throw error;

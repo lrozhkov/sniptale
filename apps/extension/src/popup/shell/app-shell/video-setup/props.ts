@@ -49,8 +49,9 @@ function createVideoSetupActionProps(
     onStart: handleStartRecording,
     onPauseResume: handlePauseResume,
     onStop: handleStop,
+    onRefreshRecordingState: runtime.recording.handleRefreshRecordingState,
     onCancel: () =>
-      void handleStop(
+      handleStop(
         isRecordingStartInProgress(recordingState.status)
           ? { cancelStart: true }
           : { discard: true }

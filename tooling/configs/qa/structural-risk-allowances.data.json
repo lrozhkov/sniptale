@@ -578,21 +578,21 @@
       "file": "apps/extension/src/background/media/video/runtime/recording-completion.ts",
       "symbol": "<file>",
       "owner": "extension:background:media",
-      "reason": "tool-noise: This file owns one recording completion operation. It decides Stop admission, outcomes, retry, startup cancellation and IDLE. The analyzer counts contracts, logging, translation, messaging and storage imports as separate owners. Recording identity, tab identity, runtime projection and terminal lease belong to this operation. Surface, grant, recorder and storage effects retain their existing owners. An independent reader confirmed this boundary. Delivery failure and ACK settlement have private phases within this owner.",
+      "reason": "tool-noise: This file owns one recording completion operation. It decides Stop admission, outcomes, retry, startup cancellation and IDLE. Its new read-only projection derives from the same lease and Stop admission. It grants no new authority and introduces no state owner. The score remains ten and cohesion increases to 0.97. Existing architecture review checked the boundary. Final review must check this projection.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent operation, fixture lifetime, transition authority or effect owner. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-10-14",
-      "astHash": "5f13f0552641190cf2c9aa12988504d014df4e6ca3c2ae4f01d080d2c6757af1",
-      "signatureHash": "7438bd6bb7e15e3d2027321e9628a39cb6abeb5c13a9d2b02f82ea78c147f1cb"
+      "astHash": "b0336c47ef6b6b8979842027acd061c8086454a6b59d0a38f163966d80c53c9f",
+      "signatureHash": "e60420bdb9852442df8c6e72c3543983d04808fa3e4ec324db2dde8a932041f6"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts",
       "symbol": "<file>",
       "owner": "extension:background:media",
-      "reason": "tool-noise: This file uses one storage fixture to test recording authority across completion, lease, runtime and lifecycle consumers. It controls ordering for restart, stale identity, parallel completion, watchdog and countdown cases. The score remains two and cohesion remains one. The line limit causes this finding. An independent reader confirmed that these cases share one fixture lifetime and invariant.",
+      "reason": "tool-noise: This file uses one storage fixture to test recording authority across completion, lease, runtime and lifecycle consumers. Added cases restore the same terminal outcomes into the runtime projection after worker memory loss. The score remains two and cohesion remains one. The line limit causes this finding. Existing architecture review checked this fixture boundary. Final review must check the added cases.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent operation, fixture lifetime, transition authority or effect owner. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-10-14",
-      "astHash": "815c8264455bd3728dc33e9b48ada8a06199de40d29156288fcf3757af9bd68d",
+      "astHash": "027483aa394dded96010f899829a0efecc3748824a1cc46de34eb2c338e276c0",
       "signatureHash": "d20553052c92f825c5d86b199747dc39e36550dd32e40a3cdcd57efa7ec23938"
     }
   ]

@@ -171,7 +171,10 @@ function expectRuntimeStateReset(): void {
   expect(setVideoRecordingIdMock).toHaveBeenCalledWith(null);
   expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
-  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({ error: 'permission denied' });
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    error: 'permission denied',
+    completion: null,
+  });
 }
 
 async function verifyStartFailureBroadcast(): Promise<void> {

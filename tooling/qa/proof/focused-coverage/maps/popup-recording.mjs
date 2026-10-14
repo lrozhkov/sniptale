@@ -1,5 +1,25 @@
 export const POPUP_RECORDING_OWNER_MAPPINGS = [
   {
+    owner: 'popup-recording-completion-actions',
+    productionFile: 'apps/extension/src/popup/shell/runtime/handlers.ts',
+    exclusive: true,
+    reason: 'Completion refresh and capability replacement require the real handler hook.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/handlers.test.tsx'],
+  },
+  {
+    owner: 'popup-recording-body-states',
+    productionFile: 'apps/extension/src/popup/recording/video/setup/body.tsx',
+    exclusive: true,
+    reason:
+      'Recording body proof includes pending, cleanup failure, retry, and post-record states.',
+    testFiles: [
+      'apps/extension/src/popup/recording/video/setup/body.test.tsx',
+      'apps/extension/src/popup/recording/video/setup/body.states.test.tsx',
+      'apps/extension/src/popup/recording/video/setup/index.post-record.test.tsx',
+      'apps/extension/src/popup/recording/video/setup/index.test.tsx',
+    ],
+  },
+  {
     owner: 'popup-recording-start-workflow',
     productionFile: 'apps/extension/src/popup/shell/runtime/start-recording.ts',
     exclusive: true,

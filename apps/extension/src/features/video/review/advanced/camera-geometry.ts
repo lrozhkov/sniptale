@@ -32,7 +32,7 @@ import type {
   QuickEditZoomRegion,
   QuickEditCameraTransform,
 } from './types';
-import type { QuickEditRect, QuickEditCameraSceneInput } from './scene';
+import type { QuickEditRect, QuickEditCameraSceneInput } from './types';
 
 function phaseTrajectory(
   start: number,

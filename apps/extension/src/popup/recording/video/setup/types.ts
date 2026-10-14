@@ -42,7 +42,8 @@ export interface VideoSetupPageProps {
   onStart: () => void;
   onPauseResume: () => void;
   onStop: () => void;
-  onCancel: () => void;
+  onCancel: () => Promise<'accepted' | 'failed' | 'unknown'> | void;
+  onRefreshRecordingState?: () => Promise<void>;
   activeRecordingId: string | null;
   recordingState: VideoRecordingRuntimeState;
   galleryStatus: GalleryStatus | null;

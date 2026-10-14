@@ -1,5 +1,5 @@
 import type { QuickEditSpatialFrame, SpatialQuaternion } from './spatial';
-import type { QuickEditRect } from './scene';
+import type { QuickEditRect } from './types';
 
 export type QuickEditHomography = readonly [
   number,

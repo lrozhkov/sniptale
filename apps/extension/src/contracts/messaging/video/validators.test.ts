@@ -290,3 +290,32 @@ it('validates export capability payloads with optional codec reasons', () => {
     })
   ).toBe(false);
 });
+
+it('validates the completion projection without accepting malformed cleanup authority', () => {
+  const state = {
+    captureMode: null,
+    captureSource: null,
+    countdownEndsAt: null,
+    duration: 0,
+    error: null,
+    status: 'stopping',
+    viewportPresetId: null,
+  };
+  for (const outcome of ['unknown', 'stopped', 'failed']) {
+    expect(
+      isVideoRecordingRuntimeState({
+        ...state,
+        completion: { outcome, discard: true, pending: false },
+      })
+    ).toBe(true);
+  }
+  for (const completion of [
+    true,
+    {},
+    { outcome: 'idle', discard: true, pending: false },
+    { outcome: 'failed', discard: 'true', pending: false },
+    { outcome: 'stopped', discard: true, pending: 'false' },
+  ]) {
+    expect(isVideoRecordingRuntimeState({ ...state, completion })).toBe(false);
+  }
+});

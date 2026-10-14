@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
 import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
@@ -13,6 +13,22 @@ vi.mock('../../../platform/runtime-messaging', async (original) => ({
   ...(await original<typeof import('../../../platform/runtime-messaging')>()),
   sendRuntimeMessage: vi.fn().mockResolvedValue({ success: true }),
 }));
+
+vi.mock('../post-record-publication', async (original) => ({
+  ...(await original<typeof import('../post-record-publication')>()),
+  retryPendingPostRecordResult: vi.fn().mockResolvedValue(false),
+}));
+
+const startMultiSource = vi.hoisted(() => vi.fn());
+vi.mock('./index', async (original) => ({
+  ...(await original<typeof import('./index')>()),
+  startMultiSourceRecording: startMultiSource,
+}));
+
+beforeEach(() => {
+  vi.mocked(sendRuntimeMessage).mockClear();
+  setActiveMultiSourceSession(null);
+});
 
 function createArtifact(id: string): FinalizedRecordingStagingArtifact {
   const file = new File(['media'], `${id}.webm`, { type: 'video/webm' });
@@ -37,7 +53,7 @@ function createSession(): MultiSourceSession {
       {
         artifact: null,
         artifactSession: {
-          abort: vi.fn(),
+          abort: vi.fn().mockResolvedValue(undefined),
           recorder: {} as MediaRecorder,
           setLifecycleCallbacks: vi.fn(),
           start: vi.fn(),
@@ -92,8 +108,7 @@ it('aborts staging instead of finalizing a discarded artifact set', async () => 
   expect(finalizeSession).not.toHaveBeenCalled();
 });
 
-// Remove fails when discard notification is implemented.
-it.fails('notifies background once after discarded staging drains, including concurrent stop callers', async () => {
+it('notifies background once after discarded staging drains, including concurrent stop callers', async () => {
   vi.mocked(sendRuntimeMessage).mockClear();
   const session = createSession();
   let release!: () => void;
@@ -129,7 +144,7 @@ it('releases only the recording-owned webcam lease during normal stop', async ()
   session.webcamRecorder = {
     artifact: null,
     artifactSession: {
-      abort: vi.fn(),
+      abort: vi.fn().mockResolvedValue(undefined),
       recorder: {} as MediaRecorder,
       setLifecycleCallbacks: vi.fn(),
       start: vi.fn(),
@@ -150,4 +165,123 @@ it('releases only the recording-owned webcam lease during normal stop', async ()
   await stopMultiSourceSession({ discard: false, finalizeSession, session });
 
   expect(webcamRelease).toHaveBeenCalledOnce();
+});
+
+it('waits for starting artifact abort through the bound controller before reporting stopped', async () => {
+  const controller = await import('../controller');
+  const session = createSession();
+  session.lifecycle = createMultiSourceLifecycle();
+  let releaseAbort!: () => void;
+  let enteredAbort!: () => void;
+  let enteredStart!: () => void;
+  const abortPending = new Promise<void>((resolve) => {
+    releaseAbort = resolve;
+  });
+  const abortEntered = new Promise<void>((resolve) => {
+    enteredAbort = resolve;
+  });
+  const startEntered = new Promise<void>((resolve) => {
+    enteredStart = resolve;
+  });
+  vi.mocked(session.recorders[0]!.artifactSession.abort).mockImplementation(async () => {
+    enteredAbort();
+    await abortPending;
+  });
+  startMultiSource.mockImplementationOnce(async () => {
+    setActiveMultiSourceSession(session);
+    enteredStart();
+    await session.lifecycle.startPromise;
+  });
+  const binding = {
+    recordingId: session.recordingId,
+    generation: 1,
+    streamInstanceId: 'source-start',
+  };
+  const starting = controller.startRecording({
+    ...binding,
+    streamId: 'desktop-multi',
+    settings: { ...DEFAULT_VIDEO_SETTINGS, sourceCount: 2 },
+  });
+  await startEntered;
+  const stopping = controller.stopRecording(binding, true);
+  let settled = false;
+  void stopping.then(() => {
+    settled = true;
+  });
+  await abortEntered;
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const duplicate = controller.stopRecording(binding, true);
+  const duplicateOutcome = duplicate.catch((error: unknown) => error);
+  const settledBeforeAbort = settled;
+  const notificationsBeforeAbort = vi.mocked(sendRuntimeMessage).mock.calls.length;
+  releaseAbort();
+  await starting;
+  await expect(stopping).resolves.toEqual({ result: 'stopped' });
+  await expect(duplicateOutcome).resolves.toEqual({ result: 'stopped' });
+  expect(duplicate).toBe(stopping);
+  expect(settledBeforeAbort).toBe(false);
+  expect(notificationsBeforeAbort).toBe(0);
+  expect(sendRuntimeMessage).toHaveBeenCalledExactlyOnceWith({
+    type: VideoMessageType.OFFSCREEN_RECORDING_STOPPED,
+    recordingId: session.recordingId,
+  });
+});
+
+it.each(['starting-artifact', 'starting-staging', 'active-staging'] as const)(
+  'retains rejected cleanup without a success notification or repeat work: %s',
+  async (failure) => {
+    const session = createSession();
+    if (failure.startsWith('starting')) session.lifecycle = createMultiSourceLifecycle();
+    if (failure === 'starting-artifact')
+      vi.mocked(session.recorders[0]!.artifactSession.abort).mockRejectedValue(
+        new Error('Artifact abort failed')
+      );
+    else vi.mocked(session.staging.abort).mockRejectedValue(new Error('Staging abort failed'));
+    setActiveMultiSourceSession(session);
+    const params = { discard: true, finalizeSession: vi.fn(), session };
+    const first = stopMultiSourceSession(params);
+    await expect(first).rejects.toThrow();
+    const calls = vi.mocked(session.staging.abort).mock.calls.length;
+    const retry = stopMultiSourceSession(params);
+    expect(retry).toBe(first);
+    await expect(retry).rejects.toThrow();
+    expect(session.staging.abort).toHaveBeenCalledTimes(calls);
+    expect(sendRuntimeMessage).not.toHaveBeenCalled();
+  }
+);
+
+it('retains starting cleanup failure through the controller after the active session is gone', async () => {
+  const controller = await import('../controller');
+  const session = createSession();
+  session.recordingId = 'failed-starting-cleanup';
+  session.lifecycle = createMultiSourceLifecycle();
+  vi.mocked(session.recorders[0]!.artifactSession.abort).mockRejectedValue(
+    new Error('Abort refused')
+  );
+  let started!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  startMultiSource.mockImplementationOnce(async () => {
+    setActiveMultiSourceSession(session);
+    started();
+    await session.lifecycle.startPromise;
+  });
+  const binding = {
+    recordingId: session.recordingId,
+    generation: 2,
+    streamInstanceId: 'failed-source',
+  };
+  const starting = controller.startRecording({
+    ...binding,
+    streamId: 'desktop-multi',
+    settings: { ...DEFAULT_VIDEO_SETTINGS, sourceCount: 2 },
+  });
+  await entered;
+  const first = await controller.stopRecording(binding, true);
+  await starting;
+  expect(first.result).toBe('terminal-failure');
+  await expect(controller.stopRecording(binding, true)).resolves.toEqual(first);
+  expect(session.recorders[0]!.artifactSession.abort).toHaveBeenCalledOnce();
+  expect(sendRuntimeMessage).not.toHaveBeenCalled();
 });

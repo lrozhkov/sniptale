@@ -877,3 +877,26 @@ it('returns to IDLE when an admitted start has no required tab identity', async 
   expect(getVideoRecordingRuntimeState().status).toBe(VideoRecordingStatus.IDLE);
   expect(boundary.requestStop).not.toHaveBeenCalled();
 });
+
+it.each(['unknown', 'stopped', 'failed'] as const)(
+  'restores the %s completion projection after worker memory is lost',
+  async (outcome) => {
+    await start(CaptureMode.TAB);
+    await updateVideoRecordingTerminal(
+      { recordingId, generation: 1, streamInstanceId: 'source-a' },
+      {
+        discard: true,
+        outcome,
+        cleanupStep: 'surface',
+      }
+    );
+    resetActiveVideoRecordingLeaseForTests();
+    resetCompletedVideoRecordingSession();
+    resetVideoRecordingRuntimeState();
+    await expect(readState()).resolves.toEqual(
+      expect.objectContaining({
+        state: expect.objectContaining({ completion: { discard: true, outcome, pending: false } }),
+      })
+    );
+  }
+);

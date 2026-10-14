@@ -17,7 +17,10 @@ import {
   restoreAuthorizedCameraRecorderDocument,
 } from '../../camera-recorder-control';
 import { getActiveVideoRecordingLeaseSnapshot } from '../../../recording-control-lease';
-import { ensureActiveVideoRecordingLeaseHydrated } from '../../recording-completion';
+import {
+  ensureActiveVideoRecordingLeaseHydrated,
+  getRecordingCompletionState,
+} from '../../recording-completion';
 import {
   resolveTrustedCameraRecorderRuntimeSenderUrl,
   resolveTrustedPopupRuntimeSenderUrl,
@@ -119,7 +122,10 @@ function sendRecordingStateResponse(
   sender?: chrome.runtime.MessageSender,
   postRecordResult: Awaited<ReturnType<typeof readPendingVideoPostRecordResult>> = null
 ): void {
-  const recordingState = getVideoRecordingRuntimeState() as VideoRecordingRuntimeState;
+  const recordingState: VideoRecordingRuntimeState = {
+    ...getVideoRecordingRuntimeState(),
+    completion: getRecordingCompletionState(),
+  };
   const controlCapability = resolveRecordingControlCapabilityForSender(sender);
   sendResponse({
     success: true,

@@ -1,7 +1,7 @@
 import { cameraTrajectoryBounds } from '../../composition/motion/camera-trajectory';
 import type { CameraPanBounds, CameraTrajectory } from '../../composition/motion/camera-trajectory';
 import type { CameraProjectionProof } from '../../composition/motion/camera-plan-proof';
-import type { QuickEditRect } from './scene';
+import type { QuickEditRect } from './types';
 
 type Range = readonly [number, number];
 type Derivatives = readonly [Range, Range, Range];

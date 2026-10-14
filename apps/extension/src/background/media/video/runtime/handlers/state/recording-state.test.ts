@@ -218,7 +218,7 @@ it('handles recording state and tab lookup through the recording owner', async (
   expect(sendResponse).toHaveBeenCalledWith({
     recordingHealth: 'healthy',
     success: true,
-    state: { duration: 0, status: VideoRecordingStatus.IDLE },
+    state: { duration: 0, status: VideoRecordingStatus.IDLE, completion: null },
   });
   expectAsyncRoute(handleRecordingTabId(sendResponse, 17));
   await flushAsyncRoute();
@@ -249,6 +249,7 @@ it('marks recording-state reads as degraded when the runtime state already carri
     recordingHealth: 'degraded',
     success: true,
     state: {
+      completion: null,
       duration: 12,
       error: 'Microphone unavailable',
       status: VideoRecordingStatus.RECORDING,

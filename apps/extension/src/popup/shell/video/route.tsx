@@ -31,7 +31,7 @@ export function VideoRoute({ startup }: { startup: PopupStartupDescriptor }) {
       ? { initialMode: initialStartup.videoMode }
       : {}),
   });
-  const handlers = usePopupRuntimeHandlers(state);
+  const handlers = usePopupRuntimeHandlers(state, state.getRecordingRevision);
   const pageAccess = usePopupPageAccessRuntime(capabilities);
   const runtime = assemblePopupVideoRuntimeState(state, handlers, pageAccess);
   useVideoRouteBootstrap(initialStartup, capabilities, state);

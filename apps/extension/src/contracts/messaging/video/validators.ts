@@ -196,6 +196,14 @@ export function isVideoRecordingRuntimeState(value: unknown): value is VideoReco
     (value['liveMedia'] === undefined ||
       value['liveMedia'] === null ||
       isVideoRecordingLiveMediaState(value['liveMedia'])) &&
+    (value['completion'] === undefined ||
+      value['completion'] === null ||
+      (isRecord(value['completion']) &&
+        isBoolean(value['completion']['discard']) &&
+        isBoolean(value['completion']['pending']) &&
+        (value['completion']['outcome'] === 'unknown' ||
+          value['completion']['outcome'] === 'stopped' ||
+          value['completion']['outcome'] === 'failed'))) &&
     (value['error'] === null || isString(value['error']))
   );
 }

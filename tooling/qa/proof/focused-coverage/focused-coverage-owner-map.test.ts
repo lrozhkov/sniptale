@@ -367,3 +367,21 @@ it('keeps actual Stop and startup concurrency proof on the completion owner', as
     ])
   );
 });
+
+it('selects completion refresh, body states, and native clock response proof', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/popup/shell/runtime/handlers.ts`)).toEqual(
+    [`${root}/popup/shell/runtime/handlers.test.tsx`]
+  );
+  expect(
+    module.resolveMappedCoverageOwnerTests(`${root}/popup/recording/video/setup/body.tsx`)
+  ).toContain(`${root}/popup/recording/video/setup/body.states.test.tsx`);
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      `${root}/background/media/video/runtime/handlers/state/recording-state-response.ts`
+    )
+  ).toContain(
+    `${root}/background/media/video/runtime/handlers/state/recording-state.clock.test.ts`
+  );
+});

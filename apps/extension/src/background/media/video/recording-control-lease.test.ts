@@ -219,6 +219,7 @@ it('hydrates active recording state from a persisted lease after restart', async
   expect(setVideoRecordingIdMock).toHaveBeenCalledWith('recording-2');
   expect(setVideoRecordingTabIdMock).toHaveBeenCalledWith(77);
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    completion: null,
     captureMode: CaptureMode.TAB_CROP,
     countdownEndsAt: null,
     cropRegion: { x: 10, y: 20, width: 300, height: 200 },

@@ -289,6 +289,7 @@ it('switches to STOPPING and notifies offscreen when a live recording stops', as
 
   expect(OVERLAY_RESTORE_RETRY_DELAYS_MS).toEqual([0, 250, 1000]);
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    completion: null,
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: null,
@@ -406,6 +407,7 @@ it('retains STOPPING when confirmed completion cleanup fails', async () => {
   await expect(stopRecording()).resolves.toEqual({ error: 'restore-conflict', result: 'failed' });
   expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenLastCalledWith({
+    completion: { discard: false, outcome: 'stopped', pending: false },
     status: VideoRecordingStatus.STOPPING,
     error: 'restore-conflict',
   });
@@ -463,11 +465,13 @@ it('retains unknown terminal state when offscreen stop delivery fails', async ()
 
   expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenNthCalledWith(1, {
+    completion: null,
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: null,
   });
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenNthCalledWith(2, {
+    completion: { discard: false, outcome: 'unknown', pending: false },
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: 'transport failed',
@@ -592,6 +596,7 @@ it('keeps committed post-record completion idle when only the stop response is l
   );
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    completion: null,
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: null,
@@ -656,6 +661,7 @@ it('retains the lease and session when saved-result publication is not acknowled
   expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
   expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenLastCalledWith({
+    completion: { discard: false, outcome: 'unknown', pending: false },
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: 'session storage failed',
@@ -688,6 +694,7 @@ it('retains accepted-start terminal intent when its offscreen stop is rejected',
 
   expect(restoreVideoRecordingOffscreenStartPendingMock).not.toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenLastCalledWith({
+    completion: { discard: true, outcome: 'unknown', pending: false },
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: 'stop rejected',
