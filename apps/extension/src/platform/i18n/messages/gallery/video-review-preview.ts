@@ -16,6 +16,8 @@ export const galleryVideoReviewPreviewMessages = defineMessageSource({
   previewShowFrameRate: { ru: 'Показывать FPS', en: 'Show FPS' },
   previewOff: { ru: 'Выкл.', en: 'Off' },
   previewOn: { ru: 'Вкл.', en: 'On' },
+  workspaceColor: { ru: 'Цвет рабочей зоны', en: 'Workspace color' },
+  workspaceColorAutomatic: { ru: 'Цвет по теме', en: 'Use theme color' },
   previewReset: { ru: 'Сбросить', en: 'Reset' },
   previewActualRaster: { ru: 'Фактическое разрешение превью', en: 'Actual preview resolution' },
   previewOnly: {

@@ -117,14 +117,33 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
   };
 }
 
+/** Admit only normalized solid colors for the two resolved application themes. */
+function parseWorkspaceColors(value: unknown): QuickEditUiState['workspaceColors'] | null {
+  if (value === undefined) return {};
+  if (!isRecord(value) || Array.isArray(value)) return null;
+  const colors: NonNullable<QuickEditUiState['workspaceColors']> = {};
+  for (const theme of ['light', 'dark'] as const) {
+    const raw = value[theme];
+    if (raw === undefined) continue;
+    if (typeof raw !== 'string') return null;
+    const color = normalizePaintColor(raw);
+    if (!color) return null;
+    colors[theme] = color;
+  }
+  return colors;
+}
+
 function parseUiState(value: unknown): QuickEditUiState | null {
   if (!isRecord(value) || (value['mode'] !== 'basic' && value['mode'] !== 'advanced')) return null;
   const initialized = value['advancedTracksInitialized'];
   if (initialized !== undefined && typeof initialized !== 'boolean') return null;
+  const workspaceColors = parseWorkspaceColors(value['workspaceColors']);
+  if (!workspaceColors) return null;
   const tracks = parseTrackVisibility(value['tracks']);
   if (!tracks) return null;
   // Pre-overlay workspaces omit the display toggle; missing or invalid falls back on.
   return {
+    ...(value['workspaceColors'] === undefined ? {} : { workspaceColors }),
     mode: value['mode'],
     ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
@@ -661,7 +680,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].some(
       (known) => known >= firstHistorical && version === known
     )
   );

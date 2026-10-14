@@ -72,11 +72,11 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when workspace composition adds a persistence writer or mutation queue rather than passing existing editor bindings. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "b479c42580f878c750a1db293b5e1ada8b630591d77daa5eb75df81e699c3d56",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess if this owner acquires another state authority or independent operation. Remove when the analyzer recognizes this cohesive boundary.",
+      "astHash": "9014945003e7bde436726efe371b93e3e975e6814a60d7444464aaf4121c150d",
       "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e",
-      "reason": "tool-noise: The existing editor composes its session state, navigation, panel sizing, preview/inspector/timeline and audio layers. Added annotation bindings pass the same state commands, snapshots and source identity into existing children; they add no writer or queue. Caption/history/playback guards still use the existing beforeAction owner. Outer score is unchanged and the body remains one workspace view. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: ReviewEditor binds workspace color style and existing UI save/reset commands. Theme and preview stay in workspace-color; durable changes stay in useReviewAdvanced/session. Another view wrapper would only forward these bindings. Read-only workspace_color_structural_diagnosis independently confirmed Keep. Complete-candidate architecture review remains required.",
+      "reviewDate": "2026-10-15"
     },
     {
       "rule": "structural-file-risk",
@@ -215,10 +215,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence",
-      "reason": "tool-noise: One review workspace fixture owns the storage receiver. Crop cases extend stale-write, quota-retry, restore and history checks through that same fixture. They add no production writer or independent recovery authority. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
-      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-14",
-      "astHash": "3f3ae7f6cdff64e1f27a566915fd86ca08d128e52778bc91c05dd09ebd1e9639",
+      "reason": "tool-noise: Workspace color restore and competing UI writer cases share the existing isolated transactional fixture. Mock control and case-local advanced values are not product state authorities. Read-only workspace_color_structural_diagnosis independently confirmed Keep. Complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess if this owner acquires another state authority or independent operation. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-15",
+      "astHash": "21e0353304bd8705c504791aa3c825d285c7d85be2ccf71c489b305f4832c960",
       "signatureHash": "b327e93b8e7ed0284582f4dfb3249f64ac9b0107b37a2552656a373c887b99f2"
     },
     {

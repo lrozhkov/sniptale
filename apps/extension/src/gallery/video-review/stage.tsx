@@ -216,6 +216,11 @@ export function ReviewStage(props: ReviewStageProps) {
   return (
     <div
       ref={host}
+      data-ui="gallery.videoReview.workspaceSurface"
+      style={{
+        backgroundColor:
+          'var(--sniptale-review-workspace-color, var(--sniptale-color-surface-canvas))',
+      }}
       onPointerDownCapture={beginInteraction}
       className={[
         'relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]',

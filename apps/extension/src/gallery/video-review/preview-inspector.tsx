@@ -1,4 +1,5 @@
-import { SelectField } from '../../ui/compact-inspector-controls';
+import type { useReviewWorkspaceColor } from './workspace-color';
+import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   QUICK_PREVIEW_RASTER_PRESETS,
@@ -10,6 +11,9 @@ import { ReviewButton, reviewSelectFieldClassName } from './controls';
 
 /** Runtime supplies actual dimensions; this panel owns no rendering or persisted project state. */
 type ReviewPreviewInspectorBinding = {
+  workspaceColor?: ReturnType<typeof useReviewWorkspaceColor>;
+  projectFailed?: boolean;
+  onProjectRetry?: () => void;
   preferences: QuickPreviewPreferences;
   status: ReturnType<typeof useReviewPreviewPreferences>['status'];
   actualRaster: { width: number; height: number } | null;
@@ -88,6 +92,37 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
         ]}
         onChange={(value: 'on' | 'off') => props.onChange({ showFrameRate: value === 'on' })}
       />
+      {props.workspaceColor?.value ? (
+        <ColorField
+          key={props.workspaceColor.theme}
+          label={translate('gallery.videoReview.workspaceColor')}
+          title={translate('gallery.videoReview.workspaceColor')}
+          value={props.workspaceColor.value}
+          disabled={props.disabled === true}
+          paletteInPicker
+          allowAlpha={false}
+          allowTransparent={false}
+          onChange={props.workspaceColor.change}
+          onPreviewChange={props.workspaceColor.preview}
+          onPreviewReset={props.workspaceColor.cancel}
+        />
+      ) : null}
+      {props.workspaceColor ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.workspaceColorAutomatic')}
+          disabled={props.disabled}
+          onClick={props.workspaceColor.reset}
+        />
+      ) : null}
+      {props.projectFailed ? (
+        <div role="alert" className="space-y-1 text-xs">
+          <span>{translate('gallery.videoReview.saveFailed')}</span>
+          <ReviewButton
+            label={translate('gallery.videoReview.retry')}
+            onClick={() => props.onProjectRetry?.()}
+          />
+        </div>
+      ) : null}
       <ReviewButton
         label={translate('gallery.videoReview.previewReset')}
         disabled={props.disabled}

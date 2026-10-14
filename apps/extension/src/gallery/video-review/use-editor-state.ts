@@ -520,6 +520,7 @@ function reviewAdvancedControls(
       }),
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
+    setWorkspaceColor: advancedState.setWorkspaceColor,
     setKeyAnimations: advancedState.setKeyAnimations,
     setActionAudio: advancedState.setActionAudio,
     setActionsEnabled: advancedState.setActionsEnabled,

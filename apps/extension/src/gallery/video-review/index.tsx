@@ -1,3 +1,4 @@
+import { useReviewWorkspaceColor } from './workspace-color';
 import {
   useReviewInspectorNavigation,
   reviewTimelineInspectorCommands,
@@ -114,6 +115,11 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
   const [fullHeight, setFullHeight] = useState(false);
   const panelsEnabled = state.advanced.ui.mode === 'advanced';
   const panels = useReviewPanelLayout(panelsEnabled);
+  const workspaceColor = useReviewWorkspaceColor(
+    panels.container,
+    state.advanced.ui.workspaceColors,
+    state.setWorkspaceColor
+  );
   const { navigation, requestExport, historyCommands } = useReviewEditorNavigation(state);
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const music = useReviewMusicImport(state);
@@ -140,6 +146,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
           data-ui="gallery.videoReview.workspace"
           inert={voiceover.recording}
           style={{
+            ...workspaceColor.style,
             gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
             gridTemplateRows: `minmax(0,1fr) ${panels.timelineHeight === null ? 'auto' : `${panels.timelineHeight}px`}`,
           }}
@@ -157,11 +164,19 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
             onJoinPreview={onJoinPreview ?? joinPreview.open}
             preview={
               <ReviewPreviewInspector
+                workspaceColor={workspaceColor}
+                projectFailed={state.advancedFailed}
+                onProjectRetry={() => {
+                  void state.retryAdvanced().catch(() => undefined);
+                }}
                 preferences={previewPreferences.preferences}
                 status={previewPreferences.status}
                 actualRaster={previewRaster}
                 onChange={previewPreferences.change}
-                onReset={previewPreferences.reset}
+                onReset={() => {
+                  previewPreferences.reset();
+                  workspaceColor.reset();
+                }}
                 onRetry={previewPreferences.retry}
               />
             }

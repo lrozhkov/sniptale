@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createCameraFollowSettings } from '../../project/camera/cursor-policy';
-import { createQuickEditAdvancedContent } from './defaults';
-import { loadQuickEditAdvancedContentState } from './validation';
+import { createQuickEditAdvancedState, createQuickEditAdvancedContent } from './defaults';
+import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 
 it('retains defaults and local camera policy through native serialization and history admission', () => {
   const content = {
@@ -41,4 +41,23 @@ it('continues reading the released schema nineteen without inserting new policy'
     ...previous,
     schemaVersion: createQuickEditAdvancedContent().schemaVersion,
   });
+});
+
+it('preserves theme workspace colors, rejects malformed colors, and leaves legacy UI absent', () => {
+  const state = createQuickEditAdvancedState();
+  expect(
+    loadQuickEditAdvancedState({ ...state, schemaVersion: 21 })?.ui.workspaceColors
+  ).toBeUndefined();
+  const value = {
+    ...state,
+    ui: { ...state.ui, workspaceColors: { light: '#abcdef', dark: '#123456' } },
+  };
+  expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(value)))?.ui.workspaceColors).toEqual(
+    { light: '#abcdefff', dark: '#123456ff' }
+  );
+  for (const workspaceColors of [null, [], { light: 'url(https://example.com)' }, { dark: 3 }]) {
+    expect(
+      loadQuickEditAdvancedState({ ...state, ui: { ...state.ui, workspaceColors } })
+    ).toBeNull();
+  }
 });

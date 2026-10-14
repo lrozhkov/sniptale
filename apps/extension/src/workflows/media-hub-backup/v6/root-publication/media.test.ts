@@ -1,3 +1,4 @@
+import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import { openAsBlob } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -685,7 +686,10 @@ it('retains imported quick-edit recording and mirror without clearing source Tra
             revision: 1,
             history: [],
             cursor: 0,
-            advanced: createQuickEditAdvancedState(),
+            advanced: {
+              ...createQuickEditAdvancedState(),
+              ui: { ...createQuickEditAdvancedState().ui, workspaceColors: { dark: '#123456ff' } },
+            },
             createdAt: 1,
             updatedAt: 2,
           },
@@ -718,4 +722,11 @@ it('retains imported quick-edit recording and mirror without clearing source Tra
     lifecycle: { storageClass: 'library', trashedAt: 3 },
   });
   expect(fixture.rows.get('asset_refs')!.has('restored-source')).toBe(true);
+  const restored = await readWorkspaceStorage(
+    fixture.database.transaction(['video_workspaces', 'video_workspace_history'], 'readonly'),
+    id
+  );
+  expect(restored.logical).toMatchObject({
+    advanced: { ui: { workspaceColors: { dark: '#123456ff' } } },
+  });
 });

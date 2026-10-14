@@ -32,7 +32,7 @@ vi.mock('../../composition/persistence/assets/opfs-store', async (original) => (
 }));
 afterEach(() => vi.unstubAllGlobals());
 
-it.each(['text', 'crop'] as const)(
+it.each(['text', 'crop', 'workspace color'] as const)(
   'no deleted %s returns: delayed editor write, purge retry, and same-identity recreation',
   async (kind) => {
     vi.stubGlobal('chrome', undefined);
@@ -74,6 +74,10 @@ it.each(['text', 'crop'] as const)(
     };
     const oldEditor = createVideoReviewSession(initial, {
       ...reviewSessionPersistence,
+      saveVideoWorkspaceAdvanced: async (args) => {
+        if (kind === 'workspace color') await waitForRelease();
+        return reviewSessionPersistence.saveVideoWorkspaceAdvanced(args);
+      },
       saveVideoWorkspaceDraft: async (args) => {
         if (kind === 'text') await waitForRelease();
         return reviewSessionPersistence.saveVideoWorkspaceDraft(args);
@@ -100,7 +104,14 @@ it.each(['text', 'crop'] as const)(
       },
     };
     const write = () =>
-      kind === 'text' ? oldEditor.saveDraft(annotation, null) : oldEditor.commit(cropOperation);
+      kind === 'text'
+        ? oldEditor.saveDraft(annotation, null)
+        : kind === 'crop'
+          ? oldEditor.commit(cropOperation)
+          : oldEditor.saveAdvanced({
+              ...initial.workspace.advanced,
+              ui: { ...initial.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },
+            });
     const delayedWrite = write();
     await started;
     try {
@@ -133,6 +144,7 @@ it.each(['text', 'crop'] as const)(
       expect(purgedWhileLive).toBe(false);
       expect(recreated.workspace.history).toEqual([]);
       expect(recreated.workspace.advanced.canvas).toBeUndefined();
+      expect(recreated.workspace.advanced.ui.workspaceColors).toBeUndefined();
     } finally {
       resume();
       await delayedWrite.catch(() => undefined);

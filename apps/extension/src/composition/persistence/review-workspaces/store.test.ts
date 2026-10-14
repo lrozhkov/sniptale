@@ -316,7 +316,11 @@ it('rejects a stale tab after restore even when imported history has the same nu
   replaceLegacyWorkspaceFixture(rows, id, {
     ...opened.workspace,
     sourceAssetId: 'restored-local',
-    advanced: { ...opened.workspace.advanced, canvas: restoredCanvas },
+    advanced: {
+      ...opened.workspace.advanced,
+      canvas: restoredCanvas,
+      ui: { ...opened.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },
+    },
   });
   await expect(
     commitVideoWorkspace({
@@ -335,6 +339,17 @@ it('rejects a stale tab after restore even when imported history has the same nu
       },
     })
   ).rejects.toMatchObject({ code: 'conflict' });
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedRevision: 1,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      advanced: opened.workspace.advanced,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  expect((await readVideoWorkspace(id))?.workspace.advanced.ui.workspaceColors).toEqual({
+    dark: '#123456ff',
+  });
   expect((await readVideoWorkspace(id))?.workspace.history).toEqual([]);
   expect((await readVideoWorkspace(id))?.workspace.advanced.canvas).toEqual(restoredCanvas);
 });
@@ -853,4 +868,28 @@ it('preserves crop history across stale writers, quota refusal, retry, undo and 
     direction: 'redo',
   });
   expect(redone.workspace.history).toEqual(saved.workspace.history);
+});
+
+it('preserves workspace colors against a parallel stale UI writer and through reopen', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const advanced = {
+    ...opened.workspace.advanced,
+    ui: {
+      ...opened.workspace.advanced.ui,
+      workspaceColors: { light: '#abcdefff', dark: '#123456ff' },
+    },
+  };
+  const request = {
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    advanced,
+  };
+  await saveVideoWorkspaceAdvanced(request);
+  await expect(
+    saveVideoWorkspaceAdvanced({ ...request, advanced: opened.workspace.advanced })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  const reopened = await openVideoWorkspace(id, source);
+  expect(reopened.workspace.advanced.ui.workspaceColors).toEqual(advanced.ui.workspaceColors);
+  expect(reopened.workspace.history).toEqual([]);
 });

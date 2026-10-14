@@ -170,6 +170,13 @@ function reviewAdvancedUiCommands(
         ui: { ...current.ui, tracks: { ...current.ui.tracks, [track]: visible } },
       }));
     },
+    setWorkspaceColor: (theme: 'light' | 'dark', color: string | null) =>
+      stage((current) => {
+        const workspaceColors = { ...current.ui.workspaceColors };
+        if (color === null) delete workspaceColors[theme];
+        else workspaceColors[theme] = color;
+        return { ...current, ui: { ...current.ui, workspaceColors } };
+      }),
     setOverlaysVisible: (visible: boolean) =>
       stage((current) => ({ ...current, ui: { ...current.ui, overlaysVisible: visible } })),
   };

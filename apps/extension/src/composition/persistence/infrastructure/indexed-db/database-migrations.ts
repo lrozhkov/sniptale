@@ -704,4 +704,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 25, to: 26 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 30,
+    toDatabaseVersion: 31,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Workspace color stores are unavailable.');
+      return undefined;
+    },
+  },
 ];

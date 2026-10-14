@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 21;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 22;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -17,6 +17,8 @@ export interface QuickEditTrackVisibility {
 }
 
 export interface QuickEditUiState {
+  /** Project workspace appearance, independent of authored scene and history. */
+  workspaceColors?: Partial<Record<'light' | 'dark', string>>;
   mode: 'basic' | 'advanced';
   /** First entry reveals editing lanes; later mode switches preserve their settings. */
   advancedTracksInitialized?: boolean;

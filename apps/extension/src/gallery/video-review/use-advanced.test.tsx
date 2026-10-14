@@ -225,20 +225,27 @@ it('keeps the pending edit after a save failure, rejects flush, and retries (S3)
   deps.saveVideoWorkspaceAdvanced
     .mockRejectedValueOnce(new Error('storage'))
     .mockRejectedValueOnce(new Error('storage'));
-  act(() => advanced.setMode('advanced'));
+  act(() => {
+    advanced.setWorkspaceColor('light', '#abcdefff');
+    advanced.setWorkspaceColor('dark', '#123456ff');
+  });
   await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(advanced.saveFailed).toBe(true);
-  expect(advanced.advanced.ui.mode).toBe('advanced');
+  expect(advanced.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
   await expect(advanced.flush()).rejects.toThrow();
   expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(2);
-  expect(advanced.advanced.ui.mode).toBe('advanced');
+  expect(advanced.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
   await act(async () => advanced.retry());
   expect(advanced.saveFailed).toBe(false);
-  expect(advanced.advanced.ui.mode).toBe('advanced');
+  expect(advanced.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
   const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
     advanced: QuickEditAdvancedState;
   };
-  expect(write.advanced.ui.mode).toBe('advanced');
+  expect(write.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
+  act(() => advanced.setWorkspaceColor('light', null));
+  await act(async () => advanced.flush());
+  expect(advanced.advanced.ui.workspaceColors).toEqual({ dark: '#123456ff' });
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
 });
 
 it('persists canvas and lane gains through content history and clears an override back to native', async () => {

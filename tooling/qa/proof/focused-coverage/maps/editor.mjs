@@ -158,8 +158,9 @@ export const EDITOR_OWNER_MAPPINGS = [
     owner: 'gallery-review-editor-state',
     productionFile: 'apps/extension/src/gallery/video-review/use-editor-state.ts',
     reason:
-      'Native selection integrations exercise the owning editor state, persisted replay, action selection and contextual tools.',
+      'Native modal and selection integrations cover editor commands, recovery, persisted replay and contextual tools.',
     testFiles: [
+      'apps/extension/src/gallery/video-review/review.test.tsx',
       'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
       'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
       'apps/extension/src/gallery/video-review/index.test.tsx',

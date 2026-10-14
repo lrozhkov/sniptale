@@ -61,6 +61,59 @@ async function inspectResizeGuide(page: Page, dialog: Locator) {
   return guide;
 }
 
+async function inspectWorkspaceColor(
+  page: Page,
+  dialog: Locator,
+  locale: 'ru' | 'en',
+  screenshotPath: string
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  await dialog.locator('[data-ui="gallery.videoReview.previewSettings"]').click();
+  const surface = dialog.locator('[data-ui="gallery.videoReview.workspaceSurface"]');
+  const original = await surface.evaluate((node) => getComputedStyle(node).backgroundColor);
+  const field = dialog
+    .locator('[data-ui="shared.ui.compact-inspector.color-field"]')
+    .filter({ hasText: label('gallery.videoReview.workspaceColor') });
+  const open = () => field.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+  await open();
+  const hex = page.getByRole('textbox', { name: label('shared.ui.colorSelectorHex'), exact: true });
+  await hex.fill('#c83456');
+  await expect(surface).toHaveCSS('background-color', 'rgb(200, 52, 86)');
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  await page.keyboard.press('Escape');
+  await expect(surface).toHaveCSS('background-color', original);
+  await open();
+  await hex.fill('#123456');
+  await page
+    .getByRole('button', { name: label('shared.ui.colorSelectorApply'), exact: true })
+    .click();
+  await expect(surface).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  const originalTheme = await surface.evaluate((node) => {
+    const owner = node.closest<HTMLElement>('[data-theme]')!;
+    const theme = owner.dataset['theme']!;
+    owner.dataset['theme'] = theme === 'dark' ? 'light' : 'dark';
+    return theme;
+  });
+  await expect(surface).not.toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await open();
+  await hex.fill('#abcdef');
+  await page
+    .getByRole('button', { name: label('shared.ui.colorSelectorApply'), exact: true })
+    .click();
+  await expect(surface).toHaveCSS('background-color', 'rgb(171, 205, 239)');
+  await dialog
+    .getByRole('button', {
+      name: label('gallery.videoReview.workspaceColorAutomatic'),
+      exact: true,
+    })
+    .click();
+  await surface.evaluate((node, theme) => {
+    node.closest<HTMLElement>('[data-theme]')!.dataset['theme'] = theme;
+  }, originalTheme);
+  await expect(surface).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  return surface;
+}
+
 for (const variant of [
   { width: 1280, height: 560, theme: 'light', locale: 'ru' },
   { width: 1280, height: 560, theme: 'dark', locale: 'en' },
@@ -199,6 +252,32 @@ for (const variant of [
         path: info.outputPath('source-tools-and-ruler.png'),
         fullPage: false,
       });
+      const workspaceSurface = await inspectWorkspaceColor(
+        page,
+        dialog,
+        variant.locale,
+        info.outputPath('workspace-picker.png')
+      );
+      await page.screenshot({ path: info.outputPath('workspace-color.png'), fullPage: false });
+      await expect
+        .poll(
+          async () =>
+            (
+              await readNativeReviewWorkspace(
+                page,
+                `recording:${betaV1Fixture.records.recordings[0]!.id}`
+              )
+            )?.advanced.ui.workspaceColors
+        )
+        .toEqual({ [variant.theme]: '#123456ff' });
+      await page.reload();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(workspaceSurface).toHaveCSS('background-color', 'rgb(18, 52, 86)');
       if (variant.width < 1280) {
         const scroll = dialog.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
         expect(await scroll.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
