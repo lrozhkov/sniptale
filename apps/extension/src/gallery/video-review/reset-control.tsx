@@ -66,6 +66,7 @@ export function ReviewResetControl(props: {
         ? createPortal(
             <div onKeyDown={(event) => event.stopPropagation()}>
               <ProductConfirmDialog
+                dialogClassName="sniptale-compact-workspace"
                 title={translate('gallery.videoReview.resetOriginal')}
                 message={
                   <>

@@ -19,7 +19,7 @@ export function ReviewBorderInspector(props: {
 }) {
   const { value, onChange } = props;
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <ColorField
         label={translate('gallery.videoReview.borderColor')}
         title={translate('gallery.videoReview.borderColor')}

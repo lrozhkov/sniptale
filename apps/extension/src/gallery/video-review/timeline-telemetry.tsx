@@ -213,6 +213,7 @@ function ReviewHistoryCluster(props: {
       style={{ left: props.left, width: props.width, top: props.top }}
     >
       <ProductSelect
+        menuClassName="sniptale-parameter-menu"
         dataUi="gallery.videoReview.historyCluster"
         value=""
         placeholder={props.members.length > 99 ? '99+' : String(props.members.length)}

@@ -254,12 +254,12 @@ function handlePointerActiveChange(
 
 function getRangeShellStyle(rangeRatio: number): CSSProperties {
   return {
-    bottom: '-1px',
+    bottom: 'var(--sniptale-inspector-range-bottom, -1px)',
     left: NUMERIC_ROW_RANGE_INLINE_INSET,
     right: NUMERIC_ROW_RANGE_INLINE_INSET,
     '--sniptale-range-fill-ratio': `${rangeRatio}%`,
-    '--sniptale-range-track-height': '4px',
-    '--sniptale-range-thumb-size': '16px',
+    '--sniptale-range-track-height': 'var(--sniptale-inspector-range-track-height, 4px)',
+    '--sniptale-range-thumb-size': 'var(--sniptale-inspector-range-thumb-size, 16px)',
   } as CSSProperties;
 }
 
@@ -271,7 +271,7 @@ function getRangeInputStyle(rangeRatio: number): CSSProperties {
     width: 'auto',
     '--sniptale-range-fill-ratio': `${rangeRatio}%`,
     '--sniptale-range-shell-height': 'var(--sniptale-range-thumb-size)',
-    '--sniptale-range-track-height': '4px',
-    '--sniptale-range-thumb-size': '16px',
+    '--sniptale-range-track-height': 'var(--sniptale-inspector-range-track-height, 4px)',
+    '--sniptale-range-thumb-size': 'var(--sniptale-inspector-range-thumb-size, 16px)',
   } as CSSProperties;
 }

@@ -215,7 +215,7 @@ export function ReviewPanelResizeHandle({ resize }: { resize: PanelResize }) {
       tabIndex={0}
       className={`review-panel-resize absolute z-20 touch-none outline-offset-[-2px]
         focus-visible:outline focus-visible:outline-2
-        focus-visible:outline-[var(--sniptale-color-focus-ring)] ${
+        focus-visible:outline-[var(--sniptale-color-accent)] ${
           panel === 'inspector' ? 'inset-y-0 -left-1 w-2' : 'inset-x-0 -top-1 h-2'
         }`}
     />

@@ -104,7 +104,7 @@ export function ReviewVoiceoverRecording(props: {
         closeOnBackdrop={false}
         labelledBy={titleId}
         backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_18%,transparent)]"
-        dialogClassName="!top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg"
+        dialogClassName="sniptale-compact-workspace !top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg"
         width="min(800px, calc(100vw - 32px))"
         maxHeight="calc(100vh - 24px)"
         scrollable
@@ -156,7 +156,10 @@ export function ReviewVoiceoverRecording(props: {
           ) : null}
         </div>
       </ProductModal>
-      <RecordingDiscardConfirmation value={session.confirmation} />
+      <RecordingDiscardConfirmation
+        dialogClassName="sniptale-compact-workspace"
+        value={session.confirmation}
+      />
     </>
   );
 }
@@ -174,6 +177,7 @@ export function VoiceoverCaptureOptions(props: {
     <RecordingSetup
       device={
         <AudioRecordingDeviceSelect
+          menuClassName="sniptale-parameter-menu"
           value={props.session.deviceId}
           onChange={props.session.setDeviceId}
           disabled={disabled || props.session.isSaving}

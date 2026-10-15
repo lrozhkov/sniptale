@@ -5,6 +5,7 @@
 [data-theme='light'],
 :host([data-theme='dark']),
 :host([data-theme='light']) {
+  --sniptale-font-interface: 'Sniptale Interface', 'Segoe UI', sans-serif;
   --sniptale-font-sans:
     'Sniptale Sans', 'Manrope Variable', 'Manrope', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 

@@ -15,6 +15,8 @@ A single checkbox is valid. Checkbox does not mean batch action. Immediate filte
 
 A switch can accept an immediate project edit with Undo or a persistent default for future operations. A checkbox can include a source in one upcoming operation without implying that the source currently operates. During recording, a microphone command or switch must expose its actual current action and state. A persistent processing setting with a live test uses a switch when no Save applies.
 
+A multiple-object boolean editor can contain different values. Use a trailing native checkbox with its indeterminate state when this editor must represent mixed values. A switch cannot represent mixed values. Keep the same control while the selected objects change. Selecting a mixed checkbox applies the enabled value through the existing edit owner.
+
 Keep accepted configuration, pending application, rejected constraints, and unsupported capabilities distinct. Status dots and current-step markers are not radio controls.
 
 | Layout | Placement and text |

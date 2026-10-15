@@ -166,7 +166,11 @@ it('edits camera placement, appearance and signed timing through inspector contr
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeSoft');
   await enter('videoEditor.sidebar.cameraRoundness', '35');
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeRounded');
-  await choose(label('webcamMirror'), label('webcamMirrorOn'));
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label('webcamMirror')}"]`)!
+      .click()
+  );
   await enter('videoEditor.sidebar.cameraCropZoom', '2');
   await enter(label('webcamCropX'), '25');
   await enter(label('webcamCropY'), '-30');
@@ -176,7 +180,11 @@ it('edits camera placement, appearance and signed timing through inspector contr
     offsetSeconds: -1.25,
     appearance: { shape: 'rounded', roundness: 35, zoom: 2, panX: 0.25, panY: -0.3 },
   });
-  await choose(label('webcamMirror'), label('webcamMirrorOff'));
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label('webcamMirror')}"]`)!
+      .click()
+  );
   click('webcamHideRange');
   expect(editor.hide).toHaveBeenCalledWith({ start: 4, end: 6 });
   click('webcamDisable');

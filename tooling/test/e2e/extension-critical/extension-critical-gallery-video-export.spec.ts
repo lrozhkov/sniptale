@@ -46,12 +46,15 @@ for (const variant of [
       const closeIdleColor = await close.evaluate((node) => getComputedStyle(node).color);
       await close.hover();
       await expect(close).not.toHaveCSS('color', closeIdleColor);
-      const danger = await close.evaluate((node) => {
+      const foreground = await close.evaluate((node) => {
         const probe = document.createElement('span');
-        probe.style.color = getComputedStyle(node).getPropertyValue('--sniptale-color-danger');
-        return probe.style.color;
+        probe.style.color = 'var(--sniptale-color-text-primary)';
+        node.appendChild(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
       });
-      await expect(close).toHaveCSS('color', danger);
+      await expect(close).toHaveCSS('color', foreground);
       await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(close).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
       await page.screenshot({ path: testInfo.outputPath('close-hover.png'), fullPage: false });
@@ -339,7 +342,19 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
     await page.getByRole('option', { name: '16:9', exact: true }).click();
     await button('videoEditor.sidebar.canvasResolutionLabel').click();
     await page.getByRole('option', { name: '1920 × 1080', exact: true }).click();
-    await button('gallery.videoReview.backgroundSolid').click();
+    const solid = button('gallery.videoReview.backgroundSolid');
+    if (await solid.count()) await solid.click();
+    else {
+      const background = dialog.locator('.review-background-kinds').getByRole('button', {
+        name: label('gallery.videoReview.background'),
+        exact: true,
+      });
+      await background.click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.backgroundSolid'), exact: true })
+        .click();
+      await expect(background).toContainText(label('gallery.videoReview.backgroundSolid'));
+    }
     const padding = dialog.getByRole('textbox', {
       name: label('gallery.videoReview.backgroundPadding'),
       exact: true,

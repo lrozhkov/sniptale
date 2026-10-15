@@ -254,7 +254,11 @@ it('controls video sound, gain, and join preview independently', async () => {
       }),
     })
   );
-  await select(0, 'Off', section());
+  const sound = section().querySelector<HTMLButtonElement>(
+    '[role="switch"][aria-label="Bookend audio"]'
+  )!;
+  expect(sound.getAttribute('aria-checked')).toBe('true');
+  act(() => sound.click());
   expect(props.onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
       intro: expect.objectContaining({
@@ -348,7 +352,11 @@ it('keeps fade settings independent and retains them when media is selected', as
   act(() => button('Fade in', section()).click());
   props.settings = vi.mocked(props.onChange).mock.calls.at(-1)![0];
   await render();
-  await select(0, 'On', section());
+  const fadeAudio = section().querySelector<HTMLButtonElement>(
+    '[role="switch"][aria-label="Fade audio"]'
+  )!;
+  expect(fadeAudio.getAttribute('aria-checked')).toBe('false');
+  act(() => fadeAudio.click());
   const changed = vi.mocked(props.onChange).mock.calls.at(-1)![0];
   expect(changed.introControl?.plain.audioFade).toBe(true);
   expect(changed.outroControl).toBeUndefined();

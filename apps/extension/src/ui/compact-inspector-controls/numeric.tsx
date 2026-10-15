@@ -9,6 +9,7 @@ import { NumericRangeScrub } from './numeric-range-scrub';
 import { NumericStepper } from './stepper';
 import { useNumericValueFieldState } from './numeric-value-state';
 import { TextWithOverflowHint } from './overflow-hint';
+import { useInspectorLayout, toggleInspectorFieldEditing } from './layout';
 
 export interface NumericValueFieldProps {
   /** Enter commits then advances by default; blur ends an isolated inspector edit. */
@@ -157,12 +158,35 @@ export function NumericRow({
   ...props
 }: NumericRowProps) {
   const range = useNumericRowRangeState(scrub, props.disabled, revealScrub);
+  const inspector = useInspectorLayout();
 
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-row"
       data-appearance={appearance}
       data-range-visible={range.visible ? 'true' : 'false'}
+      data-layout={inspector ? 'inline' : undefined}
+      data-activates={inspector ? 'true' : undefined}
+      onPointerDown={(event) => {
+        if (
+          inspector &&
+          event.button === 0 &&
+          event.target instanceof Element &&
+          !event.target.closest('input,button')
+        )
+          event.preventDefault();
+      }}
+      onClick={(event) => {
+        if (
+          !inspector ||
+          !(event.target instanceof Element) ||
+          event.target.closest('input,button')
+        )
+          return;
+        const input = event.currentTarget.querySelector<HTMLInputElement>('input[type="text"]');
+        event.stopPropagation();
+        toggleInspectorFieldEditing(input);
+      }}
       onPointerMove={range.show}
       onPointerLeave={range.hide}
       onFocusCapture={(event) => {
@@ -182,7 +206,8 @@ export function NumericRow({
             'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
           ].join(' '),
         appearance === 'plain' && 'grid grid-cols-[7.5rem_minmax(0,1fr)] py-0.5',
-        className
+        className,
+        inspector && 'sniptale-parameter-row'
       )}
     >
       {labelVisible ? <NumericRowLabel appearance={appearance} label={label} /> : null}
@@ -246,13 +271,15 @@ function NumericRowLabel({
   appearance: 'surface' | 'plain';
   label: string;
 }) {
+  const inspector = useInspectorLayout();
   return (
     <TextWithOverflowHint
       className={cx(
         'min-w-0 truncate font-semibold text-[color:var(--sniptale-color-text-secondary)]',
         appearance === 'plain'
           ? 'text-[length:var(--sniptale-compact-font-size,11px)]'
-          : 'flex-1 text-[length:var(--sniptale-compact-font-size,12px)]'
+          : 'flex-1 text-[length:var(--sniptale-compact-font-size,12px)]',
+        inspector && 'sniptale-parameter-name'
       )}
       text={label}
     />

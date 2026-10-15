@@ -395,6 +395,7 @@ export function ReviewHistoryControls(props: {
       {(['undo', 'redo'] as const).map((direction) => (
         <ReviewButton
           key={direction}
+          chrome
           label={translate(`gallery.videoReview.${direction}`)}
           toolbarPriority={1}
           toolbarLabel={translate(
@@ -482,6 +483,7 @@ function ReviewAutosaveControl(props: {
         }}
       />
       <ProductConfirmDialog
+        dialogClassName="sniptale-compact-workspace"
         isOpen={confirmReload}
         isLoading={props.busy}
         title={translate('gallery.videoReview.reload')}

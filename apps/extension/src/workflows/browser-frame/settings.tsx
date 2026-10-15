@@ -4,6 +4,7 @@ import { type WindowHeader } from '../../features/browser-frame/header';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { useWindowHeaderEditing, type WindowHeaderSettingsProps } from './editing';
 import { WindowHeaderIconControls } from './icon-controls';
+import { useInspectorLayout } from '../../ui/compact-inspector-controls/layout';
 
 /** Shared controls for explicit window-header edits in image and video editors. */
 export function WindowHeaderSettings({
@@ -13,9 +14,14 @@ export function WindowHeaderSettings({
   allowNone = true,
 }: WindowHeaderSettingsProps) {
   useAppLocale();
+  const inspector = useInspectorLayout();
   const editing = useWindowHeaderEditing({ header, onChange, disabled });
   return (
-    <fieldset disabled={disabled} className="min-w-0 space-y-3" data-ui="window-header-settings">
+    <fieldset
+      disabled={disabled}
+      className={inspector ? 'sniptale-parameter-stack' : 'min-w-0 space-y-3'}
+      data-ui="window-header-settings"
+    >
       <HeaderSegments<'none' | WindowHeader['kind']>
         label={translate('windowHeader.type')}
         value={header?.kind ?? 'none'}
@@ -95,6 +101,18 @@ function HeaderSegments<T extends string>({
   options: { id: T; label: string }[];
   onChange: (value: T) => void;
 }) {
+  const inspector = useInspectorLayout();
+  if (inspector)
+    return (
+      <SegmentedRow
+        label={label}
+        columns={options.length === 2 ? 2 : 3}
+        ariaLabel={label}
+        value={value}
+        options={options.map((option) => ({ value: option.id, label: option.label }))}
+        onChange={onChange}
+      />
+    );
   return (
     <div className="min-w-0 space-y-1.5">
       <span

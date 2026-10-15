@@ -2,6 +2,125 @@ import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cx } from './shared';
 
+const InspectorLayoutContext = React.createContext(false);
+
+/** Enables the canonical parameter construction for a migrated inspector owner. */
+export function InspectorLayout({ children }: { children: React.ReactNode }) {
+  return <InspectorLayoutContext value>{children}</InspectorLayoutContext>;
+}
+
+export function useInspectorLayout() {
+  return React.useContext(InspectorLayoutContext);
+}
+
+/** A label activation ends an existing edit or focuses its available native field. */
+export function toggleInspectorFieldEditing(input: HTMLInputElement | HTMLTextAreaElement | null) {
+  if (!input || input.matches(':disabled')) return;
+  const root = input.getRootNode();
+  const active =
+    root instanceof ShadowRoot ? root.activeElement : input.ownerDocument.activeElement;
+  if (active === input) input.blur();
+  else input.focus();
+}
+
+/** One geometry owner fits ordinary name/value rows before stacking the value. */
+export function InspectorParameterRow(props: {
+  label: string;
+  children: React.ReactNode;
+  valueMinimum?: number;
+  valueText?: string | undefined;
+  valueOptions?: readonly string[] | undefined;
+  stacked?: boolean;
+  keepInline?: boolean;
+  className?: string | undefined;
+  dataUi?: string;
+  onActivate?(): void;
+}) {
+  const row = React.useRef<HTMLDivElement>(null);
+  const name = React.useRef<HTMLSpanElement>(null);
+  const [stacked, setStacked] = React.useState(props.stacked ?? false);
+  const fit = React.useCallback(() => {
+    const element = row.current;
+    const label = name.current;
+    if (!element || !label || !element.clientWidth || props.stacked || props.keepInline) return;
+    if (element.contains(document.activeElement) || element.querySelector('[aria-expanded="true"]'))
+      return;
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) return;
+    context.font = getComputedStyle(label).font;
+    const available = element.clientWidth - 16;
+    const labelWidth = context.measureText(props.label).width;
+    const valueWidth = Math.max(
+      props.valueMinimum ?? 100,
+      props.valueText ? context.measureText(props.valueText).width + 40 : 0,
+      props.valueOptions?.length
+        ? (Math.max(...props.valueOptions.map((text) => context.measureText(text).width)) + 20) *
+            props.valueOptions.length +
+            4 +
+            2 * (props.valueOptions.length - 1)
+        : 0
+    );
+    setStacked(labelWidth > (available - 8) * 0.45 || valueWidth > (available - 8) * 0.55);
+  }, [
+    props.label,
+    props.stacked,
+    props.keepInline,
+    props.valueMinimum,
+    props.valueText,
+    props.valueOptions,
+  ]);
+  React.useLayoutEffect(() => {
+    fit();
+    const element = row.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    let disposed = false;
+    void document.fonts?.ready.then(() => {
+      if (!disposed) fit();
+    });
+    return () => {
+      disposed = true;
+      observer.disconnect();
+    };
+  }, [fit]);
+  const getActivation = () => {
+    if (props.onActivate) return props.onActivate;
+    const dropdown = row.current?.querySelector<HTMLButtonElement>(
+      '.sniptale-parameter-value button[aria-haspopup="listbox"]:enabled'
+    );
+    return dropdown ? () => dropdown.click() : undefined;
+  };
+  const isActivation = (target: EventTarget) =>
+    target instanceof Element && !target.closest('button,input,textarea,select,a,[role="slider"]');
+  return (
+    <div
+      ref={row}
+      data-ui={props.dataUi}
+      data-layout={props.stacked || stacked ? 'stacked' : 'inline'}
+      data-activates={props.onActivate ? 'true' : undefined}
+      className={cx('sniptale-parameter-row', props.className)}
+      onBlurCapture={() => queueMicrotask(fit)}
+      onPointerDown={(event) => {
+        if (getActivation() && event.button === 0 && isActivation(event.target))
+          event.preventDefault();
+      }}
+      onClick={(event) => {
+        const activate = getActivation();
+        if (activate && isActivation(event.target)) {
+          event.stopPropagation();
+          activate();
+        }
+      }}
+    >
+      <span ref={name} className="sniptale-parameter-name" title={props.label}>
+        {props.label}
+      </span>
+      <div className="sniptale-parameter-value">{props.children}</div>
+    </div>
+  );
+}
+
 export interface InspectorPanelProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }

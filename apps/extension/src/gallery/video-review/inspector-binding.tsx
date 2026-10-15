@@ -243,7 +243,7 @@ export function ReviewInspectorBinding({
         message={snapshot.error ? reviewErrorMessage(snapshot.error) : state.message}
         onBack={() => leave(onBack)}
         onClose={() => leave(onClose)}
-        rangeSelected={state.selection.kind === 'range'}
+        rangeSelected={!!state.playbackRange}
         onAdd={state.add}
         onSelect={state.selectComment}
         onHover={state.setHovered}

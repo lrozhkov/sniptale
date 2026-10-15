@@ -39,7 +39,8 @@ function buildTriggerDisplayValue(value: string, formatMode: ColorSelectorFormat
   return resolvedColor.toUpperCase();
 }
 
-function ColorValue(props: {
+/** Inline structured-color editing shared by solid color and paint triggers. */
+export function ColorValue(props: {
   value: string;
   displayValue: string;
   label: string;

@@ -14,6 +14,7 @@ import { mergeFloatingInteractionLayerStyle } from '@sniptale/ui/floating-intera
 import { FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import { cx } from './shared';
+import { useInspectorLayout } from './layout';
 import type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
 
 interface CompactSelectMenuProps<T extends string> {
@@ -52,6 +53,7 @@ export function CompactSelectMenu<T extends string>({
   theme,
   value,
 }: CompactSelectMenuProps<T>): ReactNode {
+  const inspector = useInspectorLayout();
   const containedMenuRef = useFloatingSurfaceWheelContainment(menuRef);
   const selectedIndex = options.findIndex((option) => option.value === value);
   useLayoutEffect(() => {
@@ -82,7 +84,8 @@ export function CompactSelectMenu<T extends string>({
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_86%,transparent)]',
         'bg-[color:var(--sniptale-color-surface-canvas)]',
         'shadow-[var(--sniptale-shadow-floating-strong)]',
-        menuClassName
+        menuClassName,
+        inspector && 'sniptale-parameter-menu'
       )}
     >
       {options.map((option, index) => (

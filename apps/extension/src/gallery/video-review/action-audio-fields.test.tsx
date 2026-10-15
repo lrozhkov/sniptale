@@ -9,7 +9,8 @@ import {
 } from '../../features/video/review/advanced/action-audio';
 import { translate } from '../../platform/i18n';
 
-vi.mock('../../ui/compact-inspector-controls', () => ({
+vi.mock('../../ui/compact-inspector-controls', async (original) => ({
+  ...(await original<typeof import('../../ui/compact-inspector-controls')>()),
   SelectField: (p: {
     label: string;
     value: string;
@@ -46,11 +47,6 @@ vi.mock('../../ui/compact-inspector-controls', () => ({
       }}
     />
   ),
-  OptionRow: (p: { label: string; value: string; onToggle(): void }) => (
-    <button onClick={p.onToggle}>
-      {p.label} {p.value}
-    </button>
-  ),
 }));
 
 it('scopes family selectors to typed targets and patches only the edited common field', () => {
@@ -81,7 +77,7 @@ it('scopes family selectors to typed targets and patches only the edited common 
       selectors[2]!.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(onChange).toHaveBeenLastCalledWith([targets[1]], { presetId: 'typing-natural-v1' });
-    const volume = host.querySelector<HTMLInputElement>('input')!;
+    const volume = host.querySelector<HTMLInputElement>('input[type="number"]')!;
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(volume, '25');
       volume.dispatchEvent(new Event('input', { bubbles: true }));
@@ -124,11 +120,7 @@ it('paired phases and recorded repeats target their own families and stop auditi
     },
   ];
   const clickLabel = (label: Parameters<typeof translate>[0]) =>
-    act(() =>
-      [...host.querySelectorAll('button')]
-        .find((button) => button.textContent?.startsWith(translate(label)))!
-        .click()
-    );
+    act(() => host.querySelector<HTMLElement>(`[aria-label="${translate(label)}"]`)!.click());
   try {
     act(() =>
       root.render(

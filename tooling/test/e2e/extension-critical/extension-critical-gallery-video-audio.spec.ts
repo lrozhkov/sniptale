@@ -73,6 +73,8 @@ for (const variant of [
         ).toHaveAttribute('aria-pressed', String(!muted));
       };
       const originalRow = original.locator('xpath=ancestor::*[@data-review-track-muted][1]');
+      const originalHeader = dialog.locator('[data-review-header-track="originalAudio"]');
+      const focusHeader = dialog.locator('[data-review-header-track="zoom"]');
       await addReviewFocus(page);
       const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const focusRow = focusLane.locator('xpath=ancestor::*[@data-review-track-muted][1]');
@@ -80,9 +82,7 @@ for (const variant of [
       await expect(focusRow).toHaveAttribute('data-review-track-muted', 'true');
       await expect(focusLane).toHaveCSS(
         'background-color',
-        await focusRow
-          .locator('[data-ui="gallery.videoReview.trackHeader"]')
-          .evaluate((node) => getComputedStyle(node).backgroundColor)
+        await focusHeader.evaluate((node) => getComputedStyle(node).backgroundColor)
       );
       await expect(button('gallery.videoReview.zoomEnabled')).toBeEnabled();
       await focusLane.getByRole('button').first().click();
@@ -93,19 +93,14 @@ for (const variant of [
       await expect(originalRow).toHaveAttribute('data-review-track-muted', 'true');
       await expect(original).toHaveCSS(
         'background-color',
-        await originalRow
-          .locator('[data-ui="gallery.videoReview.trackHeader"]')
-          .evaluate((node) => getComputedStyle(node).backgroundColor)
+        await originalHeader.evaluate((node) => getComputedStyle(node).backgroundColor)
       );
       expect(
         await originalRow
           .locator('[data-review-track-content]')
           .evaluate((node) => getComputedStyle(node, '::after').backgroundImage)
       ).toContain('repeating-linear-gradient');
-      await expect(originalRow.locator('[data-ui="gallery.videoReview.trackHeader"]')).toHaveCSS(
-        'opacity',
-        '1'
-      );
+      await expect(originalHeader).toHaveCSS('opacity', '1');
       await sound(true, 0);
       await expect(original).toHaveCSS('border-bottom-style', 'dashed');
       await page.screenshot({ path: testInfo.outputPath('master-muted.png') });

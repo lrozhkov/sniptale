@@ -31,9 +31,8 @@ import {
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
 import { Trash2, Copy, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
-import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
   ReviewButton,
@@ -584,26 +583,18 @@ function ReviewMotionBlurSettings(props: {
       data-ui="gallery.videoReview.motionBlurSettings"
       data-phase={props.phase}
     >
-      <div
-        className="flex min-h-8 items-center justify-between gap-2 text-xs
-          text-[var(--sniptale-color-text-secondary)]"
-      >
-        <span>{translate('gallery.videoReview.motionBlur')}</span>
-        <ProductGlassSwitch
-          role="switch"
-          aria-label={translate('gallery.videoReview.motionBlur')}
-          aria-checked={value.enabled}
-          on={value.enabled}
-          onClick={() =>
-            props.onChange({
-              motionBlur: {
-                ...props.region.motionBlur,
-                [props.phase]: { ...value, enabled: !value.enabled },
-              },
-            })
-          }
-        />
-      </div>
+      <ToggleField
+        label={translate('gallery.videoReview.motionBlur')}
+        value={value.enabled}
+        onChange={(enabled) =>
+          props.onChange({
+            motionBlur: {
+              ...props.region.motionBlur,
+              [props.phase]: { ...value, enabled },
+            },
+          })
+        }
+      />
       {value.enabled ? (
         <ReviewNumberRow
           label={translate('gallery.videoReview.motionBlurStrength')}

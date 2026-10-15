@@ -51,7 +51,7 @@ export function MusicLibraryDrawer(props: MusicLibraryDrawerProps) {
       onKeyDown={(event) => event.stopPropagation()}
       onKeyUp={(event) => event.stopPropagation()}
       className={[
-        'm-0 h-screen max-h-none w-screen max-w-none border-0 bg-transparent p-0',
+        'sniptale-compact-workspace m-0 h-screen max-h-none w-screen max-w-none border-0 bg-transparent p-0',
         'text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
     >
@@ -182,6 +182,7 @@ function MusicLibraryHeader(props: {
       <MediaLibraryHeader
         title={props.label}
         dataUi="music.library"
+        menuClassName="sniptale-parameter-menu"
         query={state.query}
         onQueryChange={state.setQuery}
         onApplyQuery={state.applyQuery}

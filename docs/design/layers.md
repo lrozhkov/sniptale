@@ -19,6 +19,8 @@ Tab from command menus exits relative to the root trigger. Nested Right enters. 
 
 Menus share the light-glass surface, 5px shell inset, 8px row padding, and 36px minimum option row. Their hit regions remain contiguous despite 1px painted top/bottom insets. Anchored editors can use 12px content insets. Dialogs use the shared 8px radius and compact content-driven spacing. Do not reserve a large empty dialog height for short copy. Use clear title/body/action separation.
 
+Dialog headers and bodies use 16px horizontal and 12px vertical insets. Footers use 16px horizontal and 8px vertical insets, with 8px between commands. Titles use the structural heading role. Messages use the appropriate text role. These defaults do not replace specialized recording strips or edge drawers.
+
 At short heights, content scrolls while actions remain reachable through their actual owner. Modal focus stays within the dialog. Destructive confirmation initially focuses Cancel.
 
 ## Drafts and color

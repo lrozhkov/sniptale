@@ -100,7 +100,10 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     const explicit = explicitSection.current;
     explicitSection.current = null;
     if (previewReturn.current && !explicit) previewReturn.current = null;
-    const preserveExport = !modeChanged && props.contextSelection?.kind === 'none';
+    const preserveExport =
+      !modeChanged &&
+      props.contextSelection?.kind === 'none' &&
+      !contextKey.startsWith('comments:');
     if (exportRequested && exportAvailable) updateContext('export');
     else if (!explicit)
       updateContext((current) =>

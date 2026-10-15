@@ -16,11 +16,16 @@ Check long names, unbroken values, local clipping, real overflow, short-height a
 - Exercise press, hold, release outside, interruption, and release once for commands.
 - Check editing, valid acceptance, invalid draft retention, Escape, Save/Cancel, pending, failure, and retry.
 - Drag ranges and scrollbars. Check hidden ranges during typing and no layout movement during hover.
+- After pointer gestures, use keyboard commands without another focus click. Check native focus movement while an editor draft remains open.
 - Check disappearing anchors, nested Escape, modal clipping, and focus after removal.
 - Inspect contrast against actual themed and patterned backdrops, including reduced transparency and forced colors.
 - Check reduced motion without hiding state feedback.
 
+After control composition changes, check that input, focus, blur, composition, and keyboard events still reach the existing owner. Preserve its commit, cancellation, and retry behavior.
+
 ## Mixed-row rhythm
+
+Below the minimum width, operate the actual horizontal scroll owner and reach the off-screen actions. Body overflow behind a modal does not prove access to its content.
 
 Check every inspector category at regular and narrow widths, in both themes and languages. Compare visible label baselines across numbers, colors, switches, choices, and text fields. Include transitions between inline and stacked layouts and compound-resource rows. Check the actual text inset within each row. Do not restrict coverage to numeric, color, and boolean controls. For adjacent compact one-line rows, expect a 36px pitch: 32px row plus 4px gap. Allow 0.5px rounding tolerance. Check an 8px gap below the complete disclosure header target.
 

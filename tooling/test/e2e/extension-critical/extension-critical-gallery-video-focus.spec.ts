@@ -88,7 +88,9 @@ for (const variant of [
         await page.mouse.move(box.x + box.width * 0.25, box.y + box.height / 2);
         await page.mouse.up();
         const message = translate('gallery.videoReview.originalAudioOverlap', variant.locale);
-        await expect(dialog.locator('aside')).toContainText(message);
+        await expect(dialog.locator('[data-ui="gallery.videoReview.feedback"]')).toContainText(
+          message
+        );
         await expect(timeline).not.toContainText(message);
         await expect(range).toHaveCount(1);
         await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
@@ -137,10 +139,15 @@ for (const variant of [
       const source = page.locator('[data-ui="gallery.videoReview.sourceLane"]');
       const box = (await source.boundingBox())!;
       await page.mouse.move(box.x + box.width * 0.25, box.y + box.height / 2);
-      await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
+      await expect(plane).toHaveCSS('cursor', 'default');
       const guide = page.locator('[data-ui="gallery.videoReview.hoverTime"]');
       await expect(guide).toBeVisible();
+      await expect(guide).toHaveCSS('width', '1px');
       expect(Math.abs((await guide.boundingBox())!.x - (box.x + box.width * 0.25))).toBeLessThan(2);
+      await button('gallery.videoReview.cutMode').click();
+      await page.mouse.move(box.x + box.width * 0.25, box.y + box.height / 2);
+      await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
+      await expect(guide).toHaveAttribute('data-snapped', 'true');
       await page.screenshot({
         path: testInfo.outputPath(`timeline-cursor-${variant.locale}-dpr${variant.dpr}.png`),
       });
@@ -173,24 +180,55 @@ for (const variant of [
       await page.mouse.up();
       await expect(focus.locator('[role="button"]')).toHaveCount(1);
       await expect(page.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
+      // Separate authored operations at the existing durable history boundary before testing Undo.
+      await expect.poll(() => persistedFocus(page)).toBeTruthy();
       await button('gallery.videoReview.pointerTool').click();
+      await expect(button('gallery.videoReview.pointerTool')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
       await page.mouse.move(
         restrictedSource.x + restrictedSource.width * 0.25,
         restrictedSource.y + restrictedSource.height / 2
       );
-      await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
+      await expect(plane).toHaveCSS('cursor', 'default');
       await button('gallery.videoReview.originalAudioRange').click();
       const original = page.locator('[data-original-audio-lane]');
       const audioBox = (await original.boundingBox())!;
       await page.mouse.move(audioBox.x + audioBox.width * 0.25, audioBox.y + audioBox.height / 2);
       await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
-      await page.mouse.move(focusBox.x + focusBox.width * 0.25, focusBox.y + focusBox.height / 2);
+      // Creating/selecting a focus can scroll the timeline. Test the actual empty focus lane.
+      await focus.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+      const restrictedFocus = (await focus.boundingBox())!;
+      const focusPoint = {
+        x: restrictedFocus.x + restrictedFocus.width * 0.75,
+        y: restrictedFocus.y + restrictedFocus.height / 2,
+      };
+      await expect
+        .poll(() =>
+          page.evaluate(
+            ({ x, y }) =>
+              !!document
+                .elementFromPoint(x, y)
+                ?.closest('[data-ui="gallery.videoReview.zoomLane"]'),
+            focusPoint
+          )
+        )
+        .toBe(true);
+      await page.mouse.move(focusPoint.x, focusPoint.y);
       await expect(plane).toHaveCSS('cursor', 'default');
-      await page.mouse.move(audioBox.x + audioBox.width * 0.5, audioBox.y + audioBox.height / 2);
+      await original.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+      const drawAudioBox = (await original.boundingBox())!;
+      await page.mouse.move(
+        drawAudioBox.x + drawAudioBox.width * 0.5,
+        drawAudioBox.y + drawAudioBox.height / 2
+      );
       await page.mouse.down();
-      await page.mouse.move(audioBox.x + audioBox.width * 0.7, audioBox.y + audioBox.height / 2, {
-        steps: 5,
-      });
+      await page.mouse.move(
+        drawAudioBox.x + drawAudioBox.width * 0.7,
+        drawAudioBox.y + drawAudioBox.height / 2,
+        { steps: 5 }
+      );
       await page.mouse.up();
       await expect(
         original.locator('[data-ui="gallery.videoReview.originalAudioRange"]')
@@ -278,15 +316,19 @@ for (const variant of [
       const reopened = (await block.boundingBox())!;
       expect(reopened.width).toBeCloseTo(preview.width, 0);
       expect(reopened.x).toBeCloseTo(preview.x, 0);
-      const controls = dialog.locator('[data-ui="gallery.videoReview.trackControls"]');
-      for (const key of ['zoomTrack', 'audioTrack'] as const) {
-        const compact = controls.getByRole('button', {
-          name: translate(`gallery.videoReview.${key}`, variant.locale),
-          exact: true,
-        });
-        await compact.hover();
-        await expect(compact).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      const settings = dialog.getByRole('button', {
+        name: translate('gallery.videoReview.trackSettings', variant.locale),
+        exact: true,
+      });
+      await settings.hover();
+      await expect(settings).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await settings.click();
+      for (const track of ['zoom', 'voiceover', 'music']) {
+        await expect(
+          dialog.locator(`[data-review-header-track="${track}"]`).getByRole('switch')
+        ).toHaveAttribute('aria-checked', 'true');
       }
+      await settings.click();
       await dialog
         .getByRole('button', {
           name: translate('gallery.videoReview.undo', variant.locale),
@@ -392,9 +434,11 @@ for (const theme of ['light', 'dark'] as const) {
       await page.mouse.move(0, 0);
       await expect.soft(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect.soft(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      const idleColor = await remove.evaluate((node) => getComputedStyle(node).color);
       await remove.hover();
-      await expect.soft(remove).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect.soft(remove).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(remove).not.toHaveCSS('color', idleColor);
+      await expect.soft(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
       await page.mouse.move(0, 0);
       await expect.soft(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await page.screenshot({ path: testInfo.outputPath(`quiet-delete-${theme}.png`) });
@@ -635,7 +679,7 @@ for (const variant of [
         await button('gallery.videoReview.speedMode').click();
         await button('gallery.videoReview.speedRate').click();
         await page.getByRole('option', { name: '2×', exact: true }).click();
-        await draw('[data-ui="gallery.videoReview.ruler"]', 0.1, 11.9);
+        await draw('[data-ui="gallery.videoReview.sourceLane"]', 0.1, 11.9);
         await expect(dialog.getByRole('button', { name: /^Speed 2×/ })).toBeVisible();
       }
       await button('gallery.videoReview.focusRangeTool').click();

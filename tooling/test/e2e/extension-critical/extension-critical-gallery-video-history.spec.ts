@@ -47,9 +47,16 @@ for (const variant of [
       const choices = dialog.locator('[data-ui="gallery.videoReview.historyChoices"]');
       await expect(choices).toBeVisible();
       await expect(choices).toHaveCSS('opacity', '1');
-      expect(await choices.evaluate((node) => getComputedStyle(node).backgroundColor)).toMatch(
-        /^rgb\(/
-      );
+      const panelColor = await choices.evaluate((node) => {
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = 'var(--sniptale-color-surface-panel)';
+        node.appendChild(probe);
+        const color = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return color;
+      });
+      await expect(choices).toHaveCSS('background-color', panelColor);
+      await expect(choices).toHaveCSS('backdrop-filter', /blur\(/);
       const bounds = (await choices.boundingBox())!;
       expect(bounds.y).toBeGreaterThanOrEqual(0);
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);

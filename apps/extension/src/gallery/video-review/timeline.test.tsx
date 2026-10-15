@@ -721,3 +721,43 @@ it('keeps a separate ruler marker aligned with the scrolling source playhead', (
   expect(cap.style.left).toBe(head.style.left);
   expect(ruler.contains(head)).toBe(false);
 });
+
+it('retains timeline keyboard focus when a committed row becomes inert', () => {
+  const zoomTrack = (
+    <div>
+      <input aria-label="Child value" />
+      <button type="button">Child command</button>
+    </div>
+  );
+  const { host } = renderTimeline({ zoomTrack });
+  document.body.appendChild(host);
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  const field = host.querySelector<HTMLInputElement>('[aria-label="Child value"]')!;
+  const command = Array.from(host.querySelectorAll('button')).find(
+    (node) => node.textContent === 'Child command'
+  )!;
+  const external = document.createElement('button');
+  document.body.appendChild(external);
+  try {
+    for (const target of [field, command]) {
+      renderTimeline({ zoomTrack, busy: false });
+      target.focus();
+      expect(document.activeElement).toBe(target);
+      renderTimeline({ zoomTrack, busy: true });
+      // jsdom does not implement the native blur caused by an inert ancestor.
+      act(() => target.blur());
+      expect(document.activeElement).toBe(plane);
+    }
+    renderTimeline({ zoomTrack, busy: false });
+    field.focus();
+    act(() => field.blur());
+    expect(document.activeElement).toBe(document.body);
+    field.focus();
+    renderTimeline({ zoomTrack, busy: true });
+    act(() => external.focus());
+    expect(document.activeElement).toBe(external);
+  } finally {
+    external.remove();
+    host.remove();
+  }
+});

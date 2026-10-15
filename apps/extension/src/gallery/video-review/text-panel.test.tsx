@@ -1,3 +1,4 @@
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 // @vitest-environment jsdom
 import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -104,10 +105,14 @@ function Fixture({
     seek,
     pause: vi.fn(),
   });
-  return selectedId ? (
-    <ReviewSelectedTextProperties editor={editor} id={selectedId} busy={false} voice={voice} />
-  ) : (
-    <ReviewTextDocumentPanel editor={editor} snapshots={[]} busy={false} voice={voice} />
+  return (
+    <InspectorLayout>
+      {selectedId ? (
+        <ReviewSelectedTextProperties editor={editor} id={selectedId} busy={false} voice={voice} />
+      ) : (
+        <ReviewTextDocumentPanel editor={editor} snapshots={[]} busy={false} voice={voice} />
+      )}
+    </InspectorLayout>
   );
 }
 function voiceAccess(): ReviewTextVoiceAccess {

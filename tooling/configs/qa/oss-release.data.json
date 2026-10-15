@@ -27,6 +27,11 @@
       "source": "LICENSES/OFL-1.1.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt",
+      "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
+      "source": "LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
       "sha256": "bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c",
       "source": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt"
@@ -238,12 +243,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "0d85b0fb2aae890026dd9c9c83a37428cac20453e7990be1c178282d924de60d",
+      "sha256": "43a82da1da49e1a56e7ed918ea00f21105a6443d3b223f7234a98cc855c0191a",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "012a3724b078c8ad1c2227f6dd72a9b955f525bd2499054559d4d7bbaf438e94",
+      "sha256": "933beac1cfc7a8a744b3453c5291835f49f5c35b37c6ec4dee187bd28300e178",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

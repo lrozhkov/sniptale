@@ -110,6 +110,9 @@ for (const variant of [
       await type
         .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
+      await expect
+        .poll(async () => (await persistedFocus(page))?.spotlight?.area.width)
+        .toBeCloseTo(0.5);
       await expect(frame).toHaveAttribute('role', 'group');
       await expect(frame.locator('[data-resize]')).toHaveCount(4);
       await frame.hover();
@@ -505,8 +508,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .click();
       await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(false);
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(dialog).toBeVisible();
       await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(false);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));

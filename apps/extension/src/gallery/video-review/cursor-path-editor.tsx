@@ -5,7 +5,6 @@ import {
   resolveCameraFollowPolicy,
   type CameraFollowSettings,
 } from '../../features/video/project/camera/cursor-policy';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import {
   reviewCursorFocusTimelineKeys,
   adjacentCursorFocusKey,
@@ -22,7 +21,7 @@ import {
 } from '../../features/video/project/cursor-focus-path/authoring';
 import { evaluateReviewCursorFocus } from '../../features/video/review/advanced/cursor-focus-path';
 import { Clock3, MousePointer2, SlidersHorizontal } from 'lucide-react';
-import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { ReviewNumberRow } from './number-row';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import {
@@ -406,55 +405,43 @@ export function ReviewCameraFollowSettings(props: {
     name: 'preservePointer' | 'allowExpansion',
     key: Parameters<typeof translate>[0]
   ) => (
-    <div className="flex min-w-0 items-center justify-between gap-2" key={name}>
-      <span className="text-xs">{label(key)}</span>
-      <ProductGlassSwitch
-        role="switch"
-        aria-label={label(key)}
-        aria-checked={settings[name]}
-        on={settings[name]}
-        disabled={props.disabled}
-        onClick={() => update({ [name]: !settings[name] })}
-      />
-    </div>
+    <ToggleField
+      key={name}
+      label={label(key)}
+      value={settings[name]}
+      disabled={props.disabled}
+      onChange={(value) => update({ [name]: value })}
+    />
   );
   return (
-    <fieldset className="m-0 min-w-0 space-y-2 border-0 p-0" data-ui="cameraFollow.settings">
-      <div className="min-w-0 space-y-1.5">
-        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {label('videoEditor.sidebar.cameraZoneSize')}
-        </span>
-        <SegmentedRow
-          ariaLabel={label('videoEditor.sidebar.cameraZoneSize')}
-          value={String(settings.zoneSize)}
-          options={[
-            { value: '0.3', label: label('videoEditor.sidebar.cameraZoneSmall') },
-            { value: '0.55', label: label('videoEditor.sidebar.cameraZoneMedium') },
-            { value: '0.8', label: label('videoEditor.sidebar.cameraZoneLarge') },
-          ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
-          onChange={(value) =>
-            update({ zoneSize: value === '0.3' ? 0.3 : value === '0.55' ? 0.55 : 0.8 })
-          }
-        />
-      </div>
-      <div className="min-w-0 space-y-1.5">
-        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {label('videoEditor.sidebar.cameraMovement')}
-        </span>
-        <SegmentedRow
-          ariaLabel={label('videoEditor.sidebar.cameraMovement')}
-          value={cameraFollowPreset(settings)}
-          options={[
-            { value: 'calm', label: label('videoEditor.sidebar.cameraCalm') },
-            { value: 'balanced', label: label('videoEditor.sidebar.cameraBalanced') },
-            { value: 'fast', label: label('videoEditor.sidebar.cameraFast') },
-          ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
-          onChange={(preset) => {
-            if (preset === 'calm' || preset === 'balanced' || preset === 'fast')
-              props.onChange(applyCameraFollowPreset(settings, preset));
-          }}
-        />
-      </div>
+    <fieldset className="sniptale-parameter-stack m-0 border-0 p-0" data-ui="cameraFollow.settings">
+      <SegmentedRow
+        label={label('videoEditor.sidebar.cameraZoneSize')}
+        ariaLabel={label('videoEditor.sidebar.cameraZoneSize')}
+        value={String(settings.zoneSize)}
+        options={[
+          { value: '0.3', label: label('videoEditor.sidebar.cameraZoneSmall') },
+          { value: '0.55', label: label('videoEditor.sidebar.cameraZoneMedium') },
+          { value: '0.8', label: label('videoEditor.sidebar.cameraZoneLarge') },
+        ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
+        onChange={(value) =>
+          update({ zoneSize: value === '0.3' ? 0.3 : value === '0.55' ? 0.55 : 0.8 })
+        }
+      />
+      <SegmentedRow
+        label={label('videoEditor.sidebar.cameraMovement')}
+        ariaLabel={label('videoEditor.sidebar.cameraMovement')}
+        value={cameraFollowPreset(settings)}
+        options={[
+          { value: 'calm', label: label('videoEditor.sidebar.cameraCalm') },
+          { value: 'balanced', label: label('videoEditor.sidebar.cameraBalanced') },
+          { value: 'fast', label: label('videoEditor.sidebar.cameraFast') },
+        ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
+        onChange={(preset) => {
+          if (preset === 'calm' || preset === 'balanced' || preset === 'fast')
+            props.onChange(applyCameraFollowPreset(settings, preset));
+        }}
+      />
       <ReviewDetails
         label={label('videoEditor.sidebar.framingFineTune')}
         icon={SlidersHorizontal}

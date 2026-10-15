@@ -383,7 +383,10 @@ function TextVoiceRecordingBody(
           {session.saveError || transport.error || translate('gallery.videoReview.speechChanged')}
         </p>
       )}
-      <RecordingDiscardConfirmation value={recording.confirmation} />
+      <RecordingDiscardConfirmation
+        dialogClassName="sniptale-compact-workspace"
+        value={recording.confirmation}
+      />
     </div>
   );
 }

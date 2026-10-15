@@ -66,6 +66,9 @@ for (const variant of [
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
       await addReviewFocus(page);
+      await expect.poll(() => persistedFocus(page)).toBeTruthy();
+      const created = (await persistedFocus(page))!;
+      const intervalDuration = created.end - created.start;
       const phase = (side: 'In' | 'Out') =>
         dialog.getByRole('group', {
           name: translate(`gallery.videoReview.zoomTransition${side}`, variant.locale),
@@ -80,7 +83,7 @@ for (const variant of [
       await phase('Out').locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').hover();
       await exitRange.press('End');
       await expect(exit).toHaveValue('0.33');
-      await expectAlignedRange(exitRange, 0.33);
+      await expectAlignedRange(exitRange, intervalDuration - 1.67);
       await exitRange.press('ArrowLeft');
       await expect(exit).toHaveValue('0.32');
       await expectAlignedRange(exitRange, 0.32);
@@ -89,9 +92,9 @@ for (const variant of [
       await enter.press('Enter');
       await expect
         .poll(async () => Number(await exitRange.getAttribute('max')))
-        .toBeCloseTo(1.63, 9);
+        .toBeCloseTo(intervalDuration - 0.37, 9);
       await exitRange.press('End');
-      await expectAlignedRange(exitRange, 1.63);
+      await expectAlignedRange(exitRange, intervalDuration - 0.37);
       await expect(enter).toHaveValue('0.37');
       await phase('In').locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').hover();
       const box = (await enterRange.boundingBox())!;
@@ -101,9 +104,13 @@ for (const variant of [
         await page.mouse.move(box.x + 8 + (box.width - 16) * ratio, box.y + box.height / 2, {
           steps: 3,
         });
-        const value = Number(await enter.inputValue());
+        const displayed = Number(await enter.inputValue());
+        const value = ratio === 1 ? Number(await enterRange.getAttribute('max')) : displayed;
+        expect(displayed).toBe(Number(value.toFixed(2)));
         await expectAlignedRange(enterRange, value);
-        expect(value + Number(await exit.inputValue())).toBeLessThanOrEqual(2.000000001);
+        expect(value + Number(await exitRange.inputValue())).toBeLessThanOrEqual(
+          intervalDuration + 1e-9
+        );
       }
       await page.mouse.move(box.x + box.width - 8, box.y + box.height + 40);
       await page.mouse.up();

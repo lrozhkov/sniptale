@@ -200,6 +200,15 @@ export function ReviewTimeline(props: TimelineProps) {
               else hover.clear();
             }}
             onPointerMove={plane.onPointerMove}
+            onBlurCapture={(event) => {
+              // A pending commit makes its row inert after pointer release.
+              if (
+                event.relatedTarget === null &&
+                event.target.closest('[inert]') &&
+                document.activeElement === document.body
+              )
+                event.currentTarget.focus({ preventScroll: true });
+            }}
             onPointerUp={(event) => {
               plane.onPointerUp(event);
               hover.clear();

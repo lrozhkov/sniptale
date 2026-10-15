@@ -65,7 +65,7 @@ export function ReviewSpatialInspector(props: Props) {
   return (
     <>
       {props.tool !== 'focus' ? (
-        <div className="space-y-2">
+        <div className="sniptale-parameter-stack">
           {(props.tool === 'rotation'
             ? (['rotateZ'] as const)
             : (['rotateX', 'rotateY', 'strength'] as const)

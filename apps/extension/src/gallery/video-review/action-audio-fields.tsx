@@ -1,6 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Play, RotateCcw, Volume2 } from 'lucide-react';
-import { NumericRow, OptionRow, SelectField } from '../../ui/compact-inspector-controls';
+import {
+  NumericRow,
+  CheckboxField,
+  SelectField,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import { translate, formatNumber } from '../../platform/i18n';
 import {
   REVIEW_ACTION_AUDIO_DEFAULT,
@@ -82,20 +87,14 @@ export function ReviewActionAudioFields(props: {
   return (
     <fieldset
       disabled={props.busy}
-      className="min-w-0 space-y-2"
+      className="min-w-0 sniptale-parameter-stack"
       data-ui="gallery.videoReview.actionAudioFields"
     >
-      <OptionRow
+      <CheckboxField
         label={translate('gallery.videoReview.actionAudioEnabled')}
-        active={enabled === true}
-        value={translate(
-          enabled === undefined
-            ? 'gallery.videoReview.clickMixed'
-            : enabled
-              ? 'gallery.videoReview.actionAudioOn'
-              : 'gallery.videoReview.actionAudioOff'
-        )}
-        onToggle={() => props.onChange(props.targets, { enabled: enabled !== true })}
+        value={enabled === true}
+        indeterminate={enabled === undefined}
+        onChange={(enabled) => props.onChange(props.targets, { enabled })}
       />
       {(['mouse', 'keyboard', 'typing'] as const).map((family) => (
         <ReviewAudioFamily key={family} family={family} props={props} style={style} />
@@ -113,19 +112,15 @@ export function ReviewActionAudioFields(props: {
             const phaseEnabled = common(targets.map((target) => style(target)[enabledKey] ?? true));
             return (
               <div key={phase} className="space-y-1">
-                <OptionRow
+                <CheckboxField
                   label={translate(
                     phase === 'down'
                       ? 'gallery.videoReview.actionAudioDown'
                       : 'gallery.videoReview.actionAudioUp'
                   )}
-                  active={phaseEnabled === true}
-                  value={translate(
-                    phaseEnabled
-                      ? 'gallery.videoReview.actionAudioOn'
-                      : 'gallery.videoReview.actionAudioOff'
-                  )}
-                  onToggle={() => props.onChange(targets, { [enabledKey]: phaseEnabled !== true })}
+                  value={phaseEnabled === true}
+                  indeterminate={phaseEnabled === undefined}
+                  onChange={(enabled) => props.onChange(targets, { [enabledKey]: enabled })}
                 />
                 <ActionAudioNumber
                   disabled={props.busy}
@@ -142,18 +137,13 @@ export function ReviewActionAudioFields(props: {
           style(target).presetId === 'keyboard-recorded-v2' ||
           style(target).presetId === 'typing-recorded-v2'
       ) ? (
-        <OptionRow
+        <ToggleField
           label={translate('gallery.videoReview.actionAudioRepeats')}
-          active={values.some((value) => value.includeRepeats === true)}
-          value={translate(
-            values.some((value) => value.includeRepeats === true)
-              ? 'gallery.videoReview.actionAudioOn'
-              : 'gallery.videoReview.actionAudioOff'
-          )}
-          onToggle={() =>
+          value={values.some((value) => value.includeRepeats === true)}
+          onChange={(includeRepeats) =>
             props.onChange(
               props.targets.filter((target) => target.family !== 'mouse'),
-              { includeRepeats: !values.some((value) => value.includeRepeats === true) }
+              { includeRepeats }
             )
           }
         />

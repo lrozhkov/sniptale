@@ -1,5 +1,49 @@
 @layer theme, base, components, utilities;
 
+/* Rollout boundary: pending editor surfaces and popup keep their current tokens. */
+.sniptale-compact-workspace {
+  --sniptale-font-sans: var(--sniptale-font-interface);
+  --sniptale-radius-sm: 4px;
+  --sniptale-radius-md: 4px;
+  --sniptale-radius-lg: 8px;
+  --sniptale-radius-toolbar: 4px;
+  --sniptale-radius-toolbar-glass: 4px;
+  --sniptale-media-header-radius: 4px;
+  --sniptale-inspector-range-track-height: 2px;
+  --sniptale-inspector-range-thumb-size: 12px;
+  --sniptale-inspector-range-bottom: -2px;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+  user-select: none;
+}
+.sniptale-compact-workspace :is(input, textarea, [contenteditable='true'], [role='alert']) {
+  user-select: text;
+}
+
+/* Portaled dialogs carry the surface role; edge drawers retain their explicit radius. */
+.sniptale-compact-workspace.sniptale-modal,
+.sniptale-compact-workspace .sniptale-modal {
+  border-radius: 8px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-compact-workspace :is(.sniptale-modal-header, .sniptale-modal-header-sm) {
+  padding: 12px 16px;
+}
+.sniptale-compact-workspace :is(.sniptale-modal-body, .sniptale-modal-body-sm) {
+  padding: 12px 16px;
+  gap: 12px;
+}
+.sniptale-compact-workspace :is(.sniptale-modal-footer, .sniptale-modal-footer-sm) {
+  padding: 8px 16px;
+  gap: 8px;
+}
+.sniptale-compact-workspace
+  :is(.sniptale-modal-title, .sniptale-modal-title-sm, .sniptale-confirm-title) {
+  font: 600 14px / 20px var(--sniptale-font-interface);
+}
+.sniptale-compact-workspace .sniptale-confirm-message {
+  font: 400 14px / 20px var(--sniptale-font-interface);
+}
+
 /* Opt-in editor presentation; field components retain input, commit and popup ownership. */
 .sniptale-inspector-surface {
   container: inspector-surface / inline-size;
@@ -39,7 +83,7 @@
     [data-ui='shared.ui.compact-inspector.text-field'],
     [data-ui='shared.ui.compact-inspector.textarea-field'],
     [data-inspector-toggle]
-  )
+  ):not(.sniptale-parameter-row)
   > span:first-child {
   font: 500 12px / 1.5 var(--sniptale-font-sans);
   color: var(--sniptale-color-text-secondary);
@@ -250,4 +294,351 @@
 .sniptale-inspector-surface [data-ui='shared.ui.compact-inspector.text-field'] > input {
   font: 500 12px / 1.5 var(--sniptale-font-sans);
   border-radius: var(--sniptale-radius-sm);
+}
+
+.sniptale-compact-workspace .sniptale-inspector-surface {
+  --sniptale-compact-font-size: 13px;
+  --sniptale-compact-control-height: 32px;
+}
+.sniptale-compact-workspace .sniptale-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+}
+.sniptale-compact-workspace .sniptale-parameter-row[data-layout='stacked'] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.sniptale-compact-workspace
+  .sniptale-parameter-row[data-layout='stacked']
+  > .sniptale-parameter-name {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+.sniptale-compact-workspace .sniptale-parameter-row > .sniptale-parameter-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+  cursor: default;
+}
+.sniptale-compact-workspace .sniptale-parameter-row > .sniptale-parameter-value {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
+.sniptale-compact-workspace .sniptale-parameter-row[data-activates='true']:hover:has(:enabled),
+.sniptale-compact-workspace
+  .sniptale-parameter-row:has(
+    > .sniptale-parameter-value button[aria-haspopup='listbox']:enabled
+  ):hover {
+  background: var(--sniptale-color-surface-input);
+}
+.sniptale-compact-workspace .sniptale-parameter-row [data-ui='shared.ui.compact-select'] > button {
+  min-height: 32px;
+  height: auto;
+  padding: 6px 8px;
+  border: 0;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace .sniptale-parameter-row [data-ui='shared.ui.compact-select'] .truncate {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
+.sniptale-compact-workspace .sniptale-text-value {
+  position: relative;
+  min-width: 0;
+}
+.sniptale-compact-workspace .sniptale-text-value > input {
+  min-height: 32px;
+  height: 32px;
+  padding: 6px 32px 6px 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+  text-align: start;
+}
+.sniptale-compact-workspace .sniptale-text-value > input:is(:hover, :focus) {
+  background: var(--sniptale-color-surface-input);
+}
+.sniptale-compact-workspace .sniptale-field-clear {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+}
+.sniptale-compact-workspace .sniptale-field-clear:hover {
+  background: transparent;
+  color: var(--sniptale-color-text-primary-strong);
+}
+.sniptale-compact-workspace [data-ui='shared.ui.color-selector.picker-trigger'] {
+  order: 1;
+}
+.sniptale-compact-workspace [data-ui='shared.ui.color-selector.picker-trigger'] > span {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+.sniptale-compact-workspace [data-ui='shared.ui.color-selector.trigger'] button {
+  font: 500 13px / 18px var(--sniptale-font-sans);
+}
+
+.sniptale-compact-workspace .sniptale-property-choice {
+  min-width: 0;
+  width: 100%;
+}
+.sniptale-compact-workspace .sniptale-property-segments {
+  display: grid;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-input);
+}
+@layer utilities {
+  .sniptale-compact-workspace .sniptale-property-segments > button {
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 4px 10px !important;
+    border: 0 !important;
+    border-radius: 4px !important;
+    font: 500 13px / 18px var(--sniptale-font-sans) !important;
+    white-space: nowrap;
+  }
+  .sniptale-compact-workspace .sniptale-property-segments > button[aria-pressed='true'] {
+    background: color-mix(
+      in srgb,
+      var(--sniptale-color-text-secondary) 22%,
+      var(--sniptale-color-surface-panel)
+    ) !important;
+    color: var(--sniptale-color-text-primary) !important;
+  }
+}
+.sniptale-parameter-menu,
+.sniptale-parameter-menu[data-theme] {
+  --sniptale-font-sans: var(--sniptale-font-interface);
+  --sniptale-radius-sm: 4px;
+  padding: 5px;
+  border-radius: 4px;
+  font-family: var(--sniptale-font-interface);
+  background: var(--sniptale-color-surface-panel);
+  backdrop-filter: blur(var(--sniptale-glass-blur));
+}
+.sniptale-parameter-menu [role='option'] {
+  border-color: transparent;
+  min-height: 36px;
+  margin: 0;
+  padding: 8px;
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+  color: var(--sniptale-color-text-primary);
+}
+.sniptale-parameter-menu [role='option'][aria-selected='true'],
+.sniptale-parameter-menu [role='option']:hover:not(:disabled) {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-parameter-menu [role='option'][aria-selected='true'] .lucide-check {
+  color: var(--sniptale-color-accent);
+}
+.sniptale-parameter-menu .truncate {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sniptale-compact-workspace .sniptale-parameter-value:has(> [role='switch']) {
+  display: flex;
+  justify-content: flex-end;
+}
+@layer utilities {
+  .sniptale-compact-workspace .sniptale-parameter-row {
+    min-height: 32px !important;
+  }
+  .sniptale-compact-workspace
+    [data-ui='shared.ui.compact-inspector.numeric-row'].sniptale-parameter-row {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) !important;
+  }
+}
+.sniptale-compact-workspace .sniptale-paint-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace .sniptale-paint-swatch-trigger {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+}
+.sniptale-compact-workspace .sniptale-paint-swatch-trigger > span {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+.sniptale-compact-workspace .sniptale-parameter-stack {
+  display: grid;
+  align-items: start;
+  min-width: 0;
+  gap: 4px;
+}
+.sniptale-compact-workspace .sniptale-parameter-stack > * {
+  margin-block: 0;
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .sniptale-parameter-menu {
+    background: rgb(from var(--sniptale-color-surface-panel) r g b);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sniptale-parameter-menu {
+    background: rgb(from var(--sniptale-color-surface-panel) r g b);
+    backdrop-filter: none;
+  }
+}
+@media (forced-colors: active) {
+  .sniptale-parameter-menu {
+    background: Canvas;
+    color: CanvasText;
+    backdrop-filter: none;
+  }
+}
+.sniptale-compact-workspace .sniptale-parameter-value:has(> .sniptale-parameter-check) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 32px;
+}
+.sniptale-compact-workspace .sniptale-parameter-check {
+  width: 18px;
+  height: 18px;
+  margin: 0 7px;
+  accent-color: var(--sniptale-color-text-primary);
+  cursor: pointer;
+}
+.sniptale-compact-workspace .sniptale-parameter-check:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sniptale-compact-workspace .sniptale-parameter-check:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+
+.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch::before {
+  content: '';
+  position: absolute;
+  inset-inline: 12px;
+  top: 13px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sniptale-color-text-dim);
+}
+.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch--on::before {
+  background: var(--sniptale-color-accent);
+}
+.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch-thumb {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 4px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--sniptale-color-text-muted);
+  border-radius: 50%;
+  background: var(--sniptale-color-toggle-thumb);
+  box-shadow: none;
+  transform: translateX(0);
+  transition: transform 110ms var(--sniptale-ease-standard);
+}
+.sniptale-compact-workspace
+  .sniptale-inspector-surface
+  .sniptale-glass-switch--on
+  .sniptale-glass-switch-thumb {
+  transform: translateX(16px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch-thumb {
+    transition: none;
+  }
+}
+.sniptale-compact-workspace .sniptale-parameter-stack > :is(details, button):not(:first-child) {
+  margin-block-start: 4px;
+}
+.sniptale-compact-workspace
+  .sniptale-parameter-row[data-activates='true']:has(:enabled)
+  > .sniptale-parameter-name {
+  cursor: pointer;
+}
+.sniptale-compact-workspace .sniptale-text-value > .sniptale-parameter-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px 32px 8px 8px;
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+  text-align: start;
+  resize: vertical;
+}
+.sniptale-compact-workspace .sniptale-text-value:has(:disabled) > .sniptale-field-clear {
+  display: none;
+}
+
+@layer utilities {
+  .sniptale-compact-workspace .sniptale-select {
+    --sniptale-field-height: 32px;
+    --sniptale-field-radius: 4px;
+    --sniptale-field-padding-block: 4px;
+    font: 500 13px / 18px var(--sniptale-font-interface) !important;
+  }
+}
+.sniptale-parameter-menu .sniptale-select-value-label-menu {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sniptale-compact-workspace
+  .sniptale-parameter-row:has(> .sniptale-parameter-value button[aria-haspopup='listbox']:enabled)
+  > .sniptale-parameter-name {
+  cursor: pointer;
+}
+.sniptale-compact-workspace
+  [data-ui='shared.ui.compact-inspector.textarea-field']
+  > .sniptale-parameter-name {
+  min-height: 18px;
 }

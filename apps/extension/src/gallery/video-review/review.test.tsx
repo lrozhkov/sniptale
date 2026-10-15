@@ -779,18 +779,25 @@ it('connects Scene presentation controls to the real session and suppresses them
     );
     expect(inspector()).toBeNull();
     await fixture.click('advancedEditing');
-    await act(async () =>
-      inspector()!
-        .querySelector<HTMLButtonElement>(
-          '[aria-label="gallery.videoReview.presentationIntro"] button:nth-child(2)'
-        )!
-        .click()
+    const fade = inspector()!.querySelector<HTMLButtonElement>(
+      'button[aria-label="gallery.videoReview.presentationFadeIn"]'
     );
+    if (fade) await act(async () => fade.click());
+    else {
+      await act(async () =>
+        inspector()!
+          .querySelector<HTMLButtonElement>(
+            'button[aria-label="gallery.videoReview.presentationIntro"][aria-haspopup="listbox"]'
+          )!
+          .click()
+      );
+      const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+        (node) => node.textContent === 'gallery.videoReview.presentationFadeIn'
+      );
+      expect(option).toBeDefined();
+      await act(async () => option!.click());
+    }
     await fixture.click('presentationAudioFade');
-    const on = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
-      (node) => node.textContent === 'gallery.videoReview.presentationOn'
-    )!;
-    await act(async () => on.click());
     await act(async () => vi.waitFor(() => expect(audioFade()).toBe(true), { timeout: 2500 }));
     await fixture.click('advancedEditing');
     expect(inspector()).toBeNull();

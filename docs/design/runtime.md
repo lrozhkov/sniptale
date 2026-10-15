@@ -22,6 +22,10 @@ Each transient layer and gesture has one activation, dismissal, cleanup, capture
 
 Do not leave listeners, capture, or pressed state active after dismissal.
 
+After a pointer gesture, retain a valid keyboard target within its surface. Preserve focused child controls and deliberate focus outside that surface. Drawing gestures must not trigger an unrelated blur commit through browser default focus movement.
+
+Separate explicit user commands from asynchronous component feedback. Feedback from an earlier operation must not submit or dismiss a newer editor. Preserve the existing feedback transition without repeating command admission against the current draft.
+
 Distinguish unsaved, saving, and failed edits. Show saved feedback when the committed result is not otherwise visible. Selection is not a saved-state indicator. Keep failures explicit and preserve recoverable data. User-facing feedback must not expose raw exceptions, internal identifiers, secrets, or retained page content.
 
 ## Rollout evidence

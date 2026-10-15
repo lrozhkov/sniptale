@@ -19,6 +19,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 
 ## Production dependency licenses
 
+### `@fontsource-variable/inter` 5.3.0
+
+- Installed path: `node_modules/@fontsource-variable/inter`
+- Declared license expression: `OFL-1.1`
+- Selected license: `OFL-1.1`
+- License source class: `installed-file`
+- License source: `node_modules/@fontsource-variable/inter/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt`](LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt)
+- License text SHA-256: `3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345`
+- Repository/source: https://github.com/fontsource/font-files.git
+
 ### `@fontsource-variable/manrope` 5.3.0
 
 - Installed path: `node_modules/@fontsource-variable/manrope`

@@ -7,7 +7,12 @@ import {
   type PresentationEdgeControl,
   type QuickEditPresentationSettings,
 } from '../../features/video/review/advanced/presentation';
-import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
+import {
+  ColorField,
+  SegmentedRow,
+  SelectField,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   ReviewButton,
@@ -64,21 +69,6 @@ export function ReviewPresentationInspector(props: ReviewPresentationInspectorPr
         ))}
       </div>
     </fieldset>
-  );
-}
-
-function Enabled(props: { label: string; value: boolean; onChange(value: boolean): void }) {
-  return (
-    <SelectField
-      className={reviewSelectFieldClassName}
-      label={props.label}
-      value={props.value ? 'on' : 'off'}
-      options={[
-        { value: 'off', label: label('presentationOff') },
-        { value: 'on', label: label('presentationOn') },
-      ]}
-      onChange={(value) => props.onChange(value === 'on')}
-    />
   );
 }
 
@@ -255,7 +245,7 @@ function FadeFields(
   return (
     <div className="min-w-0 space-y-1">
       {props.media && (
-        <Enabled
+        <ToggleField
           label={label(props.slot === 'intro' ? 'presentationFadeIn' : 'presentationFadeOut')}
           value={fade.enabled}
           onChange={(enabled) => props.onChange(patch({ enabled }))}
@@ -284,7 +274,7 @@ function FadeFields(
             onChange={(color) => props.onChange(patch({ color }))}
             onPreviewChange={(color) => props.onPreview(color ? patch({ color }) : null)}
           />
-          <Enabled
+          <ToggleField
             label={label('presentationAudioFade')}
             value={fade.audioFade ?? props.settings.audioFade}
             onChange={(audioFade) => props.onChange(patch({ audioFade }))}
@@ -461,7 +451,7 @@ function VideoFields(
         />
       </ReviewDetails>
       {props.hasAudio && (
-        <Enabled
+        <ToggleField
           label={label('presentationSound')}
           value={!video.audio.muted}
           onChange={(enabled) =>

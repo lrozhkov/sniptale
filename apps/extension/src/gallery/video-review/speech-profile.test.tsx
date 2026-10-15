@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, type ComponentProps } from 'react';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { translate } from '../../platform/i18n';
@@ -129,6 +130,77 @@ it('uses the configured selector for either operation and preserves explicit voi
       root.render(<SpeechTranscriptionModelField speech={{ ...speech, modelId: 'model' }} />)
     );
     expect(host.textContent).toContain('model');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('clears immediate profile values through their normal handlers and preserves voice keyboard focus', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const changeProfile = vi.fn();
+  const profile = {
+    modelId: 'model',
+    voiceId: 'voice',
+    responseFormat: 'mp3' as const,
+    instructions: 'Use a quiet voice',
+  };
+  try {
+    await act(async () =>
+      root.render(
+        <InspectorLayout>
+          <SpeechProfileFields
+            operation="speech"
+            speech={{
+              catalogs: null,
+              modelId: '',
+              setModelId: vi.fn(),
+              profile,
+              changeProfile,
+            }}
+          />
+        </InspectorLayout>
+      )
+    );
+    const voice = host.querySelector<HTMLInputElement>('input')!;
+    await act(async () => {
+      voice.focus();
+      voice.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      );
+      voice.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    });
+    expect(document.activeElement).toBe(voice);
+    expect(changeProfile).not.toHaveBeenCalled();
+    await act(async () =>
+      voice
+        .closest('.sniptale-parameter-row')!
+        .querySelector<HTMLButtonElement>('.sniptale-field-clear')!
+        .click()
+    );
+    expect(changeProfile).toHaveBeenLastCalledWith({ ...profile, voiceId: '' });
+    expect(document.activeElement).toBe(voice);
+    await act(async () => voice.blur());
+    expect(changeProfile).toHaveBeenCalledTimes(1);
+    const instructions = host.querySelector<HTMLTextAreaElement>('textarea')!;
+    await act(async () =>
+      instructions
+        .closest('.sniptale-parameter-row')!
+        .querySelector<HTMLButtonElement>('.sniptale-field-clear')!
+        .click()
+    );
+    expect(changeProfile).toHaveBeenLastCalledWith({
+      modelId: 'model',
+      voiceId: 'voice',
+      responseFormat: 'mp3',
+    });
+    expect(document.activeElement).toBe(instructions);
   } finally {
     await act(async () => root.unmount());
     host.remove();

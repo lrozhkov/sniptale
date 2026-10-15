@@ -95,7 +95,7 @@ export function applyLocalReviewChange(
     const { baseline: _baseline, ...withoutBaseline } = withoutVideoWorkspaceTyping(workspace);
     workspace = {
       ...withoutBaseline,
-      formatVersion: 1,
+      formatVersion: workspace.project ? 3 : 1,
       history: [],
       cursor: 0,
       advanced: { ...createQuickEditAdvancedState(), ui: workspace.advanced.ui },

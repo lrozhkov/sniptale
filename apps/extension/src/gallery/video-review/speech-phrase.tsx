@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Clock3, Merge, Scissors, Trash2 } from 'lucide-react';
-import { ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { TextareaField } from '../../ui/compact-inspector-controls';
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import {
   ReviewButton,
@@ -155,14 +155,14 @@ export function ReviewTextPhrase(props: {
       />
       {props.expanded && (
         <>
-          <ProductTextarea
+          <TextareaField
             ref={textarea}
             rows={3}
             maxLength={16000}
-            aria-label={translate('gallery.videoReview.speechText')}
+            label={translate('gallery.videoReview.speechText')}
             value={fragment.text}
             disabled={props.busy}
-            onChange={(event) => props.editor.change(fragment.id, { text: event.target.value })}
+            onChange={(text) => props.editor.change(fragment.id, { text })}
             onBlur={() => props.editor.endTyping()}
             onKeyDown={(event) => {
               if (event.key === 'Enter') props.editor.endTyping();

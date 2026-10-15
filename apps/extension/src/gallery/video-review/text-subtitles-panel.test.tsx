@@ -90,14 +90,14 @@ beforeEach(() => {
 });
 
 async function select(key: string, text: string) {
-  act(() => button(key).click());
+  await act(async () => button(key).click());
   await vi.waitFor(() =>
     expect(document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0)
   );
   const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
     (entry) => entry.textContent === text
   )!;
-  act(() => option.click());
+  await act(async () => option.click());
 }
 
 it('selects explicit language and format, with recoverable normalization refusal and bounded preview', async () => {
@@ -128,7 +128,7 @@ it('selects explicit language and format, with recoverable normalization refusal
   render({ document: large });
   await select('subtitlesFormat', 'gallery.videoReview.subtitlesSrt');
   const toggle = () =>
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.subtitlesNormalize"]')!;
+    host.querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.subtitlesNormalize"]')!;
   act(() => toggle().click());
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('subtitlesUnavailable');
   expect(toggle()).not.toBeNull();
@@ -166,7 +166,7 @@ it('exports whole current document including hidden text without Save or project
 it('limits selected scope and applies only-shown solely to disposable file cues', () => {
   render({ whole: false, ids: ['hidden'] });
   expect(button('subtitlesDownload').disabled).toBe(false);
-  act(() => host.querySelector<HTMLButtonElement>('[role="switch"]')!.click());
+  act(() => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click());
   expect(button('subtitlesDownload').disabled).toBe(true);
   expect(documentText.fragments[0]?.showInVideo).toBe(false);
 });

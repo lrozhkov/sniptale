@@ -48,7 +48,7 @@ export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
     <fieldset
       disabled={props.pending}
       aria-busy={props.pending}
-      className="min-w-0 space-y-3"
+      className="sniptale-parameter-stack"
       data-ui="gallery.videoReview.watermarkInspector"
     >
       <SegmentedRow
@@ -87,7 +87,7 @@ export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
       )}
       {settings.mode !== 'none' && (
         <div className="review-inspector-columns">
-          <div className="min-w-0 space-y-2">
+          <div className="sniptale-parameter-stack">
             {settings.mode === 'text' ? (
               <WatermarkTextFields {...binding} output={props.output} />
             ) : (

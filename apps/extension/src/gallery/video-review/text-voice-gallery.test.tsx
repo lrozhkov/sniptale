@@ -217,7 +217,7 @@ async function render() {
         >
           Change profile
         </button>
-        <span>{operation.previews.length}</span>
+        <span data-ui="test.previewCount">{operation.previews.length}</span>
       </>
     );
   }
@@ -286,7 +286,7 @@ it('retains a local Gallery preview when AI parameters change', async () => {
   await render();
   await click('gallery.videoReview.musicAdd: Speech.wav');
   await click('change-profile');
-  expect(host.querySelector('span')?.textContent).toBe('1');
+  expect(host.querySelector('[data-ui="test.previewCount"]')?.textContent).toBe('1');
   expect(io.cleanup).not.toHaveBeenCalled();
   expect(io.prepare).toHaveBeenCalledOnce();
   expect(io.apply).not.toHaveBeenCalled();

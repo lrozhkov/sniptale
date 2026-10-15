@@ -4,6 +4,7 @@ import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import { useContext } from 'react';
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { ReviewIntervalMap, reviewIntervalDuration } from './interval-timing';
 import { Clock3 } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
@@ -95,7 +96,7 @@ export function ReviewToolGroup({
 export const reviewDeleteButtonClassName =
   reviewTextButtonClassName +
   ' review-inspector-danger enabled:hover:!text-[var(--sniptale-color-danger)] ' +
-  'enabled:hover:!border-[var(--sniptale-color-danger)]';
+  'enabled:hover:!border-transparent';
 
 /** Source placement and playback duration remain distinct without adding inspector rows. */
 export function ReviewInterval({
@@ -187,12 +188,13 @@ export function ReviewInterval({
 }
 
 /** Inline parameter selectors use the same geometry and typography as numeric rows. */
-export const reviewSelectFieldClassName = '!min-h-9 !border-0 !bg-transparent !px-0 !py-0';
+export const reviewSelectFieldClassName = 'w-full min-w-0';
 
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({
   label,
   primary = false,
+  chrome = false,
   toolbarLabel,
   toolbarPriority = 6,
   children,
@@ -201,10 +203,12 @@ export function ReviewButton({
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   label: string;
   primary?: boolean;
+  chrome?: boolean;
   toolbarLabel?: string | undefined;
   /** Lower priorities lose their caption first when the toolbar runs out of space. */
   toolbarPriority?: number;
 }) {
+  const press = useCommandPress(props);
   const tone = primary
     ? getControlPrimaryButtonClassName()
     : getControlSecondaryButtonClassName({ density: 'compact' });
@@ -216,16 +220,23 @@ export function ReviewButton({
       data-review-toolbar-button={toolbarLabel === undefined ? undefined : ''}
       data-toolbar-priority={toolbarLabel === undefined ? undefined : toolbarPriority}
       {...props}
-      className={`${tone}
+      {...press.props}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
+      data-command-chrome={chrome ? 'true' : undefined}
+      data-command-primary={primary ? 'true' : undefined}
+      className={`review-command ${tone}
       !h-8 !min-h-8 !rounded-[var(--sniptale-radius-sm)]
       !px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)] ${className}`}
     >
-      {children ?? label}
-      {toolbarLabel !== undefined ? (
-        <span data-review-toolbar-label aria-hidden="true">
-          {toolbarLabel}
-        </span>
-      ) : null}
+      <span className="review-command-content sniptale-command-content">
+        {children ?? label}
+        {toolbarLabel !== undefined ? (
+          <span data-review-toolbar-label aria-hidden="true">
+            {toolbarLabel}
+          </span>
+        ) : null}
+      </span>
     </button>
   );
 }

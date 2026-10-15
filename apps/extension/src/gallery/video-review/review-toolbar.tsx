@@ -213,6 +213,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             </ReviewButton>
             {props.originalAudioEditor.originalTool && sourceAudioReady ? (
               <ProductSelect
+                menuClassName="sniptale-parameter-menu"
                 aria-label={translate('gallery.videoReview.volume')}
                 controlSize="sm"
                 className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -368,6 +369,7 @@ function ReviewFocusToolControl({
       </ReviewButton>
       {tool.active ? (
         <ProductSelect
+          menuClassName="sniptale-parameter-menu"
           aria-label={translate('gallery.videoReview.focusType')}
           controlSize="sm"
           className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -426,6 +428,7 @@ function ReviewAnnotationToolControl(props: {
       {tool.active ? (
         <>
           <ProductSelect
+            menuClassName="sniptale-parameter-menu"
             aria-label={translate('gallery.videoReview.annotationEffectsChoose')}
             aria-describedby={required ? requiredId : undefined}
             dataUi="gallery.videoReview.annotationType"

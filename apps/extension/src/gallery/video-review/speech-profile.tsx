@@ -1,9 +1,5 @@
-import {
-  ProductField,
-  ProductInput,
-  ProductSelect,
-  ProductTextarea,
-} from '@sniptale/ui/product-form-controls';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
+import { SelectField, TextField, TextareaField } from '../../ui/compact-inspector-controls';
 import { AIModelSelector } from '../../features/ai/model-selector';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
 import { translate } from '../../platform/i18n';
@@ -19,7 +15,10 @@ export function SpeechTranscriptionModelField({
   speech: Pick<Controller, 'catalogs' | 'modelId' | 'setModelId'>;
 }) {
   return (
-    <ProductField label={translate('gallery.videoReview.speechTranscriptionModel')}>
+    <InspectorParameterRow
+      stacked
+      label={translate('gallery.videoReview.speechTranscriptionModel')}
+    >
       {speech.catalogs ? (
         <AIModelSelector
           models={speech.catalogs.transcription.models}
@@ -30,7 +29,7 @@ export function SpeechTranscriptionModelField({
       ) : (
         <p role="status">{translate('common.states.loading')}</p>
       )}
-    </ProductField>
+    </InspectorParameterRow>
   );
 }
 export function SpeechProfileFields({
@@ -49,7 +48,10 @@ export function SpeechProfileFields({
       {operation !== 'speech' && <SpeechTranscriptionModelField speech={speech} />}
       {operation !== 'transcription' && (
         <>
-          <ProductField label={translate('gallery.videoReview.speechSynthesisModel')}>
+          <InspectorParameterRow
+            stacked
+            label={translate('gallery.videoReview.speechSynthesisModel')}
+          >
             {speech.catalogs ? (
               <AIModelSelector
                 models={speech.catalogs.speech.models}
@@ -62,16 +64,17 @@ export function SpeechProfileFields({
                 }}
               />
             ) : null}
-          </ProductField>
+          </InspectorParameterRow>
           {profile ? (
             <>
-              <ProductField label={translate('gallery.videoReview.speechVoice')}>
-                <ProductInput
-                  aria-label={translate('gallery.videoReview.speechVoice')}
-                  value={profile.voiceId}
-                  onChange={(event) => change({ voiceId: event.target.value })}
-                />
-              </ProductField>
+              <TextField
+                label={translate('gallery.videoReview.speechVoice')}
+                value={profile.voiceId}
+                onChange={(event) => change({ voiceId: event.target.value })}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === 'Escape') event.preventDefault();
+                }}
+              />
               <ReviewInspectorColumns>
                 <ReviewPreviewNumberRow
                   label={translate('gallery.videoReview.speechSpeed')}
@@ -86,40 +89,34 @@ export function SpeechProfileFields({
                   value={profile.speed ?? 1}
                   onChange={(speed) => change({ speed })}
                 />
-                <ProductField label={translate('gallery.videoReview.speechFormat')}>
-                  <ProductSelect
-                    aria-label={translate('gallery.videoReview.speechFormat')}
-                    value={profile.responseFormat}
-                    options={[
-                      { value: 'mp3', label: 'MP3' },
-                      { value: 'wav', label: 'WAV' },
-                      { value: 'pcm', label: translate('settings.aiProviders.modelAudioPcm') },
-                    ]}
-                    onChange={(value) => {
-                      if (value === 'mp3' || value === 'wav' || value === 'pcm')
-                        change({ responseFormat: value });
-                    }}
-                  />
-                </ProductField>
+                <SelectField
+                  label={translate('gallery.videoReview.speechFormat')}
+                  value={profile.responseFormat}
+                  options={[
+                    { value: 'mp3', label: 'MP3' },
+                    { value: 'wav', label: 'WAV' },
+                    { value: 'pcm', label: translate('settings.aiProviders.modelAudioPcm') },
+                  ]}
+                  onChange={(value) => {
+                    if (value === 'mp3' || value === 'wav' || value === 'pcm')
+                      change({ responseFormat: value });
+                  }}
+                />
               </ReviewInspectorColumns>
               <ReviewDetails
                 label={translate('gallery.videoReview.presentationAdvanced')}
                 preferenceId="speech.profile.advanced"
               >
-                <ProductField label={translate('gallery.videoReview.speechInstructions')}>
-                  <ProductTextarea
-                    aria-label={translate('gallery.videoReview.speechInstructions')}
-                    rows={2}
-                    value={profile.instructions ?? ''}
-                    maxLength={10000}
-                    onChange={(event) => {
-                      const { instructions: _instructions, ...rest } = profile;
-                      speech.changeProfile(
-                        event.target.value ? { ...rest, instructions: event.target.value } : rest
-                      );
-                    }}
-                  />
-                </ProductField>
+                <TextareaField
+                  label={translate('gallery.videoReview.speechInstructions')}
+                  rows={2}
+                  value={profile.instructions ?? ''}
+                  maxLength={10000}
+                  onChange={(instructions) => {
+                    const { instructions: _instructions, ...rest } = profile;
+                    speech.changeProfile(instructions ? { ...rest, instructions } : rest);
+                  }}
+                />
               </ReviewDetails>
             </>
           ) : null}

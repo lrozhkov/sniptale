@@ -117,6 +117,156 @@ it('saves a new note before editing an existing one and preserves the chosen edi
   }
 });
 
+it('retains a new note when native ended arrives after the previous End command', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('addComment');
+    await fixture.fill('Before End');
+    await act(async () => {
+      const plane = fixture.host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.timePlane"]'
+      )!;
+      plane.focus();
+      plane.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', code: 'End', bubbles: true }));
+    });
+    expect(fixture.host.querySelector('textarea')).toBeNull();
+    await fixture.click('addComment');
+    const field = fixture.host.querySelector('textarea');
+    expect(field).not.toBeNull();
+    await act(async () => {
+      const video = fixture.host.querySelector('video');
+      expect(video).not.toBeNull();
+      video!.dispatchEvent(new Event('ended', { bubbles: true }));
+    });
+    expect(fixture.host.querySelector('textarea')).toBe(field);
+    expect(field?.disabled).toBe(false);
+    await fixture.fill('After End');
+    await fixture.click('save');
+    expect(
+      fixture.snapshot.workspace.history.filter(
+        (operation) => operation.target === 'annotation' && operation.after?.text === 'After End'
+      )
+    ).toHaveLength(1);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps the note field focused while drawing its region', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('addComment');
+    await fixture.fill('Region note');
+    const field = fixture.host.querySelector('textarea');
+    const stage = fixture.host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+    Object.assign(stage, {
+      getBoundingClientRect: () => new DOMRect(0, 0, 640, 360),
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    for (const [type, x, y] of [
+      ['pointerdown', 160, 90],
+      ['pointermove', 480, 270],
+      ['pointerup', 480, 270],
+    ] as const) {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientX: x,
+        clientY: y,
+      });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      await act(async () => {
+        stage.dispatchEvent(event);
+        // Native mouse focus moves to the enclosing dialog unless pointerdown prevents it.
+        if (type === 'pointerdown' && !event.defaultPrevented)
+          fixture.host.querySelector('dialog')!.focus();
+      });
+    }
+    expect(fixture.host.querySelector('textarea')).toBe(field);
+    expect(document.activeElement).toBe(field);
+    expect(fixture.host.querySelector('[data-region-corner="se"]')).not.toBeNull();
+    await fixture.click('save');
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'annotation',
+      after: { text: 'Region note', region: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } },
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('restores a deleted note with keyboard Undo after its focused action disappears', async () => {
+  const fixture = createEditorFixture(integration);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('addComment');
+    await fixture.fill('Restore this note');
+    await fixture.click('save');
+    await act(async () => {
+      fixture.host.querySelector<HTMLButtonElement>('.review-inspector-list > li button')!.click();
+    });
+    const remove = fixture.host.querySelector<HTMLButtonElement>('[data-note-delete]')!;
+    expect(remove).not.toBeNull();
+    const commit = integration.commit.getMockImplementation()!;
+    integration.commit.mockImplementationOnce(async (...args) => {
+      await gate;
+      return commit(...args);
+    });
+    await act(async () => {
+      remove.focus();
+      remove.click();
+    });
+    expect(remove.disabled).toBe(true);
+    // Native disabling removes focus before the accepted delete commits.
+    if (document.activeElement === remove) {
+      document.body.tabIndex = -1;
+      document.body.focus();
+      document.body.removeAttribute('tabindex');
+    }
+    await act(async () => release());
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'annotation',
+      after: null,
+    });
+    expect(fixture.host.querySelector('.review-inspector-list')?.textContent).not.toContain(
+      'Restore this note'
+    );
+    await act(async () => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'z',
+          code: 'KeyZ',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    });
+    expect(fixture.snapshot.workspace.cursor).toBe(1);
+    expect(fixture.host.querySelector('.review-inspector-list')?.textContent).toContain(
+      'Restore this note'
+    );
+  } finally {
+    release();
+    await fixture.cleanup();
+  }
+});
+
 it('retains failed new-note text and blocks Back until retry succeeds', async () => {
   const fixture = createEditorFixture(integration);
   try {
@@ -213,6 +363,22 @@ it('keeps Scene and Export after the accompanying draft context reset', async ()
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.exportSection"]')
     ).not.toBeNull();
+    await fixture.click('addComment');
+    const field = fixture.host.querySelector('textarea');
+    expect(field).not.toBeNull();
+    expect(document.activeElement).toBe(field);
+    await fixture.fill('After Export');
+    await act(async () => {
+      const plane = fixture.host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.timePlane"]'
+      )!;
+      plane.focus();
+      plane.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', code: 'End', bubbles: true }));
+    });
+    expect(fixture.host.querySelector('textarea')).toBeNull();
+    expect(
+      fixture.snapshot.workspace.history.findLast((operation) => operation.target === 'annotation')
+    ).toMatchObject({ target: 'annotation', after: { text: 'After Export' } });
   } finally {
     await fixture.cleanup();
   }
@@ -292,8 +458,8 @@ it.each(['toolbar', 'shortcut'] as const)(
   'anchors %s Notes to the ruler range, then the playhead with action history hidden',
   async (entry) => {
     const fixture = createEditorFixture(integration);
-    const add = async () => {
-      if (entry === 'toolbar') await fixture.click('addComment');
+    const add = async (range: boolean) => {
+      if (entry === 'toolbar') await fixture.click(range ? 'commentRange' : 'addComment');
       else
         await act(async () =>
           fixture.key(new KeyboardEvent('keydown', { key: 'm', code: 'KeyM' }))
@@ -305,7 +471,12 @@ it.each(['toolbar', 'shortcut'] as const)(
       );
       await fixture.click('telemetry');
       await fixture.selectRulerRange(1, 3);
-      await add();
+      expect(
+        fixture.host.querySelector(
+          '[data-ui="gallery.videoReview.inspector"] [aria-label="gallery.videoReview.commentRange"]'
+        )
+      ).not.toBeNull();
+      await add(true);
       await fixture.fill('Ruler note');
       await fixture.click('save');
       expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
@@ -319,8 +490,13 @@ it.each(['toolbar', 'shortcut'] as const)(
       expect(marker).not.toBeNull();
       await act(async () => marker.click());
       await fixture.click('clearPlaybackRange');
+      expect(
+        fixture.host.querySelector(
+          '[data-ui="gallery.videoReview.inspector"] [aria-label="gallery.videoReview.addComment"]'
+        )
+      ).not.toBeNull();
       await fixture.selectRulerRange(2, 2);
-      await add();
+      await add(false);
       await fixture.fill('Playhead note');
       await fixture.click('save');
       expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({

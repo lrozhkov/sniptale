@@ -1,5 +1,5 @@
 import type { useReviewWorkspaceColor } from './workspace-color';
-import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
+import { ColorField, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   QUICK_PREVIEW_RASTER_PRESETS,
@@ -30,7 +30,10 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
     key: 'previewResolution' | 'previewFrameRate' | 'previewPaused' | 'previewShowFrameRate'
   ) => translate(`gallery.videoReview.${key}`);
   return (
-    <div className="min-w-0 space-y-3" title={translate('gallery.videoReview.previewOnly')}>
+    <div
+      className="min-w-0 sniptale-parameter-stack"
+      title={translate('gallery.videoReview.previewOnly')}
+    >
       <SelectField
         className={reviewSelectFieldClassName}
         label={label('previewResolution')}
@@ -81,16 +84,11 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           props.onChange({ pausedQuality })
         }
       />
-      <SelectField
-        className={reviewSelectFieldClassName}
+      <ToggleField
         label={label('previewShowFrameRate')}
         disabled={props.disabled}
-        value={props.preferences.showFrameRate ? 'on' : 'off'}
-        options={[
-          { value: 'off', label: translate('gallery.videoReview.previewOff') },
-          { value: 'on', label: translate('gallery.videoReview.previewOn') },
-        ]}
-        onChange={(value: 'on' | 'off') => props.onChange({ showFrameRate: value === 'on' })}
+        value={props.preferences.showFrameRate}
+        onChange={(showFrameRate) => props.onChange({ showFrameRate })}
       />
       {props.workspaceColor?.value ? (
         <ColorField

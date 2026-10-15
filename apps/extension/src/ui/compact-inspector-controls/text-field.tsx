@@ -3,6 +3,9 @@ import type React from 'react';
 import type { ProductInputProps } from '@sniptale/ui/product-form-controls';
 import { focusNextCompactInput } from '@sniptale/ui/compact-inspector-controls/focus';
 import { cx } from './shared';
+import { X } from 'lucide-react';
+import { translate } from '../../platform/i18n';
+import { InspectorParameterRow, useInspectorLayout, toggleInspectorFieldEditing } from './layout';
 
 const TEXT_FIELD_LABEL_CLASS_NAME = [
   'select-none break-words',
@@ -34,7 +37,40 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   const inputRef = useRef<HTMLInputElement | null>(null);
   const lastCommittedValueRef = useRef<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [uncontrolledText, setUncontrolledText] = useState(String(props.defaultValue ?? ''));
+  const inspector = useInspectorLayout();
+  const hasText = String(props.value ?? uncontrolledText).length > 0;
   const setInputRef = (node: HTMLInputElement | null) => assignTextFieldRef(inputRef, ref, node);
+
+  if (inspector)
+    return (
+      <InspectorParameterRow
+        label={label}
+        valueMinimum={144}
+        valueText={String(props.value ?? uncontrolledText)}
+        className={className}
+        dataUi="shared.ui.compact-inspector.text-field"
+        onActivate={() => toggleInspectorFieldEditing(inputRef.current)}
+      >
+        <div className="sniptale-text-value">
+          <TextFieldInput
+            invalid={invalid}
+            label={label}
+            lastCommittedValueRef={lastCommittedValueRef}
+            setEditing={setEditing}
+            setInputRef={setInputRef}
+            {...props}
+            onChange={(event) => {
+              setUncontrolledText(event.currentTarget.value);
+              props.onChange?.(event);
+            }}
+          />
+          {!props.disabled && !props.readOnly && hasText ? (
+            <InspectorFieldClear label={label} target={inputRef} />
+          ) : null}
+        </div>
+      </InspectorParameterRow>
+    );
 
   return (
     <div
@@ -56,6 +92,36 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
     </div>
   );
 });
+
+/** Clears through the native input event and keeps acceptance with the field owner. */
+export function InspectorFieldClear(props: {
+  label: string;
+  target: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
+}) {
+  const label = translate('shared.ui.clearField').replace('{field}', props.label);
+  return (
+    <button
+      type="button"
+      className="sniptale-field-clear"
+      aria-label={label}
+      title={label}
+      onPointerDown={(event) => event.preventDefault()}
+      onClick={() => {
+        const input = props.target.current;
+        if (!input || input.matches(':disabled') || input.readOnly) return;
+        const prototype =
+          input instanceof HTMLTextAreaElement
+            ? HTMLTextAreaElement.prototype
+            : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(input, '');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+      }}
+    >
+      <X size={14} aria-hidden="true" />
+    </button>
+  );
+}
 
 function TextFieldInput({
   inputClassName,

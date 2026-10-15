@@ -13,6 +13,7 @@ export function MediaLibraryHeader(props: {
   dataUi: string;
   searchLabel: string;
   filterLabel: string;
+  menuClassName?: string;
   query: string;
   onQueryChange(value: string): void;
   onApplyQuery(): void;
@@ -34,7 +35,8 @@ export function MediaLibraryHeader(props: {
             data-ui={`${props.dataUi}.controls`}
           >
             <div
-              className="flex h-8 w-48 shrink-0 items-center gap-1.5 rounded-[6px] border
+              className="flex h-8 w-48 shrink-0 items-center gap-1.5
+                rounded-[var(--sniptale-media-header-radius,6px)] border
                 border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)] px-2
                 transition-[width] duration-200 focus-within:w-60 motion-reduce:transition-none"
               data-ui={`${props.dataUi}.search`}
@@ -78,11 +80,12 @@ export function MediaLibraryHeader(props: {
                   height: 32,
                   paddingTop: 4,
                   paddingBottom: 4,
-                  borderRadius: 6,
+                  borderRadius: 'var(--sniptale-media-header-radius, 6px)',
                 }}
                 controlSize="sm"
                 value={props.viewId}
                 onChange={props.onViewChange}
+                {...(props.menuClassName ? { menuClassName: props.menuClassName } : {})}
                 menuWidth={280}
                 options={props.options}
               />

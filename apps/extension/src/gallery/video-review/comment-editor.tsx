@@ -1,5 +1,14 @@
+import {
+  InspectorParameterRow,
+  toggleInspectorFieldEditing,
+} from '../../ui/compact-inspector-controls/layout';
 import { CompactPaintSelector } from '../../ui/paint-selector';
-import { ColorField } from '../../ui/compact-inspector-controls/controls';
+import {
+  ColorField,
+  SegmentedRow,
+  TextareaField,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import { Plus, Type, Paintbrush, Play, Trash2 } from 'lucide-react';
 import {
   reviewInspectorActions,
@@ -36,16 +45,22 @@ function ReviewOverlayTimeFields(props: {
   onInputEnd(value: string): void;
   onCommit(window: { start?: number | undefined; end?: number | undefined }): void;
 }) {
+  const startInput = useRef<HTMLInputElement>(null);
+  const endInput = useRef<HTMLInputElement>(null);
   return (
-    <fieldset className="space-y-1">
+    <fieldset className="sniptale-parameter-stack">
       <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('gallery.videoReview.overlayWindow')}
       </legend>
-      <div className="flex gap-2">
-        <label className="flex-1 text-xs">
-          {translate('gallery.videoReview.overlayStart')}
+      <div className="sniptale-parameter-stack">
+        <InspectorParameterRow
+          label={translate('gallery.videoReview.overlayStart')}
+          onActivate={() => toggleInspectorFieldEditing(startInput.current)}
+        >
           <input
+            ref={startInput}
             data-ui="gallery.videoReview.overlayStartInput"
+            aria-label={translate('gallery.videoReview.overlayStart')}
             type="number"
             step={0.1}
             min={0}
@@ -56,14 +71,18 @@ function ReviewOverlayTimeFields(props: {
             onBlur={() =>
               props.onCommit({ start: resolveTimes(props.start), end: props.comment.end })
             }
-            className="mt-1 w-full rounded-md border
-                border-[var(--sniptale-color-border-soft)] px-2 py-1 text-sm tabular-nums"
+            className="h-8 w-full min-w-0 rounded-md border border-transparent
+              bg-transparent px-2 py-1 text-right tabular-nums"
           />
-        </label>
-        <label className="flex-1 text-xs">
-          {translate('gallery.videoReview.overlayEnd')}
+        </InspectorParameterRow>
+        <InspectorParameterRow
+          label={translate('gallery.videoReview.overlayEnd')}
+          onActivate={() => toggleInspectorFieldEditing(endInput.current)}
+        >
           <input
+            ref={endInput}
             data-ui="gallery.videoReview.overlayEndInput"
+            aria-label={translate('gallery.videoReview.overlayEnd')}
             type="number"
             step={0.1}
             min={0}
@@ -74,10 +93,10 @@ function ReviewOverlayTimeFields(props: {
             onBlur={() =>
               props.onCommit({ start: props.comment.start, end: resolveTimes(props.end) })
             }
-            className="mt-1 w-full rounded-md border
-                border-[var(--sniptale-color-border-soft)] px-2 py-1 text-sm tabular-nums"
+            className="h-8 w-full min-w-0 rounded-md border border-transparent
+              bg-transparent px-2 py-1 text-right tabular-nums"
           />
-        </label>
+        </InspectorParameterRow>
       </div>
     </fieldset>
   );
@@ -89,33 +108,29 @@ function ReviewOverlayPlacementFields(props: {
   busy: boolean;
   onPatch(patch: Partial<Omit<CanvasComment, 'id'>>): void;
 }) {
-  const toggleButton = 'aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
   return (
-    <fieldset className="space-y-1">
-      <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate('gallery.videoReview.overlayPlacement')}
-      </legend>
-      <div data-inspector-choices className="flex flex-wrap gap-1">
-        <ReviewButton
-          label={translate('gallery.videoReview.overlayAbove')}
-          aria-pressed={props.placement !== 'below'}
-          disabled={props.busy}
-          className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
-          onClick={() => {
-            if (props.placement === 'below') props.onPatch({ placement: 'above' });
-          }}
-        />
-        <ReviewButton
-          label={translate('gallery.videoReview.overlayBelow')}
-          aria-pressed={props.placement === 'below'}
-          disabled={props.busy}
-          className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
-          onClick={() => {
-            if (props.placement !== 'below') props.onPatch({ placement: 'below' });
-          }}
-        />
-      </div>
-    </fieldset>
+    <SegmentedRow
+      label={translate('gallery.videoReview.overlayPlacement')}
+      ariaLabel={translate('gallery.videoReview.overlayPlacement')}
+      columns={2}
+      value={props.placement === 'below' ? 'below' : 'above'}
+      options={[
+        {
+          value: 'above',
+          label: translate('gallery.videoReview.overlayAbove'),
+          disabled: props.busy,
+        },
+        {
+          value: 'below',
+          label: translate('gallery.videoReview.overlayBelow'),
+          disabled: props.busy,
+        },
+      ]}
+      onChange={(placement) => {
+        if (placement !== (props.placement === 'below' ? 'below' : 'above'))
+          props.onPatch({ placement });
+      }}
+    />
   );
 }
 
@@ -126,36 +141,35 @@ function ReviewOverlayStyleRow(props: {
   onPatch(patch: Partial<Omit<CanvasComment, 'id'>>): void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <span className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate('gallery.videoReview.overlayStyle')}
-      </span>
-      {CANVAS_COMMENT_STYLE_PRESETS.map((preset, index) => {
-        const active = JSON.stringify(props.style.fillPaint) === JSON.stringify(preset.fillPaint);
-        return (
-          <button
-            key={index}
-            type="button"
-            aria-label={`${translate('gallery.videoReview.overlayStyle')} ${index + 1}`}
-            aria-pressed={active}
-            disabled={props.busy}
-            className="h-5 w-5 rounded-full border border-[var(--sniptale-color-border-soft)]
+    <InspectorParameterRow label={translate('gallery.videoReview.overlayStyle')}>
+      <div className="flex flex-wrap items-center gap-1">
+        {CANVAS_COMMENT_STYLE_PRESETS.map((preset, index) => {
+          const active = JSON.stringify(props.style.fillPaint) === JSON.stringify(preset.fillPaint);
+          return (
+            <button
+              key={index}
+              type="button"
+              aria-label={`${translate('gallery.videoReview.overlayStyle')} ${index + 1}`}
+              aria-pressed={active}
+              disabled={props.busy}
+              className="h-6 w-6 rounded-full border border-[var(--sniptale-color-border-soft)]
                 aria-pressed:outline aria-pressed:outline-2
                 aria-pressed:outline-[var(--sniptale-color-accent)]"
-            style={{ background: serializePaintToCss(preset.fillPaint) }}
-            onClick={() =>
-              props.onPatch({
-                style: {
-                  ...props.style,
-                  fillPaint: { ...preset.fillPaint },
-                  textColor: preset.textColor,
-                },
-              })
-            }
-          />
-        );
-      })}
-    </div>
+              style={{ background: serializePaintToCss(preset.fillPaint) }}
+              onClick={() =>
+                props.onPatch({
+                  style: {
+                    ...props.style,
+                    fillPaint: { ...preset.fillPaint },
+                    textColor: preset.textColor,
+                  },
+                })
+              }
+            />
+          );
+        })}
+      </div>
+    </InspectorParameterRow>
   );
 }
 
@@ -249,7 +263,6 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
   const linked = !!props.comment.annotationId;
   const { text, start, end, setStart, setEnd, change, commit, pause, patchComment, patchTimes } =
     useCommentEditorDraft(props);
-  const toggleButton = 'aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
   return (
     <div data-ui="gallery.videoReview.canvasCommentEditor" className="min-w-0 space-y-3">
       <ReviewInspectorSections
@@ -259,36 +272,32 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
             label: translate('videoEditor.sidebar.inspectorGroupContent'),
             icon: Type,
             content: (
-              <>
-                <label className="block text-xs text-[var(--sniptale-color-text-muted)]">
-                  {translate(linked ? linkedTextPlaceholder : 'gallery.videoReview.overlayText')}
-                  <textarea
-                    data-ui="gallery.videoReview.overlayTextInput"
-                    value={linked ? '' : text}
-                    placeholder={
-                      linked ? translate('gallery.videoReview.overlayLinkedHint') : undefined
-                    }
-                    disabled={props.busy || linked}
-                    readOnly={linked}
-                    onChange={(event) => change(event.target.value)}
-                    onBlur={(event) => {
-                      if (
-                        event.relatedTarget instanceof Element &&
-                        event.relatedTarget.closest(
-                          '[data-ui="gallery.videoReview.canvasCommentEditor"]'
-                        )
-                      ) {
-                        pause();
-                        return;
-                      }
-                      commit(event.target.value);
-                    }}
-                    className="mt-1 w-full resize-none rounded-md border
-              border-[var(--sniptale-color-border-soft)] p-2 text-sm"
-                    rows={3}
-                  />
-                </label>
-              </>
+              <TextareaField
+                label={translate(
+                  linked ? linkedTextPlaceholder : 'gallery.videoReview.overlayText'
+                )}
+                data-ui="gallery.videoReview.overlayTextInput"
+                value={linked ? '' : text}
+                placeholder={
+                  linked ? translate('gallery.videoReview.overlayLinkedHint') : undefined
+                }
+                disabled={props.busy || linked}
+                readOnly={linked}
+                onChange={change}
+                onBlur={(event) => {
+                  if (
+                    event.relatedTarget instanceof Element &&
+                    event.relatedTarget.closest(
+                      '[data-ui="gallery.videoReview.canvasCommentEditor"]'
+                    )
+                  ) {
+                    pause();
+                    return;
+                  }
+                  commit(event.target.value);
+                }}
+                rows={3}
+              />
             ),
           },
           {
@@ -302,7 +311,7 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
                   busy={props.busy}
                   onPatch={patchComment}
                 />
-                <div className="min-w-0 space-y-2">
+                <div className="sniptale-parameter-stack">
                   <ReviewOverlayStyleRow
                     style={props.comment.style}
                     busy={props.busy}
@@ -333,28 +342,26 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
                   onInputEnd={setEnd}
                   onCommit={patchTimes}
                 />
-                <div className="min-w-0 space-y-2">
-                  <fieldset className="space-y-1">
-                    <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
-                      {translate('gallery.videoReview.behaviorAtZoom')}
-                    </legend>
-                    <div data-inspector-choices className="flex flex-wrap gap-1">
-                      <ReviewButton
-                        label={translate('gallery.videoReview.followVideo')}
-                        aria-pressed={props.comment.attachment === 'content'}
-                        disabled={props.busy}
-                        className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
-                        onClick={() => props.onSwitchAttachment('content')}
-                      />
-                      <ReviewButton
-                        label={translate('gallery.videoReview.stayOnScreen')}
-                        aria-pressed={props.comment.attachment === 'viewport'}
-                        disabled={props.busy}
-                        className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
-                        onClick={() => props.onSwitchAttachment('viewport')}
-                      />
-                    </div>
-                  </fieldset>
+                <div className="sniptale-parameter-stack">
+                  <SegmentedRow
+                    label={translate('gallery.videoReview.behaviorAtZoom')}
+                    ariaLabel={translate('gallery.videoReview.behaviorAtZoom')}
+                    columns={2}
+                    value={props.comment.attachment}
+                    options={[
+                      {
+                        value: 'content',
+                        label: translate('gallery.videoReview.followVideo'),
+                        disabled: props.busy,
+                      },
+                      {
+                        value: 'viewport',
+                        label: translate('gallery.videoReview.stayOnScreen'),
+                        disabled: props.busy,
+                      },
+                    ]}
+                    onChange={props.onSwitchAttachment}
+                  />
                   <ReviewOverlayFlagRow
                     comment={props.comment}
                     busy={props.busy}
@@ -389,10 +396,11 @@ function ReviewCommentStyleFields(props: {
   busy: boolean;
   onPatch(patch: Partial<Omit<CanvasComment, 'id'>>): void;
 }) {
+  const inputs = useRef(new Map<string, HTMLInputElement>());
   const patch = (style: Partial<CanvasComment['style']>) =>
     props.onPatch({ style: { ...props.style, ...style } });
   return (
-    <fieldset disabled={props.busy} className="space-y-2">
+    <fieldset disabled={props.busy} className="sniptale-parameter-stack">
       <CompactPaintSelector
         triggerVariant="swatch"
         label={translate('gallery.videoReview.overlayFill')}
@@ -413,7 +421,7 @@ function ReviewCommentStyleFields(props: {
         palette={['#111827', '#ffffff', '#334155', '#f97316']}
         onChange={(textColor) => patch({ textColor })}
       />
-      <div className="grid gap-2">
+      <div className="sniptale-parameter-stack">
         {(
           [
             {
@@ -446,10 +454,18 @@ function ReviewCommentStyleFields(props: {
             },
           ] as const
         ).map((field) => (
-          <label key={field.key} className="review-overlay-number">
-            <span>{translate(field.label)}</span>
+          <InspectorParameterRow
+            key={field.key}
+            label={translate(field.label)}
+            onActivate={() => toggleInspectorFieldEditing(inputs.current.get(field.key) ?? null)}
+          >
             <input
               type="number"
+              ref={(input) => {
+                if (input) inputs.current.set(field.key, input);
+                else inputs.current.delete(field.key);
+              }}
+              aria-label={translate(field.label)}
               min={field.min}
               max={field.max}
               step={1}
@@ -474,7 +490,7 @@ function ReviewCommentStyleFields(props: {
                 }
               }}
             />
-          </label>
+          </InspectorParameterRow>
         ))}
       </div>
     </fieldset>
@@ -487,22 +503,19 @@ function ReviewOverlayFlagRow(props: {
   busy: boolean;
   onPatch(patch: Partial<Omit<CanvasComment, 'id'>>): void;
 }) {
-  const toggleButton = 'aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
   return (
-    <div data-inspector-choices className="flex flex-wrap gap-2">
-      <ReviewButton
+    <div className="sniptale-parameter-stack">
+      <ToggleField
         label={translate('gallery.videoReview.overlayVisible')}
-        aria-pressed={props.comment.visible}
+        value={props.comment.visible}
         disabled={props.busy}
-        className={`!text-xs ${toggleButton}`}
-        onClick={() => props.onPatch({ visible: !props.comment.visible })}
+        onChange={(visible) => props.onPatch({ visible })}
       />
-      <ReviewButton
+      <ToggleField
         label={translate('gallery.videoReview.overlayRenderToVideo')}
-        aria-pressed={props.comment.renderToVideo}
+        value={props.comment.renderToVideo}
         disabled={props.busy}
-        className={`!text-xs ${toggleButton}`}
-        onClick={() => props.onPatch({ renderToVideo: !props.comment.renderToVideo })}
+        onChange={(renderToVideo) => props.onPatch({ renderToVideo })}
       />
     </div>
   );
@@ -551,7 +564,7 @@ export function ReviewCanvasCommentsSection(props: {
                 return (
                   <li
                     key={comment.id}
-                    className={`rounded-lg border p-3 ${
+                    className={`rounded-[var(--sniptale-radius-sm)] border p-3 ${
                       props.selectedId === comment.id
                         ? 'border-[var(--sniptale-color-accent)]'
                         : 'border-[var(--sniptale-color-border-soft)]'

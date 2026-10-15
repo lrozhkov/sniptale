@@ -22,6 +22,7 @@ it('shares search, grouped filter and borderless close while keeping query callb
           dataUi="test.library"
           searchLabel="Find media"
           filterLabel="Filter media"
+          menuClassName="sniptale-parameter-menu"
           query=""
           onQueryChange={change}
           onApplyQuery={apply}
@@ -40,6 +41,11 @@ it('shares search, grouped filter and borderless close while keeping query callb
     const filter = host.querySelector('[aria-label="Filter media"]')!;
     expect(search.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(filter.getAttribute('title')).toBe('All images: Backgrounds');
+    await act(async () => (filter as HTMLButtonElement).click());
+    expect(document.querySelector('[role="listbox"]')?.className).toContain(
+      'sniptale-parameter-menu'
+    );
+    await act(async () => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
         search,

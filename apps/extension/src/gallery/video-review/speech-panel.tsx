@@ -1,7 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
-import { ProductField, ProductSelect, ProductTextarea } from '@sniptale/ui/product-form-controls';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
 import { ReviewInspectorSections } from './inspector-sections';
 import { ReviewPreviewNumberRow } from './number-row';
 import { SpeechTranscriptionModelField } from './speech-profile';
@@ -102,7 +101,7 @@ export function ReviewSpeechPanel(props: Props) {
             label: translate('gallery.videoReview.recognitionTitle'),
             icon: FileText,
             content: (
-              <div className="min-w-0 space-y-2">
+              <div className="min-w-0 sniptale-parameter-stack">
                 <RecognitionSettings recognition={recognition} access={props} />
                 <RecognitionFeedback recognition={recognition} />
                 {recognition.proposal && (
@@ -200,42 +199,35 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
   );
   return (
     <div className="space-y-2">
-      <fieldset disabled={disabled} className="min-w-0 space-y-2">
+      <fieldset disabled={disabled} className="min-w-0 sniptale-parameter-stack">
         <SpeechTranscriptionModelField speech={recognition} />
         {!recognition.multimodal && (
-          <ProductField label={translate('gallery.videoReview.recognitionGrouping')}>
-            <ProductSelect
-              aria-label={translate('gallery.videoReview.recognitionGrouping')}
-              value={recognition.grouping}
-              options={[
-                {
-                  value: 'sentences',
-                  label: translate('gallery.videoReview.recognitionSentences'),
-                },
-                {
-                  value: 'sentences-pauses',
-                  label: translate('gallery.videoReview.recognitionPauses'),
-                },
-              ]}
-              onChange={(value) => {
-                if (value === 'sentences' || value === 'sentences-pauses')
-                  recognition.setGrouping(value);
-              }}
-            />
-          </ProductField>
+          <SelectField
+            label={translate('gallery.videoReview.recognitionGrouping')}
+            value={recognition.grouping}
+            options={[
+              {
+                value: 'sentences',
+                label: translate('gallery.videoReview.recognitionSentences'),
+              },
+              {
+                value: 'sentences-pauses',
+                label: translate('gallery.videoReview.recognitionPauses'),
+              },
+            ]}
+            onChange={(value) => {
+              if (value === 'sentences' || value === 'sentences-pauses')
+                recognition.setGrouping(value);
+            }}
+          />
         )}
         {recognition.multimodal && <MultimodalRecognitionSettings recognition={recognition} />}
         {scope.selectable && (
-          <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-            <span>{translate('gallery.videoReview.recognitionSelection')}</span>
-            <ProductGlassSwitch
-              role="switch"
-              aria-checked={recognition.selectionOnly}
-              on={recognition.selectionOnly}
-              onClick={() => recognition.setSelectionOnly(!recognition.selectionOnly)}
-              aria-label={translate('gallery.videoReview.recognitionSelection')}
-            />
-          </div>
+          <CheckboxField
+            value={recognition.selectionOnly}
+            onChange={recognition.setSelectionOnly}
+            label={translate('gallery.videoReview.recognitionSelection')}
+          />
         )}
         <div className="flex flex-wrap gap-1">
           <ReviewButton
@@ -382,7 +374,10 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
       : 'gallery.videoReview.recognitionSaveApply'
   );
   return (
-    <section className="min-w-0 space-y-2" data-ui="gallery.videoReview.recognitionResult">
+    <section
+      className="min-w-0 sniptale-parameter-stack"
+      data-ui="gallery.videoReview.recognitionResult"
+    >
       {editor.document.fragments.some((fragment) => fragment.alignment !== 'word') && (
         <p className="text-xs">{translate('gallery.videoReview.recognitionApproximate')}</p>
       )}
@@ -427,20 +422,18 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
         </ReviewButton>
       )}
       {proposal.job.relatedIds.length > 0 && (
-        <ProductField label={translate('gallery.videoReview.recognitionMode')}>
-          <ProductSelect
-            aria-label={translate('gallery.videoReview.recognitionMode')}
-            value={recognition.mode}
-            disabled={busy}
-            options={[
-              { value: 'add', label: translate('gallery.videoReview.recognitionAdd') },
-              { value: 'replace', label: translate('gallery.videoReview.recognitionReplace') },
-            ]}
-            onChange={(value) => {
-              if (value === 'add' || value === 'replace') recognition.setMode(value);
-            }}
-          />
-        </ProductField>
+        <SelectField
+          label={translate('gallery.videoReview.recognitionMode')}
+          value={recognition.mode}
+          disabled={busy}
+          options={[
+            { value: 'add', label: translate('gallery.videoReview.recognitionAdd') },
+            { value: 'replace', label: translate('gallery.videoReview.recognitionReplace') },
+          ]}
+          onChange={(value) => {
+            if (value === 'add' || value === 'replace') recognition.setMode(value);
+          }}
+        />
       )}
       {recognition.mode === 'replace' && (
         <p className="text-xs">{translate('gallery.videoReview.recognitionReplaceHint')}</p>
@@ -490,46 +483,39 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
 
 function MultimodalRecognitionSettings({ recognition }: { recognition: Recognition }) {
   return (
-    <div className="min-w-0 space-y-2">
-      <ProductField label={translate('gallery.videoReview.recognitionProcessingMode')}>
-        <ProductSelect
-          aria-label={translate('gallery.videoReview.recognitionProcessingMode')}
-          value={recognition.recognitionMode}
-          options={[
-            { value: 'transcribe', label: translate('gallery.videoReview.recognitionVerbatim') },
-            { value: 'rewrite', label: translate('gallery.videoReview.recognitionRewrite') },
-          ]}
-          onChange={(value) => {
-            if (value === 'transcribe' || value === 'rewrite')
-              recognition.setRecognitionMode(value);
-          }}
-        />
-      </ProductField>
-      <ProductField label={translate('gallery.videoReview.recognitionGrouping')}>
-        <ProductSelect
-          aria-label={translate('gallery.videoReview.recognitionGrouping')}
-          value={recognition.granularity}
-          options={[
-            { value: 'phrase', label: translate('gallery.videoReview.recognitionPhrases') },
-            { value: 'sentence', label: translate('gallery.videoReview.recognitionSentences') },
-            { value: 'paragraph', label: translate('gallery.videoReview.recognitionParagraphs') },
-          ]}
-          onChange={(value) => {
-            if (value === 'phrase' || value === 'sentence' || value === 'paragraph')
-              recognition.setGranularity(value);
-          }}
-        />
-      </ProductField>
+    <div className="min-w-0 sniptale-parameter-stack">
+      <SelectField
+        label={translate('gallery.videoReview.recognitionProcessingMode')}
+        value={recognition.recognitionMode}
+        options={[
+          { value: 'transcribe', label: translate('gallery.videoReview.recognitionVerbatim') },
+          { value: 'rewrite', label: translate('gallery.videoReview.recognitionRewrite') },
+        ]}
+        onChange={(value) => {
+          if (value === 'transcribe' || value === 'rewrite') recognition.setRecognitionMode(value);
+        }}
+      />
+      <SelectField
+        label={translate('gallery.videoReview.recognitionGrouping')}
+        value={recognition.granularity}
+        options={[
+          { value: 'phrase', label: translate('gallery.videoReview.recognitionPhrases') },
+          { value: 'sentence', label: translate('gallery.videoReview.recognitionSentences') },
+          { value: 'paragraph', label: translate('gallery.videoReview.recognitionParagraphs') },
+        ]}
+        onChange={(value) => {
+          if (value === 'phrase' || value === 'sentence' || value === 'paragraph')
+            recognition.setGranularity(value);
+        }}
+      />
       {recognition.recognitionMode === 'rewrite' && (
-        <ProductField label={translate('gallery.videoReview.recognitionInstructions')}>
-          <ProductTextarea
-            aria-label={translate('gallery.videoReview.recognitionInstructions')}
-            rows={3}
-            maxLength={10000}
-            value={recognition.prompt}
-            onChange={(event) => recognition.setPrompt(event.target.value)}
-          />
-        </ProductField>
+        <TextareaField
+          label={translate('gallery.videoReview.recognitionInstructions')}
+          rows={3}
+          maxLength={10000}
+          value={recognition.prompt}
+          onChange={recognition.setPrompt}
+        />
       )}
     </div>
   );

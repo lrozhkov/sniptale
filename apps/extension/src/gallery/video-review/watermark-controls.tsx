@@ -1,8 +1,12 @@
 import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Strikethrough } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { useEffect, useId, useRef, useState } from 'react';
-import { ColorField, CompactTextarea, SegmentedRow } from '../../ui/compact-inspector-controls';
+import {
+  ColorField,
+  TextareaField,
+  SegmentedRow,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import {
   parseQuickEditWatermark,
   type QuickEditWatermarkSettings,
@@ -57,20 +61,19 @@ function WatermarkTextDraft({ settings, onChange, onPreview }: Binding) {
   };
   return (
     <div className="space-y-1">
-      <CompactTextarea
+      <TextareaField
         value={draft}
+        label={translate('gallery.videoReview.watermarkText')}
         aria-label={translate('gallery.videoReview.watermarkText')}
         aria-invalid={!valid}
         aria-describedby={valid ? undefined : errorId}
-        className="!min-h-20 w-full rounded-md px-2 py-2 text-xs"
         onCompositionStart={() => {
           composing.current = true;
         }}
         onCompositionEnd={() => {
           composing.current = false;
         }}
-        onChange={(event) => {
-          const value = event.currentTarget.value;
+        onChange={(value) => {
           setDraft(value);
           const next = { ...settings, text: { ...settings.text, value } };
           onPreview(parseQuickEditWatermark(next) ? next : null);
@@ -223,19 +226,11 @@ export function WatermarkTextFields(
           step={1}
           change={(value) => patch({ wrapWidth: value / 100 })}
         />
-        <div
-          className="flex min-h-8 items-center justify-between gap-2 text-xs
-          text-[var(--sniptale-color-text-secondary)]"
-        >
-          <span>{translate('gallery.videoReview.watermarkShadow')}</span>
-          <ProductGlassSwitch
-            role="switch"
-            aria-checked={text.shadow}
-            on={text.shadow}
-            aria-label={translate('gallery.videoReview.watermarkShadow')}
-            onClick={() => onChange(patch({ shadow: !text.shadow }))}
-          />
-        </div>
+        <ToggleField
+          value={text.shadow}
+          label={translate('gallery.videoReview.watermarkShadow')}
+          onChange={(shadow) => onChange(patch({ shadow }))}
+        />
       </ReviewDetails>
     </>
   );

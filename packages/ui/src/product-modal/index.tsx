@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
+import { CommandPressScope, useCommandPress } from '../control-language/press';
 import type { CSSProperties, FormEventHandler, ReactNode } from 'react';
 
 let modalScrollLockCount = 0;
@@ -147,6 +148,23 @@ export function ProductModalHeader({
   closeTitle,
   actions,
 }: ProductModalHeaderProps) {
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({ disabled, onClick: onClose, enabled: scoped });
+  const icon = (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
   return (
     <div className={compact ? 'sniptale-modal-header-sm' : 'sniptale-modal-header'}>
       <div className={compact ? 'sniptale-modal-title-sm' : 'sniptale-modal-title'}>{title}</div>
@@ -156,23 +174,14 @@ export function ProductModalHeader({
           className={
             compact ? 'sniptale-modal-close sniptale-modal-close-sm' : 'sniptale-modal-close'
           }
-          onClick={onClose}
+          {...press.props}
+          data-command-press={scoped ? '' : undefined}
+          data-pressing={press.pressed ? 'true' : undefined}
+          data-command-chrome={scoped ? 'true' : undefined}
           disabled={disabled}
           title={closeTitle}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
+          {scoped ? <span className="sniptale-command-content">{icon}</span> : icon}
         </button>
       )}
     </div>

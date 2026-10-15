@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewInspectorPresentation } from './inspector-sections';
@@ -14,6 +15,10 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 
 let root: Root;
 let host: HTMLDivElement;
+
+function renderEditor(node: ReactNode) {
+  root.render(<InspectorLayout>{node}</InspectorLayout>);
+}
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -49,7 +54,7 @@ it('commits text after the debounce and switches the zoom behavior once', async 
   const onSwitch = vi.fn((_attachment: CanvasComment['attachment']) => undefined);
   const onDelete = vi.fn();
   act(() => {
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentEditor
         comment={comment()}
         annotations={annotations}
@@ -107,7 +112,7 @@ it('lists overlay comments, selects them, and adds through the section button', 
     { ...createCanvasComment({ id: 'c2', at: 5 }), text: 'Second' },
   ];
   act(() => {
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentsSection
         comments={comments}
         annotations={annotations}
@@ -141,7 +146,7 @@ it('keeps the typed draft when the acknowledged text arrives and commits it late
   const onDraft = vi.fn();
   const render = (text: string) =>
     act(() => {
-      root.render(
+      renderEditor(
         <ReviewCanvasCommentEditor
           comment={{ ...comment(), text }}
           annotations={annotations}
@@ -170,7 +175,7 @@ it('keeps the typed draft when the acknowledged text arrives and commits it late
 it('commits pending text when the editor unmounts', async () => {
   const onPatch = vi.fn();
   act(() => {
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentEditor
         comment={comment()}
         annotations={annotations}
@@ -190,7 +195,7 @@ it('commits pending text when the editor unmounts', async () => {
 it('keeps intermediate numeric input and commits the complete style with pending text on blur', async () => {
   const onPatch = vi.fn();
   await act(async () =>
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentEditor
         comment={comment()}
         annotations={[]}
@@ -229,7 +234,7 @@ it('keeps intermediate numeric input and commits the complete style with pending
 
 it('groups overlay management commands in Actions in both inspector modes', async () => {
   const render = (mode: 'all' | 'sections') =>
-    root.render(
+    renderEditor(
       <ReviewInspectorPresentation value={mode}>
         <ReviewCanvasCommentEditor
           comment={comment()}
@@ -263,7 +268,7 @@ it('groups overlay management commands in Actions in both inspector modes', asyn
 it('keeps linked annotation text read-only without copying it into appearance patches', async () => {
   const onPatch = vi.fn();
   await act(async () =>
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentEditor
         comment={{ ...comment(), annotationId: 'a1' }}
         annotations={annotations}
@@ -291,7 +296,7 @@ it('keeps linked annotation text read-only without copying it into appearance pa
 it('commits a pending text draft when focus leaves the inspector', async () => {
   const onPatch = vi.fn();
   await act(async () =>
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentEditor
         comment={comment()}
         annotations={[]}
@@ -314,7 +319,7 @@ it('commits a pending text draft when focus leaves the inspector', async () => {
 
 it('disables text editing while the existing comment is busy', async () => {
   await act(async () =>
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentEditor
         comment={comment()}
         annotations={[]}
@@ -340,7 +345,7 @@ it('preserves stored numeric values when an empty draft loses focus', async () =
     style: { ...comment().style, width: 300, fontSize: 18, padding: 12, radius: 8 },
   };
   await act(async () =>
-    root.render(
+    renderEditor(
       <ReviewCanvasCommentEditor
         comment={stored}
         annotations={[]}
@@ -362,4 +367,60 @@ it('preserves stored numeric values when an empty draft loses focus', async () =
   });
   expect(input.value).toBe('18');
   expect(onPatch).toHaveBeenCalledWith({ text: 'Hello', style: stored.style });
+});
+
+it('clears the comment draft through its editor and commits after leaving the inspector', async () => {
+  const onPatch = vi.fn();
+  const onDraft = vi.fn();
+  await act(async () =>
+    renderEditor(
+      <ReviewCanvasCommentEditor
+        comment={comment()}
+        annotations={[]}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onDraft={onDraft}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const area = host.querySelector('textarea')!;
+  await act(async () => host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
+  expect(area.value).toBe('');
+  expect(document.activeElement).toBe(area);
+  expect(onDraft).toHaveBeenCalledWith('c1', '');
+  expect(onPatch).not.toHaveBeenCalled();
+  await act(async () => area.blur());
+  expect(onPatch).toHaveBeenCalledWith({ text: '' });
+});
+
+it('restores the accepted numeric value on Escape before blur acceptance', async () => {
+  const onPatch = vi.fn();
+  await act(async () =>
+    renderEditor(
+      <ReviewCanvasCommentEditor
+        comment={comment()}
+        annotations={[]}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const input = host.querySelector<HTMLInputElement>('input[min="10"]')!;
+  await act(async () => {
+    input.focus();
+    input.value = '25';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  });
+  expect(input.value).toBe('12');
+  expect(document.activeElement).not.toBe(input);
+  expect(onPatch).toHaveBeenCalledWith({
+    text: 'Hello',
+    style: { ...comment().style, fontSize: 12 },
+  });
 });

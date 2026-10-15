@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTextRewriteForm } from './text-rewrite-panel';
@@ -135,12 +136,14 @@ async function fill(element: HTMLInputElement | HTMLTextAreaElement, value: stri
 async function mountForm(wholeDocument = false, withSecondSource = false) {
   await act(async () =>
     root.render(
-      <ReviewTextRewriteForm
-        access={access(withSecondSource)}
-        ids={withSecondSource ? ['text', 'second'] : ['text']}
-        wholeDocument={wholeDocument}
-        onClose={vi.fn()}
-      />
+      <InspectorLayout>
+        <ReviewTextRewriteForm
+          access={access(withSecondSource)}
+          ids={withSecondSource ? ['text', 'second'] : ['text']}
+          wholeDocument={wholeDocument}
+          onClose={vi.fn()}
+        />
+      </InspectorLayout>
     )
   );
   await fill(host.querySelector('textarea')!, 'Shorten');
@@ -301,7 +304,7 @@ it('names the prompt, discloses the recipient, and disables Start before a valid
     host.querySelector('textarea[aria-label="gallery.videoReview.textRewritePrompt"]')
   ).not.toBeNull();
   expect(host.textContent).toContain('Disclosed provider');
-  expect(host.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('false');
+  expect(host.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked).toBe(false);
   expect(host.querySelector('[aria-label="gallery.videoReview.textRewriteStructure"]')).toBeNull();
   const start = host.querySelector<HTMLButtonElement>(
     'button[aria-label="gallery.videoReview.textRewriteStart"]'
@@ -309,4 +312,25 @@ it('names the prompt, discloses the recipient, and disables Start before a valid
   expect(start?.disabled).toBe(true);
   expect(source.beforeRequest).not.toHaveBeenCalled();
   expect(host.querySelector('dialog')).toBeNull();
+});
+
+it('clears the rewrite prompt draft without submitting or changing the source document', async () => {
+  await mountForm();
+  const prompt = host.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="gallery.videoReview.textRewritePrompt"]'
+  )!;
+  await act(async () =>
+    prompt
+      .closest('.sniptale-parameter-row')!
+      .querySelector<HTMLButtonElement>('.sniptale-field-clear')!
+      .click()
+  );
+  expect(prompt.value).toBe('');
+  expect(document.activeElement).toBe(prompt);
+  expect(jobs.generate).not.toHaveBeenCalled();
+  expect(jobs.apply).not.toHaveBeenCalled();
+  await fill(prompt, 'Shorten again');
+  await click('textRewriteStart');
+  expect(jobs.generate).toHaveBeenCalledTimes(1);
+  expect(jobs.generate.mock.calls[0]?.[1].context.prompt).toBe('Shorten again');
 });

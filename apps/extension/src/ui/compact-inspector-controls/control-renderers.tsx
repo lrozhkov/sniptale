@@ -1,8 +1,11 @@
 import type React from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { resolveCompactGridClassName } from '@sniptale/ui/compact-inspector-controls/grid';
 import { cx } from './shared';
+import { useInspectorLayout } from './layout';
+import { CompactSelect } from './select';
 
 export function CompactSegmentedSelector<T extends string>(props: {
   ariaLabel: string;
@@ -11,6 +14,8 @@ export function CompactSegmentedSelector<T extends string>(props: {
   value: T;
   onChange: (value: T) => void;
 }) {
+  const inspector = useInspectorLayout();
+  if (inspector) return <InspectorSegments {...props} />;
   return (
     <div
       role="group"
@@ -26,6 +31,89 @@ export function CompactSegmentedSelector<T extends string>(props: {
           option={option}
         />
       ))}
+    </div>
+  );
+}
+
+/** Equal segments stay on one line; only a full-width fit failure changes representation. */
+function InspectorSegments<T extends string>(
+  props: Parameters<typeof CompactSegmentedSelector<T>>[0]
+) {
+  const host = useRef<HTMLDivElement>(null);
+  const [dropdown, setDropdown] = useState(false);
+  const iconOnly = props.options.every((option) => option.icon !== undefined);
+  useLayoutEffect(() => {
+    const element = host.current;
+    if (!element) return;
+    const fit = () => {
+      if (
+        !element.clientWidth ||
+        element.contains(document.activeElement) ||
+        element.querySelector('[aria-expanded="true"]')
+      )
+        return;
+      const context = document.createElement('canvas').getContext('2d');
+      if (!context) return;
+      context.font = `500 13px ${getComputedStyle(element).fontFamily}`;
+      const width = Math.max(
+        0,
+        ...props.options.map((option) => context.measureText(option.label).width)
+      );
+      setDropdown(
+        !iconOnly &&
+          (width + 20) * props.options.length + 4 + 2 * (props.options.length - 1) >
+            element.clientWidth
+      );
+    };
+    fit();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    observer?.observe(element);
+    let disposed = false;
+    void document.fonts?.ready.then(() => {
+      if (!disposed) fit();
+    });
+    const afterBlur = () => queueMicrotask(fit);
+    element.addEventListener('focusout', afterBlur);
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      element.removeEventListener('focusout', afterBlur);
+    };
+  }, [iconOnly, props.options]);
+  return (
+    <div ref={host} className="sniptale-property-choice">
+      {dropdown ? (
+        <CompactSelect
+          aria-label={props.ariaLabel}
+          value={props.value}
+          options={props.options}
+          appearance="plain"
+          onChange={props.onChange}
+        />
+      ) : (
+        <div
+          role="group"
+          aria-label={props.ariaLabel}
+          data-ui="shared.ui.compact-inspector.segmented-row"
+          data-icon-only={iconOnly ? 'true' : undefined}
+          className="sniptale-property-segments"
+          style={{ gridTemplateColumns: `repeat(${props.options.length}, minmax(0, 1fr))` }}
+        >
+          {props.options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-label={option.label}
+              title={option.label}
+              aria-pressed={option.value === props.value}
+              disabled={option.disabled}
+              onClick={() => props.onChange(option.value)}
+            >
+              {option.icon ?? option.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

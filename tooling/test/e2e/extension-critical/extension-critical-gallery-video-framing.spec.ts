@@ -153,7 +153,22 @@ for (const variant of [
         };
         await button('gallery.videoReview.advancedEditing').click();
         await button('gallery.videoReview.scene').click();
-        await button('gallery.videoReview.backgroundSolid').click();
+        const solid = button('gallery.videoReview.backgroundSolid');
+        if (await solid.count()) await solid.click();
+        else {
+          const background = dialog.locator('.review-background-kinds').getByRole('button', {
+            name: label('gallery.videoReview.background'),
+            exact: true,
+          });
+          await background.click();
+          await page
+            .getByRole('option', {
+              name: label('gallery.videoReview.backgroundSolid'),
+              exact: true,
+            })
+            .click();
+          await expect(background).toContainText(label('gallery.videoReview.backgroundSolid'));
+        }
         await button('gallery.videoReview.backgroundZoomContent').click();
         await setNumber('gallery.videoReview.backgroundPadding', '20');
         await setNumber('gallery.videoReview.backgroundCornerRadius', '0');

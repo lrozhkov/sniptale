@@ -1,9 +1,6 @@
+import { TextareaField } from '../../ui/compact-inspector-controls';
 import { useState } from 'react';
-import {
-  ProductSelect,
-  ProductTextarea,
-  type ProductSelectOption,
-} from '@sniptale/ui/product-form-controls';
+import { ProductSelect, type ProductSelectOption } from '@sniptale/ui/product-form-controls';
 import { X } from 'lucide-react';
 import { ReviewButton, ReviewDetails, reviewTextButtonClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
@@ -116,19 +113,19 @@ function RewriteProposalPhrase({
       <span className="text-xs tabular-nums">
         {index + 1}. {fragment.start !== undefined ? `${fragment.start}–${fragment.end} s` : ''}
       </span>
-      <ProductTextarea
-        aria-label={translate('gallery.videoReview.textRewriteResult').replace(
+      <TextareaField
+        label={translate('gallery.videoReview.textRewriteResult').replace(
           '{index}',
           String(index + 1)
         )}
         rows={2}
         value={fragment.text}
         maxLength={16_000}
-        onChange={(event) =>
+        onChange={(text) =>
           operation.edit((proposal) => ({
             ...proposal,
             fragments: proposal.fragments.map((entry, item) =>
-              item === index ? { ...entry, text: event.target.value } : entry
+              item === index ? { ...entry, text } : entry
             ),
           }))
         }
@@ -202,6 +199,7 @@ function RewriteSourceMapping({
       {fromIds.map((id, position) => (
         <div key={position} className="flex min-w-0 gap-1">
           <ProductSelect
+            menuClassName="sniptale-parameter-menu"
             aria-label={label('textRewriteSource')}
             value={id}
             controlSize="sm"
@@ -226,6 +224,7 @@ function RewriteSourceMapping({
       ))}
       {fromIds.length < sourceOptions.length && (
         <ProductSelect
+          menuClassName="sniptale-parameter-menu"
           aria-label={label('textRewriteSourceAdd')}
           value=""
           controlSize="sm"

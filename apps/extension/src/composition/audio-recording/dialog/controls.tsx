@@ -188,6 +188,7 @@ export function RecordingSetup(props: {
 }
 
 export function AudioRecordingDeviceSelect(props: {
+  menuClassName?: string;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;

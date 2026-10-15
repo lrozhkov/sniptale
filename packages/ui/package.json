@@ -131,7 +131,8 @@
     "./voice-input/use-push-to-talk": "./src/voice-input/use-push-to-talk.ts",
     "./viewport-pan": "./src/viewport-pan/index.ts",
     "./product-modal/native-drawer": "./src/product-modal/native-drawer.tsx",
-    "./material-browser/selectable-card": "./src/material-browser/selectable-card.tsx"
+    "./material-browser/selectable-card": "./src/material-browser/selectable-card.tsx",
+    "./control-language/press": "./src/control-language/press.ts"
   },
   "dependencies": {
     "@sniptale/foundation": "0.5.1",

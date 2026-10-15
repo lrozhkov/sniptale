@@ -1,7 +1,7 @@
 import { ReviewWebcamCropPreview } from './webcam-crop-preview';
 import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
+import { ColorField, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { ReviewNumberRow } from './number-row';
 import {
@@ -149,7 +149,7 @@ export function ReviewWebcamInspector({
               label: translate('gallery.videoReview.webcamTiming'),
               icon: Clock3,
               content: (
-                <div className="space-y-2">
+                <div className="sniptale-parameter-stack">
                   <div title={translate('gallery.videoReview.webcamOffsetHint')}>
                     <ReviewNumberRow
                       label={translate('gallery.videoReview.webcamOffset')}
@@ -188,7 +188,7 @@ function WebcamLayout({ editor }: { editor: Editor }) {
       });
   };
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack">
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.webcamPosition')}
@@ -207,7 +207,7 @@ function WebcamLayout({ editor }: { editor: Editor }) {
         <WebcamPlacement editor={editor} />
         <WebcamCrop editor={editor} />
         {position ? (
-          <div className="space-y-2">
+          <div className="sniptale-parameter-stack">
             <ReviewNumberRow
               label={translate('gallery.videoReview.webcamPositionTime')}
               value={position.time}
@@ -260,7 +260,7 @@ function WebcamPlacement({ editor }: { editor: Editor }) {
   const camera = editor.camera!;
   const placement = editor.placement!;
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack">
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.webcamPlacement')}
@@ -338,7 +338,7 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
     });
   return (
     <div className="review-inspector-columns">
-      <div className="space-y-2">
+      <div className="sniptale-parameter-stack">
         <SelectField
           className={reviewSelectFieldClassName}
           label={translate('videoEditor.sidebar.cameraShape')}
@@ -370,18 +370,13 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
             onChange={(roundness) => editor.patch({ appearance: { ...appearance, roundness } })}
           />
         ) : null}
-        <SelectField
-          className={reviewSelectFieldClassName}
+        <ToggleField
           label={translate('gallery.videoReview.webcamMirror')}
-          value={camera.mirrored ? 'yes' : 'no'}
-          options={[
-            { value: 'no', label: translate('gallery.videoReview.webcamMirrorOff') },
-            { value: 'yes', label: translate('gallery.videoReview.webcamMirrorOn') },
-          ]}
-          onChange={(value) => editor.patch({ mirrored: value === 'yes' })}
+          value={camera.mirrored}
+          onChange={(mirrored) => editor.patch({ mirrored })}
         />
       </div>
-      <div className="space-y-2">
+      <div className="sniptale-parameter-stack">
         <ReviewNumberRow
           label={translate('gallery.videoReview.webcamShadow')}
           value={camera.shadow?.intensity ?? 0}
@@ -417,7 +412,7 @@ function WebcamCrop({ editor }: { editor: Editor }) {
     crop = editor.crop!,
     placement = editor.placement!;
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack">
       <ReviewWebcamCropPreview
         camera={camera}
         crop={crop}

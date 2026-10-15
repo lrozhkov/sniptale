@@ -8,13 +8,13 @@
   color: var(--sniptale-color-text-primary);
 }
 [data-ui='gallery.videoReview.inspector'] :is(label, legend) {
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  font: 500 13px / 18px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-secondary);
 }
 [data-ui='gallery.videoReview.inspector']
   input:not([type='range']):not([type='checkbox']):not([type='file']),
 [data-ui='gallery.videoReview.inspector'] textarea {
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  font: 500 13px / 18px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-primary);
   background: var(--sniptale-color-surface-panel);
   border-radius: var(--sniptale-radius-sm);
@@ -260,7 +260,7 @@
   [data-ui='gallery.videoReview.inspector']
     :is(.review-inspector-danger, [data-note-delete]):hover:not(:disabled) {
     color: var(--sniptale-color-danger) !important;
-    border-color: var(--sniptale-color-danger) !important;
+    border-color: transparent !important;
     background: transparent !important;
   }
 }
@@ -368,4 +368,40 @@
     width: calc((100cqw - 12px) / 2);
     max-width: 100%;
   }
+}
+
+/* Mixed parameter families share one rhythm within the migrated workspace. */
+.sniptale-compact-workspace .review-inspector-section-body,
+.sniptale-compact-workspace .review-inspector-columns {
+  gap: 4px;
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.inspector'] {
+  background: var(--sniptale-color-surface-panel);
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.disclosure'] > summary {
+  min-height: 32px;
+  padding-inline: 8px;
+  font: 600 14px / 20px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.disclosure'][data-level='group']
+  > summary {
+  min-height: 28px;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.disclosure'] > summary:hover {
+  box-shadow: none;
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.disclosure']
+  > .review-inspector-section-body {
+  padding-top: 8px;
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.inspector'] :is(label, legend) {
+  font: 500 13px / 18px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace
+  [data-ui='shared.ui.compact-inspector.numeric-value-field']
+  :is(input, span) {
+  font: 500 13px / 18px var(--sniptale-font-sans);
 }

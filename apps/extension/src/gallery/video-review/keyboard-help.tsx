@@ -55,7 +55,8 @@ function KeyboardHelpDialog({ anchor, onClose }: { anchor: HTMLButtonElement; on
           event.currentTarget.querySelector<HTMLButtonElement>('button')?.focus();
         }
       }}
-      className="fixed inset-0 m-auto w-[min(560px,calc(100vw-40px))] max-h-[calc(100dvh-40px)]
+      className="sniptale-compact-workspace fixed inset-0 m-auto
+        w-[min(560px,calc(100vw-40px))] max-h-[calc(100dvh-40px)]
         overflow-y-auto rounded-[var(--sniptale-radius-lg)] border border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] p-0 text-[var(--sniptale-color-text-primary)] backdrop:bg-black/60"
     >

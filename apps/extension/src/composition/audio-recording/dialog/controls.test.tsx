@@ -60,11 +60,21 @@ it('lists microphones, refreshes device changes and removes its listener on clos
   const onChange = vi.fn();
   try {
     await act(async () =>
-      root.render(<AudioRecordingDeviceSelect value="mic" onChange={onChange} disabled={false} />)
+      root.render(
+        <AudioRecordingDeviceSelect
+          value="mic"
+          onChange={onChange}
+          disabled={false}
+          menuClassName="sniptale-parameter-menu"
+        />
+      )
     );
     expect(host.textContent).toContain('Desk microphone');
     const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
     await act(async () => trigger.click());
+    expect(document.querySelector('[role="listbox"]')?.className).toContain(
+      'sniptale-parameter-menu'
+    );
     const unnamed = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
       (option) => option.textContent?.includes('videoEditor.app.recordAudioDevice 2')
     )!;

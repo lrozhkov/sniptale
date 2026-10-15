@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const sharedUiMessages = defineMessageSource({
+  clearField: {
+    ru: 'Очистить поле «{field}»',
+    en: 'Clear {field}',
+  },
   colorSelectorTransparent: {
     ru: 'Прозрачный',
     en: 'Transparent',

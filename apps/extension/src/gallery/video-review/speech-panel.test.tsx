@@ -70,30 +70,21 @@ vi.mock('../../features/ai/model-selector', () => ({
     </select>
   ),
 }));
-vi.mock('@sniptale/ui/product-form-controls', async (original) => ({
-  ...(await original<typeof import('@sniptale/ui/product-form-controls')>()),
-  ProductSelect: (props: {
-    'aria-label'?: string;
-    value: string;
-    disabled?: boolean;
-    options: Array<{ value: string; label: string }>;
-    onChange(value: string): void;
-  }) => (
-    <select
-      aria-label={props['aria-label']}
-      value={props.value}
-      disabled={props.disabled}
-      onChange={(event) => props.onChange(event.target.value)}
-    >
-      {props.options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  ),
-}));
 import { ReviewSpeechPanel } from './speech-panel';
+async function chooseField(
+  key: Parameters<typeof translate>[0],
+  optionKey: Parameters<typeof translate>[0]
+) {
+  await act(async () => {
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`)!.click();
+  });
+  const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (entry) => entry.textContent === translate(optionKey)
+  );
+  if (!option) throw new Error('Missing option: ' + optionKey);
+  await act(async () => option.click());
+}
+
 let root: Root | undefined;
 let host: HTMLDivElement;
 beforeEach(() => {
@@ -237,9 +228,9 @@ async function mount(
   return { session, proposal, onSelectText, render };
 }
 function button(label: string) {
-  const found = Array.from(host.querySelectorAll('button')).find(
-    (node) => node.getAttribute('aria-label') === label
-  );
+  const found = Array.from(
+    host.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input[type=checkbox]')
+  ).find((node) => node.getAttribute('aria-label') === label);
   if (!found) throw new Error('Missing button: ' + label);
   return found;
 }
@@ -252,9 +243,7 @@ it('keeps selected-only intent and blocks consent when the ruler interval disapp
   await click(translate('gallery.videoReview.recognitionStart'));
   expect(button(translate('gallery.videoReview.speechConsentContinue')).disabled).toBe(false);
   await render();
-  expect(
-    button(translate('gallery.videoReview.recognitionSelection')).getAttribute('aria-checked')
-  ).toBe('true');
+  expect(host.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked).toBe(true);
   expect(button(translate('gallery.videoReview.speechConsentContinue')).disabled).toBe(true);
   expect(host.textContent).toContain(translate('gallery.videoReview.recognitionSelectionMissing'));
   expect(mocks.prepare).not.toHaveBeenCalled();
@@ -364,14 +353,10 @@ it('applies only on explicit acceptance and enables another recognition after ac
 it('requires an explicit replacement choice and preserves a failed Apply result for retry', async () => {
   const { proposal } = await mount();
   await recognize();
-  const mode = host.querySelector(
-    'select[aria-label="' + translate('gallery.videoReview.recognitionMode') + '"]'
+  await chooseField(
+    'gallery.videoReview.recognitionMode',
+    'gallery.videoReview.recognitionReplace'
   );
-  if (!(mode instanceof HTMLSelectElement)) throw new Error('Missing application mode');
-  await act(async () => {
-    mode.value = 'replace';
-    mode.dispatchEvent(new Event('change', { bubbles: true }));
-  });
   expect(host.textContent).toContain(translate('gallery.videoReview.recognitionReplaceHint'));
   mocks.apply.mockImplementationOnce(async () => {
     const before = createQuickEditAdvancedState();
@@ -433,14 +418,13 @@ it('uses compact multimodal controls and captures only the chosen rewrite instru
   mocks.multimodal = true;
   await mount(false, { start: 0, end: 1 });
   const select = async (key: Parameters<typeof translate>[0], value: string) => {
-    const node = host.querySelector<HTMLSelectElement>(
-      'select[aria-label="' + translate(key) + '"]'
-    );
-    if (!node) throw new Error('Missing selector: ' + key);
-    await act(async () => {
-      node.value = value;
-      node.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    const labels = {
+      rewrite: 'gallery.videoReview.recognitionRewrite',
+      transcribe: 'gallery.videoReview.recognitionVerbatim',
+      paragraph: 'gallery.videoReview.recognitionParagraphs',
+      phrase: 'gallery.videoReview.recognitionPhrases',
+    } as const;
+    await chooseField(key, labels[value as keyof typeof labels]);
   };
   expect(host.querySelector('fieldset p')).toBeNull();
   expect(host.querySelector('textarea')).toBeNull();

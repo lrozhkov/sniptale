@@ -163,10 +163,6 @@ it('shows effective timing without committing opposite or dormant authored durat
   );
   expect(host.querySelector<HTMLInputElement>('input[aria-label="Duration"]')?.value).toBe('2');
   await act(async () => button('Fade audio').click());
-  const on = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
-    (node) => node.textContent === 'On'
-  )!;
-  await act(async () => on.click());
   const changed = vi.mocked(editor.change).mock.calls[0]![0];
   if (!changed) throw new Error('Expected settings commit');
   expect(changed.outroControl).toEqual(before.outroControl);

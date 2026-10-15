@@ -72,7 +72,13 @@ it('shows current defaults and actual raster, commits local settings and offers 
     expect(onChange).toHaveBeenLastCalledWith({ frameRate: '15' });
     await choose(2, 'gallery.videoReview.previewPausedDetailed');
     expect(onChange).toHaveBeenLastCalledWith({ pausedQuality: 'detailed' });
-    await choose(3, 'gallery.videoReview.previewOn');
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>(
+          '[role="switch"][aria-label="gallery.videoReview.previewShowFrameRate"]'
+        )!
+        .click()
+    );
     expect(onChange).toHaveBeenLastCalledWith({ showFrameRate: true });
 
     const button = (key: string) =>

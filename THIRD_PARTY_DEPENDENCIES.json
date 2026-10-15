@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "archivePath": "LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt",
+      "licenseExpression": "OFL-1.1",
+      "licenseSource": "node_modules/@fontsource-variable/inter/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@fontsource-variable/inter",
+      "packagePath": "node_modules/@fontsource-variable/inter",
+      "selectedLicense": "OFL-1.1",
+      "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
+      "sourceUrl": "https://github.com/fontsource/font-files.git",
+      "version": "5.3.0"
+    },
+    {
       "archivePath": "LICENSES/OFL-1.1.txt",
       "licenseExpression": "OFL-1.1",
       "licenseSource": "node_modules/@fontsource-variable/manrope/LICENSE",

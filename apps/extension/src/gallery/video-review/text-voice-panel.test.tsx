@@ -200,7 +200,9 @@ async function render(
   return { session, beforeRequest, props };
 }
 async function click(label: string) {
-  const button = Array.from(host.querySelectorAll('button')).find(
+  const button = Array.from(
+    host.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input[type=checkbox]')
+  ).find(
     (element) => element.getAttribute('aria-label') === label || element.textContent === label
   );
   if (!button) throw new Error(`Missing button ${label}`);
@@ -316,14 +318,17 @@ it('keeps source attenuation off and unavailable for silent/unknown media, and c
   const mutedLabel = 'gallery.videoReview.textVoiceMuteSource';
   await render();
   expect(
-    host.querySelector<HTMLButtonElement>(`button[aria-label="${mutedLabel}"]`)?.disabled
+    host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${mutedLabel}"]`)
+      ?.disabled
   ).toBe(true);
   expect(host.textContent).toContain('gallery.videoReview.textVoiceMuteUnavailable');
   const { beforeRequest } = await render(['first'], undefined, () => true);
-  const toggle = host.querySelector<HTMLButtonElement>(`button[aria-label="${mutedLabel}"]`)!;
-  expect(toggle.getAttribute('aria-checked')).toBe('false');
+  const toggle = host.querySelector<HTMLInputElement>(
+    `input[type=checkbox][aria-label="${mutedLabel}"]`
+  )!;
+  expect(toggle.checked).toBe(false);
   await click(mutedLabel);
-  expect(toggle.getAttribute('aria-checked')).toBe('true');
+  expect(toggle.checked).toBe(true);
   expect(beforeRequest).not.toHaveBeenCalled();
   expect(mocks.apply).not.toHaveBeenCalled();
   await start();
@@ -597,7 +602,9 @@ it('keeps batch local modes unavailable and routes Back and mode changes through
     'gallery.videoReview.textVoiceMicrophone',
     'gallery.videoReview.textVoiceGallery',
   ]) {
-    const button = [...host.querySelectorAll('button')].find((node) => node.textContent === key);
+    const button = [
+      ...host.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input[type=checkbox]'),
+    ].find((node) => node.textContent === key);
     expect(button?.disabled).toBe(true);
   }
   expect(host.textContent).toContain('gallery.videoReview.textVoiceLocalSingle');

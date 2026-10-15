@@ -1,0 +1,85 @@
+/* The marker is emitted only by surfaces that adopt the command press contract. */
+button[data-command-press] {
+  transform: none !important;
+  /* Keep the longhand: minification can fold a literal reset into transform. */
+  translate: var(--sniptale-command-resting-translate, 0px 0px) !important;
+}
+
+button[data-command-press] > .sniptale-command-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: inherit;
+  gap: inherit;
+  min-width: 0;
+  max-width: 100%;
+  transition:
+    transform 110ms ease-out,
+    opacity 55ms ease-out;
+}
+
+button[data-command-press]:enabled[data-pressing='true'] > .sniptale-command-content {
+  transform: translateY(1px);
+  opacity: 0.72;
+  transition-duration: 55ms;
+}
+
+/* Switches retain their thumb geometry and use opacity for physical pressure. */
+button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
+  opacity: 0.72;
+}
+
+@layer utilities {
+  button[data-command-press][data-command-tone] {
+    height: 32px !important;
+    min-height: 32px !important;
+    border: 1px solid transparent !important;
+    border-radius: var(--sniptale-radius-sm, 4px) !important;
+    padding: 0 8px !important;
+    font: 500 13px / 18px var(--sniptale-font-interface) !important;
+    background: transparent !important;
+    color: var(--sniptale-color-text-primary) !important;
+  }
+
+  button[data-command-press][data-command-tone='primary'],
+  button[data-command-press][data-command-tone='toggle'][data-command-active='true'] {
+    background: var(--sniptale-color-surface-hover) !important;
+  }
+
+  button[data-command-press][data-command-tone]:enabled:hover {
+    background: color-mix(
+      in srgb,
+      var(--sniptale-color-text-secondary) 18%,
+      var(--sniptale-color-surface-panel)
+    ) !important;
+  }
+
+  button[data-command-press][data-command-tone='danger'] {
+    color: var(--sniptale-color-danger) !important;
+  }
+
+  button[data-command-press][data-command-chrome='true'],
+  button[data-command-press][data-command-chrome='true']:is(:hover, :active, :focus-visible) {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--sniptale-color-text-secondary) !important;
+  }
+
+  button[data-command-press][data-command-chrome='true']:enabled:hover {
+    color: var(--sniptale-color-text-primary) !important;
+  }
+
+  button[data-command-press]:focus-visible {
+    outline: 2px solid var(--sniptale-color-accent) !important;
+    outline-offset: -2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button[data-command-press] > .sniptale-command-content {
+    transition: none;
+  }
+  button[data-command-press]:enabled[data-pressing='true'] > .sniptale-command-content {
+    transform: none;
+  }
+}

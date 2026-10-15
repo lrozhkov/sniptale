@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { CheckboxField } from '../../ui/compact-inspector-controls';
 import { ReviewTextVoiceRecording } from './text-voice-recording';
 import { ReviewTextVoiceGallery } from './text-voice-gallery';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
@@ -89,22 +89,17 @@ export function ReviewTextVoiceForm(props: Props) {
       {props.ids.length !== 1 && (
         <p className="text-xs">{translate('gallery.videoReview.textVoiceLocalSingle')}</p>
       )}
-      <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-        <span>{translate('gallery.videoReview.textVoiceMuteSource')}</span>
-        <ProductGlassSwitch
-          role="switch"
-          aria-label={translate('gallery.videoReview.textVoiceMuteSource')}
-          aria-checked={operation.muteSource}
-          on={operation.muteSource}
-          disabled={
-            props.disabled ||
-            operation.running ||
-            operation.pendingApplyIds.length > 0 ||
-            (!props.access.sourceAudioAvailable?.() && !operation.muteSource)
-          }
-          onClick={() => operation.setMuteSource(!operation.muteSource)}
-        />
-      </div>
+      <CheckboxField
+        label={translate('gallery.videoReview.textVoiceMuteSource')}
+        value={operation.muteSource}
+        disabled={
+          props.disabled ||
+          operation.running ||
+          operation.pendingApplyIds.length > 0 ||
+          (!props.access.sourceAudioAvailable?.() && !operation.muteSource)
+        }
+        onChange={operation.setMuteSource}
+      />
       {!props.access.sourceAudioAvailable?.() && (
         <p className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.textVoiceMuteUnavailable')}

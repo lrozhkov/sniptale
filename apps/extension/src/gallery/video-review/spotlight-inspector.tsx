@@ -15,7 +15,7 @@ export function ReviewSpotlightInspector(props: {
 }) {
   const { value, onChange } = props;
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.focusOutside')}
