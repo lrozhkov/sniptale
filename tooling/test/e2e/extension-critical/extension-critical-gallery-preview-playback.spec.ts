@@ -308,7 +308,7 @@ test('manual camera offset pixels follow cut speed and loop transport', async ({
 });
 
 for (const width of [1280, 1920]) {
-  test(`timeline follows playback and respects manual navigation at ${width}`, async ({
+  test(`timeline pages playback and respects manual navigation at ${width}`, async ({
     page,
   }, info) => {
     await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
@@ -363,6 +363,14 @@ for (const width of [1280, 1920]) {
       expect(samples.at(-1)!.time).toBeGreaterThan(samples[0]!.time + 0.5);
       expect(samples.at(-1)!.left).toBeGreaterThan(samples[0]!.left);
       expect(samples.every((sample) => sample.x >= -1 && sample.x <= sample.width + 1)).toBe(true);
+      const advances = samples.slice(1).map((sample, index) => sample.left - samples[index]!.left);
+      expect(advances.filter((advance) => advance > 1).length).toBeGreaterThan(0);
+      expect(
+        advances.every((advance) => Math.abs(advance) <= 1 || advance >= samples[0]!.width * 0.8)
+      ).toBe(true);
+      expect(advances.filter((advance) => Math.abs(advance) <= 1).length).toBeGreaterThan(
+        samples.length / 2
+      );
       await writeFile(info.outputPath('timeline-follow.json'), JSON.stringify(samples, null, 2));
       await viewport.hover();
       const beforeWheel = await viewport.evaluate((node) => node.scrollLeft);
