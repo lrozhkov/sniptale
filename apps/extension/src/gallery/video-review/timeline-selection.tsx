@@ -170,7 +170,7 @@ function ReviewEditBlock(
           deltaPx: event.clientX - current.x,
           duration,
           widthPx: current.width,
-          bypass: event.shiftKey,
+          bypass: event.altKey,
           edits: props.edits,
           boundaries: props.boundaries,
           playhead: props.time,

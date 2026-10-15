@@ -505,8 +505,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   zoomAdd: { ru: 'Добавить фокусировку', en: 'Add focus' },
   focusRangeTool: { ru: 'Фокусировка на интервале', en: 'Focus on a range' },
   focusRangeHint: {
-    ru: 'Выделите интервал на дорожке фокусировки или примените к выбранному интервалу. При перемещении и изменении границ магнит притягивает к бегунку, краям видео и видимых участков. Shift временно отключает магнит.',
-    en: 'Draw a range on the focus track or apply to the selected range. Moving and resizing snap to the playhead, video ends and visible interval edges. Hold Shift to bypass snapping.',
+    ru: 'Выделите интервал на дорожке фокусировки или примените к выбранному интервалу. При перемещении и изменении границ магнит притягивает к бегунку, краям видео и видимых участков. Alt временно отключает магнит.',
+    en: 'Draw a range on the focus track or apply to the selected range. Moving and resizing snap to the playhead, video ends and visible interval edges. Hold Alt to bypass snapping.',
   },
   zoomRegionLabel: { ru: 'Приближение', en: 'Zoom' },
   zoomEmptyHint: {

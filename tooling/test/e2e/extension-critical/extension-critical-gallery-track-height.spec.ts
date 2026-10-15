@@ -303,12 +303,12 @@ for (const variant of [
       const block = (await blocks.last().boundingBox())!;
       await page.mouse.move(block.x + block.width / 2, block.y + block.height / 2);
       await page.mouse.down();
-      await page.keyboard.down('Shift');
+      await page.keyboard.down('Alt');
       await page.mouse.move(block.x + block.width / 2 + 25, block.y + block.height / 2, {
         steps: 4,
       });
       await page.mouse.up();
-      await page.keyboard.up('Shift');
+      await page.keyboard.up('Alt');
       await expect
         .poll(async () => (await persistedFocus(page))?.sourceAnchor?.start ?? before)
         .toBeGreaterThan(before);

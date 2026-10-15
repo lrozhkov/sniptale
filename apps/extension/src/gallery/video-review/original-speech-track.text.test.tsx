@@ -142,9 +142,9 @@ it.each([false, true])(
     }
   }
 );
-async function pointer(target: Element, type: string, x: number) {
+async function pointer(target: Element, type: string, x: number, altKey = false) {
   await act(async () => {
-    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0, altKey });
     Object.defineProperty(event, 'pointerId', { value: 1 });
     target.dispatchEvent(event);
   });
@@ -279,5 +279,28 @@ it.each(['source', 'result'] as const)(
     await pointer(block, 'pointerup', 2000);
     expect(readout()).toBeUndefined();
     expect(current.fragments[0]).toMatchObject({ start: 1.99, end: 2 });
+  }
+);
+
+it.each(['source', 'result'] as const)(
+  'snaps %s text resize in source pixels and releases with Alt',
+  async (domain) => {
+    act(() => root.render(<Fixture domain={domain} fragmentCount={2} />));
+    act(() => {
+      editor.change('overlap', { start: 3, end: 4 });
+    });
+    const block = prepare();
+    const initial = domain === 'source' ? 200 : 400;
+    const near = domain === 'source' ? 295 : 595;
+    await pointer(block.querySelector('[data-text-edge="end"]')!, 'pointerdown', initial);
+    await pointer(block, 'pointermove', near);
+    expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe(`${near + 5}px`);
+    await pointer(block, 'pointermove', near, true);
+    expect(
+      Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+    ).toBeCloseTo(near, 3);
+    await pointer(block, 'pointermove', near);
+    await pointer(block, 'pointerup', near);
+    expect(current.fragments[0]?.end).toBe(3);
   }
 );

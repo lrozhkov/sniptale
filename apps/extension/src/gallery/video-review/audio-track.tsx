@@ -439,7 +439,7 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
       const original = retimeReviewVoiceover(stored, props.voiceoverSegments);
       const range = reviewVoiceoverRange(original);
       const base = { ...original, timelineStart: range.start, duration: range.end - range.start };
-      const threshold = event.shiftKey ? -1 : (SNAP_THRESHOLD_PX * props.duration) / current.width;
+      const threshold = event.altKey ? -1 : (SNAP_THRESHOLD_PX * props.duration) / current.width;
       const candidates = [
         ...(props.snapTimes ?? []),
         ...props.clips

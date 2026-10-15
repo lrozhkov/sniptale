@@ -114,9 +114,15 @@ function setup(
   vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
   lane.setPointerCapture = vi.fn();
   lane.releasePointerCapture = vi.fn();
-  const send = (type: string, x: number, target: Element = lane, button = 0) =>
+  const send = (type: string, x: number, target: Element = lane, button = 0, altKey = false) =>
     act(() => {
-      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, button });
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        button,
+        altKey,
+      });
       Object.defineProperty(event, 'pointerId', { value: 1 });
       target.dispatchEvent(event);
     });
@@ -536,6 +542,25 @@ it('does not create gain automation from a deferred completed gesture after tool
     act(() => admit());
     expect(f.editor.selectedOriginal).toBeNull();
     expect(f.onRange).not.toHaveBeenCalled();
+  } finally {
+    f.close();
+  }
+});
+
+it('snaps original-audio resize to edit edges and temporarily releases with Alt', () => {
+  const f = setup();
+  try {
+    act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 5 }));
+    const id = f.editor.originalRanges.find((range) => range.start === 2)!.id;
+    const block = f.host.querySelector(`[data-audio-id="${id}"]`)!;
+    f.send('pointerdown', 500, block.querySelector('[data-audio-edge="end"]')!);
+    f.send('pointermove', 695);
+    expect(f.host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('700px');
+    f.send('pointermove', 695, f.lane, 0, true);
+    expect(f.host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('695px');
+    f.send('pointermove', 695);
+    f.send('pointerup', 695);
+    expect(f.editor.originalRanges.find((range) => range.id === id)?.end).toBe(7);
   } finally {
     f.close();
   }

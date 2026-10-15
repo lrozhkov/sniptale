@@ -587,7 +587,7 @@ function ReviewZoomRegionBlock(
         const current = props.drag.current;
         if (!current || current.width <= 0) return;
         current.moved ||= Math.abs(event.clientX - current.x) > 3;
-        const next = projectFocusDrag(props, current, event.clientX - current.x, event.shiftKey);
+        const next = projectFocusDrag(props, current, event.clientX - current.x, event.altKey);
         onGuide(current.edge === 'move' ? next.guide : null);
         if (next.start < next.end) {
           const { guide: _guide, ...range } = next;

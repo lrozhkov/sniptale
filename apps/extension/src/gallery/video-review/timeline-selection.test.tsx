@@ -90,7 +90,7 @@ function renderLane(args: {
   };
 }
 
-type PointerInit = { shiftKey?: boolean };
+type PointerInit = { altKey?: boolean };
 
 const cut = (start: number, end: number): ReviewEdit => ({
   id: 'cut',
@@ -165,7 +165,7 @@ it('moves and resizes edit blocks once per gesture, cancelling transient geometr
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 0, end: 4 });
 });
 
-it('snaps boundary drags to candidates inside the pixel threshold with a shift bypass', async () => {
+it('snaps boundary drags to candidates inside the pixel threshold with a Alt bypass', async () => {
   const change = vi.fn();
   const edit = cut(2, 4);
   const lane = renderLane({
@@ -193,7 +193,7 @@ it('snaps boundary drags to candidates inside the pixel threshold with a shift b
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2.3, end: 4 });
   // Shift temporarily disables the magnet.
   await lane.event(lane.end, 'pointerdown', 400);
-  await lane.event(lane.block, 'pointermove', 605, { shiftKey: true });
+  await lane.event(lane.block, 'pointermove', 605, { altKey: true });
   await lane.event(lane.block, 'pointerup', 605);
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6.05 });
 });
@@ -215,7 +215,7 @@ it('keeps a whole source edit at its original width when only one edge meets a m
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 3, end: 5 });
 
   await lane.event(lane.block, 'pointerdown', 200);
-  await lane.event(lane.block, 'pointermove', 305, { shiftKey: true });
+  await lane.event(lane.block, 'pointermove', 305, { altKey: true });
   expect(parseFloat(lane.block.style.width)).toBeCloseTo(20);
   await lane.event(lane.block, 'pointerup', 305);
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 3.05, end: 5.05 });
@@ -303,7 +303,7 @@ it('keeps resize geometry while a deferred commit is pending and restores it on 
     onChangeEdit: () => pending,
   });
   await lane.event(lane.end, 'pointerdown', 400);
-  await lane.event(lane.block, 'pointermove', 600, { shiftKey: true });
+  await lane.event(lane.block, 'pointermove', 600, { altKey: true });
   expect(lane.block.style.width).toBe('40%');
   await lane.event(lane.block, 'pointerup', 600);
   expect(lane.block.style.width).toBe('40%');

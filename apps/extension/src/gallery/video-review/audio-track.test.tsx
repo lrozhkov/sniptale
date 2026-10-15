@@ -145,7 +145,7 @@ it('stacks overlapping voiceovers without moving neighbors and retains rows duri
   );
   await act(async () =>
     moving.dispatchEvent(
-      new MouseEvent('pointermove', { bubbles: true, clientX: 300, shiftKey: true })
+      new MouseEvent('pointermove', { bubbles: true, clientX: 300, altKey: true })
     )
   );
   expect(moving.style.top).toBe('38px');
@@ -195,7 +195,7 @@ it('retains one music gesture owner when the visible pieces disappear during mov
   );
   await act(async () =>
     block.dispatchEvent(
-      new MouseEvent('pointermove', { bubbles: true, clientX: 700, shiftKey: true })
+      new MouseEvent('pointermove', { bubbles: true, clientX: 700, altKey: true })
     )
   );
   expect(lane.querySelector('[role="button"]')).toBe(block);
@@ -393,7 +393,7 @@ it('keeps music playback duration while its source-axis width changes at a speed
   const send = (kind: string, x: number) =>
     act(async () =>
       block.dispatchEvent(
-        new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, shiftKey: true })
+        new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, altKey: true })
       )
     );
   await send('pointerdown', 0);
@@ -434,7 +434,7 @@ it('discards a drag preview on pointer cancellation without committing it', asyn
   expect(onTrimClip).not.toHaveBeenCalled();
 });
 
-it('snaps audio placement to projected edit edges and allows Shift to bypass', async () => {
+it('snaps audio placement to projected edit edges and allows Alt to bypass', async () => {
   const lanes = renderTrack(
     { original: { muted: false, volume: 1 }, voiceover: [clip('a1', 2, 2)], music: [] },
     false,
@@ -444,9 +444,9 @@ it('snaps audio placement to projected edit edges and allows Shift to bypass', a
   vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
   const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
   Object.assign(block, { setPointerCapture: vi.fn() });
-  const send = (kind: string, x: number, shiftKey = false) =>
+  const send = (kind: string, x: number, altKey = false) =>
     act(async () => {
-      block.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, shiftKey }));
+      block.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, altKey }));
     });
   await send('pointerdown', 0);
   await send('pointermove', 95);

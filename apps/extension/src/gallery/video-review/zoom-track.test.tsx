@@ -116,7 +116,7 @@ function renderTrack(
     event: async (target: Element, kind: string, x: number, shift = false) =>
       act(async () => {
         target.dispatchEvent(
-          new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, shiftKey: shift })
+          new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, altKey: shift })
         );
       }),
   };
@@ -301,11 +301,11 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   await track.event(second, 'pointerup', 195);
   expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
   expect(document.querySelector('[data-zoom-guide]')).toBeNull();
-  // The shift bypass releases the magnet; the clamp still keeps the window open.
+  // The Alt bypass releases the magnet; the clamp still keeps the window open.
   await track.event(startEdge, 'pointerdown', 400);
-  await track.event(second, 'pointermove', 195, true);
-  await track.event(second, 'pointerup', 195);
-  expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
+  await track.event(second, 'pointermove', 205, true);
+  await track.event(second, 'pointerup', 205);
+  expect(commit).toHaveBeenLastCalledWith('b', { start: 2.05, end: 6 }, 'start');
   expect(commit).toHaveBeenCalledTimes(3);
   // Escape cancels the transient drag without committing.
   await track.event(startEdge, 'pointerdown', 400);
@@ -576,7 +576,7 @@ it('retains a visible playhead target coinciding with the moving focus old edge'
 });
 
 it.each([false, true])(
-  'preserves visible timeline-end snapping with Shift bypass %s',
+  'preserves visible timeline-end snapping with Alt bypass %s',
   async (shift) => {
     const commit = vi.fn();
     const track = renderTrack([zoom('a', 1, 2)], commit, 9);
