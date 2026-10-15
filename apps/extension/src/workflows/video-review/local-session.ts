@@ -1,5 +1,20 @@
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { moveReviewWorkspaceCursor } from '../../composition/persistence/review-workspaces/history-cursor';
+import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
+import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
+import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
+import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import { pruneReviewAnnotationEffectSnapshots } from '../../composition/persistence/review-workspaces/asset-refs';
+import { mergeReviewAnnotationEffectSnapshots } from '../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
+import { compactVideoWorkspaceHistory } from '../../composition/persistence/review-workspaces/history-retention';
+import {
+  prepareVideoWorkspaceTyping,
+  withoutVideoWorkspaceTyping,
+  type VideoWorkspaceTypingChange,
+} from '../../composition/persistence/review-workspaces/typing';
+import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import {
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
@@ -13,10 +28,62 @@ import type {
 /** Page-local operations use the same canonical snapshot validation as durable recovery. */
 export type LocalReviewChange =
   | { kind: 'reset' }
+  | { kind: 'typing'; change: VideoWorkspaceTypingChange }
   | { kind: 'advanced'; advanced: unknown }
   | { kind: 'draft'; annotation: ReviewAnnotation | null; before: ReviewAnnotation | null }
-  | { kind: 'commit'; operation: ReviewOperation; consumeDraft: boolean }
+  | {
+      kind: 'commit';
+      operation: ReviewOperation;
+      consumeDraft: boolean;
+      effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
+    }
   | { kind: 'history'; direction: ReviewHistoryDirection };
+
+/** Prepares only the content change; the session retains queue, identity and commit ownership. */
+export function prepareReviewSpeechTranscriptChange(
+  before: Extract<ReviewOperation, { target: 'advancedContent' }>['before'],
+  target: ReviewSpeechTarget,
+  sourceAssetId: string,
+  expectedAssetId: string,
+  captured: ReviewSpeechTranscript
+): Omit<Extract<ReviewOperation, { target: 'advancedContent' }>, 'id' | 'at'> | null {
+  const clip =
+    target.kind === 'voiceover'
+      ? before.audio.voiceover.find((entry) => entry.id === target.clipId)
+      : undefined;
+  const assetId = target.kind === 'original' ? sourceAssetId : clip?.assetId;
+  if (assetId !== expectedAssetId) throw new Error('Speech target changed.');
+  const previous =
+    target.kind === 'original' ? before.audio.originalSpeech?.transcript : clip?.transcript;
+  if (
+    JSON.stringify(
+      target.kind === 'original'
+        ? parseReviewOriginalSpeechTranscript(previous)
+        : parseReviewSpeechTranscript(previous)
+    ) === JSON.stringify(captured)
+  )
+    return null;
+  const original =
+    target.kind === 'original' ? parseReviewOriginalSpeechTranscript(captured) : null;
+  if (target.kind === 'original' && !original) throw new Error('Invalid original transcript.');
+  const audio = original
+    ? {
+        ...before.audio,
+        originalSpeech: {
+          enabled: before.audio.originalSpeech?.enabled ?? true,
+          transcript: original,
+        },
+      }
+    : {
+        ...before.audio,
+        voiceover: before.audio.voiceover.map((entry) =>
+          target.kind === 'voiceover' && entry.id === target.clipId
+            ? { ...entry, transcript: captured }
+            : entry
+        ),
+      };
+  return { target: 'advancedContent', before, after: { ...before, audio } };
+}
 
 /** Derives an editable buffer without advancing either durable revision. */
 export function applyLocalReviewChange(
@@ -25,13 +92,23 @@ export function applyLocalReviewChange(
 ): VideoWorkspaceSnapshot {
   let { workspace, draft } = snapshot;
   if (change.kind === 'reset') {
+    const { baseline: _baseline, ...withoutBaseline } = withoutVideoWorkspaceTyping(workspace);
     workspace = {
-      ...workspace,
+      ...withoutBaseline,
+      formatVersion: 1,
       history: [],
       cursor: 0,
       advanced: { ...createQuickEditAdvancedState(), ui: workspace.advanced.ui },
     };
     draft = null;
+  } else if (change.kind === 'typing') {
+    const document = replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewDocumentBaseline(workspace)
+    );
+    workspace = prepareVideoWorkspaceTyping(workspace, document, change.change);
   } else if (change.kind === 'advanced') {
     const next = parseVideoWorkspace({ ...workspace, advanced: change.advanced });
     if (!next) throw new Error('Invalid review state');
@@ -52,20 +129,22 @@ export function applyLocalReviewChange(
           );
     if (change.annotation !== null && !draft) throw new Error('Invalid review draft');
   } else if (change.kind === 'history') {
-    workspace = {
-      ...workspace,
-      cursor:
-        change.direction === 'start'
-          ? 0
-          : Math.max(
-              0,
-              Math.min(
-                workspace.history.length,
-                workspace.cursor + (change.direction === 'undo' ? -1 : 1)
-              )
-            ),
-    };
+    workspace = moveReviewWorkspaceCursor(
+      workspace,
+      change.direction === 'start' ? 0 : workspace.cursor + (change.direction === 'undo' ? -1 : 1)
+    );
   } else {
+    const merged = change.effectSnapshots
+      ? mergeReviewAnnotationEffectSnapshots(
+          workspace.effectSnapshots ?? [],
+          change.effectSnapshots
+        )
+      : undefined;
+    if (
+      merged === null ||
+      (change.effectSnapshots && change.operation.target !== 'advancedContent')
+    )
+      throw new Error('Invalid immutable annotation sources');
     if (
       change.consumeDraft &&
       (!draft ||
@@ -86,13 +165,16 @@ export function applyLocalReviewChange(
           }
         : change.operation;
     workspace = {
-      ...workspace,
+      ...withoutVideoWorkspaceTyping(workspace),
+      ...(merged ? { effectSnapshots: merged } : {}),
       history: [...workspace.history.slice(0, workspace.cursor), operation],
       cursor: workspace.cursor + 1,
     };
     if (change.consumeDraft) draft = null;
   }
-  const parsed = parseVideoWorkspace(workspace);
+  const parsed = parseVideoWorkspace(
+    change.kind === 'history' ? workspace : pruneReviewAnnotationEffectSnapshots(workspace)
+  );
   if (!parsed) throw new Error('Invalid review workspace');
-  return { workspace: parsed, draft };
+  return { workspace: compactVideoWorkspaceHistory(parsed).workspace, draft };
 }

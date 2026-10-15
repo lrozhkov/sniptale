@@ -57,3 +57,29 @@ describe('ensureOffscreenDocumentReady', () => {
     expect(waitForReady).toHaveBeenCalledOnce();
   });
 });
+
+it('allows a cold recording document to become ready after six seconds', async () => {
+  vi.useFakeTimers();
+  try {
+    const pending = ensureOffscreenDocumentReady('Recording tab video', {
+      ensureOffscreenDocument: async () => true,
+      hasOffscreenDocument: () => true,
+      waitForOffscreenReady: (timeoutMs = 5000) =>
+        new Promise<void>((resolve, reject) => {
+          const ready = setTimeout(() => {
+            clearTimeout(deadline);
+            resolve();
+          }, 6000);
+          const deadline = setTimeout(() => {
+            clearTimeout(ready);
+            reject(new Error('readiness timeout'));
+          }, timeoutMs ?? 60_000);
+        }),
+    });
+    const observed = pending.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(6000);
+    await expect(observed).resolves.toBeUndefined();
+  } finally {
+    vi.useRealTimers();
+  }
+});

@@ -59,9 +59,8 @@ function HookHarness(props: {
   settings?: VideoProjectExportSettings;
   onChange: (patch: VideoProjectExportSettingsPatch) => void;
 }) {
-  const { onChange, onLayoutEffect, settings } = props;
+  const { onLayoutEffect, settings } = props;
   const state = useExportDialogCapabilities({
-    onChange,
     settings: settings ?? createSettings(),
   });
   useLayoutEffect(() => {
@@ -96,7 +95,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('stores successful export capabilities and normalizes unavailable codecs', async () => {
+it('stores capabilities without replacing the selected codec', async () => {
   const onChange = vi.fn();
   getProjectExportCapabilitiesMock.mockResolvedValue({
     success: true,
@@ -121,10 +120,10 @@ it('stores successful export capabilities and normalizes unavailable codecs', as
   expect(getProjectExportCapabilitiesMock).toHaveBeenCalledWith(createSettings());
   expect(container?.textContent).toContain('"capabilitiesPending":false');
   expect(container?.textContent).toContain('"defaultMp4VideoCodec":"HEVC"');
-  expect(onChange).toHaveBeenCalledWith({ mp4VideoCodec: VideoMp4Codec.HEVC });
+  expect(onChange).not.toHaveBeenCalled();
 });
 
-it('falls back to WebM-only capabilities when probing fails', async () => {
+it('reports a probe error without changing the selected format', async () => {
   const onChange = vi.fn();
   getProjectExportCapabilitiesMock.mockRejectedValue(new Error('probe failed'));
 
@@ -135,12 +134,8 @@ it('falls back to WebM-only capabilities when probing fails', async () => {
 
   expect(container?.textContent).toContain('Sniptale');
   expect(container?.textContent).not.toContain('probe failed');
-  expect(container?.textContent).toContain('"format":"WEBM"');
-  expect(onChange).toHaveBeenCalledWith({
-    format: VideoExportFormat.WEBM,
-    mp4VideoCodec: undefined,
-    webmVideoCodec: VideoWebmCodec.VP9,
-  });
+  expect(container?.textContent).toContain('"capabilities":null');
+  expect(onChange).not.toHaveBeenCalled();
 });
 
 it('re-probes exact encoder inputs and ignores an older result with a stable change owner', async () => {
@@ -196,7 +191,7 @@ it('re-probes exact encoder inputs and ignores an older result with a stable cha
   expect(container?.textContent).not.toContain('"defaultMp4VideoCodec":"AVC"');
 });
 
-it('normalizes an in-flight response against the latest same-fingerprint format and codec', async () => {
+it('keeps the latest same-fingerprint codec when an in-flight response arrives', async () => {
   let resolveCapabilities: ((value: ReturnType<typeof createCapabilities>) => void) | undefined;
   getProjectExportCapabilitiesMock.mockImplementationOnce(
     () =>
@@ -233,7 +228,7 @@ it('normalizes an in-flight response against the latest same-fingerprint format 
     await Promise.resolve();
   });
 
-  expect(onChange).toHaveBeenCalledWith({ mp4VideoCodec: VideoMp4Codec.AVC });
+  expect(onChange).not.toHaveBeenCalled();
   expect(container?.textContent).toContain('"defaultMp4VideoCodec":"AVC"');
 });
 
@@ -277,4 +272,42 @@ it('rejects an old fingerprint response that resolves before passive cleanup', a
   expect(getProjectExportCapabilitiesMock).toHaveBeenNthCalledWith(2, updatedSettings);
   expect(onChange).not.toHaveBeenCalled();
   expect(container?.textContent).toContain('"capabilitiesPending":true');
+});
+
+it('preserves explicitly selected 1080p30 HEVC across probe failures and recovery', async () => {
+  const onChange = vi.fn();
+  const settings: VideoProjectExportSettings = {
+    ...createSettings(),
+    resolution: '1080P',
+    mp4VideoCodec: VideoMp4Codec.HEVC,
+  };
+  getProjectExportCapabilitiesMock.mockRejectedValueOnce(new Error('transient probe failure'));
+  act(() => root?.render(<HookHarness settings={settings} onChange={onChange} />));
+  await flushEffects();
+  expect(onChange).not.toHaveBeenCalled();
+
+  getProjectExportCapabilitiesMock.mockResolvedValueOnce(createCapabilities(VideoMp4Codec.HEVC));
+  act(() =>
+    root?.render(<HookHarness settings={{ ...settings, quality: 'HIGH' }} onChange={onChange} />)
+  );
+  await flushEffects();
+  expect(container?.textContent).toContain('"capabilitiesPending":false');
+  expect(container?.textContent).toContain('"defaultMp4VideoCodec":"HEVC"');
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it('reports unsupported HEVC without replacing the explicit selection', async () => {
+  const onChange = vi.fn();
+  getProjectExportCapabilitiesMock.mockResolvedValueOnce(createCapabilities(VideoMp4Codec.AVC));
+  act(() =>
+    root?.render(
+      <HookHarness
+        settings={{ ...createSettings(), mp4VideoCodec: VideoMp4Codec.HEVC }}
+        onChange={onChange}
+      />
+    )
+  );
+  await flushEffects();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(container?.textContent).toContain('"codec":"HEVC","available":false');
 });

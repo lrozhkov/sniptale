@@ -75,13 +75,22 @@ async function runBackgroundContextMenuRebuild(): Promise<void> {
   const contexts = getContextMenuContexts();
 
   for (const descriptor of descriptors) {
-    const createProperties: chrome.contextMenus.CreateProperties = {
+    const properties = {
       id: descriptor.id,
       ...(contexts ? { contexts } : {}),
       ...(descriptor.parentId ? { parentId: descriptor.parentId } : {}),
-      ...(descriptor.title ? { title: descriptor.title } : {}),
-      ...(descriptor.type ? { type: descriptor.type } : {}),
     };
+    if (descriptor.type !== 'separator' && !descriptor.title) {
+      throw new Error('A context menu item must have a title.');
+    }
+    const createProperties: chrome.contextMenus.CreateProperties =
+      descriptor.type === 'separator'
+        ? { ...properties, type: 'separator' }
+        : {
+            ...properties,
+            title: descriptor.title!,
+            ...(descriptor.type ? { type: descriptor.type } : {}),
+          };
 
     await browserContextMenus.create(createProperties);
     createdDescriptors.push(descriptor);

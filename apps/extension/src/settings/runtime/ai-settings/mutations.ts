@@ -156,3 +156,15 @@ export function resetAISecretPassphraseProtection(): Promise<void> {
     () => undefined
   );
 }
+
+/** Saves additional recognition instructions through the existing serialized background mutation. */
+export function saveAudioTranscriptionSystemPrompt(prompt: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'save-audio-transcription-prompt', prompt }).then(
+    () => undefined
+  );
+}
+export function resetAudioTranscriptionSystemPrompt(): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'reset-audio-transcription-prompt' }).then(
+    () => undefined
+  );
+}

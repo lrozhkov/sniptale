@@ -1,3 +1,4 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoProjectAssetType } from '../../../features/video/project/types/index';
 import { createMediaLibraryEntry, createVideoProjectEntry } from './index.test-support.ts';
@@ -69,7 +70,11 @@ function createDb() {
             : deleteMocks.txDeleteMock,
         get: deleteMocks.txGetMock,
         getAll: deleteMocks.txGetAllMock,
-        index: vi.fn(() => ({ count: deleteMocks.txCountMock })),
+        index: vi.fn(() => ({
+          count: deleteMocks.txCountMock,
+          getAll: async () => [],
+          getAllKeys: async () => [],
+        })),
         put: deleteMocks.txPutMock,
       })),
     })),
@@ -318,14 +323,38 @@ async function installNestedResourceGraph(failRelease = false) {
     updatedAt: 1,
   });
   const objectStore = (name: string) => ({
-    get: async (key: IDBValidKey) => table(name).get(String(key)),
+    get: async (key: IDBValidKey) =>
+      table(name).get(
+        name === 'video_workspace_history' && Array.isArray(key) ? JSON.stringify(key) : String(key)
+      ),
     getAll: async () => [...table(name).values()],
-    delete: async (key: IDBValidKey) => table(name).delete(String(key)),
+    delete: async (key: IDBValidKey) =>
+      table(name).delete(
+        name === 'video_workspace_history' && Array.isArray(key) ? JSON.stringify(key) : String(key)
+      ),
     put: async (value: Record<string, unknown>) => {
       if (name === 'asset_operations' && failRelease) throw new Error('release journal failed');
-      return table(name).set(String(value['id'] ?? value['aggregateId']), value);
+      return table(name).set(
+        name === 'video_workspace_history'
+          ? JSON.stringify([value['aggregateId'], value['ordinal']])
+          : String(value['id'] ?? value['aggregateId'] ?? value['operationId']),
+        value
+      );
     },
-    index: () => ({ count: async () => 0 }),
+    index: (indexName: string) => ({
+      count: async () => 0,
+      getAll: async (key: IDBValidKey) =>
+        [...table(name).values()].filter(isRecord).filter((row) => row[indexName] === key),
+      getAllKeys: async (key: IDBValidKey) =>
+        [...table(name).values()]
+          .filter(isRecord)
+          .filter((row) => row[indexName] === key)
+          .map((row) => {
+            if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
+              throw new Error('Invalid history fixture key');
+            return [row['aggregateId'], row['ordinal']];
+          }),
+    }),
   });
   deleteMocks.initDBMock.mockResolvedValue({
     get: (name: string, key: IDBValidKey) => objectStore(name).get(key),
@@ -345,7 +374,7 @@ async function installNestedResourceGraph(failRelease = false) {
 }
 
 it.each(['save', 'delete', 'asset', 'asset-shared', 'asset-published-shared'] as const)(
-  'reclaims nested private review resources on parent %s',
+  'preserves independent quick-edit projects on parent %s',
   async (operation) => {
     const { saveVideoProject, deleteVideoProject, deleteProjectAsset } = await import('./index');
     const { parent, table } = await installNestedResourceGraph();
@@ -369,17 +398,28 @@ it.each(['save', 'delete', 'asset', 'asset-shared', 'asset-published-shared'] as
     else if (operation === 'save')
       await saveVideoProject({ ...parent.project, assets: [], clips: [] });
     else await deleteProjectAsset('parent');
+    if (operation === 'save') {
+      expect(table('project_assets').size).toBe(2);
+      expect(table('video_workspaces').size).toBe(1);
+      expect([...table('asset_operations').values()]).toEqual([
+        expect.objectContaining({
+          assetIds: [],
+          privateSources: [{ projectAssetId: 'parent', expectedAssetId: 'parent-bytes' }],
+        }),
+      ]);
+      expect(deleteMocks.completePhysicalDeleteOperationMock).toHaveBeenCalledOnce();
+      return;
+    }
     if (operation === 'asset-shared') {
       expect(table('project_assets').size).toBe(2);
       expect(table('video_workspaces').size).toBe(1);
       expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
       return;
     }
-    expect(table('project_assets').size).toBe(0);
-    expect(table('video_workspaces').size).toBe(0);
-    expect(deleteMocks.completePhysicalDeleteOperationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ assetIds: expect.arrayContaining(['parent-bytes', 'child-bytes']) })
-    );
+    expect(table('project_assets').size).toBe(2);
+    expect(table('video_workspaces').size).toBe(1);
+    expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
+    if (operation === 'delete') expect(table('video_projects').has(parent.id)).toBe(false);
   }
 );
 
@@ -427,6 +467,8 @@ it.each(['save-failure', 'delete-failure'] as const)(
   async (operation) => {
     const { saveVideoProject, deleteVideoProject } = await import('./index');
     const { parent, table } = await installNestedResourceGraph(true);
+    // An independent quick-edit project retains its source; this case releases an unowned source.
+    if (operation === 'delete-failure') table('video_workspaces').clear();
     const names = ['video_projects', 'project_assets', 'video_workspaces'];
     const before = names.map((name) => structuredClone(table(name)));
     const run =

@@ -1,5 +1,25 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+
+const completionMock = vi.hoisted(() => vi.fn());
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  completeVideoRecording: completionMock,
+  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));
+
+const clockMocks = vi.hoisted(() => ({
+  getMode: vi.fn(),
+  isStopping: vi.fn(),
+  setClock: vi.fn(),
+  enable: vi.fn(),
+  sync: vi.fn(),
+}));
+vi.mock('../../manager/controlled-cursor/messages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../manager/controlled-cursor/messages')>()),
+  enableControlledCursorCapture: clockMocks.enable,
+  syncControlledCursorCapture: clockMocks.sync,
+}));
 
 const {
   finishVideoRecordingStopMock,
@@ -82,6 +102,9 @@ vi.mock('../../session-state/service/runtime-state-service', async (importOrigin
 vi.mock('../../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../session-state')>()),
   finishVideoRecordingStop: finishVideoRecordingStopMock,
+  getVideoRecordingCaptureMode: clockMocks.getMode,
+  isVideoRecordingStopInProgress: clockMocks.isStopping,
+  setRecordingFrameClock: clockMocks.setClock,
   getVideoRecordingId: getVideoRecordingIdMock,
   isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
     recordingId != null && getVideoRecordingIdMock() === recordingId,
@@ -103,9 +126,8 @@ vi.mock('../../../manager/start-activation-watchdog', async (importOriginal) => 
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
   getActiveVideoRecordingLeaseSnapshot: getActiveVideoRecordingLeaseSnapshotMock,
-  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
 }));
 vi.mock('../../sender-policy', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../sender-policy')>()),
@@ -161,6 +183,12 @@ function expectAsyncRoute(routeResult: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  completionMock.mockReset().mockResolvedValue(undefined);
+  clockMocks.getMode.mockReturnValue(null);
+  clockMocks.isStopping.mockReturnValue(false);
+  clockMocks.setClock.mockReturnValue(true);
+  clockMocks.enable.mockResolvedValue(undefined);
+  clockMocks.sync.mockResolvedValue(undefined);
   getVideoRecordingRuntimeStateMock.mockReturnValue({
     duration: 0,
     status: VideoRecordingStatus.IDLE,
@@ -190,7 +218,7 @@ it('handles recording state and tab lookup through the recording owner', async (
   expect(sendResponse).toHaveBeenCalledWith({
     recordingHealth: 'healthy',
     success: true,
-    state: { duration: 0, status: VideoRecordingStatus.IDLE },
+    state: { duration: 0, status: VideoRecordingStatus.IDLE, completion: null },
   });
   expectAsyncRoute(handleRecordingTabId(sendResponse, 17));
   await flushAsyncRoute();
@@ -221,6 +249,7 @@ it('marks recording-state reads as degraded when the runtime state already carri
     recordingHealth: 'degraded',
     success: true,
     state: {
+      completion: null,
       duration: 12,
       error: 'Microphone unavailable',
       status: VideoRecordingStatus.RECORDING,
@@ -528,69 +557,27 @@ it('handles recording start and stop lifecycle mutations through the recording o
   expectAcceptedLifecycleResponse(sendResponse);
   expectAsyncRoute(handleOffscreenRecordingStopped({ recordingId: 'rec-1' }, sendResponse));
   await flushAsyncRoute();
-  expect(finishVideoRecordingStopMock).toHaveBeenCalledTimes(1);
-  expect(resetCompletedVideoRecordingSessionMock).toHaveBeenCalledWith('rec-1');
-  expect(resetRecordingTabIdMock).toHaveBeenCalledTimes(1);
-  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
-  expect(releaseVideoCaptureSurfaceMock.mock.invocationCallOrder[0]).toBeLessThan(
-    finishVideoRecordingStopMock.mock.invocationCallOrder[0] ?? 0
-  );
+  expect(completionMock).toHaveBeenCalledWith('rec-1');
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
-it('preserves recording identity when stopped-event surface restoration fails', async () => {
+it('reports completion failure without acknowledging successful stop', async () => {
   const sendResponse = createSendResponse();
-  releaseVideoCaptureSurfaceMock.mockRejectedValueOnce(new Error('restore-conflict'));
-
+  completionMock.mockRejectedValueOnce(new Error('cleanup refused'));
   handleOffscreenRecordingStopped({ recordingId: 'rec-1' }, sendResponse);
   await flushAsyncRoute();
-
   expect(sendResponse).toHaveBeenLastCalledWith({ success: false, error: 'Internal error' });
-  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
-  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
-  expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
-  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
-  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
 });
 
-it('does not let delayed stopped cleanup for A reset current recording B', async () => {
+it('waits for the completion owner before acknowledging stopped', async () => {
   const sendResponse = createSendResponse();
-  const release = createDeferred();
-  releaseVideoCaptureSurfaceMock.mockReturnValueOnce(release.promise);
-
+  const completion = createDeferred();
+  completionMock.mockReturnValueOnce(completion.promise);
   handleOffscreenRecordingStopped({ recordingId: 'rec-1' }, sendResponse);
   await flushAsyncRoute();
   expect(sendResponse).not.toHaveBeenCalled();
-
-  getVideoRecordingIdMock.mockReturnValue('rec-2');
-  release.resolve();
+  completion.resolve();
   await flushAsyncRoute();
-
-  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
-  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
-  expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
-  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
-  expect(clearCameraRecorderControlGrantMock).toHaveBeenCalledWith('rec-1');
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
-  expectAcceptedLifecycleResponse(sendResponse);
-});
-
-it('waits for stopped-recording lease cleanup before acknowledging the lifecycle route', async () => {
-  const sendResponse = createSendResponse();
-  const cleanup = createDeferred();
-  clearActiveVideoRecordingLeaseMock.mockReturnValueOnce(cleanup.promise);
-
-  handleOffscreenRecordingStopped({ recordingId: 'rec-1' }, sendResponse);
-  await flushAsyncRoute();
-
-  expect(finishVideoRecordingStopMock).toHaveBeenCalledTimes(1);
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
-  expect(sendResponse).not.toHaveBeenCalled();
-
-  cleanup.resolve();
-  await flushAsyncRoute();
-
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
@@ -614,15 +601,17 @@ it('handles recording pause and resume lifecycle mutations through the recording
 it('restores the active recording lease before accepting post-restart lifecycle events', async () => {
   const sendResponse = createSendResponse();
   getVideoRecordingIdMock.mockReturnValue(null);
-  restoreCurrentRecordingFromLeaseMock.mockImplementationOnce(async () => {
+  const lease = { recordingId: 'rec-1', phase: 'active' };
+  getActiveVideoRecordingLeaseSnapshotMock.mockReturnValue(lease);
+  ensureActiveVideoRecordingLeaseHydratedMock.mockImplementationOnce(async () => {
     getVideoRecordingIdMock.mockReturnValue('rec-1');
-    return true;
+    return lease;
   });
 
   expectAsyncRoute(handleOffscreenRecordingPaused({ recordingId: 'rec-1' }, sendResponse));
   await flushAsyncRoute();
 
-  expect(restoreCurrentRecordingFromLeaseMock).toHaveBeenCalledWith('rec-1');
+  expect(ensureActiveVideoRecordingLeaseHydratedMock).toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
     status: VideoRecordingStatus.PAUSED,
   });
@@ -638,4 +627,93 @@ it('clears the stored display surface when recording starts without metadata', a
   expect(setControlledCursorVerifiedModeMock).not.toHaveBeenCalled();
   expect(setControlledCursorDisplaySurfaceMock).toHaveBeenCalledWith(null);
   expectAcceptedLifecycleResponse(sendResponse);
+});
+
+it('forwards recorder anchors through start/pause/resume without receipt timing', async () => {
+  clockMocks.getMode.mockReturnValue(CaptureMode.TAB);
+  getActiveVideoRecordingLeaseSnapshotMock.mockReturnValue({
+    recordingId: 'rec-1',
+    surfaceBinding: { generation: 3, streamInstanceId: 'source' },
+  });
+  const initial = {
+    recordingId: 'rec-1',
+    generation: 3,
+    streamInstanceId: 'source',
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: 1000000,
+    mediaTimeSeconds: 0,
+  };
+  const paused = {
+    ...initial,
+    revision: 2,
+    phase: 'paused' as const,
+    captureEpochMs: 1001000,
+    mediaTimeSeconds: 1,
+  };
+  const resumed = { ...initial, revision: 3, captureEpochMs: 1005000, mediaTimeSeconds: 1.1 };
+  handleOffscreenRecordingStarted(
+    { recordingId: 'rec-1', frameClock: initial },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(clockMocks.enable).toHaveBeenCalledExactlyOnceWith(17, 'rec-1', 0, initial);
+  handleOffscreenRecordingPaused(
+    { recordingId: 'rec-1', frameClock: paused },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(clockMocks.sync).toHaveBeenCalledWith(17, 'pause', paused);
+  handleOffscreenRecordingResumed(
+    { recordingId: 'rec-1', frameClock: resumed },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(clockMocks.sync).toHaveBeenCalledWith(17, 'resume', resumed);
+  expect(clockMocks.setClock.mock.calls.map(([anchor]) => anchor)).toEqual([
+    initial,
+    paused,
+    resumed,
+  ]);
+});
+
+it('refuses guessed TAB history when exact clock is absent while keeping primary recording status active', async () => {
+  clockMocks.getMode.mockReturnValue(CaptureMode.TAB);
+  handleOffscreenRecordingStarted({ recordingId: 'rec-1', frameClock: null }, createSendResponse());
+  await flushAsyncRoute();
+  expect(clockMocks.enable).toHaveBeenCalledExactlyOnceWith(17, 'rec-1', 0, null);
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith(
+    expect.objectContaining({ status: VideoRecordingStatus.RECORDING })
+  );
+});
+
+it('ignores late source generations and stale anchor revisions before reopening capture', async () => {
+  clockMocks.getMode.mockReturnValue(CaptureMode.TAB);
+  getActiveVideoRecordingLeaseSnapshotMock.mockReturnValue({
+    recordingId: 'rec-1',
+    surfaceBinding: { generation: 3, streamInstanceId: 'source' },
+  });
+  const stale = {
+    recordingId: 'rec-1',
+    generation: 2,
+    streamInstanceId: 'source',
+    revision: 1,
+    phase: 'active' as const,
+    captureEpochMs: 1000000,
+    mediaTimeSeconds: 0,
+  };
+  handleOffscreenRecordingResumed(
+    { recordingId: 'rec-1', frameClock: stale },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(clockMocks.sync).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  clockMocks.setClock.mockReturnValue(false);
+  handleOffscreenRecordingResumed(
+    { recordingId: 'rec-1', frameClock: { ...stale, generation: 3 } },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(clockMocks.sync).not.toHaveBeenCalled();
 });

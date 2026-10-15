@@ -1,3 +1,5 @@
+import { commitScenarioEditedImage } from './edits';
+import type { ScenarioProjectSnapshot } from '../../composition/persistence/scenario/contracts';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
@@ -9,9 +11,9 @@ import {
   type EditorDocument,
 } from '../../features/editor/document/public';
 import { remapTourImageGeometry } from '../../features/scenario/project/public';
-import { commitScenarioAggregateMutation } from '../../composition/persistence/scenario/aggregate-mutations';
+
 import { rejectScenarioMutationBeforeHandoff } from '../../composition/persistence/scenario/asset-staging';
-import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
+
 import { loadScenarioImageEditorSource } from './source';
 import { discardPreparedScenarioAsset } from '../../composition/persistence/scenario/projects';
 import { prepareScenarioEditedCaptureAsset } from './edits';
@@ -40,11 +42,14 @@ function rasterDocument(dataUrl: string, width: number, height: number): EditorD
 export async function applyTourImageEdit(args: {
   project: GuideProject;
   baseUpdatedAt: number;
+  expectedRevision?: number;
   target: TourImageEditTarget;
   dataUrl: string;
   document: EditorDocument;
   allowTargetReview?: boolean;
-}): Promise<{ status: 'applied'; project: GuideProject } | { status: 'requires-target-review' }> {
+}): Promise<
+  ({ status: 'applied' } & ScenarioProjectSnapshot) | { status: 'requires-target-review' }
+> {
   const parsed = parseGuideProject(args.project);
   if (parsed.status !== 'ok' || !isImageDataUrl(args.dataUrl) || !isEditorDocument(args.document))
     throw new Error('Invalid tour image edit.');
@@ -100,23 +105,8 @@ export async function applyTourImageEdit(args: {
       Object.assign(slide, geometry.slide, { image: replacement });
     else if (slide.kind === 'navigation') slide.background.image = replacement;
     handedOff = true;
-    const result = await commitScenarioAggregateMutation(project, {
-      expectedUpdatedAt: args.baseUpdatedAt,
-      children: {
-        assetPuts: [prepared.entry],
-        editorDocumentPuts: [
-          {
-            projectId: project.id,
-            stepId: documentId,
-            document: args.document,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-        ],
-      },
-    });
-    publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
-    return { status: 'applied', project: result.project };
+    const result = await commitScenarioEditedImage(project, args, documentId, prepared.entry);
+    return { status: 'applied', ...result };
   } catch (error) {
     if (!handedOff)
       return rejectScenarioMutationBeforeHandoff({ assetPuts: [prepared.entry] }, error);

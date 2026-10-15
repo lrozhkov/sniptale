@@ -14,6 +14,7 @@ export async function generateDependencyLegalClosure(options = {}) {
   return selectDependencyLegalMaterials(records, {
     canonicalLicenseAliases: options.canonicalLicenseAliases,
     pinnedSources: options.pinnedSources,
+    modifiedSources: options.modifiedSources,
     reviewedSelections: options.reviewedSelections,
   });
 }

@@ -7,8 +7,8 @@ This document owns public operator commands and external run procedures. Wrapper
 | Need | Command |
 | --- | --- |
 | Plan current or explicit paths | `npm run qa:preflight -- [--files <paths...>]` |
-| Validate harness/shared controls | `npm run qa:release-harness` |
-| Validate the current diff | `npm run qa:checkpoint` |
+| Check harness/shared controls | `npm run qa:release-harness` |
+| Check the current diff | `npm run qa:checkpoint` |
 | Build and commit an accepted diff | `npm run qa:closeout -- -m "message"` |
 | Run complete Fast proof | `npm run ci:proof -- [resource flags]` |
 | Run release proof | `npm run ci:release -- [resource flags]` |
@@ -30,17 +30,19 @@ Resource flags are `--cpu N`, `--memory-mib N`, and `--workers N`. Use them only
 
 Follow the [blocking-wrapper rule](wrapper-summary.md#locks-and-scheduling).
 
+On WSL/Linux, blocking wrappers in different directories wait for the same user's QA slot. Leave the waiting command running. It prints one queue message and continues after admission. Use Ctrl+C to cancel its ticket. A second wrapper in the same directory still reports the existing repository lock.
+
 ## GitHub operations
 
 Ready pull requests run **Continuous Integration**. A merge to `main` does not repeat this gate for the squash commit.
 
-Run **Release provenance** from `main` to create canonical release proof. If a consumer job fails after proof upload, rerun the failed jobs; the workflow selects the latest live producer attempt.
+Run **Release provenance** from `main` to create canonical release proof. If a consumer job fails after proof upload, rerun the failed jobs. The workflow selects the latest live producer attempt.
 
-Treat a Selectel run as complete only when its cleanup receipt covers every attempt-owned resource. To recover an interrupted attempt, run **Selectel maintenance**, select `recover`, and provide its run ID and attempt. Do not substitute the daily sweep for exact recovery.
+Treat a Selectel run as complete only when its cleanup receipt covers every attempt-owned resource. To recover an interrupted attempt, run **Selectel maintenance**. Select `recover` for that recovery. Provide its run ID and attempt. Do not substitute the daily sweep for exact recovery.
 
 To publish:
 
-1. Create and push a GitHub-verifiable annotated tag matching the package version.
+1. Create a GitHub-verifiable annotated tag matching the package version. Push that tag.
 2. Run **Publish release** with the tag, matching provenance finalizer run ID, and product-facing release notes.
 3. Rerun with the same inputs after a publication failure.
 
@@ -50,13 +52,13 @@ Before merge, a branch `diagnostic: true` run requires the matching provenance d
 
 For exact recovery from unavailable external capacity, run `npm run ci:proof -- --pr <number> --reason "<audit note>" [resource flags]`. The command requires the clean remote PR candidate, posts its evidence, and never merges.
 
-For the no-run CI bootstrap, open a draft PR, apply `ci-local-proof-bypass`, mark it ready, and verify that no PR jobs execute before manual merge.
+For the no-run CI bootstrap, open a draft PR. Apply `ci-local-proof-bypass` to that PR. Mark that PR ready. Before manual merge, check that no PR jobs execute.
 
 ## Local environment
 
-Native `ci:proof` and `ci:release` do not require Docker. Container proof and the local PR bypass do. Enable Docker Desktop WSL integration and verify `docker version` before either mode.
+Native `ci:proof` and `ci:release` do not require Docker. Container proof and the local PR bypass do. Before either mode, enable Docker Desktop WSL integration. Check `docker version` before that mode.
 
-External audit tools and browser dependencies are mandatory when their selected lane runs. Repair missing tools instead of accepting partial proof.
+External audit tools and browser dependencies are mandatory when their selected lane runs. Fix missing tools instead of accepting partial proof.
 
 ## Focused diagnostics
 

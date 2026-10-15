@@ -5,6 +5,7 @@ import {
   getCallName,
   getNodeEndLine,
   getNodeLine,
+  hasFunctionScopedVarShadow,
   isFunctionNode,
   ts,
   unwrapExpression,
@@ -138,8 +139,34 @@ function hasDynamicCallReceiver(node) {
   return ts.isCallExpression(receiver) || ts.isNewExpression(receiver);
 }
 
+function isNativeGlobalTimerCall(node, sourceFile) {
+  if (!ts.isCallExpression(node)) return false;
+  const expression = unwrapExpression(node.expression);
+  let root = expression;
+  let timerName = ts.isIdentifier(expression) ? expression.text : null;
+  if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+    root = unwrapExpression(expression.expression);
+    timerName = ts.isPropertyAccessExpression(expression)
+      ? expression.name.text
+      : ts.isStringLiteral(expression.argumentExpression)
+        ? expression.argumentExpression.text
+        : null;
+    if (!ts.isIdentifier(root) || !['window', 'globalThis'].includes(root.text)) return false;
+  }
+  if (!ts.isIdentifier(root) || !['setInterval', 'setTimeout'].includes(timerName)) return false;
+  return (
+    createLexicalBindingKey(root, sourceFile) === `${root.text}@global` &&
+    !hasFunctionScopedVarShadow(root, sourceFile)
+  );
+}
+
 function recordStateCall(node, sourceFile, callName, signals) {
-  if (!STATE_PATTERN.test(callName) || hasDynamicCallReceiver(node)) return;
+  if (
+    !STATE_PATTERN.test(callName) ||
+    hasDynamicCallReceiver(node) ||
+    isNativeGlobalTimerCall(node, sourceFile)
+  )
+    return;
   signals.stateAuthorities.add(callName);
   const receiver = stateCallReceiver(node, sourceFile, callName);
   if (receiver) {

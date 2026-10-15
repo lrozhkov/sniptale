@@ -1,3 +1,4 @@
+import { eventsLogsMessages } from './events-logs';
 import { filenameRulesMessages } from './filename-rules';
 import { defineMessageSource } from '../source';
 import { settingsAiProvidersMessages } from './ai-providers/index';
@@ -16,6 +17,7 @@ import { settingsStorageDraftsMessages } from './storage-drafts';
 import { settingsTransferMessages } from './transfer';
 
 export const settingsMessages = defineMessageSource({
+  eventsLogs: eventsLogsMessages,
   filenameRules: filenameRulesMessages,
   collection: settingsCollectionMessages,
   appearance: settingsAppearanceMessages,

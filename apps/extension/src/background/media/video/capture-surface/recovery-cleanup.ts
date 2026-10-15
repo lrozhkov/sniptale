@@ -5,9 +5,9 @@ import {
 import { isViewportPresetAllowedForVideoCaptureMode } from '../../../../features/viewport-presets/video-recording-policy';
 import {
   clearActiveVideoRecordingLease,
-  type ensureActiveVideoRecordingLeaseHydrated,
+  type ensureVideoRecordingLeaseCache,
 } from '../recording-control-lease';
-import { requestBoundOffscreenRecordingStop } from '../offscreen-recording-stop';
+import { confirmRecordingSourceStoppedForRecovery } from '../runtime/recording-completion';
 import { deleteVideoSurfaceSession, getVideoSurfaceSession } from './session-registry';
 import { releaseAppliedVideoCaptureSurface } from './release-applied';
 
@@ -17,16 +17,8 @@ export type VideoCaptureSurfacePageAccessVerifier = (
 ) => Promise<void>;
 
 type RecoveredVideoRecordingLease = NonNullable<
-  Awaited<ReturnType<typeof ensureActiveVideoRecordingLeaseHydrated>>
+  Awaited<ReturnType<typeof ensureVideoRecordingLeaseCache>>
 >;
-
-async function requestOffscreenStopAcknowledgement(binding: {
-  generation: number;
-  recordingId: string;
-  streamInstanceId: string;
-}): Promise<void> {
-  await requestBoundOffscreenRecordingStop(binding, true);
-}
 
 async function releaseRecoveredAppliedSurface(
   binding: AppliedCaptureSurfaceBinding,
@@ -52,7 +44,7 @@ export async function stopBoundRecordingBeforeAbandonedStackRestore(
   if (!activeLease.surfaceBinding) {
     throw new Error('Recovered recording source binding is incomplete before surface cleanup');
   }
-  await requestOffscreenStopAcknowledgement({
+  await confirmRecordingSourceStoppedForRecovery({
     recordingId: activeLease.recordingId,
     ...activeLease.surfaceBinding,
   });
@@ -83,7 +75,7 @@ export async function stopPreparedRecoveredRecording(
   if (!activeLease.surfaceBinding) {
     throw new Error('Recovered prepared recording source binding is incomplete');
   }
-  await requestOffscreenStopAcknowledgement({
+  await confirmRecordingSourceStoppedForRecovery({
     recordingId: activeLease.recordingId,
     ...activeLease.surfaceBinding,
   });
@@ -110,7 +102,7 @@ export async function stopInvalidRecoveredRecording(
       ? { recordingId, ...persistedBinding }
       : null;
   if (!binding) throw new Error('Recovered recording source binding is incomplete');
-  await requestOffscreenStopAcknowledgement(binding);
+  await confirmRecordingSourceStoppedForRecovery(binding);
   if (appliedBinding) {
     await releaseRecoveredAppliedSurface(appliedBinding, pageAccessVerifier);
   }

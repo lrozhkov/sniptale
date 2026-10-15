@@ -1,15 +1,34 @@
-import { parseProjectAssetPayload } from './asset-publication-payload';
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
+import type { IDBPTransaction } from 'idb';
+import {
+  parseProjectAssetPayload,
+  type ProjectAssetPublicationOptions,
+  type ProjectAssetPublicationPayload,
+  type KnownLibrarySourceClaim,
+} from './asset-publication-payload';
+import { admitKnownLibraryPublication } from './known-library-source';
+import { readWorkspaceStorage } from '../review-workspaces/storage';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
 export type {
   ProjectAssetPublicationOptions,
   ProjectAssetPublicationPayload,
 } from './asset-publication-payload';
-import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import {
+  collectReviewAssetReferences,
+  reviewWorkspaceHasAudioClip,
+  reviewWorkspaceHasSpeechReplacement,
+  reviewWorkspaceHasWatermarkImage,
+  reviewWorkspaceHasSceneResource,
+  reviewWorkspaceHasAnnotationEffectResource,
+} from '../review-workspaces/asset-refs';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { assertStandaloneMediaSourceReplaceable } from './source-admission';
 import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  STORE_NAME,
 } from '../infrastructure/indexed-db/core';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
 import {
@@ -30,6 +49,7 @@ import {
   recoverStandaloneAssetPublications,
   type AssetPublicationAdapter,
   type AssetReadyJournal,
+  type AssetRef,
 } from '../assets';
 import {
   buildProjectAssetMediaEntry,
@@ -85,6 +105,8 @@ async function publishProjectMediaAsset(args: {
   filename?: string;
   expectedAssetId?: string | null;
   publishToLibrary?: boolean;
+  requiredReviewAnnotationEffect?: ProjectAssetPublicationOptions['requiredReviewAnnotationEffect'];
+  expectedLibrarySource?: ProjectAssetPublicationPayload['expectedLibrarySource'];
   journal: AssetReadyJournal;
   ownerKind: string;
   storeName: typeof PROJECT_ASSETS_STORE | typeof PROJECT_EXPORTS_STORE;
@@ -107,10 +129,23 @@ async function publishProjectMediaAsset(args: {
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
+        ...(args.expectedLibrarySource ? [STORE_NAME, PROJECT_EXPORTS_STORE] : []),
       ],
       'readwrite'
     );
     const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+    if (args.expectedLibrarySource) {
+      try {
+        const entry = parseProjectAssetEntry(args.entry);
+        if (!entry) throw new Error('Invalid private acquisition metadata.');
+        await publishKnownLibraryAsset(tx, entry, ref, args.expectedLibrarySource);
+        await tx.done;
+        return;
+      } catch (error) {
+        await abortIndexedDbMutation(tx, error);
+      }
+    }
     if (
       args.publishToLibrary === false &&
       (await mediaStore.get(`project-asset:${args.entry.id}`)) !== undefined
@@ -124,6 +159,20 @@ async function publishProjectMediaAsset(args: {
         throw new Error('Private resource Library source is unavailable.');
     }
     try {
+      if (args.requiredReviewAnnotationEffect) {
+        const claim = args.requiredReviewAnnotationEffect;
+        const stored = await readWorkspaceStorage(tx, claim.aggregateId);
+        const workspace = parseVideoWorkspace(stored.logical);
+        if (
+          !workspace ||
+          !reviewWorkspaceHasAnnotationEffectResource(workspace, claim, {
+            assetId: `project-asset:${args.entry.id}`,
+            mimeType: ref.mimeType,
+            byteLength: ref.size,
+          })
+        )
+          throw new SupersededAssetPublicationError();
+      }
       const domainStore = tx.objectStore(args.storeName);
       const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
       const previousRaw: unknown = await domainStore.get(args.entry.id);
@@ -181,13 +230,7 @@ async function publishProjectMediaAsset(args: {
       }
       await tx.done;
     } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* The transaction may already have aborted. */
-      }
-      await tx.done.catch(() => undefined);
-      throw error;
+      await abortIndexedDbMutation(tx, error);
     }
   });
   if (physicalDelete.assetIds.length > 0) {
@@ -195,6 +238,31 @@ async function publishProjectMediaAsset(args: {
       () => undefined
     );
   }
+}
+
+/** Specialized accepted-receipt transition shares its caller's commit/abort authority. */
+async function publishKnownLibraryAsset(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  entry: StoredProjectAssetEntry,
+  ref: AssetRef,
+  claim: KnownLibrarySourceClaim
+) {
+  if ((await tx.objectStore(MEDIA_LIBRARY_STORE).get(`project-asset:${entry.id}`)) !== undefined)
+    throw new SupersededAssetPublicationError();
+  const admission = await admitKnownLibraryPublication({
+    claim,
+    entry,
+    ref,
+    read: (store, key) => tx.objectStore(store).get(key),
+  });
+  if (admission === 'replay') return;
+  await tx.objectStore(ASSET_OWNERS_STORE).put({
+    assetId: ref.assetId,
+    ownerId: entry.id,
+    ownerKind: PROJECT_ASSET_OWNER_KIND,
+    role: PROJECT_MEDIA_ASSET_ROLE,
+  });
+  await tx.objectStore(PROJECT_ASSETS_STORE).put(entry);
 }
 
 export async function publishProjectAssetJournal(
@@ -214,6 +282,12 @@ export async function publishProjectAssetJournal(
       ? {}
       : { publishToLibrary: payload.publishToLibrary }),
     journal,
+    ...(payload.expectedLibrarySource
+      ? { expectedLibrarySource: payload.expectedLibrarySource }
+      : {}),
+    ...(payload.requiredReviewAnnotationEffect
+      ? { requiredReviewAnnotationEffect: payload.requiredReviewAnnotationEffect }
+      : {}),
     ...(lifecyclePermit ? { lifecyclePermit } : {}),
     ownerKind: PROJECT_ASSET_OWNER_KIND,
     storeName: PROJECT_ASSETS_STORE,
@@ -226,6 +300,7 @@ async function recoverProjectAssetJournal(
 ): Promise<void | 'defer'> {
   const payload = parseProjectAssetPayload(journal.payload);
   if (!payload) throw new Error('Invalid project asset publication payload.');
+  if (payload.expectedLibrarySource) return publishProjectAssetJournal(journal, lifecyclePermit);
   if (payload.publishToLibrary === false && payload.entry.originMediaId) {
     const rawOrigin: unknown = await runWithIndexedDbMutation((db) =>
       db.get(MEDIA_LIBRARY_STORE, payload.entry.originMediaId!)
@@ -237,11 +312,46 @@ async function recoverProjectAssetJournal(
     if (!origin || origin.id !== payload.entry.originMediaId)
       throw new Error('Private resource Library source is invalid.');
   }
-  if (payload.requiredReview) {
+  const aggregateId =
+    payload.requiredReview?.aggregateId ??
+    payload.requiredReviewResource?.aggregateId ??
+    payload.requiredReviewAnnotationEffect?.aggregateId ??
+    payload.requiredReviewSpeech?.aggregateId;
+  if (aggregateId) {
     const assetId = `project-asset:${payload.entry.id}`;
     return tryVoiceoverAttachmentLock(assetId, async () => {
-      const review = await readVideoWorkspace(payload.requiredReview!.aggregateId);
-      const referenced = !!review && collectReviewAssetReferences(review.workspace).has(assetId);
+      const review = await readVideoWorkspace(aggregateId);
+      const referenced =
+        !!review &&
+        (payload.requiredReviewAnnotationEffect
+          ? reviewWorkspaceHasAnnotationEffectResource(
+              review.workspace,
+              payload.requiredReviewAnnotationEffect,
+              { assetId, mimeType: payload.entry.mimeType, byteLength: payload.entry.size }
+            )
+          : payload.requiredReviewSpeech
+            ? reviewWorkspaceHasSpeechReplacement(
+                review.workspace,
+                payload.requiredReviewSpeech.target,
+                payload.requiredReviewSpeech.replacementId,
+                assetId
+              )
+            : payload.requiredReviewResource
+              ? payload.requiredReviewResource.slot === 'watermark'
+                ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
+                : reviewWorkspaceHasSceneResource(
+                    review.workspace,
+                    payload.requiredReviewResource.slot,
+                    payload.requiredReviewResource.kind,
+                    assetId
+                  )
+              : payload.librarySourceId
+                ? reviewWorkspaceHasAudioClip(
+                    review.workspace,
+                    payload.requiredReview!.clipId,
+                    assetId
+                  )
+                : collectReviewAssetReferences(review.workspace).has(assetId));
       if (!referenced) {
         throw new SupersededAssetPublicationError();
       }

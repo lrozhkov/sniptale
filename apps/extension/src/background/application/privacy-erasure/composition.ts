@@ -1,3 +1,4 @@
+import type { AudioJobService } from '../../ai/audio/service';
 import type { LocalDataErasureMessage } from '../../../contracts/messaging/privacy-erasure';
 import { createPrivacyErasureStorageCleanupAdapter } from '../../../composition/persistence/privacy-erasure/cleanup';
 import { diagnosticsPrivacyErasureCleanupAdapter } from '../../diagnostics/privacy-erasure/cleanup';
@@ -33,7 +34,46 @@ const nativeIngestionCleanupProxy: NativeIngestionCleanupPort = {
   reserveErasureExclusion: () => nativeIngestionCleanupPort.reserveErasureExclusion(),
 };
 
+let audioJobs: Pick<AudioJobService, 'reserveErasureExclusion' | 'cancelActiveJob'> | undefined;
+export function configureAudioJobPrivacyErasurePort(
+  ...ports: Array<Pick<AudioJobService, 'reserveErasureExclusion' | 'cancelActiveJob'>>
+): void {
+  audioJobs = {
+    async cancelActiveJob() {
+      await Promise.all(ports.map((port) => port.cancelActiveJob()));
+    },
+    reserveErasureExclusion() {
+      const reservations: Array<ReturnType<AudioJobService['reserveErasureExclusion']>> = [];
+      try {
+        for (const port of ports) reservations.push(port.reserveErasureExclusion());
+      } catch (error) {
+        reservations.forEach((reservation) => reservation.release());
+        throw error;
+      }
+      let released = false;
+      return {
+        release() {
+          if (!released) {
+            released = true;
+            reservations.forEach((reservation) => reservation.release());
+          }
+        },
+        async waitForActiveMutations() {
+          await Promise.all(
+            reservations.map((reservation) => reservation.waitForActiveMutations())
+          );
+        },
+      };
+    },
+  };
+}
+
 const privacyErasureUseCase = new PrivacyErasureUseCase({
+  audioJobs: {
+    cancelActiveJob: () => (audioJobs ? audioJobs.cancelActiveJob() : Promise.resolve()),
+    reserveErasureExclusion: () =>
+      audioJobs?.reserveErasureExclusion() ?? { release() {}, async waitForActiveMutations() {} },
+  },
   diagnostics: diagnosticsPrivacyErasureCleanupAdapter,
   media: mediaPrivacyErasureCleanupAdapter,
   nativeIngestion: nativeIngestionCleanupProxy,

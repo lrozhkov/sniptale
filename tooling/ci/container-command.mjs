@@ -1,7 +1,7 @@
 const TRUSTED_CONTAINER_WORKDIR = '/workspace';
 const CANONICAL_IMAGE_ENVIRONMENT = Object.freeze({
   DEBIAN_FRONTEND: 'noninteractive',
-  NODE_VERSION: '24.18.0',
+  NODE_VERSION: '24.21.0',
   PATH: '/opt/codeql:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
   PLAYWRIGHT_BROWSERS_PATH: '/opt/playwright',
   XDG_CACHE_HOME: '/workspace/.tmp/ci-cache',

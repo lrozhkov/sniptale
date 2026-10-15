@@ -1,4 +1,8 @@
 import {
+  getVideoExportConfigCandidates,
+  supportsVideoExportConfig,
+} from '../../features/video/project/export/encoding-quality';
+import {
   AudioBufferSource,
   BufferTarget,
   EncodedPacket,
@@ -13,20 +17,33 @@ export async function createWebmEncoding(settings: VideoProjectExportSettings, h
   const codec = settings.webmVideoCodec === 'VP8' ? 'vp8' : 'vp9';
   const output = new Output({ format: new WebMOutputFormat(), target: new BufferTarget() });
   const source = new EncodedVideoPacketSource(codec);
-  output.addVideoTrack(source, { frameRate: settings.fps });
+  output.addVideoTrack(
+    source,
+    settings.frameRateMode === 'adaptive' ? {} : { frameRate: settings.fps }
+  );
   const audio = hasAudio ? new AudioBufferSource({ codec: 'opus', bitrate: 128_000 }) : null;
   if (audio) output.addAudioTrack(audio);
   const state = createPacketWriter(source);
   const videoEncoder = new VideoEncoder({ output: state.write, error: state.fail });
   try {
-    videoEncoder.configure({
+    const requested: VideoEncoderConfig = {
       codec: codec === 'vp8' ? 'vp8' : 'vp09.00.10.08',
       width: settings.width,
       height: settings.height,
       framerate: settings.fps,
       bitrate: resolveExportTargetBitrate(settings),
       bitrateMode: 'variable',
-    });
+    };
+    let selected: VideoEncoderConfig | null = null;
+    for (const config of getVideoExportConfigCandidates(requested)) {
+      const support = await VideoEncoder.isConfigSupported(config).catch(() => null);
+      if (support && supportsVideoExportConfig(config, support)) {
+        selected = config;
+        break;
+      }
+    }
+    if (!selected) throw new Error('WEBM_VIDEO_ENCODER_UNSUPPORTED');
+    videoEncoder.configure(selected);
     await output.start();
   } catch (error) {
     closeEncoderQuietly(videoEncoder);

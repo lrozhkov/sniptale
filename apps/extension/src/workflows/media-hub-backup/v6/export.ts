@@ -5,42 +5,45 @@ import {
   type ExportSink,
 } from '../../../composition/archive-transfer';
 import { encodeCatalogShards } from './catalog';
-import { parseArchiveRootDescriptor, parseRootEnvelope } from './codec';
+import {
+  parseArchiveRootDescriptor,
+  parseRootEnvelope,
+  parseBoundedJson,
+  parseManifestV6,
+} from './codec';
 import {
   MEDIA_HUB_BACKUP_FORMAT,
   MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER,
   MEDIA_HUB_BACKUP_VERSION,
-  type JsonValue,
+  MAX_ROOT_METADATA_BYTES,
+  MAX_EXPANDED_ARCHIVE_METADATA_BYTES,
+  type MediaHubBackupRootInventoryItem,
   type MediaHubBackupCatalogShard,
   type MediaHubBackupManifestV6,
   type MediaHubBackupPrivacyFlags,
-  type MediaHubBackupRootEnvelope,
 } from './contracts';
-import { CATALOG_ROOT, MANIFEST_PATH, MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import {
+  CATALOG_ROOT,
+  MANIFEST_PATH,
+  MEDIA_HUB_BACKUP_LAYOUT,
+  MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  isSharedBackupLayout,
+  MEDIA_HUB_BACKUP_PROJECT_LAYOUT,
+  hasReviewProjectMetadata,
+  assertReviewProjectLayout,
+  type MediaHubBackupLayout,
+} from './layout';
+import { encodeBackupMetadata } from './metadata-transport';
+import { assertBackupByteBudget } from './errors';
+import { prepareSharedBackupExport } from './shared-object-export';
+import { parseSharedRootEnvelope } from './shared-object-envelope';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
-export interface ArchiveRootObjectSource {
-  blob: Blob;
-  ref: MediaHubBackupRootEnvelope['objects'][number];
-}
-
-export interface ArchiveRootPayload {
-  metadata: JsonValue;
-  objects: ArchiveRootObjectSource[];
-}
-
-export interface MediaHubBackupRootInventoryItem {
-  descriptor: ArchiveRootDescriptor;
-  load(signal?: AbortSignal): Promise<ArchiveRootPayload>;
-  summary: {
-    draftCount: number;
-    recordingCount: number;
-    sourceMetadataCount: number;
-    telemetryCount: number;
-    thumbnailCount: number;
-    webSnapshotCount: number;
-  };
-}
+export type {
+  ArchiveRootObjectSource,
+  ArchiveRootPayload,
+  MediaHubBackupRootInventoryItem,
+} from './contracts';
 
 interface PlannedCatalog {
   descriptor: MediaHubBackupCatalogShard;
@@ -89,6 +92,7 @@ function createArchiveId(): string {
 }
 
 export function buildMediaHubBackupExportPlanV6(args: {
+  layout?: MediaHubBackupLayout;
   archiveId?: string;
   exportedAt?: string;
   galleryViews?: GallerySavedView[];
@@ -149,7 +153,7 @@ export function buildMediaHubBackupExportPlanV6(args: {
     exportedAt: args.exportedAt ?? new Date().toISOString(),
     format: MEDIA_HUB_BACKUP_FORMAT,
     ...(args.galleryViews ? { galleryViews: structuredClone(args.galleryViews) } : {}),
-    layout: MEDIA_HUB_BACKUP_LAYOUT,
+    layout: args.layout ?? MEDIA_HUB_BACKUP_LAYOUT,
     privacy: args.privacy,
     totals: {
       bytes: roots.reduce((total, item) => total + item.descriptor.totalBytes, 0),
@@ -185,40 +189,82 @@ export async function exportMediaHubBackupV6(args: {
     throwIfAborted(args.signal);
     progress.currentFilename = MANIFEST_PATH;
     report();
-    await writer.addText(
-      MANIFEST_PATH,
-      JSON.stringify(args.plan.manifest),
-      signalOptions(args.signal)
+    if (
+      args.plan.manifest.layout === MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT ||
+      isSharedBackupLayout(args.plan.manifest.layout)
+    ) {
+      const roots: MediaHubBackupRootInventoryItem[] = [];
+      let expandedBytes = 0;
+      let layout = args.plan.manifest.layout;
+      for (const [index, item] of args.plan.roots.entries()) {
+        throwIfAborted(args.signal);
+        const payload = await item.load(args.signal);
+        const encoded = await encodeBackupMetadata(
+          { ...item, load: async () => payload },
+          index + 1,
+          args.signal
+        );
+        if (hasReviewProjectMetadata(payload.metadata)) layout = MEDIA_HUB_BACKUP_PROJECT_LAYOUT;
+        expandedBytes += encoded.expandedBytes;
+        assertBackupByteBudget(expandedBytes, MAX_EXPANDED_ARCHIVE_METADATA_BYTES, 'encode');
+        roots.push(encoded.item);
+      }
+      args = {
+        ...args,
+        plan: buildMediaHubBackupExportPlanV6({ ...args.plan.manifest, layout, roots }),
+      };
+    }
+    const shared = isSharedBackupLayout(args.plan.manifest.layout)
+      ? await prepareSharedBackupExport(args.plan.roots, args.signal)
+      : null;
+    if (shared) args.plan.manifest = { ...args.plan.manifest, sharedObjects: shared.sharedObjects };
+    const manifestText = JSON.stringify(args.plan.manifest);
+    assertBackupByteBudget(
+      new TextEncoder().encode(manifestText).byteLength,
+      MAX_ROOT_METADATA_BYTES,
+      'encode'
     );
+    parseManifestV6(parseBoundedJson(manifestText));
+    await writer.addText(MANIFEST_PATH, manifestText, signalOptions(args.signal));
     for (const catalog of args.plan.catalogs) {
       throwIfAborted(args.signal);
       progress.currentFilename = catalog.descriptor.path;
       report();
       await writer.addText(catalog.descriptor.path, catalog.text, signalOptions(args.signal));
     }
-    for (const item of args.plan.roots) {
+    for (const [index, item] of args.plan.roots.entries()) {
       throwIfAborted(args.signal);
       const payload = await item.load(args.signal);
-      const envelope = parseRootEnvelope({
-        descriptor: item.descriptor,
-        metadata: payload.metadata,
-        objects: payload.objects.map((object) => object.ref),
-      });
+      assertReviewProjectLayout(payload.metadata, args.plan.manifest.layout);
+      const prepared = shared?.roots[index];
+      const envelope =
+        prepared?.metadata ??
+        parseRootEnvelope({
+          descriptor: item.descriptor,
+          metadata: payload.metadata,
+          objects: payload.objects.map((object) => object.ref),
+        });
+      if (prepared) parseSharedRootEnvelope(envelope, shared!.sharedObjects);
       progress.currentFilename = item.descriptor.metadataPath;
       report();
-      await writer.addText(
-        item.descriptor.metadataPath,
-        JSON.stringify(envelope),
-        signalOptions(args.signal)
+      const metadataText = JSON.stringify(envelope);
+      assertBackupByteBudget(
+        new TextEncoder().encode(metadataText).byteLength,
+        MAX_ROOT_METADATA_BYTES,
+        'encode'
       );
-      for (const object of payload.objects) {
+      await writer.addText(item.descriptor.metadataPath, metadataText, signalOptions(args.signal));
+      for (const object of prepared?.objects ?? payload.objects) {
         throwIfAborted(args.signal);
         if (object.blob.size !== object.ref.size) {
           throw new Error(`Media backup object source size changed: ${object.ref.path}.`);
         }
         progress.currentFilename = object.ref.filename;
         report();
-        await writer.addBlob(object.ref.path, object.blob, signalOptions(args.signal));
+        await writer.addBlob(object.ref.path, object.blob, {
+          ...signalOptions(args.signal),
+          compress: object.ref.mimeType.toLowerCase() === 'application/json',
+        });
         progress.bytesRead += object.blob.size;
         report();
       }

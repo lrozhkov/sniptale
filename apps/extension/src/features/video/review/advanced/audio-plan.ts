@@ -1,10 +1,33 @@
 import type { QuickEditAudioClip } from './types';
+import type { ActionSoundSampleId } from '../action-audio-catalog';
+import { iterateReviewActionAudioCues, type ReviewActionAudioPlan } from '../action-audio';
+
+/** Project bytes and immutable bundled samples have separate resolution authorities. */
+type QuickEditAudioSource =
+  | { kind: 'project'; assetId: string }
+  | { kind: 'bundled'; sampleId: ActionSoundSampleId };
+
+/** Namespaces decoder/cache identities without manufacturing project asset IDs. */
+export function quickEditAudioSourceKey(source: QuickEditAudioSource): string {
+  return JSON.stringify([
+    source.kind,
+    source.kind === 'project' ? source.assetId : source.sampleId,
+  ]);
+}
+
+/** Compact full-main plan plus a single main-to-fragment offset; bounds are global, never query-local. */
+export interface QuickEditActionAudioSchedule {
+  plan: ReviewActionAudioPlan;
+  busGain: number;
+  offset: number;
+  bounds?: { start: number; end: number };
+}
 
 /** One scheduled external-audio entry in output time; consumed by preview and export. */
 export interface QuickEditAudioPlanEntry {
-  lane: 'voiceover' | 'music';
+  lane: 'voiceover' | 'music' | 'action';
   clipId: string;
-  assetId: string;
+  source: QuickEditAudioSource;
   timelineStart: number;
   duration: number;
   sourceOffset: number;
@@ -27,7 +50,7 @@ export function buildQuickEditAudioPlan(args: {
     args[lane].map((clip) => ({
       lane,
       clipId: clip.id,
-      assetId: clip.assetId,
+      source: { kind: 'project' as const, assetId: clip.assetId },
       timelineStart: clip.timelineStart,
       duration: clip.duration,
       sourceOffset: clip.sourceOffset,
@@ -38,6 +61,49 @@ export function buildQuickEditAudioPlan(args: {
       ...(clip.fadePhase ? { fadePhase: clip.fadePhase } : {}),
     }))
   );
+}
+
+/** Exhaust every bounded batch; seeking and window partitioning preserve cue identity and phase. */
+export function* iterateQuickEditActionAudioPlan(
+  action: QuickEditActionAudioSchedule,
+  window: { start: number; end: number }
+): Generator<readonly QuickEditAudioPlanEntry[], void> {
+  const lower = action.bounds?.start ?? 0;
+  const upper = action.bounds?.end ?? action.plan.duration;
+  const start = Math.max(lower, window.start + action.offset);
+  const end = Math.min(upper, window.end + action.offset);
+  if (end <= start) return;
+  for (const batch of iterateReviewActionAudioCues(action.plan, { start, end })) {
+    const entries: QuickEditAudioPlanEntry[] = [];
+    for (const cue of batch) {
+      const from = Math.max(lower, cue.start),
+        to = Math.min(upper, cue.end);
+      if (to <= from) continue;
+      const duration = to - from;
+      const fade = Math.min(0.01, duration / 4);
+      entries.push({
+        lane: 'action',
+        clipId: cue.id,
+        source: { kind: 'bundled', sampleId: cue.sampleId },
+        timelineStart: from - action.offset,
+        duration,
+        sourceOffset: cue.sourceOffset + from - cue.start,
+        volume: cue.volume * action.busGain,
+        fadeIn: from > cue.start ? fade : Math.min(cue.fadeIn, duration / 4),
+        fadeOut: to < cue.end ? fade : Math.min(cue.fadeOut, duration / 4),
+        playbackRate: 1,
+      });
+    }
+    if (entries.length) yield entries;
+  }
+}
+
+/** Presence uses the same clipped native cues as scheduling, including pre-window tails. */
+export function hasQuickEditActionAudio(
+  action: QuickEditActionAudioSchedule,
+  window: { start: number; end: number }
+): boolean {
+  return !iterateQuickEditActionAudioPlan(action, window).next().done;
 }
 
 /** Gain automation [second, value] pairs over the clip interval, clipped to [0, duration]. */

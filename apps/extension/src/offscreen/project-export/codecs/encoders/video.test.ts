@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 it.each([VideoMp4Codec.AVC, VideoMp4Codec.HEVC, VideoMp4Codec.VP9])(
-  'passes the same explicit quality target into the validated %s encoder config',
+  'prefers constant-quality control for the validated %s encoder config',
   async (codec) => {
     const isConfigSupported = vi.fn(async (config: VideoEncoderConfig) => ({
       config,
@@ -37,9 +37,9 @@ it.each([VideoMp4Codec.AVC, VideoMp4Codec.HEVC, VideoMp4Codec.VP9])(
     const encoder = await getSupportedMp4VideoEncoder(createSettings(codec), codec);
 
     expect(isConfigSupported).toHaveBeenCalledWith(
-      expect.objectContaining({ bitrate: 8_000_000, bitrateMode: 'variable' })
+      expect.objectContaining({ bitrateMode: 'quantizer', latencyMode: 'quality' })
     );
-    expect(encoder.config.bitrate).toBe(8_000_000);
+    expect(encoder.config.bitrate).toBeUndefined();
   }
 );
 
@@ -53,7 +53,7 @@ it('rejects a codec family when the browser does not preserve the requested VBR 
   await expect(
     getSupportedMp4VideoEncoder(createSettings(VideoMp4Codec.AVC), VideoMp4Codec.AVC)
   ).rejects.toThrow(/video encoder/i);
-  expect(isConfigSupported).toHaveBeenCalledTimes(10);
+  expect(isConfigSupported).toHaveBeenCalledTimes(20);
 });
 
 it('collects capability profiles per codec and isolates a rejected family', async () => {
@@ -91,3 +91,50 @@ it.each([VideoMp4Codec.AVC, VideoMp4Codec.HEVC])(
     expect(profiles.map((profile) => profile.codec)).toEqual([codec]);
   }
 );
+
+it('falls back to the exact VBR budget when quantizer support is rejected', async () => {
+  vi.stubGlobal('VideoEncoder', {
+    isConfigSupported: vi.fn(async (config: VideoEncoderConfig) => ({
+      config,
+      supported: config.bitrateMode === 'variable',
+    })),
+  });
+  const encoder = await getSupportedMp4VideoEncoder(
+    createSettings(VideoMp4Codec.HEVC),
+    VideoMp4Codec.HEVC
+  );
+  expect(encoder.config).toMatchObject({
+    bitrate: 8_000_000,
+    bitrateMode: 'variable',
+    width: 1920,
+    height: 1080,
+    framerate: 30,
+  });
+});
+
+it('keeps supported HEVC with identical 1904x1064/30 settings in capability and export probes', async () => {
+  const { resolveVideoExportDimensions } =
+    await import('../../../../features/video/project/export/output-dimensions');
+  const settings = {
+    ...createSettings(VideoMp4Codec.HEVC),
+    ...resolveVideoExportDimensions(1904, 1064, '1080P'),
+    fps: 30,
+  };
+  const probe = vi.fn(async (config: VideoEncoderConfig) => ({
+    config,
+    supported:
+      config.codec.startsWith('hvc1') &&
+      config.width === 1904 &&
+      config.height === 1064 &&
+      config.framerate === 30,
+  }));
+  vi.stubGlobal('VideoEncoder', { isConfigSupported: probe });
+  const profiles = await getSupportedMp4VideoCodecProfiles(settings);
+  expect(profiles.map((p) => p.codec)).toContain(VideoMp4Codec.HEVC);
+  const encoder = await getSupportedMp4VideoEncoder(settings, VideoMp4Codec.HEVC);
+  expect(encoder.config).toEqual(profiles.find((p) => p.codec === VideoMp4Codec.HEVC)!.config);
+  expect(encoder.config).toMatchObject({ width: 1904, height: 1064, framerate: 30 });
+  expect(
+    await getSupportedMp4VideoCodecProfiles({ ...settings, fps: 40 }, [VideoMp4Codec.HEVC])
+  ).toEqual([]);
+});

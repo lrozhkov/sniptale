@@ -52,7 +52,7 @@ function createDb() {
       done: Promise.resolve(),
       objectStore: vi.fn(() => ({
         delete: projectsDbMocks.txDeleteMock,
-        index: () => ({ count: async () => 0 }),
+        index: () => ({ count: async () => 0, getAll: async () => [], getAllKeys: async () => [] }),
         getAll: projectsDbMocks.txGetAllMock,
         get: projectsDbMocks.txGetMock,
         put: projectsDbMocks.txPutMock,
@@ -123,7 +123,7 @@ it('accepts only a null expected workspace revision when creating a project', as
   ).resolves.toMatchObject({ workspaceRevision: 1 });
 });
 
-it('removes project-owned assets that are no longer referenced by the saved project', async () => {
+it('journals detached project sources while saving without revoking mounted Undo', async () => {
   const { saveVideoProject } = await importProjectsDbModule();
   const project = createVideoProject({ updatedAt: 10 });
   projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
@@ -145,8 +145,14 @@ it('removes project-owned assets that are no longer referenced by the saved proj
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'project-1' })
   );
-  expect(projectsDbMocks.txDeleteMock).toHaveBeenCalledWith('project-asset-1');
-  expect(projectsDbMocks.txDeleteMock).toHaveBeenCalledWith('project-asset:project-asset-1');
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      kind: 'physical-delete',
+      assetIds: [],
+      privateSources: [{ projectAssetId: 'project-asset-1', expectedAssetId: 'asset-body' }],
+    })
+  );
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'video-project:project-1',
   ]);

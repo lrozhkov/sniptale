@@ -53,6 +53,10 @@ const idempotencyPolicyByType = {
     idempotent: true,
     reason: 'frame annotation rasterization is correlated by the staged immutable job reference',
   },
+  [MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD]: {
+    idempotent: false,
+    reason: 'data preparation rechecks the current connection and coalesces in its readiness owner',
+  },
   [MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE]: {
     idempotent: true,
     reason: 'lease creation is correlated by the stable download operation identity',
@@ -104,6 +108,10 @@ const idempotencyPolicyByType = {
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: {
     idempotent: true,
     reason: 'recording stop is scoped to the active recording generation',
+  },
+  [VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING]: {
+    idempotent: false,
+    reason: 'each monotonic timing exchange needs fresh readings',
   },
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: {
     idempotent: true,

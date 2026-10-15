@@ -1,3 +1,9 @@
+import {
+  createLibraryLifecycle,
+  promoteLibraryLifecycle,
+} from '../../../../composition/persistence/library-lifecycle/contracts';
+import { promoteReviewSourceLifecycles } from '../../../../composition/persistence/review-workspaces/new-reference-admission';
+import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import { freezeScenarioMediaRepresentations } from '../../../../composition/persistence/scenario/library-publication';
 import { sameMediaSource } from '../../../../composition/persistence/media-library/dependencies';
 import {
@@ -8,6 +14,7 @@ import {
 import { replaceSanitizedSnapshotPackage } from './page-package';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -71,6 +78,7 @@ import {
   hasMediaReviewAssetConflict,
   prepareMediaReviewAssets,
   prepareStandaloneMediaVideoReview,
+  verifyPreparedMediaReviewAnnotations,
   publishMediaReviewAssets,
 } from './media-review-assets';
 
@@ -213,6 +221,15 @@ function prepareRecording(args: {
     args.metadata.recording && recordingId
       ? parseRecordingEntry({
           ...args.metadata.recording.entry,
+          ...(args.metadata.videoReview
+            ? {
+                lifecycle: promoteLibraryLifecycle(
+                  args.metadata.recording.entry.lifecycle ??
+                    createLibraryLifecycle('library', args.metadata.recording.entry.createdAt),
+                  Date.now()
+                ),
+              }
+            : {}),
           assetId: args.original.ref.assetId,
           id: recordingId,
           mimeType: args.original.ref.mimeType,
@@ -259,20 +276,24 @@ function prepareSnapshot(args: {
   return snapshot;
 }
 
+// Gallery thumbnails are 320×180; 8 MiB allows legacy encodings and bounds the byte copy.
+const MAX_RESTORED_THUMBNAIL_BYTES = 8 * 1024 * 1024;
+
 async function prepareThumbnail(args: {
   mediaId: string;
   metadata: PortableMedia;
   objects: StagedObjectMap;
 }): Promise<MediaThumbnailEntry | null> {
   if (!args.metadata.thumbnail) return null;
-  const file = await readAssetFile(
-    requireObject(args.objects, args.metadata.thumbnail.objectId).ref,
-    `${args.mediaId}-thumbnail`
-  );
+  const ref = requireObject(args.objects, args.metadata.thumbnail.objectId).ref;
+  if (ref.size > MAX_RESTORED_THUMBNAIL_BYTES)
+    throw new Error('Restored media thumbnail exceeds the 8 MiB limit.');
+  const file = await readAssetFile(ref, `${args.mediaId}-thumbnail`);
   const thumbnail = parseMediaThumbnailEntry({
     ...args.metadata.thumbnail,
     assetId: args.mediaId,
-    blob: file,
+    // Restore cleanup deletes the staging file after publication.
+    blob: new Blob([await file.arrayBuffer()], { type: file.type }),
   });
   if (!thumbnail) throw new Error('Restored media thumbnail is invalid.');
   return thumbnail;
@@ -350,7 +371,17 @@ async function prepareMediaRoot(args: {
     args.metadata,
     args.strategy === 'duplicate' && (await hasMediaSourceConflict(args.metadata))
   );
-  const restoredEntry = rebaseTemporaryLifecycle(targetEntry);
+  const acceptedEntry =
+    args.metadata.workspace || args.metadata.videoReview
+      ? {
+          ...targetEntry,
+          lifecycle: promoteLibraryLifecycle(
+            targetEntry.lifecycle ?? createLibraryLifecycle('library', targetEntry.updatedAt),
+            Date.now()
+          ),
+        }
+      : targetEntry;
+  const restoredEntry = rebaseTemporaryLifecycle(acceptedEntry);
   const restoredSource =
     restoredEntry.source.kind === 'stored-asset'
       ? { kind: 'stored-asset' as const, assetId: original.ref.assetId }
@@ -402,6 +433,7 @@ async function prepareMediaRoot(args: {
     original,
     reviewAssets,
   });
+  if (videoReview) await verifyPreparedMediaReviewAnnotations(videoReview, reviewAssets);
   return {
     media,
     original,
@@ -491,12 +523,22 @@ async function publishPreparedMedia(args: {
   if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
   await publishProjectVideo(args.prepared, args.stores);
   await publishMediaReviewAssets(args.prepared.reviewAssets, args.stores);
-  if (args.prepared.videoReview)
+  if (args.prepared.videoReview) {
+    await promoteReviewSourceLifecycles(
+      args.prepared.videoReview.workspace,
+      {
+        assets: args.stores.projectAssets,
+        media: args.stores.media,
+        recordings: args.stores.recordings,
+      },
+      { assets: new Map(), libraryAudioClaims: [] }
+    );
     await putVideoReviewRestore({
       review: args.prepared.videoReview,
       workspaces: args.stores.videoWorkspaces,
       drafts: args.stores.videoDrafts,
     });
+  }
   if (args.prepared.recording) {
     await putRecordingBackupRestore({
       entry: args.prepared.recording,
@@ -550,6 +592,7 @@ async function commitPreparedMediaRoot(args: {
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
@@ -575,7 +618,7 @@ async function commitPreparedMediaRoot(args: {
       thumbnails: tx.objectStore(THUMBNAILS_STORE),
       snapshots: tx.objectStore(WEB_SNAPSHOTS_STORE),
       workspaces: tx.objectStore(IMAGE_WORKSPACES_STORE),
-      videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+      videoWorkspaces: createVideoWorkspaceStore(tx),
       videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
       videoProjects: tx.objectStore(VIDEO_PROJECTS_STORE),
       projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),

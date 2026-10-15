@@ -115,11 +115,23 @@ function mediaEntry(sourceKind: 'recording' | 'project-video'): MediaLibraryEntr
   };
 }
 
-function database(entry: MediaLibraryEntry) {
-  const workspace = review(entry.id);
+function database(entry: MediaLibraryEntry, project = false) {
+  const workspace = {
+    ...review(entry.id),
+    ...(project
+      ? {
+          formatVersion: 3,
+          project: {
+            name: 'Renamed edit',
+            lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 3 },
+          },
+        }
+      : {}),
+  };
   return {
     transaction: () => ({
       objectStore: (store: string) => ({
+        index: () => ({ getAll: async () => [] }),
         get: async () => (store === 'video_workspaces' ? workspace : undefined),
       }),
       done: Promise.resolve(),
@@ -210,3 +222,56 @@ it.each(['recording', 'project-video'] as const)(
     expect(payload.objects).toHaveLength(4);
   }
 );
+
+it('exports selected project metadata and source bytes once through the media inventory', async () => {
+  const entry = mediaEntry('recording');
+  const { blob: _blob, ...metadata } = entry;
+  const roots = await buildMediaRootInventory({
+    db: database(entry, true),
+    items: [{ ...metadata, hasThumbnail: false }],
+    options: createMediaHubBackupExportOptions({
+      scope: 'selected',
+      selected: {
+        mediaAssetIds: [entry.id, entry.id],
+        videoProjectIds: [],
+        scenarioProjectIds: [],
+      },
+    }),
+    paths: createArchivePathAllocator(),
+  });
+  expect(roots).toHaveLength(1);
+  const payload = await roots[0]!.load();
+  const portable = parsePortableMediaMetadata(payload.metadata);
+  expect(portable.videoReview).toMatchObject({
+    workspace: {
+      project: { name: 'Renamed edit', lifecycle: { storageClass: 'library', trashedAt: 3 } },
+    },
+  });
+  expect(payload.objects).toHaveLength(4);
+});
+
+it('uses the same recording identity for review admission and original bytes after replacement', async () => {
+  const entry = mediaEntry('recording');
+  const db = database(entry);
+  const get = db.get.getMockImplementation()!;
+  let recordingReads = 0;
+  db.get.mockImplementation(async (store, key) => {
+    if (store === 'recordings') {
+      recordingReads++;
+      return {
+        ...sourceRow('recording'),
+        assetId: recordingReads === 1 ? 'video-object' : 'replacement-object',
+      };
+    }
+    return get(store, key);
+  });
+  const { blob: _blob, ...metadata } = entry;
+  await buildMediaRootInventory({
+    db,
+    items: [{ ...metadata, hasThumbnail: false }],
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+  });
+  const videoReads = mocks.readFile.mock.calls.filter(([ref]) => ref.mimeType === 'video/webm');
+  expect(videoReads.at(-1)?.[0].assetId).toBe('video-object');
+});

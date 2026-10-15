@@ -168,3 +168,46 @@ it('keeps TAB history nonspatial when recordingPoint is absent or explicitly una
     { id: 'unavailable', point: null },
   ]);
 });
+
+it('projects cropped cursor using its admitted recording point instead of full-viewport dimensions', () => {
+  const track = createCursorTrack();
+  track.samples[0] = { ...track.samples[0]!, recordingPoint: { x: 0.25, y: 0.75 } };
+  const result = normalizeRecordingCursorTrackToProjectSpace(track, {
+    captureMode: CaptureMode.TAB_CROP,
+    displaySurface: 'browser',
+    projectWidth: 800,
+    projectHeight: 600,
+    viewport: createViewportInfo(),
+  });
+  expect(result?.samples[0]).toMatchObject({ x: 200, y: 450 });
+  const action = normalizeRecordingActionEventsToProjectSpace(
+    [{ ...createActionEvents()[0]!, recordingPoint: { x: 0.25, y: 0.75 } }],
+    {
+      captureMode: CaptureMode.TAB_CROP,
+      displaySurface: 'browser',
+      projectWidth: 800,
+      projectHeight: 600,
+      viewport: createViewportInfo(),
+    }
+  );
+  expect(result?.samples[0]?.x).toBe(action[0]!.point!.x * 800);
+  expect(result?.samples[0]?.y).toBe(action[0]!.point!.y * 600);
+});
+
+it('keeps original cropped cursor coordinates but disables spatial output when geometry is unproven', () => {
+  for (const recordingPoint of [undefined, null]) {
+    const track = createCursorTrack();
+    track.samples[0] = {
+      ...track.samples[0]!,
+      ...(recordingPoint === undefined ? {} : { recordingPoint }),
+    };
+    const result = normalizeRecordingCursorTrackToProjectSpace(track, {
+      captureMode: CaptureMode.TAB_CROP,
+      displaySurface: 'browser',
+      projectWidth: 800,
+      projectHeight: 600,
+      viewport: createViewportInfo(),
+    });
+    expect(result?.samples[0]).toMatchObject({ x: 100, y: 200, visible: false });
+  }
+});

@@ -1,3 +1,4 @@
+import { filterAIModelsByOperation } from '../../contracts/settings/model-operation';
 import {
   CHROME_AI_MODEL_ID,
   isChromeAiModelId,
@@ -38,6 +39,7 @@ export function loadAIModelSelectionBootstrap(): Promise<AIModelSelectionBootstr
       ])
     )
     .then(async ([models, providers, chromeAiEnabled, defaultModelId, globalSystemPrompt]) => {
+      models = filterAIModelsByOperation(models, 'text');
       const availability = chromeAiEnabled ? await loadChromeAiAvailability() : 'unsupported';
       const canUseChromeAi = chromeAiEnabled && availability === 'available';
       const nextSelection = canUseChromeAi

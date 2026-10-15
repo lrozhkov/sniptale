@@ -164,7 +164,7 @@ it('enters and leaves reading without reloading or saving the project', async ()
   project.items = [createGuideStep('First', 'first')];
   io.load.mockResolvedValue(project);
   io.previous.mockReturnValue([]);
-  io.save.mockImplementation(async (value) => value);
+  io.save.mockImplementation(async (value) => ({ project: value, workspaceRevision: 2 }));
   window.history.replaceState({}, '', '/?projectId=guide&stepId=first');
   const button = (label: string) => {
     const node = [...host.querySelectorAll('button')].find(
@@ -202,7 +202,9 @@ it('keeps export activation available during a pending autosave', async () => {
   project.items = [createGuideStep('First', 'first')];
   io.load.mockResolvedValue(project);
   io.previous.mockReturnValue([]);
-  let complete: ((value: typeof project) => void) | undefined;
+  let complete:
+    | ((value: { project: typeof project; workspaceRevision: number }) => void)
+    | undefined;
   io.save.mockReset().mockImplementation(
     () =>
       new Promise((resolve) => {
@@ -230,7 +232,10 @@ it('keeps export activation available during a pending autosave', async () => {
     await act(async () => exportButton.click());
     expect(host.querySelector('.guide-reader')).not.toBeNull();
     await act(async () =>
-      complete?.({ ...project, name: 'Edited guide', updatedAt: project.updatedAt + 1 })
+      complete?.({
+        project: { ...project, name: 'Edited guide', updatedAt: project.updatedAt + 1 },
+        workspaceRevision: 2,
+      })
     );
     expect(host.querySelector('.guide-reader')).not.toBeNull();
   } finally {

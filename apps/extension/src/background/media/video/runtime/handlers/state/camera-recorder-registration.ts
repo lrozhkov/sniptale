@@ -1,9 +1,7 @@
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  ensureActiveVideoRecordingLeaseHydrated,
-  getActiveVideoRecordingLeaseSnapshot,
-} from '../../../recording-control-lease';
+import { getActiveVideoRecordingLeaseSnapshot } from '../../../recording-control-lease';
+import { ensureActiveVideoRecordingLeaseHydrated } from '../../recording-completion';
 import {
   authorizeCameraRecorderDocument,
   reconnectCameraRecorderDocument,

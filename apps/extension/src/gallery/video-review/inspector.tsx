@@ -6,6 +6,7 @@ import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import './inspector-navigation.css';
 import {
+  Archive,
   List,
   PanelLeft,
   ChevronsDownUp,
@@ -13,12 +14,11 @@ import {
   Pencil,
   Trash2,
   Copy,
-  ArrowLeft,
   Plus,
   FileDown,
   X,
 } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
@@ -29,6 +29,45 @@ import {
   reviewTextButtonClassName,
 } from './controls';
 
+type InspectorSection =
+  | 'scene'
+  | 'selected'
+  | 'comments'
+  | 'export'
+  | 'history'
+  | 'preview'
+  | 'speech'
+  | 'text';
+
+function inspectorNavigationOptions(args: {
+  shown: InspectorSection;
+  context: ReviewInspectorNavigation['context'];
+  settingsAvailable: boolean | undefined;
+  selectionLabel: string | undefined;
+  actionHistory: boolean;
+  actions: boolean;
+}): { id: InspectorSection; label: string }[] {
+  const options: { id: InspectorSection; label: string }[] = [];
+  options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
+  if (args.settingsAvailable)
+    options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
+  if (args.shown === 'preview') {
+    options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
+    return options;
+  }
+  if (args.context === 'text' && args.settingsAvailable)
+    options.push({ id: 'text', label: translate('gallery.videoReview.textTrackDocument') });
+  if (args.context === 'speech')
+    options.push({ id: 'speech', label: translate('gallery.videoReview.speechTitle') });
+  if (args.context === 'selected' && args.selectionLabel)
+    options.push({ id: 'selected', label: args.selectionLabel });
+  if (args.context === 'history' && args.actionHistory)
+    options.push({ id: 'history', label: translate('gallery.videoReview.telemetry') });
+  if (args.context === 'export' && args.actions)
+    options.push({ id: 'export', label: translate('gallery.videoReview.exportSection') });
+  return options;
+}
+
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
   beforeAction?: ReviewBeforeAction | undefined;
@@ -37,10 +76,15 @@ export function ReviewInspector(props: {
   selectedId: string | null;
   busy: boolean;
   fullHeight?: boolean;
+  resizeHandle?: ReactNode;
   onToggleHeight?(): void;
   message: string | null;
   recovery?: ReactNode;
   scene?: ReactNode;
+  preview?: ReactNode;
+  speech?: ReactNode;
+  textDocument?: ReactNode;
+  actionHistory?: ReactNode;
   selectionLabel?: string | undefined;
   selectionHasSections?: boolean;
   selectionPreferenceScope?: string;
@@ -53,6 +97,7 @@ export function ReviewInspector(props: {
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
+  onBackup?(): void;
   children: ReactNode;
   actions?: ReactNode;
   composer?: ReactNode;
@@ -62,20 +107,30 @@ export function ReviewInspector(props: {
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  type Section = 'scene' | 'selected' | 'comments' | 'export';
   const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
+  const previewHost = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (shown === 'preview') previewHost.current?.focus({ preventScroll: true });
+  }, [shown]);
   return (
     <aside
+      onKeyDown={(event) => {
+        if (shown === 'preview' && event.key === 'Escape' && !event.defaultPrevented) {
+          event.preventDefault();
+          event.stopPropagation();
+          props.navigation.closePreview();
+        }
+      }}
       data-ui="gallery.videoReview.inspector"
-      className={`sniptale-inspector-surface flex min-h-0 flex-col gap-2 overflow-hidden border-l
+      className={`sniptale-inspector-surface relative flex min-h-0 flex-col gap-2 border-l
         border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
-          props.fullHeight
-            ? 'min-[800px]:col-start-2 min-[800px]:row-start-1 min-[800px]:row-span-2'
-            : ''
+          props.fullHeight ? 'col-start-2 row-start-1 row-span-2' : ''
         }`}
     >
+      {props.resizeHandle}
       <ReviewInspectorHeader
         {...props}
+        onBack={props.onBack}
         presentation={presentation}
         section={shown}
         onTogglePresentation={() =>
@@ -84,46 +139,39 @@ export function ReviewInspector(props: {
           )
         }
       />
-      <div className="shrink-0">
-        <p
-          className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
-          title={props.filename}
-        >
-          {props.filename}
-        </p>
-      </div>
       <ReviewInspectorStatus {...props} />
-      {props.settingsAvailable || props.selectionLabel || props.actions ? (
+      {props.settingsAvailable ||
+      props.selectionLabel ||
+      props.actions ||
+      shown === 'preview' ||
+      shown === 'speech' ? (
         <div
           className="review-inspector-navigation shrink-0"
           data-ui="gallery.videoReview.inspectorNavigation"
         >
-          <SegmentedSwitch<Section>
+          <SegmentedSwitch<InspectorSection>
             density="compact"
             activeId={shown}
             ariaLabel={translate('gallery.videoReview.inspector')}
-            options={[
-              { id: 'comments', label: translate('gallery.videoReview.comments') },
-              ...(props.settingsAvailable
-                ? [{ id: 'scene' as const, label: translate('gallery.videoReview.scene') }]
-                : []),
-              ...(context === 'selected' && props.selectionLabel
-                ? [{ id: 'selected' as const, label: props.selectionLabel }]
-                : []),
-              ...(context === 'export' && props.actions
-                ? [
-                    {
-                      id: 'export' as const,
-                      label: translate('gallery.videoReview.exportSection'),
-                    },
-                  ]
-                : []),
-            ]}
+            options={inspectorNavigationOptions({
+              shown,
+              context,
+              settingsAvailable: props.settingsAvailable,
+              selectionLabel: props.selectionLabel,
+              actionHistory: !!props.actionHistory,
+              actions: !!props.actions,
+            })}
             onChange={setSection}
           />
         </div>
       ) : null}
+      <div hidden={shown !== 'history'} className="review-history-host min-h-0 flex-1">
+        <ReviewInspectorPresentation value={presentation} section="history">
+          {props.actionHistory}
+        </ReviewInspectorPresentation>
+      </div>
       <div
+        hidden={shown === 'history'}
         ref={scroll}
         className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
       >
@@ -132,10 +180,23 @@ export function ReviewInspector(props: {
           section={shown}
           selectionScope={props.selectionPreferenceScope}
         >
-          {shown === 'export' ? (
+          {shown === 'preview' ? (
+            <div
+              ref={previewHost}
+              tabIndex={-1}
+              aria-label={translate('gallery.videoReview.previewSection')}
+              data-ui="gallery.videoReview.previewInspector"
+            >
+              {props.preview}
+            </div>
+          ) : shown === 'history' ? null : shown === 'export' ? (
             <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
               {props.actions}
             </section>
+          ) : shown === 'text' ? (
+            props.textDocument
+          ) : shown === 'speech' ? (
+            props.speech
           ) : shown === 'scene' ? (
             props.scene
           ) : shown === 'selected' ? (
@@ -232,6 +293,17 @@ function ReviewInspectorFooter(
 ) {
   return (
     <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pt-20 space-y-2 overflow-y-auto">
+      {props.onBackup ? (
+        <ReviewButton
+          label={translate('gallery.app.selectionBackup')}
+          disabled={props.busy}
+          className={`${reviewTextButtonClassName} justify-start`}
+          onClick={props.onBackup}
+        >
+          <Archive size={15} aria-hidden="true" />
+          <span>{translate('gallery.app.selectionBackup')}</span>
+        </ReviewButton>
+      ) : null}
       {props.showReports ? (
         <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
           <ReviewButton
@@ -309,44 +381,21 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
   );
 }
 
-/** Header exits share the flush owner; Back restores the viewer, Close dismisses it. */
+/** The header close action returns to the viewer through the existing guarded exit. */
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
-    section: 'scene' | 'selected' | 'comments' | 'export';
+    section: InspectorSection;
     onTogglePresentation(): void;
   }
 ) {
   return (
     <header className="flex shrink-0 items-center gap-1">
-      <ContentToolbarButton
-        type="button"
-        tone="utility"
-        size="compact"
-        title={translate('gallery.videoReview.back')}
-        disabled={props.busy}
-        onClick={props.onBack}
-      >
-        <ArrowLeft size={16} aria-hidden="true" />
-      </ContentToolbarButton>
-      <h2 className="min-w-0 flex-1 text-sm font-semibold">
-        {translate('gallery.videoReview.editorTitle')}
+      <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={props.filename}>
+        {props.filename}
       </h2>
-      <ContentToolbarButton
-        type="button"
-        tone="utility"
-        size="compact"
-        title={translate(
-          props.fullHeight
-            ? 'videoEditor.app.panelRestoreHeight'
-            : 'videoEditor.app.panelFullHeight'
-        )}
-        aria-pressed={!!props.fullHeight}
-        onClick={props.onToggleHeight}
-      >
-        {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
-      </ContentToolbarButton>
       {props.section === 'scene' ||
+      props.section === 'speech' ||
       (props.section === 'selected' && props.selectionHasSections === true) ? (
         <ContentToolbarButton
           type="button"
@@ -370,11 +419,31 @@ function ReviewInspectorHeader(
 
       <ContentToolbarButton
         type="button"
+        tone="utility"
+        size="compact"
+        title={translate(
+          props.fullHeight
+            ? 'videoEditor.app.panelRestoreHeight'
+            : 'videoEditor.app.panelFullHeight'
+        )}
+        aria-pressed={!!props.fullHeight}
+        onClick={props.onToggleHeight}
+      >
+        {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
+      </ContentToolbarButton>
+
+      <ContentToolbarButton
+        type="button"
         tone="close"
+        className="review-inspector-close"
         size="compact"
         title={translate('common.actions.close')}
         disabled={props.busy}
-        onClick={props.onClose ?? props.onBack}
+        onPointerDown={(event) => {
+          // The guarded exit owns field flush; blur must not disable Close before click.
+          if (event.button === 0) event.preventDefault();
+        }}
+        onClick={props.onBack}
       >
         <X size={16} aria-hidden="true" />
       </ContentToolbarButton>

@@ -160,6 +160,7 @@ const expectedKeys = {
     'updateMediaClipFitScalePercent',
     'updateMediaClipShadowIntensity',
     'updateMediaClipShadowMode',
+    'updateMediaClipWindowHeader',
     'updateMotionRegion',
     'updateProject',
     'updateTransitionDuration',

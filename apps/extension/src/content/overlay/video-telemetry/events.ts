@@ -1,5 +1,11 @@
-import { isRepeatedRecordingClick } from '../../../features/video/project/recording-actions';
 import { describeTelemetryTarget } from './target';
+import { createPointerGestureRecorder } from './gestures';
+import {
+  createKeyboardRecorder,
+  endKeyboardObservation,
+  flushKeyboardRhythm,
+  isProtectedKeyboardTarget,
+} from './keyboard';
 import { createVideoProjectCursorTrack } from '../../../features/video/project/defaults';
 import {
   VideoProjectActionEventKind,
@@ -9,7 +15,6 @@ import type { TelemetryListeners, TelemetryState } from './types';
 import {
   finalizeTelemetrySignals,
   finalizeTypingSignal,
-  recordKeyboardShortcut,
   recordTypingActivity,
   tickCursorIdleTelemetry,
   updatePointerIdleAnchor,
@@ -62,6 +67,9 @@ function recordCursorSample(
     id: crypto.randomUUID(),
     time: getElapsedSeconds(state, event.timeStamp),
     visible,
+    observationClockId: state.observationClock.id,
+    captureSegment: state.captureSegment,
+    observation: visible ? 'observed' : 'outside',
     x: event.clientX,
     y: event.clientY,
   });
@@ -87,101 +95,143 @@ function recordLastKnownPointerBoundary(
       clientX: state.lastKnownPointerPosition.x,
       clientY: state.lastKnownPointerPosition.y,
       timeStamp: timestampMs,
-    } as Pick<PointerEvent, 'clientX' | 'clientY' | 'timeStamp'>,
+    },
     { force: true, visible }
   );
 }
 
-function resolveActionEvent(event: MouseEvent | null) {
-  const target = describeTelemetryTarget(event).data;
-  return {
-    timeStamp: event?.timeStamp ?? performance.now(),
-    point: event
-      ? {
-          x: event.clientX,
-          y: event.clientY,
-        }
-      : null,
-    data: { button: event?.button ?? 0, ...target },
-    label: target['targetName'] ?? '',
-  };
-}
-
-function recordActionEvent(
+/** An observation boundary records unavailable coverage, never a new observed position. */
+function endObservation(
   state: TelemetryState,
-  event: MouseEvent,
-  targetId: string | null
+  reason: 'outside' | 'hidden' | 'blur' | 'paused',
+  boundaryTimestamp?: number
 ): void {
-  state.viewportObserver?.();
-  const resolvedEvent = resolveActionEvent(event);
-  const action = {
-    id: crypto.randomUUID(),
-    kind: VideoProjectActionEventKind.CLICK,
-    time: getElapsedSeconds(state, resolvedEvent.timeStamp),
-    duration: 0.45,
-    point: resolvedEvent.point,
-    label: resolvedEvent.label,
-    data: { ...resolvedEvent.data, ...(targetId ? { targetId } : {}), clickCount: event.detail },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-  };
-  const previous = state.actionEvents.at(-1);
-  if (previous && isRepeatedRecordingClick(previous, action)) {
-    if (event.detail === 2) previous.data['clickCount'] = 2;
-    return;
+  const timestamp = boundaryTimestamp ?? performance.now();
+  if (state.observationAvailable) {
+    if (boundaryTimestamp === undefined) tickCursorIdleTelemetry(state);
+    recordLastKnownPointerBoundary(state, timestamp, false);
+    const boundary = state.cursorTrack?.samples.at(-1);
+    if (boundary) boundary.observation = reason;
   }
-  state.actionEvents.push(action);
+  endKeyboardObservation(state);
+  finalizeTelemetrySignals(state);
+  createPointerGestureRecorder(state).lose('lost', timestamp, reason === 'outside');
+  state.observationAvailable = false;
+  state.pointerStationaryPosition = null;
+  state.pointerStationaryStartedAtMs = null;
 }
 
 export function createTelemetryListeners(state: TelemetryState): TelemetryListeners {
-  const targets = new WeakMap<Element, string>();
-  const identity = (event: MouseEvent) => {
-    const target = describeTelemetryTarget(event).element;
-    if (!target) return null;
-    let id = targets.get(target);
-    if (!id) {
-      id = crypto.randomUUID();
-      targets.set(target, id);
-    }
-    return id;
+  const gestures = createPointerGestureRecorder(state);
+  const keyboard = createKeyboardRecorder(state);
+  const observePointer = (event: MouseEvent, force: boolean) => {
+    if (!event.isTrusted) return;
+    state.observationAvailable = true;
+    updatePointerIdleAnchor(state, event, { reset: force });
+    recordCursorSample(state, event, { force });
+  };
+  const recordScroll = (event: Event, wheel = false) => {
+    if (!event.isTrusted) return;
+    const point =
+      wheel && event instanceof MouseEvent ? { x: event.clientX, y: event.clientY } : null;
+    state.actionEvents.push({
+      id: crypto.randomUUID(),
+      kind: VideoProjectActionEventKind.SCROLL,
+      time: getElapsedSeconds(state, event.timeStamp),
+      duration: 0.45,
+      point,
+      label: wheel ? 'Wheel' : 'Scroll',
+      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
+      data:
+        wheel && event instanceof WheelEvent
+          ? {
+              eventType: 'wheel',
+              deltaX: event.deltaX,
+              deltaY: event.deltaY,
+              deltaZ: event.deltaZ,
+              deltaMode: event.deltaMode,
+              ctrlKey: event.ctrlKey,
+              altKey: event.altKey,
+              shiftKey: event.shiftKey,
+              metaKey: event.metaKey,
+              observationClockId: state.observationClock.id,
+              captureSegment: state.captureSegment,
+            }
+          : {
+              eventType: 'scroll',
+              observationClockId: state.observationClock.id,
+              captureSegment: state.captureSegment,
+            },
+    });
   };
   return {
-    change: (event) => {
-      recordTypingActivity(state, event);
-    },
-    click: (event) => {
-      // Keyboard/accessibility activation has no pointer click count or pointer coordinates.
-      if (event.detail === 0) return;
-      recordCursorSample(state, event as PointerEvent, { force: true });
-      recordActionEvent(state, event, identity(event));
-    },
+    change: () => undefined,
+    click: gestures.click,
     input: (event) => {
+      if (!event.isTrusted) return;
+      if (isProtectedKeyboardTarget(event)) endKeyboardObservation(state, true);
+      else if (describeTelemetryTarget(event).element !== state.keyboard.target)
+        flushKeyboardRhythm(state);
+      gestures.controlInput(event);
       recordTypingActivity(state, event);
     },
-    keyDown: (event) => {
-      recordKeyboardShortcut(state, event);
-    },
+    keyDown: keyboard.down,
+    keyUp: keyboard.up,
     pointerDown: (event) => {
+      if (!event.isTrusted) return;
       finalizeTypingSignal(state, event.timeStamp);
-      updatePointerIdleAnchor(state, event as PointerEvent, { reset: true });
-      recordCursorSample(state, event as PointerEvent, { force: true });
+      flushKeyboardRhythm(state);
+      observePointer(event, true);
+      gestures.down(event);
     },
     pointerMove: (event) => {
-      updatePointerIdleAnchor(state, event as PointerEvent);
-      recordCursorSample(state, event as PointerEvent);
+      if (event instanceof MouseEvent) {
+        observePointer(event, false);
+        gestures.move(event);
+      }
     },
-    scroll: () => undefined,
+    pointerUp: (event) => {
+      observePointer(event, true);
+      gestures.up(event);
+    },
+    pointerCancel: gestures.cancel,
+    mouseDown: (event) => {
+      if (event.isTrusted && !state.gestures.has(event.button)) {
+        observePointer(event, true);
+        gestures.down(event);
+      }
+    },
+    mouseUp: (event) => {
+      if (event.isTrusted && state.gestures.has(event.button)) {
+        observePointer(event, true);
+        gestures.up(event);
+      }
+    },
+    pointerLeave: (event) => {
+      if (event.isTrusted && event.relatedTarget === null) endObservation(state, 'outside');
+    },
+    dragStart: gestures.dragStart,
+    dragEnd: gestures.dragEnd,
+    drop: gestures.drop,
+    selectionChange: gestures.selectionChange,
+    wheel: (event) => recordScroll(event, true),
+    scroll: (event) => recordScroll(event),
+    blur: (event) => {
+      if (!event || event.target === window) endObservation(state, 'blur');
+      else {
+        endKeyboardObservation(state, isProtectedKeyboardTarget(event));
+        finalizeTypingSignal(state, event.timeStamp);
+      }
+    },
     visibilityChange: () => {
-      tickCursorIdleTelemetry(state);
-      recordLastKnownPointerBoundary(
-        state,
-        performance.now(),
-        document.visibilityState === 'visible'
-      );
+      if (document.visibilityState !== 'visible') endObservation(state, 'hidden');
     },
   };
 }
 
-export function recordTelemetryPauseBoundary(state: TelemetryState): void {
-  finalizeTelemetrySignals(state);
-  recordLastKnownPointerBoundary(state, performance.now());
+export function recordTelemetryPauseBoundary(
+  state: TelemetryState,
+  boundaryTimestamp?: number
+): void {
+  endObservation(state, 'paused', boundaryTimestamp);
 }

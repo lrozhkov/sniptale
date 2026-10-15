@@ -131,7 +131,7 @@ it('retains only failed snapshots for the next recovery attempt', async () => {
   await recoverInterruptedSessions();
 
   expect(diagnosticsLogger.error).toHaveBeenCalledWith(
-    'Failed to recover interrupted diagnostics session recording-1',
+    'Failed to recover interrupted diagnostics session',
     error
   );
   expect(clearStoredDiagnosticSnapshots).not.toHaveBeenCalled();

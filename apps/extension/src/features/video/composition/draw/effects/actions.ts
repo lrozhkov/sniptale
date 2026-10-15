@@ -17,6 +17,29 @@ export function drawActionCompositionState(
   }
   const point = action.point ?? fallbackPoint;
   if (!point || action.preset === 'NONE' || action.preset === 'SCROLL_EMPHASIS') return;
+  if (action.gestureFeedback) {
+    const frame = action.gestureFeedback;
+    context.save();
+    context.globalAlpha *= frame.opacity;
+    context.strokeStyle = frame.color;
+    context.fillStyle = frame.color;
+    context.lineWidth = frame.stroke * Math.max(0.2, sizeScale);
+    if (frame.path?.length) {
+      context.beginPath();
+      frame.path.forEach((item, index) => {
+        if (index === 0) context.moveTo(item.x, item.y);
+        else context.lineTo(item.x, item.y);
+      });
+      context.stroke();
+    }
+    if (frame.area)
+      context.strokeRect(frame.area.x, frame.area.y, frame.area.width, frame.area.height);
+    context.beginPath();
+    context.arc(point.x, point.y, Math.max(0.01, frame.radius * sizeScale), 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+    return;
+  }
   const style = getActionClickStyle(action.clickStyle);
   const p = Math.min(1, Math.max(0, action.progress));
   const eased = applyTemporalEasing(p, action.easing ?? 'EASE_OUT');

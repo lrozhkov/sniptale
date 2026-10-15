@@ -1,3 +1,4 @@
+import { normalizeMediabunny } from './mediabunny/normalize.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -5,6 +6,14 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
+
+const NORMALIZATION_INPUTS = [
+  'tooling/ci/mediabunny/normalize.mjs',
+  'tooling/ci/mediabunny/patch-manifest.json',
+  'tooling/ci/mediabunny/patch-payload.json.gz',
+  'tooling/ci/mediabunny/source.patch',
+  'tooling/ci/mediabunny/LICENSE',
+];
 
 const INSTALL_STAMP_PATH = '.tmp/ci/local-install-stamp.json';
 const NATIVE_STAMP_PATH = '.tmp/ci/local-native-stamp.json';
@@ -51,7 +60,12 @@ export function createLocalInstallFingerprint({
   root = process.cwd(),
   environment = process.env,
 } = {}) {
-  const inputs = ['.npmrc', 'package-lock.json', ...workspaceManifestPaths(root)].map((file) => ({
+  const inputs = [
+    '.npmrc',
+    'package-lock.json',
+    ...workspaceManifestPaths(root),
+    ...NORMALIZATION_INPUTS,
+  ].map((file) => ({
     file,
     digest: sha256(fs.readFileSync(path.join(root, file))),
   }));
@@ -91,17 +105,23 @@ export function canReuseLocalInstall({ root = process.cwd(), environment = proce
   const stamp = readStamp(root, INSTALL_STAMP_PATH);
   const fingerprint = createLocalInstallFingerprint({ root, environment });
   const installedLockDigest = nodeModulesLockDigest(root);
-  return {
-    fingerprint,
-    reusable:
-      stamp?.schemaVersion === 1 &&
-      stamp.fingerprint === fingerprint &&
-      typeof installedLockDigest === 'string' &&
-      stamp.nodeModulesLockDigest === installedLockDigest,
-  };
+  let reusable =
+    stamp?.schemaVersion === 1 &&
+    stamp.fingerprint === fingerprint &&
+    typeof installedLockDigest === 'string' &&
+    stamp.nodeModulesLockDigest === installedLockDigest;
+  if (reusable) {
+    try {
+      normalizeMediabunny({ root, check: true });
+    } catch {
+      reusable = false;
+    }
+  }
+  return { fingerprint, reusable };
 }
 
 export function recordLocalInstallState({ root = process.cwd(), environment = process.env } = {}) {
+  normalizeMediabunny({ root, check: true });
   const fingerprint = createLocalInstallFingerprint({ root, environment });
   const installedLockDigest = nodeModulesLockDigest(root);
   if (!installedLockDigest)
@@ -132,6 +152,7 @@ function install({ environment, fresh, root }) {
   }
   invalidateLocalBootstrapState({ root });
   run('npm', ['ci', '--ignore-scripts', '--no-audit'], environment);
+  normalizeMediabunny({ root });
   recordLocalInstallState({ root, environment });
   process.stdout.write(`Local install refreshed: ${state.fingerprint}\n`);
 }

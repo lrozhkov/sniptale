@@ -99,7 +99,10 @@ beforeEach(() => {
   io.save.mockReset();
   io.request.mockReset();
   io.request.mockResolvedValue({ baseRevision: 3, changes: [] });
-  io.save.mockImplementation(async (value) => ({ ...value, updatedAt: 101 }));
+  io.save.mockImplementation(async (value) => ({
+    project: { ...value, updatedAt: 101 },
+    workspaceRevision: 2,
+  }));
 });
 it('keeps the information note control mounted and enabled through autosave', async () => {
   const project = createGuideProject('Local guide', 'guide', 100);
@@ -113,7 +116,7 @@ it('keeps the information note control mounted and enabled through autosave', as
   io.save.mockImplementationOnce(
     (source) =>
       new Promise((resolve) => {
-        finish = () => resolve({ ...source, updatedAt: 101 });
+        finish = () => resolve({ project: { ...source, updatedAt: 101 }, workspaceRevision: 2 });
       })
   );
   await act(async () => root.render(<ScenarioEditorPage />));
@@ -198,7 +201,8 @@ it('keeps autosave paused across guide/tour switching and saves latest edits on 
   await autosave(true);
   await settle();
   expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Paused tour title' }), {
-    baseUpdatedAt: 100,
+    expectedRevision: 1,
+    historyActionId: expect.any(String),
   });
 });
 
@@ -219,10 +223,13 @@ it('opens AI during a pending autosave and sends the latest draft once using the
   io.save.mockImplementationOnce(
     (source) =>
       new Promise((resolve) => {
-        release = () => resolve({ ...source, updatedAt: 101 });
+        release = () => resolve({ project: { ...source, updatedAt: 101 }, workspaceRevision: 2 });
       })
   );
-  io.save.mockImplementation(async (source) => ({ ...source, updatedAt: 102 }));
+  io.save.mockImplementation(async (source) => ({
+    project: { ...source, updatedAt: 102 },
+    workspaceRevision: 2,
+  }));
   await act(async () => root.render(<ScenarioEditorPage />));
   await changeProjectName('Earlier draft');
   await settle();
@@ -242,7 +249,8 @@ it('opens AI during a pending autosave and sends the latest draft once using the
   await act(async () => release());
   expect(io.save).toHaveBeenCalledTimes(2);
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Latest draft' }), {
-    baseUpdatedAt: 101,
+    expectedRevision: 2,
+    historyActionId: expect.any(String),
   });
   expect(io.request).toHaveBeenCalledOnce();
   expect(io.request).toHaveBeenCalledWith(
@@ -261,7 +269,8 @@ it('flushes a field boundary immediately while keeping continuous input coalesce
   await act(async () => field.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(io.save).toHaveBeenCalledOnce();
   expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Completed field' }), {
-    baseUpdatedAt: 100,
+    expectedRevision: 1,
+    historyActionId: expect.any(String),
   });
 });
 
@@ -270,7 +279,7 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
   io.save.mockImplementationOnce(
     (project) =>
       new Promise((resolve) => {
-        finish = () => resolve({ ...project, updatedAt: 101 });
+        finish = () => resolve({ project: { ...project, updatedAt: 101 }, workspaceRevision: 2 });
       })
   );
   await act(async () => root.render(<ScenarioEditorPage />));
@@ -285,12 +294,15 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
     'value',
     'More recent draft'
   );
-  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
+  io.save.mockImplementation(async (project) => ({
+    project: { ...project, updatedAt: 102 },
+    workspaceRevision: 2,
+  }));
   await settle();
   expect(io.save).toHaveBeenCalledTimes(2);
   expect(io.save).toHaveBeenLastCalledWith(
     expect.objectContaining({ items: [expect.objectContaining({ title: 'More recent draft' })] }),
-    { baseUpdatedAt: 101 }
+    { expectedRevision: 2, historyActionId: expect.any(String) }
   );
   await clickGuideControl('Undo', host);
   expect(host.querySelector('article .guide-step-title')).toHaveProperty('value', 'Step');

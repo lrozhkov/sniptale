@@ -1,10 +1,12 @@
 @layer utilities {
+  .review-inspector-navigation {
+    border-bottom: 1px solid var(--sniptale-color-border-soft);
+  }
   .review-inspector-navigation > [role='group'] {
     --sniptale-group-inset: 0px !important;
     gap: 0;
     padding: 0;
     border: 0;
-    border-bottom: 1px solid var(--sniptale-color-border-soft);
     border-radius: 0;
     background: transparent;
   }
@@ -44,5 +46,12 @@
   .review-inspector-navigation button:focus-visible {
     outline: 2px solid var(--sniptale-color-accent) !important;
     outline-offset: -2px;
+  }
+}
+
+@container review-inspector (min-width: 524px) {
+  .review-inspector-navigation > [role='group'] {
+    width: calc((100% - 12px) / 2);
+    max-width: 100%;
   }
 }

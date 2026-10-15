@@ -11,6 +11,7 @@ const {
   deleteProjectAsset,
   getRecording,
   getRecordingTelemetry,
+  readVideoWorkspace,
   getVideoProject,
   importRecordingProjectAssetMock,
   saveVideoProject,
@@ -18,6 +19,7 @@ const {
   deleteProjectAsset: vi.fn(),
   getRecording: vi.fn(),
   getRecordingTelemetry: vi.fn(),
+  readVideoWorkspace: vi.fn(),
   getVideoProject: vi.fn(),
   importRecordingProjectAssetMock: vi.fn(),
   saveVideoProject: vi.fn(),
@@ -48,6 +50,13 @@ vi.mock('../../../composition/persistence/recordings/telemetry', async (importOr
   getRecordingTelemetry,
 }));
 
+vi.mock('../../../composition/persistence/review-workspaces/store', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/review-workspaces/store')
+  >()),
+  readVideoWorkspace,
+}));
+
 vi.mock('../media-metadata', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../media-metadata')>();
   return {
@@ -69,6 +78,7 @@ vi.mock('./assets', async (importOriginal) => {
 
 async function mockRecordingProjectLoad() {
   const recordingEntry = {
+    assetId: 'recording-body',
     file: new Blob(['video'], { type: 'video/webm' }),
     createdAt: 1,
     filename: 'recording.webm',
@@ -136,6 +146,7 @@ function mockImportedRecordingAsset() {
 describe('loadInitialProjectFromLocation', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    readVideoWorkspace.mockResolvedValue(null);
     saveVideoProject.mockImplementation(async (project) => ({
       ...project,
       updatedAt: project.updatedAt + 1,
@@ -197,6 +208,8 @@ async function verifyRecordingHydration() {
     kind: 'recording',
     recordingId: 'recording-1',
   });
+  const { loadVideoMetadata } = await import('../media-metadata');
+  expect(loadVideoMetadata).not.toHaveBeenCalled();
 }
 
 async function verifyRecordingPersistenceFailure() {
@@ -335,4 +348,80 @@ it('duplicates the whole editable document without sharing mutable state', async
   copy.tracks[0]!.name = 'Changed';
   expect(original.tracks[0]!.name).not.toBe('Changed');
   expect(saveVideoProject).toHaveBeenLastCalledWith(copy, { baseRevision: null });
+});
+
+it('imports accepted Gallery interaction authoring through the recording editor route', async () => {
+  await mockRecordingProjectLoad();
+  const { createQuickEditAdvancedState } =
+    await import('../../../features/video/review/advanced/defaults');
+  const advanced = createQuickEditAdvancedState();
+  advanced.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    segments: [
+      {
+        id: 'segment',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 5,
+        keys: [{ id: 'key', time: 1, x: 0.2, y: 0.3, anchor: 'manual', interpolation: 'smooth' }],
+      },
+    ],
+  };
+  advanced.actionAudio = [
+    {
+      ref: { kind: 'signal', id: 'typed' },
+      enabled: true,
+      presetId: 'typing-recorded-v2',
+      volume: 0.35,
+      offset: 0,
+    },
+  ];
+  readVideoWorkspace.mockResolvedValue({
+    workspace: {
+      aggregateId: 'recording:recording-1',
+      sourceAssetId: 'recording-body',
+      source: { size: 5, mimeType: 'video/webm', duration: 5, width: 1280, height: 720 },
+      advanced,
+    },
+    draft: null,
+  });
+  window.history.replaceState({}, '', '/video-editor.html?id=recording-1');
+  const result = await loadInitialProjectFromLocation();
+  expect(readVideoWorkspace).toHaveBeenCalledWith('recording:recording-1');
+  expect(result.project?.cursorFocusPath?.segments[0]?.binding).toMatchObject({
+    kind: 'recording-source',
+    recordingId: 'recording-1',
+  });
+  expect(result.project?.actionFeedback?.[0]?.settings).toEqual(advanced.actionAudio);
+});
+
+it('refuses stale Gallery interaction authoring before persisting a new project', async () => {
+  await mockRecordingProjectLoad();
+  saveVideoProject.mockClear();
+  readVideoWorkspace.mockResolvedValue({
+    workspace: {
+      sourceAssetId: 'replaced-body',
+      source: { size: 5, mimeType: 'video/webm', duration: 5, width: 1280, height: 720 },
+    },
+    draft: null,
+  });
+  window.history.replaceState({}, '', '/video-editor.html?id=recording-1');
+  await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+    'Review interaction source has changed.'
+  );
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+});
+
+it('propagates review admission failure before persisting the recording project', async () => {
+  await mockRecordingProjectLoad();
+  saveVideoProject.mockClear();
+  readVideoWorkspace.mockRejectedValue(new Error('Review admission failed'));
+  window.history.replaceState({}, '', '/video-editor.html?id=recording-1');
+  await expect(loadInitialProjectFromLocation()).rejects.toThrow('Review admission failed');
+  expect(saveVideoProject).not.toHaveBeenCalled();
 });

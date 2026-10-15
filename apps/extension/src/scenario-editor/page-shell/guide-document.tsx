@@ -1,3 +1,4 @@
+import { guideParagraphText } from '../../features/scenario/project/public';
 import { useGuideInsertPlacement } from './document-insert-placement';
 import { GuideBlockRows } from './block-rows';
 import { GuideVoiceField } from './voice-field';
@@ -5,7 +6,11 @@ import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
 import { GuideBlockLayout } from './block-layout';
 import { guideDocumentStyle, guideTextAppearance } from './document-appearance';
 import { guideDocumentSelection, useGuideSelectionInput } from './document-selection';
-import { Fragment, useEffect, useId, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useId, useRef, useState } from 'react';
+import {
+  useGuideDocumentCommands,
+  type GuideDocumentCommandInputs,
+} from './guide-document-commands';
 import { GuideDocumentInsert, GuideInsertScope } from './document-insert';
 import { GuideStepActions } from './step-actions';
 import type {
@@ -35,14 +40,17 @@ export type GuideFocusRequest = {
   preserveFocus?: boolean;
 };
 
-type GuideImageUploadHandler = (
-  itemId: string,
-  blockId: string | null,
-  file: File,
-  signal: AbortSignal
-) => Promise<boolean>;
+type GuideImageUploadHandler = GuideDocumentCommandInputs['onUploadImage'];
 
-type GuideDocumentProps = {
+type GuideImageCallbacks = {
+  onOperate: (operation: GuideStructureOperation) => void;
+  onEditImage: (itemId: string, blockId: string) => void;
+  onUploadImage: GuideImageUploadHandler;
+  framedImageId: string | null;
+  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+};
+
+type GuideDocumentProps = GuideImageCallbacks & {
   project: GuideProject;
   selectedId: string | null;
   selectedBlockId?: string | null;
@@ -51,11 +59,7 @@ type GuideDocumentProps = {
   images: Record<string, string | null>;
   disabled: boolean;
   onChange: (project: GuideProject, group?: string | null) => void;
-  onOperate: (operation: GuideStructureOperation) => void;
-  onEditImage: (itemId: string, blockId: string) => void;
-  onUploadImage: GuideImageUploadHandler;
-  framedImageId: string | null;
-  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+
   onSelectBlock: (itemId: string, blockId: string | null) => void;
   t: Translate;
 };
@@ -69,15 +73,12 @@ export function GuideDocument({
   focusRequest,
   images,
   disabled,
-  onChange,
   onSelectBlock,
-  onOperate,
-  onEditImage,
-  onUploadImage,
   framedImageId,
-  onFrameImage,
   t,
+  ...callbacks
 }: GuideDocumentProps) {
+  const commands = useGuideDocumentCommands({ project, disabled, ...callbacks });
   const { showBoundaries } = useGuideLayoutAssistance();
   const content = useRef<HTMLDivElement>(null);
   const instructions = useId();
@@ -116,7 +117,7 @@ export function GuideDocument({
                 <GuideDocumentInsert
                   target={{ kind: 'item', beforeItemId: item.id }}
                   disabled={disabled}
-                  onOperate={onOperate}
+                  onOperate={commands.onOperate}
                   t={t}
                 />
                 <GuideSectionContent
@@ -125,8 +126,9 @@ export function GuideDocument({
                   selected={selectedId === item.id}
                   instructions={instructions}
                   disabled={disabled}
-                  onChange={onChange}
-                  onOperate={onOperate}
+                  onTitleChange={commands.onTitleChange}
+                  onParagraphsChange={commands.onParagraphsChange}
+                  onOperate={commands.onOperate}
                   t={t}
                 />
               </Fragment>
@@ -139,7 +141,7 @@ export function GuideDocument({
                 <GuideDocumentInsert
                   target={{ kind: 'item', beforeItemId: item.id }}
                   disabled={disabled}
-                  onOperate={onOperate}
+                  onOperate={commands.onOperate}
                   t={t}
                 />
               )}
@@ -157,33 +159,33 @@ export function GuideDocument({
                 data-selected={selectedId === item.id && !selectedBlockId}
               >
                 <GuideStepHeader
-                  project={project}
                   item={item}
                   number={number}
                   disabled={disabled}
-                  onChange={onChange}
+                  onTitleChange={commands.onTitleChange}
                   t={t}
                 />
                 <GuideStepBody
-                  project={project}
+                  projectId={project.id}
+                  purpose={project.purpose}
                   item={item}
                   images={images}
                   disabled={disabled}
-                  onChange={onChange}
-                  onOperate={onOperate}
-                  onEditImage={onEditImage}
-                  onUploadImage={onUploadImage}
+                  onChangeBlock={commands.onChangeBlock}
+                  onOperate={commands.onOperate}
+                  onEditImage={commands.onEditImage}
+                  onUploadImage={commands.onUploadImage}
                   selectedBlockId={selectedId === item.id ? selectedBlockId : null}
                   instructions={instructions}
                   framedImageId={framedImageId}
-                  onFrameImage={onFrameImage}
+                  onFrameImage={commands.onFrameImage}
                   t={t}
                 />
                 <GuideStepActions
                   project={project}
                   itemId={item.id}
                   disabled={disabled}
-                  onOperate={onOperate}
+                  onOperate={commands.onOperate}
                   t={t}
                 />
               </article>
@@ -195,7 +197,7 @@ export function GuideDocument({
             target={{ kind: 'item' }}
             end
             disabled={disabled}
-            onOperate={onOperate}
+            onOperate={commands.onOperate}
             t={t}
           />
         )}
@@ -231,7 +233,8 @@ function GuideSectionContent({
   project,
   item,
   disabled,
-  onChange,
+  onTitleChange,
+  onParagraphsChange,
   onOperate,
   selected,
   instructions,
@@ -243,7 +246,8 @@ function GuideSectionContent({
   instructions: string;
   onOperate: (operation: GuideStructureOperation) => void;
   disabled: boolean;
-  onChange: (project: GuideProject, group?: string | null) => void;
+  onTitleChange: (itemId: string, title: string) => void;
+  onParagraphsChange: (itemId: string, text: string) => void;
   t: Translate;
 }) {
   return (
@@ -256,48 +260,12 @@ function GuideSectionContent({
       aria-current={selected ? true : undefined}
       data-selected={selected}
     >
-      <h2 aria-label={item.title || t('scenario.editor.guideSectionTitle')}>
-        <GuideVoiceField
-          className="guide-section-title"
-          rows={1}
-          aria-label={t('scenario.editor.guideSectionTitle')}
-          placeholder={t('scenario.editor.guideSectionTitle')}
-          maxLength={GUIDE_LIMITS.maxLabelLength}
-          value={item.title}
-          disabled={disabled}
-          onValueChange={(value) =>
-            onChange(
-              {
-                ...project,
-                items: project.items.map((entry) =>
-                  entry.id === item.id ? { ...item, title: value } : entry
-                ),
-              },
-              `section-title:${item.id}`
-            )
-          }
-        />
-      </h2>
-      <GuideVoiceField
-        className="guide-description"
-        rows={1}
-        aria-label={t('scenario.editor.body')}
-        placeholder={t('scenario.editor.body')}
-        value={item.paragraphs
-          .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-          .join('\n')}
+      <GuideSectionFields
+        item={item}
         disabled={disabled}
-        onValueChange={(value) =>
-          onChange(
-            {
-              ...project,
-              items: project.items.map((entry) =>
-                entry.id === item.id ? { ...item, paragraphs: createGuideParagraphs(value) } : entry
-              ),
-            },
-            `section-body:${item.id}`
-          )
-        }
+        onTitleChange={onTitleChange}
+        onParagraphsChange={onParagraphsChange}
+        t={t}
       />
       <GuideStepActions
         project={project}
@@ -310,28 +278,66 @@ function GuideSectionContent({
   );
 }
 
-type GuideStepBodyProps = {
-  project: GuideProject;
+const GuideSectionFields = memo(function GuideSectionFields({
+  item,
+  disabled,
+  onTitleChange,
+  onParagraphsChange,
+  t,
+}: {
+  item: GuideSection;
+  disabled: boolean;
+  onTitleChange: (itemId: string, title: string) => void;
+  onParagraphsChange: (itemId: string, text: string) => void;
+  t: Translate;
+}) {
+  return (
+    <>
+      <h2 aria-label={item.title || t('scenario.editor.guideSectionTitle')}>
+        <GuideVoiceField
+          className="guide-section-title"
+          rows={1}
+          aria-label={t('scenario.editor.guideSectionTitle')}
+          placeholder={t('scenario.editor.guideSectionTitle')}
+          maxLength={GUIDE_LIMITS.maxLabelLength}
+          value={item.title}
+          disabled={disabled}
+          onValueChange={(value) => onTitleChange(item.id, value)}
+        />
+      </h2>
+      <GuideVoiceField
+        className="guide-description"
+        rows={1}
+        aria-label={t('scenario.editor.body')}
+        placeholder={t('scenario.editor.body')}
+        value={guideParagraphText(item.paragraphs)}
+        disabled={disabled}
+        onValueChange={(value) => onParagraphsChange(item.id, value)}
+      />
+    </>
+  );
+});
+
+type GuideStepBodyProps = GuideImageCallbacks & {
+  projectId: string;
+  purpose: GuideProject['purpose'];
   item: GuideStep;
   selectedBlockId: string | null;
   instructions: string;
   images: Record<string, string | null>;
   disabled: boolean;
-  onChange: (project: GuideProject, group?: string | null) => void;
-  onOperate: (operation: GuideStructureOperation) => void;
-  onEditImage: (itemId: string, blockId: string) => void;
-  onUploadImage: GuideImageUploadHandler;
-  framedImageId: string | null;
-  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+  onChangeBlock: (itemId: string, block: GuideBlock, group: string | null) => void;
+
   t: Translate;
 };
 
-function GuideStepBody({
-  project,
+const GuideStepBody = memo(function GuideStepBody({
+  projectId,
+  purpose,
   item,
   images,
   disabled,
-  onChange,
+  onChangeBlock,
   onOperate,
   onEditImage,
   onUploadImage,
@@ -342,24 +348,11 @@ function GuideStepBody({
   t,
 }: GuideStepBodyProps) {
   const changeBlock = (block: GuideBlock, group: string | null = `block:${block.id}`) =>
-    onChange(
-      {
-        ...project,
-        items: project.items.map((entry) =>
-          entry.id === item.id
-            ? {
-                ...item,
-                blocks: item.blocks.map((current) => (current.id === block.id ? block : current)),
-              }
-            : entry
-        ),
-      },
-      group
-    );
+    onChangeBlock(item.id, block, group);
   return (
     <>
       <GuideBlockReorder
-        projectId={project.id}
+        projectId={projectId}
         item={item}
         disabled={disabled}
         onOperate={onOperate}
@@ -392,7 +385,7 @@ function GuideStepBody({
               />
               <GuideBlockReorderHandle blockId={block.id} t={t} />
               <GuideBlockActions
-                allowSplit={project.purpose !== 'step-template'}
+                allowSplit={purpose !== 'step-template'}
                 itemId={item.id}
                 blockId={block.id}
                 index={index}
@@ -464,7 +457,7 @@ function GuideStepBody({
       )}
     </>
   );
-}
+});
 
 function GuideTextBlock({
   block,
@@ -499,28 +492,24 @@ function GuideTextBlock({
       style={guideTextAppearance(block)}
       placeholder={t('scenario.editor.body')}
       rows={1}
-      value={block.paragraphs
-        .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-        .join('\n')}
+      value={guideParagraphText(block.paragraphs)}
       onValueChange={(value) => onChange({ ...block, paragraphs: createGuideParagraphs(value) })}
     />
   );
 }
 
 /** Step heading owns its editable title and displayed numbering within the document. */
-function GuideStepHeader({
-  project,
+const GuideStepHeader = memo(function GuideStepHeader({
   item,
   number,
   disabled,
-  onChange,
+  onTitleChange,
   t,
 }: {
-  project: GuideProject;
   item: GuideStep;
   number: string | null | undefined;
   disabled: boolean;
-  onChange: GuideDocumentProps['onChange'];
+  onTitleChange: (itemId: string, title: string) => void;
   t: Translate;
 }) {
   return (
@@ -534,18 +523,8 @@ function GuideStepHeader({
         maxLength={GUIDE_LIMITS.maxLabelLength}
         value={item.title}
         disabled={disabled}
-        onValueChange={(value) =>
-          onChange(
-            {
-              ...project,
-              items: project.items.map((entry) =>
-                entry.id === item.id ? { ...item, title: value } : entry
-              ),
-            },
-            `step-title:${item.id}`
-          )
-        }
+        onValueChange={(value) => onTitleChange(item.id, value)}
       />
     </header>
   );
-}
+});

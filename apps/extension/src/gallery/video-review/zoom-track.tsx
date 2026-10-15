@@ -1,9 +1,21 @@
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+} from './track-row';
+import { useReviewResizeBoundary } from './timeline-resize-guide';
+import {
+  packQuickEditFocusRows,
+  quickEditFocusType,
+  resolveQuickEditFocusLink,
+} from '../../features/video/review/advanced/focus-layout';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
-import { ScanEye } from 'lucide-react';
+import { ScanEye, RectangleHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
+import { MoveRight, Focus, Eye, EyeOff } from 'lucide-react';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -16,20 +28,15 @@ import {
   getSnapCandidates,
   snapTimelineTime,
 } from '../../features/video/review/snap';
-import {
-  reviewTrackStatusButtonClassName,
-  reviewIconButtonClassName,
-  ReviewButton,
-  reviewTimeLabel,
-} from './controls';
+import { reviewTrackStatusButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewDragEscape } from './timeline-drag';
 
 type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor'>;
 type FocusAxis = Pick<ReviewTrackProjection, 'duration' | 'source' | 'output'>;
 
 type ZoomTrackProps = {
+  compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   sourceSelection?: ReviewAnchor | undefined;
   projection?: ReviewTrackProjection | undefined;
@@ -44,7 +51,6 @@ type ZoomTrackProps = {
   toOutputTime(source: number): number | null;
   selectedId: string | null;
   onSelect(id: string | null): void;
-  onAdd(): void;
   onLink?(id: string, targetId: string | null): void;
   /** Transient connection-settings selection; a linked gap opens it instead of unlinking. */
   linkSelectedId?: string | null;
@@ -173,7 +179,7 @@ function zoomTrimMinimum(
   return Math.max(0.001, Math.min(region.end - region.start, minimum));
 }
 
-/** Zoom regions on their own lane; drags snap to shared candidates and never overlap. */
+/** Camera stays on row zero; overlapping overlays pack from their current source ranges. */
 export function ReviewZoomTrack(props: ZoomTrackProps) {
   const sourceDuration = props.projection?.duration ?? props.duration;
   const [guide, setGuide] = useState<number | null>(null);
@@ -183,8 +189,22 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
     setPreview(null);
     setGuide(null);
   });
+  const boundary = drag.current;
+  useReviewResizeBoundary(
+    boundary,
+    boundary &&
+      boundary.edge !== 'move' &&
+      props.regions.some((region) => region.id === boundary.id)
+      ? (boundary.range.sourceAnchor?.[boundary.edge] ??
+          props.projection?.source(boundary.range[boundary.edge], boundary.edge) ??
+          boundary.range[boundary.edge])
+      : null
+  );
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : region;
+  const shownRegions = props.regions.map((region) => ({ ...region, ...shownRange(region) }));
+  const rows = packQuickEditFocusRows(shownRegions);
+  const rowCount = Math.max(1, ...Array.from(rows.values(), (row) => row + 1));
   const { edits, time, toOutputTime, duration } = props;
   // Visible result-time endpoints, projected edit edges and playhead; codec frames are not focus targets.
   const snapEdges = useMemo(() => {
@@ -198,18 +218,12 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   }, [edits, time, toOutputTime, duration]);
   return (
     <ReviewTrackRow
+      track="zoom"
       muted={props.enabled === false}
       label={translate('gallery.videoReview.zoomTrack')}
       icon={<Focus size={14} aria-hidden="true" />}
       controls={
         <>
-          <ReviewButton
-            label={translate('gallery.videoReview.zoomAdd')}
-            className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-            onClick={props.onAdd}
-          >
-            <Plus size={14} />
-          </ReviewButton>
           {props.onToggleEnabled ? (
             <ReviewButton
               label={translate('gallery.videoReview.zoomEnabled')}
@@ -225,17 +239,20 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
     >
       <div
         data-ui="gallery.videoReview.zoomLane"
-        className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]"
+        className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: rowCount * reviewTrackMetrics(props.compact).step }}
       >
-        {props.regions
+        {shownRegions
           .filter((region) => !region.dormant)
-          .map((region, index, regions) => (
+          .map((region) => (
             <ReviewZoomGapLink
               key={`link:${region.id}`}
               duration={props.duration}
               enabled={props.enabled}
               linkSelectedId={props.linkSelectedId}
-              next={regions[index + 1]}
+              row={rows.get(region.id) ?? 0}
+              compact={props.compact}
+              next={nextFocusLink(shownRegions, region)}
               projection={props.projection}
               region={region}
               onLink={props.onLink}
@@ -252,6 +269,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
               boundaries: [0, props.projection?.duration ?? duration],
               playhead: time === null ? null : (props.projection?.source(time) ?? time),
             })}
+            row={rows.get(region.id) ?? 0}
             region={region}
             range={shownRange(region)}
             selected={props.selectedId === region.id}
@@ -284,14 +302,6 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
             }}
           />
         ) : null}
-        {!props.regions.length ? (
-          <p
-            className="pointer-events-none absolute inset-0 flex items-center justify-center
-              text-[11px] text-[var(--sniptale-color-text-muted)]"
-          >
-            {translate('gallery.videoReview.zoomEmptyHint')}
-          </p>
-        ) : null}
       </div>
     </ReviewTrackRow>
   );
@@ -302,6 +312,8 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
  * click; a connected gap selects its link settings instead of silently unlinking.
  */
 function ReviewZoomGapLink(props: {
+  compact?: boolean | undefined;
+  row: number;
   duration: number;
   enabled?: boolean | undefined;
   linkSelectedId?: string | null | undefined;
@@ -312,7 +324,7 @@ function ReviewZoomGapLink(props: {
   onSelectLink: ((id: string) => void) | undefined;
 }) {
   const { next, region } = props;
-  if (!next || next.start <= region.end || !!next.spotlight !== !!region.spotlight) return null;
+  if (!next || next.start <= region.end || quickEditFocusType(region) === 'border') return null;
   if (cutCrossesFocusLink(region, next, props.projection)) return null;
   if (props.enabled === false || (!props.onLink && !props.onSelectLink)) return null;
   const left = props.projection?.position(region.end, 'end') ?? region.end / props.duration;
@@ -341,7 +353,16 @@ function ReviewZoomGapLink(props: {
                   focus-visible:border-[var(--sniptale-color-border-soft)]
                   text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]`
         }`}
-      style={{ left: `${left * 100}%`, width: `${(right - left) * 100}%` }}
+      style={{
+        left: `${left * 100}%`,
+        width: `${(right - left) * 100}%`,
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset +
+          (props.compact ? 2 : 4),
+        height: props.compact ? 20 : 24,
+        bottom: 'auto',
+      }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={() => {
         if (!connected) props.onLink?.(region.id, next.id);
@@ -398,8 +419,15 @@ function reviewZoomBlockPresentation(
   const right = authored
     ? anchor.end / sourceDuration
     : (projection?.position(range.end, 'end') ?? range.end / duration);
+  const kindLabel = translate(
+    region.border
+      ? 'gallery.videoReview.focusBorder'
+      : region.spotlight
+        ? 'gallery.videoReview.focusSpotlight'
+        : 'gallery.videoReview.zoomRegionLabel'
+  );
   const label =
-    `${translate(region.spotlight ? 'gallery.videoReview.focusSpotlight' : 'gallery.videoReview.zoomRegionLabel')} ` +
+    `${kindLabel} ` +
     `${reviewTimeLabel(anchor?.start ?? region.start)} – ${reviewTimeLabel(anchor?.end ?? region.end)}` +
     (cutOverlap ? ` · ${translate('gallery.videoReview.cutOverlapHint')}` : '');
   return {
@@ -462,6 +490,7 @@ function projectFocusDrag(
 
 function ReviewZoomRegionBlock(
   props: ZoomTrackProps & {
+    row: number;
     region: QuickEditZoomRegion;
     range: FocusRange;
     selected: boolean;
@@ -477,9 +506,20 @@ function ReviewZoomRegionBlock(
   const locale = useAppLocale();
   const scaleLabel = `${formatNumber(region.transform.scale, { maximumFractionDigits: 1 }, locale)}×`;
   const tone = reviewTimelineItemTone(props.selected, 'focus');
+  const cancel = () => {
+    if (!props.drag.current) return;
+    props.drag.current.admission.cancel();
+    props.drag.current = null;
+    onPreview(null);
+    onGuide(null);
+  };
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
+    if (reviewTrackGestureLocked(event.currentTarget)) {
+      props.onSelect(region.id);
+      return;
+    }
     const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(region.id));
     const target = event.target;
     const edge =
@@ -496,12 +536,13 @@ function ReviewZoomRegionBlock(
         (props.projection?.duration ?? duration),
       width: event.currentTarget.parentElement!.getBoundingClientRect().width,
       edge: edge === 'start' || edge === 'end' ? edge : 'move',
-      range: { start: region.start, end: region.end },
+      range: props.range,
       length: region.end - region.start,
       moved: false,
       node: event.currentTarget,
       pointerId: event.pointerId,
     };
+    onPreview(props.drag.current.range);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   return (
@@ -510,18 +551,25 @@ function ReviewZoomRegionBlock(
       data-cut-suppressed={cutOverlap ? 'true' : 'false'}
       tabIndex={0}
       aria-label={label}
-      title={`${label}${region.spotlight ? '' : ` · ${scaleLabel}`}`}
+      title={`${label}${region.spotlight || region.border ? '' : ` · ${scaleLabel}`}`}
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab rounded border text-xs
           active:cursor-grabbing ${tone}`}
-      style={style}
+      style={{
+        ...style,
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset,
+        height: reviewTrackMetrics(props.compact).body,
+        bottom: 'auto',
+      }}
       onPointerDown={begin}
       onPointerMove={(event) => {
         const current = props.drag.current;
         if (!current || current.width <= 0) return;
         current.moved ||= Math.abs(event.clientX - current.x) > 3;
         const next = projectFocusDrag(props, current, event.clientX - current.x, event.shiftKey);
-        onGuide(next.guide);
+        onGuide(current.edge === 'move' ? next.guide : null);
         if (next.start < next.end) {
           const { guide: _guide, ...range } = next;
           current.range = range;
@@ -547,12 +595,8 @@ function ReviewZoomRegionBlock(
               : props.onDragCommit(current.id, current.range, current.edge)
           );
       }}
-      onPointerCancel={() => {
-        props.drag.current?.admission.cancel();
-        props.drag.current = null;
-        onPreview(null);
-        onGuide(null);
-      }}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
@@ -561,13 +605,23 @@ function ReviewZoomRegionBlock(
     >
       <span className="pointer-events-none absolute inset-y-0 inset-x-3 text-[10px]">
         <ReviewTimelineLabel
-          icon={region.spotlight ? <ScanEye size={13} /> : <Focus size={13} />}
+          icon={
+            region.border ? (
+              <RectangleHorizontal size={13} aria-hidden="true" />
+            ) : region.spotlight ? (
+              <ScanEye size={13} />
+            ) : (
+              <Focus size={13} />
+            )
+          }
           name={translate(
-            region.spotlight
-              ? 'gallery.videoReview.focusSpotlight'
-              : 'gallery.videoReview.zoomRegionLabel'
+            region.border
+              ? 'gallery.videoReview.focusBorder'
+              : region.spotlight
+                ? 'gallery.videoReview.focusSpotlight'
+                : 'gallery.videoReview.zoomRegionLabel'
           )}
-          value={region.spotlight ? undefined : scaleLabel}
+          value={region.spotlight || region.border ? undefined : scaleLabel}
         />
       </span>
       {(['start', 'end'] as const).map((edge) => (
@@ -583,4 +637,26 @@ function ReviewZoomRegionBlock(
       ))}
     </div>
   );
+}
+
+/** The shared resolver rejects every intervening focus, including other types. */
+function nextFocusLink(regions: readonly QuickEditZoomRegion[], region: QuickEditZoomRegion) {
+  if (quickEditFocusType(region) === 'border') return undefined;
+  const linked = resolveQuickEditFocusLink(regions, region.id);
+  if (linked) return linked.target;
+  const candidates = regions
+    .filter(
+      (item) =>
+        !item.dormant &&
+        item.id !== region.id &&
+        quickEditFocusType(item) === quickEditFocusType(region) &&
+        item.start > region.end
+    )
+    .sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+  const target = candidates[0];
+  if (!target) return undefined;
+  return resolveQuickEditFocusLink(
+    regions.map((item) => (item.id === region.id ? { ...item, linkTo: target.id } : item)),
+    region.id
+  )?.target;
 }

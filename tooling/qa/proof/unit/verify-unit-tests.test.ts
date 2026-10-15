@@ -8,7 +8,6 @@ import {
   createUnitTestArgs,
   createUnitTestEnv,
   resolveProductUnitTestPool,
-  resolveProductUnitTestPartitions,
   resolveHarnessUnitTestPartitions,
   runFullHarnessUnitTests,
   runRepoNodeEntryAsync,
@@ -106,12 +105,7 @@ it('uses config-owned projects by default and keeps an explicit rollback overrid
   expect(resolveProductUnitTestPool({ SNIPTALE_PRODUCT_VITEST_POOL: 'forks' })).toBe('forks');
 });
 
-it('splits only the config-owned product suite into sequential partitions', () => {
-  expect(resolveProductUnitTestPartitions()).toEqual(['jsdom-vm', 'node-vm', 'threads']);
-  expect(resolveProductUnitTestPartitions({ coverage: true })).toEqual([null]);
-  expect(resolveProductUnitTestPartitions({ focused: true })).toEqual([null]);
-  expect(resolveProductUnitTestPartitions({ pool: 'threads' })).toEqual([null]);
-  expect(resolveProductUnitTestPartitions({ suite: 'harness' })).toEqual([null]);
+it('preserves explicit partition selectors for targeted diagnostic runs', () => {
   expect(createUnitTestEnv({ productPartition: 'jsdom-vm' })).toMatchObject({
     SNIPTALE_PRODUCT_VITEST_PARTITION: 'jsdom-vm',
   });
@@ -220,7 +214,7 @@ it('bounds async harness child output and terminates the overflowing process gro
   expect(result.stderr).toContain('Harness child output exceeded 4 bytes.');
 });
 
-it('runs only the complete plain product suite through all ordered partitions', () => {
+it('runs the complete plain product suite once through shared projects', () => {
   const fullInvocations: Array<{
     args: string[];
     options: { env: Record<string, string | null> };
@@ -234,7 +228,8 @@ it('runs only the complete plain product suite through all ordered partitions', 
 
   expect(
     fullInvocations.map(({ options }) => options.env.SNIPTALE_PRODUCT_VITEST_PARTITION)
-  ).toEqual(['jsdom-vm', 'node-vm', 'threads']);
+  ).toEqual([null]);
+  expect(fullInvocations[0]?.options.env.SNIPTALE_PRODUCT_VITEST_PROJECTS).toBe('1');
 
   const requiredRelatedInvocations: typeof fullInvocations = [];
   runUnitTests({
@@ -356,6 +351,60 @@ it('supports full wrapper coverage without diff target env', () => {
     'SNIPTALE_VITEST_COVERAGE_TARGETS'
   );
 });
+
+it('uses shared product projects only for complete default-pool product runs and clears inherited markers', () => {
+  for (const options of [
+    { coverage: true },
+    { coverage: true, coverageMode: 'full' },
+    { coverage: true, directFiles: ['apps/extension/src/background/index.test.ts'] },
+    { coverage: true, relatedFiles: ['apps/extension/src/background/index.ts'] },
+    { coverage: true, pool: 'threads' },
+    { coverage: true, suite: 'harness' },
+    { coverage: true, suite: 'all' },
+    { coverage: false },
+  ]) {
+    const environments: Array<Record<string, string | null>> = [];
+    runUnitTests({
+      ...options,
+      env: { SNIPTALE_PRODUCT_VITEST_PROJECTS: '1' },
+      execute: (_entry, _args, { env }) => {
+        environments.push(env);
+        return { status: 0, stdout: '', stderr: '' };
+      },
+    });
+    const expected =
+      !options.directFiles && !options.relatedFiles && !options.pool && !options.suite ? '1' : null;
+    expect(environments.length).toBeGreaterThan(0);
+    expect(environments.map((env) => env.SNIPTALE_PRODUCT_VITEST_PROJECTS)).toEqual(
+      environments.map(() => expected)
+    );
+  }
+});
+
+it.each([0, 1])(
+  'awaits a bounded async full-coverage child and preserves exit status %s',
+  async (status) => {
+    const invocations: string[][] = [];
+    const pending = runUnitTests({
+      coverage: true,
+      maxWorkers: 8,
+      execute: async (_entry, args, { env }) => {
+        invocations.push(args);
+        expect(env.SNIPTALE_PRODUCT_VITEST_PROJECTS).toBe('1');
+        await Promise.resolve();
+        return { status, stdout: 'child output', stderr: 'child diagnostics' };
+      },
+    });
+    expect(pending).toBeInstanceOf(Promise);
+    await expect(pending).resolves.toMatchObject({
+      status,
+      stdout: 'child output',
+      stderr: 'child diagnostics',
+    });
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]).toEqual(expect.arrayContaining(['--coverage', '--maxWorkers=8']));
+  }
+);
 
 it('requires related tests only for rollout-covered production seams', () => {
   expect(requiresRelatedUnitTests(['apps/extension/src/background/index.ts'])).toBe(true);

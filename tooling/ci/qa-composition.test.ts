@@ -361,3 +361,103 @@ it('runs a fresh production build exactly once when explicitly requested', () =>
   });
   expect(commandRunner).toHaveBeenCalledWith(['run', 'build:release']);
 });
+
+it.each(['sync', 'async'])(
+  'waits for owned proof collectors after a %s failure and preserves their diagnostics',
+  async (kind) => {
+    let finishAudit!: (value: {
+      steps: { label: string; status: string; stdout: string; stderr: string }[];
+    }) => void;
+    const audit = new Promise<{
+      steps: { label: string; status: string; stdout: string; stderr: string }[];
+    }>((resolve) => {
+      finishAudit = resolve;
+    });
+    const writeLog = vi.fn();
+    const writes: string[] = [];
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation((value) => {
+      writes.push(String(value));
+      return true;
+    });
+    let finalized = false;
+    const failure = new Error('product collection failed');
+    try {
+      const pending = collectCiProofResults({
+        session: { writeLog },
+        productProofCollector:
+          kind === 'sync'
+            ? () => {
+                throw failure;
+              }
+            : async () => {
+                throw failure;
+              },
+        auditCollector: () => audit,
+        productionBuildCollector: () => ({ label: 'Production build', status: 'ok' }),
+      }).catch((error) => {
+        finalized = true;
+        return error;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const finalizedBeforeAudit = finalized;
+      finishAudit({
+        steps: [
+          {
+            label: 'Full product coverage',
+            status: 'failed',
+            stdout: 'retained product test failure',
+            stderr: 'retained coverage error',
+          },
+        ],
+      });
+      const error = await pending;
+      expect(finalizedBeforeAudit).toBe(false);
+      expect(error).toBe(failure);
+      expect(writes.join('')).toContain('retained product test failure');
+      const log = writeLog.mock.calls.flat().join('');
+      expect(log).toContain(failure.message);
+      expect(log).toContain('retained product test failure');
+      expect(log).toContain('retained coverage error');
+    } finally {
+      stdout.mockRestore();
+    }
+  }
+);
+
+it('records an immediate exception before a later failure and retains both in the final error', async () => {
+  const first = new Error('product collection failed');
+  const second = new Error('audit collection failed later');
+  let failAudit!: (error: Error) => void;
+  const audit = new Promise<never>((_resolve, reject) => {
+    failAudit = reject;
+  });
+  const writeLog = vi.fn();
+  const build = vi.fn(() => ({ label: 'Production build', status: 'ok' }));
+  let finalized = false;
+  const pending = collectCiProofResults({
+    session: { writeLog },
+    productProofCollector: () => {
+      throw first;
+    },
+    auditCollector: () => audit,
+    productionBuildCollector: build,
+  }).catch((failure) => {
+    finalized = true;
+    return failure;
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const earlyLog = writeLog.mock.calls.flat().join('');
+  const finalizedBeforeAudit = finalized;
+  failAudit(second);
+  const error = await pending;
+  expect(build).toHaveBeenCalledOnce();
+  expect(finalizedBeforeAudit).toBe(false);
+  expect(earlyLog).toContain(first.message);
+  expect(earlyLog).toContain('Production build');
+  expect(earlyLog).not.toContain(second.message);
+  expect(writeLog.mock.calls.flat().join('')).toContain(second.message);
+  expect(error).toBeInstanceOf(AggregateError);
+  expect(error.errors).toEqual([first, second]);
+  expect(error.message).toContain(first.message);
+  expect(error.message).toContain(second.message);
+});

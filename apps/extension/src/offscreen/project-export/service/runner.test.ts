@@ -1,6 +1,10 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import * as projectFollow from '../../../features/video/composition/motion/project-follow';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cancelActiveProjectExportJob, releaseProjectExportJob, runProjectExport } from './runner';
 import { VideoExportFormat, VideoExportQualityPreset } from '../../../features/video/project/types';
+import { createVideoProjectFromRecording } from '../../../features/video/project/factories/creation';
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import { ProjectCameraConflictError } from '../../../features/video/composition/motion/project-follow';
 
 const { loadImagesForProjectMock, renderCompositeExportMock, sendProgressMock, cleanupJobMock } =
   vi.hoisted(() => ({
@@ -30,11 +34,61 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+afterEach(() => vi.restoreAllMocks());
+
 beforeEach(() => {
   vi.clearAllMocks();
   loadImagesForProjectMock.mockResolvedValue(new Map());
   renderCompositeExportMock.mockResolvedValue(undefined);
   sendProgressMock.mockResolvedValue(undefined);
+});
+
+it('refuses a conflicting follow camera before acquiring export resources', async () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'camera',
+    filename: 'camera.webm',
+    width: 1280,
+    height: 720,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 1,
+  });
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 3,
+      focusMode: 'CURSOR',
+      scale: 4,
+      zoomInDuration: 0.01,
+      zoomOutDuration: 0,
+    },
+  ];
+  vi.spyOn(projectFollow, 'resolveProjectCameraConflicts').mockReturnValueOnce([
+    {
+      regionId: project.motionRegions[0]!.id,
+      interval: { start: 0, end: 3 },
+      time: 0,
+      reason: 'dynamics',
+    },
+  ]);
+  const job = { jobId: 'camera-job', cancelled: false };
+  const settings = {
+    downloadAfterExport: true,
+    format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
+    fps: 30,
+    height: 720,
+    width: 1280,
+    quality: VideoExportQualityPreset.MEDIUM,
+  };
+  await expect(
+    runProjectExport('camera-job', project, settings, job as never)
+  ).rejects.toBeInstanceOf(ProjectCameraConflictError);
+  expect(sendProgressMock).not.toHaveBeenCalled();
+  expect(loadImagesForProjectMock).not.toHaveBeenCalled();
+  expect(renderCompositeExportMock).not.toHaveBeenCalled();
+  expect(job).not.toHaveProperty('exportAbortController');
 });
 
 it('scopes selected-clip renders before loading media', async () => {

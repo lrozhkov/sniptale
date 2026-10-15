@@ -1,6 +1,7 @@
 import type { TimelineProjection } from '../../interaction-state/projection';
 import { buildVideoCompositionTransitionSegments } from '../../../../../features/video/composition/timeline/lanes';
 import { getTrackClips } from '../../../../../features/video/project/timeline';
+import { getTrackJunctions } from '../../../../../features/video/project/transition/junctions';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import type { TimelineClipPreviewMap } from '../../../../contracts/timeline-preview';
 import { ProjectTimelineClip } from '../../clip/index';
@@ -75,7 +76,9 @@ function ProjectTimelineTrackClipItems(
     laneMetrics: ReadonlyMap<string, TimelineLogicalLaneMetrics>;
   }
 ) {
-  return getTrackClips(props.project, props.trackId).map((clip) => {
+  const clips = getTrackClips(props.project, props.trackId);
+  const junctions = clips.length ? getTrackJunctions(props.project) : [];
+  return clips.map((clip) => {
     const metrics = getClipLaneMetrics(props.clipRows, props.laneMetrics, clip.id);
     return (
       <ProjectTimelineClip
@@ -88,6 +91,7 @@ function ProjectTimelineTrackClipItems(
         projection={props.projection}
         {...(props.timelinePreviews[clip.id] ? { preview: props.timelinePreviews[clip.id] } : {})}
         project={props.project}
+        junctions={junctions}
         trackLocked={props.trackLocked}
         {...resolveClipMetricsProps(metrics)}
         onBeginClipInteraction={props.onBeginClipInteraction}

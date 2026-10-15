@@ -1,0 +1,552 @@
+import { beforeEach, expect, it, vi } from 'vitest';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import {
+  applyReviewOperation,
+  createReviewAdvancedContentOperation,
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+  reviewDocumentBaseline,
+} from '../../../features/video/review/document';
+import type { ReviewOperation } from '../../../features/video/review/types';
+import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
+import { collectReviewAssetReferences } from './asset-refs';
+import {
+  createReviewWorkspaceStoreFixture,
+  replaceLegacyWorkspaceFixture,
+  fixtureWorkspaceValue,
+} from './store.test-support';
+import type { VideoWorkspace } from './contracts';
+import { workspaceStorageHead, workspaceStorageRows } from './storage-format';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+
+const observed = vi.hoisted(() => ({
+  database: vi.fn(),
+  parse: vi.fn(),
+  inspect: vi.fn(),
+  replay: vi.fn(),
+  encode: vi.fn(),
+  reads: 0,
+  writes: 0,
+  failWrite: false,
+}));
+vi.mock('../../../features/video/review/document', async (load) => {
+  const actual = await load<typeof import('../../../features/video/review/document')>();
+  observed.replay.mockImplementation(actual.replayReviewHistory);
+  observed.encode.mockImplementation(actual.createReviewAdvancedContentOperation);
+  return {
+    ...actual,
+    replayReviewHistory: observed.replay,
+    createReviewAdvancedContentOperation: observed.encode,
+  };
+});
+vi.mock('./parser', async (load) => {
+  const actual = await load<typeof import('./parser')>();
+  observed.parse.mockImplementation(actual.parseVideoWorkspace);
+  observed.inspect.mockImplementation(actual.inspectVideoWorkspace);
+  return {
+    ...actual,
+    parseVideoWorkspace: observed.parse,
+    inspectVideoWorkspace: observed.inspect,
+  };
+});
+vi.mock('../infrastructure/indexed-db/core', () => ({
+  initDB: observed.database,
+  MEDIA_LIBRARY_STORE: 'media_library',
+  VIDEO_WORKSPACES_STORE: 'video_workspaces',
+  VIDEO_WORKSPACE_HISTORY_STORE: 'video_workspace_history',
+  VIDEO_WORKSPACE_DRAFTS_STORE: 'video_workspace_drafts',
+}));
+vi.mock('../assets/opfs-store', async (load) => ({
+  ...(await load<typeof import('../assets/opfs-store')>()),
+  listReadyJournals: vi.fn(async () => []),
+}));
+vi.mock('../infrastructure/indexed-db/mutation', () => ({
+  runWithIndexedDbMutation: async (operation: (db: unknown) => Promise<unknown>) =>
+    operation(await observed.database()),
+}));
+
+import {
+  commitVideoWorkspace,
+  commitVideoWorkspaceWithProjection,
+  moveVideoWorkspaceHistory,
+  openVideoWorkspace,
+  readVideoWorkspace,
+  saveVideoWorkspaceAdvanced,
+  saveVideoWorkspaceDraft,
+  saveVideoWorkspaceSnapshot,
+} from './store';
+
+const id = 'recording:beta-v1-recording';
+const assetId = 'beta-v1-recording-asset';
+const source = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
+let rows: Map<string, Map<string, unknown>>;
+
+beforeEach(() => {
+  observed.parse.mockClear();
+  observed.inspect.mockClear();
+  observed.replay.mockClear();
+  observed.encode.mockClear();
+  observed.reads = observed.writes = 0;
+  observed.failWrite = false;
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  rows = fixture.rows;
+  observed.database.mockResolvedValue({
+    transaction(stores: string[], mode: string) {
+      const tx = fixture.database.transaction(stores, mode);
+      return {
+        abort: () => tx.abort(),
+        get done() {
+          return tx.done;
+        },
+        objectStore(name: string) {
+          const store = tx.objectStore(name);
+          return {
+            ...store,
+            get(key: string) {
+              if (name === 'video_workspaces') observed.reads++;
+              return store.get(key);
+            },
+            put(value: Parameters<typeof store.put>[0]) {
+              if (name === 'video_workspaces') observed.writes++;
+              if (name === 'video_workspaces' && observed.failWrite)
+                throw new DOMException('No space', 'QuotaExceededError');
+              return store.put(value);
+            },
+          };
+        },
+      };
+    },
+  });
+});
+
+function workspace(historyLength: number, fragments = 10): VideoWorkspace {
+  const advanced = createQuickEditAdvancedState();
+  const content = {
+    ...reviewAdvancedContentBaseline(advanced),
+    text: {
+      version: 1 as const,
+      fragments: Array.from({ length: fragments }, (_, index) => ({
+        id: `fragment-${index}`,
+        start: (index * source.duration) / fragments,
+        end: ((index + 1) * source.duration) / fragments,
+        text: 'Synthetic text for the autosave admission regression.',
+        originalText: '',
+        revision: 0,
+        timingRevision: 0,
+        timeDomain: 'result' as const,
+        alignment: 'manual' as const,
+        showInVideo: false,
+      })),
+    },
+  };
+  const history: ReviewOperation[] = [];
+  let before = reviewAdvancedContentBaseline(advanced);
+  for (let index = 0; index < historyLength; index++) {
+    const after = {
+      ...content,
+      audio: { ...content.audio, original: { volume: 1, muted: index % 2 === 1 } },
+    };
+    history.push({
+      id: `operation-${index}`,
+      at: index + 1,
+      target: 'advancedContent',
+      before,
+      after,
+    });
+    before = after;
+  }
+  return {
+    aggregateId: id,
+    formatVersion: 1,
+    source,
+    sourceAssetId: assetId,
+    revision: 1,
+    history,
+    cursor: history.length,
+    advanced,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+
+function identity(value: VideoWorkspace) {
+  return { aggregateId: id, expectedSourceAssetId: assetId, expectedRevision: value.revision };
+}
+
+it.each(['redo', 'baseline', 'typing', 'source', 'revision', 'duplicate', 'before'] as const)(
+  'freshly refuses %s corruption on native warm append before any write',
+  async (corruption) => {
+    const legacy = workspace(2);
+    const native: VideoWorkspace = {
+      ...legacy,
+      formatVersion: 2,
+      baseline: replayReviewHistory(
+        [],
+        0,
+        legacy.source,
+        reviewAdvancedContentBaseline(legacy.advanced)
+      ),
+      cursor: 0,
+    };
+    rows.get('video_workspaces')!.set(id, workspaceStorageHead(native, []));
+    for (const row of workspaceStorageRows(native))
+      rows.get('video_workspace_history')!.set(JSON.stringify([id, row.ordinal]), row);
+    const admitted = await readVideoWorkspace(id);
+    if (!admitted) throw new Error('Missing native warm fixture');
+    let operation: unknown = {
+      id: 'warm-candidate',
+      at: 100,
+      target: 'sourceAudio',
+      before: { volume: 1, muted: false },
+      after: { volume: 0.8, muted: false },
+    };
+    const head = rows.get('video_workspaces')!.get(id);
+    if (!isRecord(head)) throw new Error('Missing native head');
+    if (corruption === 'typing') head['typing'] = { actionId: 'unbound' };
+    if (corruption === 'source') head['sourceAssetId'] = 'changed-source';
+    if (corruption === 'revision') head['revision'] = Number.MAX_SAFE_INTEGER;
+    if (corruption === 'redo' || corruption === 'baseline') {
+      const key = JSON.stringify([id, corruption === 'redo' ? 2 : 0]);
+      const row = rows.get('video_workspace_history')!.get(key);
+      if (!isRecord(row)) throw new Error('Missing retained evidence');
+      if (corruption === 'redo') row['operation'] = { id: 'bad-redo', target: 'unsupported' };
+      else row['baseline'] = { corrupt: true };
+    }
+    if (corruption === 'duplicate') {
+      head['cursor'] = 2;
+      operation = { ...parameterEdit(legacy), id: legacy.history[0]!.id };
+    }
+    if (corruption === 'before')
+      operation = {
+        id: 'invalid-before',
+        at: 100,
+        target: 'sourceAudio',
+        before: { volume: 0.3, muted: false },
+        after: { volume: 0.8, muted: false },
+      };
+    const previous = structuredClone(rows);
+    observed.writes = 0;
+    await expect(
+      commitVideoWorkspace({
+        ...identity(native),
+        operation,
+        expectedRevision: corruption === 'revision' ? Number.MAX_SAFE_INTEGER : native.revision,
+      })
+    ).rejects.toThrow();
+    expect(observed.writes).toBe(0);
+    expect(rows).toEqual(previous);
+  }
+);
+
+it('does not encode retained compound operations again on a warm native append', async () => {
+  const previous = workspace(10, 200);
+  let before = reviewAdvancedContentBaseline(previous.advanced);
+  previous.history = previous.history.map((operation, index) => {
+    if (operation.target !== 'advancedContent') throw new Error('Invalid compound fixture.');
+    const after = {
+      ...operation.after,
+      text: {
+        ...operation.after.text,
+        version: 1 as const,
+        fragments: operation.after.text!.fragments.map((fragment, fragmentIndex) => ({
+          ...fragment,
+          text: `${fragment.text} ${index}-${fragmentIndex}`,
+        })),
+      },
+    };
+    const next = { ...operation, before, after };
+    before = after;
+    return next;
+  });
+  replaceLegacyWorkspaceFixture(rows, id, previous);
+  const cold = await commitVideoWorkspace({
+    ...identity(previous),
+    operation: parameterEdit(previous),
+  });
+  // Crossing the retained count promotes the complete baseline into physical format3.
+  let warm = cold;
+  for (let index = warm.workspace.history.length; index <= 50; index++) {
+    const operation = parameterEdit(warm.workspace);
+    warm = await commitVideoWorkspace({
+      ...identity(warm.workspace),
+      operation: { ...operation, id: `warmup-${index}` },
+    });
+  }
+  observed.encode.mockClear();
+  observed.parse.mockClear();
+  observed.inspect.mockClear();
+  const operation = { ...parameterEdit(warm.workspace), id: 'ordinary-warm' };
+  observed.encode.mockClear();
+  const { snapshot: result, document } = await commitVideoWorkspaceWithProjection({
+    ...identity(warm.workspace),
+    operation,
+  });
+  expect(observed.encode.mock.calls.map(([operation]) => operation.id)).toEqual([]);
+  expect(observed.parse.mock.calls.length + observed.inspect.mock.calls.length).toBe(1);
+  expect(result.workspace.history.at(-1)).toEqual(operation);
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(result.workspace);
+  expect(Object.keys(result).sort()).toEqual(['draft', 'workspace']);
+  expect(document).toEqual(
+    replayReviewHistory(
+      result.workspace.history,
+      result.workspace.cursor,
+      result.workspace.source,
+      reviewDocumentBaseline(result.workspace)
+    )
+  );
+});
+
+function parameterEdit(value: VideoWorkspace): ReviewOperation {
+  const before = replayReviewHistory(
+    value.history,
+    value.cursor,
+    value.source,
+    reviewAdvancedContentBaseline(value.advanced)
+  ).advancedContent;
+  const operation = createReviewAdvancedContentOperation({
+    id: 'parameter-edit',
+    at: 1000,
+    before,
+    after: {
+      ...before,
+      audio: {
+        ...before.audio,
+        original: { ...before.audio.original, muted: !before.audio.original.muted },
+      },
+    },
+  });
+  if (!operation) throw new Error('Missing parameter fixture change');
+  return operation;
+}
+
+it.each([
+  { historyLength: 2, fragments: 10 },
+  { historyLength: 80, fragments: 200 },
+])('admits previous and candidate once for $historyLength retained operations', async (size) => {
+  const previous = workspace(size.historyLength, size.fragments);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
+  const operation = parameterEdit(previous);
+  observed.replay.mockClear();
+  const result = await commitVideoWorkspace({
+    ...identity(previous),
+    operation,
+  });
+  expect(observed.parse.mock.calls.length + observed.inspect.mock.calls.length).toBe(2);
+  expect(observed.reads).toBe(1);
+  expect(observed.writes).toBe(1);
+  expect(operation.target).toBe('sourceAudio');
+  const removed = Math.max(0, previous.cursor + 1 - 50);
+  const prefixReplays = observed.replay.mock.calls.filter(([history]) => history.length > 0);
+  expect(prefixReplays).toHaveLength(removed > 0 ? 1 : 0);
+  if (removed > 0) expect(prefixReplays[0]?.[1]).toBe(removed);
+  expect(observed.replay).toHaveBeenCalledTimes(2 + (removed > 0 ? 1 : 0));
+  expect(
+    result.workspace.history.slice(0, previous.cursor - removed).map(({ id, at }) => ({ id, at }))
+  ).toEqual(previous.history.slice(removed).map(({ id, at }) => ({ id, at })));
+  assertSameRetainedProjections(previous, result.workspace);
+  expect(result.workspace.cursor).toBe(previous.cursor + 1 - removed);
+  expect(result.workspace.revision).toBe(2);
+  expect(Object.keys(result).sort()).toEqual(['draft', 'workspace']);
+  const persisted = await readVideoWorkspace(id);
+  if (!persisted) throw new Error('Missing persisted workspace');
+  expect(persisted.workspace.history.at(-1)).toEqual(operation);
+  expect(
+    new TextEncoder().encode(JSON.stringify(persisted.workspace.history.at(-1))).byteLength
+  ).toBeLessThan(300);
+});
+
+it('still rejects corrupt unapplied redo before any write', async () => {
+  const previous = workspace(2);
+  replaceLegacyWorkspaceFixture(rows, id, {
+    ...previous,
+    cursor: 0,
+    history: [...previous.history, { ...previous.history[0], id: 'invalid-redo' }],
+  });
+  const before = structuredClone(rows);
+  await expect(
+    commitVideoWorkspace({ ...identity(previous), operation: parameterEdit(previous) })
+  ).rejects.toMatchObject({ code: 'invalid' });
+  expect(rows).toEqual(before);
+  expect(observed.writes).toBe(0);
+});
+
+function assertSameRetainedProjections(previous: VideoWorkspace, next: VideoWorkspace) {
+  const start = previous.history.findIndex((operation) => operation.id === next.history[0]?.id);
+  expect(start).toBeGreaterThanOrEqual(0);
+  let original = replayReviewHistory(
+    previous.history,
+    start,
+    previous.source,
+    reviewDocumentBaseline(previous)
+  );
+  let compact = replayReviewHistory([], 0, next.source, reviewDocumentBaseline(next));
+  expect(compact).toEqual(original);
+  for (const [index, operation] of previous.history.slice(start).entries()) {
+    original = applyReviewOperation(original, operation, previous.source);
+    const replacement = next.history[index];
+    if (!replacement) throw new Error('Missing retained history step');
+    compact = applyReviewOperation(compact, replacement, next.source);
+    expect(compact).toEqual(original);
+  }
+  expect(collectReviewAssetReferences(next)).toEqual(collectReviewAssetReferences(previous));
+}
+
+it('bounds legacy gain history while preserving its baseline and projections', async () => {
+  const previous = workspace(80, 200);
+  const unchanged = structuredClone(previous);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
+  expect((await readVideoWorkspace(id))?.workspace.history).toEqual(previous.history);
+  expect(observed.writes).toBe(0);
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(unchanged);
+  const result = await commitVideoWorkspace({
+    ...identity(previous),
+    operation: parameterEdit(previous),
+  });
+  expect(
+    new TextEncoder().encode(
+      JSON.stringify([
+        rows.get('video_workspaces')!.get(id),
+        ...rows.get('video_workspace_history')!.values(),
+      ])
+    ).byteLength
+  ).toBeLessThan(100_000);
+  expect(result.workspace.history).toHaveLength(50);
+  expect(result.workspace.baseline?.advancedContent.text?.fragments).toHaveLength(200);
+  expect(result.workspace.history.every((operation) => operation.target === 'sourceAudio')).toBe(
+    true
+  );
+  expect(result.workspace.history.slice(0, 49).map(({ id, at }) => ({ id, at }))).toEqual(
+    previous.history.slice(31).map(({ id, at }) => ({ id, at }))
+  );
+  assertSameRetainedProjections(previous, result.workspace);
+  expect(previous).toEqual(unchanged);
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(result.workspace);
+});
+
+it('retains all redo references and steps when a cursor mutation compacts legacy gain', async () => {
+  const previous = workspace(0);
+  const webcam = (name: string) => createQuickEditWebcam(`project-asset:${name}`, source, source);
+  previous.advanced.webcam = webcam('baseline');
+  previous.advanced.recoveryV1 = JSON.stringify({ webcam: webcam('recovery') });
+  const before = reviewAdvancedContentBaseline(previous.advanced);
+  const first = { ...before, webcam: webcam('redo') };
+  previous.history = [
+    { id: 'compound', at: 1, target: 'advancedContent', before, after: first },
+    {
+      id: 'gain-redo',
+      at: 2,
+      target: 'advancedContent',
+      before: first,
+      after: {
+        ...first,
+        audio: { ...first.audio, original: { ...first.audio.original, muted: true } },
+      },
+    },
+  ];
+  replaceLegacyWorkspaceFixture(rows, id, previous);
+  const result = await moveVideoWorkspaceHistory({ ...identity(previous), direction: 'redo' });
+  expect(result.workspace.cursor).toBe(1);
+  expect(result.workspace.history.map((operation) => operation.target)).toEqual([
+    'advancedContent',
+    'sourceAudio',
+  ]);
+  assertSameRetainedProjections(previous, result.workspace);
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(result.workspace));
+});
+
+it('preserves exact legacy rows when a compacted workspace put fails', async () => {
+  const previous = workspace(2);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
+  const original = structuredClone(rows);
+  observed.failWrite = true;
+  await expect(
+    commitVideoWorkspace({ ...identity(previous), operation: parameterEdit(previous) })
+  ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect(rows).toEqual(original);
+});
+
+it('still rejects an invalid candidate without publishing a partial revision', async () => {
+  const previous = workspace(2);
+  replaceLegacyWorkspaceFixture(rows, id, previous);
+  const before = structuredClone(rows);
+  await expect(
+    commitVideoWorkspace({
+      ...identity(previous),
+      operation: { ...parameterEdit(previous), id: previous.history[0]!.id },
+    })
+  ).rejects.toMatchObject({ code: 'invalid' });
+  expect(rows).toEqual(before);
+  expect(observed.writes).toBe(0);
+});
+
+it('derives retained usage keys for every workspace writer without accepting imported keys', async () => {
+  const previous = workspace(0);
+  const webcam = (name: string) => ({
+    ...createQuickEditWebcam(`project-asset:${name}`, source, source),
+    enabled: false,
+  });
+  previous.advanced.webcam = webcam('current');
+  previous.advanced.recoveryV1 = JSON.stringify({ webcam: webcam('recovery') });
+  previous.history = [
+    {
+      id: 'retained-redo',
+      at: 1,
+      target: 'advancedContent',
+      before: reviewAdvancedContentBaseline(previous.advanced),
+      after: { ...reviewAdvancedContentBaseline(previous.advanced), webcam: webcam('redo') },
+    },
+  ];
+  replaceLegacyWorkspaceFixture(rows, id, { ...previous, usageReferenceKeys: ['forged'] });
+  const moved = await moveVideoWorkspaceHistory({ ...identity(previous), direction: 'redo' });
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(moved.workspace));
+  const advanced = await saveVideoWorkspaceAdvanced({
+    ...identity(moved.workspace),
+    advanced: moved.workspace.advanced,
+  });
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(advanced.workspace));
+  const saved = await saveVideoWorkspaceSnapshot({
+    ...identity(advanced.workspace),
+    expectedDraftRevision: null,
+    workspace: { ...advanced.workspace, usageReferenceKeys: ['forged'] },
+    draft: null,
+  });
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(saved.workspace));
+  const draft = await saveVideoWorkspaceDraft({
+    ...identity(saved.workspace),
+    expectedDraftRevision: null,
+    annotation: { id: 'recovery-field', text: 'Recovery', anchor: { kind: 'point', time: 1 } },
+    before: null,
+  });
+  const discarded = await saveVideoWorkspaceDraft({
+    ...identity(draft.workspace),
+    expectedDraftRevision: draft.draft!.revision,
+    annotation: null,
+    before: null,
+  });
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(discarded.workspace));
+  rows.get('video_workspaces')!.delete(id);
+  rows.get('video_workspace_history')!.clear();
+  const opened = await openVideoWorkspace(id, source);
+  expect(fixtureWorkspaceValue(rows, id)).toEqual(withReviewWorkspaceUsage(opened.workspace));
+  const reopened = await openVideoWorkspace(id, source);
+  const unchanged = await moveVideoWorkspaceHistory({
+    ...identity(opened.workspace),
+    direction: 'undo',
+  });
+  const writesBeforeRead = observed.writes;
+  const read = await readVideoWorkspace(id);
+  expect(observed.writes).toBe(writesBeforeRead);
+  for (const result of [
+    moved,
+    advanced,
+    saved,
+    draft,
+    discarded,
+    opened,
+    reopened,
+    unchanged,
+    read,
+  ])
+    expect(Object.keys(result ?? {}).sort()).toEqual(['draft', 'workspace']);
+});

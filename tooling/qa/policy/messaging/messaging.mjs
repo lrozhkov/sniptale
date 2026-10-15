@@ -4,6 +4,8 @@ const TEST_FILE_PATTERN =
 export { DEFAULT_RUNTIME_MESSAGING_IMPORT_BASELINE } from './messaging-default-baseline.mjs';
 
 export const ALLOWED_DIRECT_MESSAGE_FILES = new Set([
+  // E2E page driver exercises the real transport. Remove when this driver no longer sends messages.
+  'tooling/test/e2e/support/recording-action.ts',
   'packages/platform/src/observability/message-tracer/messaging.ts',
   'apps/extension/src/platform/runtime-messaging/chrome-transport.ts',
   'packages/platform/src/ports/runtime-messaging/content-runtime-shim.ts',

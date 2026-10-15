@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
 const trustedEventMocks = vi.hoisted(() => ({
@@ -116,5 +116,29 @@ it('shares concurrent activation key requests within a client instance', async (
       type: MessageType.TRIGGER_QUICK_ACTION,
     },
   ]);
+  expectActivationKeyRequestedOnce(sendMessage);
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
+it('authorizes content actions with secure random request IDs on HTTP', async () => {
+  const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+  vi.stubGlobal('crypto', { getRandomValues });
+  const activationKeyRequest = createDeferredActivationKey();
+  const sendMessage = createConcurrentSendMessage(activationKeyRequest);
+  const requests = attachConcurrentQuickActions(createContentActionIntentClient({ sendMessage }));
+  activationKeyRequest.resolve();
+  const [first, second] = await Promise.all(requests);
+  expect(first).toMatchObject({
+    contentIntent: { requestId: expect.stringMatching(/^[0-9a-f-]{36}$/u) },
+  });
+  expect(second).not.toEqual(first);
+  const tokens = sendMessage.mock.calls
+    .map(([message]) => message)
+    .filter(
+      (message) => message.type === MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN
+    );
+  expect(tokens).toHaveLength(2);
+  expect(tokens[0]?.requestId).not.toBe(tokens[1]?.requestId);
   expectActivationKeyRequestedOnce(sendMessage);
 });

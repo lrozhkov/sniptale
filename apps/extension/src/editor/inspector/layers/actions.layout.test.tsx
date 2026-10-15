@@ -94,6 +94,7 @@ function renderLayerRow(
   act(() =>
     root?.render(
       <LayerRow
+        locale="en"
         layer={(args.layer ?? LAYER) as never}
         dragOverLayerId={null}
         setDraggedLayerId={(args.setDraggedLayerId ?? vi.fn()) as never}
@@ -112,6 +113,7 @@ function renderLockedLayerRow() {
   act(() =>
     root?.render(
       <LayerRow
+        locale="en"
         layer={{ ...LAYER, locked: true } as never}
         dragOverLayerId={null}
         setDraggedLayerId={vi.fn() as never}

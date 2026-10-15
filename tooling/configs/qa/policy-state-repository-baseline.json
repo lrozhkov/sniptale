@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 314,
-  "findingDigest": "sha256:aec05f4a589f9afc3368b38975951ee279b6830ea7df7dd902e05ffc0bf7d24c",
+  "findingCount": 317,
+  "findingDigest": "sha256:0e9bb68d2430aef669310e125066637c6bebbc5a3aec20931b7c3662d5e33d59",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -108,6 +108,34 @@
       "owner": "packages/platform/src/i18n/format.ts",
       "reason": "numberFormatters and dateFormatters are advisory caches of Intl formatter instances, capped at 64 entries each and rebuilt on misses. Keys include locale/options and the date local-zone signature; unsafe-to-cache options bypass memoization. Discarding entries changes construction cost rather than domain authority.",
       "removalCondition": "Remove if cached values become correctness or privilege authority, payload/lifetime changes invalidate this assessment, or the detector distinguishes advisory formatter memoization."
+    },
+    {
+      "id": "noise.policy-state-descriptor.privacy-erasure-composition-forwarded-exclusion",
+      "owner": "apps/extension/src/background/application/privacy-erasure/composition.ts",
+      "reason": "Exact mutation-queue-name matches the forwarded waitForActiveMutations method on caller-held exclusion reservations. This composition creates no queue, token store or authorization decision: existing lifecycle owners issue reservations and PrivacyErasureUseCase owns execution ordering.",
+      "removalCondition": "Remove this exact entry when forwarding method stops matching the signal or this composition starts owning a queue, lease, token or admission authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.lease",
+      "owner": "apps/extension/src/background/media/video/recording-control-lease/index.ts",
+      "reason": "The existing runtime descriptor registers this lease owner. The heuristic does not resolve ownerModule references.",
+      "removalCondition": "Remove when the guard resolves the existing descriptor, the signals disappear, or the descriptor no longer covers this owner.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.completion",
+      "owner": "apps/extension/src/background/media/video/runtime/recording-completion.ts",
+      "reason": "These maps join pending promises and delete completed entries. Durable lease and session state own completion decisions.",
+      "removalCondition": "Remove when these signals disappear or the collections acquire independent completion authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.speech-publication",
+      "owner": "apps/extension/src/workflows/video-review/speech-publication.ts",
+      "reason": "This WeakMap holds disposable attachment handles for retries. Session and persistence owners control publication acceptance and recovery.",
+      "removalCondition": "Remove when the signal disappears or this bookkeeping acquires publication authority.",
+      "classification": "tool-noise"
     }
   ],
   "findings": [
@@ -146,6 +174,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/background/application/privacy-erasure/composition.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.privacy-erasure-composition-forwarded-exclusion"
     },
     {
       "file": "apps/extension/src/background/capture-surface/index.ts",
@@ -335,9 +369,9 @@
     },
     {
       "file": "apps/extension/src/background/media/video/recording-control-lease/index.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: reset-for-tests.",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name, reset-for-tests.",
       "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+      "noiseId": "noise.policy-state-descriptor.lease"
     },
     {
       "file": "apps/extension/src/background/media/video/runtime/export-capabilities.ts",
@@ -380,6 +414,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/recording-completion.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.completion"
     },
     {
       "file": "apps/extension/src/background/media/video/ui/region-selection.ts",
@@ -1772,6 +1812,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/workflows/video-review/speech-publication.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.speech-publication"
     },
     {
       "file": "packages/platform/src/data/zip-profile/entry-filenames.ts",

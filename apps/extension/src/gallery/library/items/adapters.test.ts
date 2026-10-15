@@ -379,3 +379,37 @@ it('makes catalogue selection and Trash independent of its source project', () =
   });
   expect(trashed.lifecycle).toMatchObject({ updatedAt: 4, trashedAt: 5 });
 });
+
+it('puts quick-edit in the shared project folder with a distinct stable identity and no source size', () => {
+  const args = {
+    mediaItems: [createMediaLibraryItem({ id: 'source' })],
+    videoProjects: [],
+    scenarioProjects: [],
+    scenarioExportsByProjectId: new Map(),
+    thumbnailIds: new Set<string>(),
+    quickEditProjects: [
+      {
+        aggregateId: 'source',
+        name: 'Saved edit',
+        revision: 2,
+        createdAt: 20,
+        updatedAt: 21,
+        lifecycle: { storageClass: 'library' as const, savedAt: 20, updatedAt: 21 },
+        source: { duration: 3, width: 640, height: 360, mimeType: 'video/webm', size: 1000 },
+        unavailableReason: null,
+      },
+    ],
+  };
+  const items = createGalleryItems(args);
+  expect(items.map((item) => item.id)).toEqual(['quick-edit-project:source', 'source']);
+  expect(items[0]).toMatchObject({
+    type: 'quick-edit-project',
+    kind: 'video-project',
+    entityId: 'source',
+    filename: 'Saved edit',
+    size: 0,
+  });
+  expect(isGallerySelectableItem(items[0]!)).toBe(true);
+  expect(createGalleryItems(args)).toEqual(items);
+  expect(createGalleryItems({ ...args, quickEditProjects: [] })).toHaveLength(1);
+});

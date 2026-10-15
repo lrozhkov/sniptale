@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import {
   createGuideProject,
   createTourDocument,
@@ -63,7 +64,11 @@ beforeEach(() => {
   draw();
 });
 afterEach(() => {
-  act(() => root.unmount());
+  act(() => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
   vi.unstubAllGlobals();
 });

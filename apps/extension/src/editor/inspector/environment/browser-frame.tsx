@@ -1,79 +1,39 @@
 import React from 'react';
 import type { BrowserFrameState } from '../../../features/editor/document/types';
 import { translate, useAppLocale } from '../../../platform/i18n';
-import { fireAndReportEditorAction } from '../../runtime/async-actions';
+import { WindowHeaderSettings } from '../../../workflows/browser-frame/settings';
+import { useEditorStore } from '../../state/useEditorStore';
+import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 import { EditorInspectorDetails } from '../grouped';
-import { TextField } from '../../chrome/ui';
-import { BrowserFrameBehaviorSections, BrowserFrameInsertSection } from './browser-frame-sections';
+import { BrowserFrameBehaviorSections, BrowserFrameResetSection } from './browser-frame-sections';
 
-function renderBrowserFrameTextInput(args: {
-  action: string;
-  describedBy?: string;
-  invalid?: boolean;
-  ariaLabel: string;
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => Promise<void> | void;
+/** Layer presence owns activation; document identity owns pending favicon acquisition. */
+export function EditorWindowHeaderSettings(props: {
+  browserFrame: BrowserFrameState;
+  syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
 }) {
-  return (
-    <TextField
-      aria-label={args.ariaLabel}
-      {...(args.describedBy === undefined ? {} : { 'aria-describedby': args.describedBy })}
-      {...(args.invalid === undefined ? {} : { invalid: args.invalid })}
-      label={args.label}
-      placeholder={args.placeholder}
-      value={args.value}
-      onChange={(event) => {
-        const nextValue = event.currentTarget.value;
-        fireAndReportEditorAction(args.action, () => args.onChange(nextValue));
-      }}
-    />
+  const hasHeader = useEditorStore((state) => state.browserFrame.enabled === true);
+  const identity = useEditorStore(
+    (state) =>
+      `${state.sessionId ?? ''}:${state.layers.find((layer) => layer.type === 'source-image')?.id ?? ''}`
   );
-}
-
-function BrowserFrameTitleSection(props: {
-  browserFrame: BrowserFrameState;
-  syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
-}) {
-  return renderBrowserFrameTextInput({
-    action: 'browser-frame-title',
-    ariaLabel: translate('editor.compact.browserTabTitle'),
-    label: translate('editor.compact.browserTabTitle'),
-    placeholder: translate('editor.compact.pageTitlePlaceholder'),
-    value: props.browserFrame.title,
-    onChange: (title) => props.syncBrowserFrame({ title }),
-  });
-}
-
-function getBrowserFrameValidationMessage(browserFrame: BrowserFrameState): string | null {
-  return browserFrame.url.length > 2048 ? translate('editor.compact.browserFrameUrlTooLong') : null;
-}
-
-function BrowserFrameUrlSection(props: {
-  browserFrame: BrowserFrameState;
-  validationMessage: string | null;
-  syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
-}) {
-  const errorId = 'editor-browser-frame-url-error';
   return (
-    <div className="space-y-1.5">
-      {renderBrowserFrameTextInput({
-        action: 'browser-frame-url',
-        ariaLabel: translate('editor.compact.pageUrl'),
-        ...(props.validationMessage ? { describedBy: errorId } : {}),
-        invalid: props.validationMessage !== null,
-        label: translate('editor.compact.pageUrl'),
-        placeholder: translate('editor.compact.urlPlaceholder'),
-        value: props.browserFrame.url,
-        onChange: (url) => props.syncBrowserFrame({ url }),
-      })}
-      {props.validationMessage ? (
-        <p id={errorId} role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
-          {props.validationMessage}
-        </p>
-      ) : null}
-    </div>
+    <WindowHeaderSettings
+      key={identity}
+      header={hasHeader ? resolveEditorWindowHeader(props.browserFrame) : undefined}
+      onChange={(header) =>
+        props.syncBrowserFrame(
+          header
+            ? {
+                ...header,
+                faviconDataUrl: header.faviconDataUrl ?? null,
+                faviconSource: header.faviconSource ?? null,
+                ...(!hasHeader ? { enabled: true } : {}),
+              }
+            : { enabled: false }
+        )
+      }
+    />
   );
 }
 
@@ -83,31 +43,12 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
   browserFrame: BrowserFrameState;
   insertOrUpdateBrowserFrame?: () => Promise<void> | void;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
-}> = ({
-  browserCanvasModeOptions,
-  browserContentModeOptions,
-  browserFrame,
-  insertOrUpdateBrowserFrame,
-  syncBrowserFrame,
-}) => {
+}> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => {
   useAppLocale();
-  const validationMessage = getBrowserFrameValidationMessage(browserFrame);
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <div className="space-y-3">
-          <BrowserFrameTitleSection
-            browserFrame={browserFrame}
-            syncBrowserFrame={syncBrowserFrame}
-          />
-          <BrowserFrameUrlSection
-            browserFrame={browserFrame}
-            validationMessage={validationMessage}
-            syncBrowserFrame={syncBrowserFrame}
-          />
-        </div>
-      </div>
+      <EditorWindowHeaderSettings browserFrame={browserFrame} syncBrowserFrame={syncBrowserFrame} />
       <EditorInspectorDetails
         preferenceId="browser-frame:layout"
         label={translate('editor.compact.browserFrameLayout')}
@@ -119,10 +60,7 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
           syncBrowserFrame={syncBrowserFrame}
         />
       </EditorInspectorDetails>
-      <BrowserFrameInsertSection
-        disabled={validationMessage !== null}
-        insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame ?? (() => undefined)}
-      />
+      <BrowserFrameResetSection resetBrowserFrame={() => syncBrowserFrame({ enabled: false })} />
     </div>
   );
 };

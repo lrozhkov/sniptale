@@ -73,7 +73,23 @@ export function createReviewExportFixture() {
     saveRecordingsBatchSafely: vi.fn(
       async (_inputs: Parameters<typeof saveRecordingsBatchSafely>[0]) => undefined
     ),
+    openAudioSource: vi.fn(async (_blob: Blob, _signal: AbortSignal) => ({
+      sampleRate: 48000,
+      numberOfChannels: 2,
+      length: 480000,
+      read: async (start: number, end: number) => ({
+        start,
+        planes: [new Float32Array(end - start), new Float32Array(end - start)],
+      }),
+      dispose: vi.fn(),
+    })),
     readProjectAsset: vi.fn(async (_assetId: string) => new Blob() as unknown as Blob | null),
+    createActionSource: vi.fn((_signal: AbortSignal) => ({
+      read: vi.fn(async (_sampleId: unknown): Promise<AudioBuffer> => {
+        throw new Error('Unexpected bundled audio in project fixture.');
+      }),
+      dispose: vi.fn(),
+    })),
     writeReviewPackets: vi.fn(async () => ({
       videoPackets: 40,
       audioPackets: 0,
@@ -92,6 +108,7 @@ export function createReviewExportFixture() {
       boundaries: [0, 2, 4, 6],
       videoCodec: 'vp8' as const,
       audioCodec: null,
+      processedAudioCodec: 'opus',
       container: 'webm' as const,
       rotation: 0 as const,
     } as ReviewMediaIndex,

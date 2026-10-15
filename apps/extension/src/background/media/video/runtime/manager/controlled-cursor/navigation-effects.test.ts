@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   disable: vi.fn(),
   enable: vi.fn(),
   getOffset: vi.fn(),
+  getClock: vi.fn(),
   getRuntimeState: vi.fn(),
   getTabId: vi.fn(),
   isEnabled: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   beginControlledCursorNavigation: mocks.beginNavigation,
   clearControlledCursorNavigationPending: mocks.clearNavigation,
   getControlledCursorOffsetSeconds: mocks.getOffset,
+  getRecordingFrameClock: mocks.getClock,
   getVideoRecordingTabId: mocks.getTabId,
   isControlledCursorCaptureEnabled: mocks.isEnabled,
   setControlledCursorAutoPaused: mocks.setAutoPaused,
@@ -54,6 +56,7 @@ beforeEach(() => {
   mocks.beginNavigation.mockReturnValue(11);
   mocks.clearNavigation.mockReturnValue(true);
   mocks.getOffset.mockReturnValue(12);
+  mocks.getClock.mockReturnValue(clock);
   mocks.getRuntimeState.mockReturnValue({ duration: 12 });
   mocks.getTabId.mockReturnValue(7);
   mocks.isEnabled.mockReturnValue(true);
@@ -61,6 +64,16 @@ beforeEach(() => {
   mocks.enable.mockResolvedValue(undefined);
   mocks.sync.mockResolvedValue(undefined);
 });
+
+const clock = {
+  recordingId: 'recording-1',
+  generation: 3,
+  streamInstanceId: 'source',
+  revision: 1,
+  phase: 'active',
+  captureEpochMs: 1000000,
+  mediaTimeSeconds: 0,
+};
 
 const binding = {
   isCurrent: () => true,
@@ -78,8 +91,8 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
     await suspendControlledCursorEffects(binding);
     expect(mocks.appendTelemetry).toHaveBeenCalledWith({ signals: [] });
     await restoreControlledCursorEffects(binding);
-    expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12);
-    expect(mocks.sync).toHaveBeenCalledWith(7, 'resume');
+    expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12, clock);
+    expect(mocks.sync).toHaveBeenCalledWith(7, 'resume', clock);
   }
 );
 
@@ -88,14 +101,14 @@ it('flushes telemetry without owning recorder pause or resume transport', async 
   await suspendControlledCursorEffects(binding);
   expect(mocks.beginNavigation).toHaveBeenCalledOnce();
   expect(mocks.setAutoPaused).toHaveBeenCalledWith(true);
-  expect(mocks.setOffset).toHaveBeenCalledWith(12);
+  expect(mocks.setOffset).not.toHaveBeenCalled();
   expect(mocks.appendTelemetry).toHaveBeenCalledWith({ signals: [] });
 });
 
 it('restores content telemetry state and clears pending effects', async () => {
   await restoreControlledCursorEffects(binding);
-  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12);
-  expect(mocks.sync).toHaveBeenCalledWith(7, 'resume');
+  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12, clock);
+  expect(mocks.sync).toHaveBeenCalledWith(7, 'resume', clock);
   expect(mocks.setAutoPaused).toHaveBeenCalledWith(false);
   expect(mocks.clearNavigation).toHaveBeenCalledWith(11);
 });
@@ -106,7 +119,7 @@ it('keeps navigation time on the continuously recorded source clock', async () =
   await suspendControlledCursorEffects(binding);
   mocks.getRuntimeState.mockReturnValue({ duration: 15.5, captureMode: CaptureMode.TAB });
   await restoreControlledCursorEffects(binding);
-  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 15.5);
+  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 15.5, clock);
 });
 
 it('abandons stale continuations without publishing restored state', async () => {
@@ -196,6 +209,15 @@ it('restores a manually paused cursor session without publishing stale completio
     shouldResume: false,
   });
 
-  expect(mocks.sync).toHaveBeenCalledWith(7, 'pause');
+  expect(mocks.sync).toHaveBeenCalledWith(7, 'pause', clock);
   expect(mocks.clearNavigation).not.toHaveBeenCalled();
+});
+
+it('retains explicit approximate navigation timing after native calibration is unavailable', async () => {
+  mocks.getClock.mockReturnValue(null);
+  mocks.getRuntimeState.mockReturnValue({ duration: 999, captureMode: CaptureMode.TAB });
+  await restoreControlledCursorEffects(binding);
+  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 999, null);
+  expect(mocks.sync).toHaveBeenCalledWith(7, 'resume', null);
+  expect(mocks.setOffset).not.toHaveBeenCalled();
 });

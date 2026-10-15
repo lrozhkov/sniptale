@@ -1,3 +1,5 @@
+import { getAllScenarioStoredProjects } from '../../../../composition/persistence/scenario/storage';
+import { readAllWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
   parseProjectAssetEntry,
@@ -7,12 +9,12 @@ import { parseVideoWorkspace } from '../../../../composition/persistence/review-
 import { collectReviewAssetReferences } from '../../../../composition/persistence/review-workspaces/asset-refs';
 import {
   SCENARIO_ASSETS_STORE,
-  SCENARIO_PROJECTS_STORE,
   VIDEO_PROJECTS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   type initDB,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
@@ -132,7 +134,7 @@ export async function resolveBackupDependencySelection(
     ...videoDependencies.scenarioIds,
   ]);
   const admittedScenarios = admittedScenarioIds(
-    await db.getAll(SCENARIO_PROJECTS_STORE),
+    await getAllScenarioStoredProjects(db),
     selectedScenarioIds,
     options.includeDrafts
   );
@@ -162,7 +164,11 @@ export async function resolveBackupDependencySelection(
       }
     }
   }
-  const reviews = (await db.getAll(VIDEO_WORKSPACES_STORE)).flatMap((raw) => {
+  const reviews = (
+    await readAllWorkspaceStorage(
+      db.transaction([VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE], 'readonly')
+    )
+  ).flatMap((raw) => {
     const workspace = parseVideoWorkspace(raw);
     return workspace ? [workspace] : [];
   });

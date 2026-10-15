@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { inspect } from 'node:util';
 
 import { installActiveTraceObserver } from '../message-tracer/runtime';
-import { createLogger } from './index';
+import { createLogger, installDiagnosticLogObserver } from './index';
 import { isTraceEnabled } from './trace-enabled';
 
 afterEach(() => {
@@ -268,3 +268,29 @@ function verifyNullPrototypeSanitizedPayloads() {
   expect(constructorPayload['apiKey']).toBe('***');
   expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
 }
+
+it('delivers release and disabled-debug summaries without console output or attached content', () => {
+  globalThis.__SNIPTALE_RELEASE_BUILD__ = true;
+  const observer = vi.fn();
+  const dispose = installDiagnosticLogObserver(observer);
+  const sink = createSink();
+  const logger = createLogger({ namespace: 'Capture', sink, traceEnabled: false });
+  logger.debug('Preparing video', { html: 'private document' });
+  logger.info('Ready');
+  expect(observer.mock.calls.map(([event]) => event.level)).toEqual(['debug', 'info']);
+  expect(JSON.stringify(observer.mock.calls)).not.toContain('private document');
+  expect(sink.debug).not.toHaveBeenCalled();
+  expect(sink.info).not.toHaveBeenCalled();
+  dispose();
+  logger.info('After dispose');
+  expect(observer).toHaveBeenCalledTimes(2);
+});
+it('isolates diagnostic destination failure from product logging', () => {
+  const dispose = installDiagnosticLogObserver(() => {
+    throw new Error('unavailable');
+  });
+  const sink = createSink();
+  expect(() => createLogger({ namespace: 'Capture', sink }).warn('Retry')).not.toThrow();
+  expect(sink.warn).toHaveBeenCalledOnce();
+  dispose();
+});

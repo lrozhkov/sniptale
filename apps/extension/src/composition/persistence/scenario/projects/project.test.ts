@@ -82,7 +82,9 @@ function createScenarioExportRecord(id: string) {
   };
 }
 
+let storedHistory: unknown[];
 beforeEach(() => {
+  storedHistory = [];
   vi.clearAllMocks();
   dbGetMock.mockReset();
   txGetMock.mockReset();
@@ -91,13 +93,24 @@ beforeEach(() => {
     getAll: dbGetAllMock,
     getAllFromIndex: dbGetAllFromIndexMock,
     put: dbPutMock,
-    transaction: vi.fn(() => ({
+    transaction: vi.fn((_stores: string[], mode: string) => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
+      objectStore: vi.fn((name: string) => ({
         delete: txDeleteMock,
-        get: txGetMock,
-        getAll: vi.fn(async () => []),
-        index: vi.fn(() => ({ getAll: txIndexGetAllMock })),
+        get:
+          name === 'scenario_projects' && mode === 'readonly'
+            ? (id: string) => dbGetMock(name, id)
+            : txGetMock,
+        getAll: name === 'scenario_projects' ? () => dbGetAllMock(name) : vi.fn(async () => []),
+        index: vi.fn(() => ({
+          getAll:
+            name === 'scenario_project_history'
+              ? async () => storedHistory
+              : name === 'scenario_project_units'
+                ? async () => []
+                : txIndexGetAllMock,
+          getAllKeys: async () => [],
+        })),
         put: txPutMock,
       })),
     })),
@@ -119,12 +132,10 @@ it('stores scenario projects with refreshed timestamps and parses reads', async 
       updatedAt: 10,
       tags: [],
     })
-  ).resolves.toEqual(
-    expect.objectContaining({
-      id: 'project-1',
-      updatedAt: 12345,
-    })
-  );
+  ).resolves.toEqual({
+    project: expect.objectContaining({ id: 'project-1', updatedAt: 12345 }),
+    workspaceRevision: 2,
+  });
 
   expect(txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -268,7 +279,10 @@ it('uses the persisted workspace revision as the canonical CAS token', async () 
       },
       { expectedRevision: 4 }
     )
-  ).resolves.toEqual(expect.objectContaining({ name: 'Revision guarded' }));
+  ).resolves.toEqual({
+    project: expect.objectContaining({ name: 'Revision guarded' }),
+    workspaceRevision: 5,
+  });
 
   expect(txPutMock).toHaveBeenCalledWith(expect.objectContaining({ workspaceRevision: 5 }));
 
@@ -289,7 +303,7 @@ it('accepts an exact autosave replay without advancing the workspace revision', 
 
   await expect(
     saveScenarioProject(existing.project, { expectedRevision: 4, baseUpdatedAt: 50 })
-  ).resolves.toEqual(existing.project);
+  ).resolves.toEqual({ project: existing.project, workspaceRevision: 5 });
 
   expect(txPutMock).not.toHaveBeenCalled();
 });
@@ -299,7 +313,9 @@ it('advances same-millisecond writes before rejecting a stale writer', async () 
   let storedEntry = createProjectRecord('project-1', 'Existing', 10, 500);
   txGetMock.mockImplementation(async () => storedEntry);
   txPutMock.mockImplementation(async (entry) => {
-    storedEntry = entry;
+    if (entry.id === storedEntry.id) storedEntry = entry;
+    else if (entry.projectId === storedEntry.id && typeof entry.revision === 'number')
+      storedHistory.push(entry);
   });
 
   await expect(
@@ -310,7 +326,10 @@ it('advances same-millisecond writes before rejecting a stale writer', async () 
       },
       { baseUpdatedAt: 500 }
     )
-  ).resolves.toEqual(expect.objectContaining({ name: 'First write', updatedAt: 501 }));
+  ).resolves.toEqual({
+    project: expect.objectContaining({ name: 'First write', updatedAt: 501 }),
+    workspaceRevision: 2,
+  });
 
   expect(storedEntry).toEqual(
     expect.objectContaining({

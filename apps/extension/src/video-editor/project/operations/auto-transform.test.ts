@@ -295,7 +295,7 @@ it('one pass shortens both typing and pauses while preserving the immutable sour
   getTelemetry.mockResolvedValue({
     ...telemetry(),
     signals: [
-      { id: 'input', kind: 'typing', startTime: 1, endTime: 3, point: null, data: {} },
+      { id: 'input', kind: 'typing', startTime: 1, endTime: 4, point: null, data: {} },
       { id: 'idle', kind: 'cursor-idle', startTime: 0, endTime: 8, point: null, data: {} },
     ],
   });
@@ -310,4 +310,46 @@ it('one pass shortens both typing and pauses while preserving the immutable sour
       .filter((clip) => clip.type === 'VIDEO' && clip.sourceInstanceId === 'instance')
       .reduce((sum, clip) => sum + clip.duration, 0)
   ).toBe(4);
+});
+
+it('derives nonzero and resumed observation phases before auto processing and freshness checks', async () => {
+  const raw = telemetry();
+  raw.observationClock = {
+    version: 1,
+    domain: 'observation',
+    segments: [
+      {
+        id: 'resume',
+        documentId: 'doc',
+        timeOriginMs: 100000,
+        startedAtTimestampMs: 10000,
+        observationStartSeconds: 10,
+        mediaStartEstimateSeconds: 2,
+        mapping: null,
+      },
+    ],
+  };
+  raw.signals = raw.signals.map((signal) => ({
+    ...signal,
+    startTime: 10,
+    endTime: 14,
+    data: { observationClockId: 'resume' },
+  }));
+  getTelemetry.mockResolvedValue(raw);
+  const preview = await prepareAutoProcessing(fixture(), request);
+  expect(preview.telemetry[0]?.signals[0]).toMatchObject({ startTime: 2, endTime: 6 });
+  const { isAutoProcessingTelemetryCurrent } = await import('./auto-transform');
+  expect(await isAutoProcessingTelemetryCurrent(preview)).toBe(true);
+  expect(raw.signals[0]?.startTime).toBe(10);
+  getTelemetry.mockResolvedValue({
+    ...raw,
+    observationClock: {
+      ...raw.observationClock,
+      segments: raw.observationClock.segments.map((segment) => ({
+        ...segment,
+        mediaStartEstimateSeconds: 3,
+      })),
+    },
+  });
+  expect(await isAutoProcessingTelemetryCurrent(preview)).toBe(false);
 });

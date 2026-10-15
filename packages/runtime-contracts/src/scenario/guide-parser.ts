@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { isPlainRecord } from '../validation/primitives';
 import { scenarioImageSourceSchema } from './image-source-schema';
 export { guideVideoActionSchema, guideVideoFrameSourceSchema } from './image-source-schema';
-import { isBoundedScenarioInput } from './input-bounds';
+import { areBoundedScenarioInputs, isBoundedScenarioInput } from './input-bounds';
 import { GUIDE_LIMITS, type GuideProject } from './types/guide';
 
 const id = z
@@ -282,7 +282,47 @@ export type GuideParseResult =
 
 /** Parses a detached document without conversion, migration, repair or external effects. */
 export function parseGuideProject(value: unknown): GuideParseResult {
-  if (!isBoundedScenarioInput(value) || !isPlainRecord(value)) return { status: 'invalid' };
+  return parseProject(value, isBoundedScenarioInput(value), projectSchema);
+}
+
+/**
+ * Admits a private stable batch, consumed synchronously in one read scope without mutation.
+ * Canonical Guide items are shared only among returned historical snapshots. The caller
+ * must not expose or mutate that history; general editable callers use parseGuideProject.
+ * Every root, document-wide limit and identifier invariant is checked independently.
+ * Lazy consumption lets the owner stop before later documents after a metadata or budget failure.
+ */
+export function* parseGuideProjectBatch(
+  values: readonly unknown[]
+): Generator<GuideParseResult, void, unknown> {
+  const bounded = areBoundedScenarioInputs(values);
+  const known = new WeakMap<object, GuideProject['items'][number]>();
+  const item = z.unknown().transform((value, context) => {
+    if (isPlainRecord(value)) {
+      const previous = known.get(value);
+      if (previous) return previous;
+      const parsed =
+        value['kind'] === 'step'
+          ? guideItemSchemas.step.safeParse(value)
+          : guideItemSchemas.section.safeParse(value);
+      if (parsed.success) {
+        known.set(value, parsed.data);
+        return parsed.data;
+      }
+    }
+    context.addIssue({ code: 'custom', message: 'Invalid Guide item.' });
+    return z.NEVER;
+  });
+  const schema = projectSchema.extend({ items: z.array(item).max(GUIDE_LIMITS.maxItems) });
+  for (const value of values) yield parseProject(value, bounded.next().value === true, schema);
+}
+
+function parseProject(
+  value: unknown,
+  bounded: boolean,
+  schema: z.ZodType<GuideProject>
+): GuideParseResult {
+  if (!bounded || !isPlainRecord(value)) return { status: 'invalid' };
   const version = value['version'];
   if (
     typeof version === 'number' &&
@@ -297,7 +337,7 @@ export function parseGuideProject(value: unknown): GuideParseResult {
     if (tour.status === 'unsupported') return { ...tour, representation: 'tour' };
     if (tour.status !== 'ok') return { status: 'invalid' };
   }
-  const result = projectSchema.safeParse(value);
+  const result = schema.safeParse(value);
   if (!result.success || !hasUniqueGuideIds(result.data)) return { status: 'invalid' };
   if (
     result.data.purpose === 'step-template' &&

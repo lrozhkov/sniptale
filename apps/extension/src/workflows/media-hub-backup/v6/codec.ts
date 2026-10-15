@@ -15,7 +15,14 @@ import {
   type MediaHubBackupPrivacyFlags,
   type MediaHubBackupRootEnvelope,
 } from './contracts';
-import { assertV6CatalogPath, assertV6ObjectPath, MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import {
+  assertV6CatalogPath,
+  assertV6ObjectPath,
+  MEDIA_HUB_BACKUP_LAYOUT,
+  MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
+  isSharedBackupLayout,
+} from './layout';
+import { parseBackupSharedObjects } from './shared-objects';
 import { parsePortableGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 
 const PORTABLE_URL_PATTERN = /^(?:data|blob):/i;
@@ -167,6 +174,23 @@ export function assertPortableJson(value: unknown, depth = 0): asserts value is 
   }
 }
 
+/** V2 validates resource roles at their owners; authored text is never a binary signature. */
+export function assertMetadataJson(value: unknown, depth = 0): asserts value is JsonValue {
+  if (depth > MAX_JSON_DEPTH) throw new Error('Media backup metadata nesting is too deep.');
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') return;
+  if (typeof value === 'number' && Number.isFinite(value)) return;
+  if (Array.isArray(value)) {
+    for (const child of value) assertMetadataJson(child, depth + 1);
+    return;
+  }
+  if (!isPlainRecord(value)) throw new Error('Media backup metadata is not portable JSON.');
+  for (const [key, child] of Object.entries(value)) {
+    if (key.toLocaleLowerCase('en-US') === 'assetid')
+      throw new Error('Media backup metadata contains a local asset ID.');
+    assertMetadataJson(child, depth + 1);
+  }
+}
+
 export function parseRootEnvelope(value: unknown): MediaHubBackupRootEnvelope {
   if (!isPlainRecord(value)) throw new Error('Media backup root metadata is invalid.');
   assertExactKeys(value, ['descriptor', 'metadata', 'objects']);
@@ -224,19 +248,23 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
   if (
     value['format'] === MEDIA_HUB_BACKUP_FORMAT &&
     value['version'] === MEDIA_HUB_BACKUP_VERSION &&
-    value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT
+    value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT &&
+    value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT &&
+    !isSharedBackupLayout(value['layout'])
   ) {
     throw new Error('Unsupported media backup v6 layout. Create a new backup with this version.');
   }
   assertExactKeys(
     value,
     ['archiveId', 'catalogs', 'exportedAt', 'format', 'layout', 'privacy', 'totals', 'version'],
-    ['galleryViews']
+    isSharedBackupLayout(value['layout']) ? ['galleryViews', 'sharedObjects'] : ['galleryViews']
   );
   if (
     value['format'] !== MEDIA_HUB_BACKUP_FORMAT ||
     value['version'] !== MEDIA_HUB_BACKUP_VERSION ||
-    value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT
+    (value['layout'] !== MEDIA_HUB_BACKUP_LAYOUT &&
+      value['layout'] !== MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT &&
+      !isSharedBackupLayout(value['layout']))
   ) {
     throw new Error('Unsupported media backup format.');
   }
@@ -244,6 +272,12 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
     throw new Error('Media backup manifest totals are invalid.');
   }
   const totals = value['totals'];
+  if (
+    isSharedBackupLayout(value['layout']) &&
+    (parseSafeInteger(totals['objects'], 'total objects') > MAX_MEDIA_ARCHIVE_ENTRIES ||
+      parseSafeInteger(totals['bytes'], 'total bytes') > MAX_MEDIA_ARCHIVE_INFLATED_BYTES)
+  )
+    throw new Error('Media backup logical inventory exceeds its resource profile.');
   assertExactKeys(totals, ['bytes', 'objects', 'roots', 'rootsByProfile']);
   if (!isPlainRecord(totals['rootsByProfile']))
     throw new Error('Media backup profile totals are invalid.');
@@ -270,7 +304,10 @@ export function parseManifestV6(value: unknown): MediaHubBackupManifestV6 {
     ...(value['galleryViews'] === undefined
       ? {}
       : { galleryViews: parsePortableGallerySavedViews(value['galleryViews']) }),
-    layout: MEDIA_HUB_BACKUP_LAYOUT,
+    layout: value['layout'],
+    ...(isSharedBackupLayout(value['layout'])
+      ? { sharedObjects: parseBackupSharedObjects(value['sharedObjects']) }
+      : {}),
     privacy: parsePrivacyFlags(value['privacy']),
     totals: {
       bytes: parseSafeInteger(totals['bytes'], 'total bytes'),

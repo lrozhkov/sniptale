@@ -28,7 +28,7 @@ it('resolves browser-frame source deltas into layer position', () => {
       existingLayer: null,
       nextSource: { left: 30, top: 100 },
     })
-  ).toEqual({ left: 30, top: 14 });
+  ).toEqual({ left: 30, top: 100 - (86 * 480) / 900 });
 
   expect(
     resolveNextBrowserFramePosition({
@@ -36,7 +36,7 @@ it('resolves browser-frame source deltas into layer position', () => {
       existingLayer: { left: 100, top: 80 } as never,
       nextSource: { left: 35, top: 75 },
     })
-  ).toEqual({ left: 115, top: 105 });
+  ).toEqual({ left: 35, top: 75 - (86 * 480) / 900 });
 
   expect(
     resolveNextBrowserFramePosition({
@@ -44,7 +44,7 @@ it('resolves browser-frame source deltas into layer position', () => {
       existingLayer: {} as never,
       nextSource: { left: 35, top: 75 },
     })
-  ).toEqual({ left: 35, top: 25 });
+  ).toEqual({ left: 35, top: 75 - (86 * 480) / 900 });
 });
 
 it('resolves browser-frame size changes into layer width', () => {

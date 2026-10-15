@@ -1,4 +1,4 @@
-import { parseScenarioSavedVersions } from './history-model';
+import { parseScenarioSavedVersions, isScenarioHistoryActionId } from './history-model';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type {
   PendingScenarioAssetEntry,
@@ -189,7 +189,16 @@ export function parseScenarioExportEntry(value: unknown): ScenarioExportEntry | 
   };
 }
 
-export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry | null {
+export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry | null;
+/** Exclusive history is restricted to a private, freshly read immutable aggregate snapshot. */
+export function parseScenarioProjectEntry(
+  value: unknown,
+  ownership: 'exclusive'
+): ScenarioProjectEntry | null;
+export function parseScenarioProjectEntry(
+  value: unknown,
+  ownership: 'borrowed' | 'exclusive' = 'borrowed'
+): ScenarioProjectEntry | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -224,10 +233,15 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
     value['history'],
     project.id,
     workspaceRevision,
-    project.updatedAt
+    project.updatedAt,
+    ownership
   );
   if (!history) return null;
+  const lastAcceptedActionId = value['lastAcceptedActionId'];
+  if (lastAcceptedActionId !== undefined && !isScenarioHistoryActionId(lastAcceptedActionId))
+    return null;
   return {
+    ...(lastAcceptedActionId === undefined ? {} : { lastAcceptedActionId }),
     ...(history.length ? { history } : {}),
     createdAt: value['createdAt'],
     id: value['id'],

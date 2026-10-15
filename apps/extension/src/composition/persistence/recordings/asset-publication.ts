@@ -1,3 +1,4 @@
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
@@ -6,6 +7,7 @@ import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   PROJECT_ASSETS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
@@ -125,6 +127,7 @@ export async function publishRecordingAssetJournal(
           VIDEO_PROJECTS_STORE,
           SCENARIO_ASSETS_STORE,
           VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
           PROJECT_ASSETS_STORE,
         ] as const)
       : ([
@@ -136,6 +139,7 @@ export async function publishRecordingAssetJournal(
           VIDEO_PROJECTS_STORE,
           SCENARIO_ASSETS_STORE,
           VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
           PROJECT_ASSETS_STORE,
         ] as const);
     const tx = db.transaction(storeNames, 'readwrite');
@@ -202,13 +206,7 @@ export async function publishRecordingAssetJournal(
       }
       await tx.done;
     } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* The transaction may already have aborted. */
-      }
-      await tx.done.catch(() => undefined);
-      throw error;
+      await abortIndexedDbMutation(tx, error);
     }
   });
   if (physicalDelete.assetIds.length > 0)

@@ -1,3 +1,4 @@
+import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import { sendContentRuntimeShimMessage } from '@sniptale/platform/ports/runtime-messaging/content-runtime-shim';
 
 export type ShimTransportDeps = {
@@ -11,12 +12,7 @@ export type ShimTransportRuntimeDeps = {
 };
 
 function createDefaultRequestId(): string {
-  const randomUUID = globalThis.crypto?.randomUUID;
-  if (!randomUUID) {
-    throw new Error('Content runtime shim request id generation is unavailable.');
-  }
-
-  return randomUUID.call(globalThis.crypto);
+  return createSecureRandomUuid('Content runtime shim request id generation is unavailable.');
 }
 
 export function resolveShimTransportDeps(deps: ShimTransportDeps = {}): ShimTransportRuntimeDeps {

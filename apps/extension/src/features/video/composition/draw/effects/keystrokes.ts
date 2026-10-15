@@ -1,13 +1,15 @@
 import { getActionKeyStyle } from '../../../project/action-style';
 import type { VideoCompositionActionState } from '../../types';
 
-/** Positions key labels inside the visible frame; source cursor coordinates do not place captions. */
-export function drawKeystroke(
+/** The key painter and caption safe-area reservations share one measured placement. */
+export function measureKeystroke(
   context: CanvasRenderingContext2D,
-  action: VideoCompositionActionState,
+  action: Pick<VideoCompositionActionState, 'keyStyle'> & {
+    event: Pick<VideoCompositionActionState['event'], 'label'>;
+  },
   sizeScale: number,
   bounds?: { x: number; y: number; width: number; height: number }
-): void {
+) {
   const label = action.event.label;
   if (!label) return;
   const style = getActionKeyStyle(action.keyStyle);
@@ -26,9 +28,8 @@ export function drawKeystroke(
   if (available <= padding * 2 || height <= 0) return;
   context.save();
   context.font = `500 ${fontSize}px ${style.fontFamily}`;
-  context.textBaseline = 'middle';
-  context.textAlign = 'center';
   const width = Math.min(context.measureText(label).width + padding * 2, available);
+  context.restore();
   const x = style.position.endsWith('left')
     ? area.x + margin
     : style.position.endsWith('right')
@@ -36,6 +37,33 @@ export function drawKeystroke(
       : area.x + (area.width - width) / 2;
   const top = style.position.startsWith('top');
   const baseY = top ? area.y + margin : area.y + area.height - margin - height;
+  return {
+    x,
+    y: baseY,
+    width,
+    height,
+    top,
+    style,
+    scale,
+    fontSize,
+    padding,
+    font: `500 ${fontSize}px ${style.fontFamily}`,
+    travel: style.entrance === 'slide' ? fontSize * 0.35 : 0,
+  };
+}
+
+/** Positions key labels inside the visible frame; source cursor coordinates do not place captions. */
+export function drawKeystroke(
+  context: CanvasRenderingContext2D,
+  action: Pick<VideoCompositionActionState, 'progress' | 'keyStyle'> & {
+    event: Pick<VideoCompositionActionState['event'], 'label'>;
+  },
+  sizeScale: number,
+  bounds?: { x: number; y: number; width: number; height: number }
+): void {
+  const measured = measureKeystroke(context, action, sizeScale, bounds);
+  if (!measured) return;
+  const { style, scale, fontSize, padding, x, width, height, top } = measured;
   const fade =
     style.entrance === 'none'
       ? 1
@@ -44,7 +72,11 @@ export function drawKeystroke(
     style.entrance === 'slide'
       ? (1 - Math.min(1, action.progress / 0.2)) ** 3 * fontSize * 0.35
       : 0;
-  const y = baseY + (top ? -travel : travel);
+  const y = measured.y + (top ? -travel : travel);
+  context.save();
+  context.font = measured.font;
+  context.textBaseline = 'middle';
+  context.textAlign = 'center';
   context.globalAlpha *= Math.max(0, fade);
   context.beginPath();
   context.roundRect(x, y, width, height, Math.min(style.cornerRadius * scale, height / 2));
@@ -54,6 +86,11 @@ export function drawKeystroke(
   context.fill();
   context.restore();
   context.fillStyle = style.color;
-  context.fillText(label, x + width / 2, y + height / 2, Math.max(1, width - padding * 2));
+  context.fillText(
+    action.event.label!,
+    x + width / 2,
+    y + height / 2,
+    Math.max(1, width - padding * 2)
+  );
   context.restore();
 }

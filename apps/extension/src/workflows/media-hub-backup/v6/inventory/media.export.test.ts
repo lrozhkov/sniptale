@@ -36,7 +36,10 @@ it('writes a selected screenshot from inventory as an inspectable backup', async
   const item: MediaLibraryItem = { ...metadata, hasThumbnail: false };
   const db = {
     transaction: () => ({
-      objectStore: () => ({ get: async () => undefined }),
+      objectStore: () => ({
+        index: () => ({ getAll: async () => [] }),
+        get: async () => undefined,
+      }),
       done: Promise.resolve(),
     }),
     get: vi.fn(async (store: string) => (store === MEDIA_LIBRARY_STORE ? entry : undefined)),

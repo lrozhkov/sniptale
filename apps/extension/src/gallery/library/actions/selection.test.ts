@@ -18,6 +18,7 @@ import { createSelectionBackupAction, createSelectionZipAction } from './selecti
 import type { MediaAssetProjectUsage } from '../../../composition/persistence/media-library/usage';
 
 const deleteExportMock = vi.hoisted(() => vi.fn());
+const deleteQuickEditMock = vi.hoisted(() => vi.fn());
 
 const {
   moveLibraryItemsToTrashMock,
@@ -56,6 +57,7 @@ vi.mock('../../../workflows/media-hub/trash', () => ({
         [entry.target.id],
         new Map([[entry.target.id, expectedUsage]])
       );
+    else if (entry.target.kind === 'quick-edit-project') await deleteQuickEditMock(entry.target);
     else if (entry.target.kind === 'scenario-project')
       await deleteScenarioProjectRecordMock(entry.target.id);
     else if (entry.target.kind === 'video-project')
@@ -409,4 +411,53 @@ it('prepares all selected media through one fresh batch and repeats only on a ne
   await controller.state.storage.deletionRequest!.preparePermanent();
   expect(listMediaAssetProjectUsageBatchMock).toHaveBeenCalledTimes(2);
   expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
+});
+
+it.each([false, true])('routes quick-edit commands independently (mixed=%s)', async (mixed) => {
+  vi.clearAllMocks();
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const project = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const source = createMediaItem({ id: 'source', entityId: 'source' });
+  const targets = mixed ? [source, project] : [project];
+  const { controller } = createController({ selectedItems: targets, previewItem: project });
+  listMediaAssetProjectUsageBatchMock.mockResolvedValue(
+    new Map([['source', [{ id: 'source', kind: 'review', name: 'Saved edit', primary: true }]]])
+  );
+  await createDeleteManyAction(controller)(targets, runBusyAction);
+  const prepared = await controller.state.storage.deletionRequest!.preparePermanent();
+  await prepared!.confirm();
+  expect(deleteQuickEditMock).toHaveBeenCalledExactlyOnceWith({
+    kind: 'quick-edit-project',
+    id: 'source',
+    expectedRevision: 1,
+  });
+  expect(deleteExportMock).not.toHaveBeenCalled();
+  expect(deletePersistedVideoProjectMock).not.toHaveBeenCalled();
+  if (mixed) {
+    expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledExactlyOnceWith(
+      ['source'],
+      new Map([['source', []]])
+    );
+    expect(deleteQuickEditMock.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteMediaLibraryAssetsBatchSafelyMock.mock.invocationCallOrder[0]!
+    );
+  } else expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
+  await createDeleteManyAction(controller)([project], runBusyAction);
+  await controller.state.storage.deletionRequest!.moveToTrash!();
+  expect(moveLibraryItemsToTrashMock).toHaveBeenCalledExactlyOnceWith([
+    { kind: 'quick-edit-project', id: 'source', expectedRevision: 1 },
+  ]);
+  await createRestoreTrashAction(controller)([project], runBusyAction);
+  expect(restoreLibraryTrashItemsMock).toHaveBeenCalledExactlyOnceWith([
+    { kind: 'quick-edit-project', id: 'source', expectedRevision: 1 },
+  ]);
 });

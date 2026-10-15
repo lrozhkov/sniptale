@@ -73,6 +73,20 @@ describe('source audio automation', () => {
     advanced.ui.mode = 'basic';
     expect(
       resolveQuickEditExportPlan({ advanced, document: { edits: [], canvasComments: [] } })
-    ).toEqual({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
+    ).toEqual({ kind: 'ready', video: 'copy', audio: 'process', reasons: ['original-audio'] });
   });
+});
+
+it('uses only authored native gain with half-open range tails and explicit mute precedence', () => {
+  const original = {
+    muted: false,
+    volume: 2,
+    ranges: [{ id: 'manual', start: 2, end: 8, volume: 0.75 }],
+  };
+  expect(originalAudioGainAt(original, 1.99)).toBe(2);
+  expect(originalAudioGainAt(original, 2)).toBe(1.5);
+  expect(originalAudioGainAt(original, 7.99)).toBe(1.5);
+  expect(originalAudioGainAt(original, 8)).toBe(2);
+  expect(originalAudioGainAt(original, 5.5, [speed])).toBe(0);
+  expect(originalAudioGainAt({ ...original, muted: true }, 3)).toBe(0);
 });

@@ -16,12 +16,14 @@ export async function maybeSendFrameDrivenProgress(args: {
     return lastProgressFrame;
   }
 
+  const estimate = job.timeEstimator?.snapshot();
   await sendFrameDrivenProgress(
     job.jobId,
     frameIndex,
     totalFrames,
     messageDetail,
-    job.renderProgressRange
+    job.renderProgressRange,
+    ...(estimate ? [estimate] : [])
   );
   return frameIndex;
 }

@@ -1,3 +1,9 @@
+import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
+import {
+  deleteVideoWorkspaceProject,
+  renameVideoWorkspaceProject,
+} from '../../composition/persistence/review-workspaces/project-commands';
+import { createMaintenanceLog } from '../../composition/persistence/library-lifecycle/maintenance-log';
 import type { LocalStoragePolicy } from '../../contracts/settings';
 import type { LibraryLifecycle } from '../../composition/persistence/library-lifecycle/contracts';
 import type { LibraryTrashTarget } from '../../composition/persistence/library-lifecycle/trash';
@@ -24,6 +30,8 @@ import {
 import { deleteMediaLibraryAssetsBatchSafely } from './store';
 import { deletePersistedVideoProject } from './video-projects';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
+
+const maintenanceLog = createMaintenanceLog();
 
 /** A deletion preview is bound to the exact trash admission seen by the user. */
 interface TrashDeletionTarget {
@@ -68,6 +76,8 @@ async function deleteLibraryTarget(
       [target.id],
       new Map([[target.id, expectedUsage ?? []]])
     );
+  } else if (target.kind === 'quick-edit-project') {
+    await deleteVideoWorkspaceProject(target.id, target.expectedRevision);
   } else if (target.kind === 'scenario-project') {
     await deleteScenarioProjectRecord(target.id);
   } else if (target.kind === 'video-project') {
@@ -95,14 +105,16 @@ export async function permanentlyDeleteLibraryItem(
 /** Explicit Gallery maintenance; never run from a persistence read API. */
 export async function cleanupLibraryTrash(
   policy: LocalStoragePolicy,
-  now = Date.now()
+  now = Date.now(),
+  signal?: AbortSignal
 ): Promise<{ failedCount: number }> {
-  if (!policy.trashCleanupEnabled) return { failedCount: 0 };
+  if (signal?.aborted || !policy.trashCleanupEnabled) return { failedCount: 0 };
   const cutoff = now - (policy.trashRetentionDays ?? 30) * 86_400_000;
-  const [media, videos, scenarios] = await Promise.all([
+  const [media, videos, scenarios, quickEdits] = await Promise.all([
     listMediaLibrary(),
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
+    listVideoWorkspaceSummaries(),
   ]);
   const candidates: TrashDeletionTarget[] = [];
   const append = (target: LibraryTrashTarget, trashedAt: number | undefined) => {
@@ -118,20 +130,60 @@ export async function cleanupLibraryTrash(
   videos.forEach((item) =>
     append({ kind: 'video-project', id: item.id }, item.lifecycle?.trashedAt)
   );
+  quickEdits.forEach((item) =>
+    append(
+      { kind: 'quick-edit-project', id: item.aggregateId, expectedRevision: item.revision },
+      item.lifecycle.trashedAt
+    )
+  );
   media.forEach((item) => append({ kind: 'media', id: item.id }, item.lifecycle?.trashedAt));
   let failedCount = 0;
+  let deleted = 0;
+  let retained = 0;
   for (const entry of candidates) {
+    if (signal) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (signal?.aborted) break;
     try {
       // Unattended cleanup cannot detach media from projects, including trashed projects.
       if (
         entry.target.kind === 'media' &&
         (await listMediaAssetProjectUsage(entry.target.id)).length > 0
-      )
+      ) {
+        retained += 1;
         continue;
+      }
+      if (signal?.aborted) break;
       await permanentlyDeleteTrashItem(entry, []);
+      deleted += 1;
     } catch (error) {
-      if (!(error instanceof StaleTrashItemError)) failedCount += 1;
+      if (error instanceof StaleTrashItemError)
+        void maintenanceLog.append({
+          operation: 'trash',
+          code: 'conflict',
+          counts: { retained: 1 },
+        });
+      else failedCount += 1;
     }
   }
+  if (deleted)
+    void maintenanceLog.append({ operation: 'trash', code: 'expired', counts: { deleted } });
+  if (retained)
+    void maintenanceLog.append({ operation: 'trash', code: 'in-use', counts: { retained } });
+  if (failedCount)
+    void maintenanceLog.append({
+      operation: 'trash',
+      code: 'failed',
+      counts: { failed: failedCount },
+    });
   return { failedCount };
+}
+
+/** Publish a project rename only after its revisioned metadata commit. */
+export async function renameQuickEditProject(
+  id: string,
+  expectedRevision: number,
+  name: string
+): Promise<void> {
+  await renameVideoWorkspaceProject(id, expectedRevision, name);
+  publishMediaHubLibraryChanged('update', [id]);
 }

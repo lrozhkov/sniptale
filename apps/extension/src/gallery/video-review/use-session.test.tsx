@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
-import { useReviewComposer } from './use-session';
+import { useReviewComposer, useReviewSnapshot } from './use-session';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -70,6 +71,7 @@ function setup() {
   } satisfies Parameters<typeof createVideoReviewSession>[1];
   const session = createVideoReviewSession(snapshot, deps);
   function Harness() {
+    useReviewSnapshot(session);
     composer = useReviewComposer(session);
     return null;
   }
@@ -93,7 +95,7 @@ it('warns before closing for a local note draft before it reaches the review ses
   const close = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
   expect(close()).toBe(true);
   act(() => composer.change(annotation, null));
-  expect(session.getSnapshot().dirty).toBe(false);
+  expect(session.getSnapshot().dirty).toBe(true);
   expect(close()).toBe(false);
   await act(async () => composer.flush());
   expect(close()).toBe(true);
@@ -107,7 +109,7 @@ it('coalesces many field changes, restores recovery on reopen, and commits exact
     composer.change(annotation);
   });
   expect(deps.saveVideoWorkspaceDraft).not.toHaveBeenCalled();
-  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
   expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(1);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
   await act(async () => root.render(null));
@@ -132,6 +134,52 @@ it('retains text after failed commit and allows retry without duplicate history'
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
 });
 
+it('keeps a failed recovery buffer editable and retries its latest text without adding history', async () => {
+  const { session, deps } = setup();
+  deps.saveVideoWorkspaceDraft.mockRejectedValueOnce(new Error('Quota'));
+  act(() => composer.change({ ...annotation, text: 'Keep this draft' }, null));
+  await act(async () => {
+    await expect(composer.flush()).rejects.toThrow('Quota');
+  });
+  expect(composer.dirty).toBe(true);
+  expect(composer.saving).toBe(false);
+  act(() => composer.change(annotation));
+  await act(async () => composer.flush());
+  expect(session.getSnapshot().snapshot.draft?.annotation.text).toBe(annotation.text);
+  expect(composer.dirty).toBe(false);
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+});
+
+it.each(['saved', 'failed'] as const)(
+  'settles an acquired recovery write after unmount when it is %s',
+  async (outcome) => {
+    const { session, deps } = setup();
+    const original = deps.saveVideoWorkspaceDraft.getMockImplementation()!;
+    let finish!: () => void;
+    deps.saveVideoWorkspaceDraft.mockImplementationOnce(async (args) => {
+      await new Promise<void>((resolve, reject) => {
+        finish = () => {
+          if (outcome === 'failed') reject(new Error('Quota after unmount'));
+          else resolve();
+        };
+      });
+      return original(args);
+    });
+    act(() => composer.change(annotation, null));
+    await act(async () => root.render(null));
+    expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(session.getSnapshot().pending).toBe(0);
+    if (outcome === 'saved')
+      expect(session.getSnapshot().snapshot.draft?.annotation.text).toBe(annotation.text);
+    else expect(session.getSnapshot().error).toBe('storage');
+    expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  }
+);
+
 it('keeps later typing dirty while an older recovery write is pending', async () => {
   const { deps } = setup();
   const original = deps.saveVideoWorkspaceDraft.getMockImplementation()!;
@@ -155,6 +203,30 @@ it('keeps later typing dirty while an older recovery write is pending', async ()
   });
   expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(2);
   expect(composer.annotation?.text).toBe(annotation.text);
+  expect(composer.dirty).toBe(false);
+});
+
+it('preserves the next recovery deadline when an automatic write acknowledges older typing', async () => {
+  const { deps } = setup();
+  const original = deps.saveVideoWorkspaceDraft.getMockImplementation()!;
+  let release!: () => void;
+  deps.saveVideoWorkspaceDraft.mockImplementationOnce(async (args) => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return original(args);
+  });
+  act(() => composer.change({ ...annotation, text: 'old' }, null));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
+  act(() => composer.change(annotation));
+  await act(async () => {
+    release();
+    await Promise.resolve();
+  });
+  expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(1);
+  expect(composer.dirty).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
+  expect(deps.saveVideoWorkspaceDraft).toHaveBeenCalledTimes(2);
   expect(composer.dirty).toBe(false);
 });
 

@@ -85,7 +85,21 @@ beforeEach(() => {
   mocks.videoPreset.mockResolvedValue(false);
 });
 
-it('creates the exact ordered descriptor tree', async () => {
+it('creates the exact ordered descriptor tree including untitled separators', async () => {
+  const descriptors = [...menu, { id: 'separator', parentId: 'sniptale.root', type: 'separator' }];
+  mocks.descriptors.mockReturnValueOnce(descriptors);
+  await rebuildBackgroundContextMenus();
+  expect(mocks.create.mock.calls.map(([arg]) => arg)).toEqual(
+    descriptors.map((item) => ({ contexts: ['all'], ...item }))
+  );
+});
+
+it('refuses an untitled item before browser creation and permits a corrected rebuild', async () => {
+  mocks.descriptors.mockReturnValueOnce([{ id: 'invalid' }]);
+  await expect(rebuildBackgroundContextMenus()).rejects.toThrow(
+    'A context menu item must have a title.'
+  );
+  expect(mocks.create).not.toHaveBeenCalled();
   await rebuildBackgroundContextMenus();
   expect(mocks.create.mock.calls.map(([arg]) => arg)).toEqual(
     menu.map((item) => ({ contexts: ['all'], ...item }))

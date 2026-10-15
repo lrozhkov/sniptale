@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER, parseWindowHeader } from '../../browser-frame/header';
 import type { EditorDocument } from './types';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import {
@@ -105,7 +106,15 @@ function isBrowserFrameState(value: unknown): boolean {
       value['appearance'] === 'window') &&
     isString(value['title']) &&
     isString(value['url']) &&
-    (value['faviconDataUrl'] === undefined || isNullableString(value['faviconDataUrl'])) &&
+    // Image title/address retain capture provenance; the shared display projection bounds text.
+    parseWindowHeader({
+      ...DEFAULT_WINDOW_HEADER,
+      ...value,
+      title: '',
+      url: '',
+      faviconDataUrl: value['faviconDataUrl'] ?? undefined,
+      faviconSource: value['faviconSource'] ?? undefined,
+    }) !== null &&
     (value['canvasMode'] === 'resize' || value['canvasMode'] === 'keep-size') &&
     (value['contentMode'] === 'push-down' || value['contentMode'] === 'fit-content')
   );

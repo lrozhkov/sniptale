@@ -52,6 +52,23 @@ it('keeps auto-processing out of the top toolbar regardless of base-recording te
   );
 });
 
+it('does not activate history or automatic controls for a legacy static-only sidecar', () => {
+  const project = createProject([createVideoClip()]);
+  const staticOnly = createTelemetry({
+    actionEvents: [],
+    signals: [
+      { id: 'old-static', kind: 'static-frame', startTime: 1, endTime: 4, point: null, data: {} },
+    ],
+  });
+  expect(renderSurface(project, staticOnly)).not.toContain('data-ui="video-editor.auto.open"');
+  expect(
+    renderSurface(project, {
+      ...staticOnly,
+      signals: [{ ...staticOnly.signals[0]!, kind: 'cursor-idle' }],
+    })
+  ).toContain('data-ui="video-editor.auto.open"');
+});
+
 function renderSurface(
   project: ReturnType<typeof createProject>,
   recordingTelemetry: RecordingTelemetryEntry

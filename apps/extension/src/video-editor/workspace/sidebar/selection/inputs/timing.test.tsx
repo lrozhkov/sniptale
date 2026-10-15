@@ -150,10 +150,19 @@ async function verifyTimingFields() {
   expect(container?.textContent).not.toContain('Вписывание');
 
   await act(async () => {
-    setInputValue(playbackRateInput!, String(getPlaybackRateSliderProps(2.4).value));
+    setInputValue(playbackRateInput!, '63');
   });
 
-  expect(onUpdateClipPlaybackRate).toHaveBeenCalledWith('video-1', 2.4);
+  expect(onUpdateClipPlaybackRate).toHaveBeenCalledWith('video-1', 2.45);
+  const exactRate = container?.querySelector<HTMLInputElement>('input[type="text"]');
+  expect(playbackRateInput?.valueAsNumber).toBe(getPlaybackRateSliderProps(1).value);
+  expect(getPlaybackRateSliderProps(2.4).value).toBeGreaterThan(62);
+  expect(getPlaybackRateSliderProps(2.4).value).toBeLessThan(63);
+  await act(async () => {
+    setInputValue(exactRate!, '2.4');
+    exactRate!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+  });
+  expect(onUpdateClipPlaybackRate).toHaveBeenLastCalledWith('video-1', 2.4);
 
   await act(async () => {
     setInputValue(playbackRateInput!, '0');

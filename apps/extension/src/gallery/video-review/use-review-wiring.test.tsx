@@ -40,7 +40,10 @@ type ShortcutBinding = {
   addComment(): void;
   toggleCut(): void;
 };
-type LifecycleBinding = { deleteCanvas(id: string): void };
+type LifecycleBinding = {
+  deleteCanvas(id: string): void;
+  deleteAnnotationEffect(id: string): void;
+};
 
 it('wires selection, flush, history, and shortcut boundaries through one owner', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -66,6 +69,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     advancedContent: createQuickEditAdvancedContent(),
   };
   reviewDocument.canvasComments.push(createCanvasComment({ id: 'canvas-a', at: 1 }));
+  const annotationEffects = { remove: vi.fn() };
   const session = { flush: vi.fn(), history: vi.fn(), commit: vi.fn() };
   const advancedState = { flush: vi.fn(), setAudio: vi.fn() };
   const setActiveSelection = vi.fn();
@@ -79,12 +83,14 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     document: reviewDocument,
     advanced,
     advancedState,
+    annotationEffects,
     exporter: { phase: 'idle', index: { boundaries: [0, 1] } },
-    zoom: { remove: vi.fn(), setDrawing: vi.fn() },
+    zoom: { remove: vi.fn(), setDrawing: vi.fn(), change: vi.fn() },
     activeSelection: { kind: 'canvas-comment', id: 'canvas-a' } satisfies ReviewSelection,
     setActiveSelection,
     clearAnnotation: vi.fn(),
     time: 1,
+    playbackRange: null,
     timelineDuration: 4,
     busy: false,
     canStart: () => true,
@@ -96,6 +102,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     setCutting,
     telemetry: { markers: [] },
     sourceDuration: 4,
+    sourceGeometry: { width: 320, height: 180 },
     actionsVisible: true,
     play: vi.fn(),
     timelineSelection: { kind: 'point', time: 1 },
@@ -108,7 +115,19 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
   try {
     await act(async () => root.render(<Harness />));
     expect(result.telemetry).toBe(true);
+    expect(mocks.project).toHaveBeenCalledWith(args.telemetry, args.sourceDuration, true);
     expect(result.projected.warnings).toBe(2);
+    expect(result.projected.captureCapabilities).toBeNull();
+    const capabilities = {
+      version: 1 as const,
+      pointer: 'unavailable' as const,
+      keyboard: 'available' as const,
+      wheel: 'unknown' as const,
+      coverage: 'document' as const,
+    };
+    args.telemetry = { ...args.telemetry!, capabilities };
+    await act(async () => root.render(<Harness />));
+    expect(result.projected.captureCapabilities).toEqual(capabilities);
     expect(result.exporter).toEqual({ prepared: true });
 
     const canvasSelection = mocks.canvas.mock.lastCall?.[0].onSelectionChange as SelectionSetter;
@@ -121,28 +140,47 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     audioSelection(null);
     expect(setActiveSelection).toHaveBeenCalledTimes(4);
     const originalSelection = mocks.audio.mock.lastCall?.[0].onOriginalSelection as SelectionSetter;
+    originalSelection(null);
     originalSelection('gain-a');
     expect(setTimelineSelection).toHaveBeenLastCalledWith({ kind: 'point', time: 1 });
     expect(setActiveSelection).toHaveBeenLastCalledWith({ kind: 'original-audio', id: 'gain-a' });
 
+    const deleteFocus = mocks.lifecycle.mock.lastCall?.[0].deleteCursorFocus as (
+      id: string
+    ) => void;
+    const setPath = vi.fn();
+    Object.assign(advancedState, { setCursorFocusPath: setPath });
+    deleteFocus('missing');
+    expect(setPath).toHaveBeenCalledOnce();
+    expect(setPath.mock.lastCall![0].segments).toEqual([]);
     const lifecycle = mocks.lifecycle.mock.lastCall?.[0] as LifecycleBinding;
+    lifecycle.deleteAnnotationEffect('visual-a');
+    expect(annotationEffects.remove).toHaveBeenCalledWith('visual-a');
     lifecycle.deleteCanvas('missing');
     lifecycle.deleteCanvas('canvas-a');
+    const selectionActions = mocks.lifecycle.mock.lastCall![0];
+    selectionActions.clearAnnotation();
+    selectionActions.deleteZoomLink('zoom-link');
+    expect(args.clearAnnotation).toHaveBeenCalledWith(null);
+    expect(args.zoom.change).toHaveBeenCalledWith('zoom-link', { linkTo: null });
     expect(canvas.onDelete).toHaveBeenCalledWith(reviewDocument.canvasComments[0]);
 
     const shortcuts = mocks.shortcuts.mock.lastCall?.[0] as ShortcutBinding;
+    const cancelAnnotationTool = vi.fn();
+    result.annotationToolCancellation.current = cancelAnnotationTool;
     await shortcuts.undo();
     await shortcuts.redo();
     shortcuts.cancelDrawing();
     shortcuts.pointTool();
     shortcuts.addComment();
     shortcuts.toggleCut();
+    expect(cancelAnnotationTool).toHaveBeenCalledTimes(3);
     expect(advancedState.flush).toHaveBeenCalledTimes(2);
     expect(canvas.flushTexts).toHaveBeenCalledTimes(2);
     expect(session.flush).toHaveBeenCalledTimes(2);
     expect(session.history.mock.calls.map(([direction]) => direction)).toEqual(['undo', 'redo']);
     expect(setTimelineSelection).toHaveBeenCalledWith({ kind: 'point', time: 1 });
-    expect(comments.add).toHaveBeenCalledWith(args.timelineSelection);
+    expect(comments.add).toHaveBeenCalledWith();
     expect(cuts.toggle).toHaveBeenCalledWith('cut');
     expect(args.zoom.setDrawing).toHaveBeenCalledTimes(3);
     expect(args.zoom.setDrawing).toHaveBeenLastCalledWith(false);
@@ -198,6 +236,11 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     advancedState.flush.mockRejectedValueOnce(new Error('Staged content'));
     expect(await result.moveHistory('start')).toBe(false);
     expect(persist).toHaveBeenCalledTimes(2);
+    args.telemetry = null;
+    Reflect.deleteProperty(args, 'sourceGeometry');
+    await act(async () => root.render(<Harness />));
+    expect(result.telemetry).toBe(false);
+    expect(result.cursorFocusPath.segments).toEqual([]);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

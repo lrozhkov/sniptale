@@ -1,0 +1,192 @@
+.review-history-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+  background: color-mix(in srgb, var(--sniptale-color-surface-input) 78%, transparent);
+  color: var(--sniptale-color-text-muted);
+}
+.review-history-search:focus-within {
+  border-color: var(--sniptale-color-border-accent-strong);
+}
+[data-ui='gallery.videoReview.inspector']
+  :is(
+    fieldset[data-ui='gallery.videoReview.actionHistory'],
+    [data-ui='gallery.videoReview.textDocument']
+  )
+  .review-history-search
+  > input[type='search'] {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: var(--sniptale-color-text-primary);
+}
+.review-history-search input::placeholder {
+  color: var(--sniptale-color-text-muted);
+}
+.review-history-search input:focus::placeholder {
+  color: transparent;
+}
+.review-history-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.review-history-navigation,
+.review-history-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.review-history-checkbox {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: 16px;
+  height: 24px;
+  cursor: pointer;
+}
+.review-history-checkbox input {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  margin: 0;
+  cursor: inherit;
+}
+.review-history-checkbox > span {
+  display: flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid var(--sniptale-color-border-strong);
+  background: var(--sniptale-color-surface-input);
+}
+.review-history-checkbox input:checked + span,
+.review-history-checkbox input:indeterminate + span {
+  background: var(--sniptale-color-text-primary);
+  border-color: var(--sniptale-color-text-primary);
+  color: var(--sniptale-color-surface-panel);
+}
+.review-history-checkbox input:focus-visible + span {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+.review-history-checkbox input:disabled + span {
+  opacity: 0.4;
+}
+.review-history-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--sniptale-radius-sm);
+  border: 1px solid var(--sniptale-color-border-soft);
+}
+.review-history-row[data-selected] {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 55%, transparent);
+  border-color: var(--sniptale-color-border-strong);
+}
+.review-history-row button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 3px;
+  border-radius: var(--sniptale-radius-sm);
+}
+
+[data-ui='gallery.videoReview.inspector']
+  :is(
+    fieldset[data-ui='gallery.videoReview.actionHistory'],
+    [data-ui='gallery.videoReview.textDocument']
+  )
+  .review-history-search
+  > input[type='search']:focus-visible {
+  outline: none;
+}
+
+/* History owns its bounded list; the inspector retains the mounted view across event navigation. */
+.review-history-host:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+.review-history-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  gap: 12px;
+}
+.review-history-toolbar {
+  flex: none;
+}
+.review-history-results,
+.review-history-settings {
+  min-height: 0;
+  overflow-y: auto;
+}
+.review-history-results {
+  flex: 1;
+}
+.review-history-filter-toggle {
+  position: relative;
+}
+.sniptale-btn.review-history-filter-toggle[data-active='true'] {
+  color: var(--sniptale-color-text-primary);
+}
+.review-history-filter-dot {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sniptale-color-accent);
+}
+
+.review-history-navigation {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.review-history-settings {
+  min-width: 0;
+  padding-right: 2px;
+}
+
+.review-history-row:hover,
+.review-history-row:focus-within {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 35%, transparent);
+  border-color: var(--sniptale-color-border-strong);
+}
+.review-history-row[data-selected]:hover,
+.review-history-row[data-selected]:focus-within {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 65%, transparent);
+}
+.review-history-row[data-active] .review-history-target {
+  color: var(--sniptale-color-accent);
+}
+@layer utilities {
+  [data-ui='gallery.videoReview.inspector']
+    [data-ui='gallery.videoReview.actionHistory']
+    .review-history-more,
+  [data-ui='gallery.videoReview.inspector']
+    [data-ui='gallery.videoReview.actionHistory']
+    .review-history-more:hover {
+    border-color: transparent !important;
+  }
+}

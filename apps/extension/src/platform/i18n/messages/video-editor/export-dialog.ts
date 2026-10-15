@@ -1,6 +1,13 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorExportDialogMessages = defineMessageSource({
+  frameRateMode: { ru: 'Частота кадров', en: 'Frame rate' },
+  frameRateConstant: { ru: 'Постоянная', en: 'Constant' },
+  frameRateAdaptive: { ru: 'Адаптивная', en: 'Adaptive' },
+  frameRateAdaptiveHint: {
+    ru: 'До 60 FPS. Сокращает повторяющиеся кадры с приоритетом скорости экспорта. Для дальнейшего монтажа выбирайте постоянную частоту.',
+    en: 'Up to 60 FPS. Reduces duplicate frames while prioritizing export speed. Choose constant frame rate for further editing.',
+  },
   fileSection: { ru: 'Файл', en: 'File' },
   pictureSection: { ru: 'Изображение', en: 'Picture' },
   codecUnavailable: {
@@ -99,6 +106,13 @@ export const videoEditorExportDialogMessages = defineMessageSource({
   fpsLabel: {
     ru: 'FPS',
     en: 'FPS',
+  },
+  estimatedSize: { ru: 'Примерный размер файла:', en: 'Estimated file size:' },
+  sizeEstimating: { ru: 'Оцениваем размер файла…', en: 'Estimating file size…' },
+  sizeUnavailable: { ru: 'Оценка размера недоступна', en: 'Size estimate unavailable' },
+  sizeEstimateHint: {
+    ru: 'Прогноз по нескольким фрагментам. Итоговый размер может отличаться.',
+    en: 'Based on sampled sections. The final size may differ.',
   },
   capabilityLoading: {
     ru: 'Проверяем доступные кодеки MP4…',

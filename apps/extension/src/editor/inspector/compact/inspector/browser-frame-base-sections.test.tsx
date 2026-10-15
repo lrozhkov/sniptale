@@ -27,7 +27,8 @@ it('builds browser-frame base commands and routes async updates', async () => {
   await Promise.resolve();
   await Promise.resolve();
 
-  expect(insertOrUpdateBrowserFrame).toHaveBeenCalledOnce();
+  expect(insertOrUpdateBrowserFrame).not.toHaveBeenCalled();
+  expect(params.syncBrowserFrame).toHaveBeenCalledWith({ enabled: false });
   expect(params.syncBrowserFrame).toHaveBeenCalledWith({ canvasMode: 'keep-size' });
   expect(params.syncBrowserFrame).toHaveBeenCalledWith({ contentMode: 'fit-content' });
 });

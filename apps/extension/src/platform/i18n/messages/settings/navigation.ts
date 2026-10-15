@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const settingsNavigationMessages = defineMessageSource({
+  eventsLogs: { ru: 'События и логи', en: 'Events and logs' },
   scenarioLayouts: { ru: 'Макеты сценария', en: 'Scenario layouts' },
   videoEffects: { ru: 'Эффекты видеоредактора', en: 'Video editor effects' },
   groups: {
@@ -75,6 +76,10 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'Import and export',
   },
   descriptions: {
+    eventsLogs: {
+      ru: 'Диагностика, история обслуживания и выгрузка событий.',
+      en: 'Diagnostics, maintenance history and event export.',
+    },
     scenarioLayouts: {
       ru: 'Создавайте и редактируйте макеты шагов с текстом и изображениями.',
       en: 'Create and edit step layouts with text and images.',
@@ -164,6 +169,7 @@ export const settingsNavigationMessages = defineMessageSource({
     palettes: { ru: 'Палитры', en: 'Palettes' },
     surfaces: { ru: 'Поверхности', en: 'Surfaces' },
     gradients: { ru: 'Градиенты', en: 'Gradients' },
+    backgrounds: { ru: 'Фон', en: 'Backgrounds' },
     connection: { ru: 'Подключение', en: 'Connection' },
     capture: { ru: 'Захват', en: 'Capture' },
     commands: { ru: 'Команды', en: 'Commands' },

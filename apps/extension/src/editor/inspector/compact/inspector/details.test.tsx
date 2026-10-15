@@ -53,24 +53,18 @@ function interactWithDimensionCommand(args: {
   });
 }
 
-it('builds browser-frame detail commands with semantic icons and update handlers', async () => {
+it('routes compact window-header edits through the shared settings owner', () => {
   const params = createInspectorCommandParams();
-  const commands = buildBrowserFrameDetailCommands(params as never);
-
-  expect(commands.map((command) => command.icon)).toEqual(['browser', 'text', 'link']);
-
-  ((commands[1]!.content as any).props.children as any).props.onChange({
-    currentTarget: { value: 'Sniptale title' },
+  const commands = buildBrowserFrameDetailCommands({
+    ...params,
+    richShapeSelection: null,
+    lastFillModeRef: { current: 'color' },
+  } as Parameters<typeof buildBrowserFrameDetailCommands>[0]);
+  expect(commands.map((command) => command.icon)).toEqual(['browser']);
+  expect((commands[0]!.content as React.ReactElement).props).toMatchObject({
+    browserFrame: params.browserFrame,
+    syncBrowserFrame: params.syncBrowserFrame,
   });
-  ((commands[2]!.content as any).props.children as any).props.onChange({
-    currentTarget: { value: 'https://sniptale.dev' },
-  });
-
-  await Promise.resolve();
-  await Promise.resolve();
-
-  expect(params.syncBrowserFrame).toHaveBeenCalledWith({ title: 'Sniptale title' });
-  expect(params.syncBrowserFrame).toHaveBeenCalledWith({ url: 'https://sniptale.dev' });
 });
 
 it('builds dimension commands and routes size, lock, and apply actions', () => {
@@ -145,10 +139,10 @@ it('builds frame-surface commands with explicit icons and routes background acti
     (commands[0]!.content as any).props.children.props.children[0] as any
   ).props;
   const backgroundEditorProps = (
-    (commands[0]!.content as any).props.children.props.children[2] as any
+    (commands[0]!.content as any).props.children.props.children[1].props.children[1] as any
   ).props;
   const backgroundBlurProps = (
-    (commands[0]!.content as any).props.children.props.children[3] as any
+    (commands[0]!.content as any).props.children.props.children[1].props.children[2] as any
   ).props;
   const paddingFieldsProps = ((commands[1]!.content as any).props.children as any).props;
 
@@ -175,10 +169,13 @@ it('builds frame-surface commands with explicit icons and routes background acti
   commands[2]?.onClick?.();
 
   expect(params.applyGradientPreset).toHaveBeenCalledWith({ angle: 180 });
-  expect(params.setFrameDraft).toHaveBeenCalledTimes(5);
+  expect(params.setFrameDraft).toHaveBeenCalledTimes(6);
+  for (const [update] of params.setFrameDraft.mock.calls) {
+    if (typeof update === 'function') update(params.frameDraft);
+  }
   expect(params.onPickBackgroundImage).toHaveBeenCalledTimes(1);
   expect(params.clearBackgroundImage).toHaveBeenCalledTimes(1);
-  expect(params.onApplyFrame).toHaveBeenCalledTimes(1);
+  expect(params.onApplyFrame).not.toHaveBeenCalled();
 });
 
 it('builds workspace color commands with a separate save-default action', () => {

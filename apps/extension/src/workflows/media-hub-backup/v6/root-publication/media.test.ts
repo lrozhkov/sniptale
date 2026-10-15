@@ -1,3 +1,12 @@
+import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
+import { openAsBlob } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
+import { createReviewWorkspaceStoreFixture } from '../../../../composition/persistence/review-workspaces/store.test-support';
+import { createQuickEditAdvancedState } from '../../../../features/video/review/advanced/defaults';
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
@@ -84,13 +93,30 @@ beforeEach(() => {
 });
 
 describe('media v6 root publication', () => {
-  it('publishes screenshot metadata and the restore checkpoint atomically', async () => {
+  it.each([
+    { oversized: false, scenario: 'keeps thumbnail bytes readable after staging deletion' },
+    {
+      oversized: true,
+      scenario: 'refuses oversized thumbnail bytes before reading or publication',
+    },
+  ])('$scenario', async ({ oversized }) => {
     const stores = new Map<
       string,
-      { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> }
+      {
+        get: ReturnType<typeof vi.fn>;
+        put: ReturnType<typeof vi.fn>;
+        index: ReturnType<typeof vi.fn>;
+      }
     >();
     const storeFor = (name: string) => {
-      const store = stores.get(name) ?? { get: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+      const store = stores.get(name) ?? {
+        get: vi.fn().mockResolvedValue(undefined),
+        put: vi.fn(),
+        index: vi.fn(() => ({
+          getAll: vi.fn(async () => []),
+          getAllKeys: vi.fn(async () => []),
+        })),
+      };
       stores.set(name, store);
       return store;
     };
@@ -98,69 +124,112 @@ describe('media v6 root publication', () => {
     mocks.runMutation.mockImplementation(async (callback) =>
       callback({ transaction: vi.fn(() => tx) })
     );
-    mocks.readFile.mockResolvedValue(new File(['image'], 'capture.png', { type: 'image/png' }));
-
-    const result = await mediaLibraryRootPublisher.publish({
-      envelope: {
-        descriptor: {
-          mediaSubtype: 'library-item',
-          metadataPath: '_sniptale/metadata/media/media-one.json',
-          objectCount: 1,
-          rootId: 'media-one',
-          rootKind: 'media',
-          totalBytes: 5,
-        },
-        metadata: portableJson({
-          entry: {
-            createdAt: 1,
-            duration: null,
-            filename: 'capture.png',
-            height: 80,
-            id: 'media-one',
-            kind: 'screenshot',
-            mimeType: 'image/png',
-            originalFilename: 'capture.png',
-            size: 5,
-            source: { kind: 'screenshot' },
-            sourceFavicon: null,
-            sourceTitle: null,
-            sourceUrl: null,
-            tags: [],
-            updatedAt: 2,
-            width: 100,
-            workspaceRevision: 0,
-          },
-          originalObjectId: 'object-one',
-        }),
-        objects: [],
-      },
-      journal,
-      session,
-      staged: [
-        {
-          objectId: 'object-one',
-          ref: {
-            assetId: 'local-one',
-            createdAt: 1,
-            location: { kind: 'opfs', objectKey: 'objects/local-one' },
-            mimeType: 'image/png',
-            sha256: null,
-            size: 5,
-          },
-        },
-      ],
-    });
-
-    expect(result).toEqual({ conflicted: false, imported: true, retainedAssetIds: [] });
-    expect(storeFor('media_library').put).toHaveBeenCalledWith(
-      expect.objectContaining({ blob: expect.any(File), id: 'media-one' })
+    const stagingDirectory = await mkdtemp(join(tmpdir(), 'sniptale-thumbnail-'));
+    const thumbnailPath = join(stagingDirectory, 'thumbnail.png');
+    await writeFile(thumbnailPath, 'thumbnail');
+    const stagedThumbnail = new File(
+      [await openAsBlob(thumbnailPath, { type: 'image/png' })],
+      'thumbnail.png',
+      { type: 'image/png' }
     );
-    expect(mocks.checkpoint).toHaveBeenCalledWith(expect.anything(), 'restore-1', {
-      conflicted: false,
-      imported: true,
-      rootKey: 'media:library-item:media-one',
-      targetRootId: 'media-one',
-    });
+    mocks.readFile.mockImplementation(async (_ref, filename) =>
+      filename.endsWith('-thumbnail')
+        ? stagedThumbnail
+        : new File(['image'], 'capture.png', { type: 'image/png' })
+    );
+
+    try {
+      const publication = mediaLibraryRootPublisher.publish({
+        envelope: {
+          descriptor: {
+            mediaSubtype: 'library-item',
+            metadataPath: '_sniptale/metadata/media/media-one.json',
+            objectCount: 1,
+            rootId: 'media-one',
+            rootKind: 'media',
+            totalBytes: 5,
+          },
+          metadata: portableJson({
+            entry: {
+              createdAt: 1,
+              duration: null,
+              filename: 'capture.png',
+              height: 80,
+              id: 'media-one',
+              kind: 'screenshot',
+              mimeType: 'image/png',
+              originalFilename: 'capture.png',
+              size: 5,
+              source: { kind: 'screenshot' },
+              sourceFavicon: null,
+              sourceTitle: null,
+              sourceUrl: null,
+              tags: [],
+              updatedAt: 2,
+              width: 100,
+              workspaceRevision: 0,
+            },
+            originalObjectId: 'object-one',
+            thumbnail: { objectId: 'thumbnail', createdAt: 1, updatedAt: 1, width: 10, height: 8 },
+          }),
+          objects: [],
+        },
+        journal,
+        session,
+        staged: [
+          {
+            objectId: 'thumbnail',
+            ref: {
+              assetId: 'thumbnail-staging',
+              createdAt: 1,
+              location: { kind: 'opfs', objectKey: 'objects/thumbnail-staging' },
+              mimeType: 'image/png',
+              sha256: null,
+              size: oversized ? 8 * 1024 * 1024 + 1 : 9,
+            },
+          },
+          {
+            objectId: 'object-one',
+            ref: {
+              assetId: 'local-one',
+              createdAt: 1,
+              location: { kind: 'opfs', objectKey: 'objects/local-one' },
+              mimeType: 'image/png',
+              sha256: null,
+              size: 5,
+            },
+          },
+        ],
+      });
+
+      if (oversized) {
+        await expect(publication).rejects.toThrow('thumbnail exceeds');
+        expect(mocks.readFile).not.toHaveBeenCalledWith(
+          expect.objectContaining({ assetId: 'thumbnail-staging' }),
+          expect.anything()
+        );
+        expect(mocks.runMutation).not.toHaveBeenCalled();
+        expect(mocks.checkpoint).not.toHaveBeenCalled();
+        return;
+      }
+      const result = await publication;
+      expect(result).toEqual({ conflicted: false, imported: true, retainedAssetIds: [] });
+      expect(storeFor('media_library').put).toHaveBeenCalledWith(
+        expect.objectContaining({ blob: expect.any(File), id: 'media-one' })
+      );
+      expect(mocks.checkpoint).toHaveBeenCalledWith(expect.anything(), 'restore-1', {
+        conflicted: false,
+        imported: true,
+        rootKey: 'media:library-item:media-one',
+        targetRootId: 'media-one',
+      });
+      await rm(thumbnailPath);
+      const thumbnail = parseMediaThumbnailEntry(storeFor('thumbnails').put.mock.calls[0]?.[0]);
+      if (!thumbnail) throw new Error('Restored thumbnail is missing.');
+      expect(await thumbnail.blob.text()).toBe('thumbnail');
+    } finally {
+      await rm(stagingDirectory, { recursive: true, force: true });
+    }
   });
 
   it.each([
@@ -560,4 +629,119 @@ describe('media v6 web snapshot role validation', () => {
       ).rejects.toThrow(message);
     }
   );
+});
+
+it('retains imported quick-edit recording and mirror without clearing source Trash', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  mocks.runMutation.mockImplementation(async (callback) => callback(fixture.database));
+  const id = 'recording:restored';
+  const lifecycle = { ...createLibraryLifecycle('temporary', 1), trashedAt: 3 };
+  const result = await mediaLibraryRootPublisher.publish({
+    envelope: {
+      descriptor: {
+        rootKind: 'media',
+        mediaSubtype: 'library-item',
+        rootId: id,
+        metadataPath: '_sniptale/metadata/media/recording%3Arestored.json',
+        objectCount: 1,
+        totalBytes: 6,
+      },
+      objects: [],
+      metadata: portableJson({
+        entry: {
+          id,
+          kind: 'recording',
+          filename: 'restored.webm',
+          originalFilename: 'restored.webm',
+          source: { kind: 'recording', recordingId: 'restored' },
+          mimeType: 'video/webm',
+          size: 6,
+          duration: 2,
+          width: 640,
+          height: 360,
+          createdAt: 1,
+          updatedAt: 2,
+          lifecycle,
+          tags: [],
+          sourceUrl: null,
+          sourceTitle: null,
+          sourceFavicon: null,
+        },
+        originalObjectId: 'original',
+        recording: {
+          entry: {
+            id: 'restored',
+            filename: 'restored.webm',
+            mimeType: 'video/webm',
+            size: 6,
+            createdAt: 1,
+            lifecycle,
+          },
+        },
+        videoReview: {
+          workspace: {
+            aggregateId: id,
+            formatVersion: 1,
+            source: { duration: 2, width: 640, height: 360, mimeType: 'video/webm', size: 6 },
+            revision: 1,
+            history: [],
+            cursor: 0,
+            advanced: {
+              ...createQuickEditAdvancedState(),
+              ui: {
+                ...createQuickEditAdvancedState().ui,
+                workspaceColors: { dark: '#123456ff' },
+                lockedTracks: { source: true },
+                tracks: {
+                  ...createQuickEditAdvancedState().ui.tracks,
+                  originalAudio: false,
+                  music: true,
+                },
+              },
+            },
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          draft: null,
+        },
+      }),
+    },
+    journal,
+    session: { ...session, currentRoot: `media:library-item:${id}` },
+    staged: [
+      {
+        objectId: 'original',
+        ref: {
+          assetId: 'restored-source',
+          createdAt: 1,
+          location: { kind: 'opfs', objectKey: 'objects/restored-source' },
+          mimeType: 'video/webm',
+          sha256: null,
+          size: 6,
+        },
+      },
+    ],
+  });
+  expect(result.imported).toBe(true);
+  expect(fixture.rows.get('media_library')!.get(id)).toMatchObject({
+    lifecycle: { storageClass: 'library', trashedAt: 3 },
+  });
+  expect(fixture.rows.get('recordings')!.get('restored')).toMatchObject({
+    assetId: 'restored-source',
+    lifecycle: { storageClass: 'library', trashedAt: 3 },
+  });
+  expect(fixture.rows.get('asset_refs')!.has('restored-source')).toBe(true);
+  const restored = await readWorkspaceStorage(
+    fixture.database.transaction(['video_workspaces', 'video_workspace_history'], 'readonly'),
+    id
+  );
+  expect(restored.logical).toMatchObject({
+    advanced: {
+      ui: {
+        workspaceColors: { dark: '#123456ff' },
+        lockedTracks: { source: true },
+        tracks: { originalAudio: false, music: true },
+      },
+    },
+  });
 });

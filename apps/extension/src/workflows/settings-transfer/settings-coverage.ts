@@ -22,6 +22,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'voice-input': ['system.voice', 'system.voice.microphone'],
   'native-app': ['system.native', 'system.native.connection'],
   'access-data': ['action/status'],
+  'events-logs': ['action/status'],
   'settings-transfer': ['action/status'],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
 
@@ -40,6 +41,18 @@ export const SETTINGS_TRANSFER_VIEW_COVERAGE = {
   },
 } as const;
 
+// docs/security/data-handling.md, "Background preset metadata": this local catalog is
+// explicitly excluded from settings transfer; Library image bytes keep their separate owner.
+export const SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE = {
+  'editor-resources': {
+    backgrounds: {
+      storageKey: 'sniptale_background_presets',
+      policy: 'docs/security/data-handling.md',
+      reason: 'Local-only background preset metadata is excluded from settings transfer.',
+    },
+  },
+} as const;
+
 export const SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE = {} as const;
 
 type SettingsTransferExcludedControlId = keyof typeof SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE;
@@ -53,6 +66,11 @@ type PersistenceMutationCoverage = {
 };
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
+  excluded(
+    'system/events-logs/index.tsx',
+    ['createEventHistory', 'createMaintenanceLog', 'createRuntimeLog'],
+    'action/status'
+  ),
   transferable(
     'capture/saving/filename-rules.tsx',
     ['updateSettings'],
@@ -102,8 +120,10 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
   transferable(
     'ai/prompts/save.ts',
     [
+      'resetAudioTranscriptionSystemPrompt',
       'resetGlobalSystemPrompt',
       'resetScenarioEditorSystemPrompt',
+      'saveAudioTranscriptionSystemPrompt',
       'saveGlobalSystemPrompt',
       'saveScenarioEditorSystemPrompt',
     ],

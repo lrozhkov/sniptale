@@ -1,3 +1,4 @@
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import type { VideoProjectAssetSource } from '../../../features/video/project/types';
 import { parseAssetRef, type AssetRef } from '../assets';
 import {
@@ -93,16 +94,18 @@ export async function detachScenarioVideoAssets(
       assets.push({ ...asset, source });
     }
     const now = Date.now();
-    await tx.objectStore(VIDEO_PROJECTS_STORE).put!({
-      ...entry,
-      updatedAt: now,
-      workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
-      project: {
-        ...entry.project,
+    await tx.objectStore(VIDEO_PROJECTS_STORE).put!(
+      withVideoProjectUsage({
+        ...entry,
         updatedAt: now,
-        assets,
-        ...(originated ? { source: { kind: 'manual' as const } } : {}),
-      },
-    });
+        workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
+        project: {
+          ...entry.project,
+          updatedAt: now,
+          assets,
+          ...(originated ? { source: { kind: 'manual' as const } } : {}),
+        },
+      })
+    );
   }
 }

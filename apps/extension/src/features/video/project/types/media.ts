@@ -1,3 +1,5 @@
+import type { WindowHeader } from '../../../browser-frame/header';
+
 /** Bounded, source-time amplitude envelope stored with each media asset. */
 export const MAX_VIDEO_PROJECT_AUDIO_PEAKS = 30_000;
 
@@ -25,6 +27,7 @@ export interface VideoProjectMediaShadowFields {
 }
 
 export interface VideoProjectMediaVisualFields extends VideoProjectMediaShadowFields {
+  windowHeader?: WindowHeader;
   fitMode: VideoMediaFitMode;
   fitScalePercent?: number;
 }

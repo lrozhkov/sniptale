@@ -115,7 +115,11 @@ it('writes scenario preview and thumbnail blobs against the scenario root revisi
       transaction: vi.fn(() => ({
         done: Promise.resolve(),
         objectStore: vi.fn((name: string) =>
-          name === 'scenario_projects' ? { get: vi.fn(async () => root) } : { put }
+          name === 'scenario_projects'
+            ? { get: vi.fn(async () => root) }
+            : name === 'scenario_project_history' || name === 'scenario_project_units'
+              ? { index: () => ({ getAll: async () => [] }) }
+              : { put }
         ),
       })),
     })

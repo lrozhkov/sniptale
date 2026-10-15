@@ -1,3 +1,4 @@
+import type { WindowHeader } from '../../browser-frame/header';
 import type { BorderPreset } from '../../highlighter/contracts';
 import type { EditorRasterEffect } from './effects';
 import type { EditorRichShapeDocumentObject } from './rich-shape/types';
@@ -47,12 +48,15 @@ type EditorBackgroundImageFit =
   | 'fit-height';
 type EditorFrameLayoutMode = 'expand-canvas' | 'fit-image';
 
-export interface BrowserFrameState {
+export interface BrowserFrameState extends Partial<
+  Pick<WindowHeader, 'kind' | 'style' | 'theme' | 'faviconEnabled'>
+> {
   enabled?: boolean;
   appearance?: 'header' | 'window';
   title: string;
   url: string;
   faviconDataUrl?: string | null;
+  faviconSource?: WindowHeader['faviconSource'] | null;
   canvasMode: BrowserFrameCanvasMode;
   contentMode: BrowserFrameContentMode;
 }

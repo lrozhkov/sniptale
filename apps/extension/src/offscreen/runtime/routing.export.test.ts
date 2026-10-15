@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const readiness = vi.hoisted(() => ({
   ensureAdmission: vi.fn().mockResolvedValue(undefined),
   requireAdmission: vi.fn(),
+  requireAssets: vi.fn(),
   ensureAssets: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('./data-readiness', () => ({
@@ -386,4 +387,34 @@ it('refuses a terminated data connection without waiting or touching staged inpu
   expect(mocks.acquireRasterInput).not.toHaveBeenCalled();
   expect(mocks.deleteRasterJob).not.toHaveBeenCalled();
   expect(mocks.cleanupRasterJobs).not.toHaveBeenCalled();
+});
+
+it('explicitly prepares download assets and fails a cold lease without joining admission', async () => {
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD,
+      capabilityToken: 'capability-1',
+    })
+  ).resolves.toBe('accepted');
+  expect(readiness.ensureAssets).toHaveBeenCalledOnce();
+  readiness.requireAssets.mockImplementationOnce(() => {
+    throw new Error('Offscreen assets are not prepared');
+  });
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
+      capabilityToken: 'capability-1',
+      downloadOperationId: 'cold-operation',
+      filename: 'page.zip',
+      reference: {
+        assetId: 'asset-1',
+        createdAt: 1,
+        location: { kind: 'opfs', objectKey: 'objects/asset-1' },
+        mimeType: 'application/zip',
+        sha256: null,
+        size: 10,
+      },
+    })
+  ).rejects.toThrow('Offscreen assets are not prepared');
+  expect(readiness.ensureAssets).toHaveBeenCalledOnce();
 });

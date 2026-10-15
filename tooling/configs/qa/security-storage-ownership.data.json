@@ -137,8 +137,22 @@
         {
           "sink": "store.put",
           "keys": [
-            "VIDEO_WORKSPACES_STORE",
             "VIDEO_WORKSPACE_DRAFTS_STORE"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/review-workspaces/storage.ts",
+      "owner": "review-workspaces",
+      "justification": "Encodes admitted review baseline/history and compact head inside the existing caller-owned transaction; no independent retention or mutation authority.",
+      "reviewNote": "Local-only source-time annotations, edit intent, complete linear history, and final text inserted into the comment field. No raw recognition events, interim transcripts or audio. Explicit media backup only; drafts excluded from reports; no sync/logs/diagnostics. Deleted with media and verified local-data erasure.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "VIDEO_WORKSPACES_STORE",
+            "VIDEO_WORKSPACE_HISTORY_STORE"
           ]
         }
       ]
@@ -267,6 +281,108 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/export-time-history/index.ts",
+      "owner": "export-time-history",
+      "justification": "Bounded local advisory numeric export-time calibration history.",
+      "reviewNote": "At most 100 observations, ten per constrained non-identifying profile, 30 days; no media, names, IDs, content or device fingerprints. Excluded from sync, backup, export and diagnostics. Read operations do not write. Successful rendering only; abort-aware nonqueued mutation permits and cross-context locks prevent pending erasure writes. Verified local-data erasure removes the exact key.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "EXPORT_TIME_HISTORY_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/background-presets/catalog.ts",
+      "owner": "background-presets",
+      "justification": "User-requested local background catalog metadata: bounded names and Library identities, enabled state and ordering.",
+      "reviewNote": "No media bytes, remote URLs or credentials. Explicit user additions; retained until removal or local-data erasure even with preferences preserved. Excluded from sync, diagnostics and settings transfer. Library images and project snapshots retain their existing independent lifecycle.",
+      "storageWrites": [
+        {
+          "sink": "deps.storage.local.set",
+          "keys": [
+            "BACKGROUND_PRESETS_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/assets/audio-staging.ts",
+      "owner": "gallery-audio-job-staging",
+      "justification": "Temporarily retains explicitly requested Gallery transcription input and generated audio preview under the existing asset OPFS root.",
+      "reviewNote": "Random operation-scoped identifiers, 32 MiB per object (24 MiB STT input), ten-minute read expiry and bounded expired-object collection on subsequent writes. Input discarded on job completion, output discarded by preview consumer. Crashed objects remain inaccessible until next-write cleanup or full erasure. No sync, backup, logs or diagnostics. Fresh workspace admission inside the existing mutation transition prevents post-erasure recreation.",
+      "storageWrites": [
+        {
+          "sink": "writable.write",
+          "keys": [
+            "audio-jobs"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/library-lifecycle/maintenance-log.ts",
+      "owner": "library-maintenance-journal",
+      "justification": "User-requested bounded local maintenance outcome log for Library inspection and explicit JSONL export.",
+      "reviewNote": "Fixed operations/reason codes/messages, UTC times and numeric metrics only; no media, filenames, identifiers, URLs or raw exceptions. At most 512 records/256 KiB with consecutive repeated-block coalescing. Cross-context lock and nonqueued erasure admission; read is write-free. Failure is advisory. No sync/backup; unconditional erasure removes exact key. Final persistence and export use shared sanitizer and closed reconstruction. These are recent views with a 14-day access cutoff; the event-history owner retains and exports full compressed history independently.",
+      "storageWrites": [
+        {
+          "sink": "area.set",
+          "keys": [
+            "MAINTENANCE_LOG_STORAGE_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/runtime-log.ts",
+      "owner": "runtime-diagnostic-log",
+      "justification": "User-requested local Events and logs destination for runtime diagnostic summaries.",
+      "reviewNote": "Sanitized summary/source/context/level/times only, no attached payloads or raw stacks. 512 rows/256 KiB, bounded64 queue and one-second batching, drop count, idle without timers. Permit covers admitted batch delay and write, exclusive lock rereads. Unconditional privacy erasure; no sync/backup. Explicit JSONL export resanitizes. These are recent views with a 14-day access cutoff; the event-history owner retains and exports full compressed history independently.",
+      "storageWrites": [
+        {
+          "sink": "area.set",
+          "keys": [
+            "RUNTIME_LOG_STORAGE_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/event-history-database.ts",
+      "owner": "event-history",
+      "justification": "User-requested independent advisory ZIP event history, isolated from product database admission.",
+      "reviewNote": "Only closed sanitized JSONL chunks and immutable bounded ZIP segments. 14-day access cutoff, 50 MiB compressed archives plus 1 MiB active segment. Nonqueued permit and history lock cover atomic active/archive publication. Required privacy participant clears and verifies all stores; no sync/backup/network. Read does not create the database.",
+      "storageWrites": [
+        {
+          "sink": "tx.objectStore('active').add",
+          "keys": [
+            "text"
+          ]
+        },
+        {
+          "sink": "tx.objectStore('state').put",
+          "keys": [
+            "'active'"
+          ]
+        },
+        {
+          "sink": "tx.objectStore('archives').put",
+          "keys": [
+            "archive.id"
+          ]
+        },
+        {
+          "sink": "tx.objectStore('catalog').put",
+          "keys": [
+            "archive.id"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [
@@ -335,6 +451,36 @@
       "owner": "shared-message-tracer",
       "justification": "Trace utility helpers owned by the canonical tracer seam.",
       "reviewNote": "Utility-level sanitization stays internal to tracing; new diagnostic writers should import the canonical sanitizer seam."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/library-lifecycle/maintenance-log.ts",
+      "owner": "library-maintenance-journal",
+      "justification": "Final local maintenance diagnostic sink.",
+      "reviewNote": "Shared structured sanitizer is applied before the bounded browser storage write; only fixed catalog messages and numeric metrics are constructed."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/library-lifecycle/maintenance-log-model.ts",
+      "owner": "library-maintenance-journal-export",
+      "justification": "Final explicit JSONL diagnostic export.",
+      "reviewNote": "Each entry is reconstructed from a closed catalog and validated scalar fields, then passed through shared structured diagnostic sanitization."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/runtime-log.ts",
+      "owner": "runtime-diagnostic-log",
+      "justification": "Bounded user-requested diagnostic retention and JSONL export.",
+      "reviewNote": "Only validated short summary fields; canonical sanitizer at storage and export sinks."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/model.ts",
+      "owner": "runtime-diagnostic-log",
+      "justification": "Bounded user-requested diagnostic retention and JSONL export.",
+      "reviewNote": "Only validated short summary fields; canonical sanitizer at storage and export sinks."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/event-history-zip.ts",
+      "owner": "event-history",
+      "justification": "Final compressed history and full ZIP export boundary.",
+      "reviewNote": "Reconstructs the closed runtime/maintenance row schemas and reapplies shared structured sanitizer; bounded compressed input, actual inflation and sequential JSONL export."
     }
   ]
 }

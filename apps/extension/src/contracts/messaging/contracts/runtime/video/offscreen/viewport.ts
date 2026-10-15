@@ -12,6 +12,22 @@ import {
   isViewportRegion,
 } from '../../../../validators/index';
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
+import type { RuntimeOffscreenBeginRecordingMessage } from '../../../offscreen-command.types';
+
+const parseBeginEnvelope = createGuardParser<RuntimeOffscreenBeginRecordingMessage>(
+  'runtime OFFSCREEN_BEGIN_RECORDING message',
+  createMessageGuard({
+    type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+    required: {
+      capabilityToken: isString,
+      recordingId: isString,
+      generation: isNumber,
+      streamInstanceId: isString,
+    },
+  })
+);
+
+const parseBeginRequest = parseBeginEnvelope;
 
 export const runtimeVideoOffscreenViewportMessageContracts = {
   [VideoMessageType.OFFSCREEN_START_RECORDING]: {
@@ -57,18 +73,7 @@ export const runtimeVideoOffscreenViewportMessageContracts = {
     ),
   },
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: {
-    parseRequest: createGuardParser(
-      'runtime OFFSCREEN_BEGIN_RECORDING message',
-      createMessageGuard({
-        type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
-        required: {
-          capabilityToken: isString,
-          recordingId: isString,
-          generation: isNumber,
-          streamInstanceId: isString,
-        },
-      })
-    ),
+    parseRequest: parseBeginRequest,
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_BEGIN_RECORDING response',
       createRuntimeResponseGuard({

@@ -23,10 +23,6 @@ function buildNodeMapping(
   }
 }
 
-function resolveIframeLabel(iframe: HTMLIFrameElement) {
-  return iframe.id || iframe.src?.substring(0, 50);
-}
-
 function resolveVirtualIframe(props: { iframeId: string; virtualBody: HTMLElement }) {
   const escapedId = props.iframeId.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, '\\$&');
   return props.virtualBody.querySelector(`iframe#${escapedId}`) as HTMLIFrameElement | null;
@@ -34,7 +30,7 @@ function resolveVirtualIframe(props: { iframeId: string; virtualBody: HTMLElemen
 
 function annotateIframeClone(iframeBodyClone: HTMLElement, iframeId: string) {
   const allElements = iframeBodyClone.querySelectorAll('*');
-  logger.debug(`Iframe ${iframeId} has ${allElements.length} total elements (including nested)`);
+  logger.debug('Inspecting iframe elements', { count: allElements.length });
 
   for (let i = 0; i < allElements.length; i += 1) {
     const element = allElements[i];
@@ -49,7 +45,7 @@ function annotateIframeClone(iframeBodyClone: HTMLElement, iframeId: string) {
   if (!iframeBodyClone.hasAttribute('data-iframe-source')) {
     iframeBodyClone.setAttribute('data-iframe-source', iframeId);
   }
-  logger.debug(`Iframe ${iframeId}: set data-iframe-source on all ${allElements.length} elements`);
+  logger.debug('Annotated iframe elements', { count: allElements.length });
 }
 
 function appendIframeBodyChildren(props: {
@@ -120,7 +116,7 @@ function createVirtualIframeContainer(props: {
   const appCode = props.originalIframe.getAttribute('data-application-code');
   if (appCode) {
     virtualIframeContainer.setAttribute('data-application-code', appCode);
-    logger.debug(`Preserved data-application-code="${appCode}" for iframe ${props.iframeId}`);
+    logger.debug('Preserved iframe application code');
   }
 
   const dataOrigin = props.originalIframe.getAttribute('data-origin');
@@ -169,11 +165,11 @@ export function embedVirtualIframe(props: {
 }) {
   const iframeDoc = getIframeDocument(props.originalIframe);
   if (!iframeDoc?.body) {
-    logger.debug(`Skipping iframe without body: ${resolveIframeLabel(props.originalIframe)}`);
+    logger.debug('Skipping iframe without body');
     return;
   }
 
-  logger.debug(`Embedding iframe: ${resolveIframeLabel(props.originalIframe)}`);
+  logger.debug('Embedding iframe');
 
   const iframeId = props.originalIframe.id;
   if (!iframeId) {
@@ -186,7 +182,7 @@ export function embedVirtualIframe(props: {
     virtualBody: props.virtualBody,
   });
   if (!virtualIframe) {
-    logger.debug(`Virtual iframe not found: ${iframeId}`);
+    logger.debug('Virtual iframe not found');
     return;
   }
 

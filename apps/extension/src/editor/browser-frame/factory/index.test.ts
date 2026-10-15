@@ -58,14 +58,14 @@ function registerHeaderMockupTest() {
     expect(result.sourceClipPath).toBeNull();
     expect(mocks.renderExactBrowserFrameToDataUrlMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        height: BrowserFrameFactory.HEADER_HEIGHT,
+        height: (86 * 200) / 900,
         width: 320,
       })
     );
     expect(image.set).toHaveBeenCalledWith(
       expect.objectContaining({
         left: 40,
-        top: 12,
+        top: 98 - (86 * 200) / 900,
         scaleX: 1,
       })
     );

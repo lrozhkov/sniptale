@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -9,6 +10,9 @@ import { useReviewPlayback } from './use-playback';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { translate } from '../../platform/i18n';
+import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
 
 vi.mock('../../composition/persistence/media-library', () => ({
   listMediaLibrary: async () => [],
@@ -16,7 +20,8 @@ vi.mock('../../composition/persistence/media-library', () => ({
 
 function setup(
   originalVolume = 1,
-  beforeAction?: Parameters<typeof ReviewOriginalAudioTrack>[0]['beforeAction']
+  beforeAction?: Parameters<typeof ReviewOriginalAudioTrack>[0]['beforeAction'],
+  linked = false
 ) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
@@ -40,6 +45,26 @@ function setup(
   function Harness() {
     const [audio, setAudio] = useState(() => {
       const initial = createQuickEditAdvancedState().audio;
+      if (linked) {
+        initial.voiceoverSegments = buildReviewTimeMap(10, currentEdits);
+        initial.voiceover = [
+          anchorReviewVoiceover(
+            createQuickEditAudioClip({
+              id: 'take',
+              assetId: 'asset',
+              timelineStart: 2,
+              duration: 3,
+              endMax: 10,
+            }),
+            initial.voiceoverSegments
+          ),
+        ];
+        initial.original.ranges = [{ id: 'gain', start: 1, end: 8, volume: 0.5 }];
+        initial.original.mutes = [
+          { id: 'binding', kind: 'take', clipId: 'take' },
+          { id: 'detached', kind: 'range', start: 2.5, end: 4, volume: 0.25 },
+        ];
+      }
       return { ...initial, original: { ...initial.original, volume: originalVolume } };
     });
     const [selectedOriginalId, onOriginalSelection] = useState<string | null>(null);
@@ -61,7 +86,13 @@ function setup(
       original: audio.original,
     });
     return (
-      <>
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
+        duration={10}
+      >
         <video ref={playback.video} />
         <ReviewOriginalAudioTrack
           beforeAction={beforeAction}
@@ -75,7 +106,7 @@ function setup(
           onSelectSpeed={onSelectSpeed}
         />
         <ReviewOriginalAudioInspector audio={editor} duration={10} speedMuted />
-      </>
+      </ReviewTimelineResizeGuide>
     );
   }
   act(() => root.render(<Harness />));
@@ -115,6 +146,57 @@ function setup(
   };
 }
 
+it('puts overlapping source gain on separate rows and detaches linked coverage only after a real edit', () => {
+  const f = setup(1, undefined, true);
+  try {
+    const items = f.lane.querySelectorAll<HTMLButtonElement>('button[data-audio-id]');
+    expect(items).toHaveLength(3);
+    expect(new Set([...items].map((item) => item.style.top)).size).toBe(3);
+    expect(f.lane.style.height).toBe('108px');
+    const take = f.lane.querySelector<HTMLButtonElement>('button[data-audio-id="mute:binding:0"]')!;
+    f.send('pointerdown', 250, take);
+    f.send('pointerup', 250);
+    expect(f.editor.selectedOriginal?.origin).toBe('take');
+    const captured = f.editor;
+    act(() => {
+      captured.addImported(
+        createQuickEditAudioClip({
+          id: 'music',
+          assetId: 'new-music',
+          timelineStart: 0,
+          duration: 2,
+          endMax: 10,
+        }),
+        'music'
+      );
+      captured.patchOriginal('mute:binding:0', { volume: 0.5 });
+    });
+    expect(f.editor.assets.get('new-music')).toBeDefined();
+    expect(f.editor.originalRanges.find((item) => item.id === 'mute:binding:0')?.volume).toBe(0.5);
+    // The current functional update retains the independently queued clip.
+    act(() => f.editor.setSelectedId('music', 'music'));
+    expect(f.editor.selected?.clip.assetId).toBe('new-music');
+    f.send('pointerdown', 250, take);
+    f.send('pointermove', 350);
+    f.send('pointerup', 350);
+    expect(f.editor.originalRanges.find((item) => item.id === 'mute:binding:0')).toMatchObject({
+      id: 'mute:binding:0',
+      origin: 'mute',
+      start: 3,
+      end: 6,
+    });
+    expect(f.editor.originalRanges.find((item) => item.id === 'gain')).toMatchObject({
+      start: 1,
+      end: 8,
+      volume: 0.5,
+    });
+    act(() => f.editor.removeClip('voiceover', 'take'));
+    expect(f.editor.originalRanges.some((item) => item.id === 'mute:binding:0')).toBe(true);
+  } finally {
+    f.close();
+  }
+});
+
 it('draws in source time, trims both edges, cancels gestures and follows a linked speed mute', () => {
   const f = setup();
   try {
@@ -140,7 +222,9 @@ it('draws in source time, trims both edges, cancels gestures and follows a linke
     expect(f.editor.selectedOriginal!.start).toBe(1);
     f.send('pointerdown', 500, range().querySelector('[data-audio-edge="end"]')!);
     f.send('pointermove', 600);
+    expect(f.host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('600px');
     f.send('pointerup', 600);
+    expect(f.host.querySelector('[data-resizing]')).toBeNull();
     expect(f.editor.selectedOriginal!.end).toBe(6);
     for (const cancel of ['pointercancel', 'lostpointercapture', 'Escape']) {
       f.send('pointerdown', 100, range().querySelector('[data-audio-edge="start"]')!);
@@ -150,6 +234,7 @@ it('draws in source time, trims both edges, cancels gestures and follows a linke
           document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Escape' }))
         );
       else f.send(cancel, 0);
+      expect(f.host.querySelector('[data-resizing]')).toBeNull();
       f.send('pointerup', 0);
       expect(f.editor.selectedOriginal!.start).toBe(1);
     }
@@ -330,8 +415,14 @@ it('keeps audio placement feedback state without inserting messages into the tra
 it('shows zero master volume as muted and restores actual playback through positive volume', () => {
   const f = setup();
   try {
-    const control = f.host.querySelector<HTMLButtonElement>('[data-track-controls] button')!;
+    const control = f.host.querySelector<HTMLButtonElement>(
+      '[data-track-controls] button[aria-pressed]'
+    )!;
     const video = f.host.querySelector('video')!;
+    const volume = f.host.querySelector<HTMLInputElement>(
+      `input[aria-label="${translate('gallery.videoReview.sourceAudioVolume')}"]`
+    );
+    expect(volume).toBeNull();
     act(() => f.editor.setOriginal({ volume: 0 }));
     expect(video.muted).toBe(true);
     expect(control.getAttribute('aria-pressed')).toBe('false');
@@ -340,7 +431,8 @@ it('shows zero master volume as muted and restores actual playback through posit
     expect(video.volume).toBe(0.4);
     act(() => control.click());
     expect(video.muted).toBe(true);
-    act(() => f.editor.setOriginal({ volume: 0.7 }));
+    act(() => f.editor.setOriginal({ volume: 0.7, muted: false }));
+    expect(control.getAttribute('aria-pressed')).toBe('true');
     expect(video.muted).toBe(false);
     expect(video.volume).toBe(0.7);
     act(() => control.click());
@@ -364,7 +456,9 @@ it('shows zero master volume as muted and restores actual playback through posit
 it('renders legacy zero-volume snapshots as muted without changing document state', () => {
   const f = setup(0);
   try {
-    const control = f.host.querySelector<HTMLButtonElement>('[data-track-controls] button')!;
+    const control = f.host.querySelector<HTMLButtonElement>(
+      '[data-track-controls] button[aria-pressed]'
+    )!;
     expect(control.getAttribute('aria-pressed')).toBe('false');
     expect(control.title).toBe(translate('gallery.videoReview.restoreSourceAudio'));
     expect(f.lane.dataset['audioMuted']).toBe('true');

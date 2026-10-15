@@ -1,6 +1,11 @@
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoProjectExportSettings } from '../../../../../features/video/project/types';
 import * as settingsValidation from '../../../../../features/video/project/export/settings-validation';
+import { resolveProjectRenderScope } from '../../../../../features/video/project/export/render-scope';
+import {
+  ProjectCameraConflictError,
+  resolveProjectCameraConflicts,
+} from '../../../../../features/video/composition/motion/project-follow';
 import { getDefaultBackgroundProjectExportPorts, type BackgroundProjectExportPorts } from './ports';
 import { acquireMediaMutationPermit } from '../../../../mutation-exclusion/media-activity';
 import type { ProjectExportInputReference } from '../../../../../contracts/video/types/project-export-input';
@@ -77,6 +82,15 @@ export async function startProjectExportUseCase(
     if (message.jobId !== message.input.jobId) throw new Error('Project export input job mismatch');
     const project = await ports.loadProjectExportInput(message.input);
     assertVideoProjectExportSettingsCompatibleWithProject(project, message.settings);
+    const cameraConflicts = resolveProjectCameraConflicts(
+      resolveProjectRenderScope(project, message.settings),
+      message.settings,
+      {
+        start: message.settings.rangeStartSeconds ?? 0,
+        end: message.settings.rangeEndSeconds ?? project.duration,
+      }
+    );
+    if (cameraConflicts.length) throw new ProjectCameraConflictError(cameraConflicts);
     return await coordinateProjectExportLifecycle(async () => {
       const releaseStartPermit = acquireMediaMutationPermit();
       if (!releaseStartPermit) {

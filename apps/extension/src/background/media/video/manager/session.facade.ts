@@ -4,6 +4,7 @@ import type {
   VideoDisplaySurface,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { RecordingTelemetrySnapshot } from '../../../../contracts/messaging/contracts/response-types';
+import type { RecordingFrameClockAnchor } from '../../../../contracts/video/recording-frame-clock';
 
 interface VideoManagerSessionState {
   recordingTabId: number | null;
@@ -21,6 +22,7 @@ interface VideoManagerSessionState {
   controlledCursorVerifiedMode: VideoCursorCaptureMode | null;
   controlledCursorDisplaySurface: VideoDisplaySurface | null;
   controlledCursorTelemetry: RecordingTelemetrySnapshot | null;
+  recordingFrameClock: RecordingFrameClockAnchor | null;
 }
 
 export type VideoManagerSessionFacade = VideoManagerSessionState;
@@ -41,6 +43,7 @@ const VIDEO_MANAGER_SESSION_FIELDS = [
   'controlledCursorVerifiedMode',
   'controlledCursorDisplaySurface',
   'controlledCursorTelemetry',
+  'recordingFrameClock',
 ] as const satisfies readonly (keyof VideoManagerSessionState)[];
 
 type VideoManagerSessionField = (typeof VIDEO_MANAGER_SESSION_FIELDS)[number];
@@ -62,6 +65,7 @@ function createVideoManagerSessionState(): VideoManagerSessionState {
     controlledCursorVerifiedMode: null,
     controlledCursorDisplaySurface: null,
     controlledCursorTelemetry: null,
+    recordingFrameClock: null,
   };
 }
 

@@ -7,7 +7,7 @@ import {
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import { exportMediaHubBackup } from '../../../workflows/media-hub-backup';
 import { translate } from '../../../platform/i18n';
-import { isGalleryMediaItem } from '../items';
+import { isGalleryMediaItem, type GalleryItem } from '../items';
 import type { GallerySelectionController } from './controller-types';
 import { createMissingBlobError, downloadBlob, type GalleryBusyAction } from './shared';
 import { createSelectedBackupExportOptions } from './backup';
@@ -16,20 +16,26 @@ function getSelectedMediaItems(controller: GallerySelectionController) {
   return controller.state.selection.selectedItems.filter(isGalleryMediaItem);
 }
 
-export function createSelectionBackupAction(controller: GallerySelectionController) {
-  return async (withBusy: GalleryBusyAction) => {
-    const options = createSelectedBackupExportOptions(controller.state.selection.selectedItems);
-    if (!options) return;
+/** Export only the supplied library identities, through the existing backup workflow. */
+export async function exportGalleryItemsBackup(targets: GalleryItem[]) {
+  const options = createSelectedBackupExportOptions(targets);
+  if (!options) return;
+  await exportMediaHubBackup(options, {
+    requireSelected: true,
+    filename: await createOutputFilename({
+      category: 'archives',
+      type: 'media-hub-selection-backup',
+      extension: 'zip',
+    }),
+  });
+}
 
-    await withBusy(async () => {
-      await exportMediaHubBackup(options, {
-        filename: await createOutputFilename({
-          category: 'archives',
-          type: 'media-hub-selection-backup',
-          extension: 'zip',
-        }),
-      });
-    });
+export function createSelectionBackupAction(controller: GallerySelectionController) {
+  return async (
+    withBusy: GalleryBusyAction,
+    targets: GalleryItem[] = controller.state.selection.selectedItems
+  ) => {
+    await withBusy(() => exportGalleryItemsBackup(targets));
   };
 }
 

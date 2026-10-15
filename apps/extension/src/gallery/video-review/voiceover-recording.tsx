@@ -1,3 +1,4 @@
+import type { useReviewEditorState } from './use-editor-state';
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
@@ -9,24 +10,24 @@ import {
   type PreparedReviewAudio,
 } from '../../workflows/video-review/audio-import';
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
+import type { ReviewTimeSegment } from '../../features/video/review/timeline';
+import { anchorReviewVoiceoverAtSource } from '../../features/video/review/voiceover-edits';
 import { saveReviewVoiceoverTake } from './voiceover-save';
 
 /** Owns one recording lifecycle: open/close, playback sync, and the saved clip. */
 export function useReviewVoiceoverRecording(args: {
   video: RefObject<HTMLVideoElement | null>;
   time: number;
-  resultDuration: number;
-  toOutputTime(source: number): number | null;
+  segments: readonly ReviewTimeSegment[];
   audio: ReturnType<typeof useReviewAudio>;
   session: ReturnType<typeof createVideoReviewSession>;
-  onCutPlacement?: () => void;
   guard(): boolean;
   flushAdvanced(): Promise<void>;
   onOpenChange?(open: boolean): void;
 }) {
   const [recording, setRecording] = useState(false);
   const [takeStart, setTakeStart] = useState<number | null>(null);
-  const [takeOutputStart, setTakeOutputStart] = useState<number | null>(null);
+  const takeSegments = useRef(args.segments);
   const takeIds = useRef(new WeakMap<Blob, string>());
   const preparedTakes = useRef(new WeakMap<Blob, PreparedReviewAudio>());
   const reviewId = useRef<string | null>(null);
@@ -35,19 +36,13 @@ export function useReviewVoiceoverRecording(args: {
     video: args.video,
     recording,
     takeStart,
-    takeOutputStart,
     open: () => {
       if (!args.guard()) return;
-      const outputStart = args.toOutputTime(args.time);
-      if (outputStart === null || args.resultDuration - outputStart <= 0) {
-        args.onCutPlacement?.();
-        return;
-      }
       playback.open();
       reviewId.current = args.session.getSnapshot().snapshot.workspace.aggregateId;
       args.onOpenChange?.(true);
       setTakeStart(args.time);
-      setTakeOutputStart(outputStart);
+      takeSegments.current = args.segments;
       setRecording(true);
     },
     close: () => {
@@ -74,8 +69,8 @@ export function useReviewVoiceoverRecording(args: {
         signal,
         take,
         ...(onRetained ? { onRetained } : {}),
-        outputStart: takeOutputStart ?? args.toOutputTime(takeStart ?? args.time),
-        resultDuration: args.resultDuration,
+        sourceStart: takeStart ?? args.time,
+        segments: takeSegments.current,
         audio: args.audio,
         session: args.session,
         takeIds: takeIds.current,
@@ -89,7 +84,10 @@ export function useReviewVoiceoverRecording(args: {
 }
 
 /** Owns delayed playback completion and cancellation across recording generations. */
-function useVoiceoverPlayback(video: RefObject<HTMLVideoElement | null>, startTime: () => number) {
+export function useVoiceoverPlayback(
+  video: RefObject<HTMLVideoElement | null>,
+  startTime: () => number
+) {
   const generation = useRef(0);
   const openRef = useRef(false);
   const shouldPlay = useRef(false);
@@ -115,8 +113,9 @@ function useVoiceoverPlayback(video: RefObject<HTMLVideoElement | null>, startTi
       if (!node || !openRef.current) return;
       const currentGeneration = generation.current;
       node.currentTime = startTime();
-      shouldPlay.current = playVideo;
-      if (playVideo) {
+      const canPlay = playVideo && !node.ended && !(node.currentTime >= node.duration);
+      shouldPlay.current = canPlay;
+      if (canPlay) {
         await node.play();
         if (currentGeneration !== generation.current && !shouldPlay.current) node.pause();
       }
@@ -125,9 +124,10 @@ function useVoiceoverPlayback(video: RefObject<HTMLVideoElement | null>, startTi
     syncResume: async (playVideo = true) => {
       if (!openRef.current || !playVideo) return;
       const currentGeneration = generation.current;
-      shouldPlay.current = true;
       const node = video.current;
-      await node?.play();
+      if (!node || node.ended || node.currentTime >= node.duration) return;
+      shouldPlay.current = true;
+      await node.play();
       if (currentGeneration !== generation.current && !shouldPlay.current) node?.pause();
     },
   };
@@ -139,6 +139,7 @@ export function useReviewEditorAudio(args: {
   canStart: () => boolean;
   time: number;
   resultDuration: number;
+  segments: readonly ReviewTimeSegment[];
   toOutputTime(source: number): number | null;
   onCutPlacement(): void;
   video: RefObject<HTMLVideoElement | null>;
@@ -155,7 +156,11 @@ export function useReviewEditorAudio(args: {
     timelineTime?: number
   ) => {
     if (!guard()) return;
-    if (timelineTime === undefined && args.toOutputTime(args.time) === null) {
+    if (
+      lane !== 'voiceover' &&
+      timelineTime === undefined &&
+      args.toOutputTime(args.time) === null
+    ) {
       args.onCutPlacement();
       return;
     }
@@ -164,14 +169,24 @@ export function useReviewEditorAudio(args: {
         file,
         signal: new AbortController().signal,
         assertCurrentTarget: () => {
-          if (timelineTime === undefined && args.toOutputTime(args.time) === null)
+          if (
+            lane !== 'voiceover' &&
+            timelineTime === undefined &&
+            args.toOutputTime(args.time) === null
+          )
             throw new Error(translate('gallery.videoReview.placementOnCut'));
         },
         attach: (assetId, duration) => {
-          const at = timelineTime ?? args.toOutputTime(args.time);
+          const at =
+            timelineTime ?? (lane === 'voiceover' ? args.time : args.toOutputTime(args.time));
           if (at === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
           args.audio.addImported(
-            importedAudioClip(assetId, duration, at, args.resultDuration),
+            lane === 'voiceover'
+              ? anchorReviewVoiceoverAtSource(
+                  importedAudioClip(assetId, duration, at, at + duration),
+                  args.segments
+                )
+              : importedAudioClip(assetId, duration, at, args.resultDuration),
             lane,
             duration,
             file.name
@@ -184,14 +199,31 @@ export function useReviewEditorAudio(args: {
   const voiceover = useReviewVoiceoverRecording({
     video: args.video,
     time: args.time,
-    resultDuration: args.resultDuration,
-    toOutputTime: args.toOutputTime,
+    segments: args.segments,
     audio: args.audio,
     session: args.session,
     ...(args.onOpenChange ? { onOpenChange: args.onOpenChange } : {}),
-    onCutPlacement: args.onCutPlacement,
     guard,
     flushAdvanced: args.flushAdvanced,
+  });
+  return { onImportAudioFile, voiceover };
+}
+
+export function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
+  const { onImportAudioFile, voiceover } = useReviewEditorAudio({
+    busy: state.busy,
+    canStart: state.canStart,
+    time: state.time,
+    resultDuration: state.timeline.resultDuration,
+    segments: state.timeline.timeMap.getSegments(),
+    toOutputTime: state.timeline.toOutputTime,
+    onCutPlacement: () => state.setMessage(translate('gallery.videoReview.placementOnCut')),
+    video: state.video,
+    onOpenChange: state.setVoiceoverSilent,
+    run: state.run,
+    flushAdvanced: state.flushAdvanced,
+    audio: state.audio,
+    session: state.session,
   });
   return { onImportAudioFile, voiceover };
 }

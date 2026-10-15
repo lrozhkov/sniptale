@@ -1,3 +1,9 @@
+const completionBoundary = vi.hoisted(() => ({ cleanup: vi.fn(), rollback: vi.fn() }));
+vi.mock('../runtime/recording-completion', async (original) => ({
+  ...(await original<typeof import('../runtime/recording-completion')>()),
+  stopRecordingSourceForStartFailure: completionBoundary.cleanup,
+  rollbackRecordingStart: completionBoundary.rollback,
+}));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 
@@ -78,7 +84,6 @@ vi.mock('./flow', async (importOriginal) => ({
 vi.mock('../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../capture-surface')>()),
   releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
-  waitForVideoCaptureSurfaceRecovery: waitForVideoCaptureSurfaceRecoveryMock,
 }));
 vi.mock('../../../storage/video/post-record-result', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
@@ -111,6 +116,7 @@ const settings = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  completionBoundary.cleanup.mockReset().mockResolvedValue(undefined);
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'recording-1') });
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
   hasActiveVideoRecordingSessionMock.mockReturnValue(false);
@@ -191,6 +197,7 @@ it('does not dispatch an offscreen start after the initiating document reloads',
   });
   expect(finalizeRecordingStartMock).not.toHaveBeenCalled();
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('stale-context', {
+    recordingId: 'recording-1',
     diagnosticCode: 'stale-context',
     retainAuthority: false,
   });
@@ -220,7 +227,9 @@ it('rejects a reload during countdown before dispatching the prepared recording'
     result: 'failed',
   });
   expect(beginPreparedRecordingMock).not.toHaveBeenCalled();
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('recording-1');
+  expect(completionBoundary.cleanup).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1' })
+  );
   expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1');
 });
 
@@ -445,13 +454,13 @@ it('fails before beginning the prepared recording when its control lease cannot 
   expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
     'Failed to issue recording control capability',
-    { retainAuthority: false }
+    { recordingId: 'recording-1', retainAuthority: false }
   );
 });
 
 it('retains start authority when identity-bound delivery cleanup is not acknowledged', async () => {
   beginPreparedRecordingMock.mockRejectedValueOnce(new Error('offscreen failed'));
-  sendRuntimeMessageMock.mockRejectedValueOnce(new Error('offscreen cleanup failed'));
+  completionBoundary.cleanup.mockRejectedValueOnce(new Error('offscreen cleanup failed'));
   const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
   await expect(
@@ -463,22 +472,18 @@ it('retains start authority when identity-bound delivery cleanup is not acknowle
 
   expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
   expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-      capabilityToken: expect.any(String),
-      discard: true,
-    })
+  expect(completionBoundary.cleanup).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1' })
   );
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
     'Recording start failed and identity-bound offscreen cleanup was not acknowledged',
-    { retainAuthority: true }
+    { recordingId: 'recording-1', retainAuthority: true }
   );
 });
 
 it('retains start authority when the bound source stops but durable lease cleanup fails', async () => {
   beginPreparedRecordingMock.mockRejectedValueOnce(new Error('offscreen failed'));
-  clearActiveVideoRecordingLeaseMock.mockRejectedValueOnce(new Error('lease cleanup failed'));
+  completionBoundary.cleanup.mockRejectedValueOnce(new Error('lease cleanup failed'));
   const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
   await expect(
@@ -488,10 +493,12 @@ it('retains start authority when the bound source stops but durable lease cleanu
     result: 'failed',
   });
 
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('recording-1');
+  expect(completionBoundary.cleanup).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1' })
+  );
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
     'Recording start failed and identity-bound offscreen cleanup was not acknowledged',
-    { retainAuthority: true }
+    { recordingId: 'recording-1', retainAuthority: true }
   );
 });
 
@@ -516,17 +523,14 @@ it('rolls back and cleans up when raw source validation times out', async () => 
   });
   expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
   expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1');
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-      capabilityToken: expect.any(String),
-      discard: true,
-    })
+  expect(completionBoundary.cleanup).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1' })
   );
   if (result.result !== 'failed') {
     throw new Error('Expected recording start to fail after source validation timeout');
   }
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(result.error, {
+    recordingId: 'recording-1',
     retainAuthority: false,
   });
 });
@@ -538,6 +542,12 @@ it('stringifies non-Error preparation failures before notifying the runtime', as
   await startRecording(17, settings, CaptureMode.TAB, undefined, ownerSenderUrl);
 
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('capture blocked', {
+    recordingId: 'recording-1',
     retainAuthority: false,
   });
 });
+
+vi.mock('../capture-surface/recovery', async (original) => ({
+  ...(await original<typeof import('../capture-surface/recovery')>()),
+  waitForVideoCaptureSurfaceRecovery: waitForVideoCaptureSurfaceRecoveryMock,
+}));

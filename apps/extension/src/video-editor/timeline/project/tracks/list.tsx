@@ -182,6 +182,7 @@ function ProjectTimelineRailRows(props: {
     <div className="min-w-0">
       {props.showTelemetryLane ? (
         <ProjectTimelineTelemetryLaneLabelRow
+          recordingTelemetry={props.recordingTelemetry}
           height={
             getTimelineHistoryLayout(
               props.project,

@@ -1,3 +1,4 @@
+import { projectPresetCollectionFlags, dispatchPresetCollectionAction } from '../preset-collection';
 import { useState } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { translate } from '../../../../../platform/i18n';
@@ -32,48 +33,10 @@ export function SurfaceStylePresetsSettings() {
         }}
       />
     ),
-    enabled: preset.enabled,
-    isBuiltIn: preset.origin === 'system',
-    isDefault: preset.isDefault,
-    ...(preset.customized
-      ? {
-          badges: [
-            {
-              id: 'customized',
-              label: translate('settings.editor.customizedBadge'),
-              tone: 'warning' as const,
-            },
-          ],
-        }
-      : {}),
-    capabilities: {
-      delete: preset.origin === 'user',
-      edit: true,
-      reorder: true,
-      reset: preset.origin === 'system' && preset.customized,
-      setDefault: !preset.isDefault,
-      toggle: true,
-    },
-    disabledActions: {
-      ...(preset.isDefault ? { toggle: translate('settings.editor.defaultCannotDisable') } : {}),
-      ...(preset.isDefault && preset.origin === 'user'
-        ? { delete: translate('settings.editor.defaultCannotDelete') }
-        : {}),
-      ...(!preset.enabled
-        ? { 'set-default': translate('settings.editor.disabledCannotBeDefault') }
-        : {}),
-    },
+    ...projectPresetCollectionFlags(preset),
   }));
-  const byId = new Map(presets.map((preset) => [preset.id, preset]));
-  const onAction = (action: SettingsCollectionAction) => {
-    const preset = byId.get(action.itemId);
-    if (!preset) return;
-    if (action.type === 'edit') setEditor(preset);
-    if (action.type === 'toggle') void resources.actions.onToggleEnabled(preset.id);
-    if (action.type === 'set-default') void resources.actions.onSetDefault(preset.id);
-    if (action.type === 'reset') void resources.actions.onResetPreset(preset.id);
-    if (action.type === 'delete') void resources.actions.onDelete(preset.id);
-  };
+  const onAction = (action: SettingsCollectionAction) =>
+    dispatchPresetCollectionAction(presets, action, setEditor, resources.actions);
   return (
     <section>
       <SettingsCollection

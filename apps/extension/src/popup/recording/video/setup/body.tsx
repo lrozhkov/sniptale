@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { translate } from '../../../../platform/i18n/popup';
 import type { ReactNode } from 'react';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { ViewportPreset } from '../../../../contracts/settings';
@@ -66,6 +68,9 @@ interface VideoSetupBodyProps {
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
   showSavingState?: boolean;
+  completionRequestFailed?: boolean;
+  onRetryCompletion?: (() => void) | undefined;
+  onRefreshRecordingState?: (() => Promise<void>) | undefined;
   postRecordResult?: VideoPostRecordResult | null;
   onAcknowledgePostRecord?: () => Promise<void>;
   viewModel: VideoSetupViewModel;
@@ -73,8 +78,21 @@ interface VideoSetupBodyProps {
 }
 
 export function VideoSetupBody(props: VideoSetupBodyProps) {
+  const completion = props.recordingState.completion;
+  if (
+    !props.showSavingState &&
+    ((completion && !completion.pending) ||
+      props.completionRequestFailed ||
+      (props.recordingState.status === VideoRecordingStatus.STOPPING && props.recordingState.error))
+  )
+    return <VideoCompletionFailureSection {...props} />;
+
   if (props.showSavingState) {
-    return <VideoSavingSection />;
+    return (
+      <VideoSavingSection
+        discard={props.showSavingState || props.recordingState.completion?.discard === true}
+      />
+    );
   }
 
   if (props.postRecordResult && props.onAcknowledgePostRecord) {
@@ -82,7 +100,11 @@ export function VideoSetupBody(props: VideoSetupBodyProps) {
   }
 
   if (props.recordingState.status === VideoRecordingStatus.STOPPING) {
-    return <VideoSavingSection />;
+    return (
+      <VideoSavingSection
+        discard={props.showSavingState || props.recordingState.completion?.discard === true}
+      />
+    );
   }
 
   if (props.recordingState.status !== VideoRecordingStatus.IDLE) {
@@ -140,10 +162,10 @@ function VideoPostRecordSection(props: VideoSetupBodyProps) {
   );
 }
 
-function VideoSavingSection() {
+function VideoSavingSection({ discard }: { discard: boolean }) {
   return (
     <section className={VIDEO_SETUP_SECTION_CLASS_NAME}>
-      <VideoSavingPanel />
+      <VideoSavingPanel discard={discard} />
     </section>
   );
 }
@@ -235,5 +257,65 @@ function VideoCaptureModeSelector({
       {...(viewModel.modeCapabilities ? { modeCapabilities: viewModel.modeCapabilities } : {})}
       onCaptureModeChange={onCaptureModeChange}
     />
+  );
+}
+
+function VideoCompletionFailureSection(props: VideoSetupBodyProps) {
+  const [pending, setPending] = useState(false);
+  const outcome = props.recordingState.completion?.outcome ?? 'unknown';
+  const retry = outcome !== 'failed' ? props.onRetryCompletion : undefined;
+  const action = retry ?? props.onRefreshRecordingState;
+  const runAction = async () => {
+    if (!action || pending) return;
+    setPending(true);
+    try {
+      await action();
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <section
+      className={VIDEO_SETUP_SECTION_CLASS_NAME}
+      role="alert"
+      data-ui="popup.video-completion.error"
+    >
+      <div className="m-auto flex max-w-md flex-col items-center gap-3 text-center">
+        <h2 className="text-base font-semibold text-[var(--sniptale-color-text-primary)]">
+          {translate('popup.video.completionIncomplete')}
+        </h2>
+        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate(
+            outcome === 'failed'
+              ? 'popup.video.completionFailedDescription'
+              : outcome === 'stopped'
+                ? 'popup.video.completionRetryDescription'
+                : 'popup.video.completionUnknownDescription'
+          )}
+        </p>
+        {action ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              void runAction();
+            }}
+            className={[
+              'rounded-[10px] bg-[var(--sniptale-color-surface-canvas)] px-4 py-2',
+              'text-xs font-semibold disabled:opacity-50',
+            ].join(' ')}
+            data-ui="popup.video-completion.retry"
+          >
+            {translate(
+              retry
+                ? outcome === 'unknown'
+                  ? 'popup.video.completionRetryStop'
+                  : 'popup.video.completionRetry'
+                : 'popup.video.completionRefresh'
+            )}
+          </button>
+        ) : null}
+      </div>
+    </section>
   );
 }

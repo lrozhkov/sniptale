@@ -38,6 +38,7 @@ export interface PreviewPanelProps {
   onAddTag: (tag?: string) => void;
   onResetChanges?: () => void;
   onSave?: () => Promise<void>;
+  onBackup?: () => Promise<void>;
   onDownload: () => Promise<boolean | void>;
   onDownloadOriginal?: () => Promise<boolean | void>;
   onCopy: () => Promise<boolean | void>;

@@ -1,7 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n/popup';
 
-export function VideoSavingPanel() {
+export function VideoSavingPanel({ discard = false }: { discard?: boolean }) {
   return (
     <div
       className={[
@@ -11,10 +11,10 @@ export function VideoSavingPanel() {
     >
       <Loader2 className="h-7 w-7 animate-spin text-[var(--sniptale-color-accent-emphasis)]" />
       <div className="mt-4 text-base font-semibold text-[var(--sniptale-color-text-primary)]">
-        {translate('popup.video.savingTitle')}
+        {translate(discard ? 'popup.video.discardingTitle' : 'popup.video.savingTitle')}
       </div>
       <div className="mt-1 text-xs text-[var(--sniptale-color-text-muted-strong)]">
-        {translate('popup.video.savingDescription')}
+        {translate(discard ? 'popup.video.discardingDescription' : 'popup.video.savingDescription')}
       </div>
     </div>
   );

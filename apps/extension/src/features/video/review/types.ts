@@ -41,12 +41,8 @@ interface ReviewEditRange {
   end: number;
 }
 
-/** Authored result-time portions around a cut; effective bounds never retime the montage. */
-export interface ReviewCutTransition {
-  type: 'dissolve' | 'fade-black';
-  before: number;
-  after: number;
-}
+import type { ReviewCutTransition } from './cut-transition';
+export type { ReviewCutTransition } from './cut-transition';
 
 export type ReviewEdit = ReviewEditRange &
   (
@@ -114,6 +110,12 @@ export type ReviewOperation = { id: string; at: number } & (
       after: CanvasComment | null;
     }
   | {
+      /** Master source gain only; ranges, mute bindings and other content stay in the document. */
+      target: 'sourceAudio';
+      before: Pick<import('./advanced/types').QuickEditOriginalAudio, 'muted' | 'volume'>;
+      after: Pick<import('./advanced/types').QuickEditOriginalAudio, 'muted' | 'volume'>;
+    }
+  | {
       /** Whole-content advanced snapshot; `ui` chrome never travels through history. */
       target: 'advancedContent';
       before: import('./advanced/types').QuickEditAdvancedContent;
@@ -127,11 +129,17 @@ export type ReviewOperation = { id: string; at: number } & (
  * through the same owner, so a stale edit never hides behind a newer selection.
  */
 export type ReviewSelection =
+  | { kind: 'cursor-focus'; id: string; time: number }
   | { kind: 'none' }
+  | { kind: 'webcam' }
+  | { kind: 'webcam-position'; id: string }
+  | { kind: 'webcam-hidden'; id: string }
   | { kind: 'telemetry'; ref: NonNullable<ReviewAnnotation['telemetryRef']> }
   | { kind: 'edit'; id: string }
   | { kind: 'annotation'; id: string }
+  | { kind: 'annotation-effect'; id: string }
   | { kind: 'canvas-comment'; id: string }
+  | { kind: 'text'; id: string }
   | { kind: 'original-audio'; id: string }
   | { kind: 'zoom'; id: string }
   | { kind: 'zoom-link'; id: string }

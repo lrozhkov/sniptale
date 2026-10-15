@@ -1,3 +1,10 @@
+import { createExportTimeHistory } from '../../composition/persistence/export-time-history';
+import {
+  createExportTimeCalibration,
+  createExportTimeProfile,
+} from '../../features/video/project/export/time-calibration';
+import { createExportTimeEstimator } from '../../features/video/project/export/time-estimate';
+import { planProjectExportTime } from '../../features/video/project/export/time-estimate-plan';
 import { preloadClipVideos } from './media';
 import { finalizeExport } from './persistence';
 import { type LoadedImagesMap } from './renderer';
@@ -45,6 +52,48 @@ async function finalizeCompletedExport(
   await finalizeExport(job.jobId, project, settings, outputBlob, createFinalizeExportOptions(job));
 }
 
+/** Advisory timing has no authority over rendering or publication. */
+function createProjectExportTiming(
+  project: VideoProject,
+  settings: VideoProjectExportSettings,
+  signal: AbortSignal
+) {
+  const work = planProjectExportTime(project, settings);
+  const calibration = createExportTimeCalibration();
+  const history = createExportTimeHistory();
+  const codec =
+    settings.format === VideoExportFormat.MP4 ? settings.mp4VideoCodec : settings.webmVideoCodec;
+  const codecs = { AVC: 'avc', HEVC: 'hevc', VP8: 'vp8', VP9: 'vp9' } as const;
+  const profile = createExportTimeProfile({
+    editor: 'project',
+    route: 'render',
+    container: settings.format === VideoExportFormat.MP4 ? 'mp4' : 'webm',
+    codec: codecs[codec],
+    width: settings.width,
+    height: settings.height,
+    fps: settings.fps,
+    quality: settings.quality,
+    complexity:
+      work.reduce((sum, item) => sum + (item.end - item.start) * item.cost, 0) /
+      Math.max(
+        0.001,
+        work.reduce((sum, item) => sum + item.end - item.start, 0)
+      ),
+  });
+  void history
+    .read(profile, signal)
+    .then((ratios) => {
+      if (!signal.aborted) calibration.setHistory(ratios);
+    })
+    .catch(() => undefined);
+  return {
+    estimator: createExportTimeEstimator(work, undefined, calibration.estimate),
+    finish: () => {
+      void history.record(profile, calibration.finish(), signal).catch(() => undefined);
+    },
+  };
+}
+
 export async function renderCompositeExport(
   job: ExportJobState,
   project: VideoProject,
@@ -78,10 +127,14 @@ export async function renderCompositeExport(
   job.exportAbortController = abortController;
   await preloadClipVideos(project, job, container, abortController.signal);
 
+  const timing = createProjectExportTiming(project, settings, abortController.signal);
+  job.timeEstimator = timing.estimator;
   const outputBlob =
     settings.format === VideoExportFormat.MP4
       ? await renderCompositeToMp4(job, project, settings, loadedImages, canvas, context)
       : await renderCompositeToWebm(job, project, settings, loadedImages, context, canvas);
 
+  assertExportNotCancelled(job);
+  timing.finish();
   await finalizeCompletedExport(job, sourceProject ?? project, settings, outputBlob);
 }

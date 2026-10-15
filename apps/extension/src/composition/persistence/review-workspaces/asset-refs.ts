@@ -1,6 +1,14 @@
+import type { ReviewSpeechTarget } from '../../../contracts/ai/audio';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { QuickEditAdvancedContent } from '../../../features/video/review/advanced/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
+
+export {
+  collectReviewAnnotationEffectSnapshotIds,
+  pruneReviewAnnotationEffectSnapshots,
+  collectExplicitlyRemovedReviewEffectAssets,
+  reviewWorkspaceHasAnnotationEffectResource,
+} from './annotation-effect-retention';
 
 const ASSET_PREFIX = 'project-asset:';
 const LANES = ['voiceover', 'music'] as const;
@@ -10,20 +18,60 @@ const LOCAL_ASSET_ERROR = 'Portable video review contains a local asset id.';
 const UNRESOLVED_ASSET_ERROR = 'Portable video review asset reference is unresolved.';
 
 function assertNoLocalImageRef(background: unknown): void {
-  if (isRecord(background) && background['type'] === 'image' && 'assetId' in background) {
+  if (!isRecord(background)) return;
+  const remembered = background['rememberedImage'];
+  if (
+    (background['type'] === 'image' && 'assetId' in background) ||
+    (isRecord(remembered) && 'assetId' in remembered)
+  ) {
     throw new Error(LOCAL_ASSET_ERROR);
   }
 }
 
 function assertNoLocalAudioRefs(audio: unknown): void {
   if (!isRecord(audio)) return;
+  if (
+    speechReplacements(audio['originalSpeech']).some(
+      (entry) => isRecord(entry) && 'assetId' in entry
+    )
+  )
+    throw new Error(LOCAL_ASSET_ERROR);
   for (const lane of LANES) {
     const clips = audio[lane];
     if (!Array.isArray(clips)) continue;
     for (const clip of clips) {
       if (isRecord(clip) && 'assetId' in clip) throw new Error(LOCAL_ASSET_ERROR);
+      if (speechReplacements(clip).some((entry) => isRecord(entry) && 'assetId' in entry))
+        throw new Error(LOCAL_ASSET_ERROR);
     }
   }
+}
+
+function speechReplacements(clip: unknown): unknown[] {
+  if (!isRecord(clip) || !isRecord(clip['transcript'])) return [];
+  const replacements = clip['transcript']['replacements'];
+  return Array.isArray(replacements) ? replacements : [];
+}
+
+function mapSpeechReferences<T>(
+  clip: T,
+  transform: (value: Record<string, unknown>) => Record<string, unknown>
+): T {
+  if (
+    !isRecord(clip) ||
+    !isRecord(clip['transcript']) ||
+    !Array.isArray(clip['transcript']['replacements'])
+  )
+    return clip;
+  return {
+    ...clip,
+    transcript: {
+      ...clip['transcript'],
+      replacements: speechReplacements(clip).map((entry) =>
+        isRecord(entry) ? transform(entry) : entry
+      ),
+    },
+  };
 }
 
 function parseRecoveryContent(value: unknown): unknown {
@@ -35,9 +83,38 @@ function parseRecoveryContent(value: unknown): unknown {
   }
 }
 
+/** Visits only the bounded, authored scene slots, including dormant variants. */
+function mapPresentationReferences<T>(
+  presentation: T,
+  transform: (value: Record<string, unknown>) => Record<string, unknown>
+): T {
+  if (!isRecord(presentation)) return presentation;
+  const next: Record<string, unknown> = {};
+  for (const name of ['intro', 'outro']) {
+    const slot = presentation[name];
+    if (!isRecord(slot)) continue;
+    const mapped = { ...slot };
+    for (const kind of ['image', 'video']) {
+      const value = slot[kind];
+      if (isRecord(value)) mapped[kind] = transform(value);
+    }
+    next[name] = mapped;
+  }
+  return { ...presentation, ...next };
+}
+
 function assertPortableContentRefs(content: unknown, inspectRecovery = true): void {
   if (!isRecord(content)) return;
+  if (isRecord(content['webcam']) && 'assetId' in content['webcam'])
+    throw new Error(LOCAL_ASSET_ERROR);
   assertNoLocalImageRef(content['background']);
+  const watermark = content['watermark'];
+  if (isRecord(watermark) && isRecord(watermark['image']) && 'assetId' in watermark['image'])
+    throw new Error(LOCAL_ASSET_ERROR);
+  mapPresentationReferences(content['presentation'], (value) => {
+    if ('assetId' in value) throw new Error(LOCAL_ASSET_ERROR);
+    return value;
+  });
   assertNoLocalAudioRefs(content['audio']);
   if (inspectRecovery)
     assertPortableContentRefs(parseRecoveryContent(content['recoveryV1']), false);
@@ -46,7 +123,16 @@ function assertPortableContentRefs(content: unknown, inspectRecovery = true): vo
 /** Rejects runtime-only asset keys anywhere portable review content can retain them. */
 export function assertPortableReviewAssetRefs(workspace: unknown): void {
   if (!isRecord(workspace)) return;
+  for (const snapshot of Array.isArray(workspace['effectSnapshots'])
+    ? workspace['effectSnapshots']
+    : []) {
+    if (!isRecord(snapshot) || !Array.isArray(snapshot['assets'])) continue;
+    if (snapshot['assets'].some((asset: unknown) => isRecord(asset) && 'assetId' in asset))
+      throw new Error(LOCAL_ASSET_ERROR);
+  }
   assertPortableContentRefs(workspace['advanced']);
+  if (isRecord(workspace['baseline']))
+    assertPortableContentRefs(workspace['baseline']['advancedContent']);
   const history = workspace['history'];
   if (!Array.isArray(history)) return;
   for (const operation of history) {
@@ -77,6 +163,30 @@ function mapHistoryContent(
   return { ...value, history };
 }
 
+function mapBaselineContent(
+  value: unknown,
+  transform: (content: Record<string, unknown>) => Record<string, unknown>
+): unknown {
+  if (!isRecord(value) || !isRecord(value['advancedContent'])) return value;
+  return { ...value, advancedContent: transform(value['advancedContent']) };
+}
+
+/** Registry descriptors own their resources separately from authored instance history. */
+function renameSnapshotRefs(value: unknown, from: string, to: string): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((snapshot: unknown) => {
+    if (!isRecord(snapshot) || !Array.isArray(snapshot['assets'])) return snapshot;
+    return {
+      ...snapshot,
+      assets: snapshot['assets'].map((asset: unknown) => {
+        if (!isRecord(asset) || typeof asset[from] !== 'string') return asset;
+        const { [from]: reference, ...rest } = asset;
+        return { ...rest, [to]: reference };
+      }),
+    };
+  });
+}
+
 /** Renames the audio and image asset keys so archive metadata stays portable-safe. */
 export function encodePortableReviewAssetRefs<T>(review: T): T {
   if (
@@ -90,7 +200,23 @@ export function encodePortableReviewAssetRefs<T>(review: T): T {
     ...review,
     workspace: {
       ...review['workspace'],
+      ...(review['workspace']['effectSnapshots'] === undefined
+        ? {}
+        : {
+            effectSnapshots: renameSnapshotRefs(
+              review['workspace']['effectSnapshots'],
+              'assetId',
+              PORTABLE_REF_KEY
+            ),
+          }),
       advanced: renameContentRefs(advanced, 'assetId', PORTABLE_REF_KEY),
+      ...(review['workspace']['baseline'] === undefined
+        ? {}
+        : {
+            baseline: mapBaselineContent(review['workspace']['baseline'], (content) =>
+              renameContentRefs(content, 'assetId', PORTABLE_REF_KEY)
+            ),
+          }),
       history: (
         mapHistoryContent(review['workspace'], (laneAudio) =>
           renameContentRefs(laneAudio, 'assetId', PORTABLE_REF_KEY)
@@ -106,7 +232,23 @@ export function decodePortableReviewAssetRefs<T>(workspace: T): T {
   const advanced = workspace['advanced'] as Record<string, unknown>;
   return {
     ...workspace,
+    ...(workspace['effectSnapshots'] === undefined
+      ? {}
+      : {
+          effectSnapshots: renameSnapshotRefs(
+            workspace['effectSnapshots'],
+            PORTABLE_REF_KEY,
+            'assetId'
+          ),
+        }),
     advanced: renameContentRefs(advanced, PORTABLE_REF_KEY, 'assetId'),
+    ...(workspace['baseline'] === undefined
+      ? {}
+      : {
+          baseline: mapBaselineContent(workspace['baseline'], (content) =>
+            renameContentRefs(content, PORTABLE_REF_KEY, 'assetId')
+          ),
+        }),
     history: (
       mapHistoryContent(workspace, (laneAudio) =>
         renameContentRefs(laneAudio, PORTABLE_REF_KEY, 'assetId')
@@ -123,15 +265,38 @@ function renameContentRefs(
   recovery = true
 ): Record<string, unknown> {
   const next = { ...content };
+  if (content['presentation'] !== undefined)
+    next['presentation'] = mapPresentationReferences(content['presentation'], (value) => {
+      if (typeof value[from] !== 'string') return value;
+      const { [from]: reference, ...rest } = value;
+      return { ...rest, [to]: reference };
+    });
+  const webcam = content['webcam'];
+  if (isRecord(webcam) && typeof webcam[from] === 'string') {
+    const { [from]: reference, ...rest } = webcam;
+    next['webcam'] = { ...rest, [to]: reference };
+  }
   if (isRecord(content['audio'])) next['audio'] = renameLaneRef(content['audio'], from, to);
   const background = content['background'];
-  if (
-    isRecord(background) &&
-    background['type'] === 'image' &&
-    typeof background[from] === 'string'
-  ) {
-    const { [from]: reference, ...rest } = background;
-    next['background'] = { ...rest, [to]: reference };
+  if (isRecord(background)) {
+    const rename = (value: Record<string, unknown>) => {
+      if (typeof value[from] !== 'string') return value;
+      const { [from]: reference, ...rest } = value;
+      return { ...rest, [to]: reference };
+    };
+    const remembered = background['rememberedImage'];
+    next['background'] = {
+      ...(background['type'] === 'image' ? rename(background) : background),
+      ...(isRecord(remembered) ? { rememberedImage: rename(remembered) } : {}),
+    };
+  }
+  const watermark = content['watermark'];
+  if (isRecord(watermark) && isRecord(watermark['image'])) {
+    const image = watermark['image'];
+    if (typeof image[from] === 'string') {
+      const { [from]: reference, ...rest } = image;
+      next['watermark'] = { ...watermark, image: { ...rest, [to]: reference } };
+    }
   }
   if (recovery && typeof content['recoveryV1'] === 'string') {
     try {
@@ -151,16 +316,27 @@ function renameLaneRef(
   sourceKey: string,
   targetKey: string
 ): Record<string, unknown> {
+  const rename = (entry: Record<string, unknown>) => {
+    if (typeof entry[sourceKey] !== 'string') return entry;
+    const { [sourceKey]: nested, ...fields } = entry;
+    return { ...fields, [targetKey]: nested };
+  };
   const next = { ...audio };
+  if (audio['originalSpeech'] !== undefined)
+    next['originalSpeech'] = mapSpeechReferences(audio['originalSpeech'], rename);
   for (const lane of LANES) {
     const clips = audio[lane];
     if (!Array.isArray(clips)) continue;
     next[lane] = clips.map((clip: unknown) => {
       if (!isRecord(clip)) return clip;
       const reference = clip[sourceKey];
-      if (typeof reference !== 'string') return clip;
+      if (typeof reference !== 'string') return mapSpeechReferences(clip, rename);
       const { [sourceKey]: _renamed, ...rest } = clip;
-      return { ...rest, [targetKey]: reference };
+      return mapSpeechReferences({ ...rest, [targetKey]: reference }, (entry) => {
+        if (typeof entry[sourceKey] !== 'string') return entry;
+        const { [sourceKey]: nested, ...fields } = entry;
+        return { ...fields, [targetKey]: nested };
+      });
     });
   }
   return next;
@@ -184,11 +360,59 @@ function requireMappedAssetId(assetIdMap: ReadonlyMap<string, string>, reference
   return mapped;
 }
 
+/** Exact audio placement identity retained by current content, undo/redo or recovery. */
+export function reviewWorkspaceHasAudioClip(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  clipId: string,
+  assetId: string
+): boolean {
+  const matches = (content: unknown): boolean => {
+    if (!isRecord(content)) return false;
+    const audio = content['audio'];
+    if (isRecord(audio)) {
+      for (const lane of LANES) {
+        const clips = audio[lane];
+        if (
+          Array.isArray(clips) &&
+          clips.some(
+            (clip: unknown) =>
+              isRecord(clip) && clip['id'] === clipId && clip['assetId'] === assetId
+          )
+        )
+          return true;
+      }
+    }
+    return false;
+  };
+  return retainedReviewContentMatches(workspace, matches);
+}
+
+/** Exact watermark ownership survives disabled modes, undo/redo and legacy recovery. */
+export function reviewWorkspaceHasWatermarkImage(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  assetId: string
+): boolean {
+  const matches = (content: unknown): boolean => {
+    if (!isRecord(content)) return false;
+    const watermark = content['watermark'];
+    if (
+      isRecord(watermark) &&
+      isRecord(watermark['image']) &&
+      watermark['image']['assetId'] === assetId
+    )
+      return true;
+    return false;
+  };
+  return retainedReviewContentMatches(workspace, matches);
+}
+
 /** Collects every project-asset reference the review keeps, including history ops. */
 export function collectReviewAssetReferences(
-  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history' | 'effectSnapshots'>
 ): ReadonlySet<string> {
   const references = new Set<string>();
+  for (const snapshot of workspace.effectSnapshots ?? [])
+    for (const asset of snapshot.assets) references.add(asset.assetId);
   const advanced = workspace.advanced;
   collectContentReferences(advanced, references);
   if (advanced.recoveryV1) collectRecoveryReferences(advanced.recoveryV1, references);
@@ -201,45 +425,80 @@ export function collectReviewAssetReferences(
 }
 
 function collectContentReferences(
-  content: Pick<QuickEditAdvancedContent, 'audio' | 'background'>,
+  content: Pick<
+    QuickEditAdvancedContent,
+    'audio' | 'background' | 'webcam' | 'watermark' | 'presentation'
+  >,
   into: Set<string>
 ): void {
   collectImageReference(content.background, into);
+  collectAssetReference(content.webcam, into);
+  collectAssetReference(content.watermark?.image, into);
+  mapPresentationReferences(content.presentation, (value) => {
+    collectAssetReference(value, into);
+    return value;
+  });
+  for (const replacement of content.audio.originalSpeech?.transcript.replacements ?? [])
+    collectAssetReference(replacement, into);
   for (const lane of LANES) {
     for (const clip of content.audio[lane]) {
       if (clip.assetId.startsWith(ASSET_PREFIX)) into.add(clip.assetId);
+      for (const replacement of clip.transcript?.replacements ?? [])
+        collectAssetReference(replacement, into);
     }
   }
 }
 
-function collectImageReference(background: unknown, into: Set<string>): void {
+function collectAssetReference(webcam: unknown, into: Set<string>): void {
   if (
-    isRecord(background) &&
-    background['type'] === 'image' &&
-    typeof background['assetId'] === 'string' &&
-    background['assetId'].startsWith(ASSET_PREFIX)
+    isRecord(webcam) &&
+    typeof webcam['assetId'] === 'string' &&
+    webcam['assetId'].startsWith(ASSET_PREFIX)
   )
-    into.add(background['assetId']);
+    into.add(webcam['assetId']);
+}
+
+function remapAssetReference<T>(webcam: T, assetIdMap: ReadonlyMap<string, string>): T {
+  if (!isRecord(webcam) || typeof webcam['assetId'] !== 'string') return webcam;
+  return { ...webcam, assetId: requireMappedAssetId(assetIdMap, webcam['assetId']) };
+}
+
+function collectImageReference(background: unknown, into: Set<string>): void {
+  if (!isRecord(background)) return;
+  if (background['type'] === 'image') collectAssetReference(background, into);
+  collectAssetReference(background['rememberedImage'], into);
 }
 
 function remapImageReference<T>(background: T, assetIdMap: ReadonlyMap<string, string>): T {
-  if (
-    !isRecord(background) ||
-    background['type'] !== 'image' ||
-    typeof background['assetId'] !== 'string'
-  )
-    return background;
-  const assetId = requireMappedAssetId(assetIdMap, background['assetId']);
-  return { ...background, assetId };
+  if (!isRecord(background)) return background;
+  const active =
+    background['type'] === 'image' ? remapAssetReference(background, assetIdMap) : background;
+  const remembered = remapAssetReference(background['rememberedImage'], assetIdMap);
+  if (active === background && remembered === background['rememberedImage']) return background;
+  return { ...active, ...(remembered === undefined ? {} : { rememberedImage: remembered }) };
+}
+
+function remapWatermarkReference<T>(watermark: T, assetIdMap: ReadonlyMap<string, string>): T {
+  if (!isRecord(watermark)) return watermark;
+  const image = remapAssetReference(watermark['image'], assetIdMap);
+  return image === watermark['image'] ? watermark : { ...watermark, image };
 }
 
 function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void {
   try {
     const parsed: unknown = JSON.parse(recoveryV1);
     if (!isRecord(parsed)) return;
+    mapPresentationReferences(parsed['presentation'], (value) => {
+      collectAssetReference(value, into);
+      return value;
+    });
+    collectAssetReference(parsed['webcam'], into);
     collectImageReference(parsed['background'], into);
+    if (isRecord(parsed['watermark'])) collectAssetReference(parsed['watermark']['image'], into);
     if (!isRecord(parsed['audio'])) return;
     const recoveryAudio = parsed['audio'];
+    for (const replacement of speechReplacements(recoveryAudio['originalSpeech']))
+      collectAssetReference(replacement, into);
     for (const lane of LANES) {
       const clips = recoveryAudio[lane];
       if (!Array.isArray(clips)) continue;
@@ -250,6 +509,8 @@ function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void 
           clip['assetId'].startsWith(ASSET_PREFIX)
         )
           into.add(clip['assetId']);
+        for (const replacement of speechReplacements(clip))
+          collectAssetReference(replacement, into);
       }
     }
   } catch {
@@ -264,15 +525,53 @@ function remapContentReferences(
 ): QuickEditAdvancedContent {
   const audio = { ...content.audio };
   let changed = false;
+  if (audio.originalSpeech) {
+    audio.originalSpeech = mapSpeechReferences(audio.originalSpeech, (entry) =>
+      remapAssetReference(entry, assetIdMap)
+    );
+    changed = true;
+  }
   for (const lane of LANES) {
     audio[lane] = content.audio[lane].map((clip) => {
       const remapped = requireMappedAssetId(assetIdMap, clip.assetId);
       changed = true;
-      return { ...clip, assetId: remapped };
+      return {
+        ...clip,
+        assetId: remapped,
+        ...(clip.transcript
+          ? {
+              transcript: {
+                ...clip.transcript,
+                replacements: clip.transcript.replacements.map((entry) => ({
+                  ...entry,
+                  assetId: requireMappedAssetId(assetIdMap, entry.assetId),
+                })),
+              },
+            }
+          : {}),
+      };
     });
   }
   const background = remapImageReference(content.background, assetIdMap);
-  return changed || background !== content.background ? { ...content, audio, background } : content;
+  const webcam = remapAssetReference(content.webcam, assetIdMap);
+  const presentation = mapPresentationReferences(content.presentation, (value) =>
+    remapAssetReference(value, assetIdMap)
+  );
+  const watermark = remapWatermarkReference(content.watermark, assetIdMap);
+  return changed ||
+    background !== content.background ||
+    webcam !== content.webcam ||
+    presentation !== content.presentation ||
+    watermark !== content.watermark
+    ? {
+        ...content,
+        audio,
+        background,
+        ...(webcam ? { webcam } : {}),
+        ...(watermark ? { watermark } : {}),
+        ...(presentation ? { presentation } : {}),
+      }
+    : content;
 }
 
 function remapRecoveryReferences(
@@ -286,20 +585,45 @@ function remapRecoveryReferences(
     return null;
   }
   if (!isRecord(parsed)) return null;
+  const webcam = remapAssetReference(parsed['webcam'], assetIdMap);
   const background = remapImageReference(parsed['background'], assetIdMap);
-  let changed = background !== parsed['background'];
-  if (changed) parsed['background'] = background;
+  const presentation = mapPresentationReferences(parsed['presentation'], (value) =>
+    remapAssetReference(value, assetIdMap)
+  );
+  const watermark = remapWatermarkReference(parsed['watermark'], assetIdMap);
+  let changed =
+    background !== parsed['background'] ||
+    webcam !== parsed['webcam'] ||
+    presentation !== parsed['presentation'] ||
+    watermark !== parsed['watermark'];
+  if (presentation !== parsed['presentation']) parsed['presentation'] = presentation;
+  if (watermark !== parsed['watermark']) parsed['watermark'] = watermark;
+  if (background !== parsed['background']) parsed['background'] = background;
+  if (webcam !== parsed['webcam']) parsed['webcam'] = webcam;
   const recoveryAudio = isRecord(parsed['audio']) ? parsed['audio'] : {};
+  if (recoveryAudio['originalSpeech'] !== undefined) {
+    recoveryAudio['originalSpeech'] = mapSpeechReferences(
+      recoveryAudio['originalSpeech'],
+      (entry) => remapAssetReference(entry, assetIdMap)
+    );
+    changed = true;
+  }
   for (const lane of LANES) {
     const clips = recoveryAudio[lane];
     if (!Array.isArray(clips)) continue;
     recoveryAudio[lane] = clips.map((clip: unknown) => {
       if (!isRecord(clip)) return clip;
       const assetId = clip['assetId'];
-      if (typeof assetId !== 'string') return clip;
+      if (typeof assetId !== 'string') {
+        const mapped = mapSpeechReferences(clip, (entry) => remapAssetReference(entry, assetIdMap));
+        changed ||= mapped !== clip;
+        return mapped;
+      }
       const remapped = requireMappedAssetId(assetIdMap, assetId);
       changed = true;
-      return { ...clip, assetId: remapped };
+      return mapSpeechReferences({ ...clip, assetId: remapped }, (entry) =>
+        remapAssetReference(entry, assetIdMap)
+      );
     });
   }
   return changed ? JSON.stringify(parsed) : null;
@@ -338,14 +662,35 @@ function remapSnapshot(
 ): VideoWorkspaceSnapshot {
   const advanced = snapshot.workspace.advanced;
   const content = remapContentReferences(advanced, assetIdMap);
+  const baseline = snapshot.workspace.baseline;
+  const baselineContent = baseline
+    ? remapContentReferences(baseline.advancedContent, assetIdMap)
+    : undefined;
   const recovery = advanced.recoveryV1
     ? remapRecoveryReferences(advanced.recoveryV1, assetIdMap)
     : null;
-  if (content === advanced && recovery === null) return snapshot;
+  const effectSnapshots = snapshot.workspace.effectSnapshots?.map((effect) => ({
+    ...effect,
+    assets: effect.assets.map((asset) => ({
+      ...asset,
+      assetId: requireMappedAssetId(assetIdMap, asset.assetId),
+    })),
+  }));
+  if (
+    content === advanced &&
+    recovery === null &&
+    !effectSnapshots &&
+    baselineContent === baseline?.advancedContent
+  )
+    return snapshot;
   return {
     ...snapshot,
     workspace: {
       ...snapshot.workspace,
+      ...(effectSnapshots ? { effectSnapshots } : {}),
+      ...(baseline && baselineContent
+        ? { baseline: { ...baseline, advancedContent: baselineContent } }
+        : {}),
       advanced: {
         ...advanced,
         ...content,
@@ -353,4 +698,73 @@ function remapSnapshot(
       },
     },
   };
+}
+
+/** Exact retained scene slot/kind ownership, independent of its selected mode. */
+export function reviewWorkspaceHasSceneResource(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  slot: 'intro' | 'outro',
+  kind: 'image' | 'video',
+  assetId: string
+): boolean {
+  const matches = (content: unknown): boolean => {
+    if (!isRecord(content)) return false;
+    const presentation = content['presentation'];
+    const entry = isRecord(presentation) ? presentation[slot] : undefined;
+    const resource = isRecord(entry) ? entry[kind] : undefined;
+    if (isRecord(resource) && resource['assetId'] === assetId) return true;
+    return false;
+  };
+  return retainedReviewContentMatches(workspace, matches);
+}
+
+/** Exact accepted identity retained independently of draft phrases, lane enablement or cuts. */
+export function reviewWorkspaceHasSpeechReplacement(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  target: ReviewSpeechTarget,
+  replacementId: string,
+  assetId: string
+): boolean {
+  const matches = (content: unknown): boolean => {
+    if (!isRecord(content)) return false;
+    const audio = content['audio'];
+    if (isRecord(audio)) {
+      const sources =
+        target.kind === 'original'
+          ? [audio['originalSpeech']]
+          : Array.isArray(audio['voiceover'])
+            ? audio['voiceover'].filter(
+                (clip: unknown) => isRecord(clip) && clip['id'] === target.clipId
+              )
+            : [];
+      if (
+        sources.some((source) =>
+          speechReplacements(source).some(
+            (entry) =>
+              isRecord(entry) && entry['id'] === replacementId && entry['assetId'] === assetId
+          )
+        )
+      )
+        return true;
+    }
+    return false;
+  };
+  return retainedReviewContentMatches(workspace, matches);
+}
+
+/** Current, undo/redo and one admitted legacy recovery projection retain resources equally. */
+function retainedReviewContentMatches(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  matches: (content: unknown) => boolean
+): boolean {
+  const retained = (content: unknown): boolean =>
+    matches(content) || (isRecord(content) && matches(parseRecoveryContent(content['recoveryV1'])));
+  return (
+    retained(workspace.advanced) ||
+    workspace.history.some(
+      (operation) =>
+        operation.target === 'advancedContent' &&
+        (retained(operation.before) || retained(operation.after))
+    )
+  );
 }

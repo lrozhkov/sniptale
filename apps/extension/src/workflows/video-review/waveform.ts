@@ -1,3 +1,5 @@
+import { accumulateAudioPeaks } from '../../features/video/audio/peaks';
+import { bindReviewMediaInput } from './media-input-lifetime';
 import { loadAudioPeaks } from '../../composition/library-preview/audio-peaks';
 
 export interface ReviewWaveform {
@@ -61,8 +63,7 @@ export async function loadReviewWaveformWindow(
   const { ALL_FORMATS, AudioSampleSink, BlobSource, Input } = await import('mediabunny');
   signal.throwIfAborted();
   const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
-  const abort = () => input.dispose();
-  signal.addEventListener('abort', abort, { once: true });
+  const releaseInput = bindReviewMediaInput(input, signal);
   try {
     const track = await input.getPrimaryAudioTrack();
     if (!track || !(await track.canDecode())) return null;
@@ -74,17 +75,7 @@ export async function loadReviewWaveformWindow(
         const pcm = new Float32Array(sample.numberOfFrames);
         for (let channel = 0; channel < sample.numberOfChannels; channel++) {
           sample.copyTo(pcm, { planeIndex: channel, format: 'f32-planar' });
-          for (let frame = 0; frame < pcm.length; frame++) {
-            const at = sample.timestamp + frame / sample.sampleRate;
-            if (at < start || at >= end) continue;
-            const index = Math.min(
-              peaks.length - 1,
-              Math.floor(((at - start) / (end - start)) * peaks.length)
-            );
-            const amplitude = Math.abs(pcm[frame]!);
-            if (Number.isFinite(amplitude))
-              peaks[index] = Math.max(peaks[index]!, Math.min(1, amplitude));
-          }
+          accumulateAudioPeaks(peaks, pcm, sample.timestamp, sample.sampleRate, start, end);
         }
         decoded = true;
       } finally {
@@ -93,7 +84,6 @@ export async function loadReviewWaveformWindow(
     }
     return decoded ? { start, end, peaks } : null;
   } finally {
-    signal.removeEventListener('abort', abort);
-    input.dispose();
+    releaseInput();
   }
 }

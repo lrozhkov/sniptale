@@ -54,12 +54,12 @@ it('creates the complete current beta schema and persists every domain contract'
   ).toEqual(CURRENT_SCHEMA_CONTRACTS);
 });
 
-it('aborts any non-baseline source instead of reviving alpha migration history', () => {
+it('aborts an unregistered future source before changing stores', () => {
   const harness = createUpgradeHarness();
 
-  expect(() => handleDatabaseUpgrade(harness.db, 30, 31, harness.transaction)).toThrow(
-    'Unsupported beta database migration source: 30'
-  );
+  expect(() =>
+    handleDatabaseUpgrade(harness.db, DB_VERSION + 1, DB_VERSION + 2, harness.transaction)
+  ).toThrow(`Unsupported beta database migration source: ${DB_VERSION + 1}`);
   expect(harness.transaction.abort).toHaveBeenCalledOnce();
   expect(harness.db.createObjectStore).not.toHaveBeenCalled();
 });

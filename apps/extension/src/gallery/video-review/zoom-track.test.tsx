@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -52,7 +53,6 @@ function renderTrack(
     range: { start: number; end: number },
     edge: 'start' | 'end' | 'move'
   ) => void,
-  onAdd = vi.fn(),
   time: number | null = 6,
   overrides?: {
     beforeAction?: Parameters<typeof ReviewZoomTrack>[0]['beforeAction'];
@@ -64,29 +64,38 @@ function renderTrack(
     linkSelectedId?: string | null;
     projection?: ReturnType<typeof createTrackProjection>;
     duration?: number;
+    compact?: boolean;
   }
 ) {
   act(() => {
     root.render(
-      <ReviewZoomTrack
-        beforeAction={overrides?.beforeAction}
-        duration={overrides?.duration ?? 10}
-        {...(time === null ? { time: null } : { time })}
-        regions={regions}
-        edits={overrides?.edits ?? edits}
-        toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
-        projection={overrides?.projection}
-        selectedId={null}
-        onSelect={vi.fn()}
-        onAdd={onAdd}
-        onDragCommit={onDragCommit}
-        {...(overrides?.enabled === undefined ? {} : { enabled: overrides.enabled })}
-        {...(overrides?.onLink ? { onLink: overrides.onLink } : {})}
-        {...(overrides?.onSelectLink ? { onSelectLink: overrides.onSelectLink } : {})}
-        {...(overrides?.linkSelectedId !== undefined
-          ? { linkSelectedId: overrides.linkSelectedId }
-          : {})}
-      />
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
+        duration={10}
+      >
+        <ReviewZoomTrack
+          beforeAction={overrides?.beforeAction}
+          duration={overrides?.duration ?? 10}
+          compact={overrides?.compact}
+          {...(time === null ? { time: null } : { time })}
+          regions={regions}
+          edits={overrides?.edits ?? edits}
+          toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
+          projection={overrides?.projection}
+          selectedId={null}
+          onSelect={vi.fn()}
+          onDragCommit={onDragCommit}
+          {...(overrides?.enabled === undefined ? {} : { enabled: overrides.enabled })}
+          {...(overrides?.onLink ? { onLink: overrides.onLink } : {})}
+          {...(overrides?.onSelectLink ? { onSelectLink: overrides.onSelectLink } : {})}
+          {...(overrides?.linkSelectedId !== undefined
+            ? { linkSelectedId: overrides.linkSelectedId }
+            : {})}
+        />
+      </ReviewTimelineResizeGuide>
     );
   });
   const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomLane"]')!;
@@ -94,7 +103,6 @@ function renderTrack(
   return {
     lane,
     blocks: [...lane.querySelectorAll<HTMLElement>('[role="button"]')],
-    add: host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.zoomAdd"]')!,
     event: async (target: Element, kind: string, x: number, shift = false) =>
       act(async () => {
         target.dispatchEvent(
@@ -104,62 +112,61 @@ function renderTrack(
   };
 }
 
-it('adds regions through the lane button', async () => {
-  const onAdd = vi.fn();
-  const track = renderTrack([zoom('a', 0, 2)], vi.fn(), onAdd);
-  await act(async () => track.add.click());
-  expect(onAdd).toHaveBeenCalledOnce();
+it('keeps the Focus lane free of a duplicate creation control', () => {
+  renderTrack([zoom('a', 0, 2)], vi.fn());
+  expect(host.querySelector('[aria-label="gallery.videoReview.zoomAdd"]')).toBeNull();
 });
 
-it('keeps source width while moving focus across a speed segment', async () => {
-  const speed: ReviewEdit = {
-    id: 'speed',
-    kind: 'speed',
-    start: 2,
-    end: 6,
-    requestedStart: 2,
-    requestedEnd: 6,
-    rate: 2,
-    audio: 'speed',
-  };
-  const projection = createTrackProjection(10, [speed]);
-  const commit = vi.fn();
-  const track = renderTrack([zoom('a', 0, 2)], commit, vi.fn(), null, {
-    projection,
-    toOutputTime: projection.output,
-  });
-  const block = track.blocks[0]!;
-  Object.assign(block, {
-    setPointerCapture: vi.fn(),
-    hasPointerCapture: () => true,
-    releasePointerCapture: vi.fn(),
-  });
-  expect(block.style.width).toBe('20%');
-  await track.event(block, 'pointerdown', 0);
-  await track.event(block, 'pointermove', 300, true);
-  expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
-  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
-  await track.event(block, 'pointerup', 300, true);
-  expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 3.5 }, 'move', { start: 3, end: 5 });
-  renderTrack(
-    [{ ...zoom('a', 2.5, 3.5), sourceAnchor: { start: 3, end: 5 } }],
-    commit,
-    vi.fn(),
-    null,
-    {
+it.each([false, true])(
+  'keeps source width while moving focus across a speed segment (compact=%s)',
+  async (compact) => {
+    const speed: ReviewEdit = {
+      id: 'speed',
+      kind: 'speed',
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      rate: 2,
+      audio: 'speed',
+    };
+    const projection = createTrackProjection(10, [speed]);
+    const commit = vi.fn();
+    const track = renderTrack([zoom('a', 0, 2)], commit, null, {
+      projection,
+      compact,
+      toOutputTime: projection.output,
+    });
+    const block = track.blocks[0]!;
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    expect(block.style.width).toBe('20%');
+    await track.event(block, 'pointerdown', 0);
+    await track.event(block, 'pointermove', 300, true);
+    expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
+    expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+    await track.event(block, 'pointerup', 300, true);
+    expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 3.5 }, 'move', {
+      start: 3,
+      end: 5,
+    });
+    renderTrack([{ ...zoom('a', 2.5, 3.5), sourceAnchor: { start: 3, end: 5 } }], commit, null, {
       projection,
       toOutputTime: projection.output,
-    }
-  );
-  expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(20);
-});
+    });
+    expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(20);
+  }
+);
 
 it('snaps to edit edges projected into result time (R03)', async () => {
   const commit = vi.fn((_id: string, _range: { start: number; end: number }) => undefined);
   const sourceEdits: ReviewEdit[] = [
     { id: 'edit-1', start: 6, end: 7, requestedStart: 6, requestedEnd: 7, kind: 'cut' },
   ];
-  const track = renderTrack([zoom('a', 0, 2)], commit, vi.fn(), 6, {
+  const track = renderTrack([zoom('a', 0, 2)], commit, 6, {
     edits: sourceEdits,
     toOutputTime: (source) => source / 2,
   });
@@ -181,7 +188,7 @@ it('snaps to edit edges projected into result time (R03)', async () => {
 it('ignores dormant regions for snapping (R03)', async () => {
   const commit = vi.fn((_id: string, _range: { start: number; end: number }) => undefined);
   const dormant = { ...zoom('d', 3, 5), dormant: true };
-  const track = renderTrack([zoom('a', 0, 2), dormant], commit, vi.fn(), 6);
+  const track = renderTrack([zoom('a', 0, 2), dormant], commit, 6);
   const first = track.blocks[0];
   if (!first) throw new Error('Zoom region did not render.');
   Object.assign(first, {
@@ -199,7 +206,7 @@ it('ignores dormant regions for snapping (R03)', async () => {
 it('exposes a connect affordance on an eligible gap and creates the link', async () => {
   const onLink = vi.fn((_id: string, _target: string | null) => undefined);
   const onSelectLink = vi.fn((_id: string) => undefined);
-  renderTrack([zoom('a', 0, 2), zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, {
+  renderTrack([zoom('a', 0, 2), zoom('b', 4, 6)], vi.fn(), 6, {
     onLink,
     onSelectLink,
   });
@@ -215,7 +222,7 @@ it('keeps a connected gap visible and selects its settings instead of unlinking'
   const onLink = vi.fn((_id: string, _target: string | null) => undefined);
   const onSelectLink = vi.fn((_id: string) => undefined);
   const linked: QuickEditZoomRegion = { ...zoom('a', 0, 2), linkTo: 'b' };
-  renderTrack([linked, zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, {
+  renderTrack([linked, zoom('b', 4, 6)], vi.fn(), 6, {
     onLink,
     onSelectLink,
     linkSelectedId: 'a',
@@ -232,14 +239,14 @@ it('keeps a connected gap visible and selects its settings instead of unlinking'
 it('hides the affordance for dormant, touching, or disabled pairs', () => {
   const onLink = vi.fn((_id: string, _target: string | null) => undefined);
   // Touching edges leave no gap to link.
-  renderTrack([zoom('a', 0, 2), zoom('b', 2, 4)], vi.fn(), vi.fn(), 6, { onLink });
+  renderTrack([zoom('a', 0, 2), zoom('b', 2, 4)], vi.fn(), 6, { onLink });
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
   // A dormant source is skipped entirely.
   const dormant: QuickEditZoomRegion = { ...zoom('a', 0, 2), dormant: true };
-  renderTrack([dormant, zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, { onLink });
+  renderTrack([dormant, zoom('b', 4, 6)], vi.fn(), 6, { onLink });
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
   // Disabled zoom lane keeps no connect control.
-  renderTrack([zoom('a', 0, 2), zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, {
+  renderTrack([zoom('a', 0, 2), zoom('b', 4, 6)], vi.fn(), 6, {
     onLink,
     enabled: false,
   });
@@ -247,10 +254,10 @@ it('hides the affordance for dormant, touching, or disabled pairs', () => {
 });
 
 it('leaves playhead ownership to the shared timeline across kept and removed source points', () => {
-  renderTrack([zoom('a', 0, 2)], vi.fn(), vi.fn(), 6);
+  renderTrack([zoom('a', 0, 2)], vi.fn(), 6);
   const playhead = host.querySelector<HTMLElement>('[data-zoom-playhead]');
   expect(playhead).toBeNull();
-  renderTrack([zoom('a', 0, 2)], vi.fn(), vi.fn(), null);
+  renderTrack([zoom('a', 0, 2)], vi.fn(), null);
   expect(host.querySelector('[data-zoom-playhead]')).toBeNull();
 });
 
@@ -279,7 +286,8 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   // Trim the start edge of the second region onto the first region's boundary (8px magnet).
   await track.event(startEdge, 'pointerdown', 400);
   await track.event(second, 'pointermove', 195);
-  expect(document.querySelector('[data-zoom-guide]')).not.toBeNull();
+  expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('200px');
+  expect(document.querySelector('[data-zoom-guide]')).toBeNull();
   await track.event(second, 'pointerup', 195);
   expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
   expect(document.querySelector('[data-zoom-guide]')).toBeNull();
@@ -319,7 +327,14 @@ for (const width of [1000, 4000]) {
       expect(Number.parseFloat(block.style.left)).toBeCloseTo(
         edge === 'start' ? 40 - 2400 / width : 20
       );
+      const visibleEdge =
+        Number.parseFloat(block.style.left) +
+        (edge === 'end' ? Number.parseFloat(block.style.width) : 0);
+      expect(
+        Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+      ).toBeCloseTo(visibleEdge * 10);
       await track.event(block, 'pointerup', edge === 'start' ? width : -width, true);
+      expect(host.querySelector('[data-resizing]')).toBeNull();
       const range = commit.mock.calls[0]![1];
       expect(range.end - range.start).toBeCloseTo(240 / width);
       expect(edge === 'start' ? range.end : range.start).toBe(edge === 'start' ? 4 : 2);
@@ -345,7 +360,7 @@ it('keeps a cut-boundary fixed end and speed-projected minimum consistent with t
   ];
   const projection = createTrackProjection(10, sourceEdits);
   const commit = vi.fn();
-  const track = renderTrack([zoom('a', 1, 2)], commit, vi.fn(), null, { projection });
+  const track = renderTrack([zoom('a', 1, 2)], commit, null, { projection });
   const block = track.blocks[0]!;
   Object.assign(block, {
     setPointerCapture: vi.fn(),
@@ -356,6 +371,9 @@ it('keeps a cut-boundary fixed end and speed-projected minimum consistent with t
   await track.event(block, 'pointermove', 900, true);
   expect(Number.parseFloat(block.style.width)).toBeCloseTo(2.4);
   expect(Number.parseFloat(block.style.left)).toBeCloseTo(37.6);
+  expect(
+    Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+  ).toBeCloseTo(376);
   await track.event(block, 'pointerup', 900, true);
   expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start', {
     start: 3.76,
@@ -368,7 +386,7 @@ it('keeps a cut-boundary fixed end and speed-projected minimum consistent with t
 it('keeps focus selection and final range through delayed note admission', async () => {
   let admit!: () => void;
   const commit = vi.fn();
-  const track = renderTrack([zoom('a', 2, 4)], commit, vi.fn(), null, {
+  const track = renderTrack([zoom('a', 2, 4)], commit, null, {
     beforeAction: (action) => {
       admit = action;
     },
@@ -409,7 +427,7 @@ it('formats timeline scale and tooltip with one localized decimal without mutati
 });
 
 it('marks disabled focus content as muted without disabling selection', async () => {
-  const view = renderTrack([zoom('z1', 2, 4)], vi.fn(), vi.fn(), 0, { enabled: false });
+  const view = renderTrack([zoom('z1', 2, 4)], vi.fn(), 0, { enabled: false });
   const row = view.lane.closest('[data-review-track-muted]');
   expect(row?.getAttribute('data-review-track-muted')).toBe('true');
   expect(view.blocks[0]!.tabIndex).toBe(0);
@@ -444,7 +462,7 @@ for (const spotlight of [false, true]) {
         preserveUnderCuts: true,
       });
       const projection = createTrackProjection(10, [cut]);
-      const track = renderTrack(regions, vi.fn(), vi.fn(), null, {
+      const track = renderTrack(regions, vi.fn(), null, {
         projection,
         edits: [cut],
         duration: projection.resultDuration,
@@ -474,7 +492,7 @@ for (const spotlight of [false, true]) {
         ...(spotlight ? { spotlight: createQuickEditSpotlight() } : {}),
       };
       const commit = vi.fn();
-      const track = renderTrack([region], commit, vi.fn(), null, {
+      const track = renderTrack([region], commit, null, {
         projection,
         edits: [cut],
         duration: projection.resultDuration,
@@ -515,7 +533,7 @@ for (const spotlight of [false, true]) {
 
 it('does not magnet focus to invisible codec keyframes', async () => {
   const commit = vi.fn();
-  const track = renderTrack([zoom('a', 0, 1)], commit, vi.fn(), 9);
+  const track = renderTrack([zoom('a', 0, 1)], commit, 9);
   const block = track.blocks[0]!;
   Object.assign(block, {
     setPointerCapture: vi.fn(),
@@ -534,7 +552,7 @@ it('does not magnet focus to invisible codec keyframes', async () => {
 
 it('retains a visible playhead target coinciding with the moving focus old edge', async () => {
   const commit = vi.fn();
-  const track = renderTrack([zoom('a', 2, 4)], commit, vi.fn(), 2);
+  const track = renderTrack([zoom('a', 2, 4)], commit, 2);
   const block = track.blocks[0]!;
   Object.assign(block, {
     setPointerCapture: vi.fn(),
@@ -551,7 +569,7 @@ it.each([false, true])(
   'preserves visible timeline-end snapping with Shift bypass %s',
   async (shift) => {
     const commit = vi.fn();
-    const track = renderTrack([zoom('a', 1, 2)], commit, vi.fn(), 9);
+    const track = renderTrack([zoom('a', 1, 2)], commit, 9);
     const block = track.blocks[0]!;
     Object.assign(block, {
       setPointerCapture: vi.fn(),
@@ -569,5 +587,136 @@ it.each([false, true])(
       },
       'move'
     );
+  }
+);
+
+it('repacks transient overlapping overlay ranges and restores rows on Escape', async () => {
+  const overlay = (id: string, start: number, end: number) => ({
+    ...zoom(id, start, end),
+    sourceAnchor: { start, end },
+    spotlight: createQuickEditSpotlight(),
+  });
+  const commit = vi.fn();
+  const projection = createTrackProjection(10, []);
+  const track = renderTrack([overlay('a', 0, 2), overlay('b', 3, 5)], commit, null, {
+    projection,
+  });
+  const [first, second] = track.blocks;
+  first!.setPointerCapture = vi.fn();
+  first!.hasPointerCapture = vi.fn(() => false);
+  expect(first!.style.top).toBe(second!.style.top);
+  await track.event(first!, 'pointerdown', 0);
+  await track.event(first!, 'pointermove', 300, true);
+  expect(first!.style.top).not.toBe(second!.style.top);
+  expect(track.lane.style.height).toBe('72px');
+  expect(commit).not.toHaveBeenCalled();
+  await act(async () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(first!.style.top).toBe(second!.style.top);
+  await track.event(first!, 'pointerup', 300, true);
+  expect(commit).not.toHaveBeenCalled();
+});
+
+it('offers the immediate Spotlight neighbor instead of a stored link across it', async () => {
+  const overlay = (id: string, start: number, end: number) => ({
+    ...zoom(id, start, end),
+    spotlight: createQuickEditSpotlight(),
+  });
+  const onLink = vi.fn();
+  const onSelectLink = vi.fn();
+  const track = renderTrack(
+    [{ ...overlay('a', 0, 2), linkTo: 'b' }, overlay('c', 3, 4), overlay('b', 6, 8)],
+    vi.fn(),
+    null,
+    { onLink, onSelectLink }
+  );
+  const link = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.zoomLink"][data-connected="false"]'
+  )!;
+  expect(
+    host.querySelector('[data-ui="gallery.videoReview.zoomLink"][data-connected="true"]')
+  ).toBeNull();
+  expect(link.style.left).toBe('20%');
+  expect(Number.parseFloat(link.style.width)).toBeCloseTo(10);
+  expect(track.blocks[0]!.style.top).toBe(track.blocks[2]!.style.top);
+  expect(track.blocks[0]!.style.top).toBe(track.blocks[1]!.style.top);
+  await act(async () => link.click());
+  expect(onSelectLink).toHaveBeenCalledWith('a');
+  expect(onLink).toHaveBeenCalledWith('a', 'c');
+  const incoming = [
+    ...host.querySelectorAll<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]'),
+  ].find((button) => button.style.left === '40%')!;
+  expect(incoming).toBeDefined();
+  await act(async () => incoming.click());
+  expect(onLink).toHaveBeenCalledWith('c', 'b');
+});
+
+it('offers no Border links or camera link across an intervening camera', async () => {
+  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  renderTrack(
+    [
+      { ...zoom('a', 0, 2), border: createQuickEditBorder() },
+      { ...zoom('b', 6, 8), border: createQuickEditBorder() },
+    ],
+    vi.fn(),
+    null,
+    { onLink: vi.fn() }
+  );
+  expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
+  renderTrack([zoom('a', 0, 2), zoom('c', 1, 4), zoom('b', 6, 8)], vi.fn(), null, {
+    onLink: vi.fn(),
+  });
+  const links = [
+    ...host.querySelectorAll<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]'),
+  ];
+  expect(links.some((link) => link.style.left === '20%')).toBe(false);
+});
+
+it('uses one visible row for adjacent Zoom, Spotlight and Border intervals', async () => {
+  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const track = renderTrack(
+    [
+      zoom('camera-a', 0, 2),
+      { ...zoom('spotlight', 2, 4), spotlight: createQuickEditSpotlight() },
+      { ...zoom('border', 4, 6), border: createQuickEditBorder() },
+      zoom('camera-b', 6, 8),
+    ],
+    vi.fn()
+  );
+  expect(track.blocks).toHaveLength(4);
+  expect(new Set(track.blocks.map((block) => block.style.top)).size).toBe(1);
+  expect(track.lane.style.height).toBe('36px');
+});
+
+it.each(['zoom', 'spotlight'] as const)(
+  'does not offer a %s link across an installed focus of another type',
+  async (kind) => {
+    const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+    const endpoint = (id: string, start: number, end: number) => ({
+      ...zoom(id, start, end),
+      ...(kind === 'spotlight' ? { spotlight: createQuickEditSpotlight() } : {}),
+    });
+    for (const middle of [
+      { ...zoom('middle', 3, 4), border: createQuickEditBorder() },
+      {
+        ...zoom('middle', 3, 4),
+        ...(kind === 'zoom' ? { spotlight: createQuickEditSpotlight() } : {}),
+      },
+    ]) {
+      for (const connected of [false, true]) {
+        renderTrack(
+          [
+            { ...endpoint('a', 0, 2), ...(connected ? { linkTo: 'b' } : {}) },
+            middle,
+            endpoint('b', 6, 8),
+          ],
+          vi.fn(),
+          null,
+          { onLink: vi.fn(), onSelectLink: vi.fn() }
+        );
+        expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
+      }
+    }
   }
 );

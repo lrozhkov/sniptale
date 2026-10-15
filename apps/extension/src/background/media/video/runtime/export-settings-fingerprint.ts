@@ -7,6 +7,7 @@ export function createProjectExportSettingsFingerprint(
     ['width', settings.width],
     ['height', settings.height],
     ['fps', settings.fps],
+    ['frameRateMode', settings.frameRateMode ?? 'constant'],
     ['quality', settings.quality],
     ['format', settings.format],
     ['mp4VideoCodec', settings.mp4VideoCodec ?? null],

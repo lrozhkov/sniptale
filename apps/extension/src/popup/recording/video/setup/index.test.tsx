@@ -265,7 +265,7 @@ it('uses an already verified startup post-record snapshot without another state 
 });
 it('disables start when the current mode is unavailable or pending', verifiesDisabledStartState);
 
-it('shows saving state and clears the visible timer while discarding an active recording', async () => {
+it('preserves the authoritative recording state after the discard callback', async () => {
   const onCancel = vi.fn();
   await renderNode(
     <VideoSetupPage
@@ -292,16 +292,16 @@ it('shows saving state and clears the visible timer while discarding an active r
   expect(onCancel).toHaveBeenCalled();
   expect(mocks.bodyMock).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      showSavingState: true,
+      showSavingState: false,
       recordingState: expect.objectContaining({
-        duration: 0,
-        status: VideoRecordingStatus.IDLE,
+        duration: 23,
+        status: VideoRecordingStatus.RECORDING,
       }),
     })
   );
 });
 
-it('returns to setup immediately when cancelling before recorder activation', async () => {
+it('waits for authoritative state when cancelling before recorder activation', async () => {
   const onCancel = vi.fn();
   await renderNode(
     <VideoSetupPage
@@ -329,11 +329,11 @@ it('returns to setup immediately when cancelling before recorder activation', as
   expect(onCancel).toHaveBeenCalled();
   expect(mocks.bodyMock).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      isStartPending: false,
+      isStartPending: true,
       showSavingState: false,
       recordingState: expect.objectContaining({
-        countdownEndsAt: null,
-        status: VideoRecordingStatus.IDLE,
+        countdownEndsAt: expect.any(Number),
+        status: VideoRecordingStatus.COUNTDOWN,
       }),
     })
   );

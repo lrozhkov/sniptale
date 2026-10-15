@@ -10,6 +10,7 @@ import {
   createController,
   createMediaItem,
   createScenarioItem,
+  createScenarioExportItem,
   createVideoProjectItem,
   runBusyAction,
 } from './test-support/index';
@@ -164,7 +165,11 @@ async function verifyConfirmExportRequiresFreshDisclosureInspection() {
 
   await expect(
     createConfirmExportBackupAction(controller)(pendingOptions, runBusyAction)
-  ).rejects.toThrow('inspection failed');
+  ).rejects.toMatchObject({
+    reason: 'metadata-invalid',
+    phase: 'prepare',
+    cause: expect.objectContaining({ message: 'inspection failed' }),
+  });
 
   expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
   expect(getState().storage.pendingExport).toEqual({
@@ -180,7 +185,11 @@ async function verifyDirectSinkFailureIsAuthoritative() {
 
   await expect(
     createConfirmExportBackupAction(controller)(createAllBackupOptions(), runBusyAction)
-  ).rejects.toThrow('external disk write failed');
+  ).rejects.toMatchObject({
+    reason: 'archive-write',
+    phase: 'write',
+    cause: expect.objectContaining({ message: 'external disk write failed' }),
+  });
   expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
 }
 
@@ -579,4 +588,41 @@ describe('gallery backup actions', () => {
     'reports exact committed counts when a later restore root fails',
     verifyFailedBackupImportReportsPartialResult
   );
+});
+
+it('maps a selected quick-edit and its source to one media root without montage identity', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const { createSelectedBackupExportOptions } = await import('./backup');
+  const project = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const source = createMediaItem({ id: 'source', entityId: 'source' });
+  expect(createSelectedBackupExportOptions([project, source])?.selected).toEqual({
+    mediaAssetIds: ['source'],
+    scenarioProjectIds: [],
+    videoProjectIds: [],
+  });
+});
+
+it('backs up a saved scenario export through its owning project and deduplicates targets', async () => {
+  const { createSelectedBackupExportOptions } = await import('./backup');
+  const artifact = createScenarioExportItem();
+  artifact.project.lifecycle = { storageClass: 'temporary', savedAt: null, updatedAt: 1 };
+  expect(createSelectedBackupExportOptions([artifact])?.includeDrafts).toBe(true);
+  const project = createScenarioItem({ entityId: artifact.project.id });
+  expect(createSelectedBackupExportOptions([artifact])?.selected?.scenarioProjectIds).toEqual([
+    artifact.project.id,
+  ]);
+  expect(createSelectedBackupExportOptions([artifact, project, artifact])?.selected).toEqual({
+    mediaAssetIds: [],
+    scenarioProjectIds: [artifact.project.id],
+    videoProjectIds: [],
+  });
 });

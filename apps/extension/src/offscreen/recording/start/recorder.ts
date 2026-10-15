@@ -30,6 +30,11 @@ import {
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
 import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
+import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
+import {
+  RecordingFrameClockObserver,
+  type RecordingSourceClockCalibration,
+} from '../encoding/recording-frame-clock';
 
 type RecordingSourceBinding = {
   generation: number;
@@ -138,6 +143,7 @@ export async function finalizeRecordingBootstrap(params: {
   cursorCaptureMode?: VideoCursorCaptureMode | null;
   encoderFrameTransform?: LiveVideoFrameTransform | null;
   onVideoFrameGeometry?: (frame: VideoFrame) => void;
+  sourceClockCalibration?: RecordingSourceClockCalibration | null;
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
   sourceBinding?: RecordingSourceBinding;
@@ -192,6 +198,15 @@ export async function finalizeRecordingBootstrap(params: {
     ),
     frameTransform: params.encoderFrameTransform ?? undefined,
     ...(params.onVideoFrameGeometry ? { onVideoFrameGeometry: params.onVideoFrameGeometry } : {}),
+    ...(params.sourceClockCalibration === undefined || !params.sourceBinding
+      ? {}
+      : {
+          frameClockObserver: new RecordingFrameClockObserver(
+            params.sourceBinding,
+            params.sourceClockCalibration,
+            500 / encoderConfig.frameRate
+          ),
+        }),
     mimeType,
     stream: videoStream,
   });
@@ -242,6 +257,7 @@ function notifyRecordingStarted(params: {
   displaySurface: (typeof VideoDisplaySurface)[keyof typeof VideoDisplaySurface] | null;
   recordingId: string;
   webcamSettings: ReturnType<typeof getActiveSidecarWebcamSettings>;
+  frameClock?: RecordingFrameClockAnchor | null | undefined;
 }): void {
   logger.info('Recording started', { recordingId: params.recordingId });
   sendRuntimeMessageBestEffort({
@@ -251,6 +267,7 @@ function notifyRecordingStarted(params: {
     payload: {
       type: VideoMessageType.OFFSCREEN_RECORDING_STARTED,
       recordingId: params.recordingId,
+      ...(params.frameClock === undefined ? {} : { frameClock: params.frameClock }),
       ...(params.cursorCaptureMode === null ? {} : { cursorCaptureMode: params.cursorCaptureMode }),
       ...(params.displaySurface === null ? {} : { displaySurface: params.displaySurface }),
       ...(params.webcamSettings === null ? {} : { webcamSettings: params.webcamSettings }),
@@ -427,7 +444,16 @@ function attachRecorderLifecycle(params: {
       recordingContext.activateRecorder(artifactSession);
       phase = 'recording';
       params.durationTracker.startSegment();
-      notifyRecordingStarted(params);
+      notifyRecordingStarted({ ...params, frameClock: artifactSession.frameClock });
+    },
+    onResume: (frameClock) => {
+      if (
+        phase !== 'recording' ||
+        recordingContext.lifecycleState !== 'recording' ||
+        artifactSession.state !== 'recording'
+      )
+        return;
+      notifyRecordingResumed(recordingId, frameClock);
     },
     onStop: async (artifact) => {
       logger.debug('Live recording encoder stopped');
@@ -496,5 +522,20 @@ function notifyRecordingRuntimeErrorBestEffort(recordingId: string, error: Error
       phase: 'runtime',
       recordingId,
     },
+  });
+}
+
+function notifyRecordingResumed(
+  recordingId: string,
+  frameClock: Exclude<
+    Awaited<ReturnType<typeof createLiveRecordingArtifactSession>>['frameClock'],
+    undefined
+  >
+) {
+  sendRuntimeMessageBestEffort({
+    context: { recordingId },
+    logger,
+    logMessage: 'Failed to notify runtime of the exact resumed frame clock',
+    payload: { type: VideoMessageType.OFFSCREEN_RECORDING_RESUMED, recordingId, frameClock },
   });
 }

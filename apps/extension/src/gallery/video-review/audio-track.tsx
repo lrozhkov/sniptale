@@ -1,3 +1,11 @@
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+} from './track-row';
+import { useReviewGestureCancellation } from './timeline-drag';
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
@@ -21,7 +29,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { Mic, Plus, Volume2, VolumeX, AudioLines } from 'lucide-react';
+import { Mic, Plus, Volume2, VolumeX, AudioLines, Music } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditAudioClip,
@@ -38,7 +46,6 @@ import {
   ReviewButton,
 } from './controls';
 import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
@@ -75,6 +82,7 @@ const LANES: Array<{
 ];
 
 type ReviewAudioTimelineProps = {
+  compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
@@ -105,6 +113,7 @@ type ReviewAudioClipLaneProps = ReviewAudioTimelineProps & {
 };
 
 type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
+  onOpenSpeech?: (() => void) | undefined;
   originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
   selectedEditId?: string | undefined;
   edits?: readonly ReviewEdit[] | undefined;
@@ -116,6 +125,7 @@ type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
+  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
 };
 
@@ -123,6 +133,7 @@ type ReviewClipLanesProps = ReviewAudioTimelineProps & {
   audio: QuickEditAudioState;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
+  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
   pickerLane: RefObject<ReviewAudioLane | null>;
   pickerInput: RefObject<HTMLInputElement | null>;
@@ -136,6 +147,18 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
   } | null>(null);
   const dropTarget = useAudioLaneDrop(props);
   const drag = useRef<AudioDragState | null>(null);
+  const boundary = drag.current;
+  const boundaryRange = preview ? reviewVoiceoverRange(preview.clip) : null;
+  useReviewResizeBoundary(
+    boundary,
+    boundary &&
+      boundary.edge !== 'move' &&
+      boundaryRange &&
+      props.clips.some((clip) => clip.id === boundary.id)
+      ? (props.projection?.source(boundaryRange[boundary.edge], boundary.edge) ??
+          boundaryRange[boundary.edge])
+      : null
+  );
   const cancelDrag = useCallback(() => {
     const current = drag.current;
     drag.current = null;
@@ -144,6 +167,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     if (current?.node.hasPointerCapture(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
   }, []);
+  useReviewGestureCancellation(cancelDrag);
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       const current = drag.current;
@@ -184,16 +208,23 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
   const rowCount = Math.max(1, ...[...rows.values()].map((row) => row + 1));
   return (
     <ReviewTrackRow
+      track={props.lane}
       muted={props.clips.length > 0 && props.clips.every((clip) => clip.muted)}
       label={props.label}
-      icon={<AudioLines size={14} aria-hidden="true" />}
+      icon={
+        props.lane === 'music' ? (
+          <Music size={14} aria-hidden />
+        ) : (
+          <AudioLines size={14} aria-hidden />
+        )
+      }
       controls={props.trailing}
     >
       <div
         data-ui="gallery.videoReview.audioLane"
         data-audio-lane={props.lane}
         {...dropTarget}
-        style={{ height: rowCount * 36 - 4 }}
+        style={{ height: rowCount * reviewTrackMetrics(props.compact).step }}
       >
         {props.clips.flatMap((stored) => {
           const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
@@ -204,6 +235,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
               : [undefined];
           return (
             <ReviewAudioClipBlock
+              compact={props.compact}
               key={clip.id}
               row={rows.get(clip.id) ?? 0}
               pieces={pieces}
@@ -233,7 +265,6 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
         })}
         <ReviewTrackCuts projection={props.cutsProjection ?? props.projection} />
         <ReviewAudioLaneStatus
-          empty={!props.clips.length}
           guide={
             preview?.guide == null
               ? null
@@ -248,6 +279,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
 
 /** One draggable clip block; edges trim, the body moves, and Escape cancels the preview. */
 type ReviewAudioClipBlockProps = {
+  compact?: boolean | undefined;
   row: number;
   pieces: readonly (ReturnType<ReviewTrackProjection['slices']>[number] | undefined)[];
   clip: QuickEditAudioClip;
@@ -303,8 +335,10 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
       style={{
         left: `${start * 100}%`,
         width: `${(end - start) * 100}%`,
-        top: props.row * 36,
-        height: 32,
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset,
+        height: reviewTrackMetrics(props.compact).body,
       }}
       {...reviewAudioClipGesture(props, assetDuration)}
     >
@@ -361,6 +395,10 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
     onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0 || props.busy) return;
       event.stopPropagation();
+      if (reviewTrackGestureLocked(event.currentTarget)) {
+        props.onSelect(clip.id);
+        return;
+      }
       const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(clip.id));
       const edge =
         event.target instanceof Element
@@ -381,6 +419,7 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
         pointerId: event.pointerId,
         node: event.currentTarget,
       };
+      props.onPreview({ clip, guide: null });
       event.currentTarget.setPointerCapture(event.pointerId);
     },
     onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -412,7 +451,9 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
       ];
       const start = snapTimelineTime(base.timelineStart + delta, candidates, threshold);
       const mapped =
-        original.sourceAnchor && !props.cutSuppressed ? props.sourceProjection : undefined;
+        original.sourceAnchor && !props.cutSuppressed && range.end <= props.duration
+          ? props.sourceProjection
+          : undefined;
       const playbackDuration = original.sourceAnchor
         ? reviewVoiceoverPlaybackDuration(original, props.voiceoverSegments)
         : original.duration;
@@ -460,11 +501,12 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
               );
       props.onPreview({
         clip: next,
-        guide: snapped.candidate,
+        guide: current.edge === 'move' ? snapped.candidate : null,
       });
     },
     onPointerUp: props.onCommit,
     onPointerCancel: props.onCancel,
+    onLostPointerCapture: props.onCancel,
   };
 }
 
@@ -488,7 +530,9 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
       />
       {props.hasOriginalAudio !== false ? (
         <ReviewOriginalAudioTrack
+          compact={props.compact}
           beforeAction={props.beforeAction}
+          onOpenSpeech={props.onOpenSpeech}
           duration={props.duration}
           editor={props.originalEditor}
           selectedEditId={props.selectedEditId}
@@ -501,9 +545,18 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           busy={props.busy}
           onOriginal={props.onOriginal}
         />
-      ) : null}
+      ) : (
+        <ReviewTrackRow
+          placeholder
+          track="originalAudio"
+          label={translate('gallery.videoReview.audioOriginal')}
+        >
+          <div style={{ height: reviewTrackMetrics(props.compact).step }} />
+        </ReviewTrackRow>
+      )}
       {props.showAddedAudio !== false ? (
         <ReviewClipLanes
+          compact={props.compact}
           beforeAction={props.beforeAction}
           audio={props.audio}
           assets={props.assets}
@@ -519,6 +572,7 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           onTrimClip={props.onTrimClip}
           onImportFile={props.onImportFile}
           onRecordVoiceover={props.onRecordVoiceover}
+          onOpenMusic={props.onOpenMusic}
           pickerLane={picker}
           pickerInput={input}
         />
@@ -532,6 +586,7 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
     <>
       {LANES.map((lane) => (
         <ReviewAudioClipLane
+          compact={props.compact}
           key={lane.key}
           lane={lane.key}
           label={translate(lane.label)}
@@ -560,13 +615,7 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
           onMoveClip={props.onMoveClip}
           onTrimClip={props.onTrimClip}
           onDropFile={(file: File, timelineTime: number) =>
-            props.onImportFile(
-              file,
-              lane.key,
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
-                ? (props.projection?.output(timelineTime) ?? timelineTime)
-                : timelineTime
-            )
+            props.onImportFile(file, lane.key, timelineTime)
           }
           trailing={
             <>
@@ -581,10 +630,21 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
                 </ReviewButton>
               )}
               <ReviewButton
-                label={translate('gallery.videoReview.audioImport')}
+                label={translate(
+                  lane.key === 'music' && props.onOpenMusic
+                    ? 'gallery.videoReview.musicLibrary'
+                    : 'gallery.videoReview.audioImport'
+                )}
                 disabled={props.busy}
                 className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                onClick={() => {
+                onClick={(event) => {
+                  if (props.onOpenMusic) {
+                    const trigger = event.currentTarget;
+                    (props.beforeAction ?? ((action) => action()))(() =>
+                      props.onOpenMusic?.(trigger, lane.key)
+                    );
+                    return;
+                  }
                   props.pickerLane.current = lane.key;
                   props.pickerInput.current?.click();
                 }}
@@ -622,18 +682,10 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
   );
 }
 
-/** Empty-lane guidance and the current magnetic alignment share the lane coordinate scale. */
-function ReviewAudioLaneStatus(props: { empty: boolean; guide: number | null; duration: number }) {
+/** Magnetic alignment uses the lane coordinate scale. */
+function ReviewAudioLaneStatus(props: { guide: number | null; duration: number }) {
   return (
     <>
-      {props.empty ? (
-        <p
-          className="pointer-events-none absolute inset-0 flex items-center justify-center
-              text-[11px] text-[var(--sniptale-color-text-muted)]"
-        >
-          {translate('gallery.videoReview.audioEmpty')}
-        </p>
-      ) : null}
       {props.guide !== null ? (
         <div
           aria-hidden="true"
@@ -658,7 +710,7 @@ function useAudioLaneDrop(props: {
   return drop
     ? {
         'data-drop-active': dropHover ? 'true' : undefined,
-        className: `relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)] ${
+        className: `relative h-8 rounded bg-[var(--sniptale-color-surface-hover)] ${
           dropHover
             ? 'outline-2 outline-offset-[-1px] outline-[var(--sniptale-color-border-accent-strong)]'
             : ''
@@ -705,7 +757,7 @@ function useAudioLaneDrop(props: {
         },
       }
     : {
-        className: 'relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]',
+        className: 'relative h-8 rounded bg-[var(--sniptale-color-surface-hover)]',
       };
 }
 

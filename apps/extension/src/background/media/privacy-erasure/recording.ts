@@ -1,9 +1,7 @@
 import type { ErasureParticipantResult } from '@sniptale/runtime-contracts/privacy-erasure/types';
 
-import {
-  clearActiveVideoRecordingLease,
-  ensureActiveVideoRecordingLeaseHydrated,
-} from '../video/recording-control-lease';
+import { clearActiveVideoRecordingLease } from '../video/recording-control-lease';
+import { ensureActiveVideoRecordingLeaseHydrated } from '../video/runtime/recording-completion';
 import {
   getCurrentRecordingId,
   resetRecordingId,

@@ -32,6 +32,7 @@ vi.mock('mediabunny', () => ({
     samplesAtTimestamps = samplesAtTimestampsMock;
   },
   WEBM: {},
+  MP4: {},
 }));
 
 vi.mock('../../media', async (importOriginal) => ({
@@ -73,6 +74,9 @@ import { createArgs } from './webm.test-support';
 function createSample() {
   return {
     close: vi.fn(),
+    codedWidth: 1280,
+    codedHeight: 720,
+    rotation: 0,
     displayHeight: 720,
     displayWidth: 1280,
     draw: vi.fn(),
@@ -90,6 +94,7 @@ beforeEach(() => {
   inputDisposeMocks.length = 0;
   getPrimaryVideoTrackMock.mockResolvedValue({
     canDecode: canDecodeMock,
+    getTimeResolution: vi.fn().mockResolvedValue(1_000_000),
     getDecoderConfig: vi
       .fn()
       .mockResolvedValue({ codec: 'vp8', colorSpace: { matrix: 'smpte170m' } }),
@@ -146,6 +151,10 @@ it('renders decoded WebM samples into canvas frames and forwards them to the enc
   mediaMap?.get('clip-1')?.draw(args.context);
   expect(samples[0]!.draw).toHaveBeenCalled();
   expect(args.videoEncoder.encode).toHaveBeenCalledTimes(2);
+  expect(args.videoEncoder.encode).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ avc: { quantizer: 24 } })
+  );
   expect(args.videoEncoder.encode.mock.calls.map(([frame]) => frame)).toEqual([
     expect.objectContaining({ init: expect.objectContaining({ timestamp: 0 }) }),
     expect.objectContaining({ init: expect.objectContaining({ timestamp: 500_000 }) }),
@@ -178,7 +187,7 @@ it('returns false when the WebM video track cannot be decoded', async () => {
   expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
 });
 
-it('disposes providers when cancellation interrupts accelerated WebM rendering before sampling', async () => {
+it('does not acquire providers when accelerated rendering is already cancelled', async () => {
   const controller = new AbortController();
   controller.abort();
   const sample = createSample();
@@ -189,7 +198,7 @@ it('disposes providers when cancellation interrupts accelerated WebM rendering b
   ).rejects.toThrow('aborted');
 
   expect(sample.close).not.toHaveBeenCalled();
-  expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
+  expect(inputDisposeMocks).toHaveLength(0);
 });
 
 it('closes yielded samples when pipeline failure interrupts accelerated WebM rendering', async () => {
@@ -211,6 +220,7 @@ it('closes yielded samples when pipeline failure interrupts accelerated WebM ren
 it('defers untagged VP8 to the media-element renderer before encoding any frames', async () => {
   getPrimaryVideoTrackMock.mockResolvedValueOnce({
     canDecode: canDecodeMock,
+    getTimeResolution: vi.fn().mockResolvedValue(1_000_000),
     getDecoderConfig: vi.fn().mockResolvedValue({ codec: 'vp8' }),
   });
   const args = createArgs();
@@ -218,4 +228,17 @@ it('defers untagged VP8 to the media-element renderer before encoding any frames
   expect(args.videoEncoder.encode).not.toHaveBeenCalled();
   expect(drawProjectFrameMock).not.toHaveBeenCalled();
   expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
+});
+
+it('marks irreversible output only after the encoder accepts a frame', async () => {
+  const sample = createSample();
+  samplesAtTimestampsMock.mockReturnValue(createSamples([sample]));
+  const args = createArgs();
+  args.span.end = 0.5;
+  const submitted = vi.fn();
+  await renderAcceleratedCompositeWebmSpan({ ...args, onFrameSubmitted: submitted });
+  expect(submitted).toHaveBeenCalledOnce();
+  expect(args.videoEncoder.encode.mock.invocationCallOrder[0]).toBeLessThan(
+    submitted.mock.invocationCallOrder[0]!
+  );
 });

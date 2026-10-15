@@ -12,21 +12,29 @@ const logger = createLogger({ namespace: 'PopupRuntime' });
 
 export function useStopHandler(
   recordingControlCapability: RecordingControlCapability | null,
-  setRecordingError: (error: string | null) => void
+  setRecordingError: (error: string | null) => void,
+  refreshState?: () => Promise<void>
 ) {
   return useCallback(
-    async (options?: { cancelStart?: boolean; discard?: boolean }) => {
+    async (options?: {
+      cancelStart?: boolean;
+      discard?: boolean;
+    }): Promise<'accepted' | 'failed' | 'unknown'> => {
       setRecordingError(null);
 
       try {
         if (options?.cancelStart) {
-          await sendCancelRecordingStartMessage(recordingControlCapability, setRecordingError);
-          return;
+          const result = await sendCancelRecordingStartMessage(
+            recordingControlCapability,
+            setRecordingError
+          );
+          await refreshState?.();
+          return result;
         }
 
         if (!recordingControlCapability) {
           setRecordingError(getPopupRuntimeErrorMessage(null, 'popup.video.stopRecordingError'));
-          return;
+          return 'failed';
         }
 
         const response = await getPopupRuntimeServices().messaging.sendRuntimeMessage(
@@ -46,23 +54,29 @@ export function useStopHandler(
           setRecordingError(
             getPopupResponseErrorMessage(response, 'popup.video.stopRecordingError')
           );
+          await refreshState?.();
+          return 'failed';
         }
+        await refreshState?.();
+        return response?.success === true ? 'accepted' : 'unknown';
       } catch (error) {
         logger.error('Failed to stop recording', error);
         setRecordingError(getPopupRuntimeErrorMessage(error, 'popup.video.stopRecordingError'));
+        await refreshState?.();
+        return 'unknown';
       }
     },
-    [recordingControlCapability, setRecordingError]
+    [recordingControlCapability, setRecordingError, refreshState]
   );
 }
 
 async function sendCancelRecordingStartMessage(
   recordingControlCapability: RecordingControlCapability | null,
   setRecordingError: (error: string | null) => void
-): Promise<void> {
+): Promise<'accepted' | 'failed' | 'unknown'> {
   if (!recordingControlCapability) {
     setRecordingError(getPopupRuntimeErrorMessage(null, 'popup.video.stopRecordingError'));
-    return;
+    return 'failed';
   }
 
   const response = await getPopupRuntimeServices().messaging.sendRuntimeMessage({
@@ -72,5 +86,7 @@ async function sendCancelRecordingStartMessage(
 
   if (response?.success === false) {
     setRecordingError(getPopupResponseErrorMessage(response, 'popup.video.stopRecordingError'));
+    return 'failed';
   }
+  return response?.success === true ? 'accepted' : 'unknown';
 }

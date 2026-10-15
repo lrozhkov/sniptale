@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { useReviewAudio } from './use-review-audio';
 import {
   anchorReviewVoiceover,
+  anchorReviewVoiceoverAtSource,
   projectReviewVoiceover,
   reviewVoiceoverRange,
 } from '../../features/video/review/voiceover-edits';
@@ -535,6 +536,94 @@ it('creates lossless timing when own tempo is edited before the first video Spee
       playbackRate: 2,
     });
     expect(audio.voiceover[0]?.duration).toBe(4);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('initializes source timing when the first voiceover is imported without preceding edits', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let audio: QuickEditAudioState = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [],
+  };
+  const map = buildReviewTimeMap(10, []);
+  const imported = anchorReviewVoiceoverAtSource(
+    createQuickEditAudioClip({
+      id: 'new',
+      assetId: 'asset',
+      timelineStart: 9,
+      duration: 4,
+      endMax: 13,
+    }),
+    map
+  );
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewAudio>;
+  function Harness() {
+    hook = useReviewAudio({
+      audio,
+      setAudio: (update) => {
+        audio = update(audio);
+      },
+      timelineDuration: 10,
+      sourceDuration: 10,
+      edits: [],
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.addImported(imported, 'voiceover', 4, 'voice.wav'));
+    expect(audio.voiceoverSegments).toEqual(map);
+    expect(audio.voiceover).toEqual([imported]);
+    expect(projectReviewVoiceover(audio.voiceover, audio.voiceoverSegments)).toMatchObject([
+      { timelineStart: 9, duration: 1 },
+    ]);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('edits ordinary original gain without modifying admitted alpha speech metadata', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  let audio: QuickEditAudioState = {
+    original: {
+      muted: true,
+      volume: 0.4,
+      ranges: [{ id: 'manual', start: 1, end: 3, volume: 0.2 }],
+    },
+    voiceover: [],
+    music: [],
+    originalSpeech: { enabled: true, transcript: { version: 1, phrases: [], replacements: [] } },
+  };
+  const original = audio.original;
+  const transcript = audio.originalSpeech!.transcript;
+  let hook!: ReturnType<typeof useReviewAudio>;
+  function Harness() {
+    hook = useReviewAudio({
+      audio,
+      setAudio: (update) => {
+        audio = update(audio);
+      },
+      timelineDuration: 10,
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.setOriginal({ volume: 0.6 }));
+    expect(audio.original.volume).toBe(0.6);
+    expect(audio.original.muted).toBe(false);
+    expect(original.muted).toBe(true);
+    expect(audio.original.ranges).toEqual(original.ranges);
+    expect(original.volume).toBe(0.4);
+    expect(audio.originalSpeech?.enabled).toBe(true);
+    expect(audio.originalSpeech?.transcript).toBe(transcript);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

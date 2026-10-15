@@ -101,7 +101,7 @@ it('formats and reports focused steps without invoking build', async () => {
     expect(result.readyForBuild).toBe(true);
   });
 
-  expect(calls).toEqual(['format', 'advisory:src/after-format.ts', 'focused:src/after-format.ts']);
+  expect(calls).toEqual(['format', 'focused:src/after-format.ts', 'advisory:src/after-format.ts']);
 });
 
 it('awaits the asynchronous formatter barrier before collecting verification context', async () => {
@@ -144,7 +144,7 @@ it('awaits the asynchronous formatter barrier before collecting verification con
     await checkpointResult;
   });
 
-  expect(calls).toEqual(['format', 'advisory', 'focused:src/after-format.ts']);
+  expect(calls).toEqual(['format', 'focused:src/after-format.ts', 'advisory']);
 });
 
 it('keeps focused verification blocking when advisory collection reports failure', async () => {
@@ -184,7 +184,7 @@ it('keeps focused verification blocking when advisory collection reports failure
     expect(result.readyForBuild).toBe(true);
   });
 
-  expect(calls).toEqual(['advisory', 'focused']);
+  expect(calls).toEqual(['focused', 'advisory']);
 });
 
 it('keeps focused verification blocking when advisory collection throws', async () => {
@@ -451,4 +451,37 @@ it('does not publish checkpoint state when the canonical population rejects the 
     })
   ).rejects.toThrow(/injected contract rejection/u);
   expect(writtenStates).toEqual([]);
+});
+
+it('reuses the worker structural report even when its gate fails', async () => {
+  const root = createCheckpointTempRoot('qa-checkpoint-structural-reuse-');
+  const structuralReport = {
+    violations: [{ file: 'src/a.ts', message: 'blocking' }],
+    advisories: [],
+  };
+  const advisory = vi.fn((_context: unknown, _options: unknown) => okStep('Advisory report'));
+  await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./checkpoint.mjs')>(
+      './checkpoint.mjs',
+      import.meta.url
+    );
+    const result = await module.runCheckpoint({
+      producerRunId: 'checkpoint-test-structural-reuse',
+      executionContractAsserter: ignoreExecutionContract,
+      contextCollector: () => context('structural-reuse'),
+      formatStepCollector: () => okStep('Format'),
+      advisoryStepCollector: advisory,
+      focusedStepCollector: async () => [
+        {
+          label: 'Structural risk',
+          status: 'failed',
+          violations: structuralReport.violations,
+          structuralReport,
+        },
+      ],
+    });
+    expect(advisory.mock.calls[0]?.[1]).toMatchObject({ structuralReport });
+    expect(result.readyForBuild).toBe(false);
+    expect(result.steps.find((step) => step.label === 'Structural risk')?.status).toBe('failed');
+  });
 });

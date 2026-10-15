@@ -5,6 +5,47 @@ import { runtimeVideoOffscreenControlMessageContracts } from './control';
 const readyContract =
   runtimeVideoOffscreenControlMessageContracts[VideoMessageType.OFFSCREEN_READY];
 
+it('admits closed timing or unavailable observation without returning command capabilities', () => {
+  const contract =
+    runtimeVideoOffscreenControlMessageContracts[
+      VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING
+    ];
+  const request = {
+    type: VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING,
+    capabilityToken: 'synthetic-capability',
+    recordingId: 'r',
+    generation: 1,
+    streamInstanceId: 's',
+  };
+  const clockTiming = {
+    recordingId: 'r',
+    generation: 1,
+    streamInstanceId: 's',
+    receivedAtMs: 100,
+    repliedAtMs: 101,
+    maximumUncertaintyMs: 8,
+  };
+  expect(contract.parseRequest(request)).toEqual(request);
+  expect(contract.parseResponse({ success: true, clockTiming })).toEqual({
+    success: true,
+    clockTiming,
+  });
+  expect(contract.parseResponse({ success: true, clockTiming: null })).toEqual({
+    success: true,
+    clockTiming: null,
+  });
+  expect(() => contract.parseRequest({ ...request, capabilityToken: undefined })).toThrow();
+  expect(() =>
+    contract.parseResponse({
+      success: true,
+      clockTiming: { ...clockTiming, capabilityToken: 'synthetic-capability' },
+    })
+  ).toThrow();
+  expect(() =>
+    contract.parseResponse({ success: true, clockTiming: { ...clockTiming, repliedAtMs: 99 } })
+  ).toThrow();
+});
+
 it('binds offscreen readiness probes and responses to startup identity and challenge', () => {
   const contract =
     runtimeVideoOffscreenControlMessageContracts[VideoMessageType.OFFSCREEN_READINESS_PROBE];

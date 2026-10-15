@@ -106,7 +106,7 @@ export function mergeSectionsByTitle(filteredSections: SectionNode[]): SectionNo
       const inferredTitle = inferSectionTitle(section);
       if (inferredTitle) {
         section.title = inferredTitle;
-        logger.debug(`Inferred title for garbage section: ${inferredTitle}`);
+        logger.debug('Inferred title for garbage section');
       } else if (!hasSectionContent(section)) {
         logger.debug('Skipping empty section');
         return;
@@ -117,7 +117,7 @@ export function mergeSectionsByTitle(filteredSections: SectionNode[]): SectionNo
     const existingSection = titleMap.get(normalizedTitle);
     if (existingSection) {
       existingSection.children.push(...section.children);
-      logger.debug(`Merged duplicate section: ${section.title}`);
+      logger.debug('Merged duplicate section');
       return;
     }
 
@@ -138,7 +138,7 @@ export function finalizeSectionTitles(mergedSections: SectionNode[]): void {
       const inferredTitle = inferSectionTitle(section);
       if (inferredTitle) {
         section.title = inferredTitle;
-        logger.debug(`Inferred section title: ${inferredTitle}`);
+        logger.debug('Inferred section title');
       }
     }
   });

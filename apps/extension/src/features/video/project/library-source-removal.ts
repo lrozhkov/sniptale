@@ -1,6 +1,7 @@
 import type { VideoProject, VideoProjectAssetSource } from './types';
 import { VideoClipTransitionKind } from './types';
 import { assertExportReadyVideoProject } from './validation/root';
+import { reconcileVideoProjectInteractionSources } from './source-interactions';
 
 function sourceKey(source: VideoProjectAssetSource): string {
   switch (source.kind) {
@@ -101,8 +102,9 @@ export function removeVideoProjectLibrarySources(
       ? { motionRegions: removeSourceMotionRegions(project, removedClipIds, eventIds) }
       : {}),
   };
-  assertExportReadyVideoProject(next);
-  return next;
+  const reconciled = { ...next, ...reconcileVideoProjectInteractionSources(project, next) };
+  assertExportReadyVideoProject(reconciled);
+  return reconciled;
 }
 
 function removeSourceMotionRegions(

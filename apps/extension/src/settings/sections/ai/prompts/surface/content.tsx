@@ -21,6 +21,13 @@ export function AiPromptsContent(props: { prompts: AiProvidersPromptsState }) {
             titleKey="settings.aiProviders.scenarioEditorPromptTitle"
           />
         </div>
+        <div>
+          <AIProvidersPromptCard
+            prompt={props.prompts.audioTranscription}
+            descriptionKey="settings.aiProviders.audioTranscriptionPromptDescription"
+            titleKey="settings.aiProviders.audioTranscriptionPromptTitle"
+          />
+        </div>
       </section>
     </div>
   );

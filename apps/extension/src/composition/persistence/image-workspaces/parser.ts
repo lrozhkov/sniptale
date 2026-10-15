@@ -1,3 +1,4 @@
+import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { parsePersistedEditorDocument } from '../document-assets/parser';
 import {
   isNullable,
@@ -31,7 +32,7 @@ export function parseImageWorkspaceEntry(value: unknown): StoredImageWorkspaceEn
     document,
     revision: value['revision'],
     sourceTitle: value['sourceTitle'],
-    sourceUrl: value['sourceUrl'],
+    sourceUrl: sanitizeProvenanceUrl(value['sourceUrl']),
     updatedAt: value['updatedAt'],
   };
 }

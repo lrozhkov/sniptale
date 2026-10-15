@@ -307,3 +307,46 @@ describe('ai/core', () => {
     verifyInvalidStoredValuesFallback
   );
 });
+
+it('bounds additional recognition instructions and saves/resets them only locally', async () => {
+  installStorageState({ local: { [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION } });
+  const {
+    loadAudioTranscriptionSystemPrompt,
+    saveAudioTranscriptionSystemPrompt,
+    resetAudioTranscriptionSystemPrompt,
+  } = await import('./core');
+  const { DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT } = await import('./constants');
+  await expect(loadAudioTranscriptionSystemPrompt()).resolves.toBe(
+    DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT
+  );
+  await saveAudioTranscriptionSystemPrompt('Keep phrasing');
+  await expect(loadAudioTranscriptionSystemPrompt()).resolves.toBe('Keep phrasing');
+  expect(syncSetMock).not.toHaveBeenCalled();
+  await expect(saveAudioTranscriptionSystemPrompt('x'.repeat(10001))).rejects.toThrow(
+    'Invalid transcription instructions'
+  );
+  await expect(loadAudioTranscriptionSystemPrompt()).resolves.toBe('Keep phrasing');
+  await resetAudioTranscriptionSystemPrompt();
+  await expect(loadAudioTranscriptionSystemPrompt()).resolves.toBe(
+    DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT
+  );
+});
+
+it('includes local recognition instructions in the aggregate settings query', async () => {
+  installStorageState({
+    local: {
+      [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION,
+      sniptale_ai_audio_transcription_prompt: 'Keep the original meaning',
+      sniptale_ai_global_prompt: 'Global instructions',
+      sniptale_ai_chrome_enabled: true,
+    },
+  });
+  const { loadAISettings } = await import('./settings');
+  await expect(loadAISettings()).resolves.toMatchObject({
+    audioTranscriptionSystemPrompt: 'Keep the original meaning',
+    globalSystemPrompt: 'Global instructions',
+    providers: [],
+    models: [],
+  });
+  expect(syncSetMock).not.toHaveBeenCalled();
+});

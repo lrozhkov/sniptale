@@ -1,29 +1,25 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import { expect, it } from 'vitest';
 import {
+  collectReleaseWrapperResults,
   materializeInheritedFastProofEvidence,
   readFastProofAdmission,
 } from './release-wrapper.mjs';
 import { withCwd } from '../qa/test-support/test-helpers';
 
 it('fails before release composition when Fast proof admission is absent', () => {
-  const environment = { ...process.env };
-  delete environment.SNIPTALE_FAST_PROOF_ADMISSION_PATH;
-  delete environment.SNIPTALE_FAST_PROOF_PATH;
-  const result = spawnSync(process.execPath, ['tooling/ci/release-wrapper.mjs'], {
-    encoding: 'utf8',
-    env: environment,
-  });
-
-  expect(result.status).not.toBe(0);
-  expect(`${result.stdout}${result.stderr}`).toContain(
-    'CI release prerequisite failed: Fast proof admission receipt is missing.'
-  );
-  expect(`${result.stdout}${result.stderr}`).not.toContain('[qa] CI release');
+  const admission = process.env.SNIPTALE_FAST_PROOF_ADMISSION_PATH;
+  delete process.env.SNIPTALE_FAST_PROOF_ADMISSION_PATH;
+  try {
+    expect(() => collectReleaseWrapperResults({ session: null })).toThrow(
+      'CI release prerequisite failed: Fast proof admission receipt is missing.'
+    );
+  } finally {
+    if (admission !== undefined) process.env.SNIPTALE_FAST_PROOF_ADMISSION_PATH = admission;
+  }
 });
 
 it('accepts an exact container-visible proof locator after host admission transport', () => {

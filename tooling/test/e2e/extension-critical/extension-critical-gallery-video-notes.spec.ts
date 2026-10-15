@@ -119,12 +119,12 @@ for (const variant of [
       await expect(row).toHaveCount(0);
       await button('gallery.videoReview.undo').click();
       await expect(row).toContainText('An edited note');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(row).toContainText('An edited note');
       await row.getByRole('button').first().click();
       await expect(remove).toBeVisible();
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

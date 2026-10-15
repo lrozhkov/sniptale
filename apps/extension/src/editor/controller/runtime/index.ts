@@ -5,7 +5,7 @@ import { useEditorStore } from '../../state/useEditorStore';
 import { collectLayers, getObjectDimensions } from '../document/layers';
 import { isRichShapeObject } from '../../objects/rich-shape';
 import { syncSelectionToolSettingsFromObject } from '../selection';
-import { getSingleSelectionType, isUserObject } from '../../document/model';
+import { getSingleSelectionType, isUserObject, isBrowserFrameObject } from '../../document/model';
 import { readEditorDrawingObject } from '../../drawing/object/metadata';
 
 function getSelectedObjectLabel(object: FabricObject | null): string | null {
@@ -78,7 +78,10 @@ export function syncEditorRuntimeState(
     history: historyState,
     viewport,
     frame: store.frame,
-    browserFrame: store.browserFrame,
+    browserFrame: {
+      ...store.browserFrame,
+      enabled: (canvas?.getObjects?.() ?? []).some(isBrowserFrameObject),
+    },
   });
 }
 

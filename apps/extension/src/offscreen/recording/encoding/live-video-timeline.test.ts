@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { LiveVideoTimeline } from './live-video-timeline';
 
 describe('LiveVideoTimeline', () => {
+  it('reports the chosen resumed media tick without changing its terminal-frame floor', () => {
+    const timeline = new LiveVideoTimeline(30);
+    timeline.accept(0);
+    timeline.accept(1 / 30);
+    timeline.finish();
+
+    const chosenTimestamp = timeline.restart(1 / 30);
+
+    expect(chosenTimestamp).toBe(2 / 30);
+    expect(timeline.finish()?.timestamp).toBe(chosenTimestamp);
+  });
   it.each([
     ['static text delivery', [0, 0.2, 0.4, 0.9, 1.1]],
     ['blinking caret delivery', [0, 0.1, 0.2, 0.35, 0.5]],

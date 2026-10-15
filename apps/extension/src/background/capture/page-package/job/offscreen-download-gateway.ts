@@ -82,6 +82,42 @@ export function createPagePackageDownloadOffscreenGateway(): PagePackageDownload
   };
 }
 
-export async function preparePagePackageDownloadRuntime(): Promise<void> {
-  await ensureOffscreenDocument('Prepare a Page Package download');
+/** Prepare the current offscreen data connection before any export publication lease is held. */
+export async function preparePagePackageDownloadRuntime(signal: AbortSignal): Promise<void> {
+  const deadline = new AbortController();
+  const preparationSignal = AbortSignal.any([signal, deadline.signal]);
+  const timeout = setTimeout(
+    () => deadline.abort(new Error('Page Package download preparation timed out.')),
+    30_000
+  );
+  let removeAbortListener: () => void = () => undefined;
+  const cancelled = new Promise<never>((_, reject) => {
+    const abort = () => reject(preparationSignal.reason);
+    if (preparationSignal.aborted) abort();
+    else {
+      preparationSignal.addEventListener('abort', abort, { once: true });
+      removeAbortListener = () => preparationSignal.removeEventListener('abort', abort);
+    }
+  });
+  const prepare = async () => {
+    preparationSignal.throwIfAborted();
+    await ensureOffscreenDocument('Prepare a Page Package download');
+    preparationSignal.throwIfAborted();
+    await waitForOffscreenReady(OFFSCREEN_READY_TIMEOUT_MS, preparationSignal);
+    preparationSignal.throwIfAborted();
+    const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+      attachOffscreenCommandCapability({
+        type: MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD,
+      })
+    );
+    if (response.success !== true || response.result !== 'accepted') {
+      throw new Error(response.error || 'Offscreen Page Package preparation failed.');
+    }
+  };
+  try {
+    await Promise.race([prepare(), cancelled]);
+  } finally {
+    clearTimeout(timeout);
+    removeAbortListener();
+  }
 }

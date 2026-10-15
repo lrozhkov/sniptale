@@ -1,16 +1,22 @@
+import type { clusterHistoryIntervals } from './history-clusters';
 import type { TimelineEffectDragTarget } from '../types';
 import { TimelineEffectDraftContext } from './segment';
-import { getTimelineHistoryLayout } from './history-layout';
+import {
+  getTimelineHistoryLayout,
+  historyTimeBounds,
+  historyMarkerTime,
+  observedKeyboardInterval,
+  isIncompleteObservedPress,
+  buildHistoryTargetGroups,
+} from './history-layout';
 import { getActionEventLabel } from '../../../chrome/display';
 
 import type { VideoEditorTypingSpanTarget } from '../../../contracts/commands/timeline';
+import { projectTimelineInterval, type TimelineProjection } from '../interaction-state/projection';
 import {
-  projectTimelineInterval,
-  projectTimelinePoint,
-  type TimelineProjection,
-} from '../interaction-state/projection';
-import {
+  Clock,
   Keyboard,
+  Mouse,
   MousePointerClick,
   TextCursorInput,
   Eye,
@@ -28,11 +34,13 @@ import { getVideoProjectUtilityLanes } from '../../../../features/video/project/
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import { TimelineIconButton } from '../controls/icon-button';
 import { formatPreciseTime } from '../../../../composition/library-preview/time-format';
-import { clusterHistoryMarkers, clusterHistoryIntervals } from './history-clusters';
-import { useMemo, useContext, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useContext, useId, type CSSProperties, type ReactNode } from 'react';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import { translate } from '../../../../platform/i18n';
-import type { VideoProject } from '../../../../features/video/project/types';
+import { translate, formatNumber } from '../../../../platform/i18n';
+import type {
+  VideoProject,
+  VideoProjectActionEvent,
+} from '../../../../features/video/project/types';
 import { buildTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../canvas/hover-preview';
 import {
@@ -51,22 +59,9 @@ const TELEMETRY_EMPTY_LABEL_CLASS_NAME = [
   'text-[var(--sniptale-color-text-dim)]',
 ].join(' ');
 
-function getTelemetrySpanClassName(kind: 'stable' | 'typing'): string {
-  if (kind === 'typing') {
-    return [
-      'border-[var(--sniptale-color-border-soft)]',
-      'bg-[var(--sniptale-color-surface-panel)]',
-    ].join(' ');
-  }
-
-  return [
-    'border-[var(--sniptale-color-border-soft)]',
-    'bg-[var(--sniptale-color-surface-input)]',
-  ].join(' ');
-}
-
 export function ProjectTimelineTelemetryLaneLabelRow(props: {
   compactRows: boolean;
+  recordingTelemetry?: readonly RecordingTelemetryEntry[] | undefined;
   height?: number;
   project?: VideoProject;
   onSelect?: (() => void) | undefined;
@@ -74,13 +69,23 @@ export function ProjectTimelineTelemetryLaneLabelRow(props: {
   onToggleVisibility?: (() => void) | undefined;
   onToggleLock?: (() => void) | undefined;
 }) {
+  const approximate = (props.recordingTelemetry ?? []).filter(
+    (entry) => entry.capabilities?.timing?.mode === 'approximate'
+  );
+  const unknownAccuracy = approximate.some(
+    (entry) => entry.capabilities?.timing?.accuracyMs == null
+  );
+  const accuracy = Math.ceil(
+    Math.max(0, ...approximate.map((entry) => entry.capabilities?.timing?.accuracyMs ?? 0))
+  );
+
   const enabled = props.project ? getVideoProjectActionPresentation(props.project).enabled : true;
   const locked = props.project ? getVideoProjectUtilityLanes(props.project).actions.locked : false;
   return (
     <div
       className={TIMELINE_LANE_HEADER_CLASS_NAME}
       data-selected={props.selected ?? false}
-      style={{ height: props.height ?? 56 }}
+      style={{ height: props.height ?? 80 }}
     >
       <button
         type="button"
@@ -99,6 +104,31 @@ export function ProjectTimelineTelemetryLaneLabelRow(props: {
         />
       </button>
       <div className="flex shrink-0 items-center gap-1">
+        {approximate.length ? (
+          <span
+            role="status"
+            data-ui="history.timing"
+            title={
+              unknownAccuracy
+                ? translate('gallery.videoReview.historyTimingUnknown')
+                : translate('gallery.videoReview.historyTimingApproximate').replace(
+                    '{accuracy}',
+                    String(accuracy)
+                  )
+            }
+            aria-label={
+              unknownAccuracy
+                ? translate('gallery.videoReview.historyTimingUnknown')
+                : translate('gallery.videoReview.historyTimingApproximate').replace(
+                    '{accuracy}',
+                    String(accuracy)
+                  )
+            }
+            className="inline-flex items-center text-[var(--sniptale-color-text-secondary)]"
+          >
+            <Clock size={13} aria-hidden="true" />
+          </span>
+        ) : null}
         {props.onToggleVisibility ? (
           <TimelineIconButton
             frameless
@@ -144,23 +174,79 @@ function historyStatus(item: ResolvedVideoProjectActionPresentation) {
 }
 
 function historyLabel(item: ResolvedVideoProjectActionPresentation) {
+  const button = item.event.data['button'];
+  const buttonLabels = [
+    'videoEditor.timeline.historyButtonLeft',
+    'videoEditor.timeline.historyButtonMiddle',
+    'videoEditor.timeline.historyButtonRight',
+    'videoEditor.timeline.historyButtonBack',
+    'videoEditor.timeline.historyButtonForward',
+  ] as const;
   return [
-    getActionEventLabel(item.event),
+    observedEventLabel(item.event),
+    item.event.kind === 'CLICK' &&
+    typeof button === 'number' &&
+    Number.isInteger(button) &&
+    button >= 0 &&
+    button <= 31
+      ? button <= 4
+        ? translate(buttonLabels[button]!)
+        : translate('videoEditor.timeline.historyButtonOther').replace(
+            '{number}',
+            formatNumber(button + 1)
+          )
+      : '',
     formatPreciseTime(item.animationStart),
     item.offset !== 0
       ? `${translate('videoEditor.timeline.historyOriginalTime')}: ${formatPreciseTime(item.occurrence.time)}`
       : '',
     historyStatus(item),
+    item.event.kind === 'KEY' ? translate('videoEditor.timeline.historyKeyboardCoverage') : '',
     item.overridden ? translate('videoEditor.timeline.historyOverride') : '',
   ]
     .filter(Boolean)
     .join(' · ');
 }
 
+function observedEventLabel(event: VideoProjectActionEvent) {
+  const keyboard = observedKeyboardInterval(event);
+  if (keyboard) {
+    const key =
+      event.data['modifierOnly'] === true
+        ? 'videoEditor.timeline.historyKeyModifiers'
+        : keyboard.end - keyboard.start >= 0.5 ||
+            (typeof event.data['repeatCount'] === 'number' && event.data['repeatCount'] > 0)
+          ? 'videoEditor.timeline.historyKeyHold'
+          : null;
+    if (key) return [translate(key), event.label].filter(Boolean).join(' · ');
+  }
+  if (isIncompleteObservedPress(event))
+    return [translate('videoEditor.timeline.historyIncompletePress'), event.label]
+      .filter(Boolean)
+      .join(' · ');
+  const labels = {
+    hold: 'videoEditor.timeline.historyHold',
+    drag: 'videoEditor.timeline.historyDrag',
+    selection: 'videoEditor.timeline.historySelection',
+    'native-drag': 'videoEditor.timeline.historyNativeDrag',
+  } as const;
+  const gesture = event.data['gestureType'];
+  const key =
+    typeof gesture === 'string' && Object.hasOwn(labels, gesture)
+      ? labels[gesture as keyof typeof labels]
+      : event.kind === 'SCROLL' && event.data['eventType'] === 'wheel'
+        ? 'videoEditor.timeline.historyWheel'
+        : null;
+  return key
+    ? [translate(key), event.label].filter(Boolean).join(' · ')
+    : getActionEventLabel(event);
+}
+
 function HistoryMarker(props: {
   movable: boolean;
   item: ResolvedVideoProjectActionPresentation;
   left: number;
+  width?: number | undefined;
   top: number;
   selected: boolean;
   onSelect: () => void;
@@ -170,7 +256,15 @@ function HistoryMarker(props: {
   ) => void;
 }) {
   const { item } = props;
-  const Icon = item.event.kind === 'KEY' ? Keyboard : MousePointerClick;
+  const Icon =
+    item.event.kind === 'KEY'
+      ? Keyboard
+      : item.event.kind === 'SCROLL' ||
+          isIncompleteObservedPress(item.event) ||
+          (typeof item.event.data['gestureType'] === 'string' &&
+            ['hold', 'drag', 'selection', 'native-drag'].includes(item.event.data['gestureType']))
+        ? Mouse
+        : MousePointerClick;
   return (
     <button
       type="button"
@@ -186,15 +280,20 @@ function HistoryMarker(props: {
       className={[
         'video-editor-timeline-item',
         props.movable ? '!cursor-grab' : '!cursor-pointer',
-        'absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-md border',
+        'absolute z-10 flex h-6 w-6 -translate-x-1/2 items-center justify-center gap-1',
+        'overflow-hidden rounded-sm border px-1 text-[10px]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-secondary)]',
         props.selected
           ? 'video-editor-timeline-item-selected border-[var(--sniptale-color-border-soft)]'
           : 'border-[var(--sniptale-color-border-soft)]',
         item.reason === 'suppressed' ? 'border-dashed' : '',
-        !item.enabled ? 'opacity-60' : '',
+        !item.enabled ? '!text-[var(--sniptale-color-text-dim)]' : '',
       ].join(' ')}
-      style={{ left: props.left, top: props.top }}
+      style={{
+        left: props.left,
+        top: props.top,
+        ...(props.width ? { width: props.width, transform: 'translateX(-12px)' } : {}),
+      }}
       onPointerDown={(event) => {
         event.stopPropagation();
         props.onBegin(event, item);
@@ -204,7 +303,14 @@ function HistoryMarker(props: {
         props.onSelect();
       }}
     >
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {(props.width ?? 24) >= 56 ? (
+        <span className="min-w-0 truncate">
+          {item.event.kind === 'KEY' && item.event.label
+            ? item.event.label
+            : observedEventLabel(item.event)}
+        </span>
+      ) : null}
       {!item.enabled && item.reason !== 'suppressed' ? (
         <span aria-hidden="true" className="absolute h-px w-4 -rotate-45 bg-current" />
       ) : null}
@@ -227,7 +333,7 @@ function ProjectTimelineTelemetrySpan(props: {
   selected?: boolean;
   label?: string | undefined;
   endTime: number;
-  kind: 'stable' | 'typing';
+  kind: 'typing';
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
   startTime: number;
@@ -239,11 +345,7 @@ function ProjectTimelineTelemetrySpan(props: {
         width: (props.endTime - props.startTime) * props.pixelsPerSecond,
       };
   if (!geometry) return null;
-  const kindLabel = translate(
-    props.kind === 'typing'
-      ? 'videoEditor.timeline.historyTyping'
-      : 'videoEditor.timeline.historyStable'
-  );
+  const kindLabel = translate('videoEditor.timeline.historyTyping');
   return (
     <button
       type="button"
@@ -264,20 +366,20 @@ function ProjectTimelineTelemetrySpan(props: {
       data-history-recording-id={props.target?.recordingId}
       title={props.label ?? kindLabel}
       className={[
-        'absolute flex items-center justify-center rounded border text-[10px] truncate px-1',
+        'absolute z-0 flex items-center justify-center gap-1 rounded-sm border text-[10px] truncate px-1',
         props.onSelect ? 'video-editor-timeline-item !cursor-pointer' : 'cursor-default',
         props.selected ? 'video-editor-timeline-item-selected' : '',
-        getTelemetrySpanClassName(props.kind),
-        props.kind === 'typing' ? '' : 'pointer-events-none',
+        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
       ].join(' ')}
       style={{
         top: props.top,
-        height: props.kind === 'typing' ? 24 : 3,
+        height: 24,
         left: geometry.left,
         width: Math.max(16, geometry.width),
       }}
     >
-      {props.kind === 'typing' ? <TextCursorInput size={14} aria-hidden="true" /> : null}
+      <TextCursorInput size={14} className="shrink-0" aria-hidden="true" />
+      {geometry.width >= 70 ? <span className="min-w-0 truncate">{kindLabel}</span> : null}
     </button>
   );
 }
@@ -298,6 +400,7 @@ interface TimelineHistoryLaneProps {
   recordingTelemetry: readonly RecordingTelemetryEntry[];
 }
 export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
+  const coverageId = useId();
   const draft = useContext(TimelineEffectDraftContext);
   const layout = getTimelineHistoryLayout(
     props.project,
@@ -307,12 +410,12 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
   const spans = useMemo(
     () =>
       props.recordingTelemetry.flatMap((telemetry) =>
-        buildTimelineTelemetryLaneData(props.project, telemetry.recordingId, telemetry).spans.map(
-          (span) => ({
+        buildTimelineTelemetryLaneData(props.project, telemetry.recordingId, telemetry)
+          .spans.filter((span) => span.kind === 'typing')
+          .map((span) => ({
             ...span,
             id: JSON.stringify([telemetry.recordingId, span.id]),
-          })
-        )
+          }))
       ),
     [props.project, props.recordingTelemetry]
   );
@@ -320,32 +423,38 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
   const byId = new Map(
     items.map((item) => [JSON.stringify([item.occurrence.eventId, item.occurrence.clipId]), item])
   );
-  const groups = [false, true].flatMap((keys) =>
-    clusterHistoryMarkers(
-      items
-        .filter((item) => (item.event.kind === 'KEY') === keys)
-        .map((item) => {
-          const id = JSON.stringify([item.occurrence.eventId, item.occurrence.clipId]);
-          const time =
-            draft?.segmentId === id
-              ? (draft.startTime ?? historyMarkerTime(item, props.project))
-              : historyMarkerTime(item, props.project);
-          return {
-            id,
-            left: props.projection
-              ? projectTimelinePoint(props.projection, time)
-              : time * props.pixelsPerSecond,
-          };
-        }),
-      props.projection?.viewportWidth
-    ).map((group) => ({
-      ...group,
-      top: keys ? (layout.keyTop ?? layout.clickTop) : layout.clickTop,
-    }))
-  );
+  const spansById = new Map(spans.map((span) => [span.id, span]));
+  const { actionLeft, actionWidths, groups } = buildHistoryTargetGroups({
+    items,
+    spans,
+    project: props.project,
+    projection: props.projection,
+    pixelsPerSecond: props.pixelsPerSecond,
+    draft,
+    layout,
+  });
+  const selectTyping = (id: string) => {
+    const span = spansById.get(id);
+    if (!span?.signalId) return;
+    props.onSelectHistorySpan?.({
+      recordingId: span.recordingId,
+      sourceInstanceId: span.sourceInstanceId,
+      signalId: span.signalId,
+      clipId: span.clipId,
+    });
+  };
+  const typingSelected = (span: (typeof spans)[number]) =>
+    props.selection?.kind === 'history-span' &&
+    props.selection.clipId === span.clipId &&
+    props.selection.recordingId === span.recordingId &&
+    props.selection.sourceInstanceId === span.sourceInstanceId &&
+    props.selection.signalId === span.signalId;
   const select = (id: string) => {
     const item = byId.get(id);
-    if (!item) return;
+    if (!item) {
+      selectTyping(id);
+      return;
+    }
     props.onSelectActionOccurrence?.(item.occurrence.eventId, item.occurrence.clipId);
   };
   const selectedId =
@@ -359,12 +468,39 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
       className={TELEMETRY_ROW_CLASS_NAME}
       style={{ height: layout.height }}
     >
+      {(['keyboard', 'mouse', 'cursor'] as const).map((family, index) => (
+        <div
+          key={family}
+          data-history-family={family}
+          title={
+            family === 'keyboard'
+              ? translate('videoEditor.timeline.historyKeyboardCoverage')
+              : undefined
+          }
+          aria-describedby={family === 'keyboard' ? coverageId : undefined}
+          role="group"
+          aria-label={translate(
+            family === 'keyboard'
+              ? 'videoEditor.timeline.historyKeyboard'
+              : family === 'mouse'
+                ? 'videoEditor.timeline.historyMouse'
+                : 'videoEditor.timeline.cursorLane'
+          )}
+          className="pointer-events-none absolute inset-x-0"
+          style={{ top: index * 28, height: 24 }}
+        >
+          {family === 'keyboard' ? (
+            <span id={coverageId} className="sr-only">
+              {translate('videoEditor.timeline.historyKeyboardCoverage')}
+            </span>
+          ) : null}
+        </div>
+      ))}
       {!items.length && !spans.length ? (
         <span className={TELEMETRY_EMPTY_LABEL_CLASS_NAME}>
           {translate('videoEditor.timeline.telemetryLaneEmpty')}
         </span>
       ) : null}
-      <HistoryIntervals {...props} spans={spans} layout={layout} />
       {layout.cursorTop !== null ? (
         <div className="absolute inset-x-0" style={{ top: layout.cursorTop }}>
           {props.cursorRow}
@@ -376,6 +512,12 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
           Boolean(props.onBeginEffectInteraction)
         }
         groups={groups}
+        spansById={spansById}
+        typingSelected={typingSelected}
+        spanLabel={(span) => typingSpanLabel(props.project, span, props.recordingTelemetry)}
+        spanProps={props}
+        actionLeft={actionLeft}
+        actionWidths={actionWidths}
         byId={byId}
         selectedId={selectedId}
         select={select}
@@ -401,6 +543,12 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
 function ActionHistoryMarkers({
   movable,
   groups,
+  spansById,
+  typingSelected,
+  spanLabel,
+  spanProps,
+  actionLeft,
+  actionWidths,
   byId,
   selectedId,
   select,
@@ -411,7 +559,15 @@ function ActionHistoryMarkers({
     event: React.PointerEvent<HTMLButtonElement>,
     item: ResolvedVideoProjectActionPresentation
   ) => void;
-  groups: (ReturnType<typeof clusterHistoryMarkers>[number] & { top: number })[];
+  groups: (ReturnType<typeof clusterHistoryIntervals>[number] & { top: number })[];
+  spansById: Map<string, ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number]>;
+  typingSelected: (
+    span: ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number]
+  ) => boolean;
+  spanLabel: (span: ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number]) => string;
+  spanProps: TimelineHistoryLaneProps;
+  actionLeft: Map<string, number>;
+  actionWidths: Map<string, number>;
   byId: Map<string, ReturnType<typeof resolveVideoProjectActionPresentations>[number]>;
   selectedId: string | null;
   select: (id: string) => void;
@@ -419,32 +575,65 @@ function ActionHistoryMarkers({
   return (
     <>
       {groups.map((group) =>
-        group.ids.length === 1 ? (
+        group.ids.length === 1 && byId.has(group.ids[0]!) ? (
           <HistoryMarker
             movable={movable}
             key={group.ids[0]}
             item={byId.get(group.ids[0]!)!}
-            left={group.left}
+            left={actionLeft.get(group.ids[0]!) ?? group.left}
+            width={actionWidths.get(group.ids[0]!)}
             top={group.top}
             selected={selectedId === group.ids[0]}
             onSelect={() => select(group.ids[0]!)}
             onBegin={begin}
           />
+        ) : group.ids.length === 1 ? (
+          <ProjectTimelineTelemetrySpan
+            key={group.ids[0]}
+            top={group.top}
+            target={spansById.get(group.ids[0]!)!}
+            selected={typingSelected(spansById.get(group.ids[0]!)!)}
+            label={spanLabel(spansById.get(group.ids[0]!)!)}
+            endTime={spansById.get(group.ids[0]!)!.endTime}
+            startTime={spansById.get(group.ids[0]!)!.startTime}
+            kind="typing"
+            pixelsPerSecond={spanProps.pixelsPerSecond}
+            projection={spanProps.projection}
+            onSelect={spanProps.onSelectHistorySpan ? () => select(group.ids[0]!) : undefined}
+          />
         ) : (
           <div
             key={JSON.stringify(group.ids)}
-            className="absolute -translate-x-1/2"
-            style={{ left: group.left, top: group.top }}
+            className={`absolute -translate-x-1/2 ${group.ids.every((id) => spansById.has(id)) ? 'z-0' : 'z-10'}`}
+            style={{
+              left: group.left,
+              top: group.top,
+              ...(group.ids.every((id) => spansById.has(id))
+                ? { transform: 'translateX(-20px)' }
+                : {}),
+            }}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           >
             <ProductSelect
-              dataUi="video-editor.timeline.history-cluster"
+              dataUi={
+                group.ids.every((id) => spansById.has(id))
+                  ? 'video-editor.timeline.history-span-cluster'
+                  : 'video-editor.timeline.history-cluster'
+              }
               value=""
               placeholder={group.ids.length > 99 ? '99+' : String(group.ids.length)}
-              aria-pressed={Boolean(selectedId && group.ids.includes(selectedId))}
+              aria-pressed={
+                Boolean(selectedId && group.ids.includes(selectedId)) ||
+                group.ids.some((id) => {
+                  const span = spansById.get(id);
+                  return span ? typingSelected(span) : false;
+                })
+              }
               aria-label={`${translate('videoEditor.timeline.telemetryLane')} · ${group.ids.length}`}
-              style={historyClusterStyle()}
+              style={historyClusterStyle(
+                group.ids.every((id) => spansById.has(id)) ? Math.max(40, group.width) : 40
+              )}
               className={[
                 'video-editor-timeline-item',
                 selectedId && group.ids.includes(selectedId)
@@ -463,7 +652,15 @@ function ActionHistoryMarkers({
               menuScrollable
               onChange={select}
               options={group.ids.map((id) => {
-                const item = byId.get(id)!;
+                const item = byId.get(id);
+                const span = spansById.get(id);
+                if (span)
+                  return {
+                    value: id,
+                    label: spanLabel(span),
+                    icon: <TextCursorInput size={14} aria-hidden="true" />,
+                  };
+                if (!item) throw new Error('History group references an unknown fact.');
                 return {
                   value: id,
                   label: historyLabel(item),
@@ -480,16 +677,16 @@ function ActionHistoryMarkers({
   );
 }
 
-function historyClusterStyle(): CSSProperties & Record<`--${string}`, string> {
+function historyClusterStyle(width = 40): CSSProperties & Record<`--${string}`, string> {
   return {
-    width: 40,
+    width,
     minWidth: 40,
     height: 24,
     minHeight: 24,
     padding: '0 14px 0 4px',
     gap: 2,
     justifyContent: 'center',
-    '--sniptale-field-radius': 'var(--sniptale-radius-lg)',
+    '--sniptale-field-radius': 'var(--sniptale-radius-sm)',
     '--sniptale-field-font-size': '11px',
     '--sniptale-field-bg-idle': 'var(--sniptale-color-surface-panel)',
     '--sniptale-field-bg-hover': 'var(--sniptale-color-surface-panel)',
@@ -503,13 +700,19 @@ function typingSpanLabel(
   span: ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number],
   telemetry: readonly RecordingTelemetryEntry[]
 ) {
-  const targetName = telemetry
+  const signal = telemetry
     .find((entry) => entry.recordingId === span.recordingId)
-    ?.signals.find((signal) => signal.id === span.signalId)?.data['targetName'];
+    ?.signals.find((signal) => signal.id === span.signalId);
+  const targetName = signal?.data['targetName'];
   const clip = project.clips.find((item) => item.id === span.clipId);
   const track = project.tracks.find((item) => item.id === clip?.trackId);
   return [
-    translate('videoEditor.timeline.historyTyping'),
+    translate(
+      signal?.data['keyboardHold'] === true
+        ? 'videoEditor.timeline.historyKeyHold'
+        : 'videoEditor.timeline.historyTyping'
+    ),
+    translate('videoEditor.timeline.historyKeyboardCoverage'),
     typeof targetName === 'string' ? targetName : '',
     track?.name,
     clip?.name,
@@ -517,155 +720,4 @@ function typingSpanLabel(
   ]
     .filter(Boolean)
     .join(' · ');
-}
-
-function historyTimeBounds(item: ResolvedVideoProjectActionPresentation, project: VideoProject) {
-  const ids = item.occurrence.playbackRun?.clipIds;
-  const clips = ids ? project.clips.filter((clip) => ids.includes(clip.id)) : [];
-  const minimumTime = clips.length ? Math.min(...clips.map((clip) => clip.startTime)) : 0;
-  const end = clips.length
-    ? Math.max(...clips.map((clip) => clip.startTime + clip.duration))
-    : project.duration;
-  return { minimumTime, maximumTime: Math.max(minimumTime, end - 1 / project.fps) };
-}
-
-function historyMarkerTime(item: ResolvedVideoProjectActionPresentation, project: VideoProject) {
-  const { minimumTime, maximumTime } = historyTimeBounds(item, project);
-  return Math.max(minimumTime, Math.min(maximumTime, item.animationStart));
-}
-
-function HistoryIntervals(
-  props: Pick<
-    TimelineHistoryLaneProps,
-    | 'project'
-    | 'recordingTelemetry'
-    | 'pixelsPerSecond'
-    | 'projection'
-    | 'selection'
-    | 'onSeek'
-    | 'onSelectHistorySpan'
-  > & {
-    spans: ReturnType<typeof buildTimelineTelemetryLaneData>['spans'];
-    layout: ReturnType<typeof getTimelineHistoryLayout>;
-  }
-) {
-  const { spans, layout } = props;
-  const typingSpans = spans.filter((span) => span.kind === 'typing' && span.signalId);
-  const typingById = new Map(typingSpans.map((span) => [span.id, span]));
-  const typingGroups = clusterHistoryIntervals(
-    typingSpans.map((span) => {
-      const geometry = props.projection
-        ? projectTimelineInterval(props.projection, span.startTime, span.endTime)
-        : {
-            left: span.startTime * props.pixelsPerSecond,
-            width: (span.endTime - span.startTime) * props.pixelsPerSecond,
-          };
-      return { id: span.id, left: geometry?.left ?? null, width: geometry?.width ?? 0 };
-    }),
-    props.projection?.viewportWidth
-  );
-  const clusteredTypingIds = new Set(
-    typingGroups.filter((group) => group.ids.length > 1).flatMap((group) => group.ids)
-  );
-  const typingSelected = (span: (typeof spans)[number]) =>
-    props.selection?.kind === 'history-span' &&
-    props.selection.clipId === span.clipId &&
-    props.selection.recordingId === span.recordingId &&
-    props.selection.sourceInstanceId === span.sourceInstanceId &&
-    props.selection.signalId === span.signalId;
-  const selectTyping = (id: string) => {
-    const span = typingById.get(id);
-    if (!span?.signalId || !props.onSelectHistorySpan) return;
-    props.onSelectHistorySpan({
-      recordingId: span.recordingId,
-      sourceInstanceId: span.sourceInstanceId,
-      signalId: span.signalId,
-      clipId: span.clipId,
-    });
-  };
-  return (
-    <>
-      {spans
-        .filter((span) => !clusteredTypingIds.has(span.id))
-        .map((span) => (
-          <ProjectTimelineTelemetrySpan
-            key={span.id}
-            top={span.kind === 'typing' ? (layout.typingTop ?? 32) : layout.actionHeight - 4}
-            label={
-              span.kind === 'typing'
-                ? typingSpanLabel(props.project, span, props.recordingTelemetry)
-                : undefined
-            }
-            target={
-              span.kind === 'typing' && span.signalId
-                ? {
-                    recordingId: span.recordingId,
-                    sourceInstanceId: span.sourceInstanceId,
-                    signalId: span.signalId,
-                    clipId: span.clipId,
-                  }
-                : undefined
-            }
-            selected={typingSelected(span)}
-            onSelect={
-              span.kind === 'typing' && span.signalId && props.onSelectHistorySpan
-                ? () => selectTyping(span.id)
-                : undefined
-            }
-            endTime={span.endTime}
-            kind={span.kind}
-            pixelsPerSecond={props.pixelsPerSecond}
-            projection={props.projection}
-            startTime={span.startTime}
-          />
-        ))}
-      {typingGroups
-        .filter((group) => group.ids.length > 1)
-        .map((group) => {
-          const selected = group.ids.some((id) => typingSelected(typingById.get(id)!));
-          return (
-            <div
-              key={JSON.stringify(group.ids)}
-              className="absolute h-6"
-              style={{ left: group.left, width: group.width, top: layout.typingTop ?? 32 }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <ProductSelect
-                dataUi="video-editor.timeline.history-span-cluster"
-                value=""
-                placeholder={group.ids.length > 99 ? '99+' : String(group.ids.length)}
-                aria-label={`${translate('videoEditor.timeline.historyTyping')} · ${group.ids.length}`}
-                aria-pressed={selected}
-                disabled={!props.onSelectHistorySpan}
-                style={{
-                  ...historyClusterStyle(),
-                  width: group.width,
-                  minWidth: 0,
-                  padding: '0 2px',
-                }}
-                className={[
-                  'video-editor-timeline-item',
-                  selected ? 'video-editor-timeline-item-selected' : '',
-                  '[&_.sniptale-select-chevron]:hidden [&_.sniptale-select-placeholder]:text-current!',
-                ].join(' ')}
-                controlSize="sm"
-                menuWidth={360}
-                menuClassName="max-h-80!"
-                menuScrollable
-                onChange={selectTyping}
-                options={group.ids.map((id) => ({
-                  value: id,
-                  label: typingSpanLabel(
-                    props.project,
-                    typingById.get(id)!,
-                    props.recordingTelemetry
-                  ),
-                }))}
-              />
-            </div>
-          );
-        })}
-    </>
-  );
 }

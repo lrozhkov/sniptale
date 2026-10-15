@@ -25,13 +25,18 @@ import { FOLDER_LABELS, formatDate, getGalleryFolderIcon, getGalleryItemFolder }
 function isMetadataEditable(item: PreviewPanelProps['item']) {
   return (
     isGalleryMediaItem(item) ||
+    item.type === 'quick-edit-project' ||
     isGalleryScenarioItem(item) ||
     (isGalleryScenarioExportItem(item) && item.format === 'html')
   );
 }
 
 function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
-  if (!isGalleryVideoProjectItem(item) || !item.unavailableReason) return null;
+  if (
+    (!isGalleryVideoProjectItem(item) && item.type !== 'quick-edit-project') ||
+    !item.unavailableReason
+  )
+    return null;
   const reasonKey =
     item.unavailableReason === 'unsupported-engine1'
       ? 'gallery.preview.unavailableUnsupportedProject'
@@ -64,7 +69,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
         <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
           {formatDate(props.item.createdAt)}
         </div>
-        {isDraft ? (
+        {isDraft && !props.trashMode ? (
           <div
             className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2
               text-xs font-medium text-[var(--sniptale-color-warning)]"
@@ -75,6 +80,10 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
                 : translate('gallery.app.draftNoExpiration')}
             </span>
             {!props.trashMode ? <PreviewPromotionAction {...props} /> : null}
+          </div>
+        ) : !props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
+          <div className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate('gallery.app.permanentStorage')}
           </div>
         ) : null}
       </div>

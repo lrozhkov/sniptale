@@ -27,7 +27,7 @@ export function reportEditorActionFailure(
   options: EditorActionFailureOptions = {}
 ): string {
   const message = resolveEditorActionErrorMessage(error, options.fallbackKey);
-  logger.error(`${action} failed`, error, options.context);
+  logger.error('Editor action failed', error, { action, context: options.context });
   if (options.notify !== false) {
     toast.error(message);
   }

@@ -4,6 +4,32 @@ import { analyzeStructuralSource } from './report.mjs';
 import { scoreFunction } from './score.mjs';
 
 describe('function profile classification', () => {
+  it.each([
+    "import { useState } from 'react'; function useCapture() { return useState(false); }",
+    "import { useRef as captureRef } from 'react'; function useCapture() { return captureRef(null); }",
+    "import React from 'react'; function useCapture() { return React.useEffect(() => {}); }",
+    "import * as React from 'react'; function useCapture() { return React.useReducer(() => 1, 0); }",
+  ])('recognizes actual React hook calls without JSX or a Hook suffix: %s', (source) => {
+    const metric = analyzeStructuralSource('apps/extension/src/gallery/capture.ts', source);
+    expect(metric.functions.find(({ symbol }) => symbol === 'useCapture')?.profile).toBe('react');
+  });
+
+  it.each([
+    "import { useState } from 'other'; function useCapture() { return useState(false); }",
+    "import { useState } from 'react'; function useCapture(useState) { return useState(false); }",
+    "import React from 'react'; function useCapture(React) { return React.useState(false); }",
+    "import { useState } from 'react'; function useCapture() { { const useState = fake; useState(false); } }",
+    "import { useState } from 'react'; function useCapture() { useState(false); { var useState = fake; } }",
+    "import { useState } from 'react'; function useCapture() { return () => useState(false); }",
+    'function useCapture() { return useState(false); }',
+    "import type { useState } from 'react'; function useCapture() { return useState(false); }",
+    "import type React from 'react'; function useCapture() { return React.useState(false); }",
+    "import { type useState } from 'react'; function useCapture() { return useState(false); }",
+  ])('keeps non-React, shadowed and nested-only calls on the default profile: %s', (source) => {
+    const metric = analyzeStructuralSource('apps/extension/src/gallery/capture.ts', source);
+    expect(metric.functions.find(({ symbol }) => symbol === 'useCapture')?.profile).toBe('default');
+  });
+
   it('uses the entrypoint profile only for an exported entrypoint binding', () => {
     const metric = analyzeStructuralSource(
       'apps/extension/src/content/overlay/example/index.ts',

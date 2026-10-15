@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  exportCameraConflict: {
+    ru: 'Камера не может сохранить указатель в кадре с выбранным движением. Измените настройки камеры или разрешите временное расширение кадра.',
+    en: 'The camera cannot keep the pointer visible with this movement. Change the camera settings or allow temporary frame expansion.',
+  },
   startDescription: {
     ru: 'Создайте проект или продолжите работу с сохранённым видео.',
     en: 'Create a project or continue working on a saved video.',
@@ -33,6 +37,10 @@ export const videoEditorAppMessages = defineMessageSource({
   recordAudioKeep: { ru: 'Вернуться к записи', en: 'Keep recording' },
   recordAudioDiscard: { ru: 'Отказаться от записи', en: 'Discard recording' },
   recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
+  recordAudioPositiveDuration: {
+    ru: 'Введите длительность больше нуля.',
+    en: 'Enter a duration greater than zero.',
+  },
   recordAudioSeconds: { ru: 'сек', en: 'sec' },
   recordAudioLimitInvalid: {
     ru: 'Введите длительность больше нуля, не превышающую доступный максимум.',

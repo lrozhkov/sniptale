@@ -1,24 +1,24 @@
+import { runWithLibraryTrashMutation } from './trash';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import { recoverScenarioAssetPublications } from '../scenario/aggregate-mutations';
+import { recoverMediaSourcePublications } from '../media-library/delete-cascade.recovery';
+import { readAllWorkspaceStorage } from '../review-workspaces/storage';
+import { createMaintenanceLog } from './maintenance-log';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
-  VIDEO_WORKSPACE_DRAFTS_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import {
-  AGGREGATE_PRESENTATIONS_STORE,
-  ASSET_OPERATIONS_STORE,
-  ASSET_OWNERS_STORE,
-  ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
-  PROJECT_EXPORTS_STORE,
-  WEB_SNAPSHOTS_STORE,
-  RECORDING_TELEMETRY_STORE,
   SCENARIO_ASSETS_STORE,
   STORE_NAME,
-  THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
+import type { initDB } from '../infrastructure/indexed-db/core';
+import type { MediaLibraryEntry } from '../media-library/contracts';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { listMediaLibrary } from '../media-library';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -30,28 +30,34 @@ import { getDraftRetentionMs } from './policy';
 import { collectVideoProjectReferences } from './references';
 import {
   mediaDependencyTarget,
-  reviewReferencesForMedia,
   scenarioChildIsUnrelated,
   videoEntryIsUnrelated,
   reviewWorkspaceUsesMedia,
 } from '../media-library/dependencies';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
-import {
-  deleteMediaSidecars,
-  releaseUnpublishedProjectAssets,
-  releaseMediaSource,
-  recoverMediaSourcePublications,
-} from '../media-library/delete-cascade.sources';
 import { repairLinkedRecordingLifecycles } from './project-recordings';
 import { repairTemporaryProjectLifecycles } from './project-retention';
-import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
 import { recoverRecordingAssetPublications } from '../recordings/asset-publication';
 import { recoverProjectMediaPublications } from '../projects/asset-publication';
 import { recoverImageWorkspacePublications } from '../image-aggregates/mutations';
 
+const maintenanceLog = createMaintenanceLog();
+
 export interface DraftCleanupResult {
-  deletedCount: number;
-  deletedIds: string[];
+  movedCount: number;
+  movedIds: string[];
+  retainedCount: number;
+}
+
+/** Committed moves survive a later failure; callers must not report complete success. */
+export class DraftCleanupError extends Error {
+  constructor(
+    readonly result: DraftCleanupResult,
+    cause: unknown
+  ) {
+    super('Draft cleanup stopped before completion', { cause });
+    this.name = 'DraftCleanupError';
+  }
 }
 
 function isExpired(updatedAt: number, retentionMs: number | null, now: number): boolean {
@@ -61,18 +67,34 @@ function isExpired(updatedAt: number, retentionMs: number | null, now: number): 
 export async function cleanupDrafts(args: {
   policy: LocalStoragePolicy;
   includeUnexpired?: boolean;
+  signal?: AbortSignal;
   now?: number;
 }): Promise<DraftCleanupResult> {
+  const empty = { movedCount: 0, movedIds: [], retainedCount: 0 };
+  if (args.signal?.aborted) return empty;
   await recoverRecordingAssetPublications();
+  if (args.signal?.aborted) return empty;
   await recoverProjectMediaPublications();
+  if (args.signal?.aborted) return empty;
   await recoverImageWorkspacePublications();
+  if (args.signal?.aborted) return empty;
+  await recoverScenarioAssetPublications();
+  if (args.signal?.aborted) return empty;
   const now = args.now ?? Date.now();
   await repairTemporaryProjectLifecycles(now);
+  if (args.signal?.aborted) return empty;
   await repairLinkedRecordingLifecycles(now);
+  if (args.signal?.aborted || (!args.includeUnexpired && !args.policy.cleanupEnabled)) return empty;
   const ordinaryRetention = getDraftRetentionMs(args.policy, 'ordinary');
   const videoRetention = getDraftRetentionMs(args.policy, 'video');
   const [media, videoProjects] = await Promise.all([listMediaLibrary(), listVideoProjectEntries()]);
-  const deletedIds: string[] = [];
+  const movedIds: string[] = [];
+  let retainedCount = 0;
+  const result = (): DraftCleanupResult => ({
+    movedCount: movedIds.length,
+    movedIds: [...movedIds],
+    retainedCount,
+  });
   const referencedMediaIds = new Set<string>();
   const referencedRecordingIds = new Set<string>();
   for (const project of videoProjects) {
@@ -83,51 +105,89 @@ export async function cleanupDrafts(args: {
   }
 
   const includeUnexpired = Boolean(args.includeUnexpired);
-  for (const entry of media) {
+  for (const [index, entry] of media.entries()) {
+    if (args.signal && index % 32 === 0)
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (args.signal?.aborted) break;
     const lifecycle = entry.lifecycle;
     if (!lifecycle || lifecycle.trashedAt !== undefined || lifecycle.storageClass !== 'temporary')
       continue;
-    if (referencedMediaIds.has(entry.id)) continue;
-    if (entry.source.kind === 'recording' && referencedRecordingIds.has(entry.source.recordingId)) {
-      continue;
-    }
     const retention = entry.source.kind === 'recording' ? videoRetention : ordinaryRetention;
     if (!includeUnexpired && !isExpired(lifecycle.updatedAt, retention, now)) continue;
-    if (entry.source.kind === 'web-snapshot') await recoverMediaSourcePublications(entry);
-    if (await deleteExpiredMedia(entry.id, now, retention, includeUnexpired)) {
-      deletedIds.push(entry.id);
+    if (
+      referencedMediaIds.has(entry.id) ||
+      (entry.source.kind === 'recording' && referencedRecordingIds.has(entry.source.recordingId))
+    ) {
+      retainedCount++;
+      continue;
+    }
+    try {
+      if (entry.source.kind === 'web-snapshot') await recoverMediaSourcePublications(entry);
+      if (args.signal?.aborted) break;
+      const outcome = await runWithLibraryTrashMutation(() =>
+        runWithDurableAssetLifecycleLock(() =>
+          moveExpiredMediaToTrash(
+            entry.id,
+            () => args.now ?? Date.now(),
+            retention,
+            includeUnexpired,
+            args.signal
+          )
+        )
+      );
+      if (outcome === 'moved') movedIds.push(entry.id);
+      else if (outcome === 'retained') retainedCount++;
+    } catch (cause) {
+      throw new DraftCleanupError(result(), cause);
     }
   }
 
-  return { deletedCount: deletedIds.length, deletedIds };
+  return result();
 }
 
-async function deleteExpiredMedia(
-  id: string,
-  now: number,
-  retention: number | null,
-  includeUnexpired: boolean
+type ExpiryTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+
+/** Check authoritative retention evidence in the caller's fresh lifecycle transaction. */
+async function hasRetainedProjectForExpiry(
+  tx: ExpiryTransaction,
+  current: MediaLibraryEntry
 ): Promise<boolean> {
-  const operation = buildPhysicalDeleteOperation([]);
-  const deleted = await runWithIndexedDbMutation(async (db) => {
+  if ((await tx.objectStore(IMAGE_WORKSPACES_STORE).get(current.id)) !== undefined) return true;
+  const target = mediaDependencyTarget(
+    current,
+    await tx.objectStore(PROJECT_ASSETS_STORE).getAll()
+  );
+  if (target.privateProjectAssetIds?.size) return true;
+  const rawChildren = await tx.objectStore(SCENARIO_ASSETS_STORE).getAll();
+  if (rawChildren.some((raw) => !scenarioChildIsUnrelated(raw, target))) return true;
+  const videos = await tx.objectStore(VIDEO_PROJECTS_STORE).getAll();
+  if (videos.some((raw) => !videoEntryIsUnrelated(raw, target, new Set()))) return true;
+  return (await readAllWorkspaceStorage(tx)).some((raw) => {
+    if (isRecord(raw) && raw['aggregateId'] === current.id) return true;
+    const workspace = parseVideoWorkspace(raw);
+    return !workspace || reviewWorkspaceUsesMedia(workspace, target);
+  });
+}
+
+async function moveExpiredMediaToTrash(
+  id: string,
+  clock: () => number,
+  retention: number | null,
+  includeUnexpired: boolean,
+  signal?: AbortSignal
+): Promise<'moved' | 'retained' | 'skipped'> {
+  if (signal?.aborted) return 'skipped';
+  return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
         VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        THUMBNAILS_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
         IMAGE_WORKSPACES_STORE,
-        AGGREGATE_PRESENTATIONS_STORE,
         STORE_NAME,
         VIDEO_PROJECTS_STORE,
         PROJECT_ASSETS_STORE,
-        PROJECT_EXPORTS_STORE,
-        WEB_SNAPSHOTS_STORE,
         SCENARIO_ASSETS_STORE,
-        RECORDING_TELEMETRY_STORE,
-        ASSET_OWNERS_STORE,
-        ASSET_REFS_STORE,
-        ASSET_OPERATIONS_STORE,
       ],
       'readwrite'
     );
@@ -138,35 +198,19 @@ async function deleteExpiredMedia(
         !current ||
         current.lifecycle?.storageClass !== 'temporary' ||
         current.lifecycle.trashedAt !== undefined ||
-        (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, retention, now))
+        (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, retention, clock()))
       ) {
         await tx.done;
-        return false;
+        return 'skipped';
       }
-      const target = mediaDependencyTarget(
-        current,
-        await tx.objectStore(PROJECT_ASSETS_STORE).getAll()
-      );
-      const rawChildren = await tx.objectStore(SCENARIO_ASSETS_STORE).getAll();
-      const scenarioReferenced = rawChildren.some((raw) => !scenarioChildIsUnrelated(raw, target));
-      const videoReferenced = (await tx.objectStore(VIDEO_PROJECTS_STORE).getAll()).some(
-        (raw) => !videoEntryIsUnrelated(raw, target, new Set())
-      );
-      const reviewReferenced =
-        reviewReferencesForMedia(target).size > 0 &&
-        (await tx.objectStore(VIDEO_WORKSPACES_STORE).getAll()).some((raw) => {
-          if (isRecord(raw) && raw['aggregateId'] === current.id) return false;
-          const workspace = parseVideoWorkspace(raw);
-          return !workspace || reviewWorkspaceUsesMedia(workspace, target);
-        });
-      if (
-        target.privateProjectAssetIds?.size ||
-        scenarioReferenced ||
-        videoReferenced ||
-        reviewReferenced
-      ) {
+      if (await hasRetainedProjectForExpiry(tx, current)) {
         await tx.done;
-        return false;
+        void maintenanceLog.append({
+          operation: 'drafts',
+          code: 'in-use',
+          counts: { retained: 1 },
+        });
+        return 'retained';
       }
       const recordingStore = tx.objectStore(STORE_NAME);
       const recording =
@@ -176,22 +220,22 @@ async function deleteExpiredMedia(
       if (
         recording &&
         (recording.lifecycle?.storageClass !== 'temporary' ||
-          (!includeUnexpired && !isExpired(recording.lifecycle.updatedAt, retention, now)))
+          (!includeUnexpired && !isExpired(recording.lifecycle.updatedAt, retention, clock())))
       ) {
         await tx.done;
-        return false;
+        return 'retained';
       }
 
-      const privateAuxiliaries = await deleteMediaSidecars(tx, id, operation);
-      if (current.source.kind === 'project-asset')
-        privateAuxiliaries.delete(current.source.projectAssetId);
-      await releaseUnpublishedProjectAssets(tx, privateAuxiliaries, operation);
-      await releaseMediaSource(tx, current, operation);
-      if (operation.assetIds.length > 0) {
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
+      if (signal?.aborted) {
+        await tx.done;
+        return 'skipped';
       }
+      await mediaStore.put({
+        ...current,
+        lifecycle: { ...current.lifecycle, trashedAt: clock() },
+      });
       await tx.done;
-      return true;
+      return 'moved';
     } catch (error) {
       try {
         tx.abort();
@@ -202,6 +246,4 @@ async function deleteExpiredMedia(
       throw error;
     }
   });
-  if (operation.assetIds.length > 0) await completePhysicalDeleteOperation(operation);
-  return deleted;
 }

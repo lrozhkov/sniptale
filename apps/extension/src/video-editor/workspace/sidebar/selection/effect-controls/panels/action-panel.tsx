@@ -1,3 +1,4 @@
+import { ActionFeedbackFields } from '../action-feedback-fields';
 import { ActionClickStyleFields, ActionKeyStyleFields } from '../action-style-fields';
 import { InspectorDetails } from '../../shared/details';
 import { getActionEventLabel } from '../../../../../chrome/display';
@@ -70,67 +71,12 @@ export function InspectActionPanel(props: ActionProps) {
             ),
             defaultActive: true,
             content: (
-              <>
-                <SelectInput
-                  label={translate('videoEditor.sidebar.historyEventMode')}
-                  value={
-                    event.presentation?.enabled === undefined
-                      ? 'inherit'
-                      : event.presentation.enabled
-                        ? 'on'
-                        : 'off'
-                  }
-                  disabled={disabled}
-                  options={[
-                    { value: 'inherit', label: translate('videoEditor.sidebar.historyInherit') },
-                    { value: 'on', label: translate('videoEditor.sidebar.historyForceOn') },
-                    { value: 'off', label: translate('videoEditor.sidebar.historyForceOff') },
-                  ]}
-                  onChange={(mode) => {
-                    if (disabled) return;
-                    const { enabled: _enabled, ...overrides } = event.presentation ?? {};
-                    props.onUpdateActionEventDetails(event.id, {
-                      clipId: occurrence.clipId,
-                      presentation:
-                        mode === 'inherit' ? overrides : { ...overrides, enabled: mode === 'on' },
-                    });
-                  }}
-                />
-                {resolved.reason ? (
-                  <p className="mt-2 text-xs text-[var(--sniptale-color-text-muted)]" role="status">
-                    {resolveStatusLabel(resolved.reason)}
-                  </p>
-                ) : null}
-                <ActionPrimaryFields
-                  part="appearance"
-                  duration={resolved.duration}
-                  offset={resolved.offset}
-                  preset={resolved.preset}
-                  showPreset={event.kind !== 'KEY' && event.kind !== 'SCROLL'}
-                  disabled={disabled}
-                  onChange={update}
-                />
-                <EventStyleFields
-                  props={props}
-                  resolved={resolved}
-                  disabled={disabled}
-                  update={update}
-                />
-                <InspectorActionButton
-                  compact
-                  tone="secondary"
-                  separated
-                  disabled={disabled || !resolved.overridden}
-                  onClick={() =>
-                    props.onUpdateActionEventDetails(event.id, {
-                      clipId: occurrence.clipId,
-                      presentation: null,
-                    })
-                  }
-                >
-                  {translate('videoEditor.sidebar.historyReset')}
-                </InspectorActionButton>
-              </>
+              <ActionAppearanceFields
+                props={props}
+                resolved={resolved}
+                disabled={disabled}
+                update={update}
+              />
             ),
           },
           {
@@ -150,6 +96,34 @@ export function InspectActionPanel(props: ActionProps) {
               />
             ),
           },
+          ...(event.anchor.kind === 'recording-source' &&
+          (event.kind === 'CLICK' || event.kind === 'KEY')
+            ? [
+                {
+                  id: 'action-sound',
+                  semantic: 'effects' as const,
+                  label: translate('gallery.videoReview.actionAudio'),
+                  content: (
+                    <ActionFeedbackFields
+                      project={props.project}
+                      recordingId={event.anchor.recordingId}
+                      sourceInstanceId={event.anchor.sourceInstanceId}
+                      target={{
+                        ref: { kind: 'action', id: event.anchor.sourceEventId },
+                        family: event.kind === 'KEY' ? 'keyboard' : 'mouse',
+                      }}
+                      disabled={disabled}
+                      gesture={
+                        event.kind === 'CLICK' &&
+                        typeof event.data['gestureType'] === 'string' &&
+                        (event.data['gestureType'] !== 'click' ||
+                          event.data['completion'] !== 'released')
+                      }
+                    />
+                  ),
+                },
+              ]
+            : []),
           ...(event.kind === 'KEY'
             ? []
             : [
@@ -326,5 +300,76 @@ function EventStyleFields({
       value={resolved.clickStyle}
       onChange={(clickStyle) => update({ clickStyle })}
     />
+  );
+}
+
+function ActionAppearanceFields({
+  props,
+  resolved,
+  disabled,
+  update,
+}: {
+  props: ActionProps;
+  resolved: ActionPresentation;
+  disabled: boolean;
+  update(patch: VideoProjectActionPresentationOverride): void;
+}) {
+  const { event, occurrence } = resolved;
+  return (
+    <>
+      <SelectInput
+        label={translate('videoEditor.sidebar.historyEventMode')}
+        value={
+          event.presentation?.enabled === undefined
+            ? 'inherit'
+            : event.presentation.enabled
+              ? 'on'
+              : 'off'
+        }
+        disabled={disabled}
+        options={[
+          { value: 'inherit', label: translate('videoEditor.sidebar.historyInherit') },
+          { value: 'on', label: translate('videoEditor.sidebar.historyForceOn') },
+          { value: 'off', label: translate('videoEditor.sidebar.historyForceOff') },
+        ]}
+        onChange={(mode) => {
+          if (disabled) return;
+          const { enabled: _enabled, ...overrides } = event.presentation ?? {};
+          props.onUpdateActionEventDetails(event.id, {
+            clipId: occurrence.clipId,
+            presentation: mode === 'inherit' ? overrides : { ...overrides, enabled: mode === 'on' },
+          });
+        }}
+      />
+      {resolved.reason ? (
+        <p className="mt-2 text-xs text-[var(--sniptale-color-text-muted)]" role="status">
+          {resolveStatusLabel(resolved.reason)}
+        </p>
+      ) : null}
+      <ActionPrimaryFields
+        part="appearance"
+        duration={resolved.duration}
+        offset={resolved.offset}
+        preset={resolved.preset}
+        showPreset={event.kind !== 'KEY' && event.kind !== 'SCROLL'}
+        disabled={disabled}
+        onChange={update}
+      />
+      <EventStyleFields props={props} resolved={resolved} disabled={disabled} update={update} />
+      <InspectorActionButton
+        compact
+        tone="secondary"
+        separated
+        disabled={disabled || !resolved.overridden}
+        onClick={() =>
+          props.onUpdateActionEventDetails(event.id, {
+            clipId: occurrence.clipId,
+            presentation: null,
+          })
+        }
+      >
+        {translate('videoEditor.sidebar.historyReset')}
+      </InspectorActionButton>
+    </>
   );
 }

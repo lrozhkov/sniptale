@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import { afterEach, expect, it, vi } from 'vitest';
 
 import {
@@ -42,7 +44,17 @@ function createImportOnlyCodeWithChangedTestFixture() {
   return root;
 }
 
+function mockMissingFullCoverageProof() {
+  vi.doMock('../../../proof/coverage/coverage-proof.mjs', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../../proof/coverage/coverage-proof.mjs')>()),
+    resolveReusableCoverageProof: () => ({ matched: false, reason: 'fixture has no full proof' }),
+  }));
+}
+
 afterEach(() => {
+  vi.doUnmock('../../../proof/coverage/coverage-proof.mjs');
+  vi.doUnmock('../../../proof/coverage/test-coverage/check.mjs');
+  vi.doUnmock('../../../proof/unit/verify-unit-tests.mjs');
   vi.doUnmock('./focused-coverage-owner-resolver.mjs');
   vi.doUnmock('./verify-test-coverage.mjs');
   vi.doUnmock('./verify-unit-tests.mjs');
@@ -50,6 +62,7 @@ afterEach(() => {
 });
 
 it('does not invoke Vitest coverage when focused owner scope is deferred', async () => {
+  mockMissingFullCoverageProof();
   const runUnitTests = vi.fn(() => ({ status: 0, stderr: '', stdout: '' }));
   vi.doMock('../../../proof/unit/verify-unit-tests.mjs', async (importOriginal) => ({
     ...(await importOriginal<typeof import('../../../proof/unit/verify-unit-tests.mjs')>()),
@@ -72,6 +85,7 @@ it('does not invoke Vitest coverage when focused owner scope is deferred', async
 });
 
 it('blocks ambiguous focused proof for high-risk runtime and persistence owners', async () => {
+  mockMissingFullCoverageProof();
   const runUnitTests = vi.fn(() => ({ status: 0, stderr: '', stdout: '' }));
   vi.doMock('../../../proof/unit/verify-unit-tests.mjs', async (importOriginal) => ({
     ...(await importOriginal<typeof import('../../../proof/unit/verify-unit-tests.mjs')>()),
@@ -273,3 +287,126 @@ it('runs changed product tests without coverage for import-only production diffs
     ['Test coverage', 'skipped', 'skipped: import-only code diff'],
   ]);
 });
+
+it('checks changed-file thresholds from sealed full coverage when focused targets are empty', async () => {
+  const root = createTempRoot('checkpoint-full-proof-');
+  writeFile(
+    root,
+    'tooling/configs/qa/quality-baseline.json',
+    JSON.stringify({ schemaVersion: 2, rationales: [], allowances: [] })
+  );
+  initGitRepo(root);
+  writeFile(root, 'README.md', 'baseline');
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  const codeFile = 'apps/extension/src/composition/persistence/projects/new-owner.ts';
+  writeFile(root, codeFile, 'export const changed = true;\n');
+  const reportText = '{}';
+  const reportPath = '.tmp/coverage/canonical/coverage-final.json';
+  writeFile(root, reportPath, reportText);
+  const runUnitTests = vi.fn();
+  vi.doMock('../../../proof/unit/verify-unit-tests.mjs', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../../proof/unit/verify-unit-tests.mjs')>()),
+    runUnitTests,
+  }));
+  vi.doMock('../../../proof/coverage/coverage-proof.mjs', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../../proof/coverage/coverage-proof.mjs')>()),
+    resolveReusableCoverageProof: () => ({
+      matched: true,
+      source: 'local proof',
+      reportsRoot: `${root}/.tmp/coverage/canonical`,
+      proof: {
+        proofDigest: 'a'.repeat(64),
+        reports: [
+          {
+            file: 'coverage-final.json',
+            sha256: crypto.createHash('sha256').update(reportText).digest('hex'),
+          },
+        ],
+      },
+    }),
+  }));
+  const steps = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./test-steps.mjs')>(
+      './test-steps.mjs',
+      import.meta.url
+    );
+    return module.runFocusedUnitTests(
+      { codeFiles: [codeFile], newFiles: [codeFile], targetFiles: [codeFile] },
+      {
+        focusedScopeOverride: {
+          verdict: 'defer-ambiguous-existing',
+          coverageTargetFiles: [],
+          testFiles: [],
+          detail: 'local owner test expansion exceeds budget',
+        },
+      }
+    );
+  });
+  expect(runUnitTests).not.toHaveBeenCalled();
+  expect(steps[0]).toMatchObject({
+    status: 'ok',
+    detail: expect.stringContaining('reused verified'),
+  });
+  expect(steps[1]).toMatchObject({
+    status: 'failed',
+    violations: [expect.objectContaining({ rule: 'test-coverage-missing-file', file: codeFile })],
+  });
+});
+
+it.each(['block-new-file-no-owner', 'block-invalid-owner-map'])(
+  'keeps %s blocking even if full coverage exists',
+  async (verdict) => {
+    const resolveProof = vi.fn(() => ({ matched: true }));
+    vi.doMock('../../../proof/coverage/coverage-proof.mjs', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('../../../proof/coverage/coverage-proof.mjs')>()),
+      resolveReusableCoverageProof: resolveProof,
+    }));
+    const module = await importFresh<typeof import('./test-steps.mjs')>(
+      './test-steps.mjs',
+      import.meta.url
+    );
+    const codeFile = 'apps/extension/src/contracts/messaging/runtime-message/core.ts';
+    const steps = await module.runFocusedUnitTests(
+      { codeFiles: [codeFile], targetFiles: [codeFile] },
+      { focusedScopeOverride: { verdict, detail: 'invalid ownership' } }
+    );
+    expect(steps[0].status).toBe('failed');
+    expect(resolveProof).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  [
+    'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
+    'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+  ],
+  [
+    'apps/extension/src/gallery/video-review/use-session.ts',
+    'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+  ],
+])(
+  'checkpoint executes concurrency proof for %s and propagates its failure',
+  async (owner, testFile) => {
+    const module = await importFresh<typeof import('./test-steps.mjs')>(
+      './test-steps.mjs',
+      import.meta.url
+    );
+    const stdout =
+      ` FAIL  ${testFile} > deleted content must not return after recreation\n` +
+      'AssertionError: stale writer admitted';
+    const execute = vi.fn(async () => ({ status: 1, stdout, stderr: '' }));
+    const steps = await module.runFocusedUnitTests(
+      { codeFiles: [owner], targetFiles: [owner] },
+      { runUnitTestsImpl: execute, maxWorkers: 1 }
+    );
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({ directFiles: expect.arrayContaining([testFile]) })
+    );
+    expect(steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'Unit tests', status: 'failed', stdout }),
+      ])
+    );
+  }
+);

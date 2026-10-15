@@ -30,6 +30,7 @@ export class PrivacyErasureUseCase {
   constructor(private readonly ports: PrivacyErasurePorts) {}
 
   execute(request: PrivacyErasureRequest): Promise<LocalExtensionDataErasureResult> {
+    const audioExclusion = this.ports.audioJobs.reserveErasureExclusion();
     const mediaExclusion = this.ports.media.reserveErasureExclusion();
     const diagnosticsExclusion = this.ports.diagnostics.reserveErasureExclusion();
     const nativeIngestionExclusion = this.ports.nativeIngestion.reserveErasureExclusion();
@@ -37,6 +38,7 @@ export class PrivacyErasureUseCase {
     const execution = this.executionQueue.then(async () => {
       try {
         try {
+          await this.ports.audioJobs.cancelActiveJob();
           await this.ports.popupExport.cancelActiveJob();
         } catch {
           return createShortCircuitedErasureResult([
@@ -47,6 +49,7 @@ export class PrivacyErasureUseCase {
           ]);
         }
         await Promise.all([
+          audioExclusion.waitForActiveMutations(),
           mediaExclusion.waitForActiveMutations(),
           diagnosticsExclusion.waitForActiveMutations(),
           nativeIngestionExclusion.waitForActiveMutations(),
@@ -54,6 +57,7 @@ export class PrivacyErasureUseCase {
         ]);
         return await this.executeWithMutationsExcluded(request);
       } finally {
+        audioExclusion.release();
         popupExportExclusion.release();
         nativeIngestionExclusion.release();
         diagnosticsExclusion.release();

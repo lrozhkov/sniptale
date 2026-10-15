@@ -19,10 +19,7 @@ const dbMocks = vi.hoisted(() => ({
 vi.mock('./usage', () => ({
   listMediaAssetProjectUsage: dbMocks.listMediaAssetProjectUsageMock,
 }));
-vi.mock('./delete-cascade.sources', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./delete-cascade.sources')>()),
-  recoverMediaSourcePublications: vi.fn(),
-}));
+vi.mock('./delete-cascade.recovery', () => ({ recoverMediaSourcePublications: vi.fn() }));
 vi.mock('./delete-cascade', () => ({
   deleteMediaAssetWithProjectCascade: dbMocks.deleteCascadeMock,
 }));

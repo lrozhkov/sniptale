@@ -11,6 +11,13 @@ vi.mock(
   })
 );
 
+const completionMock = vi.hoisted(() => vi.fn());
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  completeVideoRecording: completionMock,
+  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));
+
 const {
   finalizeRecordingDiagnosticsMock,
   finishVideoRecordingStopMock,
@@ -113,8 +120,7 @@ vi.mock('../../../manager/start-activation-watchdog', async (importOriginal) => 
 }));
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
-  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
 }));
 vi.mock('../../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-surface')>()),
@@ -238,9 +244,7 @@ async function verifyRecordingStartStopLifecycle(
     keepChannelOpen: true,
   });
   await flushAsyncRoute();
-  expect(finishVideoRecordingStopMock).toHaveBeenCalledTimes(1);
-  expect(resetRecordingTabIdMock).toHaveBeenCalledTimes(1);
-  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
+  expect(completionMock).toHaveBeenCalledWith('rec-1');
   expectAcceptedLifecycleResponse(sendResponse);
 }
 
@@ -275,6 +279,7 @@ async function verifyRecordingStateLifecycle(sendResponse: ReturnType<typeof cre
     recordingHealth: 'healthy',
     success: true,
     state: {
+      completion: null,
       status: VideoRecordingStatus.IDLE,
       duration: 0,
     },

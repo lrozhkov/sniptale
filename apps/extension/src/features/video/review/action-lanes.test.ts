@@ -1,8 +1,33 @@
 import { expect, it } from 'vitest';
 import { layoutReviewActionLanes, REVIEW_ACTION_MIN_POINT_WIDTH_PX } from './action-lanes';
+import { reviewActionLane } from './action-lanes';
 import type { ReviewTelemetryMarker } from './telemetry';
 
 const viewport = { duration: 10, width: 100, zoom: 1 };
+it('reserves keyboard, mouse and cursor rows even with no facts', () => {
+  expect(layoutReviewActionLanes([], viewport).laneCount).toBe(3);
+});
+
+it('keeps observed command holds and modifier combinations in the keyboard family', () => {
+  for (const eventType of ['KEY', 'KEY_HOLD', 'KEY_MODIFIERS', 'typing'])
+    expect(reviewActionLane({ eventType, ref: { kind: 'action', id: eventType } })).toBe(0);
+});
+
+it('keeps typing coverage and key anchors independently selectable in the same keyboard row', () => {
+  const entries: ReviewTelemetryMarker[] = [
+    { ref: { kind: 'action', id: 'key' }, eventType: 'KEY', start: 1, end: 1 },
+    { ref: { kind: 'signal', id: 'typing' }, eventType: 'typing', start: 1, end: 4 },
+    { ref: { kind: 'action', id: 'mouse' }, eventType: 'CLICK', start: 1, end: 1 },
+    { ref: { kind: 'signal', id: 'dwell' }, eventType: 'cursor-idle', start: 1, end: 2 },
+  ];
+  const layout = layoutReviewActionLanes(entries, { ...viewport, width: 1000 });
+  expect(layout.items.map(({ lane }) => lane)).toEqual([2, 0, 1, 0]);
+  expect(
+    layout.items
+      .filter(({ lane }) => lane === 0)
+      .flatMap((item) => item.members.map(({ ref }) => ref.id))
+  ).toEqual(['key', 'typing']);
+});
 const marker = (
   id: string,
   start: number,
@@ -15,38 +40,38 @@ const marker = (
   end,
 });
 
-it('places colliding point events into separate lanes by screen width, not source time', () => {
+it('groups colliding mouse events by screen width while preserving every identity', () => {
   const layout = layoutReviewActionLanes(
     [marker('a', 1), marker('b', 1.01), marker('c', 1.03), marker('d', 1.05)],
     viewport
   );
-  expect(layout.items.map((item) => item.lane)).toEqual([0, 1, 2, 3]);
-  expect(layout.laneCount).toBe(4);
+  expect(layout.items.map((item) => item.lane)).toEqual([1]);
+  expect(layout.laneCount).toBe(3);
   expect(layout.items.every((item) => item.left >= 0)).toBe(true);
   // Screen coordinates: 0.01s of source spans less than the point-event floor.
-  expect(layout.items[0]!.width).toBe(REVIEW_ACTION_MIN_POINT_WIDTH_PX);
+  expect(layout.items[0]!.width).toBeGreaterThanOrEqual(REVIEW_ACTION_MIN_POINT_WIDTH_PX);
 });
 
-it('packs long intervals forward and splits at point-event floors', () => {
+it('clusters long intervals that intersect point-event floors', () => {
   const layout = layoutReviewActionLanes(
     [marker('a', 0, 2), marker('b', 2.5, 3), marker('c', 3, 5)],
     viewport
   );
-  // c starts at 30px while the point floor of b still occupies lane 0 until 39px.
-  expect(layout.items.map((item) => item.lane)).toEqual([0, 0, 1]);
-  expect(layout.laneCount).toBe(2);
+  // The readable target floor overlaps both following starts at this coarse scale.
+  expect(layout.items.map((item) => item.lane)).toEqual([1]);
+  expect(layout.laneCount).toBe(3);
 });
 
-it('reuses a lane once the previous visual rect ends, measuring in pixels', () => {
+it('joins overlapping mouse hit rectangles without crossing semantic rows', () => {
   // 10s plane over 100px: 1s = 10px, so point-event floors keep 0.01s events apart.
   const layout = layoutReviewActionLanes(
     [marker('a', 0, 1.2), marker('b', 1.2, 1.21), marker('c', 1.3)],
     viewport
   );
-  expect(layout.items.map((item) => item.lane)).toEqual([0, 1, 2]);
+  expect(layout.items.map((item) => item.lane)).toEqual([1]);
 });
 
-it('deduplicates cursor samples per display bucket while keeping actions', () => {
+it('clusters cursor markers without silently dropping source identities', () => {
   const layout = layoutReviewActionLanes(
     [
       marker('c1', 0.1, 0.1, 'cursor'),
@@ -56,31 +81,33 @@ it('deduplicates cursor samples per display bucket while keeping actions', () =>
     ],
     viewport
   );
-  expect(layout.items).toHaveLength(3);
-  expect(layout.items.filter((item) => item.marker.ref.kind === 'cursor')).toHaveLength(2);
+  expect(layout.items).toHaveLength(2);
+  expect(layout.items.filter((item) => item.marker.ref.kind === 'cursor')).toHaveLength(1);
+  expect(layout.items.flatMap((item) => item.members)).toHaveLength(4);
 });
 
-it('repacks lanes when the timeline zoom changes', () => {
-  const markers = [marker('a', 1), marker('b', 1.05)];
-  expect(layoutReviewActionLanes(markers, viewport).items.map((item) => item.lane)).toEqual([0, 1]);
-  // 8x zoom keeps the 0.05s gap under the point-event floor: still two lanes.
-  const zoomed = layoutReviewActionLanes(markers, { ...viewport, zoom: 8 });
-  expect(zoomed.items.map((item) => item.lane)).toEqual([0, 1]);
-  // 40x zoom separates the events by real pixels: the first free lane wins again.
-  const wide = layoutReviewActionLanes(markers, { duration: 10, width: 100, zoom: 40 });
-  expect(wide.items.map((item) => item.lane)).toEqual([0, 0]);
+it('keeps adjacent long intervals on the same lane at every fractional zoom', () => {
+  const markers = [marker('idle1', 0.13, 3.27), marker('idle2', 3.27, 6.41)];
+  for (let step = 0; step <= 100; step++) {
+    const layout = layoutReviewActionLanes(markers, {
+      duration: 12.01,
+      width: 1063,
+      zoom: 1 + step / 7,
+    });
+    expect(layout.items.map((item) => item.lane)).toEqual([1, 1]);
+  }
 });
 
 it('rejects an invalid viewport instead of manufacturing a layout', () => {
   expect(() => layoutReviewActionLanes([], { duration: 0, width: 100, zoom: 1 })).toThrow();
-  expect(layoutReviewActionLanes([], viewport)).toEqual({ items: [], laneCount: 0 });
+  expect(layoutReviewActionLanes([], viewport)).toEqual({ items: [], laneCount: 3 });
 });
 
 it('keeps every dense marker in the layout; no packed item is hidden', () => {
   const markers = Array.from({ length: 12 }, (_, index) => marker(`e${index}`, 1 + index / 200));
   const layout = layoutReviewActionLanes(markers, viewport);
-  expect(layout.items).toHaveLength(12);
-  expect(layout.items.map((item) => item.marker.ref.id)).toEqual(
+  expect(layout.laneCount).toBe(3);
+  expect(layout.items.flatMap((item) => item.members.map((member) => member.ref.id))).toEqual(
     markers.map((entry) => entry.ref.id)
   );
 });
@@ -89,4 +116,94 @@ it('keeps end-of-recording markers inside the scroll strip without a second hori
   const layout = layoutReviewActionLanes([marker('end', 10)], viewport);
   expect(layout.items[0]!.left + layout.items[0]!.width).toBeLessThanOrEqual(100);
   expect(layout.items[0]!.width).toBe(REVIEW_ACTION_MIN_POINT_WIDTH_PX);
+});
+
+it('caps dense histories at three lanes and repacks separated events at high zoom', () => {
+  const markers = Array.from({ length: 100 }, (_, i) => marker(`dense${i}`, 1 + i / 10));
+  const fit = layoutReviewActionLanes(markers, { duration: 3600, width: 1000, zoom: 1 });
+  expect(fit.laneCount).toBeLessThanOrEqual(3);
+  const expanded = layoutReviewActionLanes(markers, { duration: 3600, width: 1000, zoom: 2000 });
+  expect(expanded.laneCount).toBe(3);
+  expect(expanded.items).toHaveLength(markers.length);
+});
+
+it('packs thousands of simultaneous mixed events without losing identities or overlapping groups', () => {
+  const markers = Array.from({ length: 3000 }, (_, i) =>
+    marker(String(i), 9.99, 10, i % 2 ? 'action' : 'signal')
+  );
+  const layout = layoutReviewActionLanes(markers, viewport);
+  expect(layout.items).toHaveLength(1);
+  expect(
+    new Set(layout.items.flatMap((item) => item.members.map((m) => m.ref.kind + m.ref.id))).size
+  ).toBe(3000);
+  for (const item of layout.items)
+    expect(item.left + item.width).toBeLessThanOrEqual(viewport.width);
+});
+
+it('keeps every lane disjoint across fractional widths, dense points and long intervals', () => {
+  const markers = Array.from({ length: 180 }, (_, i) =>
+    marker(String(i), (i * 0.137) % 9, Math.min(10, ((i * 0.137) % 9) + (i % 7 === 0 ? 2 : 0)))
+  );
+  for (const zoom of [1, 1.3, 8.7, 80]) {
+    const layout = layoutReviewActionLanes(markers, { duration: 10, width: 100.3, zoom });
+    expect(layout.laneCount).toBeLessThanOrEqual(3);
+    expect(layout.items.flatMap((item) => item.members)).toHaveLength(markers.length);
+    for (let lane = 0; lane < 3; lane++) {
+      const items = layout.items.filter((item) => item.lane === lane);
+      for (let i = 1; i < items.length; i++)
+        expect(items[i]!.left + 1e-7).toBeGreaterThanOrEqual(
+          items[i - 1]!.left + items[i - 1]!.width
+        );
+    }
+  }
+});
+
+it.each([1, 4, 16, 64])(
+  'does not swallow separated commands inside long typing coverage at zoom %s',
+  (zoom) => {
+    const typing: ReviewTelemetryMarker = {
+      ref: { kind: 'signal', id: 'typing' },
+      eventType: 'typing',
+      start: 0.1,
+      end: 9,
+    };
+    const keys: ReviewTelemetryMarker[] = [1, 4, 7].map((time, index) => ({
+      ref: { kind: 'action', id: `command:${index}` },
+      eventType: 'KEY',
+      start: time,
+      end: time,
+    }));
+    const layout = layoutReviewActionLanes([typing, ...keys], { duration: 10, width: 1000, zoom });
+    expect(layout.items).toHaveLength(4);
+    expect(layout.items.every((item) => item.lane === 0 && item.members.length === 1)).toBe(true);
+    expect(
+      layout.items
+        .filter((item) => item.marker.eventType === 'KEY')
+        .every((item) => item.width >= 100)
+    ).toBe(true);
+  }
+);
+
+it('preserves the typing choice when a command covers its entire hit target', () => {
+  const layout = layoutReviewActionLanes(
+    [
+      { ref: { kind: 'action', id: 'key' }, eventType: 'KEY', start: 1, end: 1 },
+      { ref: { kind: 'signal', id: 'typing' }, eventType: 'typing', start: 1, end: 1.2 },
+    ],
+    { duration: 10, width: 1000, zoom: 1 }
+  );
+  expect(layout.items).toHaveLength(1);
+  expect(layout.items[0]!.members.map(({ ref }) => ref.id)).toEqual(['key', 'typing']);
+});
+
+it('does not inflate adjacent short cursor runs into a group', () => {
+  const layout = layoutReviewActionLanes(
+    [
+      { ref: { kind: 'cursor', id: 'a' }, eventType: 'cursor', start: 1, end: 1.025 },
+      { ref: { kind: 'cursor', id: 'b' }, eventType: 'cursor-gap', start: 1.025, end: 1.05 },
+    ],
+    { duration: 10, width: 1000, zoom: 1 }
+  );
+  expect(layout.items).toHaveLength(2);
+  expect(layout.items[0]!.width).toBeCloseTo(2.5);
 });

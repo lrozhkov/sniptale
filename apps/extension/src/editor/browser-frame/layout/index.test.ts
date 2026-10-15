@@ -1,3 +1,7 @@
+import {
+  windowHeaderGeometry,
+  DEFAULT_WINDOW_HEADER,
+} from '../../../features/browser-frame/header';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -125,10 +129,15 @@ describe('browser frame scene layout with headers and preserved canvases', () =>
       fitSourceToContent: false,
     });
 
-    expect(layout.canvas).toEqual({ width: 260, height: 226 });
-    expect(layout.content).toEqual({ left: 40, top: 96, width: 200, height: 100 });
-    expect(layout.source).toEqual({ left: 40, top: 96, width: 200, height: 100 });
-    expect(layout.header).toEqual({ left: 40, top: 10, width: 200, height: 86 });
+    expect(layout.canvas).toEqual({ width: 260, height: 150 });
+    expect(layout.content).toEqual({ left: 40, top: 10 + 86 / 9, width: 200, height: 100 });
+    expect(layout.source).toEqual({ left: 40, top: 10 + 86 / 9, width: 200, height: 100 });
+    expect(layout.header).toEqual({
+      left: 40,
+      top: expect.closeTo(10),
+      width: 200,
+      height: 86 / 9,
+    });
   });
 
   it('fits and centers the source inside a preserved canvas without a browser frame', () => {
@@ -164,9 +173,9 @@ it('fits the source to preserved browser content while keeping it aligned to the
   });
 
   expect(layout.canvas).toEqual({ width: 500, height: 400 });
-  expect(layout.content).toEqual({ left: 40, top: 96, width: 440, height: 274 });
-  expect(layout.source).toEqual({ left: 40, top: 96, width: 440, height: 220 });
-  expect(layout.header).toEqual({ left: 40, top: 10, width: 440, height: 86 });
+  expect(layout.content).toEqual({ left: 40, top: 10 + (86 * 220) / 900, width: 440, height: 339 });
+  expect(layout.source).toEqual({ left: 40, top: 10 + (86 * 220) / 900, width: 440, height: 220 });
+  expect(layout.header).toEqual({ left: 40, top: 10, width: 440, height: (86 * 220) / 900 });
 });
 
 describe('browser frame minimum-size edge cases', () => {
@@ -184,9 +193,14 @@ describe('browser frame minimum-size edge cases', () => {
     });
 
     expect(layout.canvas).toEqual({ width: 260, height: 140 });
-    expect(layout.content).toEqual({ left: 40, top: 96, width: 200, height: 14 });
-    expect(layout.source).toEqual({ left: 40, top: 96, width: 200, height: 100 });
-    expect(layout.header).toEqual({ left: 40, top: 10, width: 200, height: 86 });
+    expect(layout.content).toEqual({ left: 40, top: 10 + 86 / 9, width: 200, height: 90 });
+    expect(layout.source).toEqual({ left: 40, top: 10 + 86 / 9, width: 200, height: 100 });
+    expect(layout.header).toEqual({
+      left: 40,
+      top: expect.closeTo(10),
+      width: 200,
+      height: 86 / 9,
+    });
   });
 
   it('normalizes tiny source dimensions to the minimum canvas size', () => {
@@ -241,10 +255,12 @@ it.each(frameCombinations)(
     };
     const layout = resolveEditorSceneLayout(input);
     expect(layout.canvas).toEqual(
-      preserveCanvasSize ? { width: 500, height: 400 } : { width: 260, height: 226 }
+      preserveCanvasSize ? { width: 500, height: 400 } : { width: 260, height: 150 }
     );
-    expect(layout.source.top).toBe(frame.paddingTop + BROWSER_HEADER_HEIGHT);
-    expect(layout.header?.top).toBe(frame.paddingTop);
+    expect(layout.source.top).toBe(
+      frame.paddingTop + windowHeaderGeometry(DEFAULT_WINDOW_HEADER, layout.source).height
+    );
+    expect(layout.header?.top).toBeCloseTo(frame.paddingTop);
     expect(layout.header?.width).toBe(layout.source.width);
     expect(layout.source.width / layout.source.height).toBeCloseTo(2);
     const restored = resolveEditorSceneLayout({
@@ -264,5 +280,25 @@ it.each(frameCombinations)(
         },
       })
     ).toEqual(layout);
+  }
+);
+
+it.each(['windows', 'macos', 'linux'] as const)(
+  'fits %s application chrome with the source inside the preserved canvas',
+  (style) => {
+    const layout = resolveEditorSceneLayout({
+      frame: createFrame(),
+      browserFrame: createBrowserFrame({ kind: 'application', style }),
+      source: { width: 3840, height: 2160 },
+      canvas: { width: 1000, height: 560 },
+      hasBrowserFrame: true,
+      preserveCanvasSize: true,
+      fitSourceToContent: true,
+    });
+    expect(layout.canvas).toEqual({ width: 1000, height: 560 });
+    expect(layout.header!.height).toBeLessThan(30);
+    expect(layout.source.top).toBeCloseTo(layout.header!.top + layout.header!.height);
+    expect(layout.source.top + layout.source.height + 30).toBeLessThanOrEqual(560);
+    expect(layout.source.width / layout.source.height).toBeCloseTo(3840 / 2160, 2);
   }
 );

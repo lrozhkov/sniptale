@@ -1,3 +1,12 @@
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  matchesRecordingFrameClockBinding,
+  type RecordingFrameClockAnchor,
+} from '../../../../../../contracts/video/recording-frame-clock';
+import {
+  enableControlledCursorCapture,
+  syncControlledCursorCapture,
+} from '../../manager/controlled-cursor/messages';
 import type { VideoCursorCaptureMode } from '../../../../../../features/video/project/types';
 import {
   VideoRecordingStatus,
@@ -8,29 +17,27 @@ import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/messa
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   getVideoRecordingRuntimeState,
-  resetVideoRecordingRuntimeState,
   setVideoRecordingRuntimeState,
 } from '../../session-state/service/runtime-state-service';
 import {
-  finishVideoRecordingStop,
-  getVideoRecordingId,
+  getVideoRecordingCaptureMode,
+  isVideoRecordingStopInProgress,
+  setRecordingFrameClock,
   getVideoRecordingTabId,
   isCurrentVideoRecordingId,
   markVideoRecordingPreparationSettled,
-  resetCompletedVideoRecordingSession,
   setControlledCursorDisplaySurface,
   setControlledCursorVerifiedMode,
 } from '../../../session-state';
-import {
-  clearActiveVideoRecordingLease,
-  ensureActiveVideoRecordingLeaseHydrated,
-  restoreCurrentRecordingFromLease,
-} from '../../../recording-control-lease';
-import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
-import { resetRecordingTabId } from '../../manager';
+import { getActiveVideoRecordingLeaseSnapshot } from '../../../recording-control-lease';
+import { ensureActiveVideoRecordingLeaseHydrated } from '../../recording-completion';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { createAsyncLifecycleRoute, HANDLED_ASYNC_RESULT, type RouteResult } from '../shared';
-import { releaseVideoCaptureSurface } from '../../../capture-surface';
+import {
+  completeVideoRecording,
+  isCurrentRecordingLifecycleEvent,
+  canPublishLiveRecordingState,
+} from '../../recording-completion';
 
 export {
   handleAcknowledgePostRecordResult,
@@ -38,29 +45,6 @@ export {
 } from './recording-state-response';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeRouterHandlers' });
-
-async function isCurrentRecordingLifecycleEvent(message: {
-  recordingId?: string;
-}): Promise<boolean> {
-  const recordingId = getVideoRecordingId();
-  if (recordingId && message.recordingId === recordingId) {
-    return true;
-  }
-
-  if (message.recordingId && (await restoreCurrentRecordingFromLease(message.recordingId))) {
-    return true;
-  }
-
-  if (!recordingId || message.recordingId !== recordingId) {
-    logger.warn('Ignoring stale offscreen recording lifecycle event', {
-      currentRecordingId: recordingId,
-      eventRecordingId: message.recordingId,
-    });
-    return false;
-  }
-
-  return true;
-}
 
 export function handleRecordingTabId(
   sendResponse: ResponseSender,
@@ -113,7 +97,8 @@ async function updateRecordingDurationIfCurrent(message: {
     return;
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
-  setVideoRecordingRuntimeState({ duration: Number(message.duration) || 0 });
+  if (canPublishLiveRecordingState(message.recordingId))
+    setVideoRecordingRuntimeState({ duration: Number(message.duration) || 0 });
 }
 
 export function handleOffscreenRecordingStarted(
@@ -123,6 +108,7 @@ export function handleOffscreenRecordingStarted(
         displaySurface?: VideoDisplaySurface;
         recordingId?: string;
         webcamSettings?: WebcamActualSettings;
+        frameClock?: RecordingFrameClockAnchor | null;
       }
     | undefined,
   sendResponse: ResponseSender
@@ -140,11 +126,14 @@ async function handleOffscreenRecordingStartedIfCurrent(message?: {
   displaySurface?: VideoDisplaySurface;
   recordingId?: string;
   webcamSettings?: WebcamActualSettings;
+  frameClock?: RecordingFrameClockAnchor | null;
 }): Promise<void> {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
+  if (!(await synchronizeExactRecordingHistory(message, 'start'))) return;
+  if (!canPublishLiveRecordingState(message.recordingId)) return;
   clearRecordingStartActivationWatchdog(message.recordingId);
   markVideoRecordingPreparationSettled();
   if (message?.cursorCaptureMode) {
@@ -168,7 +157,7 @@ async function handleOffscreenRecordingStartedIfCurrent(message?: {
 }
 
 export function handleOffscreenRecordingStopped(
-  message: { recordingId?: string } | undefined,
+  message: { recordingId?: string; frameClock?: RecordingFrameClockAnchor | null } | undefined,
   sendResponse: ResponseSender
 ): RouteResult {
   return createAsyncLifecycleRoute(
@@ -182,22 +171,14 @@ export function handleOffscreenRecordingStopped(
 async function handleOffscreenRecordingStoppedIfCurrent(message?: {
   recordingId?: string;
 }): Promise<void> {
-  if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
+  if (!message || !(await isCurrentRecordingLifecycleEvent(message, true))) {
     return;
   }
-  await releaseVideoCaptureSurface(message.recordingId);
-  if (isCurrentVideoRecordingId(message.recordingId)) {
-    finishVideoRecordingStop();
-    resetCompletedVideoRecordingSession(message.recordingId);
-    resetRecordingTabId();
-    resetVideoRecordingRuntimeState();
-  }
-  await clearCameraRecorderControlGrant(message.recordingId);
-  await clearActiveVideoRecordingLease(message.recordingId);
+  if (message.recordingId) await completeVideoRecording(message.recordingId);
 }
 
 export function handleOffscreenRecordingPaused(
-  message: { recordingId?: string } | undefined,
+  message: { recordingId?: string; frameClock?: RecordingFrameClockAnchor | null } | undefined,
   sendResponse: ResponseSender
 ): RouteResult {
   return createAsyncLifecycleRoute(
@@ -210,17 +191,20 @@ export function handleOffscreenRecordingPaused(
 
 async function handleOffscreenRecordingPausedIfCurrent(message?: {
   recordingId?: string;
+  frameClock?: RecordingFrameClockAnchor | null;
 }): Promise<void> {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
+  if (!(await synchronizeExactRecordingHistory(message, 'pause'))) return;
+  if (!canPublishLiveRecordingState(message.recordingId)) return;
   logger.log('Recording paused');
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.PAUSED });
 }
 
 export function handleOffscreenRecordingResumed(
-  message: { recordingId?: string } | undefined,
+  message: { recordingId?: string; frameClock?: RecordingFrameClockAnchor | null } | undefined,
   sendResponse: ResponseSender
 ): RouteResult {
   return createAsyncLifecycleRoute(
@@ -233,11 +217,50 @@ export function handleOffscreenRecordingResumed(
 
 async function handleOffscreenRecordingResumedIfCurrent(message?: {
   recordingId?: string;
+  frameClock?: RecordingFrameClockAnchor | null;
 }): Promise<void> {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
+  if (!(await synchronizeExactRecordingHistory(message, 'resume'))) return;
+  if (!canPublishLiveRecordingState(message.recordingId)) return;
   logger.log('Recording resumed');
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.RECORDING });
+}
+
+async function synchronizeExactRecordingHistory(
+  message: { recordingId?: string; frameClock?: RecordingFrameClockAnchor | null },
+  action: 'start' | 'pause' | 'resume'
+): Promise<boolean> {
+  const mode = getVideoRecordingCaptureMode();
+  if (mode !== CaptureMode.TAB && mode !== CaptureMode.TAB_CROP) return true;
+  if (isVideoRecordingStopInProgress()) return false;
+  const anchor = message.frameClock ?? null;
+  if (anchor) {
+    const lease = getActiveVideoRecordingLeaseSnapshot();
+    const source = lease?.surfaceBinding;
+    if (
+      !lease ||
+      !source ||
+      !matchesRecordingFrameClockBinding(anchor, {
+        recordingId: lease.recordingId,
+        generation: source.generation,
+        streamInstanceId: source.streamInstanceId,
+      }) ||
+      !setRecordingFrameClock(anchor)
+    )
+      return false;
+  }
+  const tabId = getVideoRecordingTabId();
+  if (tabId !== null && message.recordingId) {
+    try {
+      if (action === 'start')
+        await enableControlledCursorCapture(tabId, message.recordingId, 0, anchor);
+      else await syncControlledCursorCapture(tabId, action, anchor);
+    } catch {
+      logger.warn('Exact recording history synchronization is unavailable');
+    }
+  }
+  return isCurrentVideoRecordingId(message.recordingId) && !isVideoRecordingStopInProgress();
 }

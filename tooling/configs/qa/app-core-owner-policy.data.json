@@ -38,13 +38,15 @@
     "apps/extension/src/composition/persistence/capture-settings",
     "apps/extension/src/composition/persistence/effect-bundles",
     "apps/extension/src/composition/persistence/video-editor-preview-preferences",
+    "apps/extension/src/composition/persistence/quick-preview-preferences",
     "apps/extension/src/composition/persistence/video-preview-cache",
     "apps/extension/src/composition/persistence/web-snapshots",
     "apps/extension/src/background/storage/diagnostics",
     "apps/extension/src/background/storage/llm",
     "apps/extension/src/background/storage/page-access",
     "apps/extension/src/background/storage/scenario",
-    "apps/extension/src/background/storage/video"
+    "apps/extension/src/background/storage/video",
+    "apps/extension/src/composition/persistence/background-presets"
   ],
   "forbiddenOwnerEdges": [
     [
@@ -54,6 +56,8 @@
   ],
   "featurePublicEntrypoints": [
     "apps/extension/src/features/ai/schemas/public.ts",
+    "apps/extension/src/features/browser-frame/appearance.ts",
+    "apps/extension/src/features/browser-frame/header.ts",
     "apps/extension/src/features/drawing/public.ts",
     "apps/extension/src/features/editor/document/public.ts",
     "apps/extension/src/features/highlighter/contracts/index.ts",

@@ -14,18 +14,15 @@ const {
   overlayRetryDelaysFromOwner: [0, 250, 1000],
 }));
 
-vi.mock('./controls.start-failure', () => ({
+vi.mock('../recording-completion', () => ({
   notifyRecordingStartFailed: notifyRecordingStartFailedFromOwner,
+  OVERLAY_RESTORE_RETRY_DELAYS_MS: overlayRetryDelaysFromOwner,
+  stopRecording: stopRecordingFromOwner,
 }));
 
 vi.mock('./controls.pause-resume', () => ({
   pauseRecording: pauseRecordingFromOwner,
   resumeRecording: resumeRecordingFromOwner,
-}));
-
-vi.mock('./controls.stop', () => ({
-  OVERLAY_RESTORE_RETRY_DELAYS_MS: overlayRetryDelaysFromOwner,
-  stopRecording: stopRecordingFromOwner,
 }));
 
 import {

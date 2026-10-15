@@ -103,6 +103,7 @@ export function createVideoProjectRestoreTransaction(
   const empty = {
     get: async () => undefined,
     getAll: async () => [],
+    index: () => ({ getAll: async () => [], getAllKeys: async () => [] }),
     delete: async () => undefined,
     put: async () => undefined,
   };
@@ -111,6 +112,7 @@ export function createVideoProjectRestoreTransaction(
     project_exports: stores.exports,
     media_library: stores.media,
     video_workspaces: stores.videoWorkspaces,
+    video_workspace_history: empty,
     video_workspace_drafts: stores.videoDrafts,
     asset_operations: stores.operations,
     asset_owners: stores.owners,
@@ -124,7 +126,5 @@ export function createVideoProjectRestoreTransaction(
   };
   return {
     objectStore: (name: keyof typeof byName) => byName[name],
-  } as unknown as ReturnType<
-    Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>['transaction']
-  >;
+  } as unknown as import('idb').IDBPTransaction<unknown, string[], 'readwrite'>;
 }

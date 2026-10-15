@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { targetOnlyPathErrors } from './verify-target-only-paths.mjs';
+import { targetOnlyReferenceRecords } from './target-only-path-references.mjs';
+import { readTargetOnlyPathPolicy } from './target-only-path-policy.mjs';
 
 const roots: string[] = [];
 
@@ -67,6 +69,88 @@ function readDocsPolicy(root: string) {
 function writeDocsPolicy(root: string, policy: object) {
   write(root, 'tooling/configs/qa/docs-topology.data.json', JSON.stringify(policy));
 }
+
+it('preserves every text reference family, ordering, qualification and line numbers', () => {
+  const policy = readTargetOnlyPathPolicy(fixture());
+  const references = [
+    'src/manifest.json',
+    'src/vite-env.d.ts',
+    'src/background',
+    'src/editor',
+    'src/effect-runtime-sandbox',
+    'apps/extension/src/package-renderer-sandbox',
+    'apps/extension/src/features/video/project/video-pack',
+    'apps/extension/src/composition/persistence/template-packs',
+    'features/video/composition/template-instances',
+    'features/video/composition/package-renderer',
+    'offscreen/project-export/package-renderer',
+    'video-editor/preview/stage/scene/package-renderer-cache',
+    'src/shared',
+    'src/workflows',
+    'public/fonts',
+    'public/icons',
+    'postcss.config.js',
+    'tailwind.config.js',
+    'vite.config.ts',
+    'vite.content-runtime-build-id.ts',
+    'vite.injected-build.ts',
+    'vite.injected-build-shim-guard.ts',
+  ];
+  const path = 'docs/engineering/live.md';
+  const text = [
+    'No matching reference here.',
+    ...references.map((reference) => `Read ${reference} and ${reference}.`),
+    'apps/extension/src/background packages/foundation/src/shared apps/extension/public/icons',
+  ].join('\r\n');
+  expect(targetOnlyReferenceRecords(path, text, policy)).toEqual(
+    references.map((reference, index) => ({
+      classification: 'active-stale-reference',
+      disposition: 'rewrite',
+      kind: 'path-reference',
+      line: index + 2,
+      path,
+      reference,
+    }))
+  );
+});
+
+it('detects policy-only control references after the policy changes', () => {
+  const root = fixture();
+  const policy = readTargetOnlyPathPolicy(root);
+  policy.retiredControls = [{ path: 'legacy/control', action: 'remove' }];
+  policy.retiredControlPrefixes = ['obsolete/'];
+  const path = 'docs/engineering/live.md';
+  expect(
+    targetOnlyReferenceRecords(
+      path,
+      'clean\nlegacy/control obsolete/first obsolete/next.',
+      policy
+    ).map(({ line, reference }) => ({ line, reference }))
+  ).toEqual([
+    { line: 2, reference: 'legacy/control' },
+    { line: 2, reference: 'obsolete/first' },
+    { line: 2, reference: 'obsolete/next' },
+  ]);
+});
+
+it('detects escaped module, mock and source-reading literals through the AST pass', () => {
+  const root = fixture();
+  const path = 'tooling/qa/core/escaped.test.ts';
+  write(
+    root,
+    path,
+    String.raw`import '../../../\u0073rc/shared/types';
+vi.mock('../../../\x73rc/content/runtime');
+readFileSync('../../../\u0073rc/background/index.ts');`
+  );
+  expect(targetOnlyPathErrors(root)).toEqual(
+    expect.arrayContaining([
+      `stale module path: ${path}:1 -> ../../../src/shared/types`,
+      `stale module path: ${path}:2 -> ../../../src/content/runtime`,
+      `stale source-reading path: ${path}:3 -> ../../../src/background/index.ts`,
+    ])
+  );
+});
 
 it('accepts a target-only tree and retained negative fixture text', () => {
   const root = fixture();
@@ -317,4 +401,14 @@ it('accepts canonical effect build imports but rejects a retired root import in 
   expect(targetOnlyPathErrors(invalidRoot)).toContain(
     `stale module path: ${path}:1 -> ../../../src/features/video/project/effect-bundle/manifest`
   );
+});
+
+it('accepts argument-free file handle reads without treating them as path literals', () => {
+  const root = fixture();
+  write(
+    root,
+    'tooling/read-owned.mjs',
+    'export async function read(handle) { return handle.readFile(); }'
+  );
+  expect(targetOnlyPathErrors(root)).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import { useCommittedFrameDraft } from './frame-commit';
 import { useEditorController } from '../../application/controller-context';
 import { getSelectedRichShapeDocumentObject } from '../../controller/public-actions/selection/rich-shape';
 import { normalizeEditorImageSettings } from '../../../features/editor/document/constants';
@@ -57,7 +58,7 @@ function useSidebarDerivedState(
     editorPresetState,
     frameDraft: store.frame,
   });
-  const localState = useEditorInspectorSidebarLocalState({
+  const drafts = useEditorInspectorSidebarLocalState({
     canvasHeight: store.viewport.canvasHeight,
     canvasWidth: store.viewport.canvasWidth,
     cropSelection: store.cropSelection,
@@ -74,6 +75,14 @@ function useSidebarDerivedState(
     workspaceBackgroundColor: store.workspace.backgroundColor,
     workspaceDefaultColor,
   });
+  const setFrameDraft = useCommittedFrameDraft({
+    frame: drafts.frameDraft,
+    setDraft: drafts.setFrameDraft,
+    apply: (frame) => {
+      if (hasImage) editorController.applyFrameSettings(frame);
+    },
+  });
+  const localState = { ...drafts, setFrameDraft };
   const derived = useEditorInspectorSidebarDerived({
     ...derivedParams,
     editorPresetState,

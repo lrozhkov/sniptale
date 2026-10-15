@@ -1,3 +1,9 @@
+import {
+  promoteReviewPrimarySourceLifecycles,
+  promoteReviewSourceLifecycles,
+} from '../review-workspaces/new-reference-admission';
+import type { IDBPTransaction } from 'idb';
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import { promoteProjectSourceLifecycles } from './new-reference-admission';
 import {
   STORE_NAME,
@@ -12,7 +18,6 @@ import {
   releaseMediaSource,
   releaseUnpublishedProjectAssets,
 } from '../media-library/delete-cascade.sources';
-import type { initDB } from '../infrastructure/indexed-db/core';
 import type {
   VideoWorkspace,
   VideoWorkspaceDraft,
@@ -105,7 +110,7 @@ export interface VideoProjectBackupRestoreStores {
   scenarioAssets: Store;
 }
 
-type RestoreTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+type RestoreTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 async function deleteExisting(args: {
   assetOwnership: ProjectAssetOwnership;
@@ -304,6 +309,29 @@ async function publishProjectSidecars(
   if (root.presentation) await stores.presentations.put(root.presentation);
 }
 
+async function retainRestoredReviewSources(
+  root: PreparedVideoProjectArchiveRoot,
+  tx: RestoreTransaction
+): Promise<void> {
+  const stores = {
+    assets: tx.objectStore(PROJECT_ASSETS_STORE),
+    media: tx.objectStore(MEDIA_LIBRARY_STORE),
+    recordings: tx.objectStore(STORE_NAME),
+  };
+  for (const item of [...root.assets, ...root.exports]) {
+    if (item.reusePublished || !item.videoReview) continue;
+    await promoteReviewPrimarySourceLifecycles(
+      item.videoReview.workspace.aggregateId,
+      stores,
+      Date.now()
+    );
+    await promoteReviewSourceLifecycles(item.videoReview.workspace, stores, {
+      assets: new Map(),
+      libraryAudioClaims: [],
+    });
+  }
+}
+
 export async function putVideoProjectBackupRestore(args: {
   operation: PhysicalDeleteAssetOperation;
   root: PreparedVideoProjectArchiveRoot;
@@ -345,13 +373,16 @@ export async function putVideoProjectBackupRestore(args: {
     });
   const lifecycle =
     args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
-  await args.stores.projects.put({
-    ...args.root.entry,
-    lifecycle: promoteLibraryLifecycle(lifecycle, lifecycle.updatedAt),
-  });
+  await args.stores.projects.put(
+    withVideoProjectUsage({
+      ...args.root.entry,
+      lifecycle: promoteLibraryLifecycle(lifecycle, lifecycle.updatedAt),
+    })
+  );
   await publishProjectAssets(args.root, args.stores);
   await publishProjectExports(args.root, args.stores);
   await publishProjectSidecars(args.root, args.stores);
+  await retainRestoredReviewSources(args.root, args.tx);
   await promoteProjectSourceLifecycles(
     args.root.entry.project,
     {

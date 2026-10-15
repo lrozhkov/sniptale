@@ -1,3 +1,5 @@
+import { readAllWorkspaceStorage } from '../review-workspaces/storage';
+import { readIndexedProjectUsage } from './usage-index';
 import { parseProjectAssetEntry } from '../projects/read-guards';
 import {
   mediaDependencyTarget,
@@ -14,20 +16,16 @@ import {
   SCENARIO_ASSETS_STORE,
   PROJECT_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core';
 import { parseMediaLibraryEntry } from './read-guards';
 import { MEDIA_LIBRARY_STORE } from '../infrastructure/indexed-db/core';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
-import type { MediaLibraryEntry } from './contracts';
+import type { MediaAssetProjectUsage, MediaLibraryEntry } from './contracts';
 import type { ScenarioAssetEntry } from '../scenario/contracts';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 
-export interface MediaAssetProjectUsage {
-  id: string;
-  kind: 'scenario' | 'video' | 'review';
-  name: string;
-  primary: boolean;
-}
+export type { MediaAssetProjectUsage } from './contracts';
 
 interface UsageSnapshot {
   mediaById: Map<string, MediaLibraryEntry>;
@@ -51,7 +49,9 @@ async function loadUsageSnapshot(db?: Awaited<ReturnType<typeof initDB>>): Promi
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
     connection.getAll(SCENARIO_ASSETS_STORE),
-    connection.getAll(VIDEO_WORKSPACES_STORE),
+    readAllWorkspaceStorage(
+      connection.transaction([VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE], 'readonly')
+    ),
     connection.getAll(MEDIA_LIBRARY_STORE),
     connection.getAll(PROJECT_ASSETS_STORE),
   ]);
@@ -107,14 +107,17 @@ function projectUsageFromSnapshot(
   }
 
   for (const workspace of reviewWorkspaces) {
-    if (workspace.aggregateId === mediaId) continue;
+    const primary = workspace.aggregateId === mediaId;
     const attached = reviewWorkspaceUsesMedia(workspace, media);
-    if (attached) {
+    if (primary || attached) {
       usage.push({
         id: workspace.aggregateId,
         kind: 'review',
-        name: mediaById.get(workspace.aggregateId)?.filename ?? root.filename,
-        primary: false,
+        name:
+          workspace.project?.name ??
+          mediaById.get(workspace.aggregateId)?.filename ??
+          root.filename,
+        primary,
       });
     }
   }
@@ -141,76 +144,30 @@ export async function listMediaAssetProjectUsageBatch(
   return new Map(ids.map((id) => [id, projectUsageFromSnapshot(id, snapshot)]));
 }
 
-// This snapshot serves only the advisory Gallery inspector. Mutating consumers use the direct read above.
-const PREVIEW_USAGE_SNAPSHOT_MS = 5_000;
-let previewSnapshot: {
-  promise: Promise<UsageSnapshot>;
-  expiresAt: number;
-  revision: number;
-  releaseTimer: ReturnType<typeof setTimeout>;
-} | null = null;
-let previewRevision = 0;
-let previewSubscriptionReady = false;
-const previewListeners = new Set<() => void>();
-
-function invalidatePreviewUsage() {
-  previewRevision += 1;
-  if (previewSnapshot) clearTimeout(previewSnapshot.releaseTimer);
-  previewSnapshot = null;
-  for (const listener of previewListeners) listener();
-}
-
-function ensurePreviewInvalidation() {
-  if (previewSubscriptionReady) return;
-  previewSubscriptionReady = true;
-  subscribeToMediaHubEvents((event) => {
-    if (event.type === 'library-changed') invalidatePreviewUsage();
-  });
-  if (typeof window !== 'undefined') {
-    window.addEventListener('focus', invalidatePreviewUsage);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') invalidatePreviewUsage();
-    });
-  }
-}
-
-/** Subscribe to inspector snapshot changes caused by library/project writes or page reconciliation. */
+/** Subscribe to advisory relationship changes with page-scoped listener cleanup. */
 export function subscribeToPreviewProjectUsageInvalidation(listener: () => void): () => void {
-  ensurePreviewInvalidation();
-  previewListeners.add(listener);
-  return () => previewListeners.delete(listener);
+  const unsubscribe = subscribeToMediaHubEvents((event) => {
+    if (event.type === 'library-changed') listener();
+  });
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') listener();
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', listener);
+    document.addEventListener('visibilitychange', onVisible);
+  }
+  return () => {
+    unsubscribe();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('focus', listener);
+      document.removeEventListener('visibilitychange', onVisible);
+    }
+  };
 }
 
-/** Bounded, retryable advisory read shared by media switches within the Gallery page. */
-export async function listPreviewMediaAssetProjectUsage(
+/** Indexed advisory lookup; deletion consumers deliberately retain the fresh graph read above. */
+export function listPreviewMediaAssetProjectUsage(
   mediaId: string
 ): Promise<MediaAssetProjectUsage[]> {
-  ensurePreviewInvalidation();
-  const now = Date.now();
-  if (!previewSnapshot || previewSnapshot.expiresAt <= now) {
-    if (previewSnapshot) clearTimeout(previewSnapshot.releaseTimer);
-    const revision = previewRevision;
-    const promise = loadUsageSnapshot();
-    const releaseTimer = setTimeout(() => {
-      if (previewSnapshot?.promise === promise) previewSnapshot = null;
-    }, PREVIEW_USAGE_SNAPSHOT_MS);
-    previewSnapshot = {
-      promise,
-      expiresAt: now + PREVIEW_USAGE_SNAPSHOT_MS,
-      revision,
-      releaseTimer,
-    };
-    void promise.catch(() => {
-      if (previewSnapshot?.promise === promise) {
-        clearTimeout(previewSnapshot.releaseTimer);
-        previewSnapshot = null;
-      }
-    });
-  }
-  const current = previewSnapshot;
-  const snapshot = await current.promise;
-  if (current.revision !== previewRevision) {
-    return listPreviewMediaAssetProjectUsage(mediaId);
-  }
-  return projectUsageFromSnapshot(mediaId, snapshot);
+  return readIndexedProjectUsage(mediaId);
 }

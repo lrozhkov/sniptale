@@ -36,43 +36,13 @@ async function detectVideoAudioPresence(blob: Blob): Promise<boolean> {
   }
 }
 
-export function loadVideoMetadata(blob: Blob): Promise<LoadedVideoMetadata> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(blob);
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.src = url;
-    video.muted = true;
-    video.playsInline = true;
-
-    const cleanup = () => {
-      URL.revokeObjectURL(url);
-      video.src = '';
-    };
-
-    resolveMediaDuration(video, 1)
-      .then(async (durationResult) => {
-        const { duration } = durationResult;
-        const hasAudio = await detectVideoAudioPresence(blob);
-        const audioPeaks =
-          hasAudio && durationResult.isAuthoritative ? await loadAudioPeaks(blob, duration) : null;
-
-        resolve({
-          width: video.videoWidth || 1280,
-          height: video.videoHeight || 720,
-          duration,
-          mimeType: blob.type || 'video/webm',
-          size: blob.size,
-          hasAudio,
-          audioPeaks,
-        });
-        cleanup();
-      })
-      .catch((error) => {
-        cleanup();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      });
-  });
+export async function loadVideoMetadata(blob: Blob): Promise<LoadedVideoMetadata> {
+  const { inspectReviewVideo } = await import('../../../workflows/video-review/source');
+  const file = blob instanceof File ? blob : new File([blob], 'video', { type: blob.type });
+  const { source } = await inspectReviewVideo(file, new AbortController().signal);
+  const hasAudio = await detectVideoAudioPresence(blob);
+  const audioPeaks = hasAudio ? await loadAudioPeaks(blob, source.duration) : null;
+  return { ...source, hasAudio, audioPeaks };
 }
 
 export function loadAudioMetadata(blob: Blob): Promise<LoadedAudioMetadata> {

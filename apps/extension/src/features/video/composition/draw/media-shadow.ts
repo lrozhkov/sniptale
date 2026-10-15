@@ -17,7 +17,8 @@ export function drawMediaFrameShadow(
   frame: VideoMediaShadowFrame,
   displayScale: number,
   appearance?: CameraAppearance,
-  camera = false
+  camera = false,
+  color?: string
 ) {
   const shadow = resolveVideoMediaShadowParams(shadowIntensity, displayScale, shadowMode, camera);
   if (!shadow) {
@@ -25,6 +26,10 @@ export function drawMediaFrameShadow(
   }
 
   context.save();
+  if (color !== undefined) {
+    shadow.color = color;
+    context.globalAlpha *= Math.max(0, Math.min(100, shadowIntensity ?? 0)) / 100;
+  }
   if (shadow.paint.kind === 'outer-shadow') {
     drawOuterMediaFrameShadow(context, shadow, frame, appearance);
   } else {

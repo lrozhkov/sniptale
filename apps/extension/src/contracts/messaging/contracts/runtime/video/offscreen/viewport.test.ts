@@ -36,3 +36,18 @@ it('requires an explicit acknowledgement for recording activation', () => {
   expect(contract.parseResponse({ success: true })).toEqual({ success: true });
   expect(() => contract.parseResponse({})).toThrow(/OFFSCREEN_BEGIN_RECORDING/);
 });
+
+it('keeps BEGIN authorization strict after removing the helper lease', () => {
+  const contract =
+    runtimeVideoOffscreenViewportMessageContracts[VideoMessageType.OFFSCREEN_BEGIN_RECORDING];
+  const primary = {
+    type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+    capabilityToken: 'capability',
+    recordingId: 'recording',
+    generation: 2,
+    streamInstanceId: 'source',
+  } as const;
+  expect(contract.parseRequest(primary)).toEqual(primary);
+  for (const extra of [{ capabilityToken: 42 }, { frameClockLease: null }, { unexpected: true }])
+    expect(() => contract.parseRequest({ ...primary, ...extra })).toThrow();
+});

@@ -305,3 +305,84 @@ it('keeps source-normalized points, retains unavailable facts, and lets captured
     resolveVideoProjectActionPresentations(project).find(({ event }) => event.kind === 'KEY')
   ).toMatchObject({ enabled: true, renderKind: 'keystroke' });
 });
+
+it('retains captured target classification in a full editor project', () => {
+  const data = {
+    targetKind: 'button',
+    targetSource: 'html',
+    targetTag: 'button',
+    targetId: 'original',
+  };
+  const project = createVideoProjectFromRecording({
+    recordingId: 'semantic',
+    filename: 'semantic.webm',
+    width: 1280,
+    height: 720,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 1024,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        time: 2,
+        duration: 0.2,
+        point: { x: 0.5, y: 0.5 },
+        label: 'Save',
+        preset: 'NONE',
+        data,
+      },
+    ],
+  });
+  expect(project.actionEvents[0]?.data).toEqual(data);
+  expect(project.actionEvents[0]?.anchor).toMatchObject({
+    kind: 'recording-source',
+    sourceEventId: 'click',
+    sourceTime: 2,
+  });
+});
+
+it('retains typing-only source cadence independently of linked audio and caller mutations', () => {
+  const signals = [
+    {
+      id: 'typed',
+      kind: 'typing' as const,
+      startTime: 1,
+      endTime: 1.8,
+      point: null,
+      data: { eventCount: 3 },
+      keyboardRhythm: [
+        {
+          version: 1 as const,
+          id: 'rhythm',
+          startTime: 1,
+          quantumMs: 1 as const,
+          count: 3,
+          encoding: 'delta' as const,
+          ticks: [0, 100, 700],
+        },
+      ],
+    },
+  ];
+  const project = createVideoProjectFromRecording({
+    recordingId: 'cadence',
+    filename: 'cadence.webm',
+    width: 1280,
+    height: 720,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 1024,
+    hasAudio: true,
+    recordingSignals: signals,
+  });
+  const video = project.clips.find((clip) => clip.type === 'VIDEO');
+  expect(project.actionEvents).toHaveLength(0);
+  expect(project.actionFeedback).toEqual([
+    { recordingId: 'cadence', sourceInstanceId: video?.sourceInstanceId, settings: [], signals },
+  ]);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  signals[0]!.keyboardRhythm[0]!.ticks[1] = 999;
+  expect(project.actionFeedback?.[0]?.signals[0]?.keyboardRhythm?.[0]?.ticks).toEqual([
+    0, 100, 700,
+  ]);
+});

@@ -1,8 +1,9 @@
+import * as repositoryFiles from '../../analysis/repository/shared-files.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { collectDefaultRuntimeMessagingImportReport } from './messaging/messaging-default-imports.mjs';
 import { collectMessagingViolations, runMessagingCheck } from './verify-messaging.mjs';
@@ -297,10 +298,21 @@ function verifiesFocusedDefaultRuntimeMessagingImportBaselineRemoval() {
 }
 
 function verifiesDefaultCallScansTheWorkspace() {
-  const report = runMessagingCheck({ baseline: new Set() });
-
-  expect(report.skipped).not.toBe(true);
-  expect(report.files.length).toBeGreaterThan(0);
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'apps/extension/src/content/logic/example.ts',
+    'export const value = 1;'
+  );
+  const discover = vi.spyOn(repositoryFiles, 'collectCodeFiles').mockReturnValueOnce([file]);
+  try {
+    const report = runMessagingCheck({ baseline: new Set(), root });
+    expect(discover).toHaveBeenCalledExactlyOnceWith();
+    expect(report.skipped).not.toBe(true);
+    expect(report.files).toEqual([path.relative(process.cwd(), file)]);
+  } finally {
+    discover.mockRestore();
+  }
 }
 
 describe('collectMessagingViolations', () => {

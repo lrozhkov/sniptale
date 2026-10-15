@@ -12,6 +12,7 @@ import { loadInitialProjectFromLocation } from './workspace';
 const {
   getRecording,
   getRecordingTelemetry,
+  readVideoWorkspace,
   getVideoProject,
   importRecordingProjectAssetMock,
   ensureRecordingAssetsMock,
@@ -19,6 +20,7 @@ const {
 } = vi.hoisted(() => ({
   getRecording: vi.fn(),
   getRecordingTelemetry: vi.fn(),
+  readVideoWorkspace: vi.fn(),
   getVideoProject: vi.fn(),
   importRecordingProjectAssetMock: vi.fn(),
   ensureRecordingAssetsMock: vi.fn(),
@@ -50,6 +52,13 @@ vi.mock('../../../composition/persistence/recordings/telemetry', async (importOr
   getRecordingTelemetry,
 }));
 
+vi.mock('../../../composition/persistence/review-workspaces/store', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/review-workspaces/store')
+  >()),
+  readVideoWorkspace,
+}));
+
 vi.mock('../media-metadata', () => ({
   loadAudioMetadata: vi.fn(),
   loadImageMetadata: vi.fn(),
@@ -75,6 +84,7 @@ function createRecordingEntry(recordingId: string, filename: string, size: numbe
 
 beforeEach(async () => {
   vi.resetAllMocks();
+  readVideoWorkspace.mockResolvedValue(null);
   saveVideoProject.mockImplementation(async (project) => ({
     ...project,
     updatedAt: project.updatedAt + 1,

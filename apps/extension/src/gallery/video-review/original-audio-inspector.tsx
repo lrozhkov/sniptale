@@ -1,4 +1,4 @@
-import { ReviewInspectorSections } from './inspector-sections';
+import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { Trash2, VolumeX, AudioLines, Clock3 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { useReviewAudio } from './use-review-audio';
@@ -34,20 +34,18 @@ export function ReviewOriginalAudioInspector(props: {
                   label={translate('gallery.videoReview.volume')}
                   unit="%"
                   min={0}
-                  max={200}
+                  max={range.origin && range.origin !== 'manual' ? 100 : 200}
                   step={1}
                   precision={0}
                   value={range.volume * 100}
                   onChange={(value) => props.audio.patchOriginal(range.id, { volume: value / 100 })}
                 />
-                <ReviewButton
-                  label={translate('gallery.videoReview.muteAudioRange')}
-                  className={`${reviewTextButtonClassName} !w-full`}
-                  onClick={() => props.audio.patchOriginal(range.id, { volume: 0 })}
-                >
-                  <VolumeX size={15} />
-                  <span>{translate('gallery.videoReview.muteAudioRange')}</span>
-                </ReviewButton>
+                {range.origin === 'take' && (
+                  <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+                    {translate('gallery.videoReview.textVoiceMuteLinked')}
+                  </p>
+                )}
+
                 {props.speedMuted ? (
                   <p className="text-xs text-[var(--sniptale-color-text-muted)]">
                     {translate('gallery.videoReview.audioRangeSpeedHint')}
@@ -87,18 +85,28 @@ export function ReviewOriginalAudioInspector(props: {
               </>
             ),
           },
+          reviewInspectorActions(
+            <>
+              <ReviewButton
+                label={translate('gallery.videoReview.muteAudioRange')}
+                className={`${reviewTextButtonClassName} !w-full justify-start`}
+                onClick={() => props.audio.patchOriginal(range.id, { volume: 0 })}
+              >
+                <VolumeX size={15} />
+                <span>{translate('gallery.videoReview.muteAudioRange')}</span>
+              </ReviewButton>
+              <ReviewButton
+                label={translate('gallery.videoReview.removeEdit')}
+                className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+                onClick={() => props.audio.removeOriginal(range.id)}
+              >
+                <Trash2 size={15} />
+                <span>{translate('gallery.videoReview.removeEdit')}</span>
+              </ReviewButton>
+            </>
+          ),
         ]}
       />
-      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate('gallery.videoReview.removeEdit')}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={() => props.audio.removeOriginal(range.id)}
-        >
-          <Trash2 size={15} />
-          <span>{translate('gallery.videoReview.removeEdit')}</span>
-        </ReviewButton>
-      </div>
     </div>
   );
 }

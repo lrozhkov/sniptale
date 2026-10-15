@@ -47,6 +47,8 @@ export interface PhysicalDeleteAssetOperation {
   createdAt: number;
   updatedAt: number;
   assetIds: string[];
+  /** Causal detached private sources; logical release precedes physical deletion. */
+  privateSources?: { projectAssetId: string; expectedAssetId: string }[];
 }
 
 export interface ArchiveRestoreSession {

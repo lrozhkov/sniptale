@@ -14,6 +14,21 @@ function commandResult(status: number, stdout = '', stderr = '') {
 }
 
 describe('QA Oxfmt wrapper', () => {
+  it('rejects installed version drift before invoking the formatter', () => {
+    const evidence = fs.readFileSync('tooling/configs/qa/formatter-migration.data.json', 'utf8');
+    const read = vi
+      .spyOn(fs, 'readFileSync')
+      .mockReturnValueOnce(evidence)
+      .mockReturnValueOnce('{"version":"0.0.0"}');
+    const runner = vi.fn();
+    try {
+      expect(() => runFormatterCheck(['example.ts'], runner)).toThrow('locked toolchain');
+      expect(runner).not.toHaveBeenCalled();
+    } finally {
+      read.mockRestore();
+    }
+  });
+
   it('preserves canonical byte-exact fixtures listed in .oxfmtignore', () => {
     const fixture =
       'packages/runtime-contracts/src/effect-v1/fixtures/valid/' +

@@ -106,3 +106,9 @@ it('does not renew an expired reserved deadline when stream preparation finishes
   await failed;
   await expect(waitForRecordingBegin(binding)).rejects.toThrow('Timed out');
 });
+
+it('retains source-bound primary activation without an optional clock dependency', async () => {
+  const allowed = waitForRecordingBegin(binding);
+  allowRecordingBegin(binding);
+  await expect(allowed).resolves.toBeUndefined();
+});

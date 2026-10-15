@@ -1,9 +1,8 @@
 import {
-  RECORDING_TYPING_FRAGMENT_MIN_SECONDS,
   normalizeRecordingSignals,
   RECORDING_TYPING_GAP_SECONDS,
 } from '../../../features/video/project/recording-actions';
-import { describeTelemetryTarget } from './target';
+import { describeTelemetryTarget, hasOpaqueTelemetryTarget } from './target';
 import {
   RecordingTelemetrySignalKind,
   VideoProjectActionEventKind,
@@ -33,12 +32,14 @@ function pushCompletedSignal(
   const data =
     signal.kind === RecordingTelemetrySignalKind.TYPING
       ? {
+          observationClockId: signal.data.observationClockId,
           captureSegment: signal.data.captureSegment,
           eventCount: signal.data.eventCount,
           eventType: signal.data.eventType,
           ...signal.data.targetDescription,
         }
       : {
+          observationClockId: signal.data.observationClockId,
           dwellMs: signal.data.dwellMs,
         };
 
@@ -60,11 +61,7 @@ export function finalizeTypingSignal(state: TelemetryState, timestampMs: number)
     return;
   }
 
-  if (
-    state.typingSignal.endTime >=
-    state.typingSignal.startTime + RECORDING_TYPING_FRAGMENT_MIN_SECONDS
-  )
-    pushCompletedSignal(state, state.typingSignal, timestampMs);
+  pushCompletedSignal(state, state.typingSignal, timestampMs);
   state.typingSignal = null;
 }
 
@@ -100,18 +97,43 @@ function resolveKeyboardShortcutLabel(event: KeyboardEvent): string {
   return parts.join('+');
 }
 
-function shouldRecordKeyboardShortcut(event: KeyboardEvent): boolean {
-  if (event.repeat) {
+export function shouldRecordKeyboardShortcut(event: KeyboardEvent): boolean {
+  if (
+    event.repeat ||
+    event.isComposing ||
+    event.getModifierState?.('AltGraph') ||
+    ['Control', 'Meta', 'Alt', 'AltGraph', 'Shift', 'Dead', 'Process', 'Unidentified', ''].includes(
+      event.key
+    )
+  )
     return false;
-  }
-
+  const target = describeTelemetryTarget(event).element;
+  if (isProtectedTelemetryTarget(target, event)) return false;
+  const editable = target?.closest(
+    'input,textarea,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'
+  );
   return (
     event.metaKey ||
     event.ctrlKey ||
     event.altKey ||
-    event.key === 'Tab' ||
-    event.key === 'Escape' ||
-    event.key === 'Enter'
+    [
+      'Tab',
+      'Escape',
+      'Enter',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'Home',
+      'End',
+      'PageUp',
+      'PageDown',
+      'Insert',
+      'Delete',
+      'Backspace',
+    ].includes(event.key) ||
+    /^F(?:[1-9]|1[0-9]|2[0-4])$/.test(event.key) ||
+    (event.key === ' ' && !editable)
   );
 }
 
@@ -144,6 +166,11 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
   const lastEventTimeMs = state.typingSignal?.data.lastEventTimeMs ?? null;
   const target = describeTelemetryTarget(event);
   const element = target.element;
+  if (isProtectedTelemetryTarget(element, event)) {
+    finalizeTypingSignal(state, timestampMs);
+    recordProtectedActivity(state, timestampMs);
+    return;
+  }
   const inputTarget =
     element?.closest('input,textarea,[contenteditable]:not([contenteditable="false"])') ?? element;
   if (element) {
@@ -185,6 +212,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
     endTime: elapsedSeconds,
     point: resolveSignalPoint(state),
     data: {
+      observationClockId: state.observationClock.id,
       captureSegment: state.captureSegment,
       eventCount: 1,
       eventType: event.type,
@@ -219,6 +247,7 @@ export function updatePointerIdleAnchor(
 function syncCursorIdleSignal(state: TelemetryState, timestampMs: number): void {
   if (
     state.isPaused ||
+    !state.observationAvailable ||
     state.pointerStationaryPosition === null ||
     state.pointerStationaryStartedAtMs === null
   ) {
@@ -238,6 +267,7 @@ function syncCursorIdleSignal(state: TelemetryState, timestampMs: number): void 
       endTime,
       point: { ...state.pointerStationaryPosition },
       data: {
+        observationClockId: state.observationClock.id,
         dwellMs: timestampMs - state.pointerStationaryStartedAtMs,
       },
     };
@@ -264,4 +294,60 @@ export function finalizeTelemetrySignals(state: TelemetryState): void {
   finalizeCursorIdleSignal(state, timestampMs);
   state.signals = normalizeRecordingSignals(state.signals);
   state.captureSegment += 1;
+}
+
+/** Conservative whole-second activity coverage excludes private controls from idle automation. */
+export function recordProtectedActivity(state: TelemetryState, timestampMs: number): void {
+  const startTime = Math.floor(getElapsedSeconds(state, timestampMs));
+  const previous = state.signals.at(-1);
+  if (
+    previous?.data['privacy'] === 'protected' &&
+    previous.data['captureSegment'] === state.captureSegment &&
+    startTime <= previous.endTime
+  ) {
+    previous.endTime = Math.max(previous.endTime, startTime + 1);
+    return;
+  }
+  state.signals.push({
+    id: crypto.randomUUID(),
+    kind: 'typing',
+    startTime,
+    endTime: startTime + 1,
+    point: null,
+    data: {
+      privacy: 'protected',
+      activity: 'input',
+      observationClockId: state.observationClock.id,
+      captureSegment: state.captureSegment,
+    },
+  });
+}
+
+/** One field-privacy predicate for key identities, cadence and input activity. */
+export function isProtectedTelemetryTarget(element: Element | null, event?: Event): boolean {
+  const path =
+    event && typeof event.composedPath === 'function'
+      ? event.composedPath().filter((node): node is Element => node instanceof Element)
+      : [];
+  if (element) path.push(element);
+  for (const node of path) {
+    // Explicit privacy applies through ancestry and visible composed hosts, independently
+    // of which native input is nearest to the delivered event.
+    if (node.closest('[data-sniptale-private]')) return true;
+    const field = node.closest('input,textarea,[autocomplete]');
+    if (!field) continue;
+    if (field instanceof HTMLInputElement && field.type === 'password') return true;
+    if (
+      (field.getAttribute('autocomplete') ?? '')
+        .toLowerCase()
+        .split(/\s+/)
+        .some(
+          (token) =>
+            ['one-time-code', 'current-password', 'new-password'].includes(token) ||
+            token.startsWith('cc-')
+        )
+    )
+      return true;
+  }
+  return hasOpaqueTelemetryTarget(event, element);
 }

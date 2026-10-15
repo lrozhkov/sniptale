@@ -1,4 +1,10 @@
+vi.mock('../../application/diagnostics/ports', () => ({ registerDiagnosticLogPorts: vi.fn() }));
+vi.mock('../../../composition/persistence/diagnostics/runtime-log', () => ({
+  installRuntimeLogCapture: vi.fn(),
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { installRuntimeLogCapture } from '../../../composition/persistence/diagnostics/runtime-log';
+import { registerDiagnosticLogPorts } from '../../application/diagnostics/ports';
 
 const {
   initTracerMock,
@@ -9,11 +15,11 @@ const {
   initTracerMock: vi.fn(),
   initializeBackgroundRuntimeMock: vi.fn(),
   registerBackgroundRuntimeMessageListenerMock: vi.fn(),
-  scenarioSessionServiceCtorMock: vi.fn(
-    function ScenarioSessionServiceMock(this: { kind: string }) {
-      this.kind = 'scenario-session-service';
-    }
-  ),
+  scenarioSessionServiceCtorMock: vi.fn(function ScenarioSessionServiceMock(this: {
+    kind: string;
+  }) {
+    this.kind = 'scenario-session-service';
+  }),
 }));
 
 vi.mock('@sniptale/platform/observability/message-tracer', () => ({
@@ -41,6 +47,8 @@ describe('background/index', () => {
   it('boots the background runtime and message listener with shared mode state maps', async () => {
     await import('../..');
 
+    expect(installRuntimeLogCapture).toHaveBeenCalledWith('background');
+    expect(registerDiagnosticLogPorts).toHaveBeenCalledOnce();
     expect(initTracerMock).toHaveBeenCalledWith('bg');
     expect(initializeBackgroundRuntimeMock).toHaveBeenCalledWith(
       expect.objectContaining({

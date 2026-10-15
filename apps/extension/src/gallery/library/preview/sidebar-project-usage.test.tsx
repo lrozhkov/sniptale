@@ -179,3 +179,47 @@ it('retries an unavailable usage lookup after a library change', async () => {
   expect(container.textContent).toContain('Video');
   expect(container.textContent).not.toContain('gallery.preview.projectsUnavailable');
 });
+
+it('ends loading for a stuck lookup instead of spinning indefinitely', async () => {
+  vi.useFakeTimers();
+  try {
+    mocks.usage.mockReturnValue(new Promise(() => undefined));
+    await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+    await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    expect(container.textContent).not.toContain('gallery.preview.projectsLoading');
+    expect(container.textContent).toContain('gallery.preview.projectsUnavailable');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('coalesces a burst of invalidations while a request is pending', async () => {
+  const pending = pendingUsage();
+  mocks.usage.mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
+  await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  const invalidate = mocks.subscribe.mock.calls[0]?.[0];
+  await act(async () => {
+    for (let i = 0; i < 100; i++) invalidate();
+  });
+  expect(mocks.usage).toHaveBeenCalledTimes(1);
+  await act(async () => pending.resolve([]));
+  expect(mocks.usage).toHaveBeenCalledTimes(2);
+  expect(container.textContent).toContain('gallery.preview.projectsEmpty');
+});
+
+it('refreshes the primary quick-edit name after metadata invalidation while retaining its identity', async () => {
+  mocks.usage
+    .mockResolvedValueOnce([{ id: 'source', name: 'Original edit', kind: 'review', primary: true }])
+    .mockResolvedValueOnce([{ id: 'source', name: 'Renamed edit', kind: 'review', primary: true }]);
+  await act(async () =>
+    root.render(
+      <PreviewProjectUsage item={createMediaItem({ id: 'source', entityId: 'source' })} />
+    )
+  );
+  expect(container.textContent).toContain('Original edit');
+  await act(async () => mocks.subscribe.mock.calls[0]?.[0]());
+  expect(container.textContent).not.toContain('Original edit');
+  expect(container.textContent).toContain('Renamed edit');
+  await act(async () => container.querySelector('button')?.click());
+  expect(mocks.gallery).toHaveBeenCalledExactlyOnceWith({ mediaId: 'source', quickEdit: true });
+});

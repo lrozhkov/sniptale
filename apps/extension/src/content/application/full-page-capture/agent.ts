@@ -291,7 +291,7 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
         rootElement === null
           ? 'document'
           : [
-              rootElement.tagName,
+              'element',
               `client=${rootElement.clientWidth}x${rootElement.clientHeight}`,
               `scroll=${rootElement.scrollWidth}x${rootElement.scrollHeight}`,
             ].join(' ');

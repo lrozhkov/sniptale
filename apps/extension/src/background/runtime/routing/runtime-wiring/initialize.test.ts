@@ -1,3 +1,4 @@
+vi.mock('../../../ai/audio/port', () => ({ registerAudioJobPorts: vi.fn() }));
 import { expect, it, vi } from 'vitest';
 
 const {
@@ -51,6 +52,7 @@ vi.mock('../../../application/privacy-erasure/composition', () => ({
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   eraseLocalExtensionDataFromBackground: vi.fn(),
+  configureAudioJobPrivacyErasurePort: vi.fn(),
 }));
 vi.mock('../../native-app/privacy-erasure', () => ({
   nativeIngestionPrivacyErasureCleanupAdapter: nativeIngestionCleanupAdapter,

@@ -36,6 +36,7 @@ vi.mock(
 );
 
 import { resolveModelConfig } from './model-config';
+import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 
 function createProvider(baseUrl = 'https://provider-1.example.com') {
   return {
@@ -176,4 +177,83 @@ describe('background/llm/model-config', () => {
     await verifyResolvedModelConfigSecretAndPolicyErrors();
     await verifySecretResolutionUsesExactProviderBinding();
   });
+});
+
+it('compares the disclosed provider, destination and model before permission or secret activation', async () => {
+  resetResolveModelConfigMocks();
+  mockResolvedModelConfigState();
+  const permissions = vi.fn(async () => true);
+  vi.stubGlobal('chrome', { permissions: { contains: permissions } });
+  try {
+    const approved = {
+      approvedProviderId: 'provider-1',
+      approvedModelCode: 'model-1-code',
+      approvedDestination: await createAIProviderDestinationBinding(createProvider()),
+      signal: new AbortController().signal,
+    };
+    for (const patch of [
+      { approvedProviderId: 'other' },
+      { approvedModelCode: 'other' },
+      { approvedDestination: `sha256:${'0'.repeat(64)}` },
+    ]) {
+      await expect(resolveModelConfig('model-1', { ...approved, ...patch })).rejects.toThrow(
+        'model-unavailable'
+      );
+      expect(permissions).not.toHaveBeenCalled();
+      expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+    }
+    await expect(resolveModelConfig('model-1', approved)).resolves.toMatchObject({
+      providerId: 'provider-1',
+    });
+    activateStoredAIProviderSecretForUseMock.mockClear();
+    permissions.mockClear();
+    loadAIProvidersMock.mockResolvedValue([createProvider('https://changed.test')]);
+    await expect(resolveModelConfig('model-1', approved)).rejects.toThrow('model-unavailable');
+    expect(permissions).not.toHaveBeenCalled();
+    expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('refuses denied or cancelled permission admission before activating credentials', async () => {
+  resetResolveModelConfigMocks();
+  mockResolvedModelConfigState();
+  const permissions = vi.fn(async () => false);
+  vi.stubGlobal('chrome', { permissions: { contains: permissions } });
+  try {
+    const controller = new AbortController();
+    const approved = {
+      approvedProviderId: 'provider-1',
+      approvedModelCode: 'model-1-code',
+      approvedDestination: await createAIProviderDestinationBinding(createProvider()),
+      signal: controller.signal,
+    };
+    await expect(resolveModelConfig('model-1', approved)).rejects.toThrow('permission-denied');
+    expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+    permissions.mockImplementationOnce(async () => {
+      controller.abort();
+      return true;
+    });
+    await expect(resolveModelConfig('model-1', approved)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('rejects audio model IDs before activating credentials for a text request', async () => {
+  resetResolveModelConfigMocks();
+  mockResolvedModelConfigState();
+  loadAIModelsMock.mockResolvedValue([
+    {
+      ...createModel('audio'),
+      operation: 'speech',
+      audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+    },
+  ]);
+  await expect(resolveModelConfig('audio')).rejects.toThrow('does not support text');
+  expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
 });

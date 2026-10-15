@@ -16,7 +16,7 @@ vi.mock('../../../../features/video/composition/timeline/render', async (importO
   resolveVideoCompositionRenderPasses: resolveVideoCompositionRenderPassesMock,
 }));
 
-import { planMp4VideoRenderSpans } from './planner';
+import { canUseHybridMp4VideoPipeline, planMp4VideoRenderSpans } from './planner';
 
 function createProject(overrides: Partial<VideoProject> = {}): VideoProject {
   return {
@@ -172,7 +172,7 @@ it('classifies same-size contained video and explicit export ranges as clean sou
   ]);
 });
 
-it('classifies WebM composition as accelerated and rejects composite-only states', () => {
+it('accelerates MP4 and WebM composition while retaining playback-rate fallback', () => {
   resolveVideoCompositionRenderPassesMock.mockImplementationOnce(() => ({
     overlayFrame: {
       actions: [],
@@ -183,7 +183,7 @@ it('classifies WebM composition as accelerated and rejects composite-only states
     visualPasses: [{ transitionOverlays: [] }],
   }));
   expect(planMp4VideoRenderSpans(createProject(), createSettings() as never)[0]).toEqual(
-    expect.objectContaining({ kind: 'composite', reason: 'cursor-overlay' })
+    expect.objectContaining({ kind: 'accelerated-composite', reason: 'decoded-frame-provider' })
   );
 
   const playbackProject = createProject({
@@ -217,7 +217,7 @@ it('classifies WebM composition as accelerated and rejects composite-only states
   );
 });
 
-it('falls back to composite for unsupported assets, hidden tracks, and resized exports', () => {
+it('retains fallback for unsupported and hidden sources while accelerating resized composition', () => {
   const unsupportedProject = createProject({
     assets: [
       {
@@ -239,7 +239,7 @@ it('falls back to composite for unsupported assets, hidden tracks, and resized e
 
   expect(
     planMp4VideoRenderSpans(createProject(), createSettings({ width: 640 }) as never)[0]?.kind
-  ).toBe('composite');
+  ).toBe('accelerated-composite');
 });
 
 it('merges adjacent composite spans after timeline boundary splitting', () => {
@@ -283,4 +283,15 @@ it('merges adjacent clean spans split by an audio-only boundary', () => {
   expect(planMp4VideoRenderSpans(project, createSettings() as never)).toEqual([
     expect.objectContaining({ end: 4, kind: 'clean-source', sourceEnd: 4, start: 0 }),
   ]);
+});
+
+it('requires full composition for adaptive MP4 even with a clean source', () => {
+  const settings = { format: VideoExportFormat.MP4, fps: 60, frameRateMode: 'adaptive' as const };
+  expect(canUseHybridMp4VideoPipeline(settings as never)).toBe(false);
+  expect(planMp4VideoRenderSpans(createProject(), settings as never)).toEqual([
+    { kind: 'composite', reason: 'non-mp4-asset', start: 0, end: 4 },
+  ]);
+  expect(canUseHybridMp4VideoPipeline({ ...settings, frameRateMode: 'constant' } as never)).toBe(
+    true
+  );
 });

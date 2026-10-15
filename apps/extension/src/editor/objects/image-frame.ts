@@ -1,4 +1,4 @@
-import type { FabricObject } from 'fabric';
+import type { FabricImage, FabricObject } from 'fabric';
 import {
   resolveEditorSourceImageGlowBlur,
   type EditorImageSettings,
@@ -9,6 +9,11 @@ import { createObjectFactoryStrokeDashArray } from './stroke-dash';
 
 type ImageStyleRuntimeObject = FabricObject & {
   sniptaleBrowserHeader?: { image: CanvasImageSource; displayHeight: number } | undefined;
+  getElement?: () => CanvasImageSource;
+  filters?: FabricImage['filters'];
+  cropX?: number;
+  cropY?: number;
+  sniptaleJoinedPlane?: { key: readonly unknown[]; canvas: HTMLCanvasElement } | undefined;
   sniptaleImageBaseRender?: (ctx: CanvasRenderingContext2D) => void;
   sniptaleImageRenderAttached?: boolean;
   _render?: (ctx: CanvasRenderingContext2D) => void;
@@ -26,6 +31,7 @@ export function attachBrowserHeaderToImage(
 ): void {
   const runtimeObject = object as ImageStyleRuntimeObject;
   runtimeObject.sniptaleBrowserHeader = image ? { image, displayHeight } : undefined;
+  runtimeObject.sniptaleJoinedPlane = undefined;
   object.dirty = true;
 }
 
@@ -117,16 +123,26 @@ function renderClippedImageContent(
   const radius = Math.min(Math.max(0, settings.radius), width / 2, height / 2);
 
   const renderContent = () => {
-    if (object.sniptaleBrowserHeader && headerHeight > 0) {
-      ctx.drawImage(
-        object.sniptaleBrowserHeader.image,
-        -width / 2,
-        -height / 2 - headerHeight,
-        width,
-        headerHeight
-      );
+    const plane = getJoinedImagePlane(object, width, height, headerHeight);
+    if (plane) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-width / 2, -height / 2 - headerHeight, width, height + headerHeight);
+      ctx.clip();
+      ctx.drawImage(plane, -width / 2, -height / 2 - Math.ceil(headerHeight));
+      ctx.restore();
+    } else {
+      if (object.sniptaleBrowserHeader) {
+        ctx.drawImage(
+          object.sniptaleBrowserHeader.image,
+          -width / 2,
+          -height / 2 - headerHeight,
+          width,
+          headerHeight
+        );
+      }
+      object.sniptaleImageBaseRender?.(ctx);
     }
-    object.sniptaleImageBaseRender?.(ctx);
   };
 
   if (radius <= 0 || typeof ctx.clip !== 'function') {
@@ -145,6 +161,44 @@ function renderClippedImageContent(
   ctx.clip();
   renderContent();
   ctx.restore();
+}
+
+/** Cache one source plane so fractional zoom samples across, rather than against, the internal join. */
+function getJoinedImagePlane(
+  object: ImageStyleRuntimeObject,
+  width: number,
+  height: number,
+  headerHeight: number
+) {
+  const header = object.sniptaleBrowserHeader;
+  if (!header || headerHeight <= 0) return null;
+  const key = [
+    header.image,
+    object.getElement?.(),
+    object.filters,
+    width,
+    height,
+    headerHeight,
+    object.cropX,
+    object.cropY,
+  ];
+  const cached = object.sniptaleJoinedPlane;
+  if (cached && key.every((value, index) => value === cached.key[index])) return cached.canvas;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = Math.ceil(height + headerHeight);
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  // SVG edges antialias, while the source bitmap edge snaps to a pixel row.
+  // Align their shared boundary to an integer row, retaining the fractional top inset.
+  const join = Math.ceil(headerHeight);
+  context.drawImage(header.image, 0, join - headerHeight, width, headerHeight);
+  context.save();
+  context.translate(width / 2, join + height / 2);
+  object.sniptaleImageBaseRender?.(context);
+  context.restore();
+  object.sniptaleJoinedPlane = { key, canvas };
+  return canvas;
 }
 
 export function attachImageStyleRenderer(

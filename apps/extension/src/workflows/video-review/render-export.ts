@@ -1,16 +1,36 @@
+import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
+import type { ReviewFrameExportInput } from './render-export-input';
+import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
+import { writeReviewPresentationFrames } from './render-presentation-export';
+import type { createReviewPresentationMain } from './presentation-main';
+import type { ReviewWatermarkRenderer } from './render-watermark';
+import type { ReviewKeyCue } from '../../features/video/review/key-animation';
+import { drawReviewKeys } from './render-key-animation';
+import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
+import { createReviewSpatialRenderer } from './spatial-renderer';
+import {
+  createAdaptiveFrameWriter,
+  createAdaptiveComparisonBudget,
+} from '../../features/video/project/export/adaptive-frames';
+import { hasQuickEditMotionBlur } from '../../features/video/review/advanced/motion-blur';
+import { createReviewRenderTimeTracking } from './time-estimate-plan';
+import type { ReviewFrameWindow } from './render-schedule';
+import type { createReviewWebcamRenderer } from './render-webcam';
+import { createReviewDecodedSampleSink } from './decoded-video-sample';
+import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
 import {
   planReviewCutTransitions,
   reviewCutTransitionAt,
   type ReviewCutTransitionPlan,
 } from '../../features/video/review/cuts';
-import { createReviewTransitionFrames, paintReviewCutTransition } from './cut-transition-frames';
-import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
-import { drawReviewSpotlight } from './render-spotlight';
 import {
-  resolveVideoOutputDimensions,
-  VideoResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
-import type { ReviewOutputCodec, ReviewRenderSettings } from './media-index';
+  type ReviewTransitionSample,
+  createReviewTransitionFrames,
+  paintReviewCutTransition,
+  paintReviewCutDissolve,
+  reviewCutTransitionSides,
+  paintReviewCutBlackout,
+} from './cut-transition-frames';
 import {
   ALL_FORMATS,
   BlobSource,
@@ -23,68 +43,28 @@ import {
 } from 'mediabunny';
 import {
   resolveReviewRenderBitrate,
-  reviewOutputCodecs,
-  resolveReviewVideoEncoderConfig,
+  prepareReviewRender,
+  type ReviewRenderPreparation,
+  resolveReviewSceneOutput,
+  assertReviewCameraAdmission,
 } from './render-settings';
-import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import type { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
-import type {
-  QuickEditAdvancedState,
-  QuickEditZoomRegion,
-} from '../../features/video/review/advanced/types';
-import {
-  computeQuickEditSceneLayout,
-  computeQuickEditSceneCamera,
-  evaluateQuickEditCameraAtTime,
-} from '../../features/video/review/advanced/scene';
-import {
-  isCanvasCommentVisibleAt,
-  type CanvasCommentExport,
-} from '../../features/video/review/comments';
+import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
-import { drawReviewComments } from './render-comments';
 import { supportedReviewVideoCodecs, type ReviewMediaIndex } from './media-index';
-import { createReviewMediaOutput } from './media-output';
+import type { createReviewMediaOutput } from './media-output';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import type { ReviewExportClipPlan } from './audio-render';
 import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
+import type { prepareReviewFinalCaptions } from './render-captions';
+import { reviewExportPhase, cleanupReviewExportFailure } from './export-diagnostics';
+import { prepareReviewFrameDecorations, createReviewFrameOutput } from './render-export-setup';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
-
-interface ReviewFrameWindow {
-  segment: Segment;
-  /** Output timestamps of the window's frames, on the fps lattice. */
-  timestamps: number[];
-  /** Source positions sampled for each output timestamp. */
-  sourceTimes: number[];
-}
-
-/** Output frame schedule over kept segments; the last frame never passes the segment end. */
-export function reviewRenderFrameSchedule(
-  duration: number,
-  edits: readonly ReviewEdit[],
-  fps: number
-): ReviewFrameWindow[] {
-  if (!Number.isFinite(fps) || fps <= 0) throw new Error('Render frame rate is invalid.');
-  return buildReviewTimeMap(duration, edits)
-    .filter((part) => part.kind !== 'cut')
-    .map((segment) => {
-      const count = Math.max(1, Math.ceil((segment.resultEnd - segment.resultStart) * fps - 1e-9));
-      return {
-        segment,
-        timestamps: Array.from({ length: count }, (_, k) => segment.resultStart + k / fps),
-        sourceTimes: Array.from(
-          { length: count },
-          (_, k) => segment.sourceStart + (k / fps) * segment.rate
-        ),
-      };
-    });
-}
 
 /**
  * Full frame render for pixel-changing effects: decodes source frames, draws the
@@ -92,32 +72,36 @@ export function reviewRenderFrameSchedule(
  * probed frame rate. Audio follows the same plan as the packet path; fragment
  * ranges keep camera and audio on global output time while timestamps start at zero.
  */
-export async function writeReviewFrames(args: {
-  renderSettings?: ReviewRenderSettings | undefined;
-  file: Blob;
-  index: ReviewMediaIndex;
-  /** Fragment-local edits; `fragmentOffset` maps local time back to global output time. */
-  edits: readonly ReviewEdit[];
-  advanced: QuickEditAdvancedState;
-  /** Text-resolved overlays; burning follows each comment's own renderToVideo flag. */
-  comments?: readonly CanvasCommentExport[];
-  fragmentOffset: number;
-  writer: Pick<SeekableAssetObjectWriter, 'writeAt'>;
-  signal: AbortSignal;
-  provenance?: string;
-  exportAudio?: ReviewExportClipPlan;
-  readProjectAsset(assetId: string): Promise<Blob | null>;
-  onProgress?(fraction: number): void;
-}): Promise<ReviewPacketReceipt> {
-  const preparation = prepareReviewRender(args);
+export async function writeReviewFrames(
+  args: ReviewFrameExportInput
+): Promise<ReviewPacketReceipt> {
+  assertReviewCameraAdmission(args);
+  if (resolveQuickEditEffectiveState(args.advanced).presentation)
+    return writeReviewPresentationFrames(args);
+  const preparation = await reviewExportPhase(args.signal, 'prepare', () =>
+    prepareReviewRender(args)
+  );
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
   args.signal.addEventListener('abort', dispose, { once: true });
   let output: Output | null = null;
+  const adaptiveBudget = createAdaptiveComparisonBudget();
   let source: ReviewRenderSource | null = null;
   let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
+  let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
+  let watermark: ReviewWatermarkRenderer | null = null;
+  let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
   try {
-    source = await openReviewRenderSource(args, input, preparation);
+    source = await reviewExportPhase(args.signal, 'decode', () =>
+      openReviewRenderSource(args, input, preparation)
+    );
+    const decorations = await reviewExportPhase(args.signal, 'compose', () =>
+      prepareReviewFrameDecorations(args, preparation, source!)
+    );
+    main = decorations.main;
+    watermark = decorations.watermark;
+    webcam = decorations.webcam;
+    const captions = decorations.captions;
     const receipt: ReviewPacketReceipt = {
       videoPackets: 0,
       audioPackets: 0,
@@ -129,153 +113,143 @@ export async function writeReviewFrames(args: {
     };
     const clock = { time: 0 };
     const clipRenderer = createReviewAudioClipRenderer();
-    const tracks = createReviewMediaOutput({
-      index: args.index,
-      container: preparation.container,
-      processedAudio: source.processedAudio,
-      writer: args.writer,
-      signal: args.signal,
-      ...(args.provenance ? { provenance: args.provenance } : {}),
-      sampleVideo: {
-        codec: preparation.codec,
-        fullCodecString: resolveReviewVideoEncoderConfig(preparation.codec, {
-          width: source.canvas.width,
-          height: source.canvas.height,
-          fps: preparation.fps,
-        }).codec,
-        frameRate: preparation.fps,
-        bitrate: resolveReviewRenderBitrate(
-          {
-            fps: preparation.fps,
-            width: source.canvas.width,
-            height: source.canvas.height,
-          },
-          args.renderSettings?.quality
-        ),
-      },
-      onAudioPacket: (packet) => {
+    const outputSource = source;
+    const tracks = await reviewExportPhase(args.signal, 'encode', () =>
+      createReviewFrameOutput(args, preparation, outputSource, (packet) => {
         receipt.audioPackets++;
         clock.time = Math.max(clock.time, packet.timestamp + packet.duration);
-      },
-    });
-    output = tracks.output;
-    if (tracks.video.kind !== 'sample') throw new Error('Video output configuration changed.');
-    const videoOut = tracks.video.source;
-    const audioOut = tracks.audio;
-    await tracks.output.start();
-    const frameSink = new VideoSampleSink(source.video);
+      })
+    );
+    output = tracks?.output ?? null;
+    if (tracks && tracks.video.kind !== 'sample')
+      throw new Error('Video output configuration changed.');
+    const videoOut = args.frameProbe
+      ? { add: args.frameProbe.add, close() {} }
+      : tracks?.video.kind === 'sample'
+        ? tracks.video.source
+        : null;
+    if (!videoOut) throw new Error('Video output configuration changed.');
+    const audioOut = tracks?.audio ?? null;
+    await reviewExportPhase(args.signal, 'encode', () => output?.start());
+    const frameSink = main
+      ? null
+      : createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal);
     const transitions = planReviewCutTransitions(args.index.duration, args.edits);
-    if (transitions.length)
+    if (!main && transitions.length)
       transitionFrames = createReviewTransitionFrames(
-        new VideoSampleSink(source.video),
+        createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal),
         args.signal
       );
+    const sourceTimeResolution = await source.video.getTimeResolution();
+    const timeTracking = createReviewRenderTimeTracking(
+      {
+        duration: receipt.resultDuration,
+        fragmentOffset: args.fragmentOffset,
+        zoomRegions: preparation.effective.zoomRegions,
+        transitions,
+        webcam: !!webcam,
+      },
+      args.frameProbe ? undefined : args.onTimeEstimate,
+      args.onProgress
+    );
     for (const window of preparation.windows) {
       const segment = window.segment;
       args.signal.throwIfAborted();
-      await drainSegmentAudio({
-        segment,
-        track: source.audio,
-        sink: source.audioSink,
-        audioOut,
-        processedAudio: source.processedAudio,
-        audioConfig: source.audioConfig,
-        muted: segmentAudioMuted(args.edits, segment, args.exportAudio),
-        exportAudio: args.exportAudio,
-        clipRenderer,
-        sampleRate: source.sampleRate,
-        audioCodec: args.index.audioCodec,
-        clock,
-        receipt,
-        signal: args.signal,
-      });
-      receipt.videoPackets += await renderRenderWindowFrames({
-        window,
-        fps: preparation.fps,
-        fragmentOffset: args.fragmentOffset,
-        zoomRegions: preparation.effective.zoomRegions,
-        background: preparation.effective.background,
-        comments: args.comments ?? [],
-        canvas: source.canvas,
-        sourceSize: source.sourceSize,
-        sceneScale: source.sceneScale,
-        context: source.context,
-        image: source.image,
-        frameSink,
-        transitions,
-        transitionFrames,
-        videoOut,
-        resultDuration: receipt.resultDuration,
-        onProgress: args.onProgress ?? undefined,
-        signal: args.signal,
-      });
+      timeTracking?.startAudio();
+      if (!args.frameProbe)
+        await drainSegmentAudio({
+          segment,
+          track: source.audio,
+          sink: source.audioSink,
+          audioOut,
+          processedAudio: source.processedAudio,
+          audioConfig: source.audioConfig,
+          muted: segmentAudioMuted(args.edits, segment, args.exportAudio),
+          exportAudio: args.exportAudio,
+          clipRenderer,
+          sampleRate: source.sampleRate,
+          audioCodec: args.index.audioCodec,
+          clock,
+          receipt,
+          signal: args.signal,
+        });
+      timeTracking?.finishAudio(segment);
+      if (main) {
+        const composedMain = main;
+        receipt.videoPackets += await reviewExportPhase(args.signal, 'compose', () =>
+          renderAnnotationWindow({
+            window,
+            main: composedMain,
+            videoOut,
+            fps: preparation.fps,
+            adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
+            adaptiveBudget,
+            resultDuration: receipt.resultDuration,
+            onProgress: timeTracking?.renderProgress ?? args.onProgress,
+            signal: args.signal,
+          })
+        );
+        continue;
+      }
+      const visual = source.visual;
+      if (!visual || !frameSink) throw new Error('Legacy render source is unavailable.');
+      const renderSource = source;
+      receipt.videoPackets += await reviewExportPhase(args.signal, 'compose', () =>
+        renderRenderWindowFrames({
+          window,
+          adaptiveBudget,
+          adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
+          fps: preparation.fps,
+          fragmentOffset: args.fragmentOffset,
+          zoomRegions: preparation.effective.zoomRegions,
+          background: preparation.effective.background,
+          keyCues: args.keyCues,
+          clickCues: args.clickCues,
+          comments: args.comments ?? [],
+          canvas: visual.canvas,
+          sourceSize: renderSource.sourceSize,
+          sceneScale: renderSource.sceneScale,
+          baseCanvas: renderSource.baseCanvas,
+          windowHeader: preparation.effective.windowHeader,
+          headerImage: visual.headerImage,
+          context: visual.context,
+          image: visual.image,
+          frameSink,
+          sourceTimeResolution,
+          transitions,
+          transitionFrames,
+          webcam,
+          watermark,
+          ...(captions ? { captions } : {}),
+          videoOut,
+          resultDuration: receipt.resultDuration,
+          onProgress: timeTracking?.renderProgress ?? args.onProgress,
+          signal: args.signal,
+        })
+      );
     }
     videoOut.close();
     audioOut?.source.close();
     args.signal.throwIfAborted();
-    await output.finalize();
+    args.onTimeEstimate?.(null);
+    await reviewExportPhase(args.signal, 'mux-finalize', () => output?.finalize());
     args.signal.throwIfAborted();
     receipt.resultDuration = Math.max(receipt.resultDuration, clock.time);
     args.onProgress?.(1);
     return receipt;
   } catch (error) {
-    await output?.cancel().catch(() => undefined);
-    throw error;
+    return await cleanupReviewExportFailure(error, () => output?.cancel());
   } finally {
+    args.onTimeEstimate?.(null);
+    webcam?.dispose();
+    watermark?.dispose();
     transitionFrames?.dispose();
-    source?.image?.close();
+    main?.dispose();
+    source?.visual?.image?.close();
+    source?.visual?.headerImage?.close();
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
   }
-}
-
-interface ReviewRenderPreparation {
-  codec: ReviewOutputCodec;
-  container: 'mp4' | 'webm';
-  resolution: VideoResolutionPreset;
-  quality: ReviewRenderSettings['quality'];
-  fps: number;
-  windows: ReviewFrameWindow[];
-  effective: ReturnType<typeof resolveQuickEditEffectiveState>;
-}
-
-/** Frame rendering validates ranges, while packet copying alone requires keyframes. */
-function prepareReviewRender(args: {
-  renderSettings?: ReviewRenderSettings | undefined;
-  index: ReviewMediaIndex;
-  edits: readonly ReviewEdit[];
-  advanced: QuickEditAdvancedState;
-}): ReviewRenderPreparation {
-  let validRanges = true;
-  try {
-    buildReviewTimeMap(args.index.duration, args.edits);
-  } catch {
-    validRanges = false;
-  }
-  if (!validRanges) throw new Error('Export requires valid non-overlapping edit ranges.');
-  const container = args.renderSettings?.format ?? args.index.container;
-  const supported = reviewOutputCodecs(args.index, container);
-  const codec = args.renderSettings?.codec ?? supported[0];
-  if (!codec || !supported.includes(codec)) throw new QuickEditExportUnavailable(['video-encoder']);
-  const requestedFps = args.renderSettings?.frameRate;
-  if (requestedFps !== undefined && ![0, 24, 30, 60].includes(requestedFps))
-    throw new Error('Unsupported render frame rate.');
-  const fps =
-    requestedFps ||
-    (args.index.frameRate && Number.isFinite(args.index.frameRate) && args.index.frameRate > 0
-      ? args.index.frameRate
-      : 30);
-  const windows = reviewRenderFrameSchedule(args.index.duration, args.edits, fps);
-  if (!windows.length) throw new Error('The edited video is empty.');
-  return {
-    codec,
-    container,
-    resolution: args.renderSettings?.resolution ?? VideoResolutionPreset.SOURCE,
-    quality: args.renderSettings?.quality ?? 'HIGH',
-    fps,
-    windows,
-    effective: resolveQuickEditEffectiveState(args.advanced),
-  };
 }
 
 /** Segment playback stays silent only for an explicit mute, never lane visibility. */
@@ -304,10 +278,15 @@ interface ReviewRenderSource {
   processedAudio: 'aac' | 'opus' | null;
   sampleRate: number;
   sceneScale: number;
-  canvas: HTMLCanvasElement;
+  baseCanvas: { width: number; height: number };
   sourceSize: { width: number; height: number };
-  context: CanvasRenderingContext2D;
-  image: ImageBitmap | null;
+  dimensions: Parameters<typeof createReviewPresentationMain>[0]['dimensions'];
+  visual: {
+    canvas: HTMLCanvasElement;
+    context: CanvasRenderingContext2D;
+    image: ImageBitmap | null;
+    headerImage: ImageBitmap | null;
+  } | null;
 }
 
 /** Opens the render media: verified source tracks, audio codec probe, canvas, background. */
@@ -347,62 +326,85 @@ async function openReviewRenderSource(
     width: Math.round(await video.getDisplayWidth()),
     height: Math.round(await video.getDisplayHeight()),
   };
-  const canvas = document.createElement('canvas');
-  const dimensions = resolveVideoOutputDimensions(
-    preparation.effective.canvas?.width ?? sourceSize.width,
-    preparation.effective.canvas?.height ?? sourceSize.height,
-    preparation.resolution
-  );
-  canvas.width = dimensions.width;
-  canvas.height = dimensions.height;
-  const scale = canvas.width / (preparation.effective.canvas?.width ?? sourceSize.width);
-  const background = preparation.effective.background;
-  if (background.enabled)
-    preparation.effective.background = {
-      ...background,
-      layout: {
-        padding: background.layout.padding * scale,
-        cornerRadius: background.layout.cornerRadius * scale,
-      },
-    };
+  const scene = resolveReviewSceneOutput(sourceSize, preparation.effective, preparation.resolution);
+  if (!scene.supported) throw new QuickEditExportUnavailable(['canvas-size']);
+  const canonical = computeQuickEditSceneSize({
+    source: sourceSize,
+    canvas: preparation.effective.canvas,
+    background: preparation.effective.background,
+    windowHeader: preparation.effective.windowHeader,
+  });
+  const dimensions = {
+    canonical: { width: canonical.width, height: canonical.height },
+    backing: scene.output,
+  };
+  const scale = scene.scale;
 
   const supported = await supportedReviewVideoCodecs(preparation.container, {
-    width: canvas.width,
-    height: canvas.height,
+    ...dimensions.backing,
     fps: preparation.fps,
     bitrate: resolveReviewRenderBitrate(
-      { width: canvas.width, height: canvas.height, fps: preparation.fps },
+      { ...dimensions.backing, fps: preparation.fps },
       preparation.quality
     ),
   });
   if (!supported.includes(preparation.codec))
     throw new QuickEditExportUnavailable(['video-encoder']);
   signal.throwIfAborted();
+  const metadata = {
+    video,
+    audio: audio ?? null,
+    audioSink: audio ? new EncodedPacketSink(audio) : null,
+    audioConfig,
+    processedAudio,
+    sourceSize,
+    sceneScale: scale,
+    baseCanvas: scene.canvas,
+    dimensions,
+  };
+  signal.throwIfAborted();
+  if (preparation.effective.annotationEffects)
+    return { ...metadata, sampleRate: audio ? await audio.getSampleRate() : 0, visual: null };
+  preparation.effective.background = scene.background;
+  const canvas = document.createElement('canvas');
+  canvas.width = dimensions.backing.width;
+  canvas.height = dimensions.backing.height;
   const context = canvas.getContext('2d', { alpha: false, colorSpace: 'srgb' });
   if (!context) throw new Error('Canvas context is unavailable.');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
-  const backgroundImage =
-    preparation.effective.background.enabled && preparation.effective.background.type === 'image'
-      ? await loadBackgroundImage(
-          preparation.effective.background.assetId,
-          args.readProjectAsset,
-          signal
-        )
-      : null;
+  const background = preparation.effective.background;
+  let backgroundImage: ImageBitmap | null = null;
+  if (background.enabled && background.type === 'image') {
+    if (!background.assetId) throw new QuickEditExportUnavailable(['asset-missing']);
+    const blob = await args.readProjectAsset(background.assetId);
+    signal.throwIfAborted();
+    if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
+    try {
+      backgroundImage = await createImageBitmap(blob);
+    } catch {
+      throw new QuickEditExportUnavailable(['asset-missing']);
+    }
+  }
   try {
     return {
-      video,
-      audio: audio ?? null,
-      audioSink: audio ? new EncodedPacketSink(audio) : null,
-      audioConfig,
-      processedAudio,
+      ...metadata,
       sampleRate: audio ? await audio.getSampleRate() : 0,
-      canvas,
-      sourceSize,
-      sceneScale: scale,
-      context,
-      image: backgroundImage,
+      visual: {
+        canvas,
+        headerImage: preparation.effective.windowHeader
+          ? await loadReviewWindowHeader(
+              reviewWindowHeaderUrl(
+                preparation.effective.windowHeader,
+                sourceSize.width,
+                sourceSize.height
+              ),
+              signal
+            )
+          : null,
+        context,
+        image: backgroundImage,
+      },
     };
   } catch (error) {
     backgroundImage?.close();
@@ -431,18 +433,20 @@ export async function drainSegmentAudio(args: {
   signal.throwIfAborted();
   if (processedAudio) {
     if (audioOut?.kind !== 'processed') throw new Error('Audio output configuration changed.');
-    for await (const sample of renderReviewAudio(
-      args.track,
-      segment,
-      args.muted,
-      signal,
-      args.exportAudio,
-      args.clipRenderer
-    )) {
-      signal.throwIfAborted();
-      await audioOut.source.add(sample);
-      clock.time = Math.max(clock.time, sample.timestamp + sample.duration);
-    }
+    await reviewExportPhase(signal, 'audio-prepare', async () => {
+      for await (const sample of renderReviewAudio(
+        args.track,
+        segment,
+        args.muted,
+        signal,
+        args.exportAudio,
+        args.clipRenderer
+      )) {
+        signal.throwIfAborted();
+        await reviewExportPhase(signal, 'encode', () => audioOut.source.add(sample));
+        clock.time = Math.max(clock.time, sample.timestamp + sample.duration);
+      }
+    });
     receipt.audioRanges.push({
       sourceStart: segment.sourceStart,
       sourceEnd: segment.sourceEnd,
@@ -451,49 +455,56 @@ export async function drainSegmentAudio(args: {
     });
     return;
   }
-  if (args.sink && args.audioCodec && audioOut?.kind === 'copy') {
-    for await (const packet of retainedAudio(
-      args.sink,
-      segment,
-      clock,
-      args.audioCodec,
-      args.sampleRate,
-      receipt,
-      signal
-    )) {
-      signal.throwIfAborted();
-      await audioOut.source.add(packet, {
-        ...(args.audioConfig ? { decoderConfig: args.audioConfig } : {}),
-      });
-      receipt.audioPackets++;
-    }
+  const { sink, audioCodec } = args;
+  if (sink && audioCodec && audioOut?.kind === 'copy') {
+    await reviewExportPhase(signal, 'audio-prepare', async () => {
+      for await (const packet of retainedAudio(
+        sink,
+        segment,
+        clock,
+        audioCodec,
+        args.sampleRate,
+        receipt,
+        signal
+      )) {
+        signal.throwIfAborted();
+        await reviewExportPhase(signal, 'encode', () =>
+          audioOut.source.add(packet, {
+            ...(args.audioConfig ? { decoderConfig: args.audioConfig } : {}),
+          })
+        );
+        receipt.audioPackets++;
+      }
+    });
   }
 }
 
 /** One window's frames: draws the scene and encodes at the fps lattice; returns the count. */
-export async function renderRenderWindowFrames(args: {
-  window: ReviewFrameWindow;
-  fps: number;
-  fragmentOffset: number;
-  zoomRegions: readonly QuickEditZoomRegion[];
-  background: QuickEditAdvancedState['background'];
-  comments: readonly CanvasCommentExport[];
-  canvas: HTMLCanvasElement;
-  sourceSize: { width: number; height: number };
-  sceneScale?: number;
-  context: CanvasRenderingContext2D;
-  image: ImageBitmap | null;
-  frameSink: VideoSampleSink;
-  transitions?: readonly ReviewCutTransitionPlan[];
-  transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
-  videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
-  resultDuration: number;
-  onProgress: ((fraction: number) => void) | undefined;
-  signal: AbortSignal;
-}): Promise<number> {
+export async function renderRenderWindowFrames(
+  args: ReviewRenderScene & {
+    keyCues?: readonly ReviewKeyCue[] | undefined;
+    window: ReviewFrameWindow;
+    adaptive?: boolean;
+    adaptiveBudget?: ReturnType<typeof createAdaptiveComparisonBudget>;
+    fps: number;
+    fragmentOffset: number;
+    canvas: HTMLCanvasElement;
+    context: CanvasRenderingContext2D;
+    frameSink: Pick<VideoSampleSink, 'samplesAtTimestamps'>;
+    sourceTimeResolution?: number;
+    transitions?: readonly ReviewCutTransitionPlan[];
+    transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
+    webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
+    watermark?: ReviewWatermarkRenderer | null;
+    captions?: Awaited<ReturnType<typeof prepareReviewFinalCaptions>>;
+    videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
+    resultDuration: number;
+    onProgress: ((fraction: number) => void) | undefined;
+    signal: AbortSignal;
+  }
+): Promise<number> {
   const { window, fps, canvas, context, videoOut, signal } = args;
-  // Decode surfaces may contain padded rows. Filter only the visible raster when composing,
-  // otherwise GPU interpolation can sample chroma from outside the source's visible rect.
+  // Stage normalized source pixels once before camera filtering and transition composition.
   const raster = document.createElement('canvas');
   raster.width = args.sourceSize.width;
   raster.height = args.sourceSize.height;
@@ -508,199 +519,248 @@ export async function renderRenderWindowFrames(args: {
     scratch.width = canvas.width;
     scratch.height = canvas.height;
   }
+  // Container ticks can round a frame PTS above its ideal CFR time (e.g. 2/30 → .067).
+  // Quantize lookups to that clock, but never sample a frame belonging to the next edit.
+  const resolution = args.sourceTimeResolution ?? 1_000_000;
+  const lastTick = (Math.ceil(window.segment.sourceEnd * resolution) - 1) / resolution;
+  const sampleTimes = window.sourceTimes.map((time) =>
+    Math.min(lastTick, Math.round(time * resolution) / resolution)
+  );
+  const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
+  const spatialRenderer = args.zoomRegions.some(
+    (r) =>
+      !r.dormant &&
+      quickEditFocusType(r) === 'zoom' &&
+      (hasQuickEditPerspective(r.perspective) || r.depthOfField?.enabled)
+  )
+    ? createReviewSpatialRenderer()
+    : undefined;
+  let dissolve: HTMLCanvasElement | undefined;
   let frame = 0;
-  for await (const sample of args.frameSink.samplesAtTimestamps(window.sourceTimes)) {
-    signal.throwIfAborted();
-    if (!sample) throw new Error('Source frame is unavailable.');
-    const timestamp = window.timestamps[frame]!;
-    try {
-      const camera = evaluateQuickEditCameraAtTime(
-        args.zoomRegions,
-        timestamp + args.fragmentOffset
-      );
-      const layout = computeQuickEditSceneLayout({
-        output: canvas,
-        source: args.sourceSize,
-        canvas,
-        background: args.background,
-        camera,
-      });
-      const burned = args.comments.filter(
-        (comment) =>
-          comment.renderToVideo &&
-          isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
-      );
-      const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
-      if (blend) {
-        const frames = await args.transitionFrames?.load(blend.plan);
+  const writer = createReviewFrameWriter({
+    canvas,
+    context,
+    videoOut,
+    signal,
+    adaptive: args.adaptive,
+    adaptiveBudget: args.adaptiveBudget,
+  });
+  const webcamFrames = args.webcam?.frames(window.sourceTimes);
+  try {
+    for await (const sample of args.frameSink.samplesAtTimestamps(sampleTimes)) {
+      if (!sample) {
         signal.throwIfAborted();
-        if (!frames) throw new QuickEditExportUnavailable(['transition-frames']);
-        paintReviewCutTransition(rasterContext, raster, blend, frames, sample);
-      } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
-      drawReviewSceneFrame(context, {
-        canvas,
-        layout,
-        background: args.background,
-        image: args.image,
-        sample: {
-          draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
-        },
-        comments: burned,
-        sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
-        cameraScale: camera.scale,
-      });
-      drawReviewSpotlight(
-        context,
-        canvas,
-        scratch,
-        evaluateQuickEditSpotlightAtTime({
-          regions: args.zoomRegions,
-          time: timestamp + args.fragmentOffset,
-          output: canvas,
-          video: layout.videoRect,
-          scale: args.sceneScale ?? 1,
-        })
-      );
-      const encoded = new VideoSample(canvas, {
-        timestamp,
-        duration: Math.min(1 / fps, window.segment.resultEnd - timestamp),
-      });
-      try {
-        await videoOut.add(encoded);
-      } finally {
-        encoded.close();
+        throw new Error('Source frame is unavailable.');
       }
+      const timestamp = window.timestamps[frame]!;
+      try {
+        signal.throwIfAborted();
+        const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
+        const draw = (
+          context: CanvasRenderingContext2D,
+          canvas: HTMLCanvasElement,
+          sample: Pick<ReviewTransitionSample, 'draw'>,
+          resultTime: number,
+          sourceTime: number
+        ) =>
+          paintReviewExportScene({
+            scene: args,
+            context,
+            canvas,
+            sample,
+            resultTime,
+            sourceTime,
+            spatialRenderer,
+            scratch,
+            blurEnabled,
+          });
+        if (blend?.plan.type === 'dissolve') {
+          const endpoints = await args.transitionFrames?.load(blend.plan);
+          signal.throwIfAborted();
+          if (!endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
+          const sides = reviewCutTransitionSides(
+            blend,
+            endpoints,
+            sample,
+            timestamp + args.fragmentOffset,
+            args.fragmentOffset
+          );
+          dissolve ??= document.createElement('canvas');
+          dissolve.width = canvas.width;
+          dissolve.height = canvas.height;
+          const dissolveContext = dissolve.getContext('2d');
+          if (!dissolveContext) throw new Error('Canvas context is unavailable.');
+          paintReviewCutDissolve(
+            context,
+            { canvas: dissolve, context: dissolveContext },
+            blend.incoming,
+            (target, surface, side) => {
+              const endpoint = sides[side];
+              draw(
+                target,
+                surface,
+                { draw: endpoint.sample.draw.bind(endpoint.sample) },
+                endpoint.resultTime,
+                endpoint.sample.timestamp
+              );
+            },
+            canvas
+          );
+        } else {
+          if (blend) {
+            const endpoints = await args.transitionFrames?.load(blend.plan);
+            signal.throwIfAborted();
+            if (!endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
+            paintReviewCutTransition(rasterContext, raster, blend, endpoints, sample);
+          } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
+          draw(
+            context,
+            canvas,
+            {
+              draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
+            },
+            timestamp + args.fragmentOffset,
+            window.sourceTimes[frame] ?? window.segment.sourceStart
+          );
+        }
+        if (webcamFrames) {
+          const cameraFrame = await webcamFrames.next();
+          signal.throwIfAborted();
+          if (cameraFrame.done) throw new QuickEditExportUnavailable(['asset-missing']);
+          cameraFrame.value?.draw(context, canvas);
+        }
+        drawReviewKeys(context, args.keyCues ?? [], timestamp + args.fragmentOffset, canvas);
+        args.watermark?.draw(context);
+        args.captions?.draw(context, timestamp + args.fragmentOffset);
+        paintReviewCutBlackout(context, canvas, blend);
+        await writer.add(
+          timestamp,
+          Math.min(window.segment.resultEnd, window.timestamps[frame + 1] ?? timestamp + 1 / fps),
+          Math.min(1 / fps, window.segment.resultEnd - timestamp)
+        );
+      } finally {
+        sample.close();
+      }
+      args.onProgress?.(Math.min(1, (timestamp + 1 / fps) / args.resultDuration));
+      frame++;
+    }
+    await writer.flush();
+  } finally {
+    spatialRenderer?.dispose();
+    writer.dispose();
+    await webcamFrames?.return(undefined);
+  }
+  return writer.count();
+}
+
+/** Shared scene output preserves ordinary window timestamps and audio draining. */
+async function renderAnnotationWindow(args: {
+  window: ReviewFrameWindow;
+  main: Awaited<ReturnType<typeof createReviewPresentationMain>>;
+  videoOut: { add(sample: VideoSample): Promise<void> };
+  fps: number;
+  adaptive: boolean;
+  adaptiveBudget: ReturnType<typeof createAdaptiveComparisonBudget>;
+  resultDuration: number;
+  onProgress: ((fraction: number) => void) | undefined;
+  signal: AbortSignal;
+}) {
+  let writer: ReturnType<typeof createReviewFrameWriter> | undefined;
+  try {
+    for (const [index, timestamp] of args.window.timestamps.entries()) {
+      args.signal.throwIfAborted();
+      const frame = await reviewExportPhase(args.signal, 'compose', () =>
+        args.main.renderAtTime(timestamp)
+      );
+      try {
+        args.signal.throwIfAborted();
+        writer ??= createReviewFrameWriter({
+          canvas: frame.canvas,
+          context: frame.context,
+          videoOut: args.videoOut,
+          signal: args.signal,
+          adaptive: args.adaptive,
+          adaptiveBudget: args.adaptiveBudget,
+        });
+        await writer.add(
+          timestamp,
+          Math.min(
+            args.window.segment.resultEnd,
+            args.window.timestamps[index + 1] ?? timestamp + 1 / args.fps
+          ),
+          Math.min(1 / args.fps, args.window.segment.resultEnd - timestamp),
+          frame
+        );
+      } finally {
+        frame.release();
+      }
+      args.onProgress?.(Math.min(1, (timestamp + 1 / args.fps) / args.resultDuration));
+    }
+    await writer?.flush();
+    return writer?.count() ?? 0;
+  } finally {
+    writer?.dispose();
+  }
+}
+
+/** Owns sample lifetime and optional VFR retention after scene composition is complete. */
+function createReviewFrameWriter(args: {
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+  videoOut: { add(sample: VideoSample): Promise<void> };
+  signal: AbortSignal;
+  adaptive: boolean | undefined;
+  adaptiveBudget: ReturnType<typeof createAdaptiveComparisonBudget> | undefined;
+}) {
+  let emitted = 0;
+  const emit = async (
+    canvas: HTMLCanvasElement | VideoFrame,
+    timestamp: number,
+    duration: number
+  ) => {
+    const sample = new VideoSample(canvas, { timestamp, duration });
+    try {
+      await reviewExportPhase(args.signal, 'encode', () => args.videoOut.add(sample));
+      emitted++;
     } finally {
       sample.close();
     }
-    args.onProgress?.(Math.min(1, (timestamp + 1 / fps) / args.resultDuration));
-    frame++;
-  }
-  return frame;
-}
-
-async function loadBackgroundImage(
-  assetId: string,
-  readProjectAsset: (assetId: string) => Promise<Blob | null>,
-  signal: AbortSignal
-): Promise<ImageBitmap | null> {
-  if (!assetId) throw new QuickEditExportUnavailable(['asset-missing']);
-  const blob = await readProjectAsset(assetId);
-  signal.throwIfAborted();
-  if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
-  try {
-    return await createImageBitmap(blob);
-  } catch {
-    throw new QuickEditExportUnavailable(['asset-missing']);
-  }
-}
-
-/**
- * One scene draw for export: full-canvas paint, rounded content clip, and the
- * camera-transformed frame. Content-attached overlays burn inside the content
- * clip; viewport-attached ones burn onto the composition frame after the clip.
- * Mirrors the preview stage so decoded frames and preview stay comparable.
- */
-export function drawReviewSceneFrame(
-  context: CanvasRenderingContext2D,
-  args: {
-    canvas: { width: number; height: number };
-    layout: ReturnType<typeof computeQuickEditSceneLayout>;
-    background: QuickEditAdvancedState['background'];
-    image: ImageBitmap | null;
-    sample: {
-      draw(
-        context: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        width: number,
-        height: number
-      ): void;
-    };
-    comments?: readonly CanvasCommentExport[];
-    sourceTime?: number;
-    cameraScale?: number;
-  }
-) {
-  const { canvas, layout, background, image, sample, comments, sourceTime } = args;
-  context.fillStyle = '#000000';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  const motion = computeQuickEditSceneCamera(layout, background);
-  if (motion.scale !== 1) {
-    context.save();
-    context.translate(motion.x, motion.y);
-    context.scale(motion.scale, motion.scale);
-  }
-  if (background.enabled) {
-    if (background.type === 'solid') {
-      context.fillStyle = background.color;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-    } else if (background.type === 'gradient') {
-      drawSceneGradient(context, background.gradient, canvas.width, canvas.height);
-    } else if (image) {
-      drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
-    }
-  }
-  if (motion.scale !== 1) context.restore();
-  context.save();
-  context.beginPath();
-  const videoClip = motion.videoClip;
-  const clip = background.enabled ? background.layout : null;
-  if (clip && clip.cornerRadius > 0) {
-    context.roundRect(
-      videoClip.x,
-      videoClip.y,
-      videoClip.width,
-      videoClip.height,
-      Math.min(clip.cornerRadius * motion.scale, Math.min(videoClip.width, videoClip.height) / 2)
-    );
-  } else {
-    context.rect(videoClip.x, videoClip.y, videoClip.width, videoClip.height);
-  }
-  context.clip();
-  sample.draw(
-    context,
-    layout.videoTransform.x,
-    layout.videoTransform.y,
-    layout.videoTransform.width,
-    layout.videoTransform.height
-  );
-  const cameraScale = args.cameraScale ?? 1;
-  drawReviewComments(context, comments ?? [], {
-    attachment: 'content',
-    canvas,
-    videoTransform: layout.videoTransform,
-    scale: cameraScale,
-    sourceTime,
-  });
-  context.restore();
-  drawReviewComments(context, comments ?? [], {
-    attachment: 'viewport',
-    canvas,
-    videoTransform: null,
-    scale: 1,
-    sourceTime,
-  });
-}
-
-function drawFittedImage(
-  context: CanvasRenderingContext2D,
-  image: ImageBitmap,
-  width: number,
-  height: number,
-  fit: 'cover' | 'contain'
-) {
-  const scale =
-    fit === 'cover'
-      ? Math.max(width / image.width, height / image.height)
-      : Math.min(width / image.width, height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  context.drawImage(
-    image,
-    (width - drawWidth) / 2,
-    (height - drawHeight) / 2,
-    drawWidth,
-    drawHeight
-  );
+  };
+  const createAdaptive = (context: CanvasRenderingContext2D) =>
+    args.adaptive
+      ? createAdaptiveFrameWriter(
+          context,
+          (frame, timestampUs, durationUs) =>
+            emit(frame.clone(), timestampUs / 1e6, durationUs / 1e6),
+          args.signal,
+          args.adaptiveBudget
+        )
+      : null;
+  let context = args.context;
+  let adaptive = createAdaptive(context);
+  return {
+    async add(
+      timestamp: number,
+      end: number,
+      constantDuration: number,
+      frame: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D } = args
+    ) {
+      if (frame.context !== context) {
+        await adaptive?.flush();
+        adaptive?.dispose();
+        context = frame.context;
+        adaptive = createAdaptive(context);
+      }
+      if (!adaptive) {
+        await emit(frame.canvas, timestamp, constantDuration);
+        return;
+      }
+      const startUs = Math.round(timestamp * 1e6);
+      const endUs = Math.round(end * 1e6);
+      if (endUs > startUs) await adaptive.add(startUs, endUs - startUs);
+    },
+    flush: () => adaptive?.flush(),
+    dispose: () => adaptive?.dispose(),
+    count: () => emitted,
+  };
 }

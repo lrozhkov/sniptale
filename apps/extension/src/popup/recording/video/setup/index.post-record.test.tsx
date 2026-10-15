@@ -348,3 +348,59 @@ it('replaces stale local post-record state with the durable latest result after 
     expect.objectContaining({ postRecordResult: resultB })
   );
 });
+
+it('preserves authoritative state during discard and releases pending after refusal', async () => {
+  let refuse!: (value: 'failed') => void;
+  const result = new Promise<'failed'>((resolve) => {
+    refuse = resolve;
+  });
+  const props = createProps({
+    activeRecordingId: 'recording-1',
+    recordingState: createRecordingState(VideoRecordingStatus.RECORDING),
+    onCancel: vi.fn(() => result),
+  });
+  await renderNode(<VideoSetupPage {...props} />);
+  const footer = mocks.footerMock.mock.calls.at(-1)?.[0] as { onCancel: () => void };
+  await act(async () => {
+    footer.onCancel();
+  });
+  const pending = mocks.bodyMock.mock.calls.at(-1)?.[0];
+  await act(async () => {
+    refuse('failed');
+    await result;
+  });
+  expect(pending.recordingState.status).toBe(VideoRecordingStatus.RECORDING);
+  expect(pending.recordingState.duration).toBe(props.recordingState.duration);
+  expect(mocks.bodyMock.mock.calls.at(-1)?.[0].showSavingState).toBe(false);
+});
+
+it('does not show a refused discard from A in the next recording B', async () => {
+  const props = createProps({
+    activeRecordingId: 'recording-a',
+    recordingState: createRecordingState(VideoRecordingStatus.RECORDING),
+    onCancel: vi.fn().mockResolvedValue('failed'),
+  });
+  await renderNode(<VideoSetupPage {...props} />);
+  const footer = mocks.footerMock.mock.calls.at(-1)?.[0] as { onCancel: () => Promise<void> };
+  await act(async () => footer.onCancel());
+  await renderNode(<VideoSetupPage {...props} activeRecordingId="recording-b" />);
+  expect(mocks.bodyMock.mock.calls.at(-1)?.[0].completionRequestFailed).toBe(false);
+});
+
+it('retries discard rather than save when the intent request was refused', async () => {
+  const onCancel = vi.fn().mockResolvedValue('failed');
+  const onStop = vi.fn();
+  const props = createProps({
+    activeRecordingId: 'recording-a',
+    recordingState: createRecordingState(VideoRecordingStatus.RECORDING),
+    onCancel,
+    onStop,
+  });
+  await renderNode(<VideoSetupPage {...props} />);
+  const footer = mocks.footerMock.mock.calls.at(-1)?.[0] as { onCancel: () => Promise<void> };
+  await act(async () => footer.onCancel());
+  const body = mocks.bodyMock.mock.calls.at(-1)?.[0] as { onRetryCompletion: () => Promise<void> };
+  await act(async () => body.onRetryCompletion());
+  expect(onCancel).toHaveBeenCalledTimes(2);
+  expect(onStop).not.toHaveBeenCalled();
+});

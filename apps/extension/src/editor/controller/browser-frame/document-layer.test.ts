@@ -52,7 +52,7 @@ it('prepares replacement browser-frame metadata from the previous header', async
   await prepareBrowserFrameLayerReplacement({
     browserFrame: { enabled: true } as never,
     header: header as never,
-    nextSource: { left: 40, top: 60 } as never,
+    nextSource: { left: 40, top: 60, displayWidth: 320, displayHeight: 180 } as never,
   });
 
   expect(mocks.createBrowserFrameLayerObjectMock).toHaveBeenCalledWith(

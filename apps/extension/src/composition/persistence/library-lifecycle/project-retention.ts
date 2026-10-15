@@ -1,8 +1,21 @@
+import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { promoteReferencedMediaLifecycles } from './promotion';
+import { createScenarioProjectStore } from '../scenario/storage';
+import { createVideoWorkspaceStore } from '../review-workspaces/storage';
+import { promoteReviewSourceLifecycles } from '../review-workspaces/new-reference-admission';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { promoteProjectSourceLifecycles } from '../projects/new-reference-admission';
 import { promoteScenarioSourceLifecycles } from '../scenario/library-publication';
 import {
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
+  IMAGE_WORKSPACES_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -14,13 +27,18 @@ import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseScenarioProjectEntry } from '../scenario/read-guards';
 import { promoteLibraryLifecycle } from './contracts';
 
-/** Repairs legacy draft project roots without changing their documents or revisions. */
+/** Repairs retained project sources and admits legacy metadata without changing content history. */
 export async function repairTemporaryProjectLifecycles(now = Date.now()): Promise<number> {
   return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        IMAGE_WORKSPACES_STORE,
         VIDEO_PROJECTS_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
         SCENARIO_PROJECTS_STORE,
+        SCENARIO_PROJECT_HISTORY_STORE,
+        SCENARIO_PROJECT_UNITS_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
         SCENARIO_ASSETS_STORE,
@@ -34,7 +52,10 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         [VIDEO_PROJECTS_STORE, parseVideoProjectEntry],
         [SCENARIO_PROJECTS_STORE, parseScenarioProjectEntry],
       ] as const) {
-        const store = tx.objectStore(storeName);
+        const store =
+          storeName === SCENARIO_PROJECTS_STORE
+            ? createScenarioProjectStore(tx)
+            : tx.objectStore(storeName);
         for (const raw of await store.getAll()) {
           const entry = parse(raw);
           if (!isRecord(raw) || entry?.lifecycle?.storageClass !== 'temporary') continue;
@@ -50,7 +71,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
         recordingStore: tx.objectStore(STORE_NAME),
         scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
-        scenarioProjectStore: tx.objectStore(SCENARIO_PROJECTS_STORE),
+        scenarioProjectStore: createScenarioProjectStore(tx),
       };
       for (const raw of await tx.objectStore(VIDEO_PROJECTS_STORE).getAll()) {
         const entry = parseVideoProjectEntry(raw);
@@ -59,6 +80,51 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
       for (const raw of await stores.scenarioProjectStore.getAll()) {
         const entry = parseScenarioProjectEntry(raw);
         if (entry) await promoteScenarioSourceLifecycles(tx, entry, now);
+      }
+      for (const raw of await tx.objectStore(IMAGE_WORKSPACES_STORE).getAll()) {
+        const workspace = parseImageWorkspaceEntry(raw);
+        if (!workspace) continue;
+        const media = parseMediaLibraryEntry(
+          await stores.mediaLibraryStore.get(workspace.aggregateId)
+        );
+        if (media?.lifecycle?.storageClass === 'temporary') repaired += 1;
+        await promoteReferencedMediaLifecycles({
+          mediaIds: new Set([workspace.aggregateId]),
+          mediaStore: stores.mediaLibraryStore,
+          recordingStore: stores.recordingStore,
+          now,
+        });
+      }
+      const workspaces = createVideoWorkspaceStore(tx);
+      for (const raw of await workspaces.getAll()) {
+        const workspace = parseVideoWorkspace(raw);
+        if (!workspace) continue;
+        const media = parseMediaLibraryEntry(
+          await stores.mediaLibraryStore.get(workspace.aggregateId)
+        );
+        await promoteReferencedMediaLifecycles({
+          mediaIds: new Set([workspace.aggregateId]),
+          mediaStore: stores.mediaLibraryStore,
+          recordingStore: stores.recordingStore,
+          now,
+        });
+        if (media && !workspace.project) {
+          await workspaces.put({
+            ...materializeVideoWorkspaceProject(workspace, media.filename),
+            revision: workspace.revision + 1,
+            updatedAt: Math.max(now, workspace.updatedAt),
+          });
+          repaired += 1;
+        } else if (media?.lifecycle?.storageClass === 'temporary') repaired += 1;
+        await promoteReviewSourceLifecycles(
+          workspace,
+          {
+            assets: stores.projectAssetStore,
+            media: stores.mediaLibraryStore,
+            recordings: stores.recordingStore,
+          },
+          { assets: new Map(), libraryAudioClaims: [] }
+        );
       }
       await tx.done;
       return repaired;

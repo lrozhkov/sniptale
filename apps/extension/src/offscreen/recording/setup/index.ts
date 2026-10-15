@@ -1,3 +1,4 @@
+import type { RecordingSourceClockCalibration } from '../encoding/recording-frame-clock';
 import type { RecordingPointTransform } from '../../../features/video/project/types';
 import { resolveRecordingPointTransform } from '../geometry/tab-source';
 import { resolveDestinationRect } from '../encoding/live-video-frame-transform';
@@ -44,6 +45,7 @@ type RecordingSetupParams = {
 };
 
 export type RecordingSetupResult = {
+  sourceClockCalibration?: RecordingSourceClockCalibration | null;
   recordingPointTransform?: RecordingPointTransform | null;
   encoderFrameTransform: LiveVideoFrameTransform | null;
   cursorCaptureMode: VideoCursorCaptureMode | null;
@@ -390,6 +392,7 @@ export async function prepareRecordingStream(
 ): Promise<RecordingSetupResult> {
   const {
     stream: sourceStream,
+    sourceClockCalibration,
     cursorCaptureMode,
     sourceLabel,
   } = await acquireRecordingSourceStream({
@@ -437,6 +440,7 @@ export async function prepareRecordingStream(
   applyVideoTrackContentHint(outputTrack, resolveRecordingContentHint(params.captureMode));
   return {
     recordingPointTransform,
+    sourceClockCalibration,
     encoderFrameTransform: output.encoderFrameTransform,
     cursorCaptureMode,
     rawTrackSettings: raw.trackSettings,

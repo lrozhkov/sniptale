@@ -1,3 +1,5 @@
+import { captureReviewSpatialPointer } from './spatial-pointer';
+import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
 import { useRef, type PointerEvent, type KeyboardEvent, type RefObject } from 'react';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
@@ -9,6 +11,9 @@ type Center = { centerX: number; centerY: number; scale?: number };
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 type CameraGestureProps = {
+  pointerProjection?:
+    | { matrix: QuickEditHomography; output: { width: number; height: number } }
+    | undefined;
   camera: QuickEditCameraTransform;
   videoRect: QuickEditRect;
   /** Actual Area footprint in normalized source coordinates, when the scene supplies it. */
@@ -27,7 +32,11 @@ type CameraGestureProps = {
 export function useReviewCameraGesture(props: CameraGestureProps) {
   const { onPreview } = props;
   const { drag, draft, setDraft, cancel } = useCapturedPreview<
-    ReturnType<typeof captureCameraPointer> & { node: HTMLElement; pending: Center | null },
+    ReturnType<typeof captureCameraPointer> & {
+      node: HTMLElement;
+      pending: Center | null;
+      pointer: ReturnType<typeof captureReviewSpatialPointer>;
+    },
     Center
   >(props.disabled, () => onPreview?.(null));
   const baseline = useRef<Center | null>(null);
@@ -51,7 +60,25 @@ export function useReviewCameraGesture(props: CameraGestureProps) {
     node.focus();
     props.onInteract?.();
     const initial = captureCameraPointer(props, event, bounds);
-    drag.current = { ...initial, node };
+    const pointer = captureReviewSpatialPointer(
+      node,
+      props.pointerProjection?.matrix,
+      props.pointerProjection?.output ?? props.output
+    );
+    const point = pointer(event);
+    drag.current = {
+      ...initial,
+      node,
+      pointer,
+      x: point.x,
+      y: point.y,
+      ...(props.pointerProjection
+        ? {
+            width: props.videoRect.width * props.camera.scale,
+            height: props.videoRect.height * props.camera.scale,
+          }
+        : {}),
+    };
     setDraft(initial.origin);
     baseline.current = null;
     node.setPointerCapture(event.pointerId);
@@ -65,17 +92,19 @@ export function useReviewCameraGesture(props: CameraGestureProps) {
       publish(
         resizeCameraPointer(
           active,
-          (event.clientX - active.x) / active.width,
-          (event.clientY - active.y) / active.height
+          (active.pointer(event).x - active.x) / active.width,
+          (active.pointer(event).y - active.y) / active.height
         )
       );
       return;
     }
     publish({
       centerX:
-        active.origin.centerX + (active.direction * (event.clientX - active.x)) / active.width,
+        active.origin.centerX +
+        (active.direction * (active.pointer(event).x - active.x)) / active.width,
       centerY:
-        active.origin.centerY + (active.direction * (event.clientY - active.y)) / active.height,
+        active.origin.centerY +
+        (active.direction * (active.pointer(event).y - active.y)) / active.height,
     });
   };
   const onPointerUp = (event: PointerEvent<HTMLElement>) => {

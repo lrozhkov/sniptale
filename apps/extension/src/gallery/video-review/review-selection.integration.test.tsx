@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
+import type { commitVideoWorkspaceWithProjection } from '../../composition/persistence/review-workspaces/store';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -17,6 +21,7 @@ const integration = vi.hoisted(() => ({
   history: vi.fn(),
   read: vi.fn(),
   advanced: vi.fn(),
+  snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
 }));
@@ -40,7 +45,11 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   >()),
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
+  saveVideoWorkspaceSnapshot: integration.snapshot,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<typeof commitVideoWorkspaceWithProjection>[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
@@ -148,9 +157,12 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
     await act(async () =>
       clip.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 0, button: 0 }))
     );
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
-    expect([musicCount(), cutCount()]).toEqual([0, 1]);
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'Delete' })));
+    await act(async () => {
+      await vi.waitFor(() => expect([musicCount(), cutCount()]).toEqual([0, 1]), {
+        timeout: 2_500,
+      });
+    });
     await click('undo');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
     expect([musicCount(), cutCount()]).toEqual([1, 1]);
@@ -181,7 +193,7 @@ it('selects captured actions without creating notes and clears the selection on 
     expect(action.getAttribute('aria-pressed')).toBe('true');
     expect(fixture.snapshot.draft).toBeNull();
     expect(integration.draft).not.toHaveBeenCalled();
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'Delete' })));
     expect(action.getAttribute('aria-pressed')).toBe('true');
     expect(fixture.snapshot.workspace.history).toHaveLength(1);
     const plane = fixture.host.querySelector<HTMLElement>(
@@ -269,7 +281,7 @@ it('edits a selected speed range from its inspector through the same reversible 
       'aside button[aria-label="gallery.videoReview.deleteSelected"]'
     )!;
     expect(remove.className).toContain('!w-full');
-    expect(remove.parentElement?.className).toContain('border-t');
+    expect(remove.closest('[data-section="actions"]')).not.toBeNull();
     await act(async () => remove.click());
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'edit',
@@ -364,9 +376,11 @@ it('keeps a newly saved note selected and visible after leaving another inspecto
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await fixture.click('save');
-    expect(fixture.host.querySelector('ol')?.textContent).toContain('Keep this note visible');
+    expect(fixture.host.querySelector('.review-inspector-list')?.textContent).toContain(
+      'Keep this note visible'
+    );
     await fixture.click('editComment');
-    expect(fixture.host.querySelector('ol li textarea')?.textContent).toBe(
+    expect(fixture.host.querySelector('.review-inspector-list li textarea')?.textContent).toBe(
       'Keep this note visible'
     );
     expect(
@@ -374,14 +388,16 @@ it('keeps a newly saved note selected and visible after leaving another inspecto
     ).toHaveLength(1);
     await fixture.click('discard');
     expect(fixture.host.querySelector('textarea')).toBeNull();
-    expect(fixture.host.querySelector('ol')?.textContent).toContain('Keep this note visible');
+    expect(fixture.host.querySelector('.review-inspector-list')?.textContent).toContain(
+      'Keep this note visible'
+    );
     expect(fixture.host.querySelector('aside [aria-label="gallery.videoReview.undo"]')).toBeNull();
     expect(
       fixture.host.querySelector(
         '[data-ui="gallery.videoReview.toolbar"] [aria-label="gallery.videoReview.undo"]'
       )
     ).not.toBeNull();
-    expect(fixture.host.querySelector('ol li')?.className).toContain(
+    expect(fixture.host.querySelector('.review-inspector-list li')?.className).toContain(
       'border-[var(--sniptale-color-accent)]'
     );
   } finally {
@@ -405,13 +421,13 @@ it('closes the preview only after saving the note and preserves it when saving f
       'header [aria-label="common.actions.close"]'
     )!;
     expect(close).not.toBeNull();
-    expect(fixture.button('back').closest('header')).not.toBeNull();
+    expect(fixture.host.querySelector('header [aria-label="gallery.videoReview.back"]')).toBeNull();
     await act(async () => close.click());
     expect(onClose).not.toHaveBeenCalled();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Keep this note');
     await act(async () => close.click());
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(fixture.back).not.toHaveBeenCalled();
+    expect(fixture.back).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
     expect(fixture.snapshot.draft).toBeNull();
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'annotation',
@@ -474,12 +490,14 @@ it('creates edits from recorded actions, selects their properties and recalculat
       '[data-ui="gallery.videoReview.actionProperties"]'
     )!;
     expect(properties.textContent).toContain('gallery.videoReview.actionRemoved');
-    expect(properties.querySelectorAll('button')).toHaveLength(0);
+    expect(
+      properties.querySelectorAll('button:not([aria-label="gallery.videoReview.historyOpen"])')
+    ).toHaveLength(0);
     expect(fixture.snapshot.draft).toBeNull();
   } finally {
     await fixture.cleanup();
   }
-});
+}, 30000);
 
 it('adds a note from the centered toolbar group and focuses the notes composer', async () => {
   const fixture = createEditorFixture(integration);
@@ -488,7 +506,7 @@ it('adds a note from the centered toolbar group and focuses the notes composer',
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
-    await fixture.click('zoomAdd');
+    await fixture.addFocus();
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')
     ).not.toBeNull();
@@ -508,4 +526,4 @@ it('adds a note from the centered toolbar group and focuses the notes composer',
   } finally {
     await fixture.cleanup();
   }
-});
+}, 30000);

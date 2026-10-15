@@ -20,6 +20,20 @@ function telemetry(): RecordingTelemetryEntry {
   };
 }
 
+it('never turns legacy static-frame and dwell overlap into a stable background', () => {
+  const project = createProject([createVideoClip({ sourceInstanceId: 'instance' })]);
+  const source = telemetry();
+  source.signals = [
+    { id: 'idle', kind: 'cursor-idle', startTime: 1, endTime: 4, point: null, data: {} },
+    { id: 'static', kind: 'static-frame', startTime: 1, endTime: 4, point: null, data: {} },
+  ];
+  expect(
+    buildTimelineTelemetryLaneData(project, source.recordingId, source).spans.map(
+      ({ kind, signalId }) => ({ kind, signalId })
+    )
+  ).toEqual([{ kind: 'cursor-idle', signalId: 'idle' }]);
+});
+
 it('projects the captured typing interval into each independent appearance at its own speed', () => {
   const project = createProject([
     createVideoClip({ id: 'first', sourceInstanceId: 'first-instance' }),

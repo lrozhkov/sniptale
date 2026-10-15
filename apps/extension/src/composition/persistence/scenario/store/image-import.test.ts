@@ -100,7 +100,7 @@ it('reuses an unedited immutable library source without staging a second object'
     imageContentState: 'original',
   });
   io.borrow.mockResolvedValue({ blob: sourceBlob, ref });
-  const result = await importScenarioImages({
+  const { project: result } = await importScenarioImages({
     ...input(),
     sources: [{ kind: 'library', mediaId: 'library' }],
   });
@@ -163,7 +163,7 @@ it('publishes ordered independent images as one aggregate and preserves the sour
   const args = input();
   args.sources.push({ kind: 'file', file: png('second.png') });
   const progress = vi.fn();
-  const result = await importScenarioImages({ ...args, onProgress: progress });
+  const { project: result } = await importScenarioImages({ ...args, onProgress: progress });
   expect(result.items.map((item) => item.title)).toEqual(['image.png', 'second.png']);
   expect(args.project.items).toEqual([]);
   expect(io.commit).toHaveBeenCalledTimes(1);
@@ -177,7 +177,7 @@ it('publishes ordered independent images as one aggregate and preserves the sour
 it('appends blocks only to the selected step and rejects missing targets before staging', async () => {
   const args = input();
   args.project.items.push(createGuideStep('Selected', 'step'));
-  const result = await importScenarioImages({
+  const { project: result } = await importScenarioImages({
     ...args,
     placement: { kind: 'blocks', stepId: 'step' },
   });
@@ -360,7 +360,7 @@ function replacementInput() {
 it('replaces exactly one image with fresh resources while retaining its layout and identity', async () => {
   const args = replacementInput();
   const original = structuredClone(args.project);
-  const result = await importScenarioImages(args);
+  const { project: result } = await importScenarioImages(args);
   expect(result.items).toHaveLength(1);
   const step = result.items[0];
   if (step?.kind !== 'step') throw new Error('Missing step');
@@ -413,7 +413,7 @@ it('replaces at block capacity and preserves the original on cancellation or con
   while (step.blocks.length < 200)
     step.blocks.push({ kind: 'heading', id: `extra-${step.blocks.length}`, text: '' });
   const original = structuredClone(args.project);
-  const result = await importScenarioImages(args);
+  const { project: result } = await importScenarioImages(args);
   expect(result.items[0]?.kind === 'step' && result.items[0].blocks.length).toBe(200);
   vi.clearAllMocks();
   const controller = new AbortController();
@@ -447,7 +447,7 @@ it('fills a resource-free slot without adding a second block', async () => {
       caption: '',
     },
   ];
-  const result = await importScenarioImages(args);
+  const { project: result } = await importScenarioImages(args);
   expect(result.items[0]).toMatchObject({
     blocks: [{ kind: 'image', id: 'target', frame: { width: 960, height: 540 } }],
   });
@@ -476,7 +476,7 @@ it('publishes independent video-frame bytes with user text and source provenance
     title: 'Open the menu',
     description: 'Choose the settings item.',
   };
-  const result = await importScenarioImages({ ...input(), sources: [frame] });
+  const { project: result } = await importScenarioImages({ ...input(), sources: [frame] });
   expect(result.items[0]).toMatchObject({
     title: frame.title,
     blocks: [
@@ -512,7 +512,7 @@ it('rejects invalid video provenance before preparing any part of a batch', asyn
 it('inserts an ordered batch before an existing item in a single publication', async () => {
   const args = input();
   args.project.items = [createGuideStep('First', 'first'), createGuideStep('Last', 'last')];
-  const result = await importScenarioImages({
+  const { project: result } = await importScenarioImages({
     ...args,
     sources: [
       { kind: 'file', file: png('A.png') },
@@ -535,7 +535,7 @@ it('rejects a vanished insertion anchor before acquiring assets', async () => {
 it('imports ordered tour slides without changing reference-guide content', async () => {
   const args = input();
   args.project.items.push(createGuideStep('Keep', 'keep'));
-  const result = await importScenarioImages({
+  const { project: result } = await importScenarioImages({
     ...args,
     sources: [
       { kind: 'file', file: png('A.png') },
@@ -553,7 +553,10 @@ it('imports ordered tour slides without changing reference-guide content', async
 });
 it('replaces tour images with new provenance and explicit positional review', async () => {
   const args = input();
-  const project = await importScenarioImages({ ...args, placement: { kind: 'tour-slides' } });
+  const { project: project } = await importScenarioImages({
+    ...args,
+    placement: { kind: 'tour-slides' },
+  });
   const slide = project.tour!.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Missing test slide');
   slide.hotspots = [
@@ -568,7 +571,7 @@ it('replaces tour images with new provenance and explicit positional review', as
       pulse: true,
     },
   ];
-  const result = await importScenarioImages({
+  const { project: result } = await importScenarioImages({
     ...args,
     project,
     sources: [{ kind: 'file', file: png('replacement.png') }],
@@ -628,7 +631,7 @@ it('creates a tour hotspot from video action evidence and preserves its source c
       target: { name: 'Open', tag: 'button', role: '' },
     },
   };
-  const result = await importScenarioImages({
+  const { project: result } = await importScenarioImages({
     ...input(),
     placement: { kind: 'tour-slides' },
     sources: [
@@ -713,7 +716,7 @@ it.each(
       });
     }
     const original = structuredClone(args.project);
-    const result = await importScenarioImages({
+    const { project: result } = await importScenarioImages({
       ...args,
       sources: sourceKind === 'library' ? [{ kind: 'library', mediaId: 'library' }] : args.sources,
     });
@@ -749,7 +752,7 @@ it('imports stage background through the shared transaction without changing the
   const args = input();
   args.project.tour = createTourDocument();
   const original = structuredClone(args.project);
-  const result = await importScenarioImages({
+  const { project: result } = await importScenarioImages({
     ...args,
     placement: { kind: 'tour-stage-background' },
   });

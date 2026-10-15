@@ -67,7 +67,7 @@ afterEach(() => {
   useEditorStore.getState().setFreshImageBackgroundPending(false);
 });
 
-it('suggests a gradient card only for a newly opened image background draft', () => {
+it('opening the background inspector preserves None without mutating the document', () => {
   useEditorStore.getState().setFreshImageBackgroundPending(true);
   const cleanOpenFrame = createCleanOpenFrame();
   const args = {
@@ -83,23 +83,14 @@ it('suggests a gradient card only for a newly opened image background draft', ()
     sourceWidth: 1280,
   };
   const hook = renderHook(args);
-  expect(hook.getValue()?.frameDraft).toMatchObject({
-    backgroundMode: 'gradient',
-    backgroundGradientFrom: '#f97316ff',
-    backgroundGradientTo: '#ec4899ff',
-    paddingTop: 32,
-    paddingRight: 32,
-    paddingBottom: 32,
-    paddingLeft: 32,
-    sourceImage: { radius: 12, shadow: 14 },
-  });
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
   expect(cleanOpenFrame).toMatchObject({ backgroundMode: 'color', paddingTop: 0 });
   expect(useEditorStore.getState().freshImageBackgroundPending).toBe(false);
   act(() => hook.getValue()?.setFrameDraft((draft) => ({ ...draft, paddingTop: 0 })));
   hook.rerender({ ...args, inspector: 'tool' });
   hook.rerender(args);
   expect(hook.getValue()?.frameDraft.paddingTop).toBe(0);
-  expect(hook.getValue()?.frameDraft.backgroundMode).toBe('gradient');
+  expect(hook.getValue()?.frameDraft.backgroundMode).toBe('color');
   act(() => hook.getValue()?.resetFrameDraft());
   expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
   hook.rerender({ ...args, inspector: 'tool' });

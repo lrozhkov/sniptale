@@ -1,3 +1,4 @@
+import { resolveProjectCursorFocusPath } from '../../../features/video/project/cursor-focus-path/projection';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { createSceneSelection } from '../selection/model';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
@@ -66,7 +67,10 @@ export function resolveSelectionAfterProjectUpdate(
         ? selection
         : createSceneSelection();
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
-      return project.cursorTrack?.samples.some((sample) => sample.id === selection.sampleId)
+      return project.cursorTrack?.samples.some((sample) => sample.id === selection.sampleId) ||
+        resolveProjectCursorFocusPath(project).segments.some((segment) =>
+          segment.keys.some((key) => key.id === selection.sampleId)
+        )
         ? selection
         : createSceneSelection();
     case VideoEditorSelectionKind.OBJECT_TRACK:

@@ -1,4 +1,5 @@
 import {
+  loadAudioTranscriptionSystemPrompt,
   loadAIModels,
   loadAIProviders,
   loadAISecretProtectionStatus,
@@ -18,6 +19,7 @@ import type {
 } from '../../../contracts/messaging/ai-settings-runtime';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
 import { isPrivateNetworkHost } from '@sniptale/platform/security/private-network-host';
+import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 
 function classifyProviderDestination(provider: AIProvider): AIProviderDestinationKind {
   if (provider.connectionType === 'chrome-built-in') {
@@ -31,11 +33,12 @@ function classifyProviderDestination(provider: AIProvider): AIProviderDestinatio
   }
 }
 
-function createProviderSelectorEntry(provider: AIProvider): AIProviderSelectorEntry {
+async function createProviderSelectorEntry(provider: AIProvider): Promise<AIProviderSelectorEntry> {
   return {
     connectionType: provider.connectionType,
     createdAt: provider.createdAt,
     destinationKind: classifyProviderDestination(provider),
+    destinationBinding: await createAIProviderDestinationBinding(provider),
     hasStoredApiKey: provider.hasStoredApiKey,
     id: provider.id,
     name: provider.name,
@@ -73,20 +76,26 @@ async function loadSanitizedModelSelection(): Promise<AIModelSelectionBootstrapP
 
   return {
     ...selection,
-    providers: selection.providers.map(createProviderSelectorEntry),
+    providers: await Promise.all(selection.providers.map(createProviderSelectorEntry)),
   };
 }
 
 async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataPayload> {
-  const [selectionBootstrap, scenarioEditorSystemPrompt, secretProtectionStatus] =
-    await Promise.all([
-      loadStoredModelSelection(),
-      loadScenarioEditorSystemPrompt(),
-      loadAISecretProtectionStatus(),
-    ]);
+  const [
+    selectionBootstrap,
+    scenarioEditorSystemPrompt,
+    secretProtectionStatus,
+    audioTranscriptionSystemPrompt,
+  ] = await Promise.all([
+    loadStoredModelSelection(),
+    loadScenarioEditorSystemPrompt(),
+    loadAISecretProtectionStatus(),
+    loadAudioTranscriptionSystemPrompt(),
+  ]);
 
   return {
     scenarioEditorSystemPrompt,
+    audioTranscriptionSystemPrompt,
     secretProtectionStatus,
     selectionBootstrap,
   };

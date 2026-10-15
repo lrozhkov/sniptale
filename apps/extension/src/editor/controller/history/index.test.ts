@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { crc32 } from 'node:zlib';
 
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import { createMockDocument } from '../instance/bindings/test-fixtures-document';
@@ -34,6 +35,58 @@ it('round-trips editor documents through snapshot history', () => {
   );
   expect(undoEditorSnapshot(history)).toEqual(first);
   expect(redoEditorSnapshot(history)).toEqual(second);
+});
+
+it('retains exactly 50 Image transitions, excluding its current snapshot from the action count', () => {
+  const document = createMockDocument();
+  const history = createEditorSnapshotHistory(document);
+  for (let index = 1; index <= 60; index++)
+    pushEditorSnapshotHistory({
+      history,
+      muted: false,
+      exportDocument: () => ({ ...document, sourceName: `image-${index}` }),
+    });
+  expect(history.getSnapshots()).toHaveLength(51);
+  for (let index = 59; index >= 10; index--)
+    expect(undoEditorSnapshot(history)?.sourceName).toBe(`image-${index}`);
+  expect(undoEditorSnapshot(history)).toBeNull();
+  for (let index = 11; index <= 60; index++)
+    expect(redoEditorSnapshot(history)?.sourceName).toBe(`image-${index}`);
+  expect(redoEditorSnapshot(history)).toBeNull();
+});
+
+it('counts distinct pooled rasters once and releases history-only tokens under the byte cap', () => {
+  const source = (index: number) =>
+    `data:image/png;base64,${String(index).padStart(4, 'A')}${'A'.repeat(1024 * 1024)}`;
+  const document = { ...createMockDocument(), sourceImageData: source(0) };
+  const history = createEditorSnapshotHistory(document);
+  for (let index = 1; index <= 10; index++)
+    pushEditorSnapshotHistory({
+      history,
+      muted: false,
+      exportDocument: () => ({
+        ...document,
+        sourceImageData: source(index),
+        sourceName: `raster-${index}`,
+      }),
+    });
+  const retained = history.getSnapshots();
+  expect(retained.length).toBeLessThan(8);
+  expect(retained.length).toBeGreaterThan(1);
+  expect(retained.every((snapshot) => snapshot.length < 1000)).toBe(true);
+  const urls = new Set<string>([source(10)]);
+  let value = undoEditorSnapshot(history);
+  while (value) {
+    urls.add(value.sourceImageData);
+    value = undoEditorSnapshot(history);
+  }
+  expect(
+    [...urls].reduce((sum, url) => sum + new TextEncoder().encode(url).byteLength, 0)
+  ).toBeLessThan(8 * 1024 * 1024);
+  while (redoEditorSnapshot(history)) {
+    /* Prove every retained transition remains decodable. */
+  }
+  expect(history.getState().index).toBe(history.getState().size - 1);
 });
 
 it('undoes and redoes edits to a hydrated document with a runtime blob source', () => {
@@ -79,7 +132,17 @@ it('stores repeated raster data once while keeping resize undo and redo loadable
 it('restores only image fields without reviver traversal of the full snapshot', () => {
   const image = `data:image/png;base64,${'A'.repeat(6_000)}`;
   const background = `data:image/png;base64,${'B'.repeat(6_000)}`;
-  const favicon = `data:image/png;base64,${'C'.repeat(6_000)}`;
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=',
+    'base64'
+  );
+  const text = Buffer.from(`Comment\0${'C'.repeat(6_000)}`);
+  const chunk = Buffer.alloc(text.length + 12);
+  chunk.writeUInt32BE(text.length);
+  chunk.write('tEXt', 4);
+  text.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(chunk.subarray(4, -4)), chunk.length - 4);
+  const favicon = `data:image/png;base64,${Buffer.concat([png.subarray(0, -12), chunk, png.subarray(-12)]).toString('base64')}`;
   const first = {
     ...createMockDocument(),
     sourceImageData: image,
@@ -89,6 +152,7 @@ it('restores only image fields without reviver traversal of the full snapshot', 
       title: 'Example',
       url: 'https://example.com',
       faviconDataUrl: favicon,
+      faviconEnabled: true,
       canvasMode: 'resize' as const,
       contentMode: 'push-down' as const,
     },
@@ -129,7 +193,7 @@ it('releases binary references after their snapshots leave the bounded history',
   }
   pushEditorSnapshotHistory({ exportDocument: () => first, history, muted: false });
 
-  expect(history.getSnapshots()).toHaveLength(80);
+  expect(history.getSnapshots()).toHaveLength(51);
   expect(history.getCurrent()).toContain('sniptale-history-asset:81');
   expect(undoEditorSnapshot(history)?.sourceImageData).toBe(source(80));
   expect(redoEditorSnapshot(history)?.sourceImageData).toBe(source(0));

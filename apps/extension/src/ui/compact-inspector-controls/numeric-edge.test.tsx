@@ -233,7 +233,7 @@ it('keeps row scrubbers hidden until the lower edge is hot or active', () => {
     range.dispatchEvent(createPointerEvent('pointerdown', { bubbles: true }));
     range.dispatchEvent(createPointerEvent('pointerup', { bubbles: true }));
   });
-  expect(onCommitValue).toHaveBeenCalledWith(42);
+  expect(onCommitValue).not.toHaveBeenCalled();
 });
 
 it('syncs non-editing prop updates into the visible numeric draft', () => {

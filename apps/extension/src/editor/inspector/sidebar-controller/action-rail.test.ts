@@ -88,6 +88,8 @@ function createEditorDocument() {
 
 function createController(): EditorActionRailTestController {
   return {
+    canvas: document.createElement('canvas'),
+    autosaveService: null,
     exportDocument: vi.fn(() => createEditorDocument()),
     insertImage: vi.fn(async () => undefined),
     loadDocument: vi.fn(async () => undefined),

@@ -33,6 +33,15 @@ const projectsDbMocks = vi.hoisted(() => ({
   readAssetFileMock: vi.fn(),
   recoverProjectMediaPublicationsMock: vi.fn(),
   writeBlobToAssetMock: vi.fn(),
+  releaseTransitionsMock: vi.fn(),
+  readyJournalsMock: vi.fn(),
+  cancelPublicationMock: vi.fn(),
+  releaseReadyMock: vi.fn(),
+}));
+
+vi.mock('../assets/opfs-store', async (original) => ({
+  ...(await original<typeof import('../assets/opfs-store')>()),
+  releaseAssetPublicationTransitions: projectsDbMocks.releaseTransitionsMock,
 }));
 
 vi.mock('../media-library/delete-cascade', () => ({
@@ -46,7 +55,9 @@ vi.mock('../assets', async (importOriginal) => ({
   completePhysicalDeleteOperation: projectsDbMocks.completePhysicalDeleteOperationMock,
   publishReadyJournalWithRetry: projectsDbMocks.publishReadyJournalWithRetryMock,
   readAssetFile: projectsDbMocks.readAssetFileMock,
-  releaseAssetReadyProtection: vi.fn(),
+  releaseAssetReadyProtection: projectsDbMocks.releaseReadyMock,
+  listReadyJournals: projectsDbMocks.readyJournalsMock,
+  cancelAssetPublication: projectsDbMocks.cancelPublicationMock,
   writeBlobToAsset: projectsDbMocks.writeBlobToAssetMock,
 }));
 
@@ -96,7 +107,11 @@ function createDb() {
         delete: projectsDbMocks.txDeleteMock,
         get: projectsDbMocks.txGetMock,
         getAll: projectsDbMocks.txGetAllMock,
-        index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
+        index: vi.fn(() => ({
+          count: vi.fn().mockResolvedValue(0),
+          getAll: async () => [],
+          getAllKeys: async () => [],
+        })),
         put: projectsDbMocks.txPutMock,
       })),
     })),
@@ -108,6 +123,10 @@ function resetProjectsDbMocks() {
   projectsDbMocks.dbGetMock.mockReset();
   projectsDbMocks.initDBMock.mockResolvedValue(createDb());
   projectsDbMocks.assertAssetWriteAdmissionMock.mockResolvedValue(undefined);
+  projectsDbMocks.releaseTransitionsMock.mockReset().mockResolvedValue(undefined);
+  projectsDbMocks.readyJournalsMock.mockReset().mockResolvedValue([]);
+  projectsDbMocks.cancelPublicationMock.mockReset().mockResolvedValue(undefined);
+  projectsDbMocks.releaseReadyMock.mockReset().mockResolvedValue(undefined);
   projectsDbMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
   projectsDbMocks.writeBlobToAssetMock.mockImplementation(async (blob: Blob) => ({
     ref: {
@@ -181,6 +200,7 @@ async function verifyProjectSaveRefreshesUpdatedAt() {
   await saveVideoProject(project);
 
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith({
+    usageReferenceKeys: ['indexed:v2'],
     createdAt: 55,
     id: 'project-1',
     lifecycle: {
@@ -385,6 +405,61 @@ describe('projects-db video project flows', () => {
 
 describe('projects-db asset save and read flows', () => {
   beforeEach(resetProjectsDbMocks);
+
+  it.each(['audio-mime', 'public', 'empty-review', 'clip-claim'] as const)(
+    'rejects an invalid private resource before staging bytes: %s',
+    async (invalid) => {
+      const { prepareProjectAsset } = await importProjectsDbModule();
+      await expect(
+        prepareProjectAsset(
+          new Blob(['logo']),
+          invalid === 'audio-mime' ? 'audio/webm' : 'image/png',
+          'logo.png',
+          'logo',
+          1,
+          invalid === 'clip-claim' ? { aggregateId: 'review', clipId: 'audio' } : undefined,
+          {
+            publishToLibrary: invalid === 'public',
+            requiredReviewResource: {
+              aggregateId: invalid === 'empty-review' ? '' : 'review',
+              slot: 'watermark',
+            },
+          }
+        )
+      ).rejects.toThrow('Invalid private review resource publication.');
+      expect(projectsDbMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+      expect(projectsDbMocks.writeBlobToAssetMock).not.toHaveBeenCalled();
+      expect(projectsDbMocks.createAssetPublicationJournalMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('records a watermark recovery slot in the real prepared writer before attachment', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    const prepared = await prepareProjectAsset(
+      new File(['logo'], 'logo.png', { type: 'image/png' }),
+      'image/png',
+      'logo.png',
+      'logo',
+      1,
+      undefined,
+      {
+        publishToLibrary: false,
+        originMediaId: 'source',
+        requiredReviewResource: { aggregateId: 'review', slot: 'watermark' },
+      }
+    );
+    await prepared.protect();
+    expect(projectsDbMocks.createAssetPublicationJournalMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          requiredReviewResource: { aggregateId: 'review', slot: 'watermark' },
+          publishToLibrary: false,
+          entry: expect.objectContaining({ originMediaId: 'source' }),
+        }),
+      })
+    );
+    expect(projectsDbMocks.publishReadyJournalWithRetryMock).not.toHaveBeenCalled();
+  });
 
   it('records private acquisition origin and publication intent before placement', async () => {
     const { saveProjectAsset } = await importProjectsDbModule();
@@ -602,5 +677,275 @@ describe('projects-db export flows', () => {
       source: { kind: 'project-export', exportId: 'export-1', projectId: exportEntry.projectId },
     });
     expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('recording:recording-1');
+  });
+});
+
+describe('prepared scene resources', () => {
+  beforeEach(resetProjectsDbMocks);
+  it('protects exact video slot claims and refuses Library binding through the upload writer', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    const claim = {
+      aggregateId: 'review',
+      slot: 'intro' as const,
+      kind: 'video' as const,
+      acquisition: 'private-upload' as const,
+    };
+    const prepared = await prepareProjectAsset(
+      new Blob(['video']),
+      'video/webm',
+      'intro.webm',
+      'intro',
+      1,
+      undefined,
+      { publishToLibrary: false, requiredReviewResource: claim }
+    );
+    await prepared.protect();
+    expect(projectsDbMocks.createAssetPublicationJournalMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          requiredReviewResource: claim,
+          publishToLibrary: false,
+        }),
+      })
+    );
+    projectsDbMocks.writeBlobToAssetMock.mockClear();
+    for (const acquisition of ['library-binding', 'private-frozen-image'] as const) {
+      await expect(
+        prepareProjectAsset(
+          new Blob(['video']),
+          'video/webm',
+          'intro.webm',
+          'intro',
+          1,
+          undefined,
+          { publishToLibrary: false, requiredReviewResource: { ...claim, acquisition } }
+        )
+      ).rejects.toThrow('Invalid private review resource');
+    }
+    expect(projectsDbMocks.writeBlobToAssetMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('prepared annotation resources', () => {
+  beforeEach(resetProjectsDbMocks);
+  const claim = {
+    aggregateId: 'review',
+    sourceAssetId: 'source',
+    snapshotId: `effect:${'a'.repeat(64)}`,
+    resourceId: 'mark',
+    sha256: 'b'.repeat(64),
+  };
+
+  it('reads its retained private physical ref without publishing and rejects reads outside that lease', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    const prepared = await prepareProjectAsset(
+      new Blob(['image'], { type: 'image/png' }),
+      'image/png',
+      'mark.png',
+      'mark',
+      1,
+      undefined,
+      { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
+    );
+    const signal = new AbortController().signal;
+    await expect(prepared.readForSession!(signal)).rejects.toThrow('retention is unavailable');
+    expect(projectsDbMocks.readAssetFileMock).not.toHaveBeenCalled();
+    const release = await prepared.retainForSession();
+    const blob = new File(['image'], 'mark.png', { type: 'image/png' });
+    projectsDbMocks.readAssetFileMock.mockResolvedValueOnce(blob);
+    expect(await prepared.readForSession!(signal)).toBe(blob);
+    expect(projectsDbMocks.readAssetFileMock).toHaveBeenCalledExactlyOnceWith(prepared.ref, 'mark');
+    expect(projectsDbMocks.publishReadyJournalWithRetryMock).not.toHaveBeenCalled();
+    expect(projectsDbMocks.dbPutMock).not.toHaveBeenCalled();
+    await release();
+    await expect(prepared.readForSession!(signal)).rejects.toThrow('retention is unavailable');
+  });
+
+  it.each(['abort', 'missing', 'release', 'publish'] as const)(
+    'cannot return stale private bytes after %s during a physical read',
+    async (outcome) => {
+      const { prepareProjectAsset } = await importProjectsDbModule();
+      const prepared = await prepareProjectAsset(
+        new Blob(['image'], { type: 'image/png' }),
+        'image/png',
+        'mark.png',
+        'mark',
+        1,
+        undefined,
+        { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
+      );
+      const release = await prepared.retainForSession();
+      const controller = new AbortController();
+      projectsDbMocks.readAssetFileMock.mockImplementationOnce(async () => {
+        if (outcome === 'missing') throw new Error('PRIVATE_PHYSICAL_ID');
+        if (outcome === 'abort') controller.abort();
+        if (outcome === 'release') await release();
+        if (outcome === 'publish') await prepared.publish();
+        return new File(['image'], 'mark.png', { type: 'image/png' });
+      });
+      const read = prepared.readForSession!(controller.signal);
+      if (outcome === 'abort') await expect(read).rejects.toMatchObject({ name: 'AbortError' });
+      else
+        await expect(read).rejects.toThrow(
+          outcome === 'missing' ? 'bytes are unavailable' : 'retention is unavailable'
+        );
+      await release();
+    }
+  );
+
+  it.each([false, true])(
+    'terminal cancellation does not recreate an erased journal, retained=%s',
+    async (retained) => {
+      const { prepareProjectAsset } = await importProjectsDbModule();
+      const prepared = await prepareProjectAsset(
+        new Blob(['image'], { type: 'image/png' }),
+        'image/png',
+        'mark.png',
+        'mark',
+        1,
+        undefined,
+        { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
+      );
+      const release = await prepared.retainForSession();
+      const journal = {
+        journalId: 'journal-1',
+        domain: 'project-assets',
+        createdAt: 1,
+        assetRefs: [prepared.ref],
+        payload: {
+          entry: {
+            id: 'mark',
+            assetId: prepared.ref.assetId,
+            mimeType: 'image/png',
+            size: prepared.ref.size,
+            createdAt: 1,
+          },
+          filename: 'mark.png',
+          expectedAssetId: null,
+          publishToLibrary: false,
+          requiredReviewAnnotationEffect: claim,
+        },
+      };
+      projectsDbMocks.readyJournalsMock.mockResolvedValue(retained ? [journal] : []);
+      try {
+        await prepared.cancel();
+        await prepared.cancel();
+        await prepared.publish();
+        expect(projectsDbMocks.cancelPublicationMock).toHaveBeenCalledTimes(retained ? 1 : 0);
+        if (retained)
+          expect(projectsDbMocks.cancelPublicationMock).toHaveBeenCalledWith(
+            journal,
+            expect.anything()
+          );
+        else
+          expect(projectsDbMocks.releaseReadyMock).toHaveBeenCalledExactlyOnceWith([
+            'asset-object-1',
+          ]);
+        expect(projectsDbMocks.publishReadyJournalWithRetryMock).not.toHaveBeenCalled();
+        expect(projectsDbMocks.dbPutMock).not.toHaveBeenCalled();
+      } finally {
+        await release();
+      }
+    }
+  );
+
+  it('protects before releasing the global gate and defers recovery until session release', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    const { tryVoiceoverAttachmentLock } = await import('./voiceover-publication-lock');
+    const prepared = await prepareProjectAsset(
+      new Blob(['image'], { type: 'image/png' }),
+      'image/png',
+      'mark.png',
+      'mark',
+      1,
+      undefined,
+      { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
+    );
+    const release = await prepared.retainForSession();
+    try {
+      expect(projectsDbMocks.createAssetPublicationJournalMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            expectedAssetId: null,
+            publishToLibrary: false,
+            requiredReviewAnnotationEffect: claim,
+          }),
+        })
+      );
+      expect(projectsDbMocks.releaseTransitionsMock).toHaveBeenCalledExactlyOnceWith([
+        'asset-object-1',
+      ]);
+      expect(
+        projectsDbMocks.createAssetPublicationJournalMock.mock.invocationCallOrder[0]
+      ).toBeLessThan(projectsDbMocks.releaseTransitionsMock.mock.invocationCallOrder[0]!);
+      expect(await tryVoiceoverAttachmentLock('project-asset:mark', async () => 'recovery')).toBe(
+        'defer'
+      );
+      expect(projectsDbMocks.publishReadyJournalWithRetryMock).not.toHaveBeenCalled();
+      expect(projectsDbMocks.dbPutMock).not.toHaveBeenCalled();
+      expect(await prepared.retainForSession()).toBe(release);
+    } finally {
+      await release();
+    }
+    expect(await tryVoiceoverAttachmentLock('project-asset:mark', async () => 'recovery')).toBe(
+      'recovery'
+    );
+    await release();
+  });
+
+  it('releases an acquired attachment lease after failed protection and permits explicit retry', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    const { tryVoiceoverAttachmentLock } = await import('./voiceover-publication-lock');
+    const prepared = await prepareProjectAsset(
+      new Blob(['image'], { type: 'image/png' }),
+      'image/png',
+      'mark.png',
+      'mark',
+      1,
+      undefined,
+      { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
+    );
+    projectsDbMocks.createAssetPublicationJournalMock.mockRejectedValueOnce(
+      new Error('journal failed')
+    );
+    await expect(prepared.retainForSession()).rejects.toThrow('journal failed');
+    expect(projectsDbMocks.releaseTransitionsMock).not.toHaveBeenCalled();
+    expect(await tryVoiceoverAttachmentLock('project-asset:mark', async () => 'recovery')).toBe(
+      'recovery'
+    );
+    const release = await prepared.retainForSession();
+    await release();
+  });
+
+  it('rejects public/mixed claims and immutable identity collision before staging', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    for (const options of [
+      { publishToLibrary: true, requiredReviewAnnotationEffect: claim },
+      { publishToLibrary: false, requiredReviewAnnotationEffect: claim, originMediaId: 'library' },
+      {
+        publishToLibrary: false,
+        requiredReviewAnnotationEffect: claim,
+        requiredReviewResource: { aggregateId: 'review', slot: 'watermark' as const },
+      },
+    ])
+      await expect(
+        prepareProjectAsset(
+          new Blob(['image']),
+          'image/png',
+          'mark.png',
+          'mark',
+          1,
+          undefined,
+          options
+        )
+      ).rejects.toThrow('Invalid private annotation');
+    projectsDbMocks.dbGetMock.mockResolvedValueOnce(createProjectAssetEntry({ id: 'mark' }));
+    await expect(
+      prepareProjectAsset(new Blob(['image']), 'image/png', 'mark.png', 'mark', 1, undefined, {
+        publishToLibrary: false,
+        requiredReviewAnnotationEffect: claim,
+      })
+    ).rejects.toThrow('new immutable identity');
+    expect(projectsDbMocks.writeBlobToAssetMock).not.toHaveBeenCalled();
   });
 });

@@ -213,7 +213,7 @@ function expectLockedOverlayMotionBlurDraws(params: {
     2,
     { asset: 'image' },
     expect.any(Map),
-    0.4
+    1
   );
   expect(drawCompositionLayerMock).toHaveBeenNthCalledWith(
     2,
@@ -223,7 +223,7 @@ function expectLockedOverlayMotionBlurDraws(params: {
     2,
     { asset: 'image' },
     expect.any(Map),
-    0.6
+    1
   );
   expect(drawCompositionLayerMock).toHaveBeenNthCalledWith(
     3,

@@ -13,12 +13,12 @@ export function findElementByCompositeSelector(composite: CompositeSelector): El
   if (composite.iframeSelector) {
     const iframe = document.querySelector(composite.iframeSelector);
     if (!(iframe instanceof HTMLIFrameElement)) {
-      logger.warn(`Iframe not found: ${composite.iframeSelector}`);
+      logger.warn('Iframe not found');
       return null;
     }
 
     if (!isIframeAccessible(iframe)) {
-      logger.warn(`Iframe not accessible: ${composite.iframeSelector}`);
+      logger.warn('Iframe not accessible');
       return null;
     }
 

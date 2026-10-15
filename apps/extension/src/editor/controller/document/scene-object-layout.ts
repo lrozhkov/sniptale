@@ -2,7 +2,6 @@ import type { Canvas, FabricObject } from 'fabric';
 
 import type { SourceState } from '../../document/model/source-state';
 import {
-  BROWSER_HEADER_HEIGHT,
   isBackgroundObject,
   isBrowserFrameObject,
   isUserObject,
@@ -16,20 +15,26 @@ function resolveBrowserFrameObjectScale(args: {
   };
   sourceSizeChanged: boolean;
 }) {
-  const baseWidth = Math.max(
-    1,
-    args.object.width ?? args.object.getScaledWidth() ?? args.layoutSource.width
-  );
-  const baseHeight = Math.max(
-    1,
-    args.object.height ?? args.object.getScaledHeight() ?? BROWSER_HEADER_HEIGHT
-  );
-  const scaledWidth = args.sourceSizeChanged
-    ? args.layoutSource.width
-    : args.object.getScaledWidth();
+  const measuredWidth = args.object.getScaledWidth();
+  const measuredHeight = args.object.getScaledHeight();
+  const currentWidth =
+    Number.isFinite(measuredWidth) && measuredWidth > 0 ? measuredWidth : args.layoutSource.width;
+  const currentHeight =
+    Number.isFinite(measuredHeight) && measuredHeight > 0
+      ? measuredHeight
+      : Math.max(1, Number.isFinite(args.object.height) ? args.object.height : 1);
+  const baseWidth =
+    Number.isFinite(args.object.width) && args.object.width > 0
+      ? args.object.width
+      : Math.max(1, currentWidth);
+  const baseHeight =
+    Number.isFinite(args.object.height) && args.object.height > 0
+      ? args.object.height
+      : currentHeight;
+  const scaledWidth = args.sourceSizeChanged ? args.layoutSource.width : currentWidth;
   const scaledHeight = args.sourceSizeChanged
-    ? BROWSER_HEADER_HEIGHT
-    : args.object.getScaledHeight();
+    ? (currentHeight * args.layoutSource.width) / Math.max(1, currentWidth)
+    : currentHeight;
 
   return {
     scaleX: Math.max(1, scaledWidth) / baseWidth,

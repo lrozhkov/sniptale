@@ -46,6 +46,10 @@ export function storageResult(
 
 export function createPorts(order: string[] = []): PrivacyErasurePorts {
   return {
+    audioJobs: {
+      cancelActiveJob: vi.fn(async () => undefined),
+      reserveErasureExclusion: () => ({ release() {}, async waitForActiveMutations() {} }),
+    },
     diagnostics: {
       cleanup: vi.fn(async () => {
         order.push('diagnostics');

@@ -39,7 +39,7 @@ vi.mock('./controls', async (importOriginal) => ({
 }));
 vi.mock('../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../recording-control-lease')>()),
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
   validateRecordingControlCapability: validateRecordingControlCapabilityMock,
 }));
 vi.mock('../sender-policy', async (importOriginal) => ({

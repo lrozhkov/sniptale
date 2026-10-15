@@ -12,6 +12,38 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it('refuses an already cancelled request before fetch and distinguishes caller cancellation from timeout', async () => {
+  const { postJsonWithTimeout } = await import('./http');
+  const controller = new AbortController();
+  controller.abort();
+  const options = {
+    url: 'https://provider.test/chat',
+    body: { prompt: 'private' },
+    headers: {},
+    timeoutErrorMessage: 'timed out',
+  };
+  await expect(
+    postJsonWithTimeout({ ...options, signal: controller.signal })
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  expect(fetchMock).not.toHaveBeenCalled();
+  const active = new AbortController();
+  fetchMock.mockImplementationOnce(
+    (_input: RequestInfo | URL, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Fetch stopped', 'AbortError')),
+          { once: true }
+        );
+      })
+  );
+  const response = postJsonWithTimeout({ ...options, signal: active.signal });
+  const refusal = expect(response).rejects.toMatchObject({ name: 'AbortError' });
+  active.abort();
+  await refusal;
+  expect(vi.getTimerCount()).toBe(0);
+});
+
 it('returns parsed JSON data for successful HTTP responses', async () => {
   const { postJsonWithTimeout } = await import('./http');
 

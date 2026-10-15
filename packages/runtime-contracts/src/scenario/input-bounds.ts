@@ -36,3 +36,68 @@ export function isBoundedScenarioInput(value: unknown): boolean {
   }
   return visit(value, 0);
 }
+
+/**
+ * Checks a privately owned, stable batch consumed synchronously in one read scope.
+ * Reused subtree summaries still charge every occurrence to each document's limits.
+ * No summary escapes this call or admits a later read of a mutable object.
+ */
+export function* areBoundedScenarioInputs(
+  values: readonly unknown[]
+): Generator<boolean, void, unknown> {
+  interface Size {
+    visits: number;
+    text: number;
+    depth: number;
+  }
+  const known = new WeakMap<object, Size>();
+  const ancestors = new WeakSet<object>();
+  function measure(value: unknown, depth: number): Size | null {
+    if (depth > GUIDE_LIMITS.maxInputDepth) return null;
+    if (typeof value === 'string')
+      return value.length <= GUIDE_LIMITS.maxInputTextLength
+        ? { visits: 1, text: value.length, depth: 0 }
+        : null;
+    if (value === null || typeof value === 'boolean') return { visits: 1, text: 0, depth: 0 };
+    if (typeof value === 'number')
+      return Number.isFinite(value) ? { visits: 1, text: 0, depth: 0 } : null;
+    if (typeof value !== 'object' || ancestors.has(value)) return null;
+    const previous = known.get(value);
+    if (previous) return previous.depth + depth <= GUIDE_LIMITS.maxInputDepth ? previous : null;
+    if (
+      !Array.isArray(value) &&
+      Object.getPrototypeOf(value) !== Object.prototype &&
+      Object.getPrototypeOf(value) !== null
+    )
+      return null;
+    const keys = Object.keys(value);
+    if (
+      keys.length + 1 > GUIDE_LIMITS.maxInputVisits ||
+      (Array.isArray(value) && keys.length !== value.length)
+    )
+      return null;
+    const size = { visits: 1, text: 0, depth: 0 };
+    ancestors.add(value);
+    try {
+      for (const key of keys) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (!descriptor || !('value' in descriptor)) return null;
+        const child = measure(descriptor.value, depth + 1);
+        if (!child) return null;
+        size.visits += child.visits;
+        size.text += key.length + child.text;
+        size.depth = Math.max(size.depth, child.depth + 1);
+        if (
+          size.visits > GUIDE_LIMITS.maxInputVisits ||
+          size.text > GUIDE_LIMITS.maxInputTextLength
+        )
+          return null;
+      }
+    } finally {
+      ancestors.delete(value);
+    }
+    known.set(value, size);
+    return size;
+  }
+  for (const value of values) yield measure(value, 0) !== null;
+}

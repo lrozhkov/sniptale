@@ -116,23 +116,31 @@ function collectAndPersistTelemetry(
       const timestamp = Date.now();
       await saveRecordingTelemetrySafely({
         recordingId,
+        ...(telemetry.observationClock
+          ? { observationClock: structuredClone(telemetry.observationClock) }
+          : {}),
+        ...(telemetry.capabilities ? { capabilities: { ...telemetry.capabilities } } : {}),
+        ...(telemetry.provenance ? { provenance: { ...telemetry.provenance } } : {}),
         createdAt: timestamp,
         updatedAt: timestamp,
         captureMode: mode,
         displaySurface,
         viewport: telemetry.viewport,
-        cursorTrack: telemetry.cursorTrack,
+        cursorTrack: resolveRecordingCursorPoints(telemetry, transform),
         actionEvents: resolveRecordingActionPoints(telemetry, transform),
-        signals: telemetry.signals,
+        signals: telemetry.signals.map((signal) => ({
+          ...signal,
+          recordingPoint: resolvePointProjector(telemetry, transform)(signal.point),
+        })),
       });
     })(),
   };
 }
 
-function resolveRecordingActionPoints(
+function resolvePointProjector(
   telemetry: NonNullable<ReturnType<typeof getControlledCursorTelemetry>>,
   transform: RecordingPointTransform | null
-): RecordingActionEvent[] {
+): (point: { x: number; y: number } | null) => { x: number; y: number } | null {
   const observation = telemetry.viewportObservation;
   const admitted =
     isRecordingPointTransform(transform) &&
@@ -142,26 +150,43 @@ function resolveRecordingActionPoints(
         ([observedKey, observedValue]) => key === observedKey && value === observedValue
       )
     );
+  return (point) => {
+    if (!admitted || !transform || !point) return null;
+    const { x, y } = point;
+    const rect = transform.visibleClientRect;
+    const projected = {
+      x: x * transform.scaleX + transform.offsetX,
+      y: y * transform.scaleY + transform.offsetY,
+    };
+    return x >= rect.x &&
+      y >= rect.y &&
+      x <= rect.x + rect.width &&
+      y <= rect.y + rect.height &&
+      isRecordingPoint(projected)
+      ? projected
+      : null;
+  };
+}
+
+function resolveRecordingActionPoints(
+  telemetry: NonNullable<ReturnType<typeof getControlledCursorTelemetry>>,
+  transform: RecordingPointTransform | null
+): RecordingActionEvent[] {
+  const project = resolvePointProjector(telemetry, transform);
   return telemetry.actionEvents.map((event) => {
-    let recordingPoint = null;
-    if (admitted && transform && event.point) {
-      const { x, y } = event.point;
-      const rect = transform.visibleClientRect;
-      const point = {
-        x: x * transform.scaleX + transform.offsetX,
-        y: y * transform.scaleY + transform.offsetY,
-      };
-      if (
-        x >= rect.x &&
-        y >= rect.y &&
-        x <= rect.x + rect.width &&
-        y <= rect.y + rect.height &&
-        isRecordingPoint(point)
-      ) {
-        recordingPoint = point;
-      }
-    }
-    return { ...event, point: event.point ? { ...event.point } : null, recordingPoint };
+    const release =
+      typeof event.data['upX'] === 'number' && typeof event.data['upY'] === 'number'
+        ? project({ x: event.data['upX'], y: event.data['upY'] })
+        : null;
+    return {
+      ...event,
+      point: event.point ? { ...event.point } : null,
+      recordingPoint: project(event.point),
+      data: {
+        ...event.data,
+        ...(release ? { recordingUpX: release.x, recordingUpY: release.y } : {}),
+      },
+    };
   });
 }
 
@@ -236,4 +261,20 @@ export function runStopSideEffects(
 
 export function waitForStopSideEffects(): Promise<void> {
   return pendingStopSideEffects;
+}
+
+/** Applies the admitted click transform to cursor facts while retaining original client coordinates. */
+function resolveRecordingCursorPoints(
+  telemetry: NonNullable<ReturnType<typeof getControlledCursorTelemetry>>,
+  transform: RecordingPointTransform | null
+) {
+  if (!telemetry.cursorTrack) return null;
+  const project = resolvePointProjector(telemetry, transform);
+  return {
+    ...telemetry.cursorTrack,
+    samples: telemetry.cursorTrack.samples.map((sample) => ({
+      ...sample,
+      recordingPoint: project({ x: sample.x, y: sample.y }),
+    })),
+  };
 }

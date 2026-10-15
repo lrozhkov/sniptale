@@ -1,12 +1,13 @@
 import type { ReviewBeforeAction } from './note-transitions';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 
-const localNavigation = [
-  '[role="slider"]:not([data-ui="gallery.videoReview.timePlane"])',
-  '[role="listbox"],[role="option"],[role="tab"],[role="menuitem"]',
-  '[data-ui="gallery.videoReview.inspector"] :is(button,summary)',
-].join(',');
+import {
+  reviewKeyboardTarget,
+  reviewOwnsKeys,
+  reviewOwnsNavigation,
+  reviewOwnsPlaybackKeys,
+} from './keyboard-context';
 
 function handleBoundaryShortcut(
   event: KeyboardEvent,
@@ -16,7 +17,7 @@ function handleBoundaryShortcut(
   const home = event.code === 'Home' || event.key === 'Home';
   const end = event.code === 'End' || event.key === 'End';
   if (!home && !end) return false;
-  if (event.shiftKey || (event.target instanceof Element && event.target.closest(localNavigation)))
+  if (event.shiftKey || (event.target instanceof HTMLElement && reviewOwnsNavigation(event.target)))
     return false;
   event.preventDefault();
   seek(home ? navigation.start : navigation.end, false);
@@ -48,63 +49,79 @@ function useReviewKeys({
   add(): void;
   tool(key: 'c' | 'v'): void;
 }) {
+  const playbackSpace = useRef(false);
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return;
+    // Capture before focused buttons/selects consume Space or schedule their native click.
+    const onPlaybackKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' && event.key !== ' ') return;
       if (
-        event.target instanceof Element &&
-        event.target.closest('[role="dialog"],[role="alertdialog"]')
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
       )
         return;
+      const target = reviewKeyboardTarget(event);
+      if (!target || reviewOwnsPlaybackKeys(target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      playbackSpace.current = true;
+      if (!event.repeat) play();
+    };
+    const onPlaybackKeyUp = (event: KeyboardEvent) => {
+      if (!playbackSpace.current || (event.code !== 'Space' && event.key !== ' ')) return;
+      playbackSpace.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    const clearPlaybackKey = () => {
+      playbackSpace.current = false;
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return;
+      const target = reviewKeyboardTarget(event);
+      if (!target || reviewOwnsKeys(target)) return;
       const key = event.code.startsWith('Key')
         ? event.code.slice(3).toLowerCase()
         : event.key.toLowerCase();
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
-        cancelDrawing();
+        if (!event.repeat) cancelDrawing();
         return;
       }
-      const target = event.target;
       if (
-        target instanceof HTMLElement &&
-        (target.closest('input,textarea,select') || target.isContentEditable)
-      )
-        return;
-      if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(key)) {
+        !event.altKey &&
+        !(event.ctrlKey && event.metaKey) &&
+        (event.ctrlKey || event.metaKey) &&
+        ['z', 'y'].includes(key)
+      ) {
         event.preventDefault();
+        if (event.repeat) return;
         if (key === 'y' || event.shiftKey) redo();
         else undo();
         return;
       }
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (handleBoundaryShortcut(event, navigation, seek)) return;
-      if (event.key === ' ') {
-        if (
-          target instanceof HTMLElement &&
-          target.closest('[data-ui="gallery.videoReview.inspector"]') &&
-          target.closest('button,summary')
-        )
-          return;
-        event.preventDefault();
-        if (!event.repeat) play();
-        return;
-      }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
-        remove();
+        if (!event.repeat) remove();
         return;
       }
-      if (key === 'm') {
+      if (!event.shiftKey && key === 'm') {
         event.preventDefault();
-        add();
+        if (!event.repeat) add();
         return;
       }
-      if (key === 'c' || key === 'v') {
+      if (!event.shiftKey && (key === 'c' || key === 'v')) {
         event.preventDefault();
-        tool(key === 'c' ? 'c' : 'v');
+        if (!event.repeat) tool(key === 'c' ? 'c' : 'v');
         return;
       }
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        if (reviewOwnsNavigation(target)) return;
         event.preventDefault();
         const direction = event.key === 'ArrowLeft' ? -1 : 1;
         const next = boundaries
@@ -115,8 +132,16 @@ function useReviewKeys({
         seek(next ?? time);
       }
     };
+    window.addEventListener('keydown', onPlaybackKeyDown, true);
+    window.addEventListener('keyup', onPlaybackKeyUp, true);
+    window.addEventListener('blur', clearPlaybackKey);
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onPlaybackKeyDown, true);
+      window.removeEventListener('keyup', onPlaybackKeyUp, true);
+      window.removeEventListener('blur', clearPlaybackKey);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   });
 }
 
@@ -147,19 +172,25 @@ export function useReviewEditorShortcuts(args: {
   useReviewKeys({
     time: args.time,
     navigation: args.navigation,
-    seek: (...values) => admit(() => args.seek(...values)),
-    play: () => admit(args.play),
+    seek: (...values) => {
+      if (!args.busy && !exportBlocked) admit(() => args.seek(...values));
+    },
+    play: () => {
+      if (!args.busy && !exportBlocked) admit(args.play);
+    },
     cancelDrawing: args.cancelDrawing,
     undo: () => {
-      if (!editingBlocked && !exportBlocked) void args.run(args.undo);
+      if (!editingBlocked && !args.busy && !exportBlocked) void args.run(args.undo);
     },
     redo: () => {
-      if (!editingBlocked && !exportBlocked) void args.run(args.redo);
+      if (!editingBlocked && !args.busy && !exportBlocked) void args.run(args.redo);
     },
     remove: () => {
       if (!editingBlocked && !args.busy && !exportBlocked) admit(args.remove);
     },
-    add: () => admit(args.addComment),
+    add: () => {
+      if (!editingBlocked && !args.busy && !exportBlocked) admit(args.addComment);
+    },
     tool: (key) => {
       if (!editingBlocked && !args.busy && !exportBlocked) {
         admit(() => {

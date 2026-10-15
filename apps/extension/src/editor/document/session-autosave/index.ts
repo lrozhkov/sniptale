@@ -18,7 +18,7 @@ import {
 } from './persistence';
 import { scheduleImagePresentation } from './presentation';
 import {
-  clearPendingAutosaveTimer,
+  cancelPendingAutosaveRequest,
   interruptImagePresentation,
   releaseAutosaveInteraction,
   createAutosaveState,
@@ -27,7 +27,12 @@ import {
 } from './state';
 
 export interface EditorSessionAutosaveService {
-  activate: (context: ActiveEditorSessionContext) => void;
+  activate: (context: ActiveEditorSessionContext, options?: { preserveMode?: boolean }) => void;
+  /** Closes automatic capture until the current document-opening owner admits its loaded canvas. */
+  beginHydration: (isCurrent: () => boolean) => {
+    finish: (ready: boolean) => void;
+    saveNow: (getDocument: () => EditorDocument) => Promise<void>;
+  };
   rebindAggregate: (context: ActiveEditorSessionContext) => void;
   updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
   restoreDraft: (
@@ -35,7 +40,7 @@ export interface EditorSessionAutosaveService {
     isCurrent?: () => boolean
   ) => Promise<ImageWorkspaceEntry | undefined>;
   scheduleAutosave: (document: EditorDocument) => void;
-  /** Suspends background work for an active page interaction without aborting atomic writes. */
+  /** Defers presentation work; admitted immutable document captures remain eligible to save. */
   setInteractionActive: (active: boolean) => void;
   flushAutosave: (getDocument: () => EditorDocument) => Promise<void>;
   persistSnapshot: (getDocument: () => EditorDocument) => Promise<void>;
@@ -56,7 +61,30 @@ function createEditorSessionAutosaveActions(
   state: EditorSessionAutosaveState
 ): EditorSessionAutosaveService {
   return {
-    activate: (context) => activateAutosaveContext(state, context),
+    activate: (context, options) => activateAutosaveContext(state, context, options),
+    beginHydration: (isCurrent) => {
+      const hydration = { isCurrent };
+      state.hydration = hydration;
+      state.hydrationGeneration += 1;
+      cancelPendingAutosaveRequest(state);
+      interruptImagePresentation(state);
+      return {
+        saveNow: (getDocument) => saveEditorSessionSnapshot(state, getDocument, hydration),
+        finish: (ready) => {
+          if (state.hydration !== hydration || !hydration.isCurrent() || !ready) return;
+          state.hydration = null;
+          schedulePendingAutosaveWrite(state);
+          const context = state.activeContext;
+          if (context && state.presentationPending)
+            scheduleImagePresentation(
+              context,
+              context.durableRevision,
+              state.autosaveRevision,
+              state
+            );
+        },
+      };
+    },
     rebindAggregate: (context) => rebindAutosaveAggregate(state, context),
     updateContext: (patch) => updateAutosaveContext(state, patch),
     restoreDraft: (aggregateId, isCurrent) => restoreAutosaveDraft(state, aggregateId, isCurrent),
@@ -66,12 +94,10 @@ function createEditorSessionAutosaveActions(
       state.interactionRevision += 1;
       state.interactionActive = active;
       if (active) {
-        clearPendingAutosaveTimer(state);
         interruptImagePresentation(state);
         return;
       }
       releaseAutosaveInteraction(state);
-      schedulePendingAutosaveWrite(state);
       const context = state.activeContext;
       if (context && state.presentationPending) {
         scheduleImagePresentation(context, context.durableRevision, state.autosaveRevision, state);
@@ -85,9 +111,9 @@ function createEditorSessionAutosaveActions(
     setEnabled: (enabled, getDocument) => {
       if (state.enabled === enabled) return;
       state.enabled = enabled;
-      clearPendingAutosaveTimer(state);
+      cancelPendingAutosaveRequest(state);
       state.pendingDocument = null;
-      if (enabled && state.activeContext && getDocument) {
+      if (enabled && state.activeContext && !state.hydration && getDocument) {
         queuePendingAutosave(state, getDocument());
       } else if (!enabled) {
         setEditorSaveState('idle');

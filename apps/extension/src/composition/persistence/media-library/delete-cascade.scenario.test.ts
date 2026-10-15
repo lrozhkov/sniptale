@@ -1,3 +1,5 @@
+import { withVideoProjectUsage } from './usage-index-keys';
+import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { expect, it } from 'vitest';
 import { mediaId, physicalId, mediaEntry, rows, replaceRows } from './delete-cascade.test-support';
 import {
@@ -11,6 +13,8 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from '../../../features/scenario/project/public';
+import { materializeScenarioUnitStorage } from '../scenario/storage-units';
+import { parseScenarioProjectEntry } from '../scenario/read-guards';
 import { createScenarioProjectEntry } from '../scenario/projects/entry';
 
 it.each([false, true])(
@@ -111,6 +115,10 @@ it.each([false, true])(
       ])
     );
 
+    const montage = createVideoProjectEntryWithMediaClip();
+    montage.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: childId };
+    rows.set('video_projects', new Map([[montage.id, withVideoProjectUsage(montage)]]));
+
     if (replaced)
       rows.get('asset_refs')!.set(childPhysicalId, {
         assetId: childPhysicalId,
@@ -122,8 +130,20 @@ it.each([false, true])(
 
     await deleteMediaAssetWithProjectCascade(scenarioMediaId, [
       { id: scenarioId, kind: 'scenario', name: 'Guide', primary: false },
+      { id: montage.id, kind: 'video', name: montage.project.name, primary: false },
     ]);
-    const saved = rows.get('scenario_projects')!.get(scenarioId) as typeof entry;
+    expect(rows.get('video_projects')!.get(montage.id)).toMatchObject({
+      usageReferenceKeys: ['indexed:v2'],
+      project: { assets: [], clips: [] },
+    });
+    const saved = parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(
+        rows.get('scenario_projects')!.get(scenarioId),
+        [...(rows.get('scenario_project_history')?.values() ?? [])],
+        [...(rows.get('scenario_project_units')?.values() ?? [])]
+      )
+    );
+    if (!saved) throw new Error('Expected readable canonical scenario after cascade');
     expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
     expect(rows.get('scenario_assets')?.has(childId)).toBe(false);
     expect(rows.get('media_library')?.has(scenarioMediaId)).toBe(false);
@@ -214,7 +234,15 @@ it.each([
     expect(rows.get('media_library')?.has(mediaId)).toBe(false);
     expect(rows.get('scenario_assets')?.has('private-child')).toBe(false);
     expect(rows.get('asset_refs')?.has('private-object')).toBe(false);
-    const saved = rows.get('scenario_projects')!.get(project.id) as typeof entry;
+    const saved = parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(
+        rows.get('scenario_projects')!.get(project.id),
+        [...(rows.get('scenario_project_history')?.values() ?? [])],
+        [...(rows.get('scenario_project_units')?.values() ?? [])]
+      )
+    );
+    expect(saved).not.toBeNull();
+    if (!saved) throw new Error('Expected a readable scenario after detaching narration.');
     expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
   }
 );
@@ -312,7 +340,15 @@ it('removes a published audio resource, narration and history on direct permanen
   expect(rows.get('media_library')?.has(audioMediaId)).toBe(false);
   expect(rows.get('scenario_assets')?.has('audio-child')).toBe(false);
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
-  const saved = rows.get('scenario_projects')!.get(project.id) as typeof entry;
+  const saved = parseScenarioProjectEntry(
+    materializeScenarioUnitStorage(
+      rows.get('scenario_projects')!.get(project.id),
+      [...(rows.get('scenario_project_history')?.values() ?? [])],
+      [...(rows.get('scenario_project_units')?.values() ?? [])]
+    )
+  );
+  expect(saved).not.toBeNull();
+  if (!saved) throw new Error('Expected a readable scenario after detaching narration.');
   expect(saved.history?.length).toBeGreaterThan(0);
   for (const content of [
     saved.project,

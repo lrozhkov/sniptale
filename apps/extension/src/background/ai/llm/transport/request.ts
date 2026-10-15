@@ -115,7 +115,8 @@ async function sendChatRequest(
   apiUrl: string,
   apiKey: string,
   payload: object,
-  handleStatus: (status: number, errorData: unknown) => void
+  handleStatus: (status: number, errorData: unknown) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   let response: Awaited<ReturnType<typeof postJsonWithTimeout>>;
   try {
@@ -127,8 +128,10 @@ async function sendChatRequest(
         Authorization: `Bearer ${apiKey}`,
       },
       timeoutErrorMessage: translate('background.runtime.llmRequestTimeout'),
+      ...(signal ? { signal } : {}),
     });
   } catch (error) {
+    if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
     if (
       error instanceof Error &&
       error.message === translate('background.runtime.llmRequestTimeout')
@@ -214,6 +217,7 @@ export async function requestChatCompletion(options: {
   systemPrompt: string;
   userPrompt: string;
   providerErrorLabel?: string;
+  signal?: AbortSignal;
 }): Promise<string> {
   const apiUrl = buildChatCompletionsUrl(options.baseUrl);
   const payload = buildChatPayload(options.modelCode, options.systemPrompt, options.userPrompt);
@@ -222,7 +226,8 @@ export async function requestChatCompletion(options: {
     apiUrl,
     options.apiKey,
     payload,
-    createStatusHandler(options.providerErrorLabel)
+    createStatusHandler(options.providerErrorLabel),
+    options.signal
   );
 }
 

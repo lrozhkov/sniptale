@@ -1,7 +1,7 @@
 // policyStateId: video-capture-surface-sessions
 // Navigation transactions suspend and revalidate the active source session.
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { deferVideoCaptureSurfaceWorkUntilRecovery } from '../../../capture-surface';
+import { deferVideoCaptureSurfaceWorkUntilRecovery } from '../../../capture-surface/recovery';
 import {
   beginTabNavigationTransaction,
   bindTabNavigationDocument,

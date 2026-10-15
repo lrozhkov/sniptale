@@ -4,7 +4,7 @@ import {
 } from '../../../composition/persistence/export-ledger';
 import {
   clearActiveVideoRecordingLease,
-  ensureActiveVideoRecordingLeaseHydrated,
+  ensureVideoRecordingLeaseCache,
 } from '../video/recording-control-lease';
 import { waitForStopSideEffects } from '../video/runtime/manager/controls.stop/effects';
 import { closeOffscreenDocumentForPrivacyErasure } from '../../offscreen-document/service';
@@ -22,7 +22,7 @@ import {
 } from './result';
 import { releaseVideoRecordingSurface } from '../video/content-surface/surface-lease';
 
-export async function recoverInvalidDurableMediaState() {
+export async function recoverDurableMediaStateForErasure() {
   let containmentFailed = false;
   try {
     await releaseVideoRecordingSurface();
@@ -45,7 +45,7 @@ export async function recoverInvalidDurableMediaState() {
     if (!(await cleanupVideoCaptureSurfacesForPrivacyErasure())) {
       throw new Error('invalid-media-state-surface-recovery-unverified');
     }
-    await clearActiveVideoRecordingLease();
+    await clearActiveVideoRecordingLease(undefined, { authority: 'verified-erasure' });
     await clearProjectExportJobLedgerForPrivacyErasure();
 
     const [recordingVerification, exportVerification] = await Promise.all([
@@ -58,7 +58,7 @@ export async function recoverInvalidDurableMediaState() {
         ...failedExportParticipants('invalid-media-state-recovery-unverified'),
       ];
     }
-    if (await ensureActiveVideoRecordingLeaseHydrated()) {
+    if (await ensureVideoRecordingLeaseCache()) {
       return [
         failed(RECORDING_PARTICIPANT_ID, 'invalid-media-state-recovery-unverified'),
         ...failedExportParticipants('invalid-media-state-recovery-unverified'),

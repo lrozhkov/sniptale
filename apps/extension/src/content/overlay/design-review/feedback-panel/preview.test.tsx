@@ -41,11 +41,11 @@ beforeEach(() => {
   anchorRect = new DOMRect(100, 200, 200, 50);
   previewRect = new DOMRect(0, 0, 300, 180);
   clipRect = new DOMRect(90, 50, 220, 600);
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      return this === anchor ? anchorRect : this === clip ? clipRect : previewRect;
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this === anchor ? anchorRect : this === clip ? clipRect : previewRect;
+  });
 });
 afterEach(() => {
   act(() => root.unmount());

@@ -287,7 +287,8 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2;
+  version: 2 | 3 | 4;
+  cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;
   name: string;
   source: VideoProjectSource;
@@ -310,6 +311,9 @@ export interface VideoProject {
   objectTracks?: VideoObjectTrack[];
   utilityLanes?: VideoProjectUtilityLanes;
   motionRegions?: VideoProjectMotionRegion[];
+  /** Authored focus geometry never replaces retained recording samples. */
+  actionFeedback?: import('../action-feedback/types').VideoProjectActionFeedback[];
+  cursorFocusPath?: import('../cursor-focus-path/types').CursorFocusPath;
   cursorTrack: VideoProjectCursorTrack | null;
   actionEvents: VideoProjectActionEvent[];
   actionPresentation?: VideoProjectActionPresentation;

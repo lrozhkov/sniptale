@@ -1,3 +1,5 @@
+import { useRecoveryLifecycle } from './use-recovery-lifecycle';
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import {
   useCallback,
   useEffect,
@@ -6,9 +8,16 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from 'react';
-import { loadVideoReviewSource } from '../../workflows/video-review/source';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { loadVideoReviewSource, VideoReviewLoadError } from '../../workflows/video-review/source';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewAnnotation } from '../../features/video/review/types';
+import {
+  acquireAssetResourceSession,
+  type AssetResourceSession,
+} from '../../composition/persistence/assets/resource-sessions';
+
+const logger = createLogger({ namespace: 'gallery:video-review' });
 
 type Session = ReturnType<typeof createVideoReviewSession>;
 export type LoadedReview = Awaited<ReturnType<typeof loadVideoReviewSource>> & {
@@ -19,24 +28,61 @@ export type LoadedReview = Awaited<ReturnType<typeof loadVideoReviewSource>> & {
 /** Owns the source URL and rejects late loads from a previously opened video. */
 export function useLoadedReview(aggregateId: string) {
   const [resource, setResource] = useState<LoadedReview | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<VideoReviewLoadError | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     let url: string | null = null;
+    let ownedSession: Session | null = null;
+    let reader: AssetResourceSession | null = null;
+    let releasing: Promise<void> | null = null;
     setResource(null);
-    setFailed(false);
-    void loadVideoReviewSource(aggregateId, controller.signal)
+    setFailed(null);
+    let loadedSource = false;
+    const loading = (async () => {
+      reader = await acquireAssetResourceSession();
+      if (controller.signal.aborted) return null;
+      return loadVideoReviewSource(aggregateId, controller.signal);
+    })();
+    const release = (): Promise<void> => {
+      releasing ??= (async () => {
+        // Opening can still commit after abort; retain exclusion until that writer settles.
+        await loading.catch(() => undefined);
+        try {
+          await ownedSession?.dispose();
+        } finally {
+          await reader?.release();
+          reader = null;
+        }
+      })();
+      return releasing;
+    };
+    void loading
       .then((loaded) => {
-        if (controller.signal.aborted) return;
+        if (!loaded || controller.signal.aborted) return;
+        loadedSource = true;
+        const session = createVideoReviewSession(loaded.snapshot);
+        ownedSession = session;
         url = URL.createObjectURL(loaded.file);
-        setResource({ ...loaded, url, session: createVideoReviewSession(loaded.snapshot) });
+        setResource({ ...loaded, url, session });
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
+      .catch((error: unknown) => {
+        void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
+        if (controller.signal.aborted) return;
+        const failure =
+          error instanceof VideoReviewLoadError
+            ? error
+            : new VideoReviewLoadError(loadedSource ? 'session' : 'source', 'unknown');
+        logger.error('video-review-open-failed', {
+          stage: failure.stage,
+          reason: failure.reason,
+          ...(failure.diagnostic ? { validation: failure.diagnostic } : {}),
+        });
+        setFailed(failure);
       });
     return () => {
       controller.abort();
+      void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
       if (url) URL.revokeObjectURL(url);
     };
   }, [aggregateId, attempt]);
@@ -85,39 +131,11 @@ export function useReviewComposer(session: Session) {
   });
   const latest = useRef({ annotation, before, dirty: false, version: 0 });
   useComposerUnloadProtection(latest);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const firstDirtyAt = useRef<number | null>(null);
-  const draining = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
   const committing = useRef<Promise<void> | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const flush = useCallback((): Promise<void> => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    if (draining.current) return draining.current;
-    const task = (async () => {
-      if (mounted.current) setField((field) => ({ ...field, saving: true }));
-      try {
-        while (latest.current.dirty) {
-          const captured = { ...latest.current };
-          await session.saveDraft(captured.annotation, captured.before);
-          if (latest.current.version === captured.version) {
-            latest.current.dirty = false;
-            firstDirtyAt.current = null;
-            if (mounted.current) setField((field) => ({ ...field, dirty: false }));
-          }
-        }
-      } finally {
-        if (mounted.current) setField((field) => ({ ...field, saving: false }));
-      }
-    })();
-    draining.current = task;
-    void task
-      .finally(() => {
-        draining.current = null;
-      })
-      .catch(() => undefined);
-    return task;
+  const flush = useCallback(async (): Promise<void> => {
+    while (latest.current.dirty) await session.flushAutosave(['draft']);
   }, [session]);
   const change = useCallback(
     (value: ReviewAnnotation | null, previous = latest.current.before) => {
@@ -129,19 +147,31 @@ export function useReviewComposer(session: Session) {
         version: latest.current.version + 1,
       };
       setField((field) => ({ ...field, annotation: value, before: previous, dirty: true }));
-      firstDirtyAt.current ??= Date.now();
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(
+      session.stageAutosave(
+        'draft',
         () => {
-          void flush().catch(() => undefined);
+          const captured = { ...latest.current };
+          if (mounted.current) setField((field) => ({ ...field, saving: true }));
+          return {
+            change: { kind: 'draft', annotation: captured.annotation, before: captured.before },
+            acknowledge: () => {
+              if (latest.current.version === captured.version) latest.current.dirty = false;
+              if (mounted.current)
+                setField((field) => ({ ...field, dirty: latest.current.dirty, saving: false }));
+            },
+            fail: () => {
+              if (mounted.current) setField((field) => ({ ...field, saving: false }));
+            },
+          };
         },
-        Math.min(250, Math.max(0, 1000 - (Date.now() - firstDirtyAt.current)))
+        EDITOR_AUTOSAVE_POLICY
       );
     },
-    [flush]
+    [session]
   );
   useRecoveryLifecycle(flush, mounted);
   const clearLocal = () => {
+    session.cancelAutosave('draft');
     latest.current = {
       annotation: null,
       before: null,
@@ -182,8 +212,7 @@ export function useReviewComposer(session: Session) {
     ...completion,
     reload: () =>
       commitField(async () => {
-        if (timer.current) clearTimeout(timer.current);
-        await draining.current?.catch(() => undefined);
+        session.cancelAutosave('draft');
         await session.reload();
         const draft = session.getSnapshot().snapshot.draft;
         latest.current = {
@@ -248,17 +277,3 @@ function createComposerCompletion(args: {
 }
 
 /** Browser visibility/unmount flushes share the same serialized recovery transaction. */
-function useRecoveryLifecycle(flush: () => Promise<void>, mounted: RefObject<boolean>) {
-  useEffect(() => {
-    mounted.current = true;
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') void flush().catch(() => undefined);
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      mounted.current = false;
-      document.removeEventListener('visibilitychange', onVisibility);
-      void flush().catch(() => undefined);
-    };
-  }, [flush, mounted]);
-}

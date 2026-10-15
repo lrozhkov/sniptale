@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Frame, Magnet } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { Translate } from '../../platform/i18n';
@@ -18,20 +18,11 @@ export function GuideLayoutAssistance({ children }: { children: ReactNode }) {
   const [snap, setSnap] = useState(true);
   const [showBoundaries, setShowBoundaries] = useState(false);
   const [unboundedImage, setUnboundedImage] = useState<string | null>(null);
-  return (
-    <Assistance.Provider
-      value={{
-        snap,
-        setSnap,
-        showBoundaries,
-        setShowBoundaries,
-        unboundedImage,
-        setUnboundedImage,
-      }}
-    >
-      {children}
-    </Assistance.Provider>
+  const value = useMemo(
+    () => ({ snap, setSnap, showBoundaries, setShowBoundaries, unboundedImage, setUnboundedImage }),
+    [snap, setSnap, showBoundaries, setShowBoundaries, unboundedImage, setUnboundedImage]
   );
+  return <Assistance.Provider value={value}>{children}</Assistance.Provider>;
 }
 
 export const useGuideLayoutAssistance = () => useContext(Assistance);

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   applyOpenedEditorDocumentMock: vi.fn(async () => undefined),
   createOpenedEditorDocumentMock: vi.fn(),
-  resolveBrowserFrameFaviconDataUrlMock: vi.fn(),
   resolveEditorOpenImageContextMock: vi.fn(),
 }));
 
@@ -18,10 +17,6 @@ vi.mock('./context', async (importOriginal) => ({
 
 vi.mock('./create', () => ({
   createOpenedEditorDocument: mocks.createOpenedEditorDocumentMock,
-}));
-
-vi.mock('./favicon', () => ({
-  resolveBrowserFrameFaviconDataUrl: mocks.resolveBrowserFrameFaviconDataUrlMock,
 }));
 
 interface BrowserFrameDocument {
@@ -62,13 +57,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-async function expectAppliedRunWithFavicon(): Promise<void> {
+async function expectAppliedRunWithoutNetwork(): Promise<void> {
   const document: BrowserFrameDocument = { version: 1, browserFrame: null };
   const applyDocument = vi.fn(async () => undefined);
   const scheduleZoomToFit = vi.fn();
   mocks.resolveEditorOpenImageContextMock.mockResolvedValue(createContext());
   mocks.createOpenedEditorDocumentMock.mockResolvedValue(document);
-  mocks.resolveBrowserFrameFaviconDataUrlMock.mockResolvedValue('data:image/png;base64,favicon');
+  const fetch = vi.spyOn(globalThis, 'fetch');
   const { openEditorControllerImage } = await importRunModule();
 
   await openEditorControllerImage({
@@ -80,13 +75,13 @@ async function expectAppliedRunWithFavicon(): Promise<void> {
   });
 
   expect(mocks.resolveEditorOpenImageContextMock).toHaveBeenCalledWith({}, 'capture.png');
-  expect(mocks.resolveBrowserFrameFaviconDataUrlMock).toHaveBeenCalledWith(
-    'https://opened.example/favicon.ico'
-  );
+  expect(fetch).not.toHaveBeenCalled();
+  fetch.mockRestore();
   expect(document.browserFrame).toEqual({
     title: 'Opened page',
     url: 'https://opened.example',
-    faviconDataUrl: 'data:image/png;base64,favicon',
+    faviconDataUrl: null,
+    faviconEnabled: false,
     canvasMode: 'resize',
     contentMode: 'push-down',
   });
@@ -95,20 +90,20 @@ async function expectAppliedRunWithFavicon(): Promise<void> {
     browserFrameUrl: 'https://opened.example',
     dataUrl: 'data:image/png;base64,opened',
     document,
-    faviconDataUrl: 'data:image/png;base64,favicon',
+    faviconDataUrl: null,
     pageTitle: 'Opened page',
     scheduleZoomToFit,
   });
 }
 
-function createDeferredFavicon() {
+function createDeferredImage() {
   let release: () => void = () => {};
   let requestedResolve: () => void = () => {};
   const requested = new Promise<void>((resolve) => {
     requestedResolve = resolve;
   });
-  const value = new Promise<string>((resolve) => {
-    release = () => resolve('data:image/png;base64,first-favicon');
+  const value = new Promise<BrowserFrameDocument>((resolve) => {
+    release = () => resolve({ id: 'first', browserFrame: null });
   });
 
   return {
@@ -122,7 +117,7 @@ function createDeferredFavicon() {
 function configureStaleRunMocks(args: {
   firstDocument: BrowserFrameDocument;
   secondDocument: BrowserFrameDocument;
-  deferredFavicon: ReturnType<typeof createDeferredFavicon>;
+  deferredImage: ReturnType<typeof createDeferredImage>;
 }): void {
   mocks.resolveEditorOpenImageContextMock
     .mockResolvedValueOnce(createContext())
@@ -134,23 +129,21 @@ function configureStaleRunMocks(args: {
       })
     );
   mocks.createOpenedEditorDocumentMock
-    .mockResolvedValueOnce(args.firstDocument)
-    .mockResolvedValueOnce(args.secondDocument);
-  mocks.resolveBrowserFrameFaviconDataUrlMock
-    .mockImplementationOnce(() => {
-      args.deferredFavicon.signalRequested();
-      return args.deferredFavicon.value;
+    .mockImplementationOnce(async () => {
+      args.deferredImage.signalRequested();
+      await args.deferredImage.value;
+      return args.firstDocument;
     })
-    .mockResolvedValueOnce('data:image/png;base64,second-favicon');
+    .mockResolvedValueOnce(args.secondDocument);
 }
 
 async function expectStaleRunIgnored(): Promise<void> {
-  const deferredFavicon = createDeferredFavicon();
+  const deferredImage = createDeferredImage();
   const firstDocument: BrowserFrameDocument = { id: 'first', browserFrame: null };
   const secondDocument: BrowserFrameDocument = { id: 'second', browserFrame: null };
   const applyDocument = vi.fn(async () => undefined);
   const scheduleZoomToFit = vi.fn();
-  configureStaleRunMocks({ firstDocument, secondDocument, deferredFavicon });
+  configureStaleRunMocks({ firstDocument, secondDocument, deferredImage });
   const { openEditorControllerImage } = await importRunModule();
 
   const firstRun = openEditorControllerImage({
@@ -160,7 +153,7 @@ async function expectStaleRunIgnored(): Promise<void> {
     scheduleZoomToFit,
     sourceName: 'first.png',
   });
-  await deferredFavicon.requested;
+  await deferredImage.requested;
   await openEditorControllerImage({
     applyDocument,
     dataUrl: 'data:image/png;base64,second',
@@ -168,7 +161,7 @@ async function expectStaleRunIgnored(): Promise<void> {
     scheduleZoomToFit,
     sourceName: 'second.png',
   });
-  deferredFavicon.release();
+  deferredImage.release();
   await firstRun;
 
   expect(mocks.applyOpenedEditorDocumentMock).toHaveBeenCalledTimes(1);
@@ -177,7 +170,7 @@ async function expectStaleRunIgnored(): Promise<void> {
       browserFrameUrl: 'https://newer.example',
       dataUrl: 'data:image/png;base64,second',
       document: secondDocument,
-      faviconDataUrl: 'data:image/png;base64,second-favicon',
+      faviconDataUrl: null,
       pageTitle: 'Newer page',
     })
   );
@@ -185,11 +178,11 @@ async function expectStaleRunIgnored(): Promise<void> {
 }
 
 describe('openEditorControllerImage', () => {
-  it('resolves favicon data and applies the opened document with the baked browser-frame state', async () => {
-    await expectAppliedRunWithFavicon();
+  it('opens the image without automatic favicon network acquisition', async () => {
+    await expectAppliedRunWithoutNetwork();
   });
 
-  it('drops stale favicon results so an older open cannot overwrite a newer document', async () => {
+  it('drops stale image creation so an older open cannot overwrite a newer document', async () => {
     await expectStaleRunIgnored();
   });
 });

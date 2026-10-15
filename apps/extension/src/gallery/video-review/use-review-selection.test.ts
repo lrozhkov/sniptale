@@ -20,6 +20,32 @@ const document: ReviewDocument = {
 };
 
 describe('review selection owner', () => {
+  it('resolves authored text in its declared clock and clears a deleted text selection', () => {
+    const advanced = createQuickEditAdvancedState();
+    const fragment = {
+      id: 'text',
+      text: 'Hello',
+      originalText: '',
+      start: 1,
+      end: 3,
+      timeDomain: 'result' as const,
+      revision: 0,
+      timingRevision: 0,
+      alignment: 'manual' as const,
+      showInVideo: true,
+    };
+    advanced.text = { version: 1, fragments: [fragment] };
+    const selection: ReviewSelection = { kind: 'text', id: fragment.id };
+    expect(reviewSelectionExists(selection, document, advanced)).toBe(true);
+    expect(selectedHistoryRemoval(selection, document)).toBeNull();
+    expect(reviewSelectionSourceTime(selection, document, advanced, 10, [])).toBe(3);
+    advanced.text = { version: 1, fragments: [{ ...fragment, timeDomain: 'source' }] };
+    expect(reviewSelectionSourceTime(selection, document, advanced, 10, [])).toBe(2);
+    advanced.text = { version: 1, fragments: [] };
+    expect(reviewSelectionExists(selection, document, advanced)).toBe(false);
+    expect(reviewSelectionSourceTime(selection, document, advanced, 10, [])).toBeNull();
+  });
+
   it('creates deletion operations only for history-owned selections', () => {
     expect(selectedHistoryRemoval({ kind: 'edit', id: 'e' }, document)).toMatchObject({
       target: 'edit',
@@ -339,4 +365,34 @@ it('ignores an individually hidden canvas comment without clearing it', () => {
   const before = structuredClone({ selection, hidden });
   expect(reviewSelectionSourceTime(selection, hidden, advanced, 10)).toBeNull();
   expect({ selection, hidden }).toEqual(before);
+});
+
+it('retains disabled effect selection and source timing, but stops navigation in basic mode', () => {
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.annotationEffects = {
+    enabled: false,
+    instances: [
+      {
+        id: 'visual',
+        snapshotId: 'effect:source',
+        enabled: false,
+        start: 2,
+        end: 6,
+        attachment: 'content',
+        controls: {},
+        order: 0,
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+      },
+    ],
+  };
+  const selected: ReviewSelection = { kind: 'annotation-effect', id: 'visual' };
+  expect(reviewSelectionExists(selected, document, advanced)).toBe(true);
+  expect(reviewSelectionSourceTime(selected, document, advanced, 10)).toBe(4);
+  expect(selectedHistoryRemoval(selected, document)).toBeNull();
+  advanced.ui.mode = 'basic';
+  expect(reviewSelectionSourceTime(selected, document, advanced, 10)).toBeNull();
+  expect(reviewSelectionExists(selected, document, advanced)).toBe(true);
+  advanced.annotationEffects.instances = [];
+  expect(reviewSelectionExists(selected, document, advanced)).toBe(false);
 });

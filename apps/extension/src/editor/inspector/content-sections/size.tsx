@@ -1,3 +1,4 @@
+import { changeFrameBackgroundMode } from '../scene/background/settings';
 import React from 'react';
 
 import { translate } from '../../../platform/i18n';
@@ -105,7 +106,7 @@ export function renderEditorInspectorFrameSection(props: RenderFrameSectionParam
       setFrameDraft={props.setFrameDraft}
       setLayoutMode={(value) => props.setFrameDraft((state) => ({ ...state, layoutMode: value }))}
       setBackgroundMode={(value) =>
-        props.setFrameDraft((state) => ({ ...state, backgroundMode: value }))
+        props.setFrameDraft((state) => changeFrameBackgroundMode(state, value))
       }
       applyGradientPreset={props.applyGradientPreset}
       previewFramePatch={(patch) => {

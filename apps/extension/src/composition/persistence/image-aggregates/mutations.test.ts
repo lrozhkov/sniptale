@@ -74,10 +74,53 @@ it('saves scenario Library image edits without replacing the stored source', asy
     imageContentState: 'edited',
     updatedAt: 10,
     workspaceRevision: 2,
-    lifecycle: { ...media.lifecycle, updatedAt: 10 },
+    lifecycle: createLibraryLifecycle('library', 10),
   });
   await expect(
     commitImageWorkspace({ aggregateId: media.id, document, expectedRevision: 1 })
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  expect(puts.media).toHaveBeenCalledTimes(2);
+});
+
+it('saves a published project background image without replacing its source identity', async () => {
+  const media = {
+    ...root(0),
+    id: 'project-asset:background',
+    blob: undefined,
+    source: { kind: 'project-asset' as const, projectAssetId: 'background' },
+  };
+  const puts = installTransaction({ media });
+  const document = createEditorDocumentFixture();
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document,
+      expectedRevision: 0,
+      requireExistingRoot: true,
+    })
+  ).resolves.toMatchObject({ revision: 1 });
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document,
+      expectedRevision: 1,
+      requireExistingRoot: true,
+    })
+  ).resolves.toMatchObject({ revision: 2 });
+  expect(puts.media).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      id: media.id,
+      source: media.source,
+      workspaceRevision: 2,
+    })
+  );
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document,
+      expectedRevision: 1,
+      requireExistingRoot: true,
+    })
   ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
   expect(puts.media).toHaveBeenCalledTimes(2);
 });
@@ -591,4 +634,37 @@ it('rejects stale-editor copy id collisions before writing any aggregate owner',
   expect(puts.media).not.toHaveBeenCalled();
   expect(puts.workspace).not.toHaveBeenCalled();
   expect(puts.presentation).not.toHaveBeenCalled();
+});
+
+it('keeps an accepted Image project and its original permanently', async () => {
+  const media = root(0);
+  const before = structuredClone(media);
+  const puts = installTransaction({ media });
+  await commitImageWorkspace({
+    aggregateId: media.id,
+    document: createEditorDocumentFixture(),
+    expectedRevision: 0,
+  });
+  expect(puts.media).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      id: media.id,
+      blob: media.blob,
+      lifecycle: expect.objectContaining({ storageClass: 'library' }),
+    })
+  );
+  expect(media).toEqual(before);
+});
+
+it('refuses a new Image project on a trashed source without changing any owner', async () => {
+  const media = { ...root(0), lifecycle: { ...root(0).lifecycle, trashedAt: 5 } };
+  const puts = installTransaction({ media });
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document: createEditorDocumentFixture(),
+      expectedRevision: 0,
+    })
+  ).rejects.toMatchObject({ name: 'ImageAggregateNotFoundError' });
+  expect(puts.media).not.toHaveBeenCalled();
+  expect(puts.workspace).not.toHaveBeenCalled();
 });

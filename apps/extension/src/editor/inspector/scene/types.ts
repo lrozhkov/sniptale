@@ -29,7 +29,7 @@ export interface EditorInspectorFramePanelProps {
   toNumber: (value: string, fallback?: number) => number;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
   setLayoutMode: (value: EditorFrameSettings['layoutMode']) => void;
-  setBackgroundMode: (value: EditorFrameSettings['backgroundMode']) => void;
+  setBackgroundMode: (value: EditorFrameSettings['backgroundMode'] | 'none') => void;
   applyGradientPreset: (preset: {
     id: string;
     label: string;

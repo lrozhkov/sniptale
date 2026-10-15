@@ -86,6 +86,7 @@ const trustedBackgroundSender = {
   url: 'chrome-extension://sniptale-extension/service-worker-loader.js',
 } as chrome.runtime.MessageSender;
 let freshnessNonceSequence = 0;
+let registerRuntimeMessageListener: (() => void) | null = null;
 
 function emitTrustedRuntimeMessage(
   listener: SubscriptionListener,
@@ -114,8 +115,10 @@ async function captureSubscriptionListener(): Promise<SubscriptionListener> {
     return vi.fn();
   });
 
-  const { registerOffscreenRuntimeMessageListener } = await import('./index');
-  registerOffscreenRuntimeMessageListener();
+  if (!registerRuntimeMessageListener) {
+    throw new Error('Offscreen runtime fixture is not initialized');
+  }
+  registerRuntimeMessageListener();
 
   if (!listener) {
     throw new Error('Expected offscreen runtime subscription listener');
@@ -124,11 +127,13 @@ async function captureSubscriptionListener(): Promise<SubscriptionListener> {
   return listener;
 }
 
-function resetStartErrorMocks() {
+async function resetStartErrorMocks() {
   vi.clearAllMocks();
   vi.resetModules();
   freshnessNonceSequence = 0;
   sendRuntimeMessageMock.mockResolvedValue(undefined);
+  const runtime = await import('./index');
+  registerRuntimeMessageListener = runtime.registerOffscreenRuntimeMessageListener;
 }
 
 function emitStartRecordingMessage(listener: SubscriptionListener): unknown {

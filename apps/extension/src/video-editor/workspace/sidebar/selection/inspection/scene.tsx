@@ -1,3 +1,4 @@
+import { InspectCursorPathSettings } from './cursor-path';
 import { GridSettingsPanel } from '../../settings';
 import { translate } from '../../../../../platform/i18n';
 import { getProjectSceneBackground } from '../../../../../features/video/project/scene/background';
@@ -79,6 +80,12 @@ function createSceneGroups(
       ) : null,
     },
     createSceneObjectTracksGroup(props, objectTracks),
+    {
+      id: 'cursor-path',
+      semantic: 'tracking' as const,
+      label: translate('videoEditor.sidebar.cursorFocusPathTitle'),
+      content: <InspectCursorPathSettings project={props.project} />,
+    },
   ] as const;
 }
 

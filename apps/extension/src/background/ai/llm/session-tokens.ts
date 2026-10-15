@@ -1,4 +1,5 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
+import { isOwnedExtensionPagePath } from '../../../platform/navigation/extension-pages/sender-url';
 import type { LlmSessionPurpose } from '../../../contracts/messaging/llm';
 import {
   createAiEgressAuthorityKey,
@@ -97,13 +98,25 @@ export function resolveLlmSessionSenderKey(
   purpose: LlmSessionPurpose,
   sender: chrome.runtime.MessageSender
 ): string | null {
-  return purpose === 'content-ai-pick'
-    ? resolveContentAiPickSenderKey(sender)
-    : resolveScenarioEditorSenderKey(sender);
+  if (purpose === 'content-ai-pick') return resolveContentAiPickSenderKey(sender);
+  if (purpose === 'scenario-editor') return resolveScenarioEditorSenderKey(sender);
+  if (
+    purpose === 'review-text' &&
+    sender.id === chrome.runtime.id &&
+    sender.frameId === 0 &&
+    sender.documentId &&
+    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html')
+  )
+    return `review-text:document:${sender.documentId}`;
+  return null;
 }
 
 function resolveLlmSessionScope(purpose: LlmSessionPurpose): CapabilityScope {
-  return purpose === 'content-ai-pick' ? 'llm:content-ai-pick' : 'llm:scenario-editor';
+  return purpose === 'content-ai-pick'
+    ? 'llm:content-ai-pick'
+    : purpose === 'review-text'
+      ? 'llm:review-text'
+      : 'llm:scenario-editor';
 }
 
 function createLlmSessionSenderBinding(args: {

@@ -209,10 +209,11 @@ describe('guide image edit publication', () => {
   it('publishes the raster and annotation version together with all unsaved guide fields', async () => {
     publication.commit.mockImplementation(async (project) => ({
       project: { ...project, updatedAt: 101 },
+      workspaceRevision: 2,
     }));
     const args = input();
     const before = structuredClone(args.project);
-    const result = await applyScenarioImageEdit(args);
+    const { project: result } = await applyScenarioImageEdit(args);
     expect(args.project).toEqual(before);
     expect(result.name).toBe('Unsaved name');
     const item = result.items[0];

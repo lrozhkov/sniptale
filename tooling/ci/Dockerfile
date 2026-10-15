@@ -1,4 +1,4 @@
-FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     XDG_CACHE_HOME=/workspace/.tmp/ci-cache \
     npm_config_cache=/workspace/.tmp/npm-cache
 
-ADD --checksum=sha256:0d5f444f594e48c1e16a41d8fc628a09b24c658916a1274025c2330f2a802bed https://snapshot.debian.org/archive/debian/20260829T000000Z/pool/main/c/ca-certificates/ca-certificates_20230311%2Bdeb12u1_all.deb /tmp/ca-certificates.deb
+ADD --checksum=sha256:0d5f444f594e48c1e16a41d8fc628a09b24c658916a1274025c2330f2a802bed https://snapshot.debian.org/archive/debian/20261008T000000Z/pool/main/c/ca-certificates/ca-certificates_20230311%2Bdeb12u1_all.deb /tmp/ca-certificates.deb
 
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && dpkg-deb --extract /tmp/ca-certificates.deb /tmp/ca-bootstrap \
@@ -14,9 +14,9 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && find /tmp/ca-bootstrap/usr/share/ca-certificates/mozilla -type f -name '*.crt' -exec cat {} + \
       > /etc/ssl/certs/ca-certificates.crt \
     && printf '%s\n' \
-      'deb https://snapshot.debian.org/archive/debian/20260829T000000Z bookworm main' \
-      'deb https://snapshot.debian.org/archive/debian/20260829T000000Z bookworm-updates main' \
-      'deb https://snapshot.debian.org/archive/debian-security/20260829T000000Z bookworm-security main' \
+      'deb https://snapshot.debian.org/archive/debian/20261008T000000Z bookworm main' \
+      'deb https://snapshot.debian.org/archive/debian/20261008T000000Z bookworm-updates main' \
+      'deb https://snapshot.debian.org/archive/debian-security/20261008T000000Z bookworm-security main' \
       > /etc/apt/sources.list \
     && printf '%s\n' \
       'Acquire::Check-Valid-Until "false";' \

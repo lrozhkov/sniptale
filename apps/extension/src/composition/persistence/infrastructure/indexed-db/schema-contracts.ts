@@ -1,3 +1,7 @@
+import { DATABASE_MIGRATIONS } from './database-migrations';
+import type { PersistenceDomainId, DatabaseMigrationDescriptor } from './schema-contract-types';
+export { DATABASE_MIGRATIONS };
+export type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
@@ -9,6 +13,7 @@ import {
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
@@ -21,6 +26,8 @@ import {
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STATE_MANAGER_STORE,
   STORE_NAME,
@@ -30,19 +37,6 @@ import {
   WEB_SNAPSHOTS_STORE,
   type EXPECTED_STORES,
 } from './core.stores.ts';
-import type { UpgradeDatabase, UpgradeTransaction } from './upgrade/types.ts';
-
-type PersistenceDomainId =
-  | 'assetGraph'
-  | 'diagnostics'
-  | 'editorAssets'
-  | 'effects'
-  | 'mediaLibrary'
-  | 'recordings'
-  | 'runtimeRecovery'
-  | 'scenarioProjects'
-  | 'snapshots'
-  | 'videoProjects';
 
 type PersistenceDataClass = 'derived-rebuildable' | 'durable-authority' | 'operational-recoverable';
 
@@ -65,7 +59,7 @@ interface StoredSchemaContract {
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
     domainId: 'recordings',
-    schemaVersion: 1,
+    schemaVersion: 2,
     stores: [
       { storeName: STORE_NAME, dataClass: 'durable-authority' },
       { storeName: RECORDING_TELEMETRY_STORE, dataClass: 'durable-authority' },
@@ -73,19 +67,20 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 3,
+    schemaVersion: 27,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
       { storeName: IMAGE_WORKSPACES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_WORKSPACE_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_DRAFTS_STORE, dataClass: 'durable-authority' },
       { storeName: AGGREGATE_PRESENTATIONS_STORE, dataClass: 'derived-rebuildable' },
     ],
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 1,
+    schemaVersion: 3,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_OWNERS_STORE, dataClass: 'durable-authority' },
@@ -94,7 +89,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 2,
+    schemaVersion: 5,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_ASSETS_STORE, dataClass: 'durable-authority' },
@@ -104,9 +99,11 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 3,
+    schemaVersion: 7,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
+      { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
+      { storeName: SCENARIO_PROJECT_UNITS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_ASSETS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PENDING_ASSETS_STORE, dataClass: 'operational-recoverable' },
       { storeName: SCENARIO_EXPORTS_STORE, dataClass: 'durable-authority' },
@@ -153,103 +150,6 @@ export const CURRENT_SCHEMA_CONTRACTS: readonly StoredSchemaContract[] =
     domainId,
     schemaVersion,
   }));
-
-type DatabaseMigrationRisk = 'additive' | 'destructive' | 'transforming';
-
-export interface DatabaseMigrationDescriptor {
-  backupCoverage: 'full' | 'none';
-  domainVersions: readonly {
-    domainId: PersistenceDomainId;
-    from: number;
-    to: number;
-  }[];
-  estimateAdditionalBytes(): Promise<number>;
-  fromDatabaseVersion: number;
-  migrate(db: UpgradeDatabase, transaction: UpgradeTransaction): undefined;
-  risk: DatabaseMigrationRisk;
-  stores: readonly Exclude<(typeof EXPECTED_STORES)[number], 'schema_contracts'>[];
-  toDatabaseVersion: number;
-  validate(db: UpgradeDatabase, transaction: UpgradeTransaction): undefined;
-}
-
-// The beta baseline has no predecessor. Every future database version must append a complete,
-// contiguous descriptor and retain the fixtures for every released beta source version.
-export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
-  {
-    backupCoverage: 'none',
-    domainVersions: [{ domainId: 'mediaLibrary', from: 1, to: 2 }],
-    estimateAdditionalBytes: async () => 64 * 1024,
-    fromDatabaseVersion: 1,
-    toDatabaseVersion: 2,
-    risk: 'additive',
-    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
-    migrate(db) {
-      for (const name of [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE]) {
-        db.createObjectStore(name, { keyPath: 'aggregateId' }).createIndex(
-          'updatedAt',
-          'updatedAt'
-        );
-      }
-      return undefined;
-    },
-    validate(db) {
-      if (
-        ![VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE].every((name) =>
-          db.objectStoreNames.contains(name)
-        )
-      ) {
-        throw new Error('Video workspace schema creation failed.');
-      }
-      return undefined;
-    },
-  },
-  {
-    backupCoverage: 'none',
-    domainVersions: [{ domainId: 'scenarioProjects', from: 1, to: 2 }],
-    estimateAdditionalBytes: async () => 64 * 1024,
-    fromDatabaseVersion: 2,
-    toDatabaseVersion: 3,
-    risk: 'additive',
-    stores: [SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE],
-    migrate() {
-      return undefined;
-    },
-    validate(db) {
-      if (
-        ![SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE].every((name) =>
-          db.objectStoreNames.contains(name)
-        )
-      )
-        throw new Error('Scenario tour stores are unavailable.');
-      return undefined;
-    },
-  },
-  {
-    backupCoverage: 'none',
-    domainVersions: [
-      { domainId: 'mediaLibrary', from: 2, to: 3 },
-      { domainId: 'scenarioProjects', from: 2, to: 3 },
-      { domainId: 'videoProjects', from: 1, to: 2 },
-    ],
-    estimateAdditionalBytes: async () => 64 * 1024,
-    fromDatabaseVersion: 3,
-    toDatabaseVersion: 4,
-    risk: 'additive',
-    stores: [MEDIA_LIBRARY_STORE, SCENARIO_PROJECTS_STORE, VIDEO_PROJECTS_STORE],
-    migrate() {
-      return undefined;
-    },
-    validate(db) {
-      if (
-        ![MEDIA_LIBRARY_STORE, SCENARIO_PROJECTS_STORE, VIDEO_PROJECTS_STORE].every((name) =>
-          db.objectStoreNames.contains(name)
-        )
-      )
-        throw new Error('Library trash stores are unavailable.');
-      return undefined;
-    },
-  },
-];
 
 export function buildDatabaseMigrationPlan(
   fromDatabaseVersion: number,

@@ -133,7 +133,15 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     artifactKind: 'sniptale-full-unit-proof',
     outcome: 'passed',
     inputDigest: '4'.repeat(64),
-    execution: { suite: 'product' },
+    execution: {
+      arch: 'x64',
+      node: process.version,
+      platform: 'linux',
+      locale: 'en-US',
+      timezone: 'UTC',
+      pool: 'threads',
+      suite: 'product',
+    },
     planning: { maxWorkers: 1 },
     fileDigests: [],
     testFiles: [],
@@ -151,8 +159,9 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     write(artifact, `.tmp/coverage/canonical/${file}`, `${file}\n`);
   }
   const coverage = sealReceipt({
-    schemaVersion: 1,
+    schemaVersion: 2,
     artifactKind: 'sniptale-coverage-proof',
+    fullUnit: { inputDigest: unit.inputDigest, execution: unit.execution },
     outcome: 'passed',
     inputDigest: '6'.repeat(64),
     reports: coverageReportFiles.map((file) => ({
@@ -584,27 +593,31 @@ it('rejects proof reuse across candidate control digests', () => {
   ).toThrow(/does not bind/u);
 });
 
-it('rejects a malformed unit receipt in the Fast proof lane', () => {
-  const value = fixture();
-  const relative = '.tmp/qa/unit-proof.json';
-  const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
-  delete receipt.inputDigest;
-  delete receipt.proofDigest;
-  write(value.artifact, relative, `${JSON.stringify(sealReceipt(receipt))}\n`);
-  refreshDeclaredFile(value.artifact, value.manifest, relative);
-
-  expect(() =>
-    admitCandidateProof({
-      artifactRoot: value.artifact,
-      baseSha: value.baseSha,
-      candidateRoot: value.candidate,
-      commit: value.commit,
-      expectedTrustedControlSha: value.commit,
-      lane: 'proof',
-      trustedRoot: value.trusted,
-    })
-  ).toThrow(/Malformed candidate receipt: \.tmp\/qa\/unit-proof\.json/u);
-});
+it.each(['unit', 'coverage-legacy', 'coverage-binding'])(
+  'rejects malformed %s receipt in the Fast proof lane',
+  (kind) => {
+    const value = fixture();
+    const relative = `.tmp/qa/${kind === 'unit' ? 'unit' : 'coverage'}-proof.json`;
+    const receipt = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
+    if (kind === 'unit') delete receipt.inputDigest;
+    else if (kind === 'coverage-legacy') receipt.schemaVersion = 1;
+    else delete receipt.fullUnit;
+    delete receipt.proofDigest;
+    write(value.artifact, relative, `${JSON.stringify(sealReceipt(receipt))}\n`);
+    refreshDeclaredFile(value.artifact, value.manifest, relative);
+    expect(() =>
+      admitCandidateProof({
+        artifactRoot: value.artifact,
+        baseSha: value.baseSha,
+        candidateRoot: value.candidate,
+        commit: value.commit,
+        expectedTrustedControlSha: value.commit,
+        lane: 'proof',
+        trustedRoot: value.trusted,
+      })
+    ).toThrow(`Malformed candidate receipt: ${relative}`);
+  }
+);
 
 it('derives unit reuse status from the validated receipt', () => {
   const value = fixture();

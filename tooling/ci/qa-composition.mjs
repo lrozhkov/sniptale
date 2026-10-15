@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {
   createOkStep,
   createProcessStep,
+  printStepResult,
 } from '../qa/composition/checkpoint/focused-qa-results.mjs';
 import { collectAuditProfileResult } from '../qa/wrappers/audit.mjs';
 import {
@@ -44,6 +45,45 @@ function capability(lane) {
   return value;
 }
 
+async function collectOwnedProofResults(collectors, session) {
+  const results = await Promise.allSettled(
+    collectors.map(({ label, collect }) =>
+      Promise.resolve()
+        .then(collect)
+        .then(
+          (value) => {
+            session?.writeLog(`[${label}]\n${JSON.stringify(value)}\n`);
+            return value;
+          },
+          (error) => {
+            const diagnostic =
+              error instanceof Error ? (error.stack ?? error.message) : String(error);
+            session?.writeLog(`[${label}] failed\n${diagnostic}\n`);
+            throw error;
+          }
+        )
+    )
+  );
+  const failures = results.filter((result) => result.status === 'rejected');
+  if (failures.length > 0) {
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      const steps = Array.isArray(result.value?.steps) ? result.value.steps : [result.value];
+      for (const step of steps) {
+        if (step?.status === 'failed') printStepResult(step);
+      }
+    }
+    if (failures.length === 1) throw failures[0].reason;
+    throw new AggregateError(
+      failures.map((result) => result.reason),
+      failures
+        .map(({ reason }) => (reason instanceof Error ? reason.message : String(reason)))
+        .join('\n')
+    );
+  }
+  return results.map((result) => result.value);
+}
+
 export async function collectCiProofResults({
   session,
   productProofCollector = (verifyScope) =>
@@ -61,12 +101,23 @@ export async function collectCiProofResults({
 } = {}) {
   capability('proof');
   const verifyScope = scopeResolver();
-  const [product, audit, productionBuild] = await Promise.all([
-    productProofCollector(verifyScope),
-    auditCollector({ profileId: 'pr', session }),
-    Promise.resolve(productionBuildCollector()),
-  ]);
-  const harnessTests = await harnessTestCollector(resolveCiHarnessTestPlan(verifyScope));
+  const [product, audit, productionBuild] = await collectOwnedProofResults(
+    [
+      { label: 'Product proof', collect: () => productProofCollector(verifyScope) },
+      { label: 'Audit', collect: () => auditCollector({ profileId: 'pr', session }) },
+      { label: 'Production build', collect: productionBuildCollector },
+    ],
+    session
+  );
+  const [harnessTests] = await collectOwnedProofResults(
+    [
+      {
+        label: 'Harness unit tests',
+        collect: () => harnessTestCollector(resolveCiHarnessTestPlan(verifyScope)),
+      },
+    ],
+    session
+  );
   const coverageStep = audit.steps.find(({ label }) => label === 'Full product coverage');
   if (!coverageStep) throw new Error('Fast proof did not produce full product coverage.');
   const unitStep = {

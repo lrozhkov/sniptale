@@ -398,7 +398,7 @@ export async function executePopupExportJob(
       await completeSaveJob(job, state);
     } else {
       try {
-        await preparePagePackageDownloadRuntime();
+        await preparePagePackageDownloadRuntime(job.abortController.signal);
       } catch (error) {
         throw new PopupExportJobFailure('popup.export.downloadPreparationErrorDetail', {
           cause: error,

@@ -15,15 +15,17 @@ export function createEditorPageController() {
 }
 
 export function createEditorPageAutosaveService() {
+  const saveNow = vi.fn(async (produceDocument: () => unknown) => {
+    produceDocument();
+  });
   return {
     activate: vi.fn(),
+    beginHydration: vi.fn(() => ({ finish: vi.fn(), saveNow })),
     dispose: vi.fn(),
     flushAutosave: vi.fn(async (produceDocument?: () => unknown) => {
       produceDocument?.();
     }),
-    saveNow: vi.fn(async (produceDocument: () => unknown) => {
-      produceDocument();
-    }),
+    saveNow,
     getDurableRevision: vi.fn((): number | null => null),
     schedulePresentation: vi.fn(async () => undefined),
     updateContext: vi.fn(),

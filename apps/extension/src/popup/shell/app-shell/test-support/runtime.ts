@@ -81,6 +81,7 @@ function createRuntimeRecording(overrides: PopupVideoSetupRuntimeOverrides) {
     clearStartError: overrides.clearStartError ?? vi.fn(),
     handlePauseResume: overrides.handlePauseResume ?? vi.fn(),
     handleStartRecording: overrides.handleStartRecording ?? vi.fn(),
+    handleRefreshRecordingState: vi.fn().mockResolvedValue(undefined),
     handleStop: overrides.handleStop ?? vi.fn(),
     handleToggleMicrophone: overrides.handleToggleMicrophone ?? vi.fn(),
     handleToggleWebcam: overrides.handleToggleWebcam ?? vi.fn(),

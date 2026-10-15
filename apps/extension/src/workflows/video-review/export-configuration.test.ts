@@ -1,7 +1,77 @@
+import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewMediaIndex } from './media-index';
 import { configuredReviewExportPlan } from './export-configuration';
+
+it.each(['mp4', 'webm'] as const)(
+  'keeps the UI source profile lossless for %s action audio without a video encoder',
+  (container) => {
+    const args = fixture();
+    args.index.container = container;
+    args.index.videoCodec = container === 'mp4' ? 'hevc' : 'vp8';
+    args.index.audioCodec = null;
+    args.index.outputCodecs = { mp4: [], webm: [] };
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        renderSettings: { frameRate: 0 },
+        actionAudioPresent: true,
+      })
+    ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'process' });
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        renderSettings: { frameRate: 0, quality: 'HIGH' },
+        actionAudioPresent: true,
+      })
+    ).toEqual({ kind: 'unavailable', reasons: ['video-encoder'] });
+  }
+);
+
+it.each([24, 30, 60] as const)(
+  'renders an explicit %sfps request even when the measured source rate matches',
+  (frameRate) => {
+    const args = fixture();
+    args.index.frameRate = frameRate;
+    expect(configuredReviewExportPlan({ ...args, renderSettings: { frameRate } })).toMatchObject({
+      kind: 'ready',
+      video: 'render',
+    });
+  }
+);
+
+it.each(['mp4', 'webm'] as const)(
+  'requires %s audio encoding for action-only sound without changing video copy',
+  (container) => {
+    const args = fixture();
+    args.index.container = container;
+    args.index.audioCodec = null;
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings: undefined, actionAudioPresent: true })
+    ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'process', reasons: ['action-audio'] });
+    args.index.outputAudioCodecs![container] = null;
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings: undefined, actionAudioPresent: true })
+    ).toEqual({ kind: 'unavailable', reasons: ['audio-encoder'] });
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        renderSettings: undefined,
+        actionAudioPresent: true,
+        presentationAudioPresent: false,
+      })
+    ).toEqual({ kind: 'unavailable', reasons: ['audio-encoder'] });
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings: undefined, actionAudioPresent: false })
+    ).toMatchObject({ kind: 'ready', audio: 'copy' });
+    args.advanced.ui.mode = 'basic';
+    expect(configuredReviewExportPlan({ ...args, actionAudioPresent: true })).toMatchObject({
+      audio: 'copy',
+    });
+  }
+);
 
 function fixture() {
   const advanced = createQuickEditAdvancedState();
@@ -68,4 +138,269 @@ it('does not require an audio encoder for silent output and preserves compatible
   expect(configuredReviewExportPlan(args)).toMatchObject({ kind: 'ready', audio: 'copy' });
   args.index.audioCodec = 'opus';
   expect(configuredReviewExportPlan(args)).toMatchObject({ kind: 'ready', audio: 'copy' });
+});
+
+it('explains an oversized decorated output and accepts a smaller export preset', () => {
+  const args = fixture();
+  args.advanced.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'browser' as const,
+    title: 'Browser',
+  };
+  args.advanced.canvas = { width: 7680, height: 4320 };
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'unavailable',
+    reasons: ['canvas-size'],
+  });
+  expect(
+    configuredReviewExportPlan({
+      ...args,
+      renderSettings: { ...args.renderSettings, resolution: '1080P' },
+    })
+  ).toMatchObject({ kind: 'ready', video: 'render' });
+});
+
+it.each(['text', 'image'] as const)(
+  'requires rendering for an isolated %s watermark and restores copy when suppressed',
+  (mode) => {
+    const fixtureArgs = fixture();
+    const args = {
+      advanced: fixtureArgs.advanced,
+      index: fixtureArgs.index,
+      document: fixtureArgs.document,
+    };
+    // No output override, cut, zoom, background, camera or other effect can force this transition.
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+    });
+    args.advanced.watermark = {
+      ...createQuickEditWatermark('Saved'),
+      mode,
+      ...(mode === 'image'
+        ? {
+            image: { assetId: 'project-asset:logo', width: 100, height: 50, size: 0.2, opacity: 1 },
+          }
+        : {}),
+    };
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'render',
+      audio: 'copy',
+      reasons: ['watermark'],
+    });
+    args.advanced.watermark.mode = 'none';
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+    });
+    args.advanced.watermark.mode = mode;
+    args.advanced.ui.mode = 'basic';
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+    });
+  }
+);
+
+it('uses sequence processing for bookends and defers unknown silent-main video audio', async () => {
+  const { createNeutralPresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const base = fixture();
+  const args = { advanced: base.advanced, document: base.document, index: base.index };
+  args.advanced.presentation = createNeutralPresentationSettings();
+  args.advanced.presentation.intro = {
+    mode: 'video',
+    video: {
+      assetId: 'project-asset:clip',
+      source: { width: 20, height: 10, duration: 2, size: 5, mimeType: 'video/webm' },
+      trim: { start: 0, end: 2 },
+      audio: { muted: false, gain: 1 },
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+    reasons: ['presentation'],
+  });
+  args.index.outputAudioCodecs!.mp4 = null;
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  args.index.audioCodec = null;
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  expect(configuredReviewExportPlan({ ...args, presentationAudioPresent: true })).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  expect(configuredReviewExportPlan({ ...args, presentationAudioPresent: false })).toMatchObject({
+    kind: 'ready',
+  });
+  args.advanced.presentation.intro.video.audio.muted = true;
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  args.advanced.presentation.intro = {
+    mode: 'none',
+    video: args.advanced.presentation.intro.video,
+  };
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});
+
+it('exports silent image sequences without an audio encoder and suppresses presentation in Basic', async () => {
+  const { createNewWorkspacePresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const base = fixture();
+  const args = { advanced: base.advanced, document: base.document, index: base.index };
+  args.index.audioCodec = null;
+  args.index.outputAudioCodecs!.mp4 = null;
+  args.advanced.presentation = createNewWorkspacePresentationSettings();
+  args.advanced.presentation.audioFade = true;
+  args.advanced.presentation.outro = {
+    mode: 'image',
+    image: {
+      assetId: 'project-asset:still',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  args.advanced.ui.mode = 'basic';
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});
+
+it('omits all fragment presentation capabilities without mutating retained settings', async () => {
+  const { createNewWorkspacePresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const args = fixture();
+  args.advanced.presentation = createNewWorkspacePresentationSettings();
+  args.advanced.presentation.intro = {
+    mode: 'image',
+    image: {
+      assetId: 'project-asset:intro',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  const before = structuredClone(args.advanced);
+  const result = configuredReviewExportPlan({ ...args, includeBookends: false });
+  expect(result).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    reasons: [],
+  });
+  expect(args.advanced).toEqual(before);
+  args.advanced.presentation.fadeIn.enabled = false;
+  args.advanced.presentation.fadeOut.enabled = false;
+  expect(
+    configuredReviewExportPlan({ ...args, renderSettings: undefined, includeBookends: false })
+  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
+});
+
+it('ignores alpha replacements and requires an encoder only for ordinary audio on a silent main', () => {
+  const args = fixture();
+  args.index.audioCodec = null;
+  args.index.outputAudioCodecs!.webm = null;
+  args.advanced.audio.originalSpeech = {
+    enabled: true,
+    transcript: {
+      version: 1,
+      phrases: [],
+      replacements: [
+        {
+          id: 'accepted',
+          phraseId: 'p',
+          start: 2,
+          end: 8,
+          duration: 4,
+          enabled: true,
+          originalVolume: 0,
+          assetId: 'project-asset:accepted',
+          revision: 0,
+          text: 'accepted',
+          textSignature: 'test',
+          profile: { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' },
+        },
+      ],
+    },
+  };
+  expect(configuredReviewExportPlan({ ...args, renderSettings: undefined })).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+  args.advanced.audio.voiceover = [
+    {
+      id: 'voice',
+      assetId: 'project-asset:voice',
+      timelineStart: 2,
+      duration: 4,
+      sourceOffset: 0,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  args.advanced.ui.tracks.audio = true;
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  args.index.outputAudioCodecs!.webm = 'opus';
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    audio: 'process',
+    reasons: ['voiceover'],
+  });
+  const { renderSettings: _settings, ...copyVideo } = args;
+  expect(configuredReviewExportPlan(copyVideo)).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'process',
+    reasons: ['voiceover'],
+  });
+  args.advanced.ui.mode = 'basic';
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+  });
 });

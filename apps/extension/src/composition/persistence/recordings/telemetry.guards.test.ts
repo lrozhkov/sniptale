@@ -140,3 +140,40 @@ it('retains verified native provenance and legacy rows without inventing time se
       parseRecordingTelemetryEntry({ ...entry, provenance: { ...provenance, ...patch } })
     ).toBeNull();
 });
+
+it('roundtrips browser source semantics and document capabilities without claiming omitted legacy support', () => {
+  const provenance = {
+    source: 'browser',
+    normalizationVersion: 1,
+    timeUnit: 'seconds',
+    coordinateSpace: 'client-css',
+  };
+  const capabilities = {
+    version: 1,
+    pointer: 'available',
+    keyboard: 'available',
+    wheel: 'available',
+    coverage: 'document',
+  };
+  const entry = { ...createTelemetryEntry(), provenance, capabilities };
+  expect(parseRecordingTelemetryEntry(JSON.parse(JSON.stringify(entry)))).toMatchObject({
+    provenance,
+    capabilities,
+  });
+  expect(parseRecordingTelemetryEntry(createTelemetryEntry())).not.toHaveProperty('capabilities');
+  for (const patch of [
+    { version: 2 },
+    { coverage: 'global' },
+    { keyboard: 'always' },
+    { secret: 'private' },
+  ])
+    expect(
+      parseRecordingTelemetryEntry({ ...entry, capabilities: { ...capabilities, ...patch } })
+    ).toBeNull();
+  expect(
+    parseRecordingTelemetryEntry({
+      ...entry,
+      provenance: { ...provenance, coordinateSpace: 'desktop' },
+    })
+  ).toBeNull();
+});

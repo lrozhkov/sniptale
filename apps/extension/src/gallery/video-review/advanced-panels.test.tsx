@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { createQuickEditBorder } from '../../features/video/review/advanced/border';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { ReviewDetails } from './controls';
 import { createInspectorDisclosureStore } from '../../composition/persistence/inspector-disclosures/store';
-import { act, useState } from 'react';
+import { act, useContext, useState } from 'react';
+import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import {
+  setImmediate as settleHostTurn,
+  setTimeout as settleTimerTurn,
+} from 'node:timers/promises';
 import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
 import { ReviewZoomInspector } from './zoom-inspector';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -28,7 +35,12 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(async () => {
+    root.unmount();
+    // React/jsdom host callbacks must finish before Vitest removes this window.
+    await settleTimerTurn(0);
+    await settleHostTurn();
+  });
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -40,7 +52,7 @@ function setInputValue(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function Harness() {
+function Harness({ pending = false }: { pending?: boolean }) {
   const [advanced, setAdvanced] = useState<QuickEditAdvancedState>(createQuickEditAdvancedState());
   const setBackground = (
     update: (
@@ -76,7 +88,7 @@ function Harness() {
           onOriginalVolume={vi.fn()}
           onLaneVolume={vi.fn()}
           busy={false}
-          pending={false}
+          pending={pending}
           failed={false}
           onImportImage={vi.fn()}
           setBackground={setBackground}
@@ -87,8 +99,13 @@ function Harness() {
   );
 }
 
-const button = (key: string) =>
-  host.querySelector<HTMLButtonElement>(`[aria-label="${key}"]`) as HTMLButtonElement;
+const button = (key: string) => {
+  const match = Array.from(host.querySelectorAll('button')).find(
+    (node) => node.getAttribute('aria-label') === key || node.textContent === key
+  );
+  if (!match) throw new Error(`Missing button: ${key}`);
+  return match;
+};
 
 it('shows the same authored source seconds as the focus block under Speed', () => {
   const region = {
@@ -129,8 +146,8 @@ it('edits the background paint and the selected zoom region through the panel ca
     '[aria-label="gallery.videoReview.zoomFocusX"]'
   )!;
   expect(focusX.value).toBe('50');
-  setInputValue(focusX, '20');
   await act(async () => {
+    setInputValue(focusX, '20');
     focusX.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
   });
   expect(focusX.value).toBe('20');
@@ -174,4 +191,360 @@ it('restores nested disclosure choices after another object and a fresh editor m
   store = createInspectorDisclosureStore(storage);
   await act(async () => render('gallery:zoom', 'another-project'));
   expect(host.querySelector('details')!.open).toBe(true);
+});
+
+it('disables dormant Spotlight conversion when revival would overlap an active Zoom', async () => {
+  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'dormant', at: 1, duration: 2, endMax: 10 }),
+      spotlight: createQuickEditSpotlight(),
+      dormant: true,
+    },
+    createQuickEditZoomRegion({ id: 'camera', at: 2, duration: 2, endMax: 10 }),
+  ];
+  const setZoom = vi.fn();
+  function DormantHarness() {
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      timelineDuration: 10,
+      selection: 'dormant',
+      setZoom,
+    });
+    return <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />;
+  }
+  act(() => root.render(<DormantHarness />));
+  const zoomButton = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.focusType"] button[title="gallery.videoReview.zoomRegionLabel"]'
+  )!;
+  expect(zoomButton.disabled).toBe(true);
+  expect(host.textContent).toContain('gallery.videoReview.focusZoomConflict');
+  act(() => zoomButton.click());
+  expect(setZoom).not.toHaveBeenCalled();
+});
+
+it('routes Border numeric drafts through the panel and cancels without a durable mutation', async () => {
+  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'border', at: 1, duration: 2, endMax: 10 }),
+    border: createQuickEditBorder(),
+  };
+  advanced.zoom.regions = [region];
+  const setZoom = vi.fn();
+  function DraftHarness() {
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      timelineDuration: 10,
+      selection: region.id,
+      setZoom,
+    });
+    return (
+      <>
+        <output data-testid="draft-width">{zoom.previewRegion(region).border!.width}</output>
+        <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />
+      </>
+    );
+  }
+  act(() => root.render(<DraftHarness />));
+  const range = host.querySelector<HTMLInputElement>(
+    '[aria-label="gallery.videoReview.borderWidth range"]'
+  )!;
+  await act(async () => {
+    range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    setInputValue(range, '9');
+  });
+  expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('9');
+  expect(region.border.width).toBe(3);
+  expect(setZoom).not.toHaveBeenCalled();
+  await act(async () =>
+    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('3');
+  expect(setZoom).not.toHaveBeenCalled();
+});
+
+it('duplicates the selected overlay through the panel binding and selects its independent copy', () => {
+  const initial = createQuickEditAdvancedState();
+  initial.ui.mode = 'advanced';
+  initial.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'original', at: 1 }),
+      border: createQuickEditBorder(),
+      sourceAnchor: { start: 1, end: 3 },
+    },
+  ];
+  initial.audio.voiceoverSegments = buildReviewTimeMap(10, [
+    { id: 'cut', kind: 'cut', start: 1.5, end: 2, requestedStart: 1.5, requestedEnd: 2 },
+  ]);
+  let state = initial;
+  let selected: string | null = null;
+  function CopyHarness() {
+    const [advanced, setAdvanced] = useState(initial);
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      setZoom: (update) => setAdvanced((current) => ({ ...current, zoom: update(current.zoom) })),
+      timelineDuration: 10,
+    });
+    state = advanced;
+    selected = zoom.selection;
+    return (
+      <>
+        <button aria-label="selectOriginal" onClick={() => zoom.setSelection('original')} />
+        <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />
+      </>
+    );
+  }
+  act(() => root.render(<CopyHarness />));
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="selectOriginal"]')!.click());
+  const copy = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.focusDuplicate"]'
+  )!;
+  expect(copy.disabled).toBe(false);
+  expect(host.textContent).toContain('gallery.videoReview.cutOverlapHint');
+  act(() => copy.click());
+  expect(state.zoom.regions).toHaveLength(2);
+  expect(selected).not.toBe('original');
+  expect(state.zoom.regions.find((item) => item.id === selected)?.sourceAnchor).toEqual({
+    start: 1,
+    end: 3,
+  });
+  expect(state.zoom.regions.find((item) => item.id === selected)?.border).toEqual(
+    initial.zoom.regions[0]!.border
+  );
+});
+
+it('does not insert a loading paragraph above scene sections during background import', async () => {
+  act(() => root.render(<Harness pending />));
+  await act(async () => button('toggleMode').click());
+  expect(host.textContent).not.toContain('gallery.videoReview.backgroundImporting');
+});
+
+function SpatialDraftNavigation() {
+  const controls = useContext(ReviewSpatialToolContext)!;
+  return (
+    <>
+      <button aria-label="draftTilt" onClick={() => controls.onTool('tilt')} />
+      <button aria-label="draftFocus" onClick={() => controls.onTool('focus')} />
+    </>
+  );
+}
+
+function mountSpatialDraftPanel(name = 'perspectiveX') {
+  const initial = createQuickEditAdvancedState();
+  initial.ui.mode = 'advanced';
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'spatial-draft', at: 1, duration: 2, endMax: 10 }),
+    perspective: { enabled: true, rotateX: 10, rotateY: 20, rotateZ: 30, strength: 0.5 },
+    depthOfField: {
+      enabled: true,
+      mode: 'area' as const,
+      x: 0.5,
+      y: 0.5,
+      width: 0.2,
+      softness: 0.3,
+      strength: 0.5,
+    },
+  };
+  initial.zoom.regions = [region];
+  let authored = initial;
+  let owner: ReturnType<typeof useReviewZoomEditor>;
+  const mutations = vi.fn();
+  function SpatialDraftPanel() {
+    const [advanced, setAdvanced] = useState(initial);
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      selection: region.id,
+      timelineDuration: 10,
+      setZoom: (update) => {
+        mutations();
+        setAdvanced((current) => ({ ...current, zoom: update(current.zoom) }));
+      },
+    });
+    authored = advanced;
+    owner = zoom;
+    return (
+      <ReviewAdvancedPanels
+        advanced={advanced}
+        zoom={zoom}
+        zoomPreview={() => <SpatialDraftNavigation />}
+      />
+    );
+  }
+  act(() => root.render(<SpatialDraftPanel />));
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(
+        `button[aria-label="${name === 'depthWidth' ? 'draftFocus' : 'draftTilt'}"]`
+      )!
+      .click()
+  );
+  if (name === 'depthWidth') {
+    const details = host.querySelector<HTMLDetailsElement>('details')!;
+    act(() => {
+      details.open = true;
+      details.dispatchEvent(new Event('toggle'));
+    });
+  }
+  const input = (name: string, range = false) => {
+    const node = host.querySelector<HTMLInputElement>(
+      `input[aria-label="gallery.videoReview.${name}${range ? ' range' : ''}"]`
+    );
+    if (!node) throw new Error(`Missing spatial numeric input: ${name}`);
+    return node;
+  };
+  return {
+    region,
+    input,
+    mutations,
+    authored: () => authored.zoom.regions[0]!,
+    owner: () => owner,
+  };
+}
+
+it.each(['perspectiveX', 'depthWidth'])(
+  'mirrors the real zoom-owner %s draft and restores authored values on cancellation',
+  (name) => {
+    const panel = mountSpatialDraftPanel(name);
+    act(() =>
+      panel.owner().preview(panel.region.id, {
+        perspective: { ...panel.region.perspective, rotateX: 34.2 },
+        depthOfField: { ...panel.region.depthOfField, width: 0.508 },
+      })
+    );
+    expect(panel.input(name).value).toBe(name === 'perspectiveX' ? '34.2' : '50.8');
+    expect(panel.authored()).toEqual(panel.region);
+    expect(panel.mutations).not.toHaveBeenCalled();
+    act(() => panel.owner().preview(panel.region.id, null));
+    expect(panel.input(name).value).toBe(name === 'perspectiveX' ? '10' : '20');
+    expect(panel.mutations).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['perspectiveX', 'depthWidth'])(
+  'commits one %s range edit after its transient value has rerendered through the real panel',
+  async (name) => {
+    const panel = mountSpatialDraftPanel(name);
+    const range = panel.input(name, true);
+    await act(async () => {
+      range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      setInputValue(range, '45');
+    });
+    expect(panel.input(name).value).toBe('45');
+    expect(panel.authored()).toEqual(panel.region);
+    expect(panel.mutations).not.toHaveBeenCalled();
+    await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    expect(panel.mutations).toHaveBeenCalledTimes(1);
+    expect(
+      name === 'perspectiveX'
+        ? panel.authored().perspective?.rotateX
+        : panel.authored().depthOfField?.width
+    ).toBe(name === 'perspectiveX' ? 45 : 0.45);
+    expect(panel.input(name).value).toBe('45');
+  }
+);
+
+it.each(['perspectiveX', 'depthWidth'])(
+  'cancels %s range preview and ignores its later pointerup after exact fields have synchronized',
+  async (name) => {
+    const panel = mountSpatialDraftPanel(name);
+    const range = panel.input(name, true);
+    await act(async () => {
+      range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      setInputValue(range, '45');
+    });
+    expect(panel.input(name).value).toBe('45');
+    await act(async () =>
+      range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    expect(panel.input(name).value).toBe(name === 'perspectiveX' ? '10' : '20');
+    expect(panel.authored()).toEqual(panel.region);
+    expect(panel.mutations).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['perspectiveX', 'depthWidth'])(
+  'commits %s text once on Enter without focusing the next exact field',
+  async (name) => {
+    const panel = mountSpatialDraftPanel(name);
+    const field = panel.input(name);
+    act(() => field.focus());
+    await act(async () => setInputValue(field, '45'));
+    expect(panel.authored()).toEqual(panel.region);
+    await act(async () =>
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
+    expect(panel.mutations).toHaveBeenCalledTimes(1);
+    expect(
+      name === 'perspectiveX'
+        ? panel.authored().perspective?.rotateX
+        : panel.authored().depthOfField?.width
+    ).toBe(name === 'perspectiveX' ? 45 : 0.45);
+    expect(panel.input(name).value).toBe('45');
+    expect(document.activeElement).toBe(document.body);
+  }
+);
+
+it('keeps computer admission cancellation reachable while Scene controls are disabled', async () => {
+  const advanced = createQuickEditAdvancedState();
+  const cancel = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewSceneProperties
+        background={advanced.background}
+        canvas={advanced.canvas}
+        source={{ width: 320, height: 180 }}
+        audio={advanced.audio}
+        hasOriginalAudio={false}
+        onCanvas={vi.fn()}
+        onOriginalVolume={vi.fn()}
+        onLaneVolume={vi.fn()}
+        busy
+        pending={false}
+        failed={false}
+        onImportImage={vi.fn()}
+        setBackground={vi.fn()}
+        presentation={{
+          editor: {
+            settings: {
+              fadeIn: { enabled: false, duration: 0.4 },
+              fadeOut: { enabled: false, duration: 0.4 },
+              color: '#000000ff',
+              audioFade: false,
+              intro: { mode: 'none' },
+              outro: { mode: 'none' },
+            },
+            slotModes: { intro: 'image', outro: 'none' },
+            picker: { slot: 'intro', kind: 'image', source: 'computer' },
+            pending: true,
+            error: null,
+            canRetry: false,
+            audioUnsupported: false,
+            preview: vi.fn(),
+            change: vi.fn(async () => false),
+            reset: vi.fn(async () => false),
+            mode: vi.fn(async () => false),
+            choose: vi.fn(),
+            selectComputer: vi.fn(async () => false),
+            selectLibrary: vi.fn(async () => false),
+            retry: vi.fn(async () => false),
+            retryMuted: vi.fn(async () => false),
+            cancel,
+          },
+        }}
+      />
+    )
+  );
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="common.actions.cancel"]')!;
+  expect(button).not.toBeNull();
+  expect(button.matches(':disabled')).toBe(false);
+  expect(button.closest('fieldset')).toBeNull();
+  expect(host.querySelector('fieldset')?.disabled).toBe(true);
+  act(() => button.click());
+  expect(cancel).toHaveBeenCalledOnce();
 });

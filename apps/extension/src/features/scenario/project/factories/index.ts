@@ -121,3 +121,7 @@ export function createTourImageSlide(
     timing: { mode: 'inherit', holdSeconds: 4, truncateNarration: false, autoplayTarget: null },
   };
 }
+
+export function guideParagraphText(paragraphs: readonly GuideParagraph[]): string {
+  return paragraphs.map((paragraph) => paragraph.runs.map((run) => run.text).join('')).join('\n');
+}

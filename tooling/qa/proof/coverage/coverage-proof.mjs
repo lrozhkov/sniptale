@@ -1,15 +1,18 @@
+import { parseCoverageProof } from '../contracts/coverage-proof-contract.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { collectProductionCoverageFiles } from './coverage-audit-report.mjs';
 import {
-  createProofDigest,
+  readProofInput,
   proofControlDigestMatches,
   resolveProofControlDigest,
   stableStringify,
   writeSealedProofJson,
 } from '../contracts/proof-input.mjs';
+
+import { createFullUnitProofInputs } from '../unit/unit-test-proof.mjs';
 
 const POLICY_PATH = 'tooling/configs/qa/coverage-proof-reuse.data.json';
 const EXTERNAL_PROOF_ENV = 'SNIPTALE_COVERAGE_PROOF_PATH';
@@ -21,10 +24,7 @@ const EXECUTABLE_TEST_SUPPORT_PATTERN = /\.(?:[cm]?[jt]sx?)$/u;
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 function regularBytes(file) {
-  const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink())
-    throw new Error(`Unsafe coverage proof input: ${file}`);
-  return fs.readFileSync(file);
+  return readProofInput(file);
 }
 
 function readPolicy(cwd) {
@@ -73,7 +73,7 @@ function fingerprint(cwd, files) {
   return { count: entries.length, digest: sha256(stableStringify(entries)) };
 }
 
-export function createCoverageProofInputs({ cwd = process.cwd() } = {}) {
+export function createCoverageProofInputs({ cwd = process.cwd(), pool = 'threads' } = {}) {
   const policy = readPolicy(cwd);
   const productionFiles = collectProductionCoverageFiles({ root: cwd });
   const tests = new Set();
@@ -88,7 +88,9 @@ export function createCoverageProofInputs({ cwd = process.cwd() } = {}) {
   const containerDigest = process.env.SNIPTALE_CI_CONTAINER_DIGEST ?? null;
   if (containerDigest !== null && !/^sha256:[a-f0-9]{64}$/u.test(containerDigest))
     throw new Error('Malformed coverage proof image digest.');
+  const unitInputs = createFullUnitProofInputs({ cwd, pool, suite: 'product' });
   const inputs = {
+    fullUnit: { inputDigest: unitInputs.inputDigest, execution: unitInputs.execution },
     production: fingerprint(cwd, productionFiles),
     tests: fingerprint(cwd, tests),
     configuration: fingerprint(cwd, configs),
@@ -108,22 +110,8 @@ function reportDigests(root, policy) {
     .map((file) => ({ file, sha256: sha256(regularBytes(path.join(root, file))) }));
 }
 
-function parseProof(file) {
-  const proof = JSON.parse(regularBytes(file).toString('utf8'));
-  if (
-    proof?.schemaVersion !== 1 ||
-    proof.artifactKind !== 'sniptale-coverage-proof' ||
-    proof.outcome !== 'passed' ||
-    !/^[a-f0-9]{64}$/u.test(proof.inputDigest ?? '') ||
-    !Array.isArray(proof.reports) ||
-    createProofDigest(proof) !== proof.proofDigest
-  )
-    throw new Error('Malformed or corrupted coverage proof.');
-  return proof;
-}
-
-export function resolveReusableCoverageProof({ cwd = process.cwd() } = {}) {
-  const current = createCoverageProofInputs({ cwd });
+export function resolveReusableCoverageProof({ cwd = process.cwd(), pool = 'threads' } = {}) {
+  const current = createCoverageProofInputs({ cwd, pool });
   const controlDigest = resolveProofControlDigest({ cwd });
   const externalProof = process.env[EXTERNAL_PROOF_ENV];
   const externalReports = process.env[EXTERNAL_REPORTS_ENV];
@@ -134,10 +122,13 @@ export function resolveReusableCoverageProof({ cwd = process.cwd() } = {}) {
     externalReports ?? (localAllowed ? path.join(cwd, current.policy.reportDirectory) : null);
   if (!proofPath || !reportsRoot) return { matched: false, reason: 'no admissible coverage proof' };
   try {
-    const proof = parseProof(proofPath);
+    const proof = parseCoverageProof(JSON.parse(regularBytes(proofPath).toString('utf8')));
     if (!proofControlDigestMatches(proof, controlDigest))
       return { matched: false, reason: 'coverage proof control digest changed' };
-    if (proof.inputDigest !== current.inputDigest)
+    if (
+      proof.inputDigest !== current.inputDigest ||
+      stableStringify(proof.fullUnit) !== stableStringify(current.fullUnit)
+    )
       return { matched: false, reason: 'coverage proof inputs changed' };
     if (
       stableStringify(reportDigests(reportsRoot, current.policy)) !== stableStringify(proof.reports)
@@ -145,6 +136,7 @@ export function resolveReusableCoverageProof({ cwd = process.cwd() } = {}) {
       return { matched: false, reason: 'coverage proof reports changed' };
     return {
       matched: true,
+      inputs: current,
       proof,
       reportsRoot,
       policy: current.policy,
@@ -155,7 +147,25 @@ export function resolveReusableCoverageProof({ cwd = process.cwd() } = {}) {
   }
 }
 
+export function readVerifiedCoverageReport(reusable, file = 'coverage-final.json') {
+  const expected = reusable.proof.reports.find((report) => report.file === file);
+  if (!expected) throw new Error(`Missing sealed coverage report: ${file}`);
+  const bytes = regularBytes(path.join(reusable.reportsRoot, file));
+  if (sha256(bytes) !== expected.sha256)
+    throw new Error('Coverage report changed after admission.');
+  return bytes.toString('utf8');
+}
+
+function assertReusableReportDigests(reusable, root = reusable.reportsRoot) {
+  if (
+    stableStringify(reportDigests(root, reusable.policy)) !==
+    stableStringify(reusable.proof.reports)
+  )
+    throw new Error('Coverage reports changed after admission.');
+}
+
 export function materializeReusableCoverageProof(reusable, { cwd = process.cwd() } = {}) {
+  assertReusableReportDigests(reusable);
   const destination = path.join(cwd, reusable.policy.reportDirectory);
   if (path.resolve(destination) !== path.resolve(reusable.reportsRoot)) {
     fs.rmSync(destination, { recursive: true, force: true });
@@ -166,6 +176,7 @@ export function materializeReusableCoverageProof(reusable, { cwd = process.cwd()
       force: false,
     });
   }
+  assertReusableReportDigests(reusable, destination);
   const materializedAt = new Date();
   for (const report of reusable.proof.reports) {
     fs.utimesSync(path.join(destination, report.file), materializedAt, materializedAt);
@@ -173,15 +184,22 @@ export function materializeReusableCoverageProof(reusable, { cwd = process.cwd()
   return destination;
 }
 
-export function recordSuccessfulCoverageProof({ cwd = process.cwd(), reusedFrom = null } = {}) {
-  const inputs = createCoverageProofInputs({ cwd });
+export function recordSuccessfulCoverageProof({
+  cwd = process.cwd(),
+  pool = 'threads',
+  reusedFrom = null,
+  inputs = createCoverageProofInputs({ cwd, pool }),
+} = {}) {
+  if (inputs.inputDigest !== createCoverageProofInputs({ cwd, pool }).inputDigest)
+    throw new Error('Coverage inputs changed during execution.');
   const controlDigest = resolveProofControlDigest({ cwd });
   const reportsRoot = path.join(cwd, inputs.policy.reportDirectory);
   const proof = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     artifactKind: 'sniptale-coverage-proof',
     outcome: 'passed',
     inputDigest: inputs.inputDigest,
+    fullUnit: inputs.fullUnit,
     production: inputs.production,
     tests: inputs.tests,
     configuration: inputs.configuration,

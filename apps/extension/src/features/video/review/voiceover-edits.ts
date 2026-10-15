@@ -89,6 +89,30 @@ export function anchorReviewVoiceover(
     : clip;
 }
 
+/** Places new source-authored audio through Cut (1x) and Speed, retaining every sample. */
+export function anchorReviewVoiceoverAtSource(
+  clip: QuickEditAudioClip,
+  map: readonly ReviewTimeSegment[],
+  trimOffset = 0
+): QuickEditAudioClip {
+  const start = reviewVoiceoverSourceAtOffset(clip.timelineStart, trimOffset, clip.tempo ?? 1, map);
+  return retimeReviewVoiceover(
+    {
+      ...clip,
+      timelineStart: start,
+      sourceAnchor: [
+        {
+          start,
+          end: start + clip.duration / (clip.tempo ?? 1),
+          offset: 0,
+          duration: clip.duration,
+        },
+      ],
+    },
+    map
+  );
+}
+
 /** Source coordinates of the single retained record, including portions hidden by cuts. */
 export function reviewVoiceoverRange(clip: QuickEditAudioClip) {
   return {
@@ -171,6 +195,45 @@ export function projectReviewVoiceover(
   });
 }
 
+/** Retained result slices for an interval measured in the intact audio asset's native seconds. */
+export function reviewVoiceoverNativeIntervals(
+  clip: QuickEditAudioClip,
+  interval: { start: number; end: number },
+  map?: readonly ReviewTimeSegment[]
+): Array<{ start: number; end: number }> {
+  if (clip.dormant || interval.end <= interval.start) return [];
+  return projectReviewVoiceover([clip], map).flatMap((slice) => {
+    const rate = slice.playbackRate ?? 1;
+    const start = Math.max(interval.start, slice.sourceOffset);
+    const end = Math.min(interval.end, slice.sourceOffset + slice.duration * rate);
+    return end > start
+      ? [
+          {
+            start: slice.timelineStart + (start - slice.sourceOffset) / rate,
+            end: slice.timelineStart + (end - slice.sourceOffset) / rate,
+          },
+        ]
+      : [];
+  });
+}
+
+/** Inverse native clock for the audible slice under a result playhead; authored gaps stay unmapped. */
+export function reviewVoiceoverNativeTime(
+  clip: QuickEditAudioClip,
+  time: number,
+  map?: readonly ReviewTimeSegment[]
+): number | null {
+  if (clip.dormant) return null;
+  const slices = projectReviewVoiceover([clip], map);
+  const slice =
+    slices.find(
+      (entry) => time >= entry.timelineStart && time < entry.timelineStart + entry.duration
+    ) ?? slices.find((entry) => time === entry.timelineStart + entry.duration);
+  return slice
+    ? slice.sourceOffset + (time - slice.timelineStart) * (slice.playbackRate ?? 1)
+    : null;
+}
+
 /** Actual audible duration; raw sample seconds are independent of applied Speed. */
 export function reviewVoiceoverPlaybackDuration(
   clip: QuickEditAudioClip,
@@ -198,15 +261,13 @@ export function moveReviewVoiceover(
       (part) =>
         part.kind !== 'cut' &&
         requestedStart >= part.sourceStart &&
-        requestedStart <= part.sourceEnd
+        (requestedStart < part.sourceEnd ||
+          (requestedStart === sourceDuration && part.sourceEnd === sourceDuration))
     )
   )
     return placeAudibleVoiceover(clip, requestedStart, sourceDuration, map);
   const range = reviewVoiceoverRange(clip);
-  const start = Math.max(
-    0,
-    Math.min(requestedStart, Math.max(0, sourceDuration - (range.end - range.start)))
-  );
+  const start = Math.max(0, Math.min(requestedStart, sourceDuration));
   const delta = start - range.start;
   return {
     ...clip,
@@ -235,14 +296,9 @@ function placeAudibleVoiceover(
         (requested === sourceDuration && part.sourceEnd === sourceDuration))
   );
   if (!segment || duration <= 0) return clip;
-  const outputStart = Math.max(
-    0,
-    Math.min(
-      segment.resultStart +
-        (Math.min(requested, segment.sourceEnd) - segment.sourceStart) / segment.rate,
-      map.at(-1)!.resultEnd - duration
-    )
-  );
+  const outputStart =
+    segment.resultStart +
+    (Math.min(requested, segment.sourceEnd) - segment.sourceStart) / segment.rate;
   const { sourceAnchor: _anchor, ...recording } = clip;
   const placed = anchorReviewVoiceover({ ...recording, timelineStart: outputStart }, map);
   return placed;

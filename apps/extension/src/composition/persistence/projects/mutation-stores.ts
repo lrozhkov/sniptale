@@ -1,5 +1,9 @@
+import type { IDBPTransaction } from 'idb';
+import { createScenarioProjectStore } from '../scenario/storage';
+import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import type { initDB } from '../infrastructure/indexed-db/core';
@@ -14,6 +18,8 @@ import {
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -30,9 +36,12 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
       AGGREGATE_PRESENTATIONS_STORE,
       SCENARIO_ASSETS_STORE,
       SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
       VIDEO_WORKSPACE_DRAFTS_STORE,
       ASSET_OWNERS_STORE,
       ASSET_REFS_STORE,
@@ -41,16 +50,9 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
     'readwrite'
   );
   return {
-    assetOperationStore: tx.objectStore(ASSET_OPERATIONS_STORE),
-    assetOwnerStore: tx.objectStore(ASSET_OWNERS_STORE),
-    assetRefStore: tx.objectStore(ASSET_REFS_STORE),
-    mediaLibraryStore: tx.objectStore(MEDIA_LIBRARY_STORE),
-    videoWorkspaceStore: tx.objectStore(VIDEO_WORKSPACES_STORE),
-    videoDraftStore: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
-    projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
-    projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
+    ...projectMutationStoreProjection(tx),
     scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
-    scenarioProjectStore: tx.objectStore(SCENARIO_PROJECTS_STORE),
+    scenarioProjectStore: createScenarioProjectStore(tx),
     recordingStore: tx.objectStore(STORE_NAME),
     tx,
   };
@@ -66,6 +68,7 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
       VIDEO_WORKSPACE_DRAFTS_STORE,
       AGGREGATE_PRESENTATIONS_STORE,
       ASSET_OWNERS_STORE,
@@ -77,14 +80,20 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
   return {
     scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
     aggregatePresentationStore: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
+    ...projectMutationStoreProjection(tx),
+    tx,
+  };
+}
+
+function projectMutationStoreProjection(tx: IDBPTransaction<unknown, string[], 'readwrite'>) {
+  return {
     assetOperationStore: tx.objectStore(ASSET_OPERATIONS_STORE),
     assetOwnerStore: tx.objectStore(ASSET_OWNERS_STORE),
     assetRefStore: tx.objectStore(ASSET_REFS_STORE),
     mediaLibraryStore: tx.objectStore(MEDIA_LIBRARY_STORE),
-    videoWorkspaceStore: tx.objectStore(VIDEO_WORKSPACES_STORE),
+    videoWorkspaceStore: createVideoWorkspaceStore(tx),
     videoDraftStore: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
-    tx,
   };
 }

@@ -1,3 +1,4 @@
+import type { WindowHeader } from '../../../features/browser-frame/header';
 import type { VideoEditorAnnotationActions } from './annotation';
 import type { VideoEditorObjectTrackActions } from './object-tracks';
 import type { VideoEditorTemporalActions } from './temporal';
@@ -114,6 +115,7 @@ export interface VideoEditorProjectActions
   updateMediaClipFitScalePercent: (clipId: string, fitScalePercent: number) => void;
   updateMediaClipShadowIntensity: (clipId: string, shadowIntensity: number) => void;
   updateMediaClipShadowMode: (clipId: string, shadowMode: VideoMediaShadowMode) => void;
+  updateMediaClipWindowHeader: (clipId: string, windowHeader: WindowHeader | undefined) => void;
   applyMediaClipVisualsToTrack: (clipId: string) => void;
   closeTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   updateTextClipContent: (clipId: string, text: string) => void;

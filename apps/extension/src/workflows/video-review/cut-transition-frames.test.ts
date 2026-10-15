@@ -4,6 +4,9 @@ import {
   createReviewTransitionFrames,
   isReviewTransitionFrame,
   paintReviewCutTransition,
+  reviewCutTransitionSides,
+  paintReviewCutDissolve,
+  paintReviewCutBlackout,
   type ReviewTransitionSample,
 } from './cut-transition-frames';
 import type { ReviewCutTransitionPlan } from '../../features/video/review/cuts';
@@ -21,6 +24,52 @@ const frame = (timestamp: number): ReviewTransitionSample => ({
   timestamp,
   draw: vi.fn(),
   close: vi.fn(),
+});
+
+it('awaits each dissolve side before blending and propagates an asynchronous side failure', async () => {
+  const target = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    drawImage: vi.fn(),
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+  } as unknown as CanvasRenderingContext2D;
+  const canvas = {} as HTMLCanvasElement;
+  const scratch = { canvas, context: target };
+  let finish!: () => void;
+  const held = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const order: number[] = [];
+  const painting = paintReviewCutDissolve(
+    target,
+    scratch,
+    0.5,
+    async (_context, _canvas, side) => {
+      order.push(side);
+      if (side === 0) await held;
+    },
+    canvas
+  );
+  expect(order).toEqual([0]);
+  expect(target.drawImage).not.toHaveBeenCalled();
+  finish();
+  await painting;
+  expect(order).toEqual([0, 1]);
+  expect(target.drawImage).toHaveBeenCalledOnce();
+  vi.mocked(target.drawImage).mockClear();
+  await expect(
+    paintReviewCutDissolve(
+      target,
+      scratch,
+      0.5,
+      async () => {
+        throw new Error('side failed');
+      },
+      canvas
+    )
+  ).rejects.toThrow('side failed');
+  expect(target.drawImage).not.toHaveBeenCalled();
 });
 
 it('rejects preceding excluded frames even when returned by the range decoder', async () => {
@@ -212,7 +261,7 @@ it('releases a cached pair when another cut takes ownership and rejects aborted 
   for (const sample of [...first, ...second]) expect(sample.close).toHaveBeenCalledOnce();
 });
 
-it('fades the admitted moving side to black and restores it without borrowing the other side', () => {
+it('keeps the admitted moving side undimmed for final scene blackout without borrowing the other side', () => {
   const fills: number[] = [];
   const context = {
     globalAlpha: 1,
@@ -234,7 +283,7 @@ it('fades the admitted moving side to black and restores it without borrowing th
   expect(moving.draw).toHaveBeenCalledOnce();
   expect(left.draw).not.toHaveBeenCalled();
   expect(right.draw).not.toHaveBeenCalled();
-  expect(fills).toEqual([1, 0.5]);
+  expect(fills).toEqual([1]);
   fills.length = 0;
   paintReviewCutTransition(
     context,
@@ -243,5 +292,90 @@ it('fades the admitted moving side to black and restores it without borrowing th
     { left, right },
     frame(4.25)
   );
-  expect(fills).toEqual([1, 0.5]);
+  expect(fills).toEqual([1]);
+});
+
+it('blacks out full output coordinates once, leaving dissolve untouched', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    fillRect: vi.fn(),
+    globalAlpha: 1,
+  } as unknown as CanvasRenderingContext2D;
+  const size = { width: 1280, height: 800 };
+  paintReviewCutBlackout(context, size, reviewCutTransitionAt(1.75, [plan]));
+  expect(context.fillRect).not.toHaveBeenCalled();
+  for (const [time, alpha] of [
+    [1.75, 0.5],
+    [2, 1],
+    [2.25, 0.5],
+  ]) {
+    paintReviewCutBlackout(
+      context,
+      size,
+      reviewCutTransitionAt(time!, [{ ...plan, type: 'fade-black' }])
+    );
+    expect(context.globalAlpha).toBe(alpha);
+    expect(context.setTransform).toHaveBeenLastCalledWith(1, 0, 0, 1, 0, 0);
+    expect(context.fillRect).toHaveBeenLastCalledWith(0, 0, 1280, 800);
+  }
+  expect(context.restore).toHaveBeenCalledTimes(3);
+  expect(context.fillStyle).toBe('#000000');
+  paintReviewCutBlackout(
+    context,
+    size,
+    reviewCutTransitionAt(2, [{ ...plan, type: 'fade-black', color: '#abcdef' }])
+  );
+  expect(context.fillStyle).toBe('#abcdef');
+});
+
+it('retains decoded allocation metadata on the same bounded endpoint samples', async () => {
+  const left = { ...frame(1.9), allocationSize: () => 1234 };
+  const right = { ...frame(4.1), allocationSize: () => 5678 };
+  const owner = createReviewTransitionFrames(
+    {
+      getSample: async () => left,
+      async *samples() {
+        yield right;
+      },
+    },
+    new AbortController().signal
+  );
+  const loaded = await owner.load(plan);
+  expect(loaded?.left.allocationSize?.()).toBe(1234);
+  expect(loaded?.right.allocationSize?.()).toBe(5678);
+  owner.dispose();
+  expect(left.close).toHaveBeenCalledOnce();
+  expect(right.close).toHaveBeenCalledOnce();
+});
+
+it('holds independent seam clocks in fragment exports and rejects a moving frame from the cut', () => {
+  const endpoints = { left: frame(1.9), right: frame(4) };
+  const blend = reviewCutTransitionAt(2.1, [plan])!;
+  const sides = reviewCutTransitionSides(blend, endpoints, frame(3), 12.1, 10);
+  expect(sides[0].sample).toBe(endpoints.left);
+  expect(sides[0].resultTime).toBeLessThan(12);
+  expect(sides[0].resultTime).toBeCloseTo(12, 12);
+  expect(sides[1]).toEqual({ sample: endpoints.right, resultTime: 12.1 });
+});
+
+it('restores the dissolve compositor context and leaves source lifetime with the caller', () => {
+  const target = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const canvas = { width: 640, height: 360 } as HTMLCanvasElement;
+  const scratch = { canvas, context: target };
+  const draw = vi.fn();
+  paintReviewCutDissolve(target, scratch, 0.5, draw, canvas);
+  expect(draw.mock.calls.map((call) => call[2])).toEqual([0, 1]);
+  expect(target.drawImage).toHaveBeenCalledWith(canvas, 0, 0);
+  expect(target.restore).toHaveBeenCalledOnce();
+  vi.mocked(target.drawImage).mockImplementationOnce(() => {
+    throw new Error('paint failed');
+  });
+  expect(() => paintReviewCutDissolve(target, scratch, 0.5, draw, canvas)).toThrow('paint failed');
+  expect(target.restore).toHaveBeenCalledTimes(2);
 });

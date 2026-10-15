@@ -49,6 +49,7 @@ vi.mock('./runtime-cleanup', async (importOriginal) => ({
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createBackgroundRuntimeState } from '../runtime-state';
 import {
+  configureAudioJobPrivacyErasurePort,
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   eraseLocalExtensionDataFromBackground,
@@ -110,4 +111,74 @@ it('configures screenshot cleanup through the application port', () => {
   configureScreenshotPrivacyErasureCleanupPort(port);
 
   expect(screenshotCleanupPortMock).toHaveBeenCalledWith(port);
+});
+
+it('cancels audio requests and waits for their staging writes before storage erasure', async () => {
+  const events: string[] = [];
+  const release = vi.fn(() => events.push('release'));
+  configureAudioJobPrivacyErasurePort(
+    {
+      cancelActiveJob: async () => {
+        events.push('cancel');
+      },
+      reserveErasureExclusion: () => {
+        events.push('reserve');
+        return {
+          release,
+          waitForActiveMutations: async () => {
+            events.push('settled');
+          },
+        };
+      },
+    },
+    {
+      async cancelActiveJob() {
+        events.push('cancel-text');
+      },
+      reserveErasureExclusion() {
+        events.push('reserve-text');
+        return {
+          release() {
+            events.push('release-text');
+          },
+          async waitForActiveMutations() {
+            events.push('settled-text');
+          },
+        };
+      },
+    }
+  );
+  storageCleanupMock.mockImplementationOnce(async () => {
+    events.push('storage');
+    return {
+      failedRequiredParticipantIds: [],
+      indexedDbStoresCleared: 0,
+      localStorageKeysRemoved: [],
+      participants: [verifiedParticipant],
+      sessionStorageKeysRemoved: [],
+      success: true,
+      syncStorageKeysRemoved: [],
+    };
+  });
+  const result = await eraseLocalExtensionDataFromBackground(
+    {
+      type: MessageType.ERASE_LOCAL_EXTENSION_DATA,
+      includeAiProviderSecrets: false,
+      preservePreferences: true,
+    },
+    createBackgroundRuntimeState()
+  );
+  expect(result.success).toBe(true);
+  expect(events).toEqual([
+    'reserve',
+    'reserve-text',
+    'cancel',
+    'cancel-text',
+    'settled',
+    'settled-text',
+    'storage',
+    'release',
+    'release-text',
+  ]);
+  expect(release).toHaveBeenCalledOnce();
 });

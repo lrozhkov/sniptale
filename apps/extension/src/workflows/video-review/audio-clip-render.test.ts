@@ -2,31 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewAudioClipRenderer } from './audio-clip-render';
 import { renderTempoBuffer } from '../../features/video/audio/tempo-buffer';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
-
-class Pcm {
-  readonly planes: Float32Array[];
-  constructor(readonly options: { length: number; sampleRate: number; numberOfChannels: number }) {
-    this.planes = Array.from(
-      { length: options.numberOfChannels },
-      () => new Float32Array(options.length)
-    );
-  }
-  get length() {
-    return this.options.length;
-  }
-  get sampleRate() {
-    return this.options.sampleRate;
-  }
-  get numberOfChannels() {
-    return this.options.numberOfChannels;
-  }
-  get duration() {
-    return this.length / this.sampleRate;
-  }
-  getChannelData(channel: number) {
-    return this.planes[channel]!;
-  }
-}
+import { Pcm, createParitySource, expectAudioClipWindows } from './audio-clip-parity.test-support';
 
 beforeEach(() => vi.stubGlobal('AudioBuffer', Pcm));
 afterEach(() => {
@@ -38,7 +14,7 @@ function entry(rate: number, duration = 1.3): QuickEditAudioPlanEntry {
   return {
     lane: 'voiceover',
     clipId: 'voice',
-    assetId: 'voice',
+    source: { kind: 'project' as const, assetId: 'voice' },
     timelineStart: 0,
     sourceOffset: 0.37,
     duration,
@@ -49,43 +25,33 @@ function entry(rate: number, duration = 1.3): QuickEditAudioPlanEntry {
   };
 }
 
-it.each([44100, 48000])(
-  'matches preview PCM across native-rate windows and a mid-clip start at %sHz',
-  async (sampleRate) => {
-    const source = new AudioBuffer({ length: sampleRate * 4, sampleRate, numberOfChannels: 2 });
-    for (let i = 0; i < source.length; i++) {
-      const value = Math.sin(i * 0.021 + Math.sin(i * 0.0003)) * 0.4 + Math.sin(i * 0.037) * 0.1;
-      source.getChannelData(0)[i] = value;
-      source.getChannelData(1)[i] = -value * 0.5;
-    }
-    const clip = entry(1.5);
-    const reference = await renderTempoBuffer(source, {
-      start: clip.sourceOffset,
-      duration: clip.duration * 1.5,
-      rate: 1.5,
-    });
-    const renderer = createReviewAudioClipRenderer();
-    const padding = Math.round(sampleRate * 0.02);
-    const check = async (from: number, to: number) => {
-      const window = await renderer.render(clip, source, from, to, new AbortController().signal);
-      const start = Math.round(from * sampleRate) - padding;
-      for (let c = 0; c < 2; c++) {
-        const expected = new Float32Array(window.length);
-        for (let i = 0; i < window.length; i++)
-          expected[i] = reference.getChannelData(c)[start + i] ?? 0;
-        expect(window.getChannelData(c)).toEqual(expected);
-      }
-      return window;
-    };
-    const first = await check(0.43, 0.93);
-    const second = await check(0.93, 1.3);
-    expect(first.getChannelData(0).slice(-2 * padding)).toEqual(
-      second.getChannelData(0).slice(0, 2 * padding)
-    );
-    await check(0, 0.2);
-    expect(source.length).toBe(sampleRate * 4);
+it('matches full preview and streamed PCM across short native-rate windows, overlap and seek', async () => {
+  const sampleRate = 44100;
+  const source = new AudioBuffer({ length: sampleRate * 2, sampleRate, numberOfChannels: 2 });
+  for (let frame = 0; frame < source.length; frame++) {
+    const value =
+      Math.sin(frame * 0.021 + Math.sin(frame * 0.0003)) * 0.4 + Math.sin(frame * 0.037) * 0.1;
+    source.getChannelData(0)[frame] = value;
+    source.getChannelData(1)[frame] = -value * 0.5;
   }
-);
+  const clip = entry(1.5, 0.6);
+  const preview = await renderTempoBuffer(source, {
+    start: clip.sourceOffset,
+    duration: clip.duration * 1.5,
+    rate: 1.5,
+  });
+  await expectAudioClipWindows({
+    clip,
+    source,
+    preview,
+    windows: [
+      [0.13, 0.33],
+      [0.33, 0.6],
+      [0, 0.1],
+    ],
+  });
+  expect(source.length).toBe(sampleRate * 2);
+});
 
 it.each([0.0625, 0.5, 2, 16])(
   'preserves vocal pitch and exact duration at %sx with bounded output',
@@ -132,3 +98,32 @@ it('cancels while priming a late fragment and never returns a partial buffer', a
   await vi.runAllTimersAsync();
   await rejection;
 });
+
+it.each(
+  [0.0625, 0.5, 1, 1.5, 2, 16].flatMap((rate) =>
+    [0, 0.037, 0.37, 1.25].map((sourceOffset) => ({ rate, sourceOffset }))
+  )
+)(
+  'matches preview and bounded windows at $rate x / offset $sourceOffset across chunks and seek',
+  async ({ rate, sourceOffset }) => {
+    const duration = 1.1;
+    const source = createParitySource({ sampleRate: 8000, rate, sourceOffset, duration });
+    const clip = { ...entry(rate, duration), sourceOffset };
+    const preview = await renderTempoBuffer(source, {
+      start: sourceOffset,
+      duration: duration * rate,
+      rate,
+    });
+    await expectAudioClipWindows({
+      clip,
+      source,
+      preview,
+      windows: [
+        [0.31, 0.61],
+        [0.61, 0.93],
+        [0, 0.13],
+        [0.93, 1.1],
+      ],
+    });
+  }
+);

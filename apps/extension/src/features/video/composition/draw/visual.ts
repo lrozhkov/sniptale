@@ -1,3 +1,4 @@
+import { windowHeaderImageKey } from './window-header';
 import { drawActionCompositionState } from './effects/actions';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
 import type { VideoCompositionVisualLayer } from '../types';
@@ -28,8 +29,11 @@ export function drawCompositionVisualLayer(
     context.filter = filter;
   }
   applyLayerTransform(context, layer, renderState, frame, scaleX, scaleY);
-  drawVisualLayerContent(context, layer, frame, displayScale, loadedImages, clipMediaElements);
-  context.restore();
+  try {
+    drawVisualLayerContent(context, layer, frame, displayScale, loadedImages, clipMediaElements);
+  } finally {
+    context.restore();
+  }
 }
 
 export function drawCompositionVisualLayerBitmap(
@@ -81,7 +85,7 @@ function drawVisualLayerContent(
 ) {
   switch (layer.kind) {
     case 'video':
-      drawVideoLayer(context, layer, frame, displayScale, clipMediaElements);
+      drawVideoLayer(context, layer, frame, displayScale, clipMediaElements, loadedImages);
       break;
     case 'image':
       drawImageLayer(context, layer, frame, displayScale, loadedImages);
@@ -186,7 +190,8 @@ function drawVideoLayer(
   layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>,
   frame: ReturnType<typeof getScaledLayerFrame>,
   displayScale: number,
-  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>
+  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>,
+  loadedImages: Record<string, HTMLImageElement>
 ) {
   const source = clipMediaElements.get(layer.clipId);
   if (!source) {
@@ -204,7 +209,10 @@ function drawVideoLayer(
     return;
   }
 
+  const header = admittedVisualWindowHeader(layer.clip, loadedImages, layer.trackRole === 'CAMERA');
   drawFittedMediaLayer({
+    ...header,
+    ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
     context,
     displayScale,
     fitMode: layer.clip.fitMode,
@@ -217,14 +225,14 @@ function drawVideoLayer(
     shadowMode: layer.clip.shadowMode,
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
     sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
-    render: (drawX, drawY, drawWidth, drawHeight) => {
+    render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
       if (!layer.effectActionsOnly && source instanceof HTMLVideoElement) {
-        context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+        drawContext.drawImage(source, drawX, drawY, drawWidth, drawHeight);
       } else if (!layer.effectActionsOnly && !(source instanceof HTMLVideoElement)) {
-        source.draw(context, drawX, drawY, drawWidth, drawHeight);
+        source.draw(drawContext, drawX, drawY, drawWidth, drawHeight);
       }
-      context.save();
-      context.beginPath();
+      drawContext.save();
+      drawContext.beginPath();
       const contentBounds = {
         x: Math.max(frame.x, drawX),
         y: Math.max(frame.y, drawY),
@@ -237,8 +245,8 @@ function drawVideoLayer(
           Math.min(frame.y + frame.height, drawY + drawHeight) - Math.max(frame.y, drawY)
         ),
       };
-      context.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
-      context.clip();
+      drawContext.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
+      drawContext.clip();
       const sourceWidth =
         source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth;
       const sourceHeight =
@@ -253,9 +261,43 @@ function drawVideoLayer(
                 y: contentBounds.y + 24 * Math.max(0.2, actionScale),
               }
             : null;
-        drawActionCompositionState(context, { ...action, point }, null, actionScale, contentBounds);
+        drawActionCompositionState(
+          drawContext,
+          {
+            ...action,
+            point,
+            ...(action.gestureFeedback
+              ? {
+                  gestureFeedback: {
+                    ...action.gestureFeedback,
+                    ...(action.gestureFeedback.path
+                      ? {
+                          path: action.gestureFeedback.path.map((item) => ({
+                            x: drawX + item.x * drawWidth,
+                            y: drawY + item.y * drawHeight,
+                          })),
+                        }
+                      : {}),
+                    ...(action.gestureFeedback.area
+                      ? {
+                          area: {
+                            x: drawX + action.gestureFeedback.area.x * drawWidth,
+                            y: drawY + action.gestureFeedback.area.y * drawHeight,
+                            width: action.gestureFeedback.area.width * drawWidth,
+                            height: action.gestureFeedback.area.height * drawHeight,
+                          },
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
+          },
+          null,
+          actionScale,
+          contentBounds
+        );
       }
-      context.restore();
+      drawContext.restore();
     },
   });
 }
@@ -272,7 +314,10 @@ function drawImageLayer(
     return;
   }
 
+  const header = admittedVisualWindowHeader(layer.clip, loadedImages, false);
   drawFittedMediaLayer({
+    ...header,
+    ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
     context,
     displayScale,
     fitMode: layer.clip.fitMode,
@@ -281,8 +326,22 @@ function drawImageLayer(
     shadowMode: layer.clip.shadowMode,
     sourceHeight: image.naturalHeight,
     sourceWidth: image.naturalWidth,
-    render: (drawX, drawY, drawWidth, drawHeight) => {
-      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
+      drawContext.drawImage(image, drawX, drawY, drawWidth, drawHeight);
     },
   });
+}
+
+function admittedVisualWindowHeader(
+  clip: { id: string; windowHeader?: import('../../../browser-frame/header').WindowHeader },
+  images: Record<string, HTMLImageElement>,
+  camera: boolean
+) {
+  const header = camera ? undefined : clip.windowHeader;
+  const image = header ? images[windowHeaderImageKey(clip.id, header)] : undefined;
+  if (image?.complete && image.naturalWidth === 0)
+    throw new Error('Window header image could not be decoded.');
+  return image && clip.windowHeader
+    ? { windowHeaderImage: image, windowHeader: clip.windowHeader }
+    : {};
 }

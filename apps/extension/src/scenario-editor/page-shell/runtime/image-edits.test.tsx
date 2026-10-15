@@ -47,15 +47,27 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
   const project = fixture();
-  io.load.mockResolvedValue({ versions: [{ project, revision: 1, savedAt: 1 }] });
+  io.load.mockResolvedValue({
+    currentRevision: 1,
+    versions: [{ project, revision: 1, savedAt: 1 }],
+  });
   io.saveTemplate.mockResolvedValue({ ...project, id: 'template', purpose: 'step-template' });
   io.apply.mockImplementation(async ({ project }) => ({
-    ...project,
-    updatedAt: 2,
-    items: [{ ...project.items[0], title: 'From template' }],
+    project: {
+      ...project,
+      updatedAt: 2,
+      items: [{ ...project.items[0], title: 'From template' }],
+    },
+    workspaceRevision: 2,
   }));
-  io.import.mockImplementation(async ({ project }) => ({ ...project, updatedAt: 2 }));
-  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 3 }));
+  io.import.mockImplementation(async ({ project }) => ({
+    project: { ...project, updatedAt: 2 },
+    workspaceRevision: 2,
+  }));
+  io.save.mockImplementation(async (project) => ({
+    project: { ...project, updatedAt: 3 },
+    workspaceRevision: 2,
+  }));
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -94,6 +106,7 @@ it('keeps review separate from publication and Undo', async () => {
   io.tourEdit.mockImplementationOnce(async ({ project }) => ({
     status: 'applied',
     project: { ...project, name: 'Edited', updatedAt: 2 },
+    workspaceRevision: 2,
   }));
   await act(async () =>
     expect(

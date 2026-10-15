@@ -36,7 +36,7 @@ export type Mp4VideoRenderSpan =
   | Mp4CleanSourceRenderSpan
   | Mp4CompositeRenderSpan;
 
-type Mp4AcceleratedCompositeReason = 'webm-frame-provider';
+type Mp4AcceleratedCompositeReason = 'webm-frame-provider' | 'decoded-frame-provider';
 
 export type Mp4CompositeRenderReason =
   | 'asset-missing'

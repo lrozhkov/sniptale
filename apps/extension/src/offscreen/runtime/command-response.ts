@@ -228,6 +228,7 @@ export function buildOffscreenCommandResponse(
       return buildDesktopFrameResponse(result);
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
       return buildStopRecordingResponse(result);
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
       return buildAcceptedScalarResponse(type, result);
@@ -251,6 +252,7 @@ export function buildOffscreenCommandResponse(
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
       return invalidCompletion(type);
   }
 }

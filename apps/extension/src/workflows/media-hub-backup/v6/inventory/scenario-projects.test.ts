@@ -12,6 +12,7 @@ import {
 } from '../../../../features/scenario/project/public';
 import { createMediaHubBackupExportOptions } from '../options';
 import { MAX_ROOT_METADATA_BYTES } from '../contracts';
+import { parseRootEnvelope } from '../codec';
 import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import { buildScenarioProjectRootInventory } from './scenario-projects';
 it('exports large saved history as a separate bounded object without inflating root metadata', async () => {
@@ -37,6 +38,7 @@ it('exports large saved history as a separate bounded object without inflating r
   };
   const roots = await buildScenarioProjectRootInventory({
     db: {
+      transaction: () => scenarioTransaction([entry]),
       get: async () => undefined,
       getAll: async (name) => (name === 'scenario_projects' ? [entry] : []),
       getAllFromIndex: async () => [],
@@ -87,6 +89,10 @@ it.each(['guide', 'tour'] as const)(
     read.mockResolvedValueOnce(blob);
     const roots = await buildScenarioProjectRootInventory({
       db: {
+        transaction: () =>
+          scenarioTransaction([
+            { id: project.id, project, createdAt: 1, updatedAt: 1, workspaceRevision: 1 },
+          ]),
         get: async (store) => (store === 'asset_refs' ? ref : undefined),
         getAll: async (store) =>
           store === 'scenario_projects'
@@ -98,6 +104,13 @@ it.each(['guide', 'tour'] as const)(
       paths: createArchivePathAllocator(),
     });
     const envelope = await roots[0]!.load();
+    expect(() =>
+      parseRootEnvelope({
+        descriptor: roots[0]!.descriptor,
+        metadata: envelope.metadata,
+        objects: envelope.objects.map((object) => object.ref),
+      })
+    ).not.toThrow();
     const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);
     const exported = metadata.exports.find((item) => item.id === 'saved')!;
     const object = envelope.objects.find((item) => item.ref.objectId === exported.html?.objectId)!;
@@ -140,6 +153,10 @@ it('exports a legacy canonical scenario snapshot with its replaced logical root 
   read.mockResolvedValue(new File(['data'], 'old.png', { type: 'image/png' }));
   const roots = await buildScenarioProjectRootInventory({
     db: {
+      transaction: () =>
+        scenarioTransaction([
+          { id: project.id, project, createdAt: 1, updatedAt: 1, workspaceRevision: 0 },
+        ]),
       get: async (store) =>
         store === 'media_library' ? media : store === 'asset_refs' ? ref : undefined,
       getAll: async (store) =>
@@ -156,3 +173,12 @@ it('exports a legacy canonical scenario snapshot with its replaced logical root 
   expect(metadata.assets[0]!.entry.galleryAssetId).toBe(media.id);
   expect(metadata.assets[0]!.entry).not.toHaveProperty('borrowedMediaId');
 });
+
+function scenarioTransaction(projects: unknown[]) {
+  return {
+    objectStore: (name: string) => ({
+      getAll: async () => (name === 'scenario_projects' ? projects : []),
+    }),
+    done: Promise.resolve(),
+  };
+}

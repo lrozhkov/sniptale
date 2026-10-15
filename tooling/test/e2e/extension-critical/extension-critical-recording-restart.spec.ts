@@ -3,93 +3,13 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { expect, terminateExtensionServiceWorker, test } from '../support/extension-fixture';
 
-const POPUP_PATH = 'apps/extension/src/popup/index.html';
+import {
+  sendRuntimeMessage,
+  openRealPopup,
+  triggerExtensionAction,
+  sendRuntimeMessageInTarget,
+} from '../support/recording-action';
 const RECORDING_LEASE_KEY = 'video-active-recording-lease';
-
-function sendRuntimeMessage(page: Page, message: unknown): Promise<unknown> {
-  return page.evaluate(async (payload) => {
-    const runtimePayload =
-      typeof payload === 'object' && payload !== null && !Array.isArray(payload)
-        ? {
-            ...payload,
-            __sniptaleRuntimeFreshness: {
-              issuedAtEpochMs: Date.now(),
-              nonce: crypto.randomUUID(),
-            },
-          }
-        : payload;
-    return chrome.runtime.sendMessage(runtimePayload);
-  }, message);
-}
-
-async function openRealPopup(context: BrowserContext, extensionId: string): Promise<Page> {
-  const popup = await context.newPage();
-  await popup.goto(`chrome-extension://${extensionId}/${POPUP_PATH}`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await popup.locator('[data-ui="popup.app.root"]').waitFor({ state: 'visible' });
-  return popup;
-}
-
-async function triggerExtensionAction(
-  context: BrowserContext,
-  extensionId: string,
-  targetPage: Page
-): Promise<string> {
-  const browser = context.browser();
-  if (!browser) throw new Error('Extension context has no browser owner');
-  const session = await browser.newBrowserCDPSession();
-  try {
-    const tabTargets = (await session.send('Target.getTargets', {
-      filter: [{ type: 'tab', exclude: false }, { exclude: true }],
-    })) as { targetInfos?: { targetId?: string; type?: string; url?: string }[] };
-    const targetId = tabTargets.targetInfos?.find(
-      (candidate) => candidate.type === 'tab' && candidate.url === targetPage.url()
-    )?.targetId;
-    if (!targetId) throw new Error('Action target tab is unavailable');
-    const existingTargets = (await session.send('Target.getTargets')) as {
-      targetInfos?: { targetId?: string }[];
-    };
-    const existingTargetIds = new Set(
-      existingTargets.targetInfos?.flatMap((candidate) =>
-        candidate.targetId ? [candidate.targetId] : []
-      ) ?? []
-    );
-
-    await session.send('Extensions.triggerAction', { id: extensionId, targetId });
-    const popupUrl = `chrome-extension://${extensionId}/${POPUP_PATH}`;
-    await expect
-      .poll(async () => {
-        const actionTargets = (await session.send('Target.getTargets')) as {
-          targetInfos?: { targetId?: string; type?: string; url?: string }[];
-        };
-        return (
-          actionTargets.targetInfos?.find(
-            (candidate) =>
-              candidate.type === 'page' &&
-              candidate.url === popupUrl &&
-              candidate.targetId !== undefined &&
-              !existingTargetIds.has(candidate.targetId)
-          )?.targetId ?? null
-        );
-      })
-      .not.toBeNull();
-    const actionTargets = (await session.send('Target.getTargets')) as {
-      targetInfos?: { targetId?: string; type?: string; url?: string }[];
-    };
-    const actionPopupTargetId = actionTargets.targetInfos?.find(
-      (candidate) =>
-        candidate.type === 'page' &&
-        candidate.url === popupUrl &&
-        candidate.targetId !== undefined &&
-        !existingTargetIds.has(candidate.targetId)
-    )?.targetId;
-    if (!actionPopupTargetId) throw new Error('Triggered action popup target is unavailable');
-    return actionPopupTargetId;
-  } finally {
-    await session.detach().catch(() => undefined);
-  }
-}
 
 async function closeBrowserTarget(context: BrowserContext, targetId: string): Promise<void> {
   const browser = context.browser();
@@ -98,74 +18,6 @@ async function closeBrowserTarget(context: BrowserContext, targetId: string): Pr
   try {
     await session.send('Target.closeTarget', { targetId });
   } finally {
-    await session.detach().catch(() => undefined);
-  }
-}
-
-async function sendRuntimeMessageInTarget(
-  context: BrowserContext,
-  targetId: string,
-  message: unknown
-): Promise<unknown> {
-  const browser = context.browser();
-  if (!browser) throw new Error('Extension context has no browser owner');
-  const session = await browser.newBrowserCDPSession();
-  let attachedSessionId: string | null = null;
-  try {
-    const attached = (await session.send('Target.attachToTarget', {
-      flatten: false,
-      targetId,
-    })) as { sessionId: string };
-    attachedSessionId = attached.sessionId;
-    const evaluationResponse = new Promise<{
-      error?: unknown;
-      result?: { exceptionDetails?: unknown; result?: { value?: unknown } };
-    }>((resolve) => {
-      const onMessage = (event: { message: string; sessionId: string }) => {
-        if (event.sessionId !== attached.sessionId) return;
-        const response = JSON.parse(event.message) as {
-          error?: unknown;
-          id?: number;
-          result?: { exceptionDetails?: unknown; result?: { value?: unknown } };
-        };
-        if (response.id !== 1) return;
-        session.off('Target.receivedMessageFromTarget', onMessage);
-        resolve(response);
-      };
-      session.on('Target.receivedMessageFromTarget', onMessage);
-    });
-    const serializedMessage = JSON.stringify(message);
-    await session.send('Target.sendMessageToTarget', {
-      message: JSON.stringify({
-        id: 1,
-        method: 'Runtime.evaluate',
-        params: {
-          awaitPromise: true,
-          expression:
-            `(async () => chrome.runtime.sendMessage({ ...${serializedMessage}, ` +
-            '__sniptaleRuntimeFreshness: { issuedAtEpochMs: Date.now(), ' +
-            'nonce: crypto.randomUUID() } }))()',
-          returnByValue: true,
-        },
-      }),
-      sessionId: attached.sessionId,
-    });
-    const evaluated = await evaluationResponse;
-    if (evaluated.error) {
-      throw new Error(`Action popup CDP evaluation failed: ${JSON.stringify(evaluated.error)}`);
-    }
-    if (evaluated.result?.exceptionDetails) {
-      throw new Error(
-        `Action popup runtime message failed: ${JSON.stringify(evaluated.result.exceptionDetails)}`
-      );
-    }
-    return evaluated.result?.result?.value;
-  } finally {
-    if (attachedSessionId) {
-      await session
-        .send('Target.detachFromTarget', { sessionId: attachedSessionId })
-        .catch(() => undefined);
-    }
     await session.detach().catch(() => undefined);
   }
 }

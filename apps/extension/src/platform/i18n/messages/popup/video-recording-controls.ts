@@ -1,6 +1,30 @@
 import { defineMessageSource } from '../source';
 
 export const popupVideoRecordingControlMessages = defineMessageSource({
+  discardingTitle: { ru: 'Удаление записи', en: 'Deleting recording' },
+  discardingDescription: {
+    ru: 'Останавливаем запись и очищаем временные данные.',
+    en: 'Stopping recording and clearing temporary data.',
+  },
+  completionIncomplete: {
+    ru: 'Очистка записи не завершена',
+    en: 'Recording cleanup is incomplete',
+  },
+  completionFailedDescription: {
+    ru: 'Не удалось очистить временные данные записи. Повтор остановки не исправит эту ошибку.',
+    en: 'Temporary recording data could not be cleared. Repeating Stop cannot resolve this failure.',
+  },
+  completionRetryDescription: {
+    ru: 'Запись остановлена. Повторите завершение очистки.',
+    en: 'Recording has stopped. Retry the remaining cleanup.',
+  },
+  completionUnknownDescription: {
+    ru: 'Результат остановки пока неизвестен. Можно повторить запрос остановки.',
+    en: 'The Stop result is unknown. You can repeat the Stop request.',
+  },
+  completionRetryStop: { ru: 'Повторить остановку', en: 'Retry Stop' },
+  completionRetry: { ru: 'Повторить очистку', en: 'Retry cleanup' },
+  completionRefresh: { ru: 'Проверить состояние', en: 'Check status' },
   diagnosticsDescription: {
     ru: [
       'Включает диагностику взаимодействий для этой вкладки: действия, ошибки и служебные',

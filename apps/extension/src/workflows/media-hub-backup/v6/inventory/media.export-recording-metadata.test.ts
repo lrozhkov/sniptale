@@ -36,7 +36,10 @@ it.each([true, false])(
     const entry = buildProjectExportMediaEntry(projectExport);
     const db = {
       transaction: () => ({
-        objectStore: () => ({ get: async () => undefined }),
+        objectStore: () => ({
+          index: () => ({ getAll: async () => [] }),
+          get: async () => undefined,
+        }),
         done: Promise.resolve(),
       }),
       get: async (store: string) => {

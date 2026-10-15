@@ -1,3 +1,4 @@
+import { createRecordingTerminal, finalizeRecordingArtifact } from './artifact-terminal';
 import { LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS } from './live-video-budget';
 import type {
   FinalizedRecordingStagingArtifact,
@@ -53,10 +54,10 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
   private callbacks: RecordingArtifactLifecycleCallbacks = {};
   private failure: Error | null = null;
   private phase: ArtifactSessionPhase = 'ready';
-  private terminalSettled = false;
+  private readonly terminalSettlement: ReturnType<
+    typeof createRecordingTerminal<FinalizedRecordingStagingArtifact>
+  >;
   private readonly terminal: Promise<FinalizedRecordingStagingArtifact>;
-  private readonly resolveTerminal: (artifact: FinalizedRecordingStagingArtifact) => void;
-  private readonly rejectTerminal: (error: Error) => void;
 
   constructor(private readonly input: CreateRecordingArtifactSessionOwnerInput) {
     const options = {
@@ -68,15 +69,8 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
         : {}),
     };
     this.recorder = new MediaRecorder(input.stream, options);
-    let resolveTerminal!: (artifact: FinalizedRecordingStagingArtifact) => void;
-    let rejectTerminal!: (error: Error) => void;
-    this.terminal = new Promise((resolve, reject) => {
-      resolveTerminal = resolve;
-      rejectTerminal = reject;
-    });
-    this.resolveTerminal = resolveTerminal;
-    this.rejectTerminal = rejectTerminal;
-    void this.terminal.catch(() => undefined);
+    this.terminalSettlement = createRecordingTerminal<FinalizedRecordingStagingArtifact>();
+    this.terminal = this.terminalSettlement.promise;
     this.attachRecorderHandlers();
   }
 
@@ -118,7 +112,9 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
     if (this.phase === 'finalized') return Promise.resolve();
     if (this.phase === 'aborted') return this.abortPromise ?? Promise.resolve();
     this.phase = 'aborted';
-    this.rejectTerminalOnce(new Error(`Recording artifact ${this.input.artifactId} was aborted.`));
+    this.terminalSettlement.reject(
+      new Error(`Recording artifact ${this.input.artifactId} was aborted.`)
+    );
     this.detachHandlers();
     this.stopRecorderBestEffort();
     this.abortPromise ??= this.input.coordinator.abort();
@@ -157,15 +153,15 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
 
   private async finalizeArtifact(): Promise<void> {
     try {
-      const artifact = await this.input.writer.finalize();
-      if (this.cannotCompleteFinalization()) return;
-      if (artifact.size === 0) {
-        throw new Error(`Recording ${this.input.artifactId} produced no media bytes.`);
-      }
-      await this.callbacks.onStop?.(artifact);
-      if (this.cannotCompleteFinalization()) return;
+      const artifact = await finalizeRecordingArtifact(
+        this.input.writer,
+        this.input.artifactId,
+        () => !this.cannotCompleteFinalization(),
+        (artifact) => this.callbacks.onStop?.(artifact)
+      );
+      if (!artifact) return;
       this.phase = 'finalized';
-      this.resolveTerminalOnce(artifact);
+      this.terminalSettlement.resolve(artifact);
     } catch (error) {
       this.fail(error);
     }
@@ -188,11 +184,11 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
     }
     this.abortPromise ??= this.input.coordinator.abort();
     void this.abortPromise.catch(() => undefined);
-    this.rejectTerminalOnce(terminalError);
+    this.terminalSettlement.reject(terminalError);
   }
 
   private cannotCompleteFinalization(): boolean {
-    return this.phase === 'aborted' || this.terminalSettled;
+    return this.phase === 'aborted' || this.terminalSettlement.settled;
   }
 
   private detachHandlers(): void {
@@ -209,17 +205,5 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
     } catch {
       // The coordinator abort remains the terminal cleanup authority.
     }
-  }
-
-  private resolveTerminalOnce(artifact: FinalizedRecordingStagingArtifact): void {
-    if (this.terminalSettled) return;
-    this.terminalSettled = true;
-    this.resolveTerminal(artifact);
-  }
-
-  private rejectTerminalOnce(error: Error): void {
-    if (this.terminalSettled) return;
-    this.terminalSettled = true;
-    this.rejectTerminal(error);
   }
 }

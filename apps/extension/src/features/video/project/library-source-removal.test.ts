@@ -207,3 +207,77 @@ it('removes source interaction anchors while preserving authored project actions
   expect(result.cursorTrack?.samples).toEqual([point]);
   expect(isExportReadyVideoProject(result)).toBe(true);
 });
+
+it.each<VideoProjectAssetSource>([
+  { kind: 'recording', recordingId: 'source' },
+  { kind: 'project-asset', projectAssetId: 'copy', originRecordingId: 'source' },
+])('prunes deleted $kind feedback and focus bindings while preserving project keys', (source) => {
+  const { project, removedClip, keptClip } = fixture(source);
+  if (removedClip.type !== 'VIDEO' || keptClip.type !== 'VIDEO')
+    throw new Error('Expected video fixture');
+  removedClip.sourceInstanceId = 'removed';
+  keptClip.sourceInstanceId = 'kept';
+  project.version = 3;
+  project.actionFeedback = ['source', 'unrelated'].map((recordingId, index) => ({
+    recordingId,
+    sourceInstanceId: index === 0 ? 'removed' : 'kept',
+    signals: [],
+    settings: [],
+  }));
+  project.actionFeedback.push({
+    recordingId: 'unrelated',
+    sourceInstanceId: 'dormant',
+    signals: [],
+    settings: [],
+  });
+  const key = {
+    id: 'key',
+    time: 1,
+    x: 0.2,
+    y: 0.3,
+    anchor: 'manual' as const,
+    interpolation: 'smooth' as const,
+  };
+  project.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    segments: [
+      {
+        id: 'removed',
+        binding: { kind: 'recording-source', recordingId: 'source', sourceInstanceId: 'removed' },
+        start: 0,
+        end: 5,
+        keys: [key],
+      },
+      {
+        id: 'kept',
+        binding: { kind: 'recording-source', recordingId: 'unrelated', sourceInstanceId: 'kept' },
+        start: 0,
+        end: 5,
+        keys: [{ ...key, id: 'kept-key' }],
+      },
+      {
+        id: 'project',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 5,
+        keys: [{ ...key, id: 'project-key' }],
+      },
+    ],
+  };
+  const original = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.actionFeedback?.map((group) => group.sourceInstanceId)).toEqual([
+    'kept',
+    'dormant',
+  ]);
+  expect(result.cursorFocusPath?.segments.map((segment) => segment.id)).toEqual([
+    'kept',
+    'project',
+  ]);
+  expect(project).toEqual(original);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+});

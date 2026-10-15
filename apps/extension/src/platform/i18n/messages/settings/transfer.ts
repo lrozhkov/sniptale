@@ -150,6 +150,7 @@ export const settingsTransferMessages = defineMessageSource({
     activeFilter: message('Активный фильтр', 'Active filter'),
     annotation: message('Аннотации', 'Annotations'),
     global: message('Глобальный промпт', 'Global prompt'),
+    recognition: message('Инструкции распознаванию речи', 'Speech recognition instructions'),
     scenario: message('Сценарный промпт', 'Scenario prompt'),
     enabled: message('Включено', 'Enabled'),
     language: message('Язык', 'Language'),

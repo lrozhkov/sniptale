@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Sniptale",
-  "version": "0.5.0",
-  "version_name": "0.5.0 alpha",
+  "version": "0.5.1",
+  "version_name": "0.5.1 alpha",
   "minimum_chrome_version": "148",
   "description": "Workspace for capturing, understanding, annotating, recording, editing, and exporting the web.",
   "default_locale": "en",
@@ -34,6 +34,11 @@
         "fonts/marck-script-cyrillic-400-normal.woff2",
         "fonts/marck-script-latin-400-normal.woff2"
       ],
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "use_dynamic_url": true
+    },
+    {
+      "resources": ["cursors/text.svg"],
       "matches": ["http://*/*", "https://*/*", "file:///*"],
       "use_dynamic_url": true
     }

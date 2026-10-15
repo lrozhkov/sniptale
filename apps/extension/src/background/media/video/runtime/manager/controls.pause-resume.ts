@@ -70,6 +70,9 @@ function resolveTelemetrySyncLabel(): 'controlled cursor capture' | 'recording t
 }
 
 async function syncControlledCursorCaptureState(actionLabel: 'pause' | 'resume'): Promise<void> {
+  const captureMode = getVideoRecordingCaptureMode();
+  // TAB lifecycle events carry the recorder's actual boundary/first resumed frame anchor.
+  if (captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP) return;
   if (!shouldSyncTelemetryCaptureState()) {
     return;
   }

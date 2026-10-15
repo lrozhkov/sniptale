@@ -1,3 +1,12 @@
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
+import {
+  parseProjectAssetSpeechClaim,
+  parseProjectAssetAnnotationEffectClaim,
+} from './asset-publication-payload';
+import { retainReviewAttachmentLock } from './voiceover-publication-lock';
+import { releaseAssetPublicationTransitions } from '../assets/opfs-store';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import { isValidProjectAssetReviewResource } from './asset-publication-payload';
 import { assertNewProjectSources, promoteProjectSourceLifecycles } from './new-reference-admission';
 import type { VideoProject } from '../../../features/video/project/types';
 import {
@@ -129,8 +138,10 @@ export async function saveVideoProject(
         tx,
         operation: physicalDelete,
         projectAssetIds: removedProjectAssetIds,
+        deferForReaders: true,
       });
-      if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
+      if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
+        await assetOperationStore.put(physicalDelete);
       await tx.done;
       publishMediaHubLibraryChanged(existing ? 'update' : 'create', [
         `video-project:${candidate.id}`,
@@ -146,7 +157,8 @@ export async function saveVideoProject(
       throw error;
     }
   });
-  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
+  if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
+    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
   return saved;
 }
 
@@ -158,7 +170,7 @@ async function persistProjectReferences(args: {
   projectStore: ReturnType<typeof createProjectMutationStores>['projectStore'];
   recordingStore: ReturnType<typeof createProjectMutationStores>['recordingStore'];
 }): Promise<void> {
-  await args.projectStore.put(args.entry);
+  await args.projectStore.put(withVideoProjectUsage(args.entry));
   await promoteLinkedRecordingLifecycles({
     mediaStore: args.mediaLibraryStore,
     now: args.now,
@@ -216,11 +228,19 @@ export async function getVideoProject(id: string): Promise<VideoProjectReadResul
 }
 
 export async function listVideoProjects(): Promise<VideoProjectListItem[]> {
-  const verified = await listVideoProjectReadResults();
-  return verified
+  const db = await initDB();
+  const entries = (await db.getAll(VIDEO_PROJECTS_STORE)).map(parseVideoProjectEntryResult);
+  // Listing metadata must not read/hash every project's effect assets. Exact reads still verify them.
+  return entries
     .flatMap((result, index) =>
       result.status === 'ready'
-        ? [createVideoProjectListItem(result.project, result.lifecycle, result.workspaceRevision)]
+        ? [
+            createVideoProjectListItem(
+              result.entry.project,
+              result.entry.lifecycle,
+              result.entry.workspaceRevision
+            ),
+          ]
         : result.status === 'unsupported'
           ? [createUnsupportedVideoProjectListItem(result.metadata)]
           : result.status === 'invalid'
@@ -265,6 +285,10 @@ export interface PreparedProjectAsset {
   ref: AssetRef;
   /** Makes staged bytes recoverable before another owner attaches their reference. */
   protect(): Promise<void>;
+  /** Protects a private annotation buffer without holding the global erasure transition gate. */
+  retainForSession(): Promise<() => Promise<void>>;
+  /** Reads only this retained annotation's staged physical object, without publication. */
+  readForSession?(signal: AbortSignal): Promise<Blob>;
   /** Cancels a protected import only when its caller proved no durable reference exists. */
   cancel(): Promise<void>;
   /** Publishes source ownership and optional Library identity, then releases ready protection. */
@@ -286,6 +310,38 @@ export async function prepareProjectAsset(
   requiredReview?: ProjectAssetPublicationPayload['requiredReview'],
   options: ProjectAssetPublicationOptions = {}
 ): Promise<PreparedProjectAsset> {
+  if (
+    options.requiredReviewAnnotationEffect &&
+    (!parseProjectAssetAnnotationEffectClaim(options.requiredReviewAnnotationEffect) ||
+      options.publishToLibrary !== false ||
+      !['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'].includes(mimeType) ||
+      requiredReview !== undefined ||
+      options.requiredReviewSpeech !== undefined ||
+      options.requiredReviewResource !== undefined ||
+      options.originMediaId !== undefined)
+  )
+    throw new Error('Invalid private annotation publication.');
+  if (
+    (options.requiredReviewResource?.slot !== 'watermark' &&
+      options.requiredReviewResource?.acquisition === 'library-binding') ||
+    !isValidProjectAssetReviewResource({
+      mimeType,
+      resource: options.requiredReviewResource,
+      requiredReview,
+      publishToLibrary: options.publishToLibrary,
+    })
+  )
+    throw new Error('Invalid private review resource publication.');
+  if (
+    options.requiredReviewSpeech &&
+    (!parseProjectAssetSpeechClaim(options.requiredReviewSpeech) ||
+      options.publishToLibrary !== false ||
+      !mimeType.startsWith('audio/') ||
+      requiredReview !== undefined ||
+      options.requiredReviewResource !== undefined ||
+      options.originMediaId !== undefined)
+  )
+    throw new Error('Invalid private speech publication.');
   const entryId = id ?? crypto.randomUUID();
   await recoverProjectMediaPublications();
   const sourceDb = await initDB();
@@ -294,6 +350,8 @@ export async function prepareProjectAsset(
   if (rawPrevious !== undefined && (!previous || previous.id !== entryId))
     throw new Error('Invalid existing project asset.');
   const expectedAssetId = previous?.assetId ?? null;
+  if (options.requiredReviewAnnotationEffect && expectedAssetId !== null)
+    throw new Error('Private annotation publication requires a new immutable identity.');
   await assertAssetWriteAdmission(blob.size);
   const prepared = await writeBlobToAsset(blob, { mimeType });
   const entry: StoredProjectAssetEntry = {
@@ -306,20 +364,36 @@ export async function prepareProjectAsset(
       ? { originMediaId: options.originMediaId }
       : {}),
   };
+  return createPreparedProjectAssetPublication(prepared.ref, {
+    entry,
+    expectedAssetId,
+    filename: filename || entryId,
+    ...(requiredReview ? { requiredReview } : {}),
+    ...(options.requiredReviewSpeech ? { requiredReviewSpeech: options.requiredReviewSpeech } : {}),
+    ...(options.requiredReviewAnnotationEffect
+      ? { requiredReviewAnnotationEffect: options.requiredReviewAnnotationEffect }
+      : {}),
+    ...(options.requiredReviewResource
+      ? { requiredReviewResource: options.requiredReviewResource }
+      : {}),
+    ...(options.publishToLibrary === false ? { publishToLibrary: false } : {}),
+  });
+}
+
+/** Owns the staged asset's protection, publication retry and terminal cleanup state. */
+function createPreparedProjectAssetPublication(
+  ref: AssetRef,
+  payload: ProjectAssetPublicationPayload
+): PreparedProjectAsset {
   let journal: AssetReadyJournal<ProjectAssetPublicationPayload> | null = null;
   let complete = false;
   let inFlight: Promise<void> | null = null;
+  let sessionLease: Promise<() => Promise<void>> | null = null;
   const protect = async () => {
     journal ??= await createAssetPublicationJournal({
-      assetRefs: [prepared.ref],
+      assetRefs: [ref],
       domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
-      payload: {
-        entry,
-        expectedAssetId,
-        filename: filename || entryId,
-        ...(requiredReview ? { requiredReview } : {}),
-        ...(options.publishToLibrary === false ? { publishToLibrary: false } : {}),
-      },
+      payload,
     });
   };
   const publish = async () => {
@@ -329,7 +403,7 @@ export async function prepareProjectAsset(
       await protect();
       if (!journal) throw new Error('Project asset publication journal is unavailable.');
       await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
-      await releaseAssetReadyProtection([prepared.ref.assetId]);
+      await releaseAssetReadyProtection([ref.assetId]);
       complete = true;
     })();
     try {
@@ -339,18 +413,73 @@ export async function prepareProjectAsset(
     }
   };
   return {
-    id: entryId,
-    ref: prepared.ref,
+    id: payload.entry.id,
+    ref,
     protect,
+    retainForSession: () => {
+      if (!payload.requiredReviewAnnotationEffect)
+        return Promise.reject(new Error('Session retention requires an annotation claim.'));
+      if (complete) return Promise.resolve(async () => undefined);
+      sessionLease ??= (async () => {
+        const release = await retainReviewAttachmentLock(`project-asset:${payload.entry.id}`);
+        try {
+          await protect();
+          await releaseAssetPublicationTransitions([ref.assetId]);
+        } catch (error) {
+          await release();
+          throw error;
+        }
+        return async () => {
+          await release();
+          sessionLease = null;
+        };
+      })();
+      void sessionLease.catch(() => {
+        sessionLease = null;
+      });
+      return sessionLease;
+    },
+    readForSession: async (signal) => {
+      signal.throwIfAborted();
+      const retained = sessionLease;
+      if (!payload.requiredReviewAnnotationEffect || complete || !retained)
+        throw new Error('Annotation resource retention is unavailable.');
+      await retained;
+      signal.throwIfAborted();
+      if (complete || sessionLease !== retained)
+        throw new Error('Annotation resource retention is unavailable.');
+      let blob: Blob;
+      try {
+        blob = await readAssetFile(ref, payload.entry.id);
+      } catch {
+        signal.throwIfAborted();
+        throw new Error('Annotation resource bytes are unavailable.');
+      }
+      signal.throwIfAborted();
+      if (complete || sessionLease !== retained)
+        throw new Error('Annotation resource retention is unavailable.');
+      return blob;
+    },
     cancel: async () => {
       if (complete) return;
-      if (journal) await cancelAssetPublication(journal);
-      else await discardPreparedAsset(prepared.ref.assetId);
+      if (journal && payload.requiredReviewAnnotationEffect) {
+        await initDB();
+        await runWithDurableAssetLifecycleLock(async (permit) => {
+          // Erasure may have removed the ready journal while a paused editor still owns its lease.
+          const retained = (await listReadyJournals()).find(
+            (value) => value.journalId === journal?.journalId
+          );
+          if (retained) await cancelAssetPublication(retained, permit);
+          else await releaseAssetReadyProtection([ref.assetId]);
+        });
+      } else if (journal) await cancelAssetPublication(journal);
+      else await discardPreparedAsset(ref.assetId);
+      complete = true;
     },
     publish,
     discard: async () => {
       if (journal) return;
-      await discardPreparedAsset(prepared.ref.assetId);
+      await discardPreparedAsset(ref.assetId);
     },
   };
 }

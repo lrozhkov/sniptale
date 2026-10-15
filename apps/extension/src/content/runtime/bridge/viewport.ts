@@ -1,3 +1,4 @@
+import { createRecordingClockSynchronizer } from '../../overlay/video-telemetry/clock-synchronization';
 import {
   CONTENT_RUNTIME_PROTOCOL_VERSION,
   VideoMessageType,
@@ -9,6 +10,7 @@ import {
   enableVideoTelemetry,
   pauseVideoTelemetry,
   resumeVideoTelemetry,
+  updateVideoTelemetryClock,
 } from '../../overlay/video-telemetry';
 import { hideVideoCountdown, showVideoCountdown } from '../../overlay/video-countdown';
 import {
@@ -18,6 +20,8 @@ import {
   type ViewportMessage,
 } from './types';
 import type { RegionSelectorController } from '../../selection/region-selector/types';
+
+const recordingClock = createRecordingClockSynchronizer();
 
 function acknowledgeViewportMessage(sendResponse: ResponseSender): false {
   sendResponse({ success: true });
@@ -46,13 +50,28 @@ function handleEnableControlledCursorCaptureMessage(
   message: Extract<ViewportMessage, { type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE }>,
   sendResponse: ResponseSender,
   getViewportInfo: () => ViewportInfo
-): false {
-  enableVideoTelemetry(message.recordingId, message.offsetSeconds);
+): false | true {
+  if (message.frameClock === undefined) {
+    recordingClock.invalidate();
+    enableVideoTelemetry(message.recordingId, message.offsetSeconds);
+  } else if (message.frameClock === null) {
+    recordingClock.invalidate();
+    enableVideoTelemetry(message.recordingId, message.offsetSeconds, null);
+  } else {
+    enableVideoTelemetry(message.recordingId, message.offsetSeconds, null);
+    if (message.frameClock.phase === 'paused') pauseVideoTelemetry(null);
+    void recordingClock.localize(message.frameClock, true).then((result) => {
+      if (result.status === 'ready') updateVideoTelemetryClock(message.recordingId, result.anchor);
+    });
+    sendResponse({ success: true, viewport: getViewportInfo() });
+    return false;
+  }
   sendResponse({ success: true, viewport: getViewportInfo() });
   return false;
 }
 
 function handleDisableControlledCursorCaptureMessage(sendResponse: ResponseSender): false {
+  recordingClock.invalidate();
   const telemetry = disableVideoTelemetry();
   sendResponse(telemetry ? { success: true, telemetry } : { success: true });
   return false;
@@ -91,11 +110,27 @@ function handleKnownViewportMessage(
     case VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE:
       return handleDisableControlledCursorCaptureMessage(sendResponse);
     case VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE:
-      pauseVideoTelemetry();
+    case VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE: {
+      const pause = message.type === VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE;
+      const apply = pause ? pauseVideoTelemetry : resumeVideoTelemetry;
+      if (message.frameClock === undefined) {
+        recordingClock.invalidate();
+        apply();
+        return acknowledgeViewportMessage(sendResponse);
+      }
+      if (message.frameClock === null) {
+        recordingClock.invalidate();
+        apply(null);
+        return acknowledgeViewportMessage(sendResponse);
+      }
+      if (pause) pauseVideoTelemetry(null);
+      else resumeVideoTelemetry(null, message.frameClock);
+      void recordingClock.localize(message.frameClock, !pause).then((result) => {
+        if (result.status === 'ready')
+          updateVideoTelemetryClock(result.anchor.recordingId, result.anchor);
+      });
       return acknowledgeViewportMessage(sendResponse);
-    case VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE:
-      resumeVideoTelemetry();
-      return acknowledgeViewportMessage(sendResponse);
+    }
   }
 
   return true;

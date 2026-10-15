@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
+import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { createVideoProjectCursorTrack } from '../../features/video/project/defaults';
 import { createVideoReviewReport } from './report';
 
 it('exports exact times and excluded comments, without leaking draft or undo text through hostile fences', () => {
@@ -69,6 +71,7 @@ it('exports exact times and excluded comments, without leaking draft or undo tex
       telemetry: 'Telemetry',
       excluded: 'Excluded',
       empty: 'Empty',
+      cursorSummary: (count: number) => `${count} cursor points recorded; trajectory omitted.`,
     },
   });
   expect(report).not.toContain('DRAFT_PRIVATE');
@@ -87,7 +90,7 @@ it('exports exact times and excluded comments, without leaking draft or undo tex
   expect(payload.exported).toBe(false);
 });
 
-it('serializes full native telemetry and speed intent in microseconds, retaining mapped range comments', () => {
+it('serializes native telemetry summaries and speed intent in microseconds, retaining mapped range comments', () => {
   const source = { duration: 4, width: 320, height: 180, size: 5, mimeType: 'video/webm' };
   const snapshot: VideoWorkspaceSnapshot = {
     workspace: {
@@ -143,6 +146,7 @@ it('serializes full native telemetry and speed intent in microseconds, retaining
     telemetry: 'Telemetry',
     excluded: 'Excluded',
     empty: 'Empty',
+    cursorSummary: (count: number) => `${count} cursor points recorded; trajectory omitted.`,
   };
   const sourceAnchor = {
     kind: 'recording-source' as const,
@@ -219,8 +223,18 @@ it('serializes full native telemetry and speed intent in microseconds, retaining
   expect(payload.telemetry.actionEvents[0]).not.toHaveProperty('anchor');
   expect(payload.telemetry.actionEvents[0]).not.toHaveProperty('time');
   expect(payload.telemetry.actionEvents[0]).not.toHaveProperty('duration');
-  expect(payload.telemetry.cursorTrack.samples[0].sourceAnchor.sourceTimeUs).toBe(1250000);
-  expect(payload.telemetry.cursorTrack.samples).toHaveLength(2);
+  expect(payload).toMatchObject({
+    schemaVersion: 'sniptale.video-review.v2',
+    reportKind: 'summary',
+  });
+  expect(payload.telemetry.cursorTrack).toEqual({
+    availability: 'present',
+    representation: 'summary',
+    captureMode: 'separate',
+    sampleCount: 2,
+    includedSampleCount: 0,
+    omittedReason: 'summary-report',
+  });
   expect(payload.annotations[0].anchor).toEqual({ kind: 'range', startUs: 0, endUs: 3000000 });
   expect(payload.annotations[0].excludedFromResult).toBe(false);
   expect(payload.edits[0]).toMatchObject({ kind: 'speed', rate: 2, audio: 'mute' });
@@ -280,6 +294,7 @@ it('binds actual export timing to its revision without claiming later edits were
       telemetry: 'Telemetry',
       excluded: 'Excluded',
       empty: 'Empty',
+      cursorSummary: (count: number) => `${count} cursor points recorded; trajectory omitted.`,
     },
     exportReceipt: {
       revision: 2,
@@ -304,4 +319,180 @@ it('binds actual export timing to its revision without claiming later edits were
   expect(later).toContain('"exported": false');
   expect(later).toContain('"matchesCurrentRevision": false');
   expect(later).toContain('"mediaId": "recording:copy"');
+});
+
+it('reports baked v2 source provenance without adding its edits to current history', async () => {
+  const { createPresentationReviewProvenance } =
+    await import('../../features/video/review/provenance');
+  const { createNeutralPresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const { planReviewPresentationSequence } =
+    await import('../../features/video/review/presentation-sequence');
+  const source = { duration: 10, width: 160, height: 90, mimeType: 'video/webm', size: 100 };
+  const plan = planReviewPresentationSequence({
+    settings: createNeutralPresentationSettings(),
+    mainDuration: 10,
+    fragmentOffset: 0,
+    includeBookends: false,
+    rate: { numerator: 30000, denominator: 1001 },
+  });
+  if (!plan.ok) throw new Error('Invalid fixture plan');
+  const provenance = createPresentationReviewProvenance({
+    base: {
+      timeUnit: 'seconds',
+      revision: 8,
+      exportedAt: 1,
+      source: { ...source, duration: 12, filename: 'original.webm' },
+      audioReencoded: true,
+      edits: [
+        { id: 'original-cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+      ],
+    },
+    plan: plan.plan,
+    output: {
+      format: 'webm',
+      videoCodec: 'vp9',
+      width: 160,
+      height: 90,
+      frameRateMode: 'constant',
+    },
+    includeBookends: false,
+    watermarkBaked: true,
+  });
+  const snapshot: VideoWorkspaceSnapshot = {
+    workspace: {
+      aggregateId: 'recording:baked',
+      formatVersion: 1,
+      revision: 1,
+      source,
+      sourceAssetId: 'baked-bytes',
+      advanced: createQuickEditAdvancedState(),
+      history: [],
+      cursor: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    draft: null,
+  };
+  const report = createVideoReviewReport({
+    snapshot,
+    filename: 'baked.webm',
+    telemetry: null,
+    provenance,
+    labels: {
+      title: 'Review',
+      source: 'Source',
+      timeline: 'Timeline',
+      machineData: 'Data',
+      comment: 'Comment',
+      cut: 'Cut',
+      speed: 'Speed',
+      telemetry: 'Telemetry',
+      excluded: 'Excluded',
+      empty: 'Empty',
+      cursorSummary: (count: number) => `${count} cursor points recorded; trajectory omitted.`,
+    },
+  });
+  const fenced = report.match(/```json\n([\s\S]*?)\n```/);
+  expect(fenced).not.toBeNull();
+  const data: unknown = JSON.parse(fenced![1]!);
+  expect(data).toMatchObject({
+    sourceProvenance: provenance,
+    edits: [],
+    source: { durationUs: 10000000 },
+  });
+});
+
+function summaryFixture(sampleCount: number) {
+  const samples: NonNullable<RecordingTelemetryEntry['cursorTrack']>['samples'] = [];
+  samples.length = sampleCount;
+  const guarded = new Proxy(samples, {
+    get(target, key) {
+      if (key === 'length') return target.length;
+      throw new Error('Summary must never read cursor sample contents');
+    },
+  });
+  const telemetry: RecordingTelemetryEntry = {
+    recordingId: 'summary-recording',
+    createdAt: 1,
+    updatedAt: 1,
+    captureMode: null,
+    viewport: null,
+    actionEvents: [],
+    signals: [],
+    cursorTrack: { ...createVideoProjectCursorTrack('embedded-fallback'), samples: guarded },
+  };
+  const snapshot: VideoWorkspaceSnapshot = {
+    workspace: {
+      aggregateId: 'recording:summary-recording',
+      sourceAssetId: 'private',
+      formatVersion: 1,
+      source: { duration: 338.35, width: 1280, height: 720, size: 100, mimeType: 'video/webm' },
+      revision: 1,
+      cursor: 0,
+      advanced: createQuickEditAdvancedState(),
+      history: [],
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    draft: null,
+  };
+  const labels = {
+    title: 'Review',
+    source: 'Source',
+    timeline: 'Timeline',
+    machineData: 'Data',
+    comment: 'Comment',
+    cut: 'Cut',
+    speed: 'Speed',
+    telemetry: 'Telemetry',
+    excluded: 'Excluded',
+    empty: 'Empty',
+    cursorSummary: (count: number) => `${count} cursor points recorded; trajectory omitted.`,
+  };
+  return { snapshot, filename: 'clip.webm', telemetry, labels };
+}
+
+it('projects a large cursor history before traversal and grows only by count digits', () => {
+  const args = summaryFixture(64688);
+  const report = createVideoReviewReport(args);
+  const payload = JSON.parse(report.split('```json\n')[1]!.split('\n```')[0]!);
+  expect(payload).toMatchObject({
+    schemaVersion: 'sniptale.video-review.v2',
+    reportKind: 'summary',
+    telemetry: {
+      cursorTrack: {
+        availability: 'present',
+        representation: 'summary',
+        captureMode: 'embedded-fallback',
+        sampleCount: 64688,
+        includedSampleCount: 0,
+        omittedReason: 'summary-report',
+      },
+    },
+  });
+  expect(payload.telemetry.cursorTrack).not.toHaveProperty('samples');
+  expect(payload.telemetry.cursorTrack).not.toHaveProperty('skin');
+  expect(report).toContain('64688 cursor points recorded; trajectory omitted.');
+  expect(new TextEncoder().encode(report).length).toBeLessThan(128 * 1024);
+  const larger = createVideoReviewReport(summaryFixture(646880));
+  expect(larger.length - report.length).toBe(2);
+  expect(args.telemetry.cursorTrack?.samples.length).toBe(64688);
+});
+
+it('distinguishes unavailable telemetry, absent trajectory and recorded empty trajectory', () => {
+  const args = summaryFixture(0);
+  const read = (report: string) =>
+    JSON.parse(report.split('```json\n')[1]!.split('\n```')[0]!).telemetry;
+  expect(read(createVideoReviewReport(args)).cursorTrack).toMatchObject({
+    availability: 'present',
+    sampleCount: 0,
+  });
+  expect(
+    read(createVideoReviewReport({ ...args, telemetry: { ...args.telemetry, cursorTrack: null } }))
+      .cursorTrack
+  ).toEqual({ availability: 'unavailable' });
+  expect(read(createVideoReviewReport({ ...args, telemetry: null }))).toEqual({
+    availability: 'unavailable',
+  });
 });

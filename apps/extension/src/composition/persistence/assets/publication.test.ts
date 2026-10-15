@@ -341,3 +341,16 @@ it('defers ambiguous legacy source replacement and continues recovery', async ()
   expect(deleteReadyJournalMock).not.toHaveBeenCalled();
   expect(cancelPutMock).not.toHaveBeenCalled();
 });
+
+it('creates a ready claim inside its caller lifecycle permit without reacquiring the lock', async () => {
+  const { runWithDurableAssetLifecycleLock } = await import('../infrastructure/mutation-barrier');
+  await runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+    const journal = await createAssetPublicationJournal({
+      assetRefs: [ref],
+      domain: 'project-assets',
+      payload: {},
+      lifecyclePermit,
+    });
+    expect(writeReadyJournalMock).toHaveBeenCalledWith(journal);
+  });
+});

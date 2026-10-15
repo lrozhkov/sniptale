@@ -1,3 +1,5 @@
+import type { VideoProjectExportTimeEstimate } from '../../../../features/video/project/types/export';
+import { getProjectExportFrameOptions } from '../../../../features/video/project/export/encoding-quality';
 import { translate } from '../../../../platform/i18n';
 import { createVideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import { VideoProjectExportPhase } from '../../../../features/video/project/types/export';
@@ -36,6 +38,7 @@ interface AcceleratedCompositeWebmRenderArgs extends Pick<
   | 'videoEncoder'
 > {
   signal?: AbortSignal;
+  onFrameSubmitted?: () => void;
   span: Mp4AcceleratedCompositeRenderSpan;
 }
 
@@ -86,8 +89,10 @@ async function encodeRenderedWebmFrame(args: {
       args.request.signal
     );
     args.request.videoEncoder.encode(frame, {
+      ...getProjectExportFrameOptions(args.request.settings),
       keyFrame: args.frameIndex === 0 || args.frameIndex % args.keyframeInterval === 0,
     });
+    args.request.onFrameSubmitted?.();
   } finally {
     frame.close();
   }
@@ -98,6 +103,7 @@ async function sendAcceleratedCompositeProgress(args: {
   jobId: string;
   range?: { start: number; end: number };
   totalFrames: number;
+  timeEstimate?: VideoProjectExportTimeEstimate | null;
 }) {
   if (
     args.frameIndex !== args.totalFrames - 1 &&
@@ -117,7 +123,8 @@ async function sendAcceleratedCompositeProgress(args: {
       `${args.frameIndex + 1}`,
       translate('offscreenExport.progressFrameOf'),
       `${args.totalFrames}`,
-    ].join(' ')
+    ].join(' '),
+    ...(args.timeEstimate ? [args.timeEstimate] : [])
   );
 }
 
@@ -130,6 +137,7 @@ async function renderDecodedCompositeFrames(
   const compositionIndex = createVideoCompositionTimelineIndex(args.project);
   const effectRuntime = createOffscreenProjectEffectRuntime();
   try {
+    args.job.timeEstimator?.resume();
     for (const [frameIndex, projectTime] of frameTimes.projectTimes.entries()) {
       await renderDecodedCompositeFrame({
         backgroundCache,
@@ -160,7 +168,11 @@ async function renderDecodedCompositeFrame(args: DecodedCompositeFrameArgs): Pro
       request: args.request,
       timestampUs: Math.round(args.projectTime * 1_000_000),
     });
+    const timeEstimate = args.request.job.timeEstimator?.observe(
+      Math.min(args.request.span.end, args.projectTime + 1 / args.frameTimes.timing.fps)
+    );
     await sendAcceleratedCompositeProgress({
+      ...(timeEstimate ? { timeEstimate } : {}),
       ...(args.request.job.renderProgressRange
         ? { range: args.request.job.renderProgressRange }
         : {}),
@@ -224,7 +236,11 @@ export async function renderAcceleratedCompositeWebmSpan(
   }
 
   const frameTimes = createFrameTimes(args.span, args.settings.fps);
-  const providers = await createWebmFrameProviders(args.project, frameTimes.projectTimes);
+  const providers = await createWebmFrameProviders(
+    args.project,
+    frameTimes.projectTimes,
+    args.signal
+  );
   if (!providers) {
     return false;
   }

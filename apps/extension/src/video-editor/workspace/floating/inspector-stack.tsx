@@ -96,6 +96,7 @@ function VideoEditorFloatingInspectorContent({
         <WorkspacePanelHeader
           actions={
             <>
+              <InspectorPresentationToggle />
               {onToggleFullHeight && (
                 <WorkspacePanelDockToggle
                   fullHeight={fullHeight}
@@ -103,7 +104,6 @@ function VideoEditorFloatingInspectorContent({
                   dataUi="video-editor.inspector.dock-toggle"
                 />
               )}
-              <InspectorPresentationToggle />
               <WorkspacePanelCloseButton
                 onClose={onClose}
                 dataUi="video-editor.inspector.close"

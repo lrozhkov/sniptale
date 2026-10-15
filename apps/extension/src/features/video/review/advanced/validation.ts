@@ -1,4 +1,24 @@
+import { parseCameraFollowSettings } from '../../project/camera/cursor-policy';
+import { parseCursorFocusPath } from '../../project/cursor-focus-path/validation';
+import { parseReviewActionAudio } from './action-audio';
+import { parseQuickEditShadow } from './shadow-validation';
+import { parseReviewAnnotationEffects } from '../annotation-effects/validation';
+import { parseReviewOriginalSpeech } from '../original-speech';
+import {
+  parseReviewCaptionSettings,
+  parseReviewTextDocument,
+  parseReviewVoiceTextSnapshot,
+} from '../text-validation';
+import { parseQuickEditPresentationSettings } from './presentation';
+import { parseQuickEditWatermark } from './watermark';
+import { parseReviewSpeechTranscript } from '../speech-validation';
+import { parseReviewKeyAnimations } from './key-animation';
+import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
+import { parseReviewClickAnimations } from './click-animation';
+import { parseQuickEditBorder } from './border';
+import { quickEditFocusConflicts } from './focus-layout';
 import { parseOriginalAudioRanges } from './original-audio';
+import { parseOriginalAudioMutes, validOriginalAudioMuteBindings } from './original-audio-mutes';
 import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
 import { parseQuickEditSpotlight } from './focus';
 import { parsePaint, normalizePaintColor } from '@sniptale/foundation/paint';
@@ -22,9 +42,30 @@ import {
   type QuickEditZoomTransition,
 } from './types';
 import { parseQuickEditCanvas } from './canvas';
+import { parseWindowHeader } from '../../../browser-frame/header';
+import { parseQuickEditWebcam } from './webcam';
 import { createQuickEditAdvancedState } from './defaults';
 import { migrateQuickEditAdvancedV1 } from './migration';
 import type { ReviewTimeSegment } from '../timeline';
+
+/** Unreleased text-only headers cannot render with the new artwork; retain the rest of the edit. */
+function parseStoredWindowHeader(value: unknown) {
+  if (value === undefined) return undefined;
+  if (
+    isRecord(value) &&
+    value['kind'] === 'browser' &&
+    Object.keys(value).every((key) => key === 'kind' || key === 'title' || key === 'url') &&
+    typeof value['title'] === 'string' &&
+    value['title'].length <= 512 &&
+    !/[\uD800-\uDFFF]/u.test(value['title']) &&
+    (value['url'] === undefined ||
+      (typeof value['url'] === 'string' &&
+        value['url'].length <= 2048 &&
+        !/[\uD800-\uDFFF]/u.test(value['url'])))
+  )
+    return undefined;
+  return parseWindowHeader(value);
+}
 
 /** Renderer-consistent camera magnification bounds, matching video project scale limits. */
 const MAX_QUICK_EDIT_CAMERA_SCALE = 4;
@@ -60,19 +101,86 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
     !isRecord(value) ||
     typeof value['actions'] !== 'boolean' ||
     typeof value['zoom'] !== 'boolean' ||
-    typeof value['audio'] !== 'boolean'
+    typeof value['audio'] !== 'boolean' ||
+    ['text', 'originalAudio', 'voiceover', 'music'].some(
+      (key) => value[key] !== undefined && typeof value[key] !== 'boolean'
+    ) ||
+    (value['webcam'] !== undefined && typeof value['webcam'] !== 'boolean') ||
+    (value['annotationEffects'] !== undefined && typeof value['annotationEffects'] !== 'boolean')
   )
     return null;
-  return { actions: value['actions'], zoom: value['zoom'], audio: value['audio'] };
+  return {
+    ...(typeof value['text'] === 'boolean' ? { text: value['text'] } : {}),
+    ...(typeof value['originalAudio'] === 'boolean'
+      ? { originalAudio: value['originalAudio'] }
+      : {}),
+    ...(typeof value['voiceover'] === 'boolean' ? { voiceover: value['voiceover'] } : {}),
+    ...(typeof value['music'] === 'boolean' ? { music: value['music'] } : {}),
+    actions: value['actions'],
+    zoom: value['zoom'],
+    audio: value['audio'],
+    ...(value['webcam'] === undefined ? {} : { webcam: value['webcam'] }),
+    ...(value['annotationEffects'] === undefined
+      ? {}
+      : { annotationEffects: value['annotationEffects'] }),
+  };
+}
+
+/** Admit only normalized solid colors for the two resolved application themes. */
+function parseWorkspaceColors(value: unknown): QuickEditUiState['workspaceColors'] | null {
+  if (value === undefined) return {};
+  if (!isRecord(value) || Array.isArray(value)) return null;
+  const colors: NonNullable<QuickEditUiState['workspaceColors']> = {};
+  for (const theme of ['light', 'dark'] as const) {
+    const raw = value[theme];
+    if (raw === undefined) continue;
+    if (typeof raw !== 'string') return null;
+    const color = normalizePaintColor(raw);
+    if (!color) return null;
+    colors[theme] = color;
+  }
+  return colors;
+}
+
+function parseLockedTracks(value: unknown): QuickEditUiState['lockedTracks'] | null {
+  if (value === undefined) return {};
+  if (!isRecord(value) || Array.isArray(value)) return null;
+  const locks: NonNullable<QuickEditUiState['lockedTracks']> = {};
+  for (const track of [
+    'source',
+    'actions',
+    'zoom',
+    'text',
+    'annotationEffects',
+    'webcam',
+    'originalAudio',
+    'voiceover',
+    'music',
+  ] as const) {
+    const locked = value[track];
+    if (locked === undefined) continue;
+    if (typeof locked !== 'boolean') return null;
+    locks[track] = locked;
+  }
+  return locks;
 }
 
 function parseUiState(value: unknown): QuickEditUiState | null {
   if (!isRecord(value) || (value['mode'] !== 'basic' && value['mode'] !== 'advanced')) return null;
+  const lockedTracks = parseLockedTracks(value['lockedTracks']);
+  if (!lockedTracks) return null;
+  const initialized = value['advancedTracksInitialized'];
+  if (initialized !== undefined && typeof initialized !== 'boolean') return null;
+  const workspaceColors = parseWorkspaceColors(value['workspaceColors']);
+  if (!workspaceColors) return null;
   const tracks = parseTrackVisibility(value['tracks']);
   if (!tracks) return null;
   // Pre-overlay workspaces omit the display toggle; missing or invalid falls back on.
   return {
+    ...(value['workspaceColors'] === undefined ? {} : { workspaceColors }),
+    ...(value['lockedTracks'] === undefined ? {} : { lockedTracks }),
     mode: value['mode'],
+    ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
     overlaysVisible: value['overlaysVisible'] === false ? false : true,
   };
@@ -99,6 +207,24 @@ function parseCameraTransform(value: unknown): QuickEditCameraTransform | null {
   return { scale: value['scale'], centerX: value['centerX'], centerY: value['centerY'] };
 }
 
+function parseMotionBlur(value: unknown): QuickEditZoomRegion['motionBlur'] | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const result: NonNullable<QuickEditZoomRegion['motionBlur']> = {};
+  for (const phase of ['enter', 'exit', 'link'] as const) {
+    const setting = value[phase];
+    if (setting === undefined) continue;
+    if (
+      !isRecord(setting) ||
+      typeof setting['enabled'] !== 'boolean' ||
+      !isBoundedNumber(setting['strength'], 0, 1)
+    )
+      return null;
+    result[phase] = { enabled: setting['enabled'], strength: setting['strength'] };
+  }
+  return result;
+}
+
 function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   if (
     !isRecord(value) ||
@@ -108,9 +234,28 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     value['start'] >= value['end']
   )
     return null;
+  if (value['followCursor'] !== undefined && typeof value['followCursor'] !== 'boolean')
+    return null;
+  const cameraFollow =
+    value['cameraFollow'] === undefined
+      ? undefined
+      : parseCameraFollowSettings(value['cameraFollow']);
+  if (cameraFollow === null) return null;
+  const perspective = parseQuickEditPerspective(value['perspective']);
+  const depthOfField = parseQuickEditDepth(value['depthOfField']);
+  if (perspective === null || depthOfField === null) return null;
+  const motionBlur = parseMotionBlur(value['motionBlur']);
+  if (motionBlur === null) return null;
   const spotlight =
     value['spotlight'] === undefined ? undefined : parseQuickEditSpotlight(value['spotlight']);
-  if (spotlight === null) return null;
+  const border = value['border'] === undefined ? undefined : parseQuickEditBorder(value['border']);
+  if (
+    spotlight === null ||
+    border === null ||
+    (spotlight && border) ||
+    (border && value['linkTo'] !== undefined)
+  )
+    return null;
   const transform = parseCameraTransform(value['transform']);
   const enter = parseZoomTransition(value['enter']);
   const exit = parseZoomTransition(value['exit']);
@@ -132,7 +277,13 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   )
     return null;
   return {
+    ...(cameraFollow ? { cameraFollow } : {}),
+    ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
+    ...(perspective ? { perspective } : {}),
+    ...(depthOfField ? { depthOfField } : {}),
+    ...(motionBlur ? { motionBlur } : {}),
     ...(spotlight ? { spotlight } : {}),
+    ...(border ? { border } : {}),
     id: value['id'],
     start: value['start'],
     end: value['end'],
@@ -160,25 +311,17 @@ function parseZoomRegions(value: unknown): QuickEditZoomRegion[] | null {
   const regions = parseBoundedArray(value, MAX_QUICK_EDIT_ZOOM_REGIONS, parseZoomRegion);
   if (!regions) return null;
   const ids = new Set<string>();
-  let previous: QuickEditZoomRegion | null = null;
   for (const region of regions) {
-    if (ids.has(region.id)) return null;
+    if (ids.has(region.id) || quickEditFocusConflicts(regions, region)) return null;
     ids.add(region.id);
-    if (region.dormant) continue;
-    if (
-      previous &&
-      (region.sourceAnchor?.start ?? region.start) < (previous.sourceAnchor?.end ?? previous.end)
-    )
-      return null;
-    previous = region;
   }
   return regions;
 }
 
-function parseZoomState(value: unknown): QuickEditZoomState | null {
+function parseZoomState(value: unknown, allowBorder: boolean): QuickEditZoomState | null {
   if (!isRecord(value) || typeof value['enabled'] !== 'boolean') return null;
   const regions = parseZoomRegions(value['regions']);
-  if (!regions) return null;
+  if (!regions || (!allowBorder && regions.some((region) => region.border))) return null;
   return { enabled: value['enabled'], regions };
 }
 
@@ -189,16 +332,59 @@ function parseBackgroundLayout(value: unknown): QuickEditBackgroundLayout | null
     !isBoundedNumber(value['cornerRadius'], 0, MAX_QUICK_EDIT_BACKGROUND_SIZE)
   )
     return null;
-  return { padding: value['padding'], cornerRadius: value['cornerRadius'] };
+  const blur = value['blur'];
+  if (blur !== undefined && !isBoundedNumber(blur, 0, 25)) return null;
+  const blurSetting = blur === undefined ? {} : { blur };
+  const shadow = value['shadow'];
+  if (shadow !== undefined) {
+    const parsedShadow = parseQuickEditShadow(shadow);
+    if (!parsedShadow) return null;
+    return {
+      padding: value['padding'],
+      cornerRadius: value['cornerRadius'],
+      shadow: parsedShadow,
+      ...blurSetting,
+    };
+  }
+  return { padding: value['padding'], cornerRadius: value['cornerRadius'], ...blurSetting };
 }
 
 function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | null {
   if (!isRecord(value)) return null;
   const behavior = value['zoomBehavior'];
-  if (behavior !== undefined && behavior !== 'fixed' && behavior !== 'follow-video') return null;
-  const motion: Pick<QuickEditBackgroundSettings, 'zoomBehavior'> = behavior
-    ? { zoomBehavior: behavior }
-    : {};
+  if (
+    behavior !== undefined &&
+    behavior !== 'fixed' &&
+    behavior !== 'follow-video' &&
+    behavior !== 'window' &&
+    behavior !== 'content'
+  )
+    return null;
+  const motion: Pick<
+    QuickEditBackgroundSettings,
+    'zoomBehavior' | 'rememberedImage' | 'rememberedPaint' | 'rememberedLayout'
+  > = behavior ? { zoomBehavior: behavior } : {};
+  const remembered = value['rememberedImage'];
+  if (remembered !== undefined) {
+    if (
+      !isRecord(remembered) ||
+      !identity(remembered['assetId']) ||
+      (remembered['imageFit'] !== 'cover' && remembered['imageFit'] !== 'contain') ||
+      value['type'] === 'image'
+    )
+      return null;
+    motion.rememberedImage = { assetId: remembered['assetId'], imageFit: remembered['imageFit'] };
+  }
+  if (value['rememberedPaint'] !== undefined) {
+    const paint = parsePaint(value['rememberedPaint']);
+    if (!paint) return null;
+    motion.rememberedPaint = paint;
+  }
+  if (value['rememberedLayout'] !== undefined) {
+    const layout = parseBackgroundLayout(value['rememberedLayout']);
+    if (!layout) return null;
+    motion.rememberedLayout = layout;
+  }
   if (value['enabled'] === false) return { enabled: false, ...motion };
   if (value['enabled'] !== true) return null;
   const layout = parseBackgroundLayout(value['layout']);
@@ -247,9 +433,19 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     value['sourceAnchor'] === undefined
       ? undefined
       : parseVoiceoverAnchors(value['sourceAnchor'], value['timelineStart'], value['duration']);
-  if (sourceAnchor === null) return null;
+  const transcript =
+    value['transcript'] === undefined
+      ? undefined
+      : parseReviewSpeechTranscript(value['transcript']);
+  const textSnapshot =
+    value['textSnapshot'] === undefined
+      ? undefined
+      : parseReviewVoiceTextSnapshot(value['textSnapshot']);
+  if (sourceAnchor === null || transcript === null || textSnapshot === null) return null;
   return {
+    ...(textSnapshot ? { textSnapshot } : {}),
     ...(sourceAnchor ? { sourceAnchor } : {}),
+    ...(transcript ? { transcript } : {}),
     ...(typeof value['tempo'] === 'number' ? { tempo: value['tempo'] } : {}),
     id: value['id'],
     assetId: value['assetId'],
@@ -284,12 +480,24 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
     return null;
   const ranges =
     value['ranges'] === undefined ? undefined : parseOriginalAudioRanges(value['ranges']);
-  if (ranges === null) return null;
-  return { muted: value['muted'], volume: value['volume'], ...(ranges ? { ranges } : {}) };
+  const mutes = value['mutes'] === undefined ? undefined : parseOriginalAudioMutes(value['mutes']);
+  if (ranges === null || mutes === null) return null;
+  return {
+    muted: value['muted'],
+    volume: value['volume'],
+    ...(ranges ? { ranges } : {}),
+    ...(mutes ? { mutes } : {}),
+  };
 }
 
-function parseAudioState(value: unknown): QuickEditAudioState | null {
+function parseAudioState(value: unknown, allowOriginalSpeech: boolean): QuickEditAudioState | null {
   if (!isRecord(value)) return null;
+  if (value['originalSpeech'] !== undefined && !allowOriginalSpeech) return null;
+  const originalSpeech =
+    value['originalSpeech'] === undefined
+      ? undefined
+      : parseReviewOriginalSpeech(value['originalSpeech']);
+  if (originalSpeech === null) return null;
   const original = parseOriginalAudio(value['original']);
   const voiceover = parseAudioClips(value['voiceover']);
   const music = parseAudioClips(value['music']);
@@ -304,8 +512,12 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
     music.some((clip) => clip.sourceAnchor || clip.tempo !== undefined)
   )
     return null;
-  const timing = segments ? { voiceoverSegments: segments } : {};
+  const timing = {
+    ...(segments ? { voiceoverSegments: segments } : {}),
+    ...(originalSpeech ? { originalSpeech } : {}),
+  };
   const gains = value['laneVolumes'];
+  if (!validOriginalAudioMuteBindings({ original, voiceover, music, ...timing })) return null;
   if (gains === undefined) return { original, voiceover, music, ...timing };
   if (!isRecord(gains)) return null;
   const voiceoverVolume = gains['voiceover'];
@@ -330,20 +542,120 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
  * rejects the operation at the workspace boundary.
  */
 export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvancedContent | null {
-  if (!isRecord(raw) || raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION || 'ui' in raw)
+  if (!isRecord(raw) || !supportsAdvancedSchema(raw['schemaVersion'], 2) || 'ui' in raw)
     return null;
-  const zoom = parseZoomState(raw['zoom']);
+  return parseAdvancedContentFields(raw);
+}
+
+function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdvancedContent | null {
+  const cameraFollowDefaults =
+    raw['cameraFollowDefaults'] === undefined
+      ? undefined
+      : parseCameraFollowSettings(raw['cameraFollowDefaults']);
+  if (
+    cameraFollowDefaults === null ||
+    (cameraFollowDefaults && !supportsAdvancedSchema(raw['schemaVersion'], 20))
+  )
+    return null;
+  const cursorFocusPath =
+    raw['cursorFocusPath'] === undefined ? undefined : parseCursorFocusPath(raw['cursorFocusPath']);
+  if (
+    cursorFocusPath === null ||
+    (cursorFocusPath && !supportsAdvancedSchema(raw['schemaVersion'], 18))
+  )
+    return null;
+  const actionAudio = parseReviewActionAudio(raw['actionAudio']);
+  if (actionAudio === null || (actionAudio && !supportsAdvancedSchema(raw['schemaVersion'], 17)))
+    return null;
+  const text =
+    isRecord(raw) && raw['text'] !== undefined ? parseReviewTextDocument(raw['text']) : undefined;
+  const captions =
+    isRecord(raw) && raw['captions'] !== undefined
+      ? parseReviewCaptionSettings(raw['captions'])
+      : undefined;
+  const annotationEffects =
+    isRecord(raw) && raw['annotationEffects'] !== undefined
+      ? parseReviewAnnotationEffects(raw['annotationEffects'])
+      : undefined;
+  if (
+    text === null ||
+    captions === null ||
+    annotationEffects === null ||
+    (annotationEffects && !supportsAdvancedSchema(raw['schemaVersion'], 15))
+  )
+    return null;
+  if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
+  const zoom = parseZoomState(raw['zoom'], supportsAdvancedSchema(raw['schemaVersion'], 3));
+  if (
+    zoom?.regions.some((region) => region.cameraFollow !== undefined) &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 20)
+  )
+    return null;
+  if (
+    zoom &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 19) &&
+    zoom.regions.some((region) => region.followCursor !== undefined)
+  )
+    return null;
   const background = parseBackgroundSettings(raw['background']);
-  const audio = parseAudioState(raw['audio']);
+  const audio = parseAudioState(raw['audio'], supportsAdvancedSchema(raw['schemaVersion'], 7));
+  const actionsEnabled = raw['actionsEnabled'];
+  if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
+  const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
+  if (keyAnimations === null) return null;
+  const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
+  if (clickAnimations === null) return null;
+  if (
+    !supportsAdvancedSchema(raw['schemaVersion'], 18) &&
+    (clickAnimations?.some(
+      (style) => style.gestureAppearance !== undefined || style.gestureArea !== undefined
+    ) ||
+      actionAudio?.some(
+        (style) =>
+          style.presetId?.endsWith('-v2') ||
+          style.downEnabled !== undefined ||
+          style.upEnabled !== undefined ||
+          style.downGain !== undefined ||
+          style.upGain !== undefined ||
+          style.includeRepeats !== undefined
+      ))
+  )
+    return null;
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
-  if (canvas === null) return null;
+  if (canvas?.crop && !supportsAdvancedSchema(raw['schemaVersion'], 21)) return null;
+  const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
+  const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
+  if (raw['watermark'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 5))
+    return null;
+  const watermark =
+    raw['watermark'] === undefined ? undefined : parseQuickEditWatermark(raw['watermark']);
+  if (raw['presentation'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 6))
+    return null;
+  const presentation =
+    raw['presentation'] === undefined ? undefined : parseStoredPresentation(raw['presentation']);
+  if (presentation === null) return null;
+  if (canvas === null || windowHeader === null || webcam === null || watermark === null)
+    return null;
   if (!zoom || !background || !audio) return null;
   return {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+    ...(cameraFollowDefaults ? { cameraFollowDefaults } : {}),
+    ...(cursorFocusPath ? { cursorFocusPath } : {}),
     zoom,
     background,
     audio,
+    ...(text ? { text } : {}),
+    ...(captions ? { captions } : {}),
+    ...(annotationEffects ? { annotationEffects } : {}),
+    ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
+    ...(keyAnimations ? { keyAnimations } : {}),
+    ...(clickAnimations ? { clickAnimations } : {}),
+    ...(actionAudio ? { actionAudio } : {}),
     ...(canvas ? { canvas } : {}),
+    ...(windowHeader ? { windowHeader } : {}),
+    ...(webcam ? { webcam } : {}),
+    ...(watermark ? { watermark } : {}),
+    ...(presentation ? { presentation } : {}),
   };
 }
 
@@ -359,7 +671,7 @@ export function loadQuickEditAdvancedState(
   if (raw === undefined) return createQuickEditAdvancedState();
   if (!isRecord(raw)) return null;
   const version = raw['schemaVersion'];
-  if (version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION) return parseAdvancedFields(raw);
+  if (supportsAdvancedSchema(version, 2)) return parseAdvancedFields(raw);
   if (version === QUICK_EDIT_ADVANCED_SCHEMA_V1 && segments) {
     const parsed = parseAdvancedFields(raw);
     if (!parsed) return null;
@@ -371,22 +683,40 @@ export function loadQuickEditAdvancedState(
 
 /** Parses the current shape; the recovery copy is an opaque string. */
 function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedState | null {
+  const content = parseAdvancedContentFields(raw);
   const ui = parseUiState(raw['ui']);
-  const zoom = parseZoomState(raw['zoom']);
-  const background = parseBackgroundSettings(raw['background']);
-  const audio = parseAudioState(raw['audio']);
-  const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
-  if (canvas === null) return null;
   const recovery = raw['recoveryV1'];
-  if (recovery !== undefined && typeof recovery !== 'string') return null;
-  if (!ui || !zoom || !background || !audio) return null;
+  if (!content || !ui || (recovery !== undefined && typeof recovery !== 'string')) return null;
+  const { schemaVersion, zoom, background, audio, ...decorations } = content;
   return {
-    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+    schemaVersion,
     ...(recovery === undefined ? {} : { recoveryV1: recovery }),
     ui,
     zoom,
     background,
-    ...(canvas ? { canvas } : {}),
+    ...decorations,
     audio,
   };
+}
+
+/** Durable scene resources use the project-asset owner; pure model IDs are transport-neutral. */
+function parseStoredPresentation(raw: unknown) {
+  const settings = parseQuickEditPresentationSettings(raw);
+  if (!settings) return null;
+  for (const slot of [settings.intro, settings.outro]) {
+    for (const resource of [slot.image, slot.video]) {
+      if (resource && !/^project-asset:\S{1,242}$/u.test(resource.assetId)) return null;
+    }
+  }
+  return settings;
+}
+
+/** Historical admission is explicit: never accept an unknown/fractional schema. */
+function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
+  return (
+    version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].some(
+      (known) => known >= firstHistorical && version === known
+    )
+  );
 }

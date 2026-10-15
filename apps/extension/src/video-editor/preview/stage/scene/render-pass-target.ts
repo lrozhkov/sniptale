@@ -7,7 +7,12 @@ export function resolvePreviewPassTarget(params: {
   prepared: PreparedPreviewSceneCanvas;
 }) {
   if (params.passCount <= 1) {
-    return { context: params.prepared.context, flush: () => undefined, dispose: () => undefined };
+    return {
+      context: params.prepared.context,
+      drawPass: undefined,
+      flush: () => undefined,
+      dispose: () => undefined,
+    };
   }
   const buffer = createVideoCompositionPassBuffer({
     bufferHeight: params.canvas.height,
@@ -18,7 +23,12 @@ export function resolvePreviewPassTarget(params: {
     targetContext: params.prepared.context,
   });
   if (!buffer)
-    return { context: params.prepared.context, flush: () => undefined, dispose: () => undefined };
+    return {
+      context: params.prepared.context,
+      drawPass: undefined,
+      flush: () => undefined,
+      dispose: () => undefined,
+    };
   buffer.context.setTransform(params.prepared.dpr, 0, 0, params.prepared.dpr, 0, 0);
   return buffer;
 }

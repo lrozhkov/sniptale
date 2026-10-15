@@ -46,7 +46,7 @@ vi.mock('./controls', () => ({
 
 vi.mock('../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../recording-control-lease')>()),
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
   validateRecordingControlCapability: validateRecordingControlCapabilityMock,
 }));
 

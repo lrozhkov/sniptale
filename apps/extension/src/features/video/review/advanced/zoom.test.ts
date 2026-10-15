@@ -140,7 +140,7 @@ describe('resolveQuickEditZoomLink', () => {
 describe('insertQuickEditZoomRegion', () => {
   it('keeps the list ascending by start', () => {
     expect(
-      insertQuickEditZoomRegion([region('a', 0, 2), region('b', 4, 6)], region('c', 1, 3)).map(
+      insertQuickEditZoomRegion([region('a', 0, 2), region('b', 4, 6)], region('c', 2, 3)).map(
         (item) => item.id
       )
     ).toEqual(['a', 'c', 'b']);
@@ -307,4 +307,27 @@ it('preserves valid five-second phases, zeroes none and derives legacy values wi
     updateQuickEditZoomRegion([none], 'long', { exit: { type: 'linear', duration: 12 } })[0]!.exit
       .duration
   ).toBe(10);
+});
+
+it('preserves independent exposure settings while changing timing and clamps authored strength', () => {
+  const original = {
+    ...region('a', 1, 8),
+    motionBlur: {
+      enter: { enabled: true, strength: 0.2 },
+      exit: { enabled: false, strength: 0.8 },
+    },
+  };
+  const updated = updateQuickEditZoomRegion([original], 'a', {
+    motionBlur: { ...original.motionBlur, link: { enabled: true, strength: 2 } },
+  });
+  expect(updated[0]?.motionBlur).toEqual({
+    ...original.motionBlur,
+    link: { enabled: true, strength: 1 },
+  });
+  const timed = updateQuickEditZoomRegion(updated, 'a', {
+    end: 6,
+    enter: { type: 'linear', duration: 2 },
+  });
+  expect(timed[0]?.motionBlur).toEqual(updated[0]?.motionBlur);
+  expect(original.motionBlur.enter.strength).toBe(0.2);
 });

@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../../contracts';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type {
   GuideImageBlock,
@@ -21,10 +22,11 @@ export type GuideTemplateApplication = 'appearance' | 'replace' | 'capture';
 export async function applyScenarioStepTemplate(args: {
   project: GuideProject;
   baseUpdatedAt: number;
+  expectedRevision?: number;
   stepId: string;
   templateId: string;
   mode: GuideTemplateApplication;
-}): Promise<GuideProject> {
+}): Promise<ScenarioProjectSnapshot> {
   const parsed = parseGuideProject(args.project);
   if (parsed.status !== 'ok') throw new Error('Invalid template destination.');
   const project = parsed.project;
@@ -65,10 +67,11 @@ export async function applyScenarioStepTemplate(args: {
     handedOff = true;
     const committed = await commitScenarioAggregateMutation(result.project, {
       expectedUpdatedAt: args.baseUpdatedAt,
+      ...(args.expectedRevision === undefined ? {} : { expectedRevision: args.expectedRevision }),
       children: { assetPuts: assets, editorDocumentPuts: documents },
     });
     publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
-    return committed.project;
+    return committed;
   } catch (error) {
     if (!handedOff) return rejectScenarioMutationBeforeHandoff({ assetPuts: assets }, error);
     throw error;

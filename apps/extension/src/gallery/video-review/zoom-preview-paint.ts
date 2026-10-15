@@ -1,6 +1,15 @@
+import type { ReviewSpatialRenderer } from '../../workflows/video-review/spatial-renderer';
+import { createReviewWindowRaster } from '../../workflows/video-review/window-header';
+import {
+  drawReviewSceneShadow,
+  reviewSpatialSourceRect,
+} from '../../workflows/video-review/scene-shadow';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import {
   computeQuickEditSceneCamera,
+  computeQuickEditSpatialWindow,
+  computeQuickEditSpatialRasterLayout,
+  computeQuickEditWindowTransform,
   computeQuickEditVisibleSourceRect,
 } from '../../features/video/review/advanced/scene';
 import type {
@@ -19,7 +28,9 @@ export type ZoomPreviewLayout = ReturnType<typeof computeQuickEditSceneLayout>;
 export function paintZoomPreview(
   context: CanvasRenderingContext2D,
   args: {
+    spatialRenderer?: ReviewSpatialRenderer | undefined;
     background?: QuickEditBackgroundSettings;
+    headerImage?: CanvasImageSource | null | undefined;
     accent: string;
     camera: QuickEditZoomRegion['transform'];
     frame: ZoomPreviewFrame | null;
@@ -28,53 +39,92 @@ export function paintZoomPreview(
     view: 'area' | 'result';
     width: number;
     cornerRadius?: number;
+    previewScale?: number;
     showControls?: boolean;
   }
 ) {
+  if (args.view === 'result' && args.camera.spatial) return paintSpatialZoomPreview(context, args);
   const { videoRect, videoTransform } = args.layout;
   const motion = computeQuickEditSceneCamera(args.layout, args.background ?? { enabled: false });
-  const clip = args.view === 'area' ? videoRect : motion.videoClip;
+  const clip = args.view === 'area' ? args.layout.windowRect : motion.windowClip;
   context.clearRect(0, 0, args.width, args.height);
-  context.save();
-  context.beginPath();
-  context.roundRect(
-    clip.x,
-    clip.y,
-    clip.width,
-    clip.height,
-    (args.cornerRadius ?? 0) * (args.view === 'result' ? motion.scale : 1)
+  drawReviewSceneShadow(
+    context,
+    args.background ?? { enabled: false },
+    clip,
+    (args.cornerRadius ?? 0) * (args.view === 'result' ? motion.scale : 1),
+    (args.previewScale ?? 1) * (args.view === 'result' ? motion.scale : 1)
   );
-  context.clip();
-  const target = args.view === 'area' ? videoRect : videoTransform;
-  if (args.frame)
-    context.drawImage(args.frame.image, target.x, target.y, target.width, target.height);
-  else {
-    context.fillStyle = '#000000';
-    context.fillRect(target.x, target.y, target.width, target.height);
-  }
-  context.restore();
-  if (args.view === 'area' && args.showControls !== false) {
-    const visible = computeQuickEditVisibleSourceRect(
-      args.layout,
-      args.background ?? { enabled: false },
-      args
+  context.save();
+  try {
+    context.beginPath();
+    context.roundRect(
+      clip.x,
+      clip.y,
+      clip.width,
+      clip.height,
+      (args.cornerRadius ?? 0) * (args.view === 'result' ? motion.scale : 1)
     );
-    const footprint: QuickEditRect = {
-      x: videoRect.x + visible.x * videoRect.width,
-      y: videoRect.y + visible.y * videoRect.height,
-      width: visible.width * videoRect.width,
-      height: visible.height * videoRect.height,
+    context.clip();
+    const target = args.view === 'area' ? videoRect : videoTransform;
+    const window =
+      args.view === 'area' ? args.layout.windowRect : computeQuickEditWindowTransform(args.layout);
+    const drawVideo = (
+      targetContext: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      width: number,
+      height: number
+    ) => {
+      if (args.frame) targetContext.drawImage(args.frame.image, x, y, width, height);
+      else {
+        targetContext.fillStyle = '#000000';
+        targetContext.fillRect(x, y, width, height);
+      }
     };
-    context.strokeStyle = args.accent;
-    context.lineWidth = 2;
-    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    if (args.headerImage || args.layout.sourceCrop) {
+      const raster = createReviewWindowRaster({
+        header: args.headerImage ?? undefined,
+        videoRect: args.layout.videoRect,
+        visibleVideoRect: args.layout.visibleVideoRect,
+        windowRect: args.layout.windowRect,
+        draw: drawVideo,
+      });
+      try {
+        context.drawImage(
+          raster.image,
+          0,
+          0,
+          raster.width,
+          raster.height,
+          window.x,
+          window.y,
+          window.width,
+          window.height
+        );
+      } finally {
+        raster.release();
+      }
+    } else drawVideo(context, target.x, target.y, target.width, target.height);
+  } finally {
+    context.restore();
   }
   if (args.view !== 'area' || args.showControls === false) return;
+  const visible = computeZoomPreviewArea(args.layout, args.background ?? { enabled: false }, args);
+  const footprint: QuickEditRect = {
+    x: args.layout.windowRect.x + visible.x * args.layout.windowRect.width,
+    y: args.layout.windowRect.y + visible.y * args.layout.windowRect.height,
+    width: visible.width * args.layout.windowRect.width,
+    height: visible.height * args.layout.windowRect.height,
+  };
+  context.strokeStyle = args.accent;
+  context.lineWidth = 2;
+  context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
   context.fillStyle = args.accent;
   context.beginPath();
   context.arc(
-    videoRect.x + args.camera.centerX * videoRect.width,
-    videoRect.y + args.camera.centerY * videoRect.height,
+    footprint.x + footprint.width / 2,
+    footprint.y + footprint.height / 2,
     3,
     0,
     Math.PI * 2
@@ -87,4 +137,73 @@ export function previewBackgroundPaint(background: QuickEditBackgroundSettings):
   if (!background.enabled || background.type === 'image') return '#000000';
   if (background.type === 'solid') return background.color;
   return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
+}
+
+/** Inspector footprint in normalized window coordinates; Follow Video includes the whole scene, not only video pixels. */
+/** The result GPU pass owns padded storage while flat painting retains scene coordinates. */
+function paintSpatialZoomPreview(
+  context: CanvasRenderingContext2D,
+  args: Parameters<typeof paintZoomPreview>[1]
+) {
+  const renderer = args.spatialRenderer;
+  const spatial = args.camera.spatial;
+  if (!renderer || !spatial) throw new Error('Perspective renderer is unavailable.');
+  const sourceRect = reviewSpatialSourceRect({
+    output: { width: args.width, height: args.height },
+    window: args.layout.windowRect,
+    background: args.background ?? { enabled: false },
+    sceneScale: args.previewScale ?? 1,
+  });
+  const plane = renderer.surface('plane', sourceRect.width, sourceRect.height);
+  plane.context.save();
+  plane.context.translate(-sourceRect.x, -sourceRect.y);
+  try {
+    paintZoomPreview(plane.context, {
+      ...args,
+      view: 'result',
+      showControls: false,
+      layout: computeQuickEditSpatialRasterLayout(
+        args.layout,
+        args.background ?? { enabled: false }
+      ),
+      background: { ...(args.background ?? { enabled: false }), zoomBehavior: 'fixed' },
+      camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
+  } finally {
+    plane.context.restore();
+  }
+  context.clearRect(0, 0, args.width, args.height);
+  renderer.draw(context, {
+    source: plane.canvas,
+    sourceRect,
+    output: { width: args.width, height: args.height },
+    base: args.layout.windowRect,
+    target: computeQuickEditSpatialWindow(args.layout, args.background ?? { enabled: false }),
+    frame: spatial,
+  });
+}
+
+export function computeZoomPreviewArea(
+  layout: ZoomPreviewLayout,
+  background: QuickEditBackgroundSettings,
+  output: { width: number; height: number }
+): QuickEditRect {
+  const source =
+    background.zoomBehavior !== 'window' &&
+    (!background.enabled || background.zoomBehavior !== 'follow-video')
+      ? computeQuickEditVisibleSourceRect(layout, background, output)
+      : {
+          x: -layout.videoTransform.x / layout.videoTransform.width,
+          y: -layout.videoTransform.y / layout.videoTransform.height,
+          width: output.width / layout.videoTransform.width,
+          height: output.height / layout.videoTransform.height,
+        };
+  const window = layout.windowRect;
+  const video = layout.videoRect;
+  return {
+    x: (video.x - window.x + source.x * video.width) / window.width,
+    y: (video.y - window.y + source.y * video.height) / window.height,
+    width: (source.width * video.width) / window.width,
+    height: (source.height * video.height) / window.height,
+  };
 }

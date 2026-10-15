@@ -28,6 +28,7 @@ interface RunLiveVideoEncoderPumpInput {
   onFrameDequeued(): void;
   onEncoderSubmissionFailed?(): void;
   onEncoderSubmissionStarted?(): void;
+  onSegmentStarted?(sourceTimestampUs: number, chosenMediaTimeSeconds: number): void;
   shouldEncodeTerminalFrame(): boolean;
   videoSource: Pick<VideoSampleSource, 'add'>;
   frameTransformer?: Pick<LiveVideoFrameTransformer, 'transformFrame'>;
@@ -206,11 +207,13 @@ class LiveVideoEncoderPumpState {
     if (this.pendingEntry && segmentEndTiming) {
       const frameToEncode = this.pendingEntry.frame;
       this.pendingEntry = entry;
-      this.timeline.restart(entry.timestampSeconds);
+      const chosenTimestamp = this.timeline.restart(entry.timestampSeconds);
+      this.input.onSegmentStarted?.(entry.frame.timestamp, chosenTimestamp);
       await this.submit(frameToEncode, segmentEndTiming);
       return;
     }
-    this.timeline.restart(entry.timestampSeconds);
+    const chosenTimestamp = this.timeline.restart(entry.timestampSeconds);
+    this.input.onSegmentStarted?.(entry.frame.timestamp, chosenTimestamp);
     this.pendingEntry = entry;
   }
 

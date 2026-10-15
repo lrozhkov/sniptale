@@ -1,3 +1,4 @@
+import { windowHeaderMessages } from './window-header';
 import { aiModalMessages } from './ai-modal';
 import { backgroundMessages } from './background';
 import { commonMessages } from './common';
@@ -23,6 +24,7 @@ import { webSnapshotViewerMessages } from './web-snapshot-viewer';
 import { viewportPresetsMessages } from './viewport-presets';
 
 export const translationMessages = defineMessageSource({
+  windowHeader: windowHeaderMessages,
   common: defineMessageSource({ ...commonMessages, languages: localeLanguageMessages }),
   settings: settingsMessages,
   templates: templatesMessages,

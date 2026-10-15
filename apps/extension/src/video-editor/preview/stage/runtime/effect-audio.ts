@@ -1,3 +1,5 @@
+import { buildProjectActionAudioPlan } from '../../../../features/video/review/project-action-audio';
+import { createProjectActionAudioRuntime } from './action-audio';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -21,6 +23,8 @@ export function usePreviewEffectAudio(args: {
 }): void {
   const plans = useMemo(() => resolveEffectRuntimeAudioPlans(args.project), [args.project]);
   const stateRef = useRef(createPreviewEffectAudioState());
+  const actionStateRef = useRef(createProjectActionAudioRuntime());
+  const actionPlan = useMemo(() => buildProjectActionAudioPlan(args.project), [args.project]);
   const retryVersionRef = useRef(args.feedback.retryVersion);
   const { onFailure, onRecovery, retryVersion } = args.feedback;
 
@@ -28,14 +32,22 @@ export function usePreviewEffectAudio(args: {
     if (retryVersionRef.current !== retryVersion) {
       retryVersionRef.current = retryVersion;
       resetPreviewEffectAudio(stateRef.current);
+      actionStateRef.current.reset();
     }
     let active = true;
-    void syncPreviewEffectAudio({
-      currentTime: args.currentTime,
-      isPlaying: args.isPlaying,
-      plans,
-      state: stateRef.current,
-    }).then(
+    void Promise.all([
+      syncPreviewEffectAudio({
+        currentTime: args.currentTime,
+        isPlaying: args.isPlaying,
+        plans,
+        state: stateRef.current,
+      }),
+      actionStateRef.current.sync({
+        plan: actionPlan,
+        currentTime: args.currentTime,
+        isPlaying: args.isPlaying,
+      }),
+    ]).then(
       () => {
         if (active) onRecovery('audio');
       },
@@ -46,11 +58,13 @@ export function usePreviewEffectAudio(args: {
     return () => {
       active = false;
     };
-  }, [args.currentTime, args.isPlaying, onFailure, onRecovery, plans, retryVersion]);
+  }, [args.currentTime, args.isPlaying, onFailure, onRecovery, plans, actionPlan, retryVersion]);
 
   useEffect(() => {
     const state = stateRef.current;
+    const actionState = actionStateRef.current;
     return () => {
+      void actionState.close().catch(() => undefined);
       void cleanupPreviewEffectAudio(state).catch((error) =>
         logger.warn('Failed to close EffectV1 preview audio context', error)
       );

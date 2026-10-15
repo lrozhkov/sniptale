@@ -185,3 +185,25 @@ it('rejects removed authored action timing authorities rather than accepting a m
     expect(isActionEvent({ ...event, ...removed })).toBe(false);
   }
 });
+
+it('preserves bounded safe command repeat blocks and rejects malformed repeated-key facts', () => {
+  const event = {
+    id: 'command',
+    anchor: { kind: 'project', time: 1 },
+    kind: 'KEY',
+    label: 'F2',
+    data: {},
+    point: null,
+  };
+  const block = {
+    version: 1,
+    id: 'repeat',
+    startTime: 1.1,
+    quantumMs: 1,
+    count: 2,
+    encoding: 'delta',
+    ticks: [0, 100],
+  };
+  expect(isActionEvent({ ...event, keyboardRepeats: [block] })).toBe(true);
+  expect(isActionEvent({ ...event, keyboardRepeats: [{ ...block, count: 10000000 }] })).toBe(false);
+});

@@ -14,6 +14,11 @@ import {
   runBusyAction,
 } from './test-support/index';
 
+const renameQuickEditMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../workflows/media-hub/trash', async (original) => ({
+  ...(await original<typeof import('../../../workflows/media-hub/trash')>()),
+  renameQuickEditProject: renameQuickEditMock,
+}));
 const { updateMediaLibraryEntrySafelyMock, updateScenarioProjectRecordMetadataMock } = vi.hoisted(
   () => ({
     updateMediaLibraryEntrySafelyMock: vi.fn(),
@@ -400,4 +405,26 @@ describe('gallery app preview and shared actions', () => {
     verifyFailedPreviewNavigationKeepsCurrentItem
   );
   it('skips metadata persistence without a preview item', verifyMissingPreviewMetadataNoop);
+});
+
+it('renames a quick-edit project through its revisioned owner without renaming its source', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const project = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 4,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const { controller } = createController({
+    previewItem: project,
+    filenameDraft: ' Renamed edit ',
+  });
+  await createClosePreviewAction(controller)(runBusyAction);
+  expect(renameQuickEditMock).toHaveBeenCalledExactlyOnceWith('source', 4, 'Renamed edit');
+  expect(updateMediaLibraryEntrySafelyMock).not.toHaveBeenCalled();
+  expect(updateScenarioProjectRecordMetadataMock).not.toHaveBeenCalled();
 });

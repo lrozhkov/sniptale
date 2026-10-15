@@ -20,17 +20,17 @@ it('drops whole label parts in priority order and recomputes on resize/content c
     }
   );
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      const part = this.dataset['labelPart'];
-      return new DOMRect(
-        0,
-        0,
-        part === 'icon' ? 12 : part === 'name' ? 90 : part === 'value' ? 28 : width,
-        14
-      );
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    const part = this.dataset['labelPart'];
+    return new DOMRect(
+      0,
+      0,
+      part === 'icon' ? 12 : part === 'name' ? 90 : part === 'value' ? 28 : width,
+      14
+    );
+  });
   const host = document.createElement('div');
   const root = createRoot(host);
   const render = (value?: string) =>

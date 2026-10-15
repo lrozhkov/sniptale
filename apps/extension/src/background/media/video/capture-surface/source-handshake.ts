@@ -3,7 +3,7 @@
 import type { RuntimeOffscreenSourceReadyMessage } from '../../../../contracts/messaging/contracts/types';
 import { getVideoSurfaceSession } from './session-registry';
 
-const SOURCE_READY_TIMEOUT_MS = 10_000;
+import { RECORDING_SOURCE_PREPARATION_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
 
 type SourceReadyWaiter = {
   expectedStreamInstanceId: string;
@@ -59,7 +59,7 @@ export function waitForVideoSourceReady(args: {
     const timeout = setTimeout(() => {
       readyWaiters.delete(args.recordingId);
       reject(new Error('Timed out while validating the recording source'));
-    }, SOURCE_READY_TIMEOUT_MS);
+    }, RECORDING_SOURCE_PREPARATION_TIMEOUT_MS);
     readyWaiters.set(args.recordingId, {
       expectedStreamInstanceId: args.expectedStreamInstanceId,
       reject,

@@ -36,7 +36,7 @@ export async function handleScenarioCreateProject(
   args: ScenarioRouteContext & { message: ScenarioCreateProjectMessage }
 ) {
   const projectName = args.message.name.trim() || translate('scenario.common.defaultProjectName');
-  const project = await createScenarioProjectRecord(projectName);
+  const { project } = await createScenarioProjectRecord(projectName);
   await args.scenarioSessionService.bumpProjectRevision(args.resolvedTabId);
   await setScenarioProjectSelection({
     ...args,

@@ -39,6 +39,30 @@ export async function withVoiceoverAttachmentLock<T>(
     : withLocalLock(name, operation);
 }
 
+/** Holds the same recovery exclusion for a disposable editor buffer; release is idempotent. */
+export async function retainReviewAttachmentLock(assetId: string): Promise<() => Promise<void>> {
+  let acquired!: () => void;
+  let rejectAcquisition!: (reason: unknown) => void;
+  let release!: () => void;
+  const admission = new Promise<void>((resolve, reject) => {
+    acquired = resolve;
+    rejectAcquisition = reject;
+  });
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const finished = withVoiceoverAttachmentLock(assetId, async () => {
+    acquired();
+    await held;
+  });
+  void finished.catch(rejectAcquisition);
+  await admission;
+  return async () => {
+    release();
+    await finished;
+  };
+}
+
 /** Recovery must never wait for a lock while it owns the asset lifecycle lock. */
 export async function tryVoiceoverAttachmentLock<T>(
   assetId: string,

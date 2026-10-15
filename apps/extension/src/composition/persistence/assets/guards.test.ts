@@ -87,6 +87,22 @@ describe('asset persistence guards', () => {
     };
     expect(parsePhysicalDeleteAssetOperation(physicalDelete)).toEqual(physicalDelete);
     expect(parsePhysicalDeleteAssetOperation({ ...physicalDelete, assetIds: [''] })).toBeNull();
+    const privateSources = [{ projectAssetId: 'private', expectedAssetId: 'bytes' }];
+    expect(parsePhysicalDeleteAssetOperation({ ...physicalDelete, privateSources })).toEqual({
+      ...physicalDelete,
+      privateSources,
+    });
+    for (const invalid of [
+      null,
+      {},
+      [{}],
+      [{ projectAssetId: '', expectedAssetId: 'bytes' }],
+      [{ projectAssetId: 'private', expectedAssetId: 1 }],
+      [{ ...privateSources[0], sourceUrl: 'untrusted' }],
+    ])
+      expect(
+        parsePhysicalDeleteAssetOperation({ ...physicalDelete, privateSources: invalid })
+      ).toBeNull();
     expect(
       parsePhysicalDeleteAssetOperation({ ...physicalDelete, status: 'committed' })
     ).toBeNull();

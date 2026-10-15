@@ -122,6 +122,7 @@ it('selects the cursor sample under the pointer after clipping the beginning of 
     samples: [
       { id: 'early', time: 0, visible: true, x: 10, y: 10 },
       { id: 'late', time: 43200, visible: true, x: 20, y: 20 },
+      { id: 'terminal', time: 86400, visible: true, x: 30, y: 30 },
     ],
   };
   const container = document.createElement('div');
@@ -144,7 +145,7 @@ it('selects the cursor sample under the pointer after clipping the beginning of 
         />
       )
     );
-    const button = container.querySelector('button');
+    const button = container.querySelector('[data-timeline-effect-segment="early"] button');
     expect(button).not.toBeNull();
     // jsdom reports left=0 for the clipped button; 121px includes the 120px overscan.
     act(() =>
@@ -292,7 +293,7 @@ it('keeps cursor draft geometry equal to composed commit and restores on Escape'
       act(() =>
         root.render(<EffectLaneHarness {...{ project, cursorMove, historyTransaction }} />)
       );
-      const button = container.querySelector('button');
+      const button = container.querySelector('[data-timeline-effect-segment="c0"] button');
       act(() =>
         button?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 250 }))
       );
@@ -300,7 +301,7 @@ it('keeps cursor draft geometry equal to composed commit and restores on Escape'
       const geometry = () =>
         container.querySelector<HTMLElement>('[data-timeline-effect-segment="c0"]');
       expect(geometry()?.style.left).toBe('0px');
-      expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(600, 5);
+      expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(500, 5);
       expect(cursorMove).not.toHaveBeenCalled();
 
       act(() =>
@@ -318,7 +319,10 @@ it('keeps cursor draft geometry equal to composed commit and restores on Escape'
           root.render(<EffectLaneHarness {...{ project, cursorMove, historyTransaction }} />)
         );
       }
-      expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(600, 5);
+      expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(
+        finish === 'commit' ? 500 : 400,
+        5
+      );
     } finally {
       act(() => root.unmount());
       container.remove();

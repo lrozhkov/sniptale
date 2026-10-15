@@ -36,8 +36,9 @@ it('logs technical errors but surfaces only localized user-facing messages', () 
     context: { attempt: 1 },
   });
 
-  expect(loggerErrorMock).toHaveBeenCalledWith('save-image failed', expect.any(Error), {
-    attempt: 1,
+  expect(loggerErrorMock).toHaveBeenCalledWith('Editor action failed', expect.any(Error), {
+    action: 'save-image',
+    context: { attempt: 1 },
   });
   expect(toastErrorMock).toHaveBeenCalledWith(
     'common.states.error. common.errors.unexpectedDetail'
@@ -50,11 +51,10 @@ it('can report an inline failure without showing a toast', () => {
     notify: false,
   });
 
-  expect(loggerErrorMock).toHaveBeenCalledWith(
-    'command-palette:copy failed',
-    expect.any(Error),
-    undefined
-  );
+  expect(loggerErrorMock).toHaveBeenCalledWith('Editor action failed', expect.any(Error), {
+    action: 'command-palette:copy',
+    context: undefined,
+  });
   expect(toastErrorMock).not.toHaveBeenCalled();
   expect(message).toBe('common.states.error. common.errors.unexpectedDetail');
 });
@@ -68,11 +68,10 @@ it('falls back to the shared error label and catches detached async actions', as
   await Promise.resolve();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  expect(loggerErrorMock).toHaveBeenCalledWith(
-    'async-failure failed',
-    expect.any(Error),
-    undefined
-  );
+  expect(loggerErrorMock).toHaveBeenCalledWith('Editor action failed', expect.any(Error), {
+    action: 'async-failure',
+    context: undefined,
+  });
   expect(toastErrorMock).toHaveBeenCalledWith(
     'common.states.error. common.errors.unexpectedDetail'
   );

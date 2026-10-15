@@ -79,6 +79,7 @@ function renderRow(layer: Record<string, unknown> = BASE_LAYER) {
   act(() => {
     root?.render(
       <LayerRow
+        locale="en"
         layer={layer as never}
         dragOverLayerId={null}
         setDraggedLayerId={vi.fn() as never}

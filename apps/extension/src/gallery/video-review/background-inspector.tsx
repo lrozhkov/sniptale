@@ -1,22 +1,19 @@
-import { SelectField } from '../../ui/compact-inspector-controls';
+import './background-inspector.css';
+import { ColorField, SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
-import { ReviewNumberRow } from './number-row';
-import { useRef } from 'react';
+import { ReviewPreviewNumberRow } from './number-row';
+import { useEffect, useRef, useState } from 'react';
+import { BackgroundImagePicker } from '../../composition/background-resources/picker';
 import { translate } from '../../platform/i18n';
-import type {
-  QuickEditBackgroundLayout,
-  QuickEditBackgroundSettings,
-} from '../../features/video/review/advanced/types';
+import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import type { QuickEditBackgroundPatch } from '../../features/video/review/advanced/background';
-import { serializePaintToCss, createSolidPaint, type Paint } from '@sniptale/foundation/paint';
-import { useGradientPresetCatalog } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
-import { CompactPaintSelector } from '../../ui/paint-selector';
-import { ReviewButton, reviewTextButtonClassName } from './controls';
+import { createSolidPaint, type Paint } from '@sniptale/foundation/paint';
+import { ReviewBackgroundPaints } from './background-paints';
 
 const kinds = [
   { key: 'none', label: 'gallery.videoReview.backgroundNone' },
   { key: 'solid', label: 'gallery.videoReview.backgroundSolid' },
-  { key: 'gradient', label: 'gallery.videoReview.backgroundGradient' },
+  { key: 'image', label: 'gallery.videoReview.backgroundImage' },
 ] as const;
 
 function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
@@ -28,131 +25,95 @@ function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
 
 /** Canvas background owner: kind, paint, and layout belong to the whole frame. */
 export function ReviewBackgroundInspector(props: {
-  onImportImage?: ((file: File) => void) | undefined;
+  pending?: boolean;
+  onImportImage?: ((file: File, originMediaId?: string) => void) | undefined;
   background: QuickEditBackgroundSettings;
   onChange(patch: QuickEditBackgroundPatch): void;
+  onPreview?(patch: QuickEditBackgroundPatch | null): void;
 }) {
-  const fileInput = useRef<HTMLInputElement>(null);
-  const { presets } = useGradientPresetCatalog('highlighter-frame-fill');
+  const [imageRequested, setImageRequested] = useState(false);
   const { background, onChange } = props;
   const paint = backgroundPaint(background);
+  const preview = useRef(props.onPreview);
+  preview.current = props.onPreview;
+  // Leaving the inspector cancels an unfinished scene gesture.
+  useEffect(() => () => preview.current?.(null), []);
 
   return (
-    <div data-ui="gallery.videoReview.backgroundInspector" className="min-w-0 space-y-2">
-      <div
-        className="grid grid-cols-2 gap-1"
-        role="group"
-        data-inspector-choices
-        aria-label={translate('gallery.videoReview.background')}
-      >
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          hidden
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0];
-            event.currentTarget.value = '';
-            if (file) props.onImportImage?.(file);
-          }}
-        />
-        {kinds.map((kind) => (
-          <ReviewButton
-            key={kind.key}
-            label={translate(kind.label)}
-            aria-pressed={
-              kind.key === 'none'
-                ? !background.enabled
-                : background.enabled && background.type === kind.key
+    <div data-ui="gallery.videoReview.backgroundInspector" className="review-inspector-columns">
+      <div className="min-w-0 space-y-2">
+        <ReviewZoomObject background={background} onChange={onChange} />
+        <div className="review-background-kinds">
+          <SegmentedRow
+            label={translate('gallery.videoReview.backgroundType')}
+            layout="stacked"
+            columns={3}
+            ariaLabel={translate('gallery.videoReview.background')}
+            options={kinds.map((kind) => ({ value: kind.key, label: translate(kind.label) }))}
+            value={
+              imageRequested
+                ? 'image'
+                : background.enabled
+                  ? background.type === 'image'
+                    ? 'image'
+                    : 'solid'
+                  : 'none'
             }
-            className={reviewTextButtonClassName}
-            onClick={() =>
-              onChange(
-                kind.key === 'none'
-                  ? { enabled: false }
-                  : {
-                      enabled: true,
-                      type: kind.key,
-                      ...(kind.key === 'solid' ? { color: '#000000ff' } : {}),
-                    }
+            onChange={(kind) => {
+              setImageRequested(kind === 'image');
+              if (kind === 'image') {
+                if (background.rememberedImage) onChange({ enabled: true, type: 'image' });
+                return;
+              }
+              if (kind === 'none') onChange({ enabled: false });
+              else {
+                const paint =
+                  background.enabled && background.type !== 'image'
+                    ? backgroundPaint(background)
+                    : background.rememberedPaint;
+                onChange(
+                  paint?.kind === 'gradient'
+                    ? { enabled: true, type: 'gradient', gradient: paint.gradient }
+                    : { enabled: true, type: 'solid', color: paint?.color ?? '#000000ff' }
+                );
+              }
+            }}
+          />
+        </div>
+        {imageRequested || (background.enabled && background.type === 'image') ? (
+          <BackgroundImagePicker
+            pending={props.pending ?? false}
+            onSelect={({ file, originMediaId }) => props.onImportImage?.(file, originMediaId)}
+          />
+        ) : null}
+        {!imageRequested && background.enabled && background.type !== 'image' ? (
+          <ReviewBackgroundPaints
+            value={paint}
+            onPreview={(next) =>
+              props.onPreview?.(
+                !next
+                  ? null
+                  : next.kind === 'solid'
+                    ? { enabled: true, type: 'solid', color: next.color }
+                    : { enabled: true, type: 'gradient', gradient: next.gradient }
               )
             }
-          >
-            {translate(kind.label)}
-          </ReviewButton>
-        ))}
-        <ReviewButton
-          label={translate('gallery.videoReview.backgroundImage')}
-          className={reviewTextButtonClassName}
-          aria-pressed={background.enabled && background.type === 'image'}
-          onClick={() => fileInput.current?.click()}
-        />
+            onChange={(next: Paint) =>
+              onChange(
+                next.kind === 'solid'
+                  ? { enabled: true, type: 'solid', color: next.color }
+                  : { enabled: true, type: 'gradient', gradient: next.gradient }
+              )
+            }
+          />
+        ) : null}
       </div>
-      {background.enabled && background.type === 'gradient' ? (
-        <div
-          className="grid grid-cols-5 gap-2"
-          role="group"
-          aria-label={translate('videoEditor.sidebar.sceneBackgroundPresetLabel')}
-          data-ui="gallery.videoReview.gradientPresets"
-        >
-          {presets
-            .filter((preset) => preset.enabled)
-            .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.order - b.order)
-            .slice(0, 10)
-            .map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                title={preset.name}
-                aria-label={preset.name}
-                aria-pressed={
-                  serializePaintToCss(paint) ===
-                  serializePaintToCss({ kind: 'gradient', gradient: preset.gradient })
-                }
-                className="h-8 min-w-0 rounded border border-[var(--sniptale-color-border-subtle)]
-                    transition-opacity hover:opacity-80
-                    aria-pressed:outline aria-pressed:outline-1 aria-pressed:outline-offset-1
-                    aria-pressed:outline-[var(--sniptale-color-text-secondary)]
-                    focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
-                style={{
-                  background: serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
-                }}
-                onClick={() =>
-                  onChange({ enabled: true, type: 'gradient', gradient: preset.gradient })
-                }
-              />
-            ))}
-        </div>
-      ) : null}
-      {background.enabled && background.type !== 'image' ? (
-        <CompactPaintSelector
-          triggerVariant="swatch"
-          className="relative w-full min-w-0 [&>button>span>span]:text-xs
-            [&>button>span>span]:font-semibold"
-          label={translate('gallery.videoReview.background')}
-          title={translate('gallery.videoReview.background')}
-          value={paint}
-          palette={[
-            '#18181b',
-            '#fafafa',
-            '#334155',
-            '#2563eb',
-            '#0f766e',
-            '#14b8a6',
-            '#f97316',
-            '#e11d48',
-          ]}
-          onChange={(next: Paint) =>
-            onChange(
-              next.kind === 'solid'
-                ? { enabled: true, type: 'solid', color: next.color }
-                : { enabled: true, type: 'gradient', gradient: next.gradient }
-            )
-          }
-        />
-      ) : null}
       {background.enabled ? (
-        <ReviewBackgroundLayoutControls background={background} onChange={onChange} />
+        <ReviewBackgroundLayoutControls
+          background={background}
+          onChange={onChange}
+          onPreview={props.onPreview}
+        />
       ) : null}
     </div>
   );
@@ -162,12 +123,22 @@ export function ReviewBackgroundInspector(props: {
 function ReviewBackgroundLayoutControls({
   background,
   onChange,
+  onPreview,
 }: {
   background: Extract<QuickEditBackgroundSettings, { enabled: true }>;
   onChange(patch: QuickEditBackgroundPatch): void;
+  onPreview?: ((patch: QuickEditBackgroundPatch | null) => void) | undefined;
 }) {
-  const layoutField = (key: keyof QuickEditBackgroundLayout, label: string) => (
-    <ReviewNumberRow
+  const changeShadowColor = (color: string) =>
+    onChange({
+      layout: {
+        ...background.layout,
+        shadow: { intensity: background.layout.shadow?.intensity ?? 0, color },
+      },
+    });
+  const layoutField = (key: 'padding' | 'cornerRadius', label: string) => (
+    <ReviewPreviewNumberRow
+      enterBehavior="blur"
       label={label}
       unit="px"
       min={0}
@@ -175,29 +146,118 @@ function ReviewBackgroundLayoutControls({
       scrubMax={key === 'padding' ? 200 : 100}
       step={1}
       value={background.layout[key]}
+      onPreview={(value) =>
+        onPreview?.(value === null ? null : { layout: { ...background.layout, [key]: value } })
+      }
       onChange={(value) => onChange({ layout: { ...background.layout, [key]: value } })}
     />
   );
   return (
     <div className="space-y-2">
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.backgroundZoom')}
-        value={background.zoomBehavior ?? 'fixed'}
-        options={[
-          { value: 'fixed', label: translate('gallery.videoReview.backgroundZoomFixed') },
-          {
-            value: 'follow-video',
-            label: translate('gallery.videoReview.backgroundZoomFollow'),
-          },
-        ]}
-        onChange={(zoomBehavior) => {
-          if (zoomBehavior === 'fixed' || zoomBehavior === 'follow-video')
-            onChange({ zoomBehavior });
-        }}
-      />
+      {background.type !== 'solid' ? (
+        <ReviewPreviewNumberRow
+          enterBehavior="blur"
+          label={translate('editor.scene.backgroundBlurAmount')}
+          unit="px"
+          min={0}
+          max={25}
+          step={1}
+          value={background.layout.blur ?? 0}
+          onPreview={(blur) =>
+            onPreview?.(blur === null ? null : { layout: { ...background.layout, blur } })
+          }
+          onChange={(blur) => onChange({ layout: { ...background.layout, blur } })}
+        />
+      ) : null}
       {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
       {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
+      <ReviewPreviewNumberRow
+        enterBehavior="blur"
+        label={translate('gallery.videoReview.backgroundShadow')}
+        unit="%"
+        min={0}
+        max={100}
+        step={1}
+        value={background.layout.shadow?.intensity ?? 0}
+        onPreview={(intensity) =>
+          onPreview?.(
+            intensity === null
+              ? null
+              : {
+                  layout: {
+                    ...background.layout,
+                    shadow: { color: background.layout.shadow?.color ?? '#475569ff', intensity },
+                  },
+                }
+          )
+        }
+        onChange={(intensity) =>
+          onChange({
+            layout: {
+              ...background.layout,
+              shadow: { color: background.layout.shadow?.color ?? '#475569ff', intensity },
+            },
+          })
+        }
+      />
+      <ColorField
+        label={translate('gallery.videoReview.backgroundShadowColor')}
+        title={translate('gallery.videoReview.backgroundShadowColor')}
+        value={background.layout.shadow?.color ?? '#475569ff'}
+        onChange={changeShadowColor}
+        onPreviewChange={(color) =>
+          onPreview?.({
+            layout: {
+              ...background.layout,
+              shadow: { intensity: background.layout.shadow?.intensity ?? 0, color },
+            },
+          })
+        }
+        onPreviewReset={() => onPreview?.(null)}
+      />
     </div>
+  );
+}
+
+/** New modes are explicit; saved legacy framing remains visible until the author changes it. */
+function ReviewZoomObject(props: {
+  background: QuickEditBackgroundSettings;
+  onChange(patch: QuickEditBackgroundPatch): void;
+}) {
+  const value = props.background.zoomBehavior ?? 'fixed';
+  const modes = [
+    { value: 'window' as const, label: translate('gallery.videoReview.backgroundZoomWindow') },
+    { value: 'content' as const, label: translate('gallery.videoReview.backgroundZoomContent') },
+  ];
+  if (value === 'window' || value === 'content')
+    return (
+      <SegmentedRow
+        columns={2}
+        ariaLabel={translate('gallery.videoReview.backgroundZoom')}
+        label={translate('gallery.videoReview.backgroundZoom')}
+        layout="stacked"
+        value={value}
+        options={modes}
+        onChange={(zoomBehavior) => props.onChange({ zoomBehavior })}
+      />
+    );
+  return (
+    <SelectField<NonNullable<QuickEditBackgroundSettings['zoomBehavior']>>
+      className={reviewSelectFieldClassName}
+      label={translate('gallery.videoReview.backgroundZoom')}
+      value={value}
+      options={[
+        {
+          value,
+          label: translate(
+            value === 'fixed'
+              ? 'gallery.videoReview.backgroundZoomLegacyFixed'
+              : 'gallery.videoReview.backgroundZoomLegacyFollow'
+          ),
+        },
+        ...modes,
+      ]}
+      onChange={(zoomBehavior) => props.onChange({ zoomBehavior })}
+    />
   );
 }

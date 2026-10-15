@@ -33,12 +33,22 @@ afterEach(() => {
 });
 const file = () => new File(['image'], 'background.png', { type: 'image/png' });
 
-it('publishes only after attaching the durable background reference', async () => {
+it('retains a fresh background privately after attaching the durable reference', async () => {
   const attach = vi.fn(async () => {
     expect(asset.publish).not.toHaveBeenCalled();
     expect(asset.protect).toHaveBeenCalledOnce();
   });
   await importReviewBackgroundImage({ file: file(), signal: new AbortController().signal, attach });
+  expect(asset.prepare).toHaveBeenCalledWith(
+    expect.any(File),
+    'image/png',
+    'background.png',
+    undefined,
+    undefined,
+    undefined,
+    { publishToLibrary: false }
+  );
+  expect(asset.changed).not.toHaveBeenCalled();
   expect(attach).toHaveBeenCalledWith('project-asset:image');
   expect(asset.publish).toHaveBeenCalledOnce();
   expect(asset.cancel).not.toHaveBeenCalled();
@@ -99,4 +109,24 @@ it('cancels after staging without attaching or publishing', async () => {
   ).rejects.toThrow();
   expect(attach).not.toHaveBeenCalled();
   expect(asset.cancel).toHaveBeenCalledOnce();
+});
+
+it('freezes a Library background privately with provenance and never publishes another card', async () => {
+  const input = file();
+  await importReviewBackgroundImage({
+    file: input,
+    originMediaId: 'library-image',
+    signal: new AbortController().signal,
+    attach: vi.fn(),
+  });
+  expect(asset.prepare).toHaveBeenCalledWith(
+    input,
+    input.type,
+    input.name,
+    undefined,
+    undefined,
+    undefined,
+    { publishToLibrary: false, originMediaId: 'library-image' }
+  );
+  expect(asset.changed).not.toHaveBeenCalled();
 });

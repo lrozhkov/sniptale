@@ -5,9 +5,9 @@ This file projects changeable values and inventories from their existing machine
 
 | Fact | Current projection | Machine authority |
 | --- | --- | --- |
-| Product version | `0.5.0` | `package.json#/version` |
+| Product version | `0.5.1` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `4` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `32` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -39,6 +39,9 @@ This inventory is projected from the live source tree. It is navigation data, no
 
 - `apps/extension/src/composition/archive-transfer`
 - `apps/extension/src/composition/audio-recording`
+- `apps/extension/src/composition/background-resources`
+- `apps/extension/src/composition/editor-resource-admission.test.tsx`
+- `apps/extension/src/composition/editor-resource-admission.tsx`
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
 - `apps/extension/src/composition/gradient-preset-resources`
@@ -49,6 +52,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/annotation-template-tags`
 - `apps/extension/src/composition/persistence/asset-publication-recovery`
 - `apps/extension/src/composition/persistence/assets`
+- `apps/extension/src/composition/persistence/background-presets`
 - `apps/extension/src/composition/persistence/callout-presets`
 - `apps/extension/src/composition/persistence/capture-settings`
 - `apps/extension/src/composition/persistence/command-palette`
@@ -60,6 +64,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/editor-presets`
 - `apps/extension/src/composition/persistence/effect-bundles`
 - `apps/extension/src/composition/persistence/export-ledger`
+- `apps/extension/src/composition/persistence/export-time-history`
 - `apps/extension/src/composition/persistence/frame-annotation-raster-jobs`
 - `apps/extension/src/composition/persistence/gallery-saved-views`
 - `apps/extension/src/composition/persistence/gradient-presets`
@@ -77,6 +82,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/projects`
 - `apps/extension/src/composition/persistence/prompt-templates`
 - `apps/extension/src/composition/persistence/quick-actions`
+- `apps/extension/src/composition/persistence/quick-preview-preferences`
 - `apps/extension/src/composition/persistence/recent-colors`
 - `apps/extension/src/composition/persistence/recordings`
 - `apps/extension/src/composition/persistence/review-workspaces`
@@ -92,6 +98,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/voice-input`
 - `apps/extension/src/contracts/aggregate-promotion.ts`
 - `apps/extension/src/contracts/ai`
+- `apps/extension/src/contracts/diagnostics.test.ts`
+- `apps/extension/src/contracts/diagnostics.ts`
 - `apps/extension/src/contracts/effect-runtime`
 - `apps/extension/src/contracts/full-page-capture`
 - `apps/extension/src/contracts/messaging`
@@ -100,8 +108,11 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/contracts/settings-transfer`
 - `apps/extension/src/contracts/video`
 - `apps/extension/src/features/ai`
+- `apps/extension/src/features/autosave`
+- `apps/extension/src/features/browser-frame`
 - `apps/extension/src/features/drawing`
 - `apps/extension/src/features/editor`
+- `apps/extension/src/features/editor-history`
 - `apps/extension/src/features/file-naming`
 - `apps/extension/src/features/highlighter`
 - `apps/extension/src/features/keyboard-shortcuts`
@@ -120,10 +131,16 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/platform/runtime-messaging`
 - `apps/extension/src/platform/security-e2e-control`
 - `apps/extension/src/ui/annotation-template-query`
+- `apps/extension/src/ui/background-thumbnails`
 - `apps/extension/src/ui/callout-background-settings`
 - `apps/extension/src/ui/color-selector`
 - `apps/extension/src/ui/command-palette`
 - `apps/extension/src/ui/compact-inspector-controls`
+- `apps/extension/src/ui/cursor-focus-control-layout.test.ts`
+- `apps/extension/src/ui/cursor-focus-control-layout.ts`
+- `apps/extension/src/ui/cursor-focus-timeline-keys.test.tsx`
+- `apps/extension/src/ui/cursor-focus-timeline-keys.tsx`
+- `apps/extension/src/ui/document-autosave-labels.ts`
 - `apps/extension/src/ui/drawing-tools`
 - `apps/extension/src/ui/editor-start`
 - `apps/extension/src/ui/effect-catalog-controls.test.tsx`
@@ -136,14 +153,20 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`
 - `apps/extension/src/ui/keyboard`
+- `apps/extension/src/ui/media-library-header.test.tsx`
+- `apps/extension/src/ui/media-library-header.tsx`
+- `apps/extension/src/ui/media-library-list.tsx`
 - `apps/extension/src/ui/page-bootstrap`
 - `apps/extension/src/ui/paint-selector`
 - `apps/extension/src/ui/popup-shell`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/theme`
+- `apps/extension/src/ui/video-export`
 - `apps/extension/src/workflows/aggregate-editor-presence`
 - `apps/extension/src/workflows/ai-session`
 - `apps/extension/src/workflows/ai-settings`
+- `apps/extension/src/workflows/background-images`
+- `apps/extension/src/workflows/browser-frame`
 - `apps/extension/src/workflows/editor`
 - `apps/extension/src/workflows/file-naming`
 - `apps/extension/src/workflows/media-hub`

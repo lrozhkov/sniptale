@@ -245,7 +245,7 @@ it('loads, updates, and cleans storage through the hook owner', async () => {
   mocks.patchLocalStoragePolicy.mockResolvedValue({
     localStoragePolicy: { ...policy, cleanupEnabled: false },
   });
-  mocks.cleanupDrafts.mockResolvedValue({ deletedCount: 2, deletedIds: ['a', 'b'] });
+  mocks.cleanupDrafts.mockResolvedValue({ movedCount: 2, retainedCount: 0, movedIds: ['a', 'b'] });
   const actual = await vi.importActual<typeof import('./use-storage-drafts-state')>(
     './use-storage-drafts-state'
   );

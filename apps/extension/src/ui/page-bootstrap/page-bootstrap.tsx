@@ -1,3 +1,4 @@
+import { installRuntimeLogCapture } from '../../composition/persistence/diagnostics/runtime-log';
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -46,6 +47,7 @@ function wrapBootstrapElement(
  * root lookup, and fatal render fallback stay consistent across extension pages.
  */
 export function renderPageShell(options: RenderPageShellOptions): Root | null {
+  installRuntimeLogCapture(options.namespace);
   const logger = createLogger({ namespace: options.namespace });
 
   if (options.initializeTheme ?? true) {

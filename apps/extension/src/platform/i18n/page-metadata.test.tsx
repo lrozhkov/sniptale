@@ -91,3 +91,72 @@ it('tracks names, preview context, locale, and clearing a document without a bra
   await act(async () => root?.render(<DocumentHarness />));
   expect(document.title).toBe('Редактор сценариев');
 });
+
+it('changes names and preview titles without rewriting current language or equal titles', async () => {
+  useAppLocaleMock.mockReturnValue('en');
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root?.render(<DocumentHarness name="Project A" />));
+
+  const languageChanges: MutationRecord[] = [];
+  const titleChanges: MutationRecord[] = [];
+  const languageObserver = new MutationObserver((records) => languageChanges.push(...records));
+  const titleObserver = new MutationObserver((records) => titleChanges.push(...records));
+  languageObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['lang'],
+  });
+  titleObserver.observe(document.querySelector('title')!, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+  try {
+    await act(async () => root?.render(<DocumentHarness name="Project B" />));
+    expect(document.title).toBe('Project B');
+    expect(titleChanges.length).toBeGreaterThan(0);
+    expect(languageChanges).toHaveLength(0);
+
+    titleChanges.length = 0;
+    await act(async () => root?.render(<DocumentHarness name="  Project B  " />));
+    expect(document.title).toBe('Project B');
+    expect(titleChanges).toHaveLength(0);
+    expect(languageChanges).toHaveLength(0);
+
+    await act(async () => root?.render(<DocumentHarness name="Project B" preview />));
+    expect(document.title).toBe('Project B · Preview');
+    expect(titleChanges.length).toBeGreaterThan(0);
+    expect(languageChanges).toHaveLength(0);
+  } finally {
+    languageObserver.disconnect();
+    titleObserver.disconnect();
+  }
+});
+
+it('updates changed locale and restores current metadata after external DOM changes', async () => {
+  useAppLocaleMock.mockReturnValue('en');
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root?.render(<DocumentHarness name="Project A" />));
+  const languageChanges: MutationRecord[] = [];
+  const observer = new MutationObserver((records) => languageChanges.push(...records));
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+  try {
+    useAppLocaleMock.mockReturnValue('ru');
+    await act(async () => root?.render(<DocumentHarness name="Project A" preview />));
+    expect(document.documentElement.lang).toBe('ru');
+    expect(document.title).toBe('Project A · Просмотр');
+    expect(languageChanges).toHaveLength(1);
+
+    document.documentElement.lang = 'en';
+    document.title = 'external';
+    await act(async () => root?.render(<DocumentHarness name="Project B" preview />));
+    expect(document.documentElement.lang).toBe('ru');
+    expect(document.title).toBe('Project B · Просмотр');
+    expect(languageChanges).toHaveLength(3);
+  } finally {
+    observer.disconnect();
+  }
+});

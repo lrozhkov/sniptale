@@ -1,11 +1,9 @@
+import { windowHeaderGeometry } from '../../features/browser-frame/header';
+import { resolveEditorWindowHeader } from '../../features/editor/document/constants';
 import { FabricImage, type FabricObject } from 'fabric';
 import type { BrowserFrameState } from '../../features/editor/document/types';
 import { renderExactBrowserFrameToDataUrl } from '../browser-frame/factory/exact/renderer';
-import {
-  BROWSER_HEADER_HEIGHT,
-  createObjectLabel,
-  getFabricImageIntrinsicSize,
-} from '../document/model';
+import { createObjectLabel, getFabricImageIntrinsicSize } from '../document/model';
 
 interface BrowserFrameLayerObjectParams {
   browserFrame: BrowserFrameState;
@@ -15,6 +13,7 @@ interface BrowserFrameLayerObjectParams {
   prepareObject: (object: FabricObject) => void;
   top: number;
   width: number;
+  sourceHeight?: number;
 }
 
 function configureBrowserFrameLayer(object: FabricObject): void {
@@ -43,10 +42,16 @@ export async function createBrowserFrameLayerObject(
   options: BrowserFrameLayerObjectParams
 ): Promise<FabricObject> {
   const width = Math.max(1, Math.round(options.width));
+  const sourceHeight = options.sourceHeight ?? width;
+  const headerHeight = windowHeaderGeometry(resolveEditorWindowHeader(options.browserFrame), {
+    width,
+    height: sourceHeight,
+  }).height;
   const dataUrl = await renderExactBrowserFrameToDataUrl({
     browserFrame: options.browserFrame,
-    height: BROWSER_HEADER_HEIGHT,
-    headerHeight: BROWSER_HEADER_HEIGHT,
+    height: headerHeight,
+    headerHeight,
+    sourceHeight,
     radius: 0,
     width,
   });
@@ -57,7 +62,7 @@ export async function createBrowserFrameLayerObject(
     left: options.left,
     top: options.top,
     scaleX: width / intrinsicSize.width,
-    scaleY: BROWSER_HEADER_HEIGHT / intrinsicSize.height,
+    scaleY: headerHeight / intrinsicSize.height,
   });
   configureBrowserFrameLayer(image);
   preserveBrowserFrameLayerState(image, options.existingObject, options.nextLabelIndex);

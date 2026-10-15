@@ -272,3 +272,11 @@
 .sniptale-select-chevron-edge.sniptale-select-chevron-open {
   transform: translateY(-50%) rotate(180deg);
 }
+
+.sniptale-select-option-group > .sniptale-select-option {
+  padding-inline-start: 28px;
+}
+
+.sniptale-select-option-group + .sniptale-select-option {
+  margin-block-start: 4px;
+}

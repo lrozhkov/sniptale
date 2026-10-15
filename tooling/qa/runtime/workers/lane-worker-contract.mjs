@@ -125,6 +125,21 @@ export function parseQaStep(value, label) {
       parseJsonValue(entry, `${label}.${field}[${index}]`)
     );
   }
+  if (step.structuralReport != null) {
+    if (step.label !== 'Structural risk')
+      throw new Error(`${label} cannot contain a structural report.`);
+    const report = assertRecord(step.structuralReport, `${label}.structuralReport`);
+    assertExactKeys(report, ['advisories', 'violations'], `${label}.structuralReport`);
+    parsed.structuralReport = Object.fromEntries(
+      ['advisories', 'violations'].map((field) => [
+        field,
+        assertArray(report[field], `${label}.structuralReport.${field}`).map((entry, index) => {
+          assertRecord(entry, `${label}.structuralReport.${field}[${index}]`);
+          return parseJsonValue(entry, `${label}.structuralReport.${field}[${index}]`);
+        }),
+      ])
+    );
+  }
   if (
     step.status !== 'failed' &&
     ((parsed.failures?.length ?? 0) > 0 ||

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
 
 import type {
   AiSettingsQueryMessage,
@@ -29,6 +30,7 @@ const aiProviderSelectorEntrySchema = AIProviderSchema.omit({ baseUrl: true })
   .extend({
     connectionType: z.enum(['chrome-built-in', 'openai-compatible']),
     destinationKind: z.enum(['chrome-built-in', 'external', 'local-custom']),
+    destinationBinding: z.string().regex(SHA256_DIGEST_PATTERN).optional(),
   })
   .strict();
 const aiModelSelectionBootstrapSchema = z
@@ -122,6 +124,15 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
         prompt: z.string().max(50000),
       })
       .strict(),
+    baseMutationSchema
+      .extend({
+        operation: z.literal('save-audio-transcription-prompt'),
+        prompt: z.string().max(10000),
+      })
+      .strict(),
+    baseMutationSchema
+      .extend({ operation: z.literal('reset-audio-transcription-prompt') })
+      .strict(),
     baseMutationSchema.extend({ operation: z.literal('reset-global-prompt') }).strict(),
     baseMutationSchema.extend({ operation: z.literal('reset-scenario-editor-prompt') }).strict(),
     baseMutationSchema
@@ -182,6 +193,7 @@ export const aiSettingsQueryResponseSchema = defineAiSettingsQueryResponseSchema
       settingsRuntimeData: z
         .object({
           scenarioEditorSystemPrompt: z.string(),
+          audioTranscriptionSystemPrompt: z.string().max(10000).optional(),
           secretProtectionStatus: secretProtectionStatusSchema,
           selectionBootstrap: aiSettingsPageModelSelectionBootstrapSchema,
         })

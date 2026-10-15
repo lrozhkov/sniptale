@@ -46,13 +46,19 @@ function isUnlockStatusOwner(
   }
   const contentSenderKey = resolveLlmSessionSenderKey('content-ai-pick', sender);
   const scenarioSenderKey = resolveLlmSessionSenderKey('scenario-editor', sender);
-  return record.senderKey === contentSenderKey || record.senderKey === scenarioSenderKey;
+  const reviewSenderKey = resolveLlmSessionSenderKey('review-text', sender);
+  return (
+    record.senderKey === contentSenderKey ||
+    record.senderKey === scenarioSenderKey ||
+    record.senderKey === reviewSenderKey
+  );
 }
 
 function isPotentialUnlockStatusOwner(sender: chrome.runtime.MessageSender): boolean {
   return (
     resolveLlmSessionSenderKey('content-ai-pick', sender) !== null ||
-    resolveLlmSessionSenderKey('scenario-editor', sender) !== null
+    resolveLlmSessionSenderKey('scenario-editor', sender) !== null ||
+    resolveLlmSessionSenderKey('review-text', sender) !== null
   );
 }
 

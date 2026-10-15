@@ -1,9 +1,11 @@
+import type { VideoWorkspaceSummary } from '../../../composition/persistence/review-workspaces/summaries';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 import type { VideoProjectListItem } from '../../../features/media-hub/video-project-list-items';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
   GalleryItem,
+  GalleryQuickEditProjectItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,
   GalleryVideoProjectItem,
@@ -111,8 +113,38 @@ export function createVideoProjectGalleryItem(
   };
 }
 
+export function createQuickEditProjectGalleryItem(
+  project: VideoWorkspaceSummary
+): GalleryQuickEditProjectItem {
+  return {
+    id: `quick-edit-project:${project.aggregateId}`,
+    entityId: project.aggregateId,
+    type: 'quick-edit-project',
+    kind: 'video-project',
+    project,
+    filename: project.name,
+    lifecycle: project.lifecycle,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    workspaceRevision: project.revision,
+    expiresAt: null,
+    hasThumbnail: false,
+    size: 0,
+    sourceFavicon: null,
+    sourceTitle: null,
+    sourceUrl: null,
+    tags: [],
+    width: project.source?.width ?? 0,
+    height: project.source?.height ?? 0,
+    duration: project.source?.duration ?? 0,
+    mimeType: 'application/x-sniptale-video-project',
+    unavailableReason: project.unavailableReason,
+  };
+}
+
 export function createGalleryItems(args: {
   mediaItems: MediaLibraryItem[];
+  quickEditProjects?: VideoWorkspaceSummary[];
   presentations?: AggregatePresentationEntry[];
   scenarioExportsByProjectId: Map<string, ScenarioExportEntry[]>;
   scenarioProjects: ScenarioProjectSummary[];
@@ -206,9 +238,13 @@ export function createGalleryItems(args: {
     })
   );
 
-  return [...mediaItems, ...videoProjectItems, ...scenarioItems, ...exportItems].sort(
-    (left, right) => {
-      return right.createdAt - left.createdAt;
-    }
-  );
+  return [
+    ...mediaItems,
+    ...videoProjectItems,
+    ...(args.quickEditProjects ?? []).map(createQuickEditProjectGalleryItem),
+    ...scenarioItems,
+    ...exportItems,
+  ].sort((left, right) => {
+    return right.createdAt - left.createdAt;
+  });
 }

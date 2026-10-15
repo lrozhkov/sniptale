@@ -1,4 +1,11 @@
-import { getTransparentExpressionRoot, hasExportModifier, ts, unwrapExpression } from './ast.mjs';
+import {
+  getTransparentExpressionRoot,
+  hasExportModifier,
+  isFunctionNode,
+  ts,
+  unwrapExpression,
+} from './ast.mjs';
+import { createReactHookCallMatcher } from './react-ref-provenance.mjs';
 import { isGeneratedDataFile, TEST_FILE_PATTERN } from './config.mjs';
 import {
   classifyArchitecturalLayer,
@@ -9,6 +16,36 @@ import {
 const ALGORITHM_PATTERN =
   /(?:^|\/)(?:parser|parsers|algorithm|algorithms|reducer|reducers)(?:\/|\.)/u;
 const REGISTERED_PURE_ALGORITHM_OWNERS = new Set();
+const REACT_HOOK_NAMES = new Set([
+  'useState',
+  'useRef',
+  'useEffect',
+  'useLayoutEffect',
+  'useMemo',
+  'useCallback',
+  'useReducer',
+  'useContext',
+  'useSyncExternalStore',
+  'useId',
+  'useTransition',
+  'useDeferredValue',
+  'useDebugValue',
+  'useImperativeHandle',
+]);
+
+function containsReactHook(node, matchesHook) {
+  let found = false;
+  function visit(current) {
+    if (found || (current !== node && isFunctionNode(current))) return;
+    if (matchesHook(current)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(current, visit);
+  }
+  visit(node);
+  return found;
+}
 
 function containsJsx(node) {
   let found = false;
@@ -115,7 +152,7 @@ function isExportedFunction(node, exportedBindings) {
   return bindingName ? exportedBindings.has(bindingName) : false;
 }
 
-function chooseProfile(relativePath, symbol, node, metrics, exportedBindings) {
+function chooseProfile(relativePath, symbol, node, metrics, exportedBindings, matchesHook) {
   if (getDeclarativeTestFixtureRoot(relativePath, symbol, node, metrics)) return 'test-fixture';
   if (TEST_FILE_PATTERN.test(relativePath)) return 'test';
   if (isGeneratedDataFile(relativePath)) return 'generated-data';
@@ -124,7 +161,9 @@ function chooseProfile(relativePath, symbol, node, metrics, exportedBindings) {
   }
   if (
     /^(?:use[A-Z]|[A-Z])/u.test(symbol) &&
-    (containsJsx(node) || /(?:Component|Hook)$/u.test(symbol))
+    (containsJsx(node) ||
+      /(?:Component|Hook)$/u.test(symbol) ||
+      containsReactHook(node, matchesHook))
   ) {
     return 'react';
   }
@@ -143,6 +182,7 @@ function chooseProfile(relativePath, symbol, node, metrics, exportedBindings) {
 
 export function createFunctionProfileClassifier(sourceFile, relativePath) {
   const exportedBindings = collectExportedBindings(sourceFile);
+  const matchesHook = createReactHookCallMatcher(sourceFile, REACT_HOOK_NAMES);
   return (symbol, node, metrics) =>
-    chooseProfile(relativePath, symbol, node, metrics, exportedBindings);
+    chooseProfile(relativePath, symbol, node, metrics, exportedBindings, matchesHook);
 }

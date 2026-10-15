@@ -1,3 +1,7 @@
+vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
+  recoverScenarioAssetPublications: vi.fn().mockResolvedValue(0),
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -57,7 +61,7 @@ beforeEach(() => {
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
 });
 
-it('deletes an expired orphan project-asset blob and never schedules a library asset', async () => {
+it('retains expired project-asset bytes in Trash and never schedules a library asset', async () => {
   const temporary = {
     createdAt: 1,
     duration: null,
@@ -98,7 +102,11 @@ it('deletes an expired orphan project-asset blob and never schedules a library a
                 ? temporary
                 : undefined
           ),
-          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          index: vi.fn(() => ({
+            count: vi.fn(async () => 0),
+            getAll: vi.fn(async () => []),
+            getAllKeys: vi.fn(async () => []),
+          })),
           getAll: vi.fn(async () => []),
           put: vi.fn(),
         })),
@@ -109,16 +117,40 @@ it('deletes an expired orphan project-asset blob and never schedules a library a
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [temporary.id],
+    movedCount: 1,
+    retainedCount: 0,
+    movedIds: [temporary.id],
   });
-  expect(deletes).toHaveBeenCalledWith('project_assets', 'orphan');
+  expect(deletes).not.toHaveBeenCalled();
 
   persistenceMocks.listMediaLibrary.mockResolvedValue([
     { ...temporary, lifecycle: createLibraryLifecycle('library', 1) },
   ]);
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(persistenceMocks.runWithIndexedDbMutation).toHaveBeenCalledOnce();
+});
+
+it('does not schedule one timer per permanent material during draft discovery', async () => {
+  persistenceMocks.listMediaLibrary.mockResolvedValue(
+    Array.from({ length: 1000 }, (_, index) => ({
+      id: `saved-${index}`,
+      lifecycle: createLibraryLifecycle('library', 1),
+    }))
+  );
+  vi.useFakeTimers();
+  const timer = vi.spyOn(globalThis, 'setTimeout');
+  try {
+    const pending = cleanupDrafts({
+      policy: DEFAULT_LOCAL_STORAGE_POLICY,
+      signal: new AbortController().signal,
+    });
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
+    expect(timer.mock.calls.length).toBeLessThanOrEqual(32);
+  } finally {
+    timer.mockRestore();
+    vi.useRealTimers();
+  }
 });

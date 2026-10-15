@@ -1,11 +1,17 @@
+import {
+  projectQuickEditPoint,
+  type QuickEditHomography,
+} from '../../features/video/review/advanced/spatial-geometry';
 import { useEffect, useRef, useState } from 'react';
 import { normalizeVideoPoint, regionFromPoints } from '../../features/video/review/geometry';
 import type { ReviewRegion } from '../../features/video/review/types';
 
 /** Annotation-region drawing: refs, escape restore, and pointer handlers live in one hook. */
 export function useReviewDrawingPlane(args: {
+  inverseProjection?: QuickEditHomography | undefined;
   drawing: boolean;
   content: { x: number; y: number; width: number; height: number };
+  crop?: ReviewRegion | undefined;
   region: ReviewRegion | undefined;
   onRegion(value: ReviewRegion): void;
   pause(): void;
@@ -43,13 +49,27 @@ export function useReviewDrawingPlane(args: {
   };
   const planePoint = (event: React.PointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    return args.inverseProjection
+      ? (projectQuickEditPoint(args.inverseProjection, point) ?? point)
+      : point;
   };
   return {
     drag,
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (!args.drawing || event.button !== 0) return;
       start.current = normalizeVideoPoint(planePoint(event), args.content);
+      if (
+        start.current &&
+        args.crop &&
+        (start.current.x < args.crop.x ||
+          start.current.x > args.crop.x + args.crop.width ||
+          start.current.y < args.crop.y ||
+          start.current.y > args.crop.y + args.crop.height)
+      ) {
+        start.current = null;
+        return;
+      }
       moving.current = null;
       const target = event.target;
       const corner =

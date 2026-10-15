@@ -24,7 +24,10 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   getScenarioProjectMock.mockResolvedValue(undefined);
-  saveScenarioProjectMock.mockImplementation(async (project) => project);
+  saveScenarioProjectMock.mockImplementation(async (project) => ({
+    project: project,
+    workspaceRevision: 2,
+  }));
 });
 
 function createProjectFixture() {
@@ -111,7 +114,7 @@ function installRevisionCheckedProjectSaveMock(
       throw new Error('stale test project save');
     }
     storedProject = { ...nextProject, updatedAt: storedProject.updatedAt + 1 };
-    return storedProject;
+    return { project: storedProject, workspaceRevision: 2 };
   });
 }
 

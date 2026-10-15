@@ -218,17 +218,17 @@ it('projects accessible iframe distances and excludes siblings clipped by the fr
 
 it('keeps actual long label boxes disjoint around a tiny selected element', () => {
   const original = HTMLElement.prototype.getBoundingClientRect;
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      if (this.tagName !== 'SPAN') return original.call(this);
-      return new DOMRect(
-        Number.parseFloat(this.style.left) || 0,
-        Number.parseFloat(this.style.top) || 0,
-        130,
-        20
-      );
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    if (this.tagName !== 'SPAN') return original.call(this);
+    return new DOMRect(
+      Number.parseFloat(this.style.left) || 0,
+      Number.parseFloat(this.style.top) || 0,
+      130,
+      20
+    );
+  });
   const parent = box(499, 299, 4, 4).element;
   const target = box(500, 300, 2, 2, parent).element;
   const runtime = createDesignReviewMeasurements();

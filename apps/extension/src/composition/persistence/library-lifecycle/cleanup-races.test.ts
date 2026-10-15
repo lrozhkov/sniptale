@@ -1,3 +1,10 @@
+import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
+import { restoreStoredItemsFromTrash } from './trash';
+vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scenario/aggregate-mutations')>()),
+  recoverScenarioAssetPublications: vi.fn().mockResolvedValue(0),
+}));
+import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('./project-retention', () => ({
@@ -66,12 +73,13 @@ const day = 24 * 60 * 60 * 1000;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  persistenceMocks.runWithIndexedDbMutation.mockReset();
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
 });
 
-it('expires image aggregates from the root lifecycle and removes their sidecars', async () => {
+it('moves an expired image root to Trash and preserves its sidecars', async () => {
   const now = 40 * day;
   const media = {
     createdAt: 1,
@@ -94,13 +102,19 @@ it('expires image aggregates from the root lifecycle and removes their sidecars'
   };
   persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
   const deletes = vi.fn();
+  const put = vi.fn();
   persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
     effect({
       transaction: vi.fn(() => ({
         done: Promise.resolve(),
         objectStore: vi.fn((name: string) => ({
           delete: vi.fn((id: string) => deletes(name, id)),
+          put,
           get: vi.fn(async () => (name === 'media_library' ? media : undefined)),
+          index: vi.fn(() => ({
+            getAll: vi.fn(async () => []),
+            getAllKeys: vi.fn(async () => []),
+          })),
           getAll: vi.fn(async () => []),
         })),
       })),
@@ -108,11 +122,17 @@ it('expires image aggregates from the root lifecycle and removes their sidecars'
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [media.id],
+    movedCount: 1,
+    retainedCount: 0,
+    movedIds: [media.id],
   });
-  expect(deletes).toHaveBeenCalledWith('image_workspaces', media.id);
-  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', media.id]);
+  expect(deletes).not.toHaveBeenCalled();
+  expect(put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ...media,
+      lifecycle: { ...media.lifecycle, trashedAt: now },
+    })
+  );
 });
 
 it.each([
@@ -167,8 +187,9 @@ it.each([
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    movedCount: 0,
+    retainedCount: 1,
+    movedIds: [],
   });
   expect(deletes).not.toHaveBeenCalled();
 });
@@ -233,8 +254,9 @@ async function runExpiredVideoProjectCleanup(args: {
   await expect(
     cleanupDrafts({ now: args.now, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    movedCount: 0,
+    retainedCount: 0,
+    movedIds: [],
   });
   return { deletes, media, project };
 }
@@ -316,8 +338,9 @@ it('retains recording telemetry and project thumbnail with a legacy project grap
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    movedCount: 0,
+    retainedCount: 1,
+    movedIds: [],
   });
   expect(deletes).not.toHaveBeenCalled();
 });
@@ -331,4 +354,288 @@ it('retains independently trashed media and its legacy video project', async () 
   expect(deletes).not.toHaveBeenCalledWith('video_projects', project.id);
   expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
   expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
+});
+
+it('does not start recovery or deletion for cancelled maintenance', async () => {
+  const { recoverRecordingAssetPublications } = await import('../recordings/asset-publication');
+  const abort = new AbortController();
+  abort.abort();
+  await expect(
+    cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal })
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
+  expect(recoverRecordingAssetPublications).not.toHaveBeenCalled();
+});
+
+it.each(['recording', 'project', 'image'] as const)(
+  'cancels after %s recovery without starting retention scans',
+  async (phase) => {
+    const { recoverRecordingAssetPublications } = await import('../recordings/asset-publication');
+    const { recoverProjectMediaPublications } = await import('../projects/asset-publication');
+    const { recoverImageWorkspacePublications } = await import('../image-aggregates/mutations');
+    const abort = new AbortController();
+    const recover =
+      phase === 'recording'
+        ? recoverRecordingAssetPublications
+        : phase === 'project'
+          ? recoverProjectMediaPublications
+          : recoverImageWorkspacePublications;
+    vi.mocked(recover).mockImplementationOnce(async () => {
+      abort.abort();
+      return 0;
+    });
+    await expect(
+      cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal })
+    ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
+    expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
+  }
+);
+
+it('cancels candidate deletion when discovery completes after cancellation', async () => {
+  const abort = new AbortController();
+  persistenceMocks.listMediaLibrary.mockImplementationOnce(async () => {
+    abort.abort();
+    return [
+      {
+        id: 'expired',
+        lifecycle: createLibraryLifecycle('temporary', 1),
+        source: { kind: 'screenshot' },
+      },
+    ];
+  });
+  await expect(
+    cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal, now: 40 * day })
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
+});
+
+it('moves a seven-day unused recording to Trash without source deletion or physical intent', async () => {
+  const now = 1 + 7 * day;
+  const recording = {
+    ...betaV1Fixture.records.recordings[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const media = {
+    ...betaV1Fixture.records.media_library[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const rows = new Map<string, Map<string, unknown>>([
+    ['media_library', new Map([[media.id, media]])],
+    ['recordings', new Map([[recording.id, recording]])],
+    ['asset_operations', new Map()],
+    [
+      'asset_refs',
+      new Map([
+        [
+          recording.assetId,
+          {
+            assetId: recording.assetId,
+            size: recording.size,
+            mimeType: recording.mimeType,
+            location: { kind: 'opfs', objectKey: 'objects/retained-recording' },
+            sha256: null,
+            createdAt: 1,
+          },
+        ],
+      ]),
+    ],
+  ]);
+  persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
+    effect({
+      transaction: () => ({
+        done: Promise.resolve(),
+        abort: vi.fn(),
+        objectStore: (name: string) => {
+          let values = rows.get(name);
+          if (!values) {
+            values = new Map();
+            rows.set(name, values);
+          }
+          const owned = values;
+          return {
+            get: async (id: string) => owned.get(id),
+            getAll: async () => [...owned.values()],
+            delete: async (key: IDBValidKey) => owned.delete(String(key)),
+            put: async (value: { id?: string; assetId?: string; operationId?: string }) => {
+              const key = value.id ?? value.operationId ?? value.assetId;
+              if (!key) throw new Error('Missing fixture row identity.');
+              owned.set(key, value);
+            },
+            index: () => ({
+              getAll: async () => [],
+              getAllKeys: async () => [],
+              count: async () => 0,
+            }),
+          };
+        },
+      }),
+    })
+  );
+  await cleanupDrafts({
+    now,
+    policy: { ...DEFAULT_LOCAL_STORAGE_POLICY, cleanupEnabled: true, videoDraftRetentionDays: 7 },
+  });
+  expect(rows.get('media_library')!.get(media.id)).toMatchObject({
+    lifecycle: { storageClass: 'temporary', trashedAt: now },
+  });
+  expect(rows.get('recordings')!.get(recording.id)).toMatchObject({ assetId: recording.assetId });
+  expect(rows.get('asset_refs')!.has(recording.assetId)).toBe(true);
+  expect(rows.get('asset_operations')!.size).toBe(0);
+});
+
+it('uses actual Trash admission, preserves duplicate admission and renews expiry after restore', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  const media = {
+    ...betaV1Fixture.records.media_library[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const recording = {
+    ...betaV1Fixture.records.recordings[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  fixture.rows.get('media_library')!.set(media.id, media);
+  fixture.rows.get('recordings')!.set(recording.id, recording);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) =>
+    operation(fixture.database)
+  );
+  persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+  const expire = (now: number, enabled = true) =>
+    cleanupDrafts({
+      now,
+      policy: {
+        ...DEFAULT_LOCAL_STORAGE_POLICY,
+        cleanupEnabled: enabled,
+        videoDraftRetentionDays: 7,
+      },
+    });
+  expect((await expire(1 + 7 * day - 1)).movedCount).toBe(0);
+  expect((await expire(1 + 7 * day, false)).movedCount).toBe(0);
+  expect((await expire(1 + 7 * day)).movedCount).toBe(1);
+  const admitted = structuredClone(fixture.rows);
+  expect((await expire(1 + 40 * day)).movedCount).toBe(0);
+  expect(fixture.rows).toEqual(admitted);
+  await restoreStoredItemsFromTrash([{ kind: 'media', id: media.id }], 1 + 41 * day);
+  expect((await expire(1 + 48 * day - 1)).movedCount).toBe(0);
+  expect((await expire(1 + 48 * day)).movedCount).toBe(1);
+  expect(fixture.rows.get('media_library')!.get(media.id)).toMatchObject({
+    lifecycle: { trashedAt: 1 + 48 * day },
+  });
+  expect(fixture.rows.get('recordings')!.get(recording.id)).toEqual(recording);
+  expect(fixture.rows.get('asset_operations')!.size).toBe(0);
+});
+
+it.each(['image', 'review', 'unknown-review', 'write-failure'] as const)(
+  'retains the fresh source graph during expiry (%s)',
+  async (state) => {
+    const fixture = createReviewWorkspaceStoreFixture(
+      (store) => state === 'write-failure' && store === 'media_library'
+    );
+    const media = {
+      ...betaV1Fixture.records.media_library[0]!,
+      lifecycle: createLibraryLifecycle('temporary', 1),
+    };
+    const recording = {
+      ...betaV1Fixture.records.recordings[0]!,
+      lifecycle: createLibraryLifecycle('temporary', 1),
+    };
+    fixture.rows.get('media_library')!.set(media.id, media);
+    fixture.rows.get('recordings')!.set(recording.id, recording);
+    if (state === 'image')
+      fixture.rows.get('image_workspaces')!.set(media.id, { unreadable: true });
+    if (state === 'review')
+      fixture.rows.get('video_workspaces')!.set(media.id, { aggregateId: media.id });
+    if (state === 'unknown-review')
+      fixture.rows.get('video_workspaces')!.set('unknown', { unreadable: true });
+    persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+    persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) =>
+      operation(fixture.database)
+    );
+    const before = structuredClone(fixture.rows);
+    const result = cleanupDrafts({ now: 1 + 7 * day, policy: DEFAULT_LOCAL_STORAGE_POLICY });
+    if (state === 'write-failure') await expect(result).rejects.toThrow();
+    else expect((await result).movedCount).toBe(0);
+    expect(fixture.rows).toEqual(before);
+  }
+);
+
+it('starts the full Trash window when delayed admission resumes', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  const media = {
+    ...betaV1Fixture.records.media_library[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  const recording = {
+    ...betaV1Fixture.records.recordings[0]!,
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  fixture.rows.get('media_library')!.set(media.id, media);
+  fixture.rows.get('recordings')!.set(recording.id, recording);
+  persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(1 + 7 * day);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) => {
+    clock.mockReturnValue(1 + 47 * day);
+    return operation(fixture.database);
+  });
+  try {
+    await expect(
+      cleanupDrafts({
+        policy: {
+          ...DEFAULT_LOCAL_STORAGE_POLICY,
+          cleanupEnabled: true,
+          videoDraftRetentionDays: 7,
+        },
+      })
+    ).resolves.toEqual({ movedCount: 1, retainedCount: 0, movedIds: [media.id] });
+    expect(fixture.rows.get('media_library')!.get(media.id)).toMatchObject({
+      lifecycle: { trashedAt: 1 + 47 * day },
+    });
+    expect(fixture.rows.get('asset_operations')!.size).toBe(0);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it('reports committed Trash moves after a later failure and retries without counting them twice', async () => {
+  let writes = 0;
+  let fail = true;
+  const fixture = createReviewWorkspaceStoreFixture(
+    (store) => store === 'media_library' && ++writes === 2 && fail
+  );
+  fixture.rows.get('media_library')!.clear();
+  fixture.rows.get('recordings')!.clear();
+  const entries = ['first', 'second', 'third'].map((id) => {
+    const lifecycle = createLibraryLifecycle('temporary', 1);
+    const media = {
+      ...betaV1Fixture.records.media_library[0]!,
+      id: `recording:${id}`,
+      source: { kind: 'recording' as const, recordingId: id },
+      lifecycle,
+    };
+    fixture.rows.get('media_library')!.set(media.id, media);
+    fixture.rows.get('recordings')!.set(id, {
+      ...betaV1Fixture.records.recordings[0]!,
+      id,
+      lifecycle,
+    });
+    return media;
+  });
+  persistenceMocks.listMediaLibrary.mockResolvedValue(entries);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) =>
+    operation(fixture.database)
+  );
+  const args = { now: 1 + 7 * day, policy: DEFAULT_LOCAL_STORAGE_POLICY };
+  await expect(cleanupDrafts(args)).rejects.toMatchObject({
+    result: { movedCount: 1, movedIds: [entries[0]!.id], retainedCount: 0 },
+    cause: { name: 'QuotaExceededError' },
+  });
+  expect(fixture.rows.get('media_library')!.get(entries[0]!.id)).toMatchObject({
+    lifecycle: { trashedAt: args.now },
+  });
+  expect(fixture.rows.get('media_library')!.get(entries[2]!.id)).toEqual(entries[2]);
+  fail = false;
+  await expect(cleanupDrafts(args)).resolves.toEqual({
+    movedCount: 2,
+    movedIds: entries.slice(1).map((entry) => entry.id),
+    retainedCount: 0,
+  });
 });

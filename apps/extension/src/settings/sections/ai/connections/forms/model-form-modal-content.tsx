@@ -1,3 +1,8 @@
+import { ModelAudioFields } from './model-audio-fields';
+import type {
+  AIModelOperation,
+  AIModelAudioParameters,
+} from '../../../../../contracts/settings/model-operation';
 import type React from 'react';
 import type { AIProvider } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
@@ -16,6 +21,8 @@ import { settingsModalClassName } from '../../../../section-surface';
 type ModelFormModalContentProps = {
   errors: Record<string, string>;
   formData: {
+    operation?: AIModelOperation;
+    audio?: AIModelAudioParameters;
     displayName: string;
     modelCode: string;
     providerId: string;
@@ -24,6 +31,8 @@ type ModelFormModalContentProps = {
   isEditing: boolean;
   isSaving: boolean;
   onClose: () => void;
+  onOperationChange?: (operation: AIModelOperation) => void;
+  onAudioChange?: (audio: AIModelAudioParameters) => void;
   onDisplayNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onModelCodeChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onProviderChange: (value: string) => void;
@@ -145,7 +154,14 @@ function ModelFormModalBody(props: ModelFormModalContentProps) {
     >
       <ModelProviderField {...props} />
       <ModelIdentityFields {...props} />
-      <ModelPromptField {...props} />
+      <ModelAudioFields
+        operation={props.formData.operation ?? 'text'}
+        audio={props.formData.audio}
+        onOperationChange={props.onOperationChange}
+        onAudioChange={props.onAudioChange}
+        error={props.errors['audio']}
+      />
+      {(props.formData.operation ?? 'text') === 'text' ? <ModelPromptField {...props} /> : null}
     </AiProvidersFormModalBody>
   );
 }

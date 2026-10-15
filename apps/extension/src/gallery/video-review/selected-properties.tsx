@@ -1,5 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
-import { NumericRow, SelectField } from '../../ui/compact-inspector-controls';
+import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
+import { ReviewTextPhrase } from './speech-phrase';
+import { ReviewTextVoiceForm } from './text-voice-panel';
+import { ReviewTextRewriteForm } from './text-rewrite-panel';
+import { useReviewTextFormMode } from './text-voice-focus';
+import type { ReviewTextVoiceAccess } from './use-text-voice';
+import type { useReviewText } from './use-review-text';
+import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
+import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
+import { ReviewSpeechPanel } from './speech-panel';
+import type { ReviewBeforeAction } from './note-transitions';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { ColorField, NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { planReviewCutTransitions } from '../../features/video/review/cuts';
 import type { ReviewCutTransition, ReviewEdit } from '../../features/video/review/types';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
@@ -18,8 +31,14 @@ import type { useReviewExport } from './use-export';
 import { ReviewEditRangeFields } from './edit-range-fields';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
-import { Trash2 } from 'lucide-react';
-import { ReviewButton, ReviewInterval, reviewDeleteButtonClassName } from './controls';
+import { Trash2, Volume2, WandSparkles } from 'lucide-react';
+import {
+  ReviewButton,
+  ReviewInterval,
+  reviewDeleteButtonClassName,
+  reviewEventLabel,
+  reviewTextButtonClassName,
+} from './controls';
 import { ReviewActionProperties } from './action-properties';
 import { ReviewAudioInspectorSection } from './audio-editor';
 import { ReviewAdvancedPanels } from './advanced-panels';
@@ -27,16 +46,41 @@ import { ReviewZoomPreview } from './zoom-preview';
 import { useZoomPreviewSource } from './use-zoom-preview-source';
 import { ReviewCanvasCommentsSection } from './comment-editor';
 import type { useCanvasComments } from './use-canvas-comments';
+import { ReviewWebcamInspector } from './webcam-inspector';
+import type { useReviewWebcamEditor } from './webcam-editor';
 
 type SelectedPropertiesProps = {
+  registerSpeechFlush?: (owner: ReviewSpeechFlushRegistration) => () => void;
+  beforeSpeechAction?: ReviewBeforeAction;
+  flushAdvanced?: () => Promise<void>;
+  onSelectText?(id: string): void;
+  webcam?: ReturnType<typeof useReviewWebcamEditor>;
+  webcamRange?: { start: number; end: number } | undefined;
   selection: ReviewSelection;
   advanced: QuickEditAdvancedState;
   editing: ReturnType<typeof useReviewEdits> & { exporter: ReturnType<typeof useReviewExport> };
   zoom: ReturnType<typeof useReviewZoomEditor>;
   busy: boolean;
   markers: readonly ReviewTelemetryMarker[];
+  onOpenHistory?(): void;
+  onActionAudio?: Parameters<typeof ReviewActionProperties>[0]['onActionAudio'];
+  onActionAudioAudition?: Parameters<typeof ReviewActionProperties>[0]['onAudition'];
+  onStopActionAudioAudition?: (() => void) | undefined;
+  onKeyAnimation?(
+    ids: readonly string[],
+    patch: import('../../features/video/review/advanced/key-animation').ReviewKeyPatch | null
+  ): void;
+  onClickAnimation?(
+    ids: readonly string[],
+    patch: Partial<
+      import('../../features/video/review/advanced/click-animation').ReviewClickStyle
+    > | null
+  ): void;
   onFocus(region: QuickEditZoomRegion): void;
   onPreviewFrame?(time: number): void;
+  focusTime?: number | undefined;
+  mainVideo?: HTMLVideoElement | undefined;
+  playback?: ComponentProps<typeof ReviewZoomPreview>['playback'];
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
   audio: ReturnType<typeof useReviewAudio>;
@@ -66,7 +110,13 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
   return (
     <>
       <fieldset disabled={busy || editing.exporter.phase !== 'idle'} className="min-w-0 space-y-3">
-        {selection.kind === 'canvas-comment' && advanced.ui.mode === 'advanced' ? (
+        {(selection.kind === 'webcam' ||
+          selection.kind === 'webcam-position' ||
+          selection.kind === 'webcam-hidden') &&
+        advanced.ui.mode === 'advanced' &&
+        props.webcam ? (
+          <ReviewWebcamInspector editor={props.webcam} range={props.webcamRange} />
+        ) : selection.kind === 'canvas-comment' && advanced.ui.mode === 'advanced' ? (
           <ReviewCanvasCommentsSection
             view="selected"
             {...props.canvasComments}
@@ -78,6 +128,15 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
         ) : selection.kind === 'telemetry' ? (
           <ReviewActionProperties
             marker={marker}
+            actionAudio={advanced.actionAudio}
+            onActionAudio={props.onActionAudio}
+            onAudition={props.onActionAudioAudition}
+            onStopAudition={props.onStopActionAudioAudition}
+            keyAnimations={advanced.keyAnimations}
+            onKeyAnimation={props.onKeyAnimation}
+            animations={advanced.clickAnimations}
+            onOpenHistory={props.onOpenHistory}
+            onClickAnimation={props.onClickAnimation}
             plan={plan}
             busy={busy || editing.exporter.phase !== 'idle'}
             onEdit={(kind) => {
@@ -87,27 +146,75 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
               if (plan?.focus) props.onFocus(plan.focus);
             }}
           />
-        ) : selection.kind === 'original-audio' && advanced.ui.mode === 'advanced' ? (
+        ) : selection.kind === 'original-audio' ? (
           <SelectedOriginalAudio audio={audio} resource={resource} advanced={advanced} />
         ) : selection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
-          <ReviewAudioInspectorSection audio={audio} busy={busy} />
+          <>
+            {selection.lane === 'voiceover' &&
+            audio.selected?.lane === 'voiceover' &&
+            props.beforeSpeechAction &&
+            props.flushAdvanced &&
+            props.registerSpeechFlush ? (
+              <ReviewSpeechPanel
+                key={audio.selected.clip.id}
+                session={resource.session}
+                target={{ kind: 'voiceover', clipId: audio.selected.clip.id }}
+                beforeAction={props.beforeSpeechAction}
+                flushAdvanced={props.flushAdvanced}
+                registerSpeechFlush={props.registerSpeechFlush}
+                mainVideo={props.mainVideo}
+                resultTime={props.focusTime}
+                {...(props.onPreviewFrame ? { onJump: props.onPreviewFrame } : {})}
+                sound={(applying) => (
+                  <ReviewAudioInspectorSection audio={audio} busy={busy || applying} embedded />
+                )}
+                {...(props.onSelectText ? { onSelectText: props.onSelectText } : {})}
+              />
+            ) : (
+              <ReviewAudioInspectorSection audio={audio} busy={busy} />
+            )}
+          </>
         ) : selection.kind === 'edit' && editing.selected ? (
           <SelectedEdit editing={editing} advanced={advanced} resource={resource} busy={busy} />
         ) : selection.kind === 'zoom' || selection.kind === 'zoom-link' ? (
           <ReviewAdvancedPanels
             advanced={advanced}
+            cursorPath={resolveReviewCursorFocusPath(
+              resource.telemetry,
+              resource.source,
+              advanced.cursorFocusPath
+            )}
             zoom={zoom}
             zoomPreview={(region) => (
               <ReviewZoomPreview
                 key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle'}
                 region={zoom.previewRegion(region)}
+                cursorFollowing={
+                  !region.spotlight &&
+                  !region.border &&
+                  (region.followCursor ?? advanced.cursorFocusPath?.mode === 'follow')
+                }
+                spatialEdit={{
+                  region,
+                  revision: zoom.revision(region),
+                  enabled: advanced.zoom.enabled,
+                  onCommit: (revision, patch) => zoom.changeAtRevision(region.id, revision, patch),
+                }}
+                focus={{
+                  regions: selectedReviewCameraRegions(props),
+                  time: props.playback
+                    ? (props.focusTime ?? (region.start + region.end) / 2)
+                    : (region.start + region.end) / 2,
+                }}
                 background={advanced.background}
                 source={resource.source}
                 canvas={advanced.canvas}
+                windowHeader={advanced.windowHeader}
                 sourceTime={props.toSourceTime((region.start + region.end) / 2)}
                 onInteract={props.onPreviewFrame}
                 loadFrame={previewLoader}
+                playback={props.playback}
                 onChange={(patch) => zoom.change(region.id, patch)}
                 onPreview={(patch) => zoom.preview(region.id, patch)}
               />
@@ -117,6 +224,28 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
       </fieldset>
     </>
   );
+}
+
+/** The selected preview consumes the source/time-mapped camera policy shared with export. */
+function selectedReviewCameraRegions(props: SelectedPropertiesProps) {
+  const { advanced, resource, zoom } = props;
+  return resolveQuickEditEffectiveState(
+    {
+      ...advanced,
+      zoom: {
+        ...advanced.zoom,
+        regions: advanced.zoom.regions.map((region) => zoom.previewRegion(region)),
+      },
+      audio: {
+        ...advanced.audio,
+        voiceoverSegments: buildReviewTimeMap(
+          resource.source.duration,
+          resource.session.getSnapshot().document.edits
+        ),
+      },
+    },
+    { facts: resource.telemetry, source: resource.source }
+  ).zoomRegions;
 }
 
 function overlapsSelected(
@@ -171,45 +300,53 @@ function SelectedEdit(
           {translate('gallery.videoReview.cutOverlapHint')}
         </p>
       ) : null}
-      {selected.kind === 'speed' ? (
-        <ReviewSpeedOptions
-          layout="inspector"
-          rate={selected.rate}
-          audio={selected.audio}
-          busy={busy}
-          onRate={editing.changeSelectedRate}
-          onAudio={editing.changeSelectedAudio}
-        />
-      ) : null}
-      {selected.kind === 'cut' ? (
-        <CutTransitionFields
-          key={selected.id}
+      <div className="review-inspector-columns">
+        <div className="min-w-0 space-y-3">
+          {selected.kind === 'speed' ? (
+            <ReviewSpeedOptions
+              layout="inspector"
+              rate={selected.rate}
+              audio={selected.audio}
+              busy={busy}
+              onRate={editing.changeSelectedRate}
+              onAudio={editing.changeSelectedAudio}
+            />
+          ) : null}
+          {selected.kind === 'cut' ? (
+            <CutTransitionFields
+              key={selected.id}
+              edit={selected}
+              edits={resource.session.getSnapshot().document.edits}
+              duration={resource.source.duration}
+              onChange={editing.changeSelectedTransition}
+            />
+          ) : null}
+        </div>
+        <ReviewEditRangeFields
+          key={`${selected.id}:${advanced.ui.mode}`}
           edit={selected}
           edits={resource.session.getSnapshot().document.edits}
           duration={resource.source.duration}
-          onChange={editing.changeSelectedTransition}
+          boundaries={
+            advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
+          }
+          onApply={(range) => editing.commitRange(range, selected)}
         />
-      ) : null}
-      <ReviewEditRangeFields
-        key={`${selected.id}:${advanced.ui.mode}`}
-        edit={selected}
-        edits={resource.session.getSnapshot().document.edits}
-        duration={resource.source.duration}
-        boundaries={
-          advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
-        }
-        onApply={(range) => editing.commitRange(range, selected)}
-      />
-      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate('gallery.videoReview.deleteSelected')}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={() => void editing.remove()}
-        >
-          <Trash2 size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.deleteSelected')}</span>
-        </ReviewButton>
       </div>
+      <ReviewInspectorSections
+        sections={[
+          reviewInspectorActions(
+            <ReviewButton
+              label={translate('gallery.videoReview.deleteSelected')}
+              className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+              onClick={() => void editing.remove()}
+            >
+              <Trash2 size={15} aria-hidden="true" />
+              <span>{translate('gallery.videoReview.deleteSelected')}</span>
+            </ReviewButton>
+          ),
+        ]}
+      />
     </div>
   );
 }
@@ -274,7 +411,7 @@ function CutTransitionFields(props: {
           options={[
             { value: 'none', label: translate('gallery.videoReview.transitionNone') },
             { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
-            { value: 'fade-black', label: translate('gallery.videoReview.cutFadeBlack') },
+            { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
           ]}
           onChange={(type) =>
             void commit(type === 'none' ? null : { before: 0.25, after: 0.25, ...draft, type })
@@ -282,6 +419,17 @@ function CutTransitionFields(props: {
         />
         {draft ? (
           <>
+            {draft.type === 'fade-black' ? (
+              <ColorField
+                className={reviewSelectFieldClassName}
+                label={translate('gallery.videoReview.cutTransitionColor')}
+                title={translate('gallery.videoReview.cutTransitionColor')}
+                value={draft.color ?? '#000000'}
+                allowAlpha={false}
+                allowTransparent={false}
+                onChange={(color) => void commit({ ...draft, color })}
+              />
+            ) : null}
             {(['total', 'before', 'after'] as const).map((field) => (
               <NumericRow
                 key={field}
@@ -304,9 +452,6 @@ function CutTransitionFields(props: {
                 onCommitValue={(value) => void commit(change(field, value))}
               />
             ))}
-            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-              {translate('gallery.videoReview.cutTransitionHint')}
-            </p>
             <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
               {plan
                 ? translate('gallery.videoReview.cutTransitionEffective')
@@ -324,5 +469,126 @@ function CutTransitionFields(props: {
         ) : null}
       </fieldset>
     </ReviewDetails>
+  );
+}
+
+export function reviewSelectionLabel(
+  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
+): string | undefined {
+  const selection = state.selection;
+  if (selection.kind === 'cursor-focus')
+    return translate('videoEditor.sidebar.cursorFocusPathTitle');
+  if (selection.kind === 'annotation-effect')
+    return translate('gallery.videoReview.annotationName');
+  if (selection.kind === 'text') return translate('gallery.videoReview.textFragment');
+  if (
+    selection.kind === 'webcam' ||
+    selection.kind === 'webcam-position' ||
+    selection.kind === 'webcam-hidden'
+  )
+    return translate('gallery.videoReview.webcam');
+  if (selection.kind === 'telemetry') {
+    const marker = state.markers.find(
+      (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
+    );
+    return reviewEventLabel(marker?.eventType ?? '');
+  }
+  if (selection.kind === 'zoom') {
+    const region = state.advanced.zoom.regions.find((item) => item.id === selection.id);
+    return translate(
+      region?.border
+        ? 'gallery.videoReview.focusBorder'
+        : region?.spotlight
+          ? 'gallery.videoReview.focusSpotlight'
+          : 'gallery.videoReview.zoomRegionLabel'
+    );
+  }
+  if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
+  if (selection.kind === 'canvas-comment') return translate('gallery.videoReview.overlayComments');
+  if (selection.kind === 'original-audio')
+    return translate('gallery.videoReview.originalAudioRange');
+  if (selection.kind === 'audio')
+    return translate(
+      selection.lane === 'voiceover'
+        ? 'gallery.videoReview.audioVoiceover'
+        : 'gallery.videoReview.audioMusic'
+    );
+  if (selection.kind === 'edit' && state.editing.selected)
+    return translate(
+      state.editing.selected.kind === 'cut'
+        ? 'gallery.videoReview.cutLabel'
+        : 'gallery.videoReview.speedMode'
+    );
+  return undefined;
+}
+
+/** Text selection owns only its fragment form; existing media inspectors keep their routing. */
+export function ReviewSelectedTextProperties(props: {
+  editor: ReturnType<typeof useReviewText>;
+  id: string;
+  busy: boolean;
+  voice?: ReviewTextVoiceAccess | undefined;
+}) {
+  const voiceMode = useReviewTextFormMode<HTMLFieldSetElement>(props.id);
+  const fragment = props.editor.document.fragments.find((entry) => entry.id === props.id);
+  if (!fragment) return null;
+  if (voiceMode.ids && props.voice)
+    return voiceMode.kind === 'rewrite' ? (
+      <ReviewTextRewriteForm
+        access={props.voice}
+        ids={voiceMode.ids}
+        wholeDocument={false}
+        disabled={props.busy}
+        onClose={voiceMode.close}
+      />
+    ) : (
+      <ReviewTextVoiceForm
+        access={props.voice}
+        ids={voiceMode.ids}
+        disabled={props.busy}
+        onClose={voiceMode.close}
+      />
+    );
+  const limit =
+    fragment.timeDomain === 'source'
+      ? props.editor.projection.duration
+      : props.editor.projection.resultDuration;
+  return (
+    <fieldset ref={voiceMode.root} disabled={props.busy} className="min-w-0 space-y-3">
+      <ReviewTextPhrase
+        key={fragment.id}
+        fragment={fragment}
+        editor={props.editor}
+        expanded
+        busy={props.busy}
+        focus={props.editor.createdId === fragment.id}
+        limit={limit}
+        onJump={() => props.editor.jump(fragment)}
+        actions={
+          props.voice && (
+            <>
+              <ReviewButton
+                data-text-voice-trigger="selected"
+                label={translate('gallery.videoReview.speechGenerate')}
+                className={`${reviewTextButtonClassName} !w-8 !px-0`}
+                disabled={props.busy || !fragment.text.trim()}
+                onClick={() => voiceMode.open([fragment.id], 'selected')}
+              >
+                <Volume2 size={14} />
+              </ReviewButton>
+              <ReviewButton
+                data-text-voice-trigger="rewrite:selected"
+                label={translate('gallery.videoReview.textRewriteTitle')}
+                className={`${reviewTextButtonClassName} !w-8 !px-0`}
+                disabled={props.busy}
+                onClick={() => voiceMode.open([fragment.id], 'rewrite:selected', 'rewrite')}
+              >
+                <WandSparkles size={14} />
+              </ReviewButton>
+            </>
+          )
+        }
+      />
+    </fieldset>
   );
 }

@@ -29,9 +29,9 @@ vi.mock('../runtime/manager', async (importOriginal) => ({
   notifyRecordingStartFailed: mocks.notifyStartFailed,
 }));
 
-vi.mock('../offscreen-recording-stop', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../offscreen-recording-stop')>()),
-  requestBoundOffscreenRecordingStop: mocks.requestBoundStop,
+vi.mock('../runtime/recording-completion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/recording-completion')>()),
+  failRecordingStartAfterTimeout: mocks.notifyStartFailed,
 }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -76,33 +76,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('uses the durable source binding before the default timeout owner clears authority', async () => {
+it('routes the default timer to the completion owner with its original identity', async () => {
   scheduleRecordingStartActivationWatchdog('recording-1');
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
-  await Promise.resolve();
-
-  expect(mocks.requestBoundStop).toHaveBeenCalledWith(
-    {
-      generation: 3,
-      recordingId: 'recording-1',
-      streamInstanceId: 'stream-instance-1',
-    },
-    true
+  expect(mocks.notifyStartFailed).toHaveBeenCalledExactlyOnceWith(
+    'recording-1',
+    'Recording start timed out'
   );
-  expect(mocks.notifyStartFailed).toHaveBeenCalledWith('Recording start timed out');
-  expect(mocks.clearActiveLease).toHaveBeenCalledWith('recording-1');
-});
-
-it('retains authority when the durable source binding is missing or belongs to another recording', async () => {
-  for (const lease of [null, { recordingId: 'recording-2', surfaceBinding: null }]) {
-    mocks.getActiveLease.mockReturnValueOnce(lease);
-    scheduleRecordingStartActivationWatchdog('recording-1');
-    await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
-    await Promise.resolve();
-  }
-
   expect(mocks.requestBoundStop).not.toHaveBeenCalled();
-  expect(mocks.notifyStartFailed).not.toHaveBeenCalled();
   expect(mocks.clearActiveLease).not.toHaveBeenCalled();
-  expect(mocks.loggerWarn).toHaveBeenCalledTimes(2);
 });

@@ -1,4 +1,7 @@
-import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
+import { ReviewTrackLockedError } from '../../features/video/review/advanced/track-controls';
+import { authoredCursorFocusPath } from '../../features/video/project/cursor-focus-path/authoring';
+import { useRecoveryLifecycle } from './use-recovery-lifecycle';
+import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   QuickEditAdvancedContent,
@@ -9,140 +12,230 @@ type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
 >;
 
-const ADVANCED_SAVE_DEBOUNCE_MS = 250;
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 type ContentMutation = (content: QuickEditAdvancedContent) => QuickEditAdvancedContent;
+type TypingAction = { id: string; target: ReviewTextTypingTarget; continuation: boolean };
 type PendingContent = {
   revision: number;
   value: QuickEditAdvancedContent;
   mutations: ContentMutation[];
+  group: string;
+  action?: TypingAction;
 };
 
-async function commitPendingContent(session: Session, sent: PendingContent): Promise<void> {
-  const document = session.getSnapshot().document;
-  const value = loadQuickEditAdvancedContentState(sent.value);
-  if (!value) throw new Error('Advanced content is invalid.');
-  // Compare the same canonical shape the history boundary will persist.
-  if (JSON.stringify(value) === JSON.stringify(document.advancedContent)) return;
-  await session.commit({
-    id: crypto.randomUUID(),
-    at: Date.now(),
-    target: 'advancedContent',
-    before: document.advancedContent,
-    after: value,
-  });
-}
-
-/** Rebases edits staged during an acknowledged write onto that acknowledged target. */
+/** Rebases newer mutations of this group without consuming a later closed-group capture. */
 function pendingAfterAcknowledgement(
-  current: PendingContent | null,
+  current: PendingContent,
   sent: PendingContent
 ): PendingContent | null {
-  if (!current || current.revision === sent.revision) return null;
+  if (current.group !== sent.group) throw new Error('Review content capture changed.');
+  if (current.revision === sent.revision) return null;
   const mutations = current.mutations.slice(sent.mutations.length);
   const value = mutations.reduce((content, mutate) => mutate(content), sent.value);
   return { ...current, value, mutations };
 }
 
-/** Debounced advanced-content writer; every durable mutation is one history operation. */
+/** The UI owns unsaved field captures; the session owns their ordered durable publication. */
 export function useReviewAdvancedContent(
   session: Session,
   documentContent: QuickEditAdvancedContent
 ) {
   const [, setVersion] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<PendingContent | null>(null);
-  const running = useRef<Promise<void> | null>(null);
+  const pending = useRef<PendingContent[]>([]);
+  const action = useRef<TypingAction | null>(null);
+  const generation = useRef(0);
   const nextRevision = useRef(0);
   const optimistic = useRef<PendingContent | null>(null);
   const mounted = useRef(true);
-  const drain = useCallback(async (): Promise<void> => {
-    while (pending.current) {
-      const sent = pending.current;
+  const failedCapture = useRef<ReturnType<Parameters<Session['stageAutosave']>[1]> | null>(null);
+  const schedule = useCallback(() => {
+    const first = pending.current[0];
+    if (!first) return;
+    const epoch = generation.current;
+    session.stageAutosave(
+      'content',
+      () => {
+        if (failedCapture.current) return failedCapture.current;
+        const sent = pending.current[0];
+        if (!sent) throw new Error('Review content buffer is unavailable.');
+        const captured = {
+          change: {
+            kind: 'content' as const,
+            content: sent.value,
+            ...(sent.action
+              ? {
+                  typing: {
+                    actionId: sent.action.id,
+                    target: sent.action.target,
+                    continuation: sent.action.continuation,
+                    writeId: crypto.randomUUID(),
+                  },
+                }
+              : {}),
+          },
+          acknowledge: () => {
+            if (epoch !== generation.current) return;
+            const current = pending.current[0];
+            if (!current) throw new Error('Review content capture is unavailable.');
+            const rest = pendingAfterAcknowledgement(current, sent);
+            pending.current = [...(rest ? [rest] : []), ...pending.current.slice(1)];
+            if (sent.action) sent.action.continuation = true;
+            failedCapture.current = null;
+            optimistic.current = pending.current.at(-1) ?? null;
+            if (mounted.current) {
+              setSaveFailed(false);
+              setVersion((version) => version + 1);
+            }
+            if (pending.current.length) schedule();
+          },
+          fail: () => {
+            if (epoch === generation.current && mounted.current) setSaveFailed(true);
+          },
+        };
+        if (sent.action) failedCapture.current = captured;
+        return captured;
+      },
+      EDITOR_AUTOSAVE_POLICY
+    );
+  }, [session]);
+  const flush = useCallback(async (): Promise<void> => {
+    while (pending.current.length) await session.flushAutosave(['content']);
+  }, [session]);
+  const endTyping = useCallback(() => {
+    action.current = null;
+  }, []);
+  const stage = useCallback(
+    (mutate: ContentMutation, target?: ReviewTextTypingTarget) => {
+      const previous = pending.current.at(-1);
+      const base = previous?.value ?? session.getSnapshot().document.advancedContent;
+      const value = mutate(base);
+      if (JSON.stringify(value) === JSON.stringify(base)) return;
       try {
-        await commitPendingContent(session, sent);
+        session.assertContentEditable(base, value);
       } catch (error) {
-        if (mounted.current) setSaveFailed(true);
+        if (error instanceof ReviewTrackLockedError) return;
         throw error;
       }
-      const acknowledged = pendingAfterAcknowledgement(pending.current, sent);
-      pending.current = acknowledged;
-      optimistic.current = acknowledged;
-      if (mounted.current) {
-        if (!acknowledged) setSaveFailed(false);
-        setVersion((value) => value + 1);
-      }
-    }
-  }, [session]);
-  const flush = useCallback((): Promise<void> => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    const attempt = async () => {
-      do {
-        if (!running.current) {
-          const task = drain().finally(() => {
-            running.current = null;
-          });
-          running.current = task;
-        }
-        await running.current;
-      } while (pending.current !== null);
-    };
-    return attempt();
-  }, [drain]);
-  const stage = useCallback(
-    (mutate: ContentMutation) => {
-      const previous = pending.current;
-      const base = previous?.value ?? session.getSnapshot().document.advancedContent;
+      if (!target) action.current = null;
+      else if (!action.current || action.current.target.fragmentId !== target.fragmentId)
+        action.current = { id: crypto.randomUUID(), target, continuation: false };
+      const active = action.current;
+      const sameGroup = active ? previous?.group === active.id : !!previous && !previous.action;
       const entry: PendingContent = {
         revision: ++nextRevision.current,
-        value: mutate(base),
-        mutations: [...(previous?.mutations ?? []), mutate],
+        value,
+        mutations: [...(sameGroup && previous ? previous.mutations : []), mutate],
+        group: active?.id ?? (sameGroup && previous ? previous.group : crypto.randomUUID()),
+        ...(active ? { action: active } : {}),
       };
+      pending.current = sameGroup
+        ? [...pending.current.slice(0, -1), entry]
+        : [...pending.current, entry];
       optimistic.current = entry;
-      pending.current = entry;
-      setVersion((value) => value + 1);
+      setVersion((version) => version + 1);
       setSaveFailed(false);
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        timer.current = null;
-        void flush().catch(() => undefined);
-      }, ADVANCED_SAVE_DEBOUNCE_MS);
+      schedule();
     },
-    [flush, session]
+    [session, schedule]
   );
+  useRecoveryLifecycle(flush, mounted);
   useEffect(() => {
-    mounted.current = true;
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') void flush().catch(() => undefined);
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      mounted.current = false;
-      document.removeEventListener('visibilitychange', onVisibility);
-      void flush().catch(() => undefined);
-    };
-  }, [flush]);
-  useEffect(() => {
-    if (!pending.current) optimistic.current = null;
-    setVersion((value) => value + 1);
+    if (!pending.current.length) optimistic.current = null;
+    setVersion((version) => version + 1);
   }, [documentContent]);
   const reset = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    pending.current = null;
+    generation.current += 1;
+    session.cancelAutosave('content');
+    pending.current = [];
     optimistic.current = null;
+    failedCapture.current = null;
+    action.current = null;
     if (mounted.current) {
       setSaveFailed(false);
-      setVersion((value) => value + 1);
+      setVersion((version) => version + 1);
     }
-  }, []);
+  }, [session]);
   return {
     content: optimistic.current?.value ?? documentContent,
     saveFailed,
-    pending: pending.current !== null,
+    pending: pending.current.length > 0,
     flush,
+    endTyping,
     reset,
+    commands: reviewContentCommands(stage),
+  };
+}
+
+/** Authored mutations share the debounced history writer, independent of its React lifecycle. */
+function reviewContentCommands(
+  stage: (mutation: ContentMutation, typing?: ReviewTextTypingTarget) => void
+) {
+  return {
+    setCameraFollowDefaults: (
+      cameraFollowDefaults: QuickEditAdvancedContent['cameraFollowDefaults']
+    ) =>
+      stage((content) => {
+        const { cameraFollowDefaults: _previous, ...rest } = content;
+        return cameraFollowDefaults ? { ...rest, cameraFollowDefaults } : rest;
+      }),
+    setCursorFocusPath: (cursorFocusPath: QuickEditAdvancedContent['cursorFocusPath']) =>
+      stage((content) => {
+        const { cursorFocusPath: _previous, ...rest } = content;
+        return cursorFocusPath
+          ? { ...rest, cursorFocusPath: authoredCursorFocusPath(cursorFocusPath) }
+          : rest;
+      }),
+    setAnnotationEffects: (
+      update: (
+        lane: QuickEditAdvancedContent['annotationEffects']
+      ) => QuickEditAdvancedContent['annotationEffects']
+    ) =>
+      stage((content) => {
+        const { annotationEffects: previous, ...rest } = content;
+        const annotationEffects = update(previous);
+        return annotationEffects ? { ...rest, annotationEffects } : rest;
+      }),
+    setText: (
+      update: (text: QuickEditAdvancedContent['text']) => QuickEditAdvancedContent['text'],
+      typing?: ReviewTextTypingTarget
+    ) =>
+      stage((content) => {
+        const { text: previous, ...rest } = content;
+        const text = update(previous);
+        return text ? { ...rest, text } : rest;
+      }, typing),
+    setCaptions: (captions: QuickEditAdvancedContent['captions']) =>
+      stage((content) => {
+        const { captions: _previous, ...rest } = content;
+        return captions ? { ...rest, captions } : rest;
+      }),
+    setActionsEnabled: (actionsEnabled: boolean) =>
+      stage((content) => ({ ...content, actionsEnabled })),
+    setActionAudio: (
+      update: (
+        current: NonNullable<QuickEditAdvancedContent['actionAudio']>
+      ) => NonNullable<QuickEditAdvancedContent['actionAudio']>
+    ) =>
+      stage((content) => {
+        const next = update(content.actionAudio ?? []);
+        if (!next.length) {
+          const { actionAudio: _previous, ...rest } = content;
+          return rest;
+        }
+        return { ...content, actionAudio: next };
+      }),
+    setKeyAnimations: (
+      update: (
+        current: NonNullable<QuickEditAdvancedContent['keyAnimations']>
+      ) => NonNullable<QuickEditAdvancedContent['keyAnimations']>
+    ) => stage((content) => ({ ...content, keyAnimations: update(content.keyAnimations ?? []) })),
+    setClickAnimations: (
+      update: (
+        current: NonNullable<QuickEditAdvancedContent['clickAnimations']>
+      ) => NonNullable<QuickEditAdvancedContent['clickAnimations']>
+    ) =>
+      stage((content) => ({ ...content, clickAnimations: update(content.clickAnimations ?? []) })),
     setZoom: (update: (zoom: QuickEditAdvancedState['zoom']) => QuickEditAdvancedState['zoom']) =>
       stage((content) => ({ ...content, zoom: update(content.zoom) })),
     setBackground: (
@@ -150,6 +243,29 @@ export function useReviewAdvancedContent(
         background: QuickEditAdvancedState['background']
       ) => QuickEditAdvancedState['background']
     ) => stage((content) => ({ ...content, background: update(content.background) })),
+    setWatermark: (watermark: QuickEditAdvancedState['watermark']) =>
+      stage((content) => {
+        const { watermark: _previous, ...rest } = content;
+        return watermark ? { ...rest, watermark } : rest;
+      }),
+    setPresentation: (presentation: QuickEditAdvancedState['presentation']) =>
+      stage((content) => {
+        const { presentation: _previous, ...rest } = content;
+        return presentation ? { ...rest, presentation } : rest;
+      }),
+    setWindowHeader: (windowHeader: QuickEditAdvancedState['windowHeader']) =>
+      stage((content) => {
+        const { windowHeader: _previous, ...rest } = content;
+        return windowHeader ? { ...rest, windowHeader } : rest;
+      }),
+    setWebcam: (
+      update: (webcam: QuickEditAdvancedState['webcam']) => QuickEditAdvancedState['webcam']
+    ) =>
+      stage((content) => {
+        const { webcam: previous, ...rest } = content;
+        const webcam = update(previous);
+        return webcam ? { ...rest, webcam } : rest;
+      }),
     setCanvas: (canvas: QuickEditAdvancedState['canvas']) =>
       stage((content) => {
         const { canvas: _previous, ...rest } = content;

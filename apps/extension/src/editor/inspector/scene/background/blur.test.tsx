@@ -35,6 +35,10 @@ it('shows the localized bounded blur control and applies its value', () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(range, '14');
     range.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  expect(applyFramePatch).not.toHaveBeenCalled();
+  expect(range.value).toBe('14');
+  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' })));
+  expect(applyFramePatch).toHaveBeenCalledTimes(1);
   expect(applyFramePatch).toHaveBeenCalledWith({ backgroundBlurAmount: 14 });
   act(() => root.unmount());
   host.remove();

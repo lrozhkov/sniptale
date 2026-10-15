@@ -11,14 +11,19 @@ const inventoryRoots = [
 ] as const;
 const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/aggregate-presentations/backup-restore.ts',
+  // Advisory database commits are admitted by event-history.append's active caller permit.
+  'apps/extension/src/composition/persistence/diagnostics/event-history-database.ts',
   'apps/extension/src/composition/persistence/editor-bootstrap/retention-cleanup.ts',
   'apps/extension/src/composition/persistence/effect-bundles/backup-restore.ts',
   // Validates the caller's active permit before returning its transaction writer.
   'apps/extension/src/composition/persistence/effect-bundles/settings-transfer.ts',
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
-  'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
+  // Uses only the caller's transaction under its existing active mutation permit.
+  'apps/extension/src/composition/persistence/review-workspaces/storage.ts',
+  // Reads and writes only the existing caller transaction; caller owns its active permit/commit/abort.
+  'apps/extension/src/composition/persistence/scenario/storage.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
   'apps/extension/src/composition/persistence/web-snapshots/backup-restore.ts',
   // Called only from media root publication under its active mutation permit.

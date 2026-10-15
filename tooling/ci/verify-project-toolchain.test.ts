@@ -49,7 +49,7 @@ function createProjectToolchainFixture(prefix: string) {
 
 it('binds installed packages, aliases, entrypoints, and the TS6 runtime to the machine lock', () => {
   expect(verifyProjectToolchain()).toMatchObject({
-    dependencyCruiserVersion: '18.2.0',
+    dependencyCruiserVersion: '18.5.0',
     mutationTypescriptVersion: '6.0.3',
     toolCount: 8,
     typescriptCompilerApiVersion: '6.0.3',

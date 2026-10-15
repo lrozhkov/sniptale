@@ -11,6 +11,8 @@ export type RenderFrameDrivenCompositeFrameArgs = {
   currentTime: number;
   frameDurationUs: number;
   frameIndex: number;
+  frameTimestampUs?: number;
+  adaptiveFrameWriter?: { add(timestampUs: number, durationUs: number): Promise<void> };
   job: RenderLoopJobState;
   loadedImages: LoadedImagesMap;
   effectRuntime?: OffscreenProjectEffectRuntime;

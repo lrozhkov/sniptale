@@ -136,7 +136,7 @@ beforeEach(() => {
   createMp4PipelineMock.mockResolvedValue({
     fallbackNotes: [],
     mixedAudio: null,
-    muxer: { finalize: vi.fn() },
+    muxer: { finalize: vi.fn(), cancel: vi.fn().mockResolvedValue(undefined) },
     target: { buffer: new ArrayBuffer(16) },
   });
   createMp4EncoderStateMock.mockReturnValue({
@@ -187,7 +187,9 @@ it('returns a finalized MP4 blob after rendering, audio encoding, and flushes su
   const success = mockSuccessfulMp4Render();
   const blob = await renderMp4();
 
-  expect(sendProgressMock).toHaveBeenCalledTimes(2);
+  expect(sendProgressMock).toHaveBeenCalledTimes(3);
+  expect(sendProgressMock.mock.calls[1]?.[1]).toBe('TRANSCODING');
+  expect(sendProgressMock.mock.calls[1]).toHaveLength(4);
   expect(encodeOfflineAudioBufferMock).toHaveBeenCalledOnce();
   expect(success.videoFlushMock).toHaveBeenCalledOnce();
   expect(success.audioFlushMock).toHaveBeenCalledOnce();

@@ -1,0 +1,214 @@
+import { expect, test } from '@playwright/test';
+import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
+import { startHostServer } from '../support/host-server';
+import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
+import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`lists and reopens a saved native quick-edit project at ${viewport.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize(viewport);
+    const host = await startHostServer();
+    const id = betaV1Fixture.records.media_library[0]!.id;
+    const theme = viewport.width === 1920 ? 'dark' : 'light';
+    let editor: typeof page | undefined;
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?locale=en&theme=${theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', {
+        width: 160,
+        height: 90,
+        duration: 12.01,
+      });
+      await page.evaluate(async (fixture) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(fixture.databaseName);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        try {
+          const tx = db.transaction(['media_library', 'recordings'], 'readwrite');
+          const done = new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error);
+          });
+          for (const [store, key] of [
+            ['media_library', fixture.records.media_library[0]!.id],
+            ['recordings', fixture.records.recordings[0]!.id],
+          ]) {
+            const request = tx.objectStore(store!).get(key!);
+            request.onsuccess = () =>
+              tx.objectStore(store!).put({
+                ...request.result,
+                lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: Date.now() },
+              });
+          }
+          await done;
+        } finally {
+          db.close();
+        }
+      }, betaV1Fixture);
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await expect(
+        page.getByRole('button', { name: 'Save to library', exact: true })
+      ).toBeVisible();
+      expect(await readNativeReviewWorkspace(page, id)).toBeNull();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const advanced = dialog.getByRole('button', { name: 'Advanced editing', exact: true });
+      await expect(advanced).toBeVisible();
+      if ((await advanced.getAttribute('aria-pressed')) !== 'true') await advanced.click();
+      await addReviewFocus(page);
+      await expect
+        .poll(async () => (await readNativeReviewWorkspace(page, id))?.history.length ?? 0)
+        .toBeGreaterThan(0);
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(dialog).toBeHidden();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await expect(page.locator('[data-ui="gallery.preview.inspectorHeader"]')).toContainText(
+        'Stored permanently'
+      );
+      await expect(page.getByRole('button', { name: 'Save to library', exact: true })).toHaveCount(
+        0
+      );
+      await page.screenshot({
+        path: info.outputPath('source-promoted-without-reload.png'),
+        fullPage: false,
+      });
+      await page.reload();
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      expect(await readNativeReviewWorkspace(page, id)).not.toBeNull();
+      const projects = page
+        .locator('[data-gallery-folder="video-project"]')
+        .getByRole('button')
+        .first();
+      await expect(projects).toBeVisible();
+      await projects.click();
+      await expect(
+        page
+          .locator('[data-ui="gallery.content.surface"]')
+          .locator(`[data-gallery-keyboard-id="quick-edit-project:${id}"]`)
+      ).toHaveCount(1);
+      await page.screenshot({
+        path: info.outputPath('saved-quick-edit-catalogue.png'),
+        fullPage: false,
+      });
+      const saved = await readNativeReviewWorkspace(page, id);
+      await page.getByRole('button', { name: 'Open in editor', exact: true }).first().click();
+      await expect
+        .poll(
+          async () =>
+            (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
+        )
+        .toBe(1);
+      const [tab] = await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []);
+      const target = new URL(tab!.url!);
+      expect(target.searchParams.get('mediaId')).toBe(id);
+      expect(target.searchParams.get('mode')).toBe('edit');
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}${target.search}`);
+      await expect(
+        page.locator('dialog').getByRole('button', { name: 'Advanced editing', exact: true })
+      ).toBeVisible();
+      expect((await readNativeReviewWorkspace(page, id))?.history).toEqual(saved?.history);
+      await page.screenshot({ path: info.outputPath('reopened-quick-edit.png'), fullPage: false });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?locale=en&theme=${theme}`);
+      await projects.click();
+      const card = page.locator(`[data-gallery-keyboard-id="quick-edit-project:${id}"]`);
+      await card.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      const preview = page.locator('[data-ui="gallery.preview.surface"]');
+      await preview.getByLabel('Filename', { exact: true }).fill('Retained edit');
+      await page.keyboard.press('Escape');
+      await expect
+        .poll(async () => (await readNativeReviewWorkspace(page, id))?.project?.name)
+        .toBe('Retained edit');
+      await card.getByRole('button', { name: 'Retained edit', exact: true }).first().click();
+      await preview
+        .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+        .getByRole('button', { name: 'Delete', exact: true })
+        .click();
+      await page
+        .locator('[data-ui="gallery.deletion.menu"]')
+        .getByRole('menuitem', { name: 'Move to Trash Bin', exact: true })
+        .click();
+      await expect
+        .poll(async () => (await readNativeReviewWorkspace(page, id))?.project?.lifecycle.trashedAt)
+        .toBeGreaterThan(0);
+      await page
+        .locator(
+          '[data-ui="gallery.sidebar.footer"] button:not([data-ui="gallery.sidebar.toggle"])'
+        )
+        .click();
+      await card.getByRole('button', { name: 'Retained edit', exact: true }).first().click();
+      await page.screenshot({
+        path: info.outputPath('quick-edit-project-trash.png'),
+        fullPage: false,
+      });
+      await preview.locator('[data-ui="gallery.preview.restore"]').click();
+      await expect
+        .poll(async () => (await readNativeReviewWorkspace(page, id))?.project?.lifecycle.trashedAt)
+        .toBeUndefined();
+      expect((await readNativeReviewWorkspace(page, id))?.history).toEqual(saved?.history);
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?locale=en&theme=${theme}`);
+      await projects.click();
+      await card.getByRole('button', { name: 'Retained edit', exact: true }).first().click();
+      await preview
+        .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+        .getByRole('button', { name: 'Delete', exact: true })
+        .click();
+      editor = await page.context().newPage();
+      await editor.setViewportSize(viewport);
+      await applyHarnessBootstrap(editor, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': theme },
+      });
+      await editor.goto(`${host.origin}${GALLERY_HARNESS_PATH}${target.search}`);
+      await expect(
+        editor.locator('dialog').getByRole('button', { name: 'Advanced editing', exact: true })
+      ).toBeVisible();
+      const deletion = page.locator('[data-ui="gallery.deletion.menu"]');
+      await deletion.getByRole('menuitem', { name: 'Delete permanently', exact: true }).click();
+      await deletion.getByRole('menuitem', { name: 'Click again to confirm', exact: true }).click();
+      await expect(
+        page.getByText('Could not complete the action. Please try again.', { exact: true })
+      ).toBeVisible();
+      expect((await readNativeReviewWorkspace(page, id))?.history).toEqual(saved?.history);
+      await editor.close();
+      await card.getByRole('button', { name: 'Retained edit', exact: true }).first().click();
+      await preview
+        .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+        .getByRole('button', { name: 'Delete', exact: true })
+        .click();
+      await deletion.getByRole('menuitem', { name: 'Delete permanently', exact: true }).click();
+      await deletion.getByRole('menuitem', { name: 'Click again to confirm', exact: true }).click();
+      await expect.poll(() => readNativeReviewWorkspace(page, id)).toBeNull();
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?locale=en&theme=${theme}`);
+      await expect(
+        page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first()
+      ).toBeVisible();
+      await expect(
+        page.locator(`[data-gallery-keyboard-id="quick-edit-project:${id}"]`)
+      ).toHaveCount(0);
+      await page.screenshot({
+        path: info.outputPath('source-after-project-purge.png'),
+        fullPage: false,
+      });
+    } finally {
+      await editor?.close();
+      await page.close();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

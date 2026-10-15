@@ -2,7 +2,7 @@ import type {
   ArchiveObjectRef,
   ArchiveRootDescriptor,
 } from '../../../composition/archive-transfer';
-import type { MEDIA_HUB_BACKUP_LAYOUT } from './layout';
+import type { MediaHubBackupLayout } from './layout';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export const MEDIA_HUB_BACKUP_FORMAT = 'sniptale-media-hub-backup';
@@ -10,6 +10,8 @@ export const MEDIA_HUB_BACKUP_VERSION = 6;
 export const MAX_CATALOG_SHARD_BYTES = 4 * 1024 * 1024;
 export const MAX_CATALOG_SHARD_ROOTS = 1_000;
 export const MAX_ROOT_METADATA_BYTES = 4 * 1024 * 1024;
+export const MAX_EXPANDED_ROOT_METADATA_BYTES = 128 * 1024 * 1024;
+export const MAX_EXPANDED_ARCHIVE_METADATA_BYTES = 512 * 1024 * 1024;
 /** Dependency order shared by archive planning and restore, including older v6 manifests. */
 export const MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER = [
   'media:library-item',
@@ -20,6 +22,29 @@ export const MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER = [
 
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
+export interface ArchiveRootObjectSource {
+  blob: Blob;
+  ref: MediaHubBackupRootEnvelope['objects'][number];
+}
+
+export interface ArchiveRootPayload {
+  metadata: JsonValue;
+  objects: ArchiveRootObjectSource[];
+}
+
+export interface MediaHubBackupRootInventoryItem {
+  descriptor: ArchiveRootDescriptor;
+  load(signal?: AbortSignal): Promise<ArchiveRootPayload>;
+  summary: {
+    draftCount: number;
+    recordingCount: number;
+    sourceMetadataCount: number;
+    telemetryCount: number;
+    thumbnailCount: number;
+    webSnapshotCount: number;
+  };
+}
 
 export interface MediaHubBackupPrivacyFlags {
   includeSourceMetadata: boolean;
@@ -82,7 +107,9 @@ export interface MediaHubBackupManifestV6 {
   exportedAt: string;
   format: typeof MEDIA_HUB_BACKUP_FORMAT;
   galleryViews?: GallerySavedView[];
-  layout: typeof MEDIA_HUB_BACKUP_LAYOUT;
+  layout: MediaHubBackupLayout;
+  /** V3 physical entries anchored by a direct root reference; no alias chains. */
+  sharedObjects?: MediaHubBackupSharedObject[];
   privacy: MediaHubBackupPrivacyFlags;
   totals: {
     bytes: number;
@@ -96,6 +123,18 @@ export interface MediaHubBackupManifestV6 {
     };
   };
   version: typeof MEDIA_HUB_BACKUP_VERSION;
+}
+
+export interface MediaHubBackupSharedObject {
+  id: string;
+  path: string;
+  sha256: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface MediaHubBackupSharedReference extends Omit<ArchiveObjectRef, 'path'> {
+  sharedObjectId: string;
 }
 
 export interface MediaHubBackupRootEnvelope {

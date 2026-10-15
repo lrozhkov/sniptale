@@ -1,4 +1,8 @@
-import { appendScenarioSavedVersion } from '../history-model';
+import {
+  appendScenarioSavedVersion,
+  retainScenarioSavedVersions,
+  isScenarioHistoryActionId,
+} from '../history-model';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { ScenarioProjectEntry } from '../contracts';
 import {
@@ -22,15 +26,23 @@ export function createScenarioProjectEntry(args: {
   storageClass?: LibraryStorageClass;
   updatedAt?: number;
   historyPolicy?: 'append' | 'preserve' | 'discard';
+  /** Exclusive history is a private fresh canonical snapshot, never a caller's mutable state. */
+  historyOwnership?: 'borrowed' | 'exclusive';
+  historyActionId?: string;
 }): ScenarioProjectEntry {
+  if (args.historyActionId !== undefined && !isScenarioHistoryActionId(args.historyActionId))
+    throw new Error('Invalid scenario history action identity.');
   const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
   const history =
     args.historyPolicy === 'discard'
       ? []
-      : args.historyPolicy === 'preserve'
-        ? (args.existing?.history ?? [])
-        : appendScenarioSavedVersion(args.existing);
+      : args.historyPolicy === 'preserve' ||
+          (args.historyActionId !== undefined &&
+            args.historyActionId === args.existing?.lastAcceptedActionId)
+        ? retainScenarioSavedVersions(args.existing?.history ?? [], args.historyOwnership)
+        : appendScenarioSavedVersion(args.existing, args.historyOwnership);
   return {
+    ...(args.historyActionId === undefined ? {} : { lastAcceptedActionId: args.historyActionId }),
     ...(history.length ? { history } : {}),
     id: args.project.id,
     project: {

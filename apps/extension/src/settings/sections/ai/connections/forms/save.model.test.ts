@@ -137,3 +137,30 @@ describe('ai-providers-section-form-save.model', () => {
     verifyModelCreateOmitsEmptyPrompt
   );
 });
+
+it('saves speech defaults without carrying over a text system prompt', async () => {
+  resetModelFormSaveMocks();
+  const { saveModelForm } = await import('./save');
+  await saveModelForm({
+    formData: {
+      providerId: 'provider-1',
+      displayName: 'Speech',
+      modelCode: 'custom',
+      systemPrompt: 'Text prompt',
+      operation: 'speech',
+      audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+    },
+    isEditing: false,
+    onSave: vi.fn(),
+    setErrors: createStateSetterMock<Record<string, string>>(),
+    setIsSaving: createStateSetterMock<boolean>(),
+  });
+  expect(addAIModelMock).toHaveBeenCalledWith({
+    id: 'generated-id',
+    providerId: 'provider-1',
+    displayName: 'Speech',
+    modelCode: 'custom',
+    operation: 'speech',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+  });
+});

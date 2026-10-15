@@ -69,6 +69,7 @@ type VideoEditorProjectActionKeys =
   | 'updateMediaClipFitScalePercent'
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
+  | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
   | 'applyEffectDocument'
   | 'deleteEffectInstance'

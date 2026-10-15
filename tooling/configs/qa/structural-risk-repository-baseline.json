@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.structural-risk",
-  "findingCount": 108,
-  "findingDigest": "sha256:f0d1a40718994f06470374325dc59db61af52f21f1b1393378830efeea9aa031",
+  "findingCount": 107,
+  "findingDigest": "sha256:3e29e89f54c18ec983480d7f01185a1f5203f39632507b24c67a4591acc9c6ef",
   "findings": [
     {
       "delta": 1,
@@ -167,21 +167,6 @@
       "score": 5,
       "severity": "attention",
       "symbol": "executeRecordingStart",
-      "noiseId": "noise.structural-risk.cohesive-reviewed-owners"
-    },
-    {
-      "delta": 5,
-      "file": "apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.ts",
-      "id": "structural-function-risk.3cf9dcbfc338",
-      "line": 94,
-      "message": "sendStopSignals: score=5, delta=5, delta-kind=new, lines=103, statements=58, cyclomatic=21, cognitive=31, nesting=3, recovery=2, params=2, effects=0, state=1, owners=1, cohesion=1.00",
-      "profile": "default",
-      "reason": "score=5, delta=5, delta-kind=new, lines=103, statements=58, cyclomatic=21, cognitive=31, nesting=3, recovery=2, params=2, effects=0, state=1, owners=1, cohesion=1.00",
-      "remediationHint": "Name cohesive decision or recovery steps without breaking the transaction boundary. Extract only behavior with an independent reason to change.",
-      "rule": "structural-function-risk",
-      "score": 5,
-      "severity": "attention",
-      "symbol": "sendStopSignals",
       "noiseId": "noise.structural-risk.cohesive-reviewed-owners"
     },
     {

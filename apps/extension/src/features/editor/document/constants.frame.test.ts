@@ -5,6 +5,7 @@ import {
   DEFAULT_EDITOR_FRAME_SETTINGS,
   DEFAULT_EDITOR_IMAGE_SETTINGS,
   normalizeBrowserFrameState,
+  resolveEditorWindowHeader,
   normalizeEditorFrameSettings,
 } from './constants';
 import { normalizeEditorImageSettings, resolveEditorSourceImageGlowBlur } from './image-types';
@@ -142,8 +143,12 @@ function registerEditorFrameDefaultTests() {
     assertExplicitFalseyFrameValues
   );
 
-  it('keeps browser-frame drafts header-only without variant/theme/window defaults', () => {
+  it('normalizes window header defaults without activating a layer', () => {
     expect(DEFAULT_BROWSER_FRAME_STATE).toEqual({
+      kind: 'browser',
+      style: 'windows',
+      theme: 'light',
+      faviconEnabled: false,
       title: '',
       url: '',
       faviconDataUrl: null,
@@ -159,8 +164,56 @@ function registerEditorFrameDefaultTests() {
       expect(normalizedEnabled).not.toHaveProperty(property);
       expect(normalizedMissing).not.toHaveProperty(property);
     });
-    ['variant', 'theme', 'mode'].forEach((property) => {
+    ['variant', 'mode'].forEach((property) => {
       expect(DEFAULT_BROWSER_FRAME_STATE).not.toHaveProperty(property);
     });
   });
 }
+
+it('preserves application appearance and retained favicon settings through normalization', () => {
+  const header = {
+    kind: 'application' as const,
+    style: 'linux' as const,
+    theme: 'dark' as const,
+    title: 'Design notes',
+    url: 'example.com',
+    faviconEnabled: true,
+    faviconDataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=',
+    canvasMode: 'keep-size' as const,
+    contentMode: 'fit-content' as const,
+  };
+  expect(normalizeBrowserFrameState(header)).toEqual(header);
+  expect(
+    normalizeBrowserFrameState({ ...header, faviconEnabled: false }).faviconDataUrl
+  ).toBeNull();
+});
+
+it('bounds header display text without mutating image provenance', () => {
+  const provenance = { title: 'a'.repeat(600), url: 'https://example.com/' + 'q'.repeat(2100) };
+  const normalized = normalizeBrowserFrameState(provenance);
+  expect(normalized.title).toBe(provenance.title);
+  expect(normalized.url).toBe(provenance.url);
+  const header = resolveEditorWindowHeader(normalized);
+  expect(header.title).toHaveLength(512);
+  expect(header.url).toHaveLength(2048);
+});
+
+it('keeps custom icon provenance across image normalization and clears it for website/off', () => {
+  const faviconDataUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+  const local = {
+    ...DEFAULT_BROWSER_FRAME_STATE,
+    faviconEnabled: true,
+    faviconSource: 'file' as const,
+    faviconDataUrl,
+  };
+  expect(normalizeBrowserFrameState(local).faviconSource).toBe('file');
+  expect(resolveEditorWindowHeader(local).faviconSource).toBe('file');
+  expect(
+    normalizeBrowserFrameState({ ...local, faviconSource: null }).faviconSource
+  ).toBeUndefined();
+  expect(
+    normalizeBrowserFrameState({ ...local, faviconEnabled: false }).faviconSource
+  ).toBeUndefined();
+});

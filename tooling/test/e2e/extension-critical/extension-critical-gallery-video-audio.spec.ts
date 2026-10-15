@@ -1,6 +1,6 @@
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { expect, test, type Page } from '@playwright/test';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import {
   replayReviewHistory,
@@ -10,7 +10,11 @@ import { buildReviewTimeMap } from '../../../../apps/extension/src/features/vide
 import { projectReviewVoiceover } from '../../../../apps/extension/src/features/video/review/voiceover-edits';
 import { resolve } from 'node:path';
 import { startHostServer } from '../support/host-server';
-import { clickReviewExport, seedReviewVideo } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  clickReviewExport,
+  seedReviewVideo,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
@@ -36,7 +40,10 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      const dialog = page.locator('dialog');
+      const dialog = page.getByRole('dialog', {
+        name: translate('gallery.videoReview.title', variant.locale),
+        exact: true,
+      });
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
@@ -66,7 +73,7 @@ for (const variant of [
         ).toHaveAttribute('aria-pressed', String(!muted));
       };
       const originalRow = original.locator('xpath=ancestor::*[@data-review-track-muted][1]');
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const focusRow = focusLane.locator('xpath=ancestor::*[@data-review-track-muted][1]');
       await button('gallery.videoReview.zoomEnabled').click();
@@ -127,7 +134,7 @@ for (const variant of [
       await button('gallery.videoReview.redo').click();
       await sound(false, 0.7);
       await change('0');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
         'aria-pressed',
@@ -137,7 +144,7 @@ for (const variant of [
       await button('gallery.videoReview.restoreSourceAudio').click();
       await sound(false, 1);
       await page.screenshot({ path: testInfo.outputPath('master-restored.png') });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -145,40 +152,21 @@ for (const variant of [
 }
 
 async function persistedWorkspace(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = db
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        db.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  return await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  return parseVideoWorkspace(raw);
 }
 
 async function persistedSourceAudio(page: Page) {
   const workspace = await persistedWorkspace(page);
-  const latest = workspace?.history
-    .slice(0, workspace.cursor)
-    .findLast((operation) => operation.target === 'advancedContent');
-  return latest?.target === 'advancedContent' ? latest.after.audio.original : undefined;
+  if (!workspace) return undefined;
+  return replayReviewHistory(
+    workspace.history,
+    workspace.cursor,
+    workspace.source,
+    reviewAdvancedContentBaseline(workspace.advanced)
+  ).advancedContent.audio.original;
 }
 
 async function voiceTiming(page: Page) {
@@ -204,7 +192,12 @@ async function voiceTiming(page: Page) {
 
 async function voiceTimelineGesture(page: Page, start: number, end?: number) {
   const plane = page.locator('[data-ui="gallery.videoReview.timePlane"]');
-  const box = (await plane.locator('[data-ui="gallery.videoReview.ruler"]').boundingBox())!;
+  const lane = plane.locator(
+    end === undefined
+      ? '[data-ui="gallery.videoReview.ruler"]'
+      : '[data-ui="gallery.videoReview.sourceLane"]'
+  );
+  const box = (await lane.boundingBox())!;
   const duration = Number(await plane.getAttribute('aria-valuemax'));
   const x = (time: number) => box.x + (box.width * time) / duration;
   await page.mouse.move(x(start), box.y + 12);
@@ -255,7 +248,10 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      const dialog = page.locator('dialog');
+      const dialog = page.getByRole('dialog', {
+        name: translate('gallery.videoReview.title', variant.locale),
+        exact: true,
+      });
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', {
           name: translate(key, variant.locale),
@@ -274,18 +270,23 @@ for (const variant of [
       const header = dialog.locator('[data-ui="gallery.videoReview.trackHeader"]').filter({
         hasText: translate('gallery.videoReview.audioVoiceover', variant.locale),
       });
-      const chooser = page.waitForEvent('filechooser');
       await header
         .getByRole('button', {
           name: translate('gallery.videoReview.audioImport', variant.locale),
           exact: true,
         })
         .click();
-      await (await chooser).setFiles(resolve('tooling/test/e2e/fixtures/review-voice-speech.wav'));
-      const voice = dialog.getByRole('button', {
-        name: `${translate('gallery.videoReview.audioVoiceover', variant.locale)} · review-voice-speech.wav`,
+      const library = page.getByRole('dialog', {
+        name: translate('gallery.videoReview.musicLibrary', variant.locale),
         exact: true,
       });
+      await expect(library).toBeVisible();
+      await library
+        .locator('input[type="file"]')
+        .setInputFiles(resolve('tooling/test/e2e/fixtures/review-voice-speech.wav'));
+      await expect(library).toHaveCount(0);
+      const voice = dialog.locator('[data-audio-lane="voiceover"] [data-audio-id]');
+      await expect(voice).toHaveCount(1);
       await expect(voice).toBeVisible();
       await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [1] });
       const initial = (await voiceTiming(page))!;
@@ -337,7 +338,7 @@ for (const variant of [
         });
       await original.fill('0');
       await original.press('Enter');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(voice).toBeVisible();
       await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [4] });
@@ -403,7 +404,7 @@ for (const variant of [
       // Exact same-rate DSP agreement is also covered at both rates by the unit proof.
       if (pcm!.sameSampleRate) expect(pcm!.difference).toBeLessThan(1e-6);
       expect(pcm!.exportedDuration).toBeCloseTo(Math.min(1, initial.rawDuration / 4) + 0.04, 4);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

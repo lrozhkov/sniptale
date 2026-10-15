@@ -1,3 +1,4 @@
+import { useViewportPanGesture } from '@sniptale/ui/viewport-pan';
 import { LoaderCircle, Pause, Play, X } from 'lucide-react';
 import {
   useCallback,
@@ -181,17 +182,7 @@ export function useFullscreenPreviewPan(
   zoomed: boolean,
   fullscreen: boolean
 ) {
-  const gesture = useRef<{ id: number; x: number; y: number; left: number; top: number } | null>(
-    null
-  );
-  const [dragging, setDragging] = useState(false);
-  const finish = useCallback(() => {
-    const active = gesture.current;
-    gesture.current = null;
-    setDragging(false);
-    if (active && viewport.current?.hasPointerCapture(active.id))
-      viewport.current.releasePointerCapture(active.id);
-  }, [viewport]);
+  const { dragging, finish, start, move, end } = useViewportPanGesture(viewport);
   useEffect(() => {
     if (!fullscreen || !zoomed) finish();
     return finish;
@@ -202,33 +193,13 @@ export function useFullscreenPreviewPan(
       viewport.current.scrollTop = 0;
     }
   }, [zoomed, viewport]);
-  const end = (event: PointerEvent<HTMLDivElement>) => {
-    if (gesture.current?.id === event.pointerId) finish();
-  };
   return {
     dragging,
     handlers: {
       onPointerDownCapture: (event: PointerEvent<HTMLDivElement>) => {
-        if (!fullscreen || !zoomed || event.button !== 0 || gesture.current) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const node = event.currentTarget;
-        gesture.current = {
-          id: event.pointerId,
-          x: event.clientX,
-          y: event.clientY,
-          left: node.scrollLeft,
-          top: node.scrollTop,
-        };
-        node.setPointerCapture(event.pointerId);
-        setDragging(true);
+        if (fullscreen && zoomed) start(event, () => event.stopPropagation());
       },
-      onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
-        const active = gesture.current;
-        if (!active || active.id !== event.pointerId) return;
-        event.currentTarget.scrollLeft = active.left + active.x - event.clientX;
-        event.currentTarget.scrollTop = active.top + active.y - event.clientY;
-      },
+      onPointerMove: move,
       onPointerUp: end,
       onPointerCancel: end,
       onLostPointerCapture: end,

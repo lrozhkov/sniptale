@@ -1,4 +1,8 @@
 import {
+  filterAIModelsByOperation,
+  type AIModelOperation,
+} from '../../contracts/settings/model-operation';
+import {
   isChromeAiModelId,
   mergeChromeAiProviderSelectorEntries,
   mergeChromeAiSelectorEntries,
@@ -78,13 +82,29 @@ async function mergeSettingsPageModelSelection(
   return { ...selection, ...merged };
 }
 
-export async function requestAIModelSelectionBootstrap(): Promise<AIModelSelectionBootstrapPayload> {
+export async function requestAIModelSelectionBootstrap(
+  operation: AIModelOperation = 'text'
+): Promise<AIModelSelectionBootstrapPayload> {
   const response = await sendAISettingsQuery({ operation: 'read-model-selection-bootstrap' });
   if (!response.modelSelection) {
     throw new Error('AI model selection bootstrap response missing payload');
   }
 
-  return mergeChromeAiModelSelection(response.modelSelection);
+  const models = filterAIModelsByOperation(response.modelSelection.models, operation);
+  const selection = {
+    ...response.modelSelection,
+    models,
+    defaultModelId:
+      operation === 'text'
+        ? response.modelSelection.models.some(
+            (model) =>
+              model.id === response.modelSelection?.defaultModelId && !models.includes(model)
+          )
+          ? null
+          : response.modelSelection.defaultModelId
+        : (models[0]?.id ?? null),
+  };
+  return operation === 'text' ? mergeChromeAiModelSelection(selection) : selection;
 }
 
 export async function requestAISettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataPayload> {

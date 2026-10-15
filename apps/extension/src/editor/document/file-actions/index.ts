@@ -13,6 +13,7 @@ import type {
   EditorDocumentOpenPort,
 } from './ports';
 import { assertEditorRasterImageFileCanBeRead } from './raster-intake';
+import type { EditorSessionAutosaveService } from '../session-autosave';
 export {
   EditorStoragePromptError,
   isEditorStoragePromptError,
@@ -31,7 +32,7 @@ export async function openEditorImageFromFile(
   setImageData: (imageData: string | null) => void,
   lifecycle: {
     beforeOpen?: () => Promise<void> | void;
-    onOpened?: () => Promise<void> | void;
+    onOpened?: (saveInitial?: EditorSessionAutosaveService['saveNow']) => Promise<void> | void;
   } = {}
 ): Promise<void> {
   if (!file) {
@@ -61,22 +62,39 @@ export async function openEditorImageFromFile(
     canvasReady: Boolean(controller.canvas),
   });
   await lifecycle.beforeOpen?.();
+  if (!lifecycle.beforeOpen && controller.autosaveService) {
+    if (!controller.exportDocument) throw new Error('Editor document export is unavailable.');
+    await controller.autosaveService.flushAutosave(controller.exportDocument.bind(controller));
+  }
   if (!isCurrentEditorDocumentOpenOperation(openToken)) {
     return;
   }
-  await controller.openImage(dataUrl, file.name);
-  if (!isCurrentEditorDocumentOpenOperation(openToken)) {
-    return;
+  const hydration = controller.autosaveService?.beginHydration(() =>
+    isCurrentEditorDocumentOpenOperation(openToken)
+  );
+  try {
+    await controller.openImage(dataUrl, file.name);
+    if (!isCurrentEditorDocumentOpenOperation(openToken)) {
+      return;
+    }
+    logEditorDocumentOpenTrace('controller:opened', {
+      canvasReady: Boolean(controller.canvas),
+      name: file.name,
+    });
+    await lifecycle.onOpened?.(hydration?.saveNow);
+    if (!isCurrentEditorDocumentOpenOperation(openToken)) {
+      return;
+    }
+    setImageData(dataUrl);
+    hydration?.finish(true);
+    if (!lifecycle.onOpened && controller.autosaveService) {
+      if (!controller.exportDocument) throw new Error('Editor document export is unavailable.');
+      await controller.autosaveService.persistSnapshot(controller.exportDocument.bind(controller));
+    }
+  } catch (error) {
+    hydration?.finish(false);
+    throw error;
   }
-  logEditorDocumentOpenTrace('controller:opened', {
-    canvasReady: Boolean(controller.canvas),
-    name: file.name,
-  });
-  await lifecycle.onOpened?.();
-  if (!isCurrentEditorDocumentOpenOperation(openToken)) {
-    return;
-  }
-  setImageData(dataUrl);
 }
 
 export async function insertEditorImageFromFile(
@@ -116,16 +134,44 @@ export async function importEditorSessionFromFile(
   if (!isCurrentEditorDocumentOpenOperation(openToken)) {
     return;
   }
-  await controller.loadDocument(document);
-  if (!isCurrentEditorDocumentOpenOperation(openToken)) {
-    return;
+  const autosaveService = controller.autosaveService;
+  if (autosaveService) {
+    if (!controller.exportDocument) throw new Error('Editor document export is unavailable.');
+    const getDocument = controller.exportDocument.bind(controller);
+    await autosaveService.flushAutosave(getDocument);
+    if (!isCurrentEditorDocumentOpenOperation(openToken)) return;
   }
-  logEditorDocumentOpenTrace('session:loaded', {
-    canvasReady: Boolean(controller.canvas),
-    canvasWidth: document.canvasWidth,
-    canvasHeight: document.canvasHeight,
-  });
-  setImageData(document.sourceImageData);
+  await loadEditorSessionDocument(controller, document, openToken, setImageData);
+}
+
+async function loadEditorSessionDocument(
+  controller: EditorDocumentOpenPort,
+  document: ReturnType<typeof parseImportedEditorDocument>,
+  openToken: ReturnType<typeof beginEditorDocumentOpenOperation>,
+  setImageData: (imageData: string | null) => void
+) {
+  const autosaveService = controller.autosaveService;
+  const hydration = autosaveService?.beginHydration(() =>
+    isCurrentEditorDocumentOpenOperation(openToken)
+  );
+  try {
+    await controller.loadDocument(document);
+    if (!isCurrentEditorDocumentOpenOperation(openToken)) {
+      return;
+    }
+    logEditorDocumentOpenTrace('session:loaded', {
+      canvasReady: Boolean(controller.canvas),
+      canvasWidth: document.canvasWidth,
+      canvasHeight: document.canvasHeight,
+    });
+    setImageData(document.sourceImageData);
+    hydration?.finish(true);
+    if (autosaveService && controller.exportDocument)
+      await autosaveService.persistSnapshot(controller.exportDocument.bind(controller));
+  } catch (error) {
+    hydration?.finish(false);
+    throw error;
+  }
 }
 
 export async function exportEditorSession(

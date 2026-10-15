@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   collectReviewAssetReferences,
+  reviewWorkspaceHasSpeechReplacement,
   decodePortableReviewAssetRefs,
   encodePortableReviewAssetRefs,
   remapReviewAssetReferences,
@@ -9,6 +10,9 @@ import { createQuickEditAdvancedState } from '../../../features/video/review/adv
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import type { QuickEditAdvancedState } from '../../../features/video/review/advanced/types';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
+import { assertPortableReviewAssetRefs } from './asset-refs';
 
 vi.mock('../infrastructure/indexed-db/core', () => ({}));
 
@@ -26,6 +30,66 @@ const advanced = (patch: Partial<QuickEditAdvancedState>): QuickEditAdvancedStat
 });
 
 afterEach(() => vi.clearAllMocks());
+
+it('retains disabled webcam references in every history and recovery position and remaps portable refs', () => {
+  const webcam = (id: string) => ({
+    ...createQuickEditWebcam(
+      `project-asset:${id}`,
+      { width: 640, height: 480 },
+      { width: 1920, height: 1080 }
+    ),
+    enabled: false,
+  });
+  const baseline = advanced({ webcam: webcam('base') });
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 1920, height: 1080, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: { ...baseline, recoveryV1: JSON.stringify({ webcam: webcam('recovery') }) },
+      history: [
+        {
+          id: 'attach',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), webcam: webcam('after') },
+        },
+      ],
+    },
+  };
+  const references = ['base', 'recovery', 'after'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}`))
+  );
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset id');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  expect(JSON.stringify(portable.workspace.advanced.webcam)).toContain('assetRef');
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  expect(() => remapReviewAssetReferences(snapshot, new Map())).toThrow('unresolved');
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(references.map((id) => [id, `${id}-restored`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}-restored`))
+  );
+  expect(snapshot.workspace.advanced.webcam?.assetId).toBe('project-asset:base');
+});
 
 describe('collectReviewAssetReferences', () => {
   it('collects every audio lane reference and recovery copy reference', () => {
@@ -362,4 +426,414 @@ it('retains and portably remaps images in current content, undo history, and rec
     ])
   );
   expect(collectReviewAssetReferences(snapshot.workspace)).toContain('project-asset:current');
+});
+
+it('retains inactive background references in every history and recovery position and remaps portable refs', () => {
+  const background = (id: string) => ({
+    enabled: false as const,
+    rememberedImage: { assetId: `project-asset:${id}`, imageFit: 'contain' as const },
+  });
+  const baseline = advanced({ background: background('base') });
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 1920, height: 1080, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: { ...baseline, recoveryV1: JSON.stringify({ background: background('recovery') }) },
+      history: [
+        {
+          id: 'attach',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), background: background('after') },
+        },
+      ],
+    },
+  };
+  const references = ['base', 'recovery', 'after'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}`))
+  );
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset id');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  expect(JSON.stringify(portable.workspace.advanced.background)).toContain('assetRef');
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  expect(() => remapReviewAssetReferences(snapshot, new Map())).toThrow('unresolved');
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(references.map((id) => [id, `${id}-restored`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}-restored`))
+  );
+  expect(snapshot.workspace.advanced.background.rememberedImage?.assetId).toBe(
+    'project-asset:base'
+  );
+});
+
+it('roundtrips speech assets across current, history and recovery with portable keys', async () => {
+  const { reviewSpeechTextSignature } =
+    await import('../../../features/video/review/speech-transcript');
+  const { parseVideoWorkspace } = await import('./parser');
+  const profile = { modelId: 'speech', voiceId: 'alloy', responseFormat: 'mp3' as const };
+  const speech = (id: string) => ({
+    version: 1 as const,
+    profile,
+    phrases: [
+      {
+        id: 'p',
+        start: 0,
+        end: 2,
+        originalText: 'Original',
+        text: 'Edited',
+        revision: 1,
+        alignment: 'manual' as const,
+      },
+    ],
+    replacements: [
+      {
+        id: 'take',
+        start: 0,
+        end: 2,
+        duration: 1,
+        assetId: `project-asset:${id}`,
+        phraseId: 'p',
+        revision: 1,
+        text: 'Edited',
+        textSignature: reviewSpeechTextSignature('Edited', profile),
+        profile,
+      },
+    ],
+  });
+  const state = createQuickEditAdvancedState();
+  state.audio.voiceover.push({
+    id: 'voice',
+    assetId: 'project-asset:original',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 4,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    transcript: speech('generated'),
+  });
+  const originalSpeech = (id: string) => ({
+    enabled: false,
+    transcript: {
+      ...speech(id),
+      replacements: speech(id).replacements.map((replacement) => ({
+        ...replacement,
+        enabled: false,
+        originalVolume: 0.2,
+      })),
+    },
+  });
+  state.audio.originalSpeech = originalSpeech('original-generated');
+  const before = reviewAdvancedContentBaseline(state);
+  const after = structuredClone(before);
+  after.audio.voiceover[0]!.transcript = speech('history');
+  after.audio.originalSpeech = originalSpeech('original-history');
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      aggregateId: 'recording:speech',
+      formatVersion: 1,
+      sourceAssetId: 'source',
+      source: { duration: 10, width: 640, height: 360, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 1,
+      advanced: {
+        ...state,
+        recoveryV1: JSON.stringify({
+          audio: {
+            voiceover: [{ assetId: 'project-asset:original', transcript: speech('recovery') }],
+            music: [],
+            originalSpeech: originalSpeech('original-recovery'),
+          },
+        }),
+      },
+      history: [{ id: 'apply', at: 1, target: 'advancedContent', before, after }],
+    },
+  };
+  const expected = [
+    'original',
+    'generated',
+    'history',
+    'recovery',
+    'original-generated',
+    'original-history',
+    'original-recovery',
+  ];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(expected.map((id) => `project-asset:${id}`))
+  );
+  for (const id of ['original-generated', 'original-history', 'original-recovery']) {
+    expect(
+      reviewWorkspaceHasSpeechReplacement(
+        snapshot.workspace,
+        { kind: 'original' },
+        'take',
+        `project-asset:${id}`
+      )
+    ).toBe(true);
+    expect(
+      reviewWorkspaceHasSpeechReplacement(
+        snapshot.workspace,
+        { kind: 'voiceover', clipId: 'voice' },
+        'take',
+        `project-asset:${id}`
+      )
+    ).toBe(false);
+    expect(
+      reviewWorkspaceHasSpeechReplacement(
+        snapshot.workspace,
+        { kind: 'original' },
+        'other',
+        `project-asset:${id}`
+      )
+    ).toBe(false);
+  }
+  expect(
+    reviewWorkspaceHasSpeechReplacement(
+      snapshot.workspace,
+      { kind: 'voiceover', clipId: 'voice' },
+      'take',
+      'project-asset:history'
+    )
+  ).toBe(true);
+  expect(
+    reviewWorkspaceHasSpeechReplacement(
+      snapshot.workspace,
+      { kind: 'voiceover', clipId: 'wrong' },
+      'take',
+      'project-asset:history'
+    )
+  ).toBe(false);
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(JSON.stringify(portable)).not.toContain('"assetId"');
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  const forged = structuredClone(portable.workspace);
+  forged.advanced.audio.voiceover[0]!.transcript!.replacements[0]!.assetId =
+    'project-asset:injected';
+  expect(() => assertPortableReviewAssetRefs(forged)).toThrow('local asset id');
+  expect(() => remapReviewAssetReferences(snapshot, new Map([['original', 'mapped']]))).toThrow(
+    'unresolved'
+  );
+  const remapped = remapReviewAssetReferences(
+    snapshot,
+    new Map(expected.map((id) => [id, `${id}-restored`]))
+  );
+  expect(collectReviewAssetReferences(remapped.workspace)).toEqual(
+    new Set(expected.map((id) => `project-asset:${id}-restored`))
+  );
+  const parsed = parseVideoWorkspace(snapshot.workspace);
+  expect(parsed?.history).toEqual(snapshot.workspace.history);
+  expect(parsed?.advanced.audio.voiceover[0]?.transcript).toEqual(speech('generated'));
+  expect(parsed?.advanced.audio.originalSpeech).toEqual(originalSpeech('original-generated'));
+  const forgedOriginal = structuredClone(portable.workspace);
+  forgedOriginal.advanced.audio.originalSpeech!.transcript.replacements[0]!.assetId =
+    'project-asset:injected';
+  expect(() => assertPortableReviewAssetRefs(forgedOriginal)).toThrow('local asset id');
+});
+
+it('finds the exact audio clip in current, history and recovery without confusing shared assets', async () => {
+  const { reviewWorkspaceHasAudioClip } = await import('./asset-refs');
+  const { createQuickEditAudioClip } =
+    await import('../../../features/video/review/advanced/audio');
+  const clip = createQuickEditAudioClip({
+    id: 'selected',
+    assetId: 'project-asset:shared',
+    timelineStart: 0,
+    duration: 1,
+    endMax: 12,
+  });
+  const current = advanced({});
+  const content = reviewAdvancedContentBaseline(current);
+  const withClip = { ...content, audio: { ...content.audio, music: [clip] } };
+  const cases: Pick<VideoWorkspace, 'advanced' | 'history'>[] = [
+    { advanced: { ...current, audio: withClip.audio }, history: [] },
+    {
+      advanced: current,
+      history: [{ id: 'op', at: 1, target: 'advancedContent', before: content, after: withClip }],
+    },
+    { advanced: { ...current, recoveryV1: JSON.stringify(withClip) }, history: [] },
+  ];
+  for (const workspace of cases) {
+    expect(reviewWorkspaceHasAudioClip(workspace, 'selected', 'project-asset:shared')).toBe(true);
+    expect(reviewWorkspaceHasAudioClip(workspace, 'other', 'project-asset:shared')).toBe(false);
+    expect(reviewWorkspaceHasAudioClip(workspace, 'selected', 'project-asset:other')).toBe(false);
+  }
+});
+
+it('retains remembered watermark logos across portable current, history and recovery', async () => {
+  const { createQuickEditWatermark } =
+    await import('../../../features/video/review/advanced/watermark');
+  const { reviewWorkspaceHasWatermarkImage } = await import('./asset-refs');
+  const logo = (id: string) => ({
+    ...createQuickEditWatermark('Saved text'),
+    mode: 'text' as const,
+    image: { assetId: `project-asset:${id}`, width: 80, height: 40, size: 0.2, opacity: 0.5 },
+  });
+  const baseline = advanced({ watermark: logo('base') });
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 1920, height: 1080, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: {
+        ...baseline,
+        recoveryV1: JSON.stringify({ watermark: { ...logo('recovery'), mode: 'none' } }),
+      },
+      history: [
+        {
+          id: 'logo',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), watermark: logo('after') },
+        },
+      ],
+    },
+  };
+  const ids = ['base', 'recovery', 'after'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:${id}`))
+  );
+  for (const id of ids)
+    expect(reviewWorkspaceHasWatermarkImage(snapshot.workspace, `project-asset:${id}`)).toBe(true);
+  expect(reviewWorkspaceHasWatermarkImage(snapshot.workspace, 'project-asset:other')).toBe(false);
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset id');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  expect(() => remapReviewAssetReferences(snapshot, new Map())).toThrow('unresolved');
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(ids.map((id) => [id, `copy-${id}`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:copy-${id}`))
+  );
+});
+
+it('retains both dormant scene variants through history, recovery, portable encoding and remap', async () => {
+  const { createNeutralPresentationSettings } =
+    await import('../../../features/video/review/advanced/presentation');
+  const { reviewWorkspaceHasSceneResource } = await import('./asset-refs');
+  const presentation = createNeutralPresentationSettings();
+  const framing = { fit: 'contain' as const, fillColor: '#000000ff', crop: { panX: 0, panY: 0 } };
+  presentation.intro = {
+    mode: 'none',
+    image: { ...framing, assetId: 'project-asset:shared', width: 20, height: 10, duration: 3 },
+    video: {
+      ...framing,
+      assetId: 'project-asset:video',
+      source: { width: 20, height: 10, duration: 5, size: 10, mimeType: 'video/webm' },
+      trim: { start: 1, end: 4 },
+      audio: { muted: false, gain: 1 },
+    },
+  };
+  presentation.outro = { mode: 'image', image: presentation.intro.image! };
+  const baseline = advanced({ presentation });
+  const historyPresentation = structuredClone(presentation);
+  historyPresentation.intro.image!.assetId = 'project-asset:history';
+  const recovery = structuredClone(presentation);
+  recovery.outro.image!.assetId = 'project-asset:recovery';
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: { ...baseline, recoveryV1: JSON.stringify({ presentation: recovery }) },
+      history: [
+        {
+          id: 'replace',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), presentation: historyPresentation },
+        },
+      ],
+    },
+  };
+  const ids = ['shared', 'video', 'history', 'recovery'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:${id}`))
+  );
+  expect(
+    reviewWorkspaceHasSceneResource(snapshot.workspace, 'intro', 'image', 'project-asset:history')
+  ).toBe(true);
+  expect(
+    reviewWorkspaceHasSceneResource(snapshot.workspace, 'outro', 'image', 'project-asset:recovery')
+  ).toBe(true);
+  expect(
+    reviewWorkspaceHasSceneResource(snapshot.workspace, 'outro', 'video', 'project-asset:video')
+  ).toBe(false);
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  expect(JSON.stringify(portable)).not.toContain('"assetId"');
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(ids.map((id) => [id, `${id}-copy`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:${id}-copy`))
+  );
+  expect(snapshot.workspace.advanced.presentation?.intro.video?.assetId).toBe(
+    'project-asset:video'
+  );
 });

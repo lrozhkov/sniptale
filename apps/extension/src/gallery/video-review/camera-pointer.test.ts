@@ -85,3 +85,30 @@ it('uses the unclipped viewport with padding and one clipped axis, including zer
   expect(visible(shifted).x).toBeGreaterThan(0);
   expect(visible(shifted).x + visible(shifted).width).toBeCloseTo(7 / 12);
 });
+
+it('places the decorated footprint center under an Area click while preserving source camera coordinates', () => {
+  const active = capture('', {
+    camera: { scale: 2, centerX: 0.8, centerY: 0.8 },
+    viewport: { x: 0, y: -0.2, width: 1, height: 1.2 },
+  });
+  expect(active.pending?.centerX).toBeCloseTo(0.25);
+  expect(active.pending?.centerY).toBeCloseTo(0.3);
+});
+
+it('captures and resizes the full window crop including the header at maximum zoom', () => {
+  const windowRect = { x: 40, y: 40, width: 640, height: 440 };
+  for (const view of ['area', 'result'] as const) {
+    const active = capture('nw', {
+      videoRect: windowRect,
+      output: { width: 720, height: 520 },
+      camera: { scale: 4, centerX: 0.5, centerY: 0 },
+      view,
+    });
+    expect(active.origin.centerY).toBe(0.125);
+    if (view === 'area') {
+      const resized = resizeCameraPointer(active, 0, -0.05);
+      expect(resized.scale).toBeLessThan(4);
+      expect(resized.centerY - 0.5 / resized.scale).toBeCloseTo(0);
+    }
+  }
+});

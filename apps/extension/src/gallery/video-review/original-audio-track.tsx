@@ -1,8 +1,16 @@
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+} from './track-row';
+import { useReviewGestureCancellation } from './timeline-drag';
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Volume2, VolumeX, Link2 } from 'lucide-react';
+import { Captions, Volume2, VolumeX, Link2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type {
@@ -11,10 +19,9 @@ import type {
 } from '../../features/video/review/advanced/types';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
-import type { ReviewTrackProjection } from './track-projection';
+import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
 import type { useReviewAudio } from './use-review-audio';
 import { ReviewAudioWaveform } from './audio-waveform';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewButton, reviewTrackStatusButtonClassName } from './controls';
 
 type Drag = {
@@ -34,6 +41,7 @@ type Drag = {
 
 /** Source-time automation shares video coordinates and never affects added audio clips. */
 export function ReviewOriginalAudioTrack(props: {
+  compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   original: QuickEditOriginalAudio;
   waveform?: ReviewWaveform | undefined;
@@ -45,15 +53,20 @@ export function ReviewOriginalAudioTrack(props: {
   selectedEditId?: string | undefined;
   onRange?: ((range: ReviewAnchor) => void) | undefined;
   onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
+  onOpenSpeech?: (() => void) | undefined;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
 }) {
   const duration = props.projection?.duration ?? props.duration;
   const muted = props.original.muted || props.original.volume === 0;
   const gesture = useOriginalAudioGesture(props, duration);
   const preview = gesture.preview;
+  const ranges = props.editor?.originalRanges ?? props.original.ranges ?? [];
+  const rows = reviewAudioClipRows(ranges);
+  const rowCount = Math.max(1, ...[...rows.values()].map((row) => row + 1));
+  const playback = props.editor?.originalPlayback ?? props.original;
   const gainAt = useCallback(
-    (time: number) => originalAudioGainAt(props.original, time, props.edits),
-    [props.original, props.edits]
+    (time: number) => originalAudioGainAt(playback, time, props.edits),
+    [playback, props.edits]
   );
   const rectStyle = (start: number, end: number) => ({
     left: `${(start / duration) * 100}%`,
@@ -61,27 +74,20 @@ export function ReviewOriginalAudioTrack(props: {
   });
   return (
     <ReviewTrackRow
+      track="originalAudio"
       muted={muted}
       label={translate('gallery.videoReview.audioOriginal')}
       icon={
         muted ? <VolumeX size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />
       }
       controls={
-        <ReviewButton
-          label={translate(
-            muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
-          )}
-          aria-pressed={!muted}
-          disabled={props.busy}
-          className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() =>
-            (props.beforeAction ?? ((action) => action()))(() =>
-              props.onOriginal({ muted: !muted })
-            )
-          }
-        >
-          {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-        </ReviewButton>
+        <OriginalAudioControls
+          onOpenSpeech={props.onOpenSpeech}
+          original={props.original}
+          busy={props.busy}
+          beforeAction={props.beforeAction}
+          onOriginal={props.onOriginal}
+        />
       }
     >
       <div className="min-w-0">
@@ -89,14 +95,15 @@ export function ReviewOriginalAudioTrack(props: {
           data-ui="gallery.videoReview.audioLane"
           data-original-audio-lane
           data-audio-muted={muted ? 'true' : 'false'}
-          className={`relative mt-1 h-8 rounded touch-none border-b border-dashed
+          className={`relative h-8 rounded touch-none border-b border-dashed
             bg-[var(--sniptale-color-surface-hover)]
             ${muted ? 'border-[var(--sniptale-color-text-secondary)]' : 'border-transparent'}`}
-          style={
-            gesture.preview?.id
+          style={{
+            height: rowCount * reviewTrackMetrics(props.compact).step,
+            ...(gesture.preview?.id
               ? { cursor: gesture.preview.edge === 'move' ? 'grabbing' : 'ew-resize' }
-              : undefined
-          }
+              : {}),
+          }}
           data-dragging={gesture.preview?.id ? 'true' : undefined}
           {...gesture.handlers}
         >
@@ -107,10 +114,12 @@ export function ReviewOriginalAudioTrack(props: {
             muted={muted}
             gainAt={gainAt}
           />
-          {props.original.ranges?.map((range) => (
+          {ranges.map((range) => (
             <ReviewOriginalGainBlock
+              compact={props.compact}
               key={range.id}
               range={range}
+              row={rows.get(range.id) ?? 0}
               duration={duration}
               preview={preview}
               selected={props.editor?.selectedOriginal?.id === range.id}
@@ -169,9 +178,49 @@ export function ReviewOriginalAudioTrack(props: {
   );
 }
 
+/** Master gain and mute share the source track's existing mutation admission. */
+function OriginalAudioControls(props: {
+  original: QuickEditOriginalAudio;
+  busy: boolean;
+  beforeAction?: ReviewBeforeAction | undefined;
+  onOpenSpeech?: (() => void) | undefined;
+  onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
+}) {
+  const muted = props.original.muted || props.original.volume === 0;
+  return (
+    <>
+      {props.onOpenSpeech ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.speechTitle')}
+          disabled={props.busy}
+          className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+          onClick={() => (props.beforeAction ?? ((action) => action()))(props.onOpenSpeech!)}
+        >
+          <Captions size={14} aria-hidden="true" />
+        </ReviewButton>
+      ) : null}
+      <ReviewButton
+        label={translate(
+          muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
+        )}
+        aria-pressed={!muted}
+        disabled={props.busy}
+        className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+        onClick={() =>
+          (props.beforeAction ?? ((action) => action()))(() => props.onOriginal({ muted: !muted }))
+        }
+      >
+        {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+      </ReviewButton>
+    </>
+  );
+}
+
 /** One authored source-gain item keeps its selection and resize handles together. */
 function ReviewOriginalGainBlock(props: {
+  compact?: boolean | undefined;
   range: QuickEditOriginalAudioRange;
+  row: number;
   duration: number;
   preview: Drag | null;
   selected: boolean;
@@ -190,9 +239,13 @@ function ReviewOriginalGainBlock(props: {
       title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
       data-ui="gallery.videoReview.originalAudioRange"
       data-audio-id={range.id}
-      className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
+      className={`absolute z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
         rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
       style={{
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset,
+        height: reviewTrackMetrics(props.compact).body,
         left: `${(start / props.duration) * 100}%`,
         width: `${((end - start) / props.duration) * 100}%`,
       }}
@@ -228,6 +281,19 @@ function useOriginalAudioGesture(
 ) {
   const drag = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
+  const boundary = preview;
+  useReviewResizeBoundary(
+    boundary?.admission ?? null,
+    boundary?.edge &&
+      boundary.edge !== 'move' &&
+      (props.editor?.originalRanges ?? props.original.ranges ?? []).some(
+        (range) => range.id === boundary.id
+      )
+      ? boundary.edge === 'start'
+        ? boundary.from
+        : boundary.to
+      : null
+  );
   const lifetime = useOriginalAudioGestureLifetime({
     drag,
     drawing: !!props.editor?.originalTool,
@@ -253,9 +319,18 @@ function useOriginalAudioGesture(
         event.preventDefault();
         const at = position(event);
         const id = item?.dataset['audioId'];
+        if (reviewTrackGestureLocked(event.currentTarget)) {
+          if (id) props.editor.selectOriginal(id);
+          return;
+        }
         const edge = item?.dataset['audioEdge'];
-        const range = props.original.ranges?.find((item) => item.id === id);
-        const neighbors = props.original.ranges?.filter((other) => other.id !== id) ?? [];
+        const range =
+          props.editor.originalRanges?.find((item) => item.id === id) ??
+          props.original.ranges?.find((item) => item.id === id);
+        const overlay = range && 'origin' in range && range.origin !== 'manual';
+        const neighbors = overlay
+          ? []
+          : (props.original.ranges?.filter((other) => other.id !== id) ?? []);
         const admission = deferReviewGesture(props.beforeAction, () => {
           if (id && lifetime.canCommit('item')) props.editor?.selectOriginal(id);
         });
@@ -371,6 +446,10 @@ function useOriginalAudioGestureLifetime(props: {
     if (current.node.hasPointerCapture?.(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
   }, [drag]);
+  useReviewGestureCancellation(() => {
+    discard();
+    resetPreview();
+  });
   useEffect(() => {
     const current = drag.current;
     if (!current || canCommit(current.id ? 'item' : 'range')) return;

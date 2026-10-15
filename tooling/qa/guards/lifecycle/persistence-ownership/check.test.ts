@@ -167,3 +167,50 @@ it('supports repo-wide mode without skipping when no explicit files are provided
   expect(result.skipped).toBe(false);
   expect(result.files.length).toBeGreaterThan(0);
 }, 120_000);
+
+it('admits only the explicit event history database adapter', () => {
+  const root = createTempRoot();
+  const owner = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/diagnostics/event-history-database.ts',
+    "import { openDB } from 'idb';\n"
+  );
+  const sibling = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/diagnostics/event-history.ts',
+    "import { openDB } from 'idb';\n"
+  );
+  expect(collectPersistenceOwnershipViolations([owner])).toEqual([]);
+  expect(collectPersistenceOwnershipViolations([sibling])).toEqual([
+    expect.objectContaining({ rule: 'indexed-db-entrypoint-owner-bypass' }),
+  ]);
+});
+
+it('distinguishes erased transaction types from runtime idb entrypoints', () => {
+  const root = createTempRoot();
+  const erased = writeFile(
+    root,
+    'apps/extension/src/example/erased.ts',
+    "import type { IDBPTransaction } from 'idb';\n"
+  );
+  const namedType = writeFile(
+    root,
+    'apps/extension/src/example/named-type.ts',
+    "import { type IDBPTransaction } from 'idb';\n"
+  );
+  const runtime = writeFile(
+    root,
+    'apps/extension/src/example/runtime.ts',
+    "import { type IDBPTransaction, openDB } from 'idb';\n"
+  );
+  const sideEffect = writeFile(
+    root,
+    'apps/extension/src/example/side-effect.ts',
+    "import 'idb';\n"
+  );
+  expect(collectPersistenceOwnershipViolations([erased, namedType])).toEqual([]);
+  expect(collectPersistenceOwnershipViolations([runtime, sideEffect])).toEqual([
+    expect.objectContaining({ rule: 'indexed-db-entrypoint-owner-bypass' }),
+    expect.objectContaining({ rule: 'indexed-db-entrypoint-owner-bypass' }),
+  ]);
+});

@@ -1,6 +1,49 @@
 import { defineMessageSource } from '../../source';
 
 export const settingsAiProvidersModelMessages = defineMessageSource({
+  modelAudioVerboseJson: { ru: 'Подробный JSON', en: 'Verbose JSON' },
+  modelOperationLabel: { ru: 'Назначение', en: 'Purpose' },
+  modelOperationText: { ru: 'Текст', en: 'Text' },
+  modelOperationTranscription: { ru: 'Распознавание речи', en: 'Transcription' },
+  modelOperationSpeech: { ru: 'Озвучка', en: 'Speech generation' },
+  modelAudioTransport: { ru: 'Способ распознавания', en: 'Recognition method' },
+  modelAudioSpeechApi: {
+    ru: 'Speech API · точные таймкоды',
+    en: 'Speech API · precise timestamps',
+  },
+  modelAudioMultimodal: {
+    ru: 'Мультимодальная модель · аудио и инструкции',
+    en: 'Multimodal model · audio and instructions',
+  },
+  modelAudioChatProtocol: { ru: 'Совместимость провайдера', en: 'Provider compatibility' },
+  modelAudioProtocolOpenai: { ru: 'OpenAI input_audio', en: 'OpenAI input_audio' },
+  modelAudioProtocolBothub: { ru: 'Bothub data URL', en: 'Bothub data URL' },
+  modelAudioJsonSchema: { ru: 'JSON Schema', en: 'JSON Schema' },
+  modelAudioJsonObject: { ru: 'JSON Object', en: 'JSON Object' },
+  modelAudioStructuredOutput: { ru: 'Структурированный ответ', en: 'Structured response' },
+  modelAudioLanguage: { ru: 'Язык (код ISO)', en: 'Language (ISO code)' },
+  modelAudioAuto: { ru: 'Автоматически', en: 'Automatic' },
+  modelAudioFormat: { ru: 'Формат ответа', en: 'Response format' },
+  modelAudioPcm: { ru: 'PCM · 24 кГц, моно', en: 'PCM · 24 kHz, mono' },
+  modelAudioTimestamps: { ru: 'Временные метки', en: 'Timestamps' },
+  modelAudioTimestampsNone: { ru: 'Без меток', en: 'None' },
+  modelAudioTimestampsSegment: { ru: 'Сегменты', en: 'Segments' },
+  modelAudioTimestampsWord: { ru: 'Слова', en: 'Words' },
+  modelAudioPrompt: {
+    ru: 'Словарь и подсказка (необязательно)',
+    en: 'Vocabulary and prompt (optional)',
+  },
+  modelAudioVoice: { ru: 'Идентификатор голоса', en: 'Voice ID' },
+  modelAudioSpeed: { ru: 'Скорость (необязательно, 0.25–4)', en: 'Speed (optional, 0.25–4)' },
+  modelAudioInstructions: {
+    ru: 'Подача (если поддерживается моделью)',
+    en: 'Delivery instructions (if supported)',
+  },
+  modelAudioInvalid: {
+    ru: 'Проверьте параметры: язык — код ISO, голос обязателен, скорость — от 0.25 до 4.',
+    en: 'Check parameters: use an ISO language code, specify a voice, and keep speed between 0.25 and 4.',
+  },
+
   modelsEmptyTitle: {
     ru: 'Нет моделей',
     en: 'No models',

@@ -112,7 +112,7 @@ it('does not begin lifecycle cleanup while retained image workspace journals can
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
 });
 
-it('removes standalone media dependency graphs and aggregate sidecars atomically', async () => {
+it('moves standalone media to Trash without deleting dependency graphs or sidecars', async () => {
   const lifecycle = createLibraryLifecycle('temporary', 1);
   const createMedia = (
     id: string,
@@ -181,7 +181,11 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
-          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          index: vi.fn(() => ({
+            count: vi.fn(async () => 0),
+            getAll: async () => [],
+            getAllKeys: async () => [],
+          })),
           put: vi.fn(),
         })),
       })),
@@ -191,21 +195,14 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 2,
-    deletedIds: [recordingMedia.id, projectAssetMedia.id],
+    movedCount: 2,
+    retainedCount: 0,
+    movedIds: [recordingMedia.id, projectAssetMedia.id],
   });
-  expect(deletes).toHaveBeenCalledWith('recordings', recording.id);
-  for (const id of [recordingMedia.id, projectAssetMedia.id]) {
-    expect(deletes).toHaveBeenCalledWith('video_workspaces', id);
-    expect(deletes).toHaveBeenCalledWith('video_workspace_drafts', id);
-  }
-  expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
-  expect(deletes).toHaveBeenCalledWith('project_assets', 'asset-1');
-  expect(deletes).toHaveBeenCalledWith('asset_refs', createProjectAssetEntry().assetId);
-  expect(deletes).toHaveBeenCalledWith('image_workspaces', recordingMedia.id);
-  expect(deletes).toHaveBeenCalledWith('image_workspaces', projectAssetMedia.id);
-  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', recordingMedia.id]);
-  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', projectAssetMedia.id]);
+  expect(deletes).not.toHaveBeenCalled();
+  expect(valuesByStore.get('recordings')!.get(recording.id)).toEqual(recording);
+  expect(valuesByStore.get('project_assets')!.has('asset-1')).toBe(true);
+  expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
 
 it('retains legacy project graphs and linked media when clearing drafts', async () => {
@@ -392,7 +389,11 @@ it('retains legacy project graphs and linked media when clearing drafts', async 
           }),
           get: vi.fn(async (id: string) => valuesByStore.get(name)?.get(id)),
           getAll: vi.fn(async () => [...(valuesByStore.get(name)?.values() ?? [])]),
-          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
+          index: vi.fn(() => ({
+            count: vi.fn(async () => 0),
+            getAll: async () => [],
+            getAllKeys: async () => [],
+          })),
           put: vi.fn(async (value: { operationId?: string }) => {
             if (value.operationId) valuesByStore.get(name)?.set(value.operationId, value);
           }),
@@ -403,7 +404,7 @@ it('retains legacy project graphs and linked media when clearing drafts', async 
 
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 1, movedIds: [] });
   expect(deletes).not.toHaveBeenCalled();
   expect(valuesByStore.get('video_projects')?.has(project.id)).toBe(true);
   expect(valuesByStore.get('scenario_projects')?.has(scenario.id)).toBe(true);
@@ -430,7 +431,7 @@ it('preserves trashed roots even when explicitly clearing every draft', async ()
       includeUnexpired: true,
       now: 1_000_000,
     })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
   expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
@@ -459,7 +460,7 @@ it('rechecks a draft project trashed after the candidate snapshot before deletin
       includeUnexpired: true,
       now: 1_000_000,
     })
-  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  ).resolves.toEqual({ movedCount: 0, retainedCount: 0, movedIds: [] });
   expect(remove).not.toHaveBeenCalled();
 });
 
@@ -546,19 +547,23 @@ it.each(['scenario-snapshot', 'video-snapshot', 'review-audio'] as const)(
                     : [],
             delete: deletes,
             put: vi.fn(),
-            index: () => ({ count: async () => 0 }),
+            index: () => ({
+              count: async () => 0,
+              getAll: async () => [],
+              getAllKeys: async () => [],
+            }),
           }),
         }),
       })
     );
     expect(
       await cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-    ).toEqual({ deletedCount: 0, deletedIds: [] });
+    ).toEqual({ movedCount: 0, retainedCount: 1, movedIds: [] });
     expect(deletes).not.toHaveBeenCalled();
   }
 );
 
-it('reclaims private auxiliary bytes when their standalone temporary review root expires', async () => {
+it('retains the primary review root and its private auxiliary bytes during expiry', async () => {
   const { createMediaLibraryEntry } = await import('../projects/index.test-support');
   const media = createMediaLibraryEntry({
     id: 'expired',
@@ -618,12 +623,18 @@ it('reclaims private auxiliary bytes when their standalone temporary review root
           getAll: async () => [...(rows.get(name)?.values() ?? [])],
           delete: async (key: string) => rows.get(name)?.delete(key),
           put: vi.fn(),
-          index: () => ({ count: async () => 0 }),
+          index: () => ({
+            count: async () => 0,
+            getAll: async () => [],
+            getAllKeys: async () => [],
+          }),
         }),
       }),
     })
   );
   await cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY });
-  expect(rows.get('project_assets')?.has('private-music')).toBe(false);
-  expect(rows.get('asset_refs')?.has('private-body')).toBe(false);
+  expect(rows.get('project_assets')?.has('private-music')).toBe(true);
+  expect(rows.get('asset_refs')?.has('private-body')).toBe(true);
+  expect(rows.get('media_library')!.get(media.id)).toEqual(media);
+  expect(rows.get('video_workspaces')!.get(media.id)).toEqual(review);
 });

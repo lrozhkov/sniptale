@@ -1,7 +1,7 @@
 import type { RecordingActionEvent, RecordingTelemetrySignal } from './types';
 
 const RECORDING_TYPING_MIN_SECONDS = 3;
-export const RECORDING_TYPING_FRAGMENT_MIN_SECONDS = 0.5;
+const RECORDING_TYPING_FRAGMENT_MIN_SECONDS = 0.5;
 export const RECORDING_TYPING_GAP_SECONDS = 1;
 const RECORDING_CLICK_GAP_SECONDS = 0.5;
 
@@ -23,12 +23,14 @@ export function normalizeRecordingActions(
 }
 
 /** Unknown target identity is preserved rather than guessed from a position or label. */
-export function isRepeatedRecordingClick(
+function isRepeatedRecordingClick(
   previous: RecordingActionEvent,
   event: RecordingActionEvent
 ): boolean {
   const target = event.data['targetId'];
   return (
+    previous.data['gestureId'] === undefined &&
+    event.data['gestureId'] === undefined &&
     previous.kind === 'CLICK' &&
     event.kind === 'CLICK' &&
     event.time >= previous.time &&
@@ -50,7 +52,7 @@ function isTextInput(signal: RecordingTelemetrySignal): boolean {
 }
 
 /** Discard tiny fragments before grouping; captureSegment prevents joining across recording pauses. */
-export function normalizeRecordingSignals(
+export function deriveLongRecordingTypingSignals(
   signals: readonly RecordingTelemetrySignal[]
 ): RecordingTelemetrySignal[] {
   const result = signals.filter((signal) => signal.kind !== 'typing');
@@ -63,6 +65,8 @@ export function normalizeRecordingSignals(
     .filter(
       (item) =>
         item.kind === 'typing' &&
+        item.data['activity'] !== 'keyboard' &&
+        item.data['privacy'] !== 'protected' &&
         item.endTime >= item.startTime + RECORDING_TYPING_FRAGMENT_MIN_SECONDS &&
         isTextInput(item)
     )
@@ -98,4 +102,20 @@ function mergeTypingSignals(
         : {}),
     },
   };
+}
+
+/** Raw signals retain short input and anonymous keyboard rhythm; automatic long typing is derived. */
+export function normalizeRecordingSignals(
+  signals: readonly RecordingTelemetrySignal[]
+): RecordingTelemetrySignal[] {
+  return signals
+    .filter(
+      (signal) =>
+        signal.kind !== 'typing' ||
+        isTextInput(signal) ||
+        signal.data['activity'] === 'keyboard' ||
+        !!signal.keyboardRhythm?.length ||
+        !!signal.keyboardRepeats?.length
+    )
+    .sort((left, right) => left.startTime - right.startTime);
 }

@@ -1,3 +1,4 @@
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { expect, type Page } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { PageAccessOperation } from '@sniptale/runtime-contracts/messaging/page-access';
@@ -587,3 +588,130 @@ test('popup video setup opens the video editor surface', async ({ page, hostOrig
   const [createdTab] = await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []);
   expect(createdTab?.url).toContain('/apps/extension/src/video-editor/index.html');
 });
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`popup discard cleanup error and retry ${viewport.name}`, async ({
+    page,
+    context,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    const capability = { recordingId: 'recording-cleanup', controlToken: 'cleanup-control-token' };
+    const activeState = createRecordingRuntimeState(VideoRecordingStatus.RECORDING);
+    const failedState = {
+      ...activeState,
+      status: VideoRecordingStatus.STOPPING,
+      error: 'Background cleanup refused',
+      completion: { discard: true, outcome: 'stopped' as const, pending: false },
+    };
+    const bootstrap = {
+      apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+      runtimeResponses: {
+        [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
+        [VideoMessageType.GET_RECORDING_STATE]: {
+          success: true,
+          recordingHealth: 'healthy',
+          state: activeState,
+          ...capability,
+        },
+      },
+      storage: {
+        'sniptale-theme-preference': viewport.name === '1920x900' ? 'dark' : 'light',
+        sniptale_popup_startup: {
+          selection: 'video',
+          lastPage: 'video',
+          lastExportDestination: 'export',
+        },
+      },
+    };
+    await applyHarnessBootstrap(page, bootstrap);
+    await openPopupHarness(page, hostOrigin);
+    await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+    await page.evaluate(
+      ({ state, capability }) => {
+        window.__sniptaleHarness?.setRuntimeResponse('STOP_RECORDING', async () => {
+          await new Promise<void>((resolve) =>
+            document.addEventListener('release-cleanup', () => resolve(), { once: true })
+          );
+          window.__sniptaleHarness?.setRuntimeResponse('GET_RECORDING_STATE', {
+            success: true,
+            recordingHealth: 'degraded',
+            state,
+            ...capability,
+          });
+          return { success: false, result: 'failed', error: 'Background cleanup refused' };
+        });
+      },
+      { state: failedState, capability }
+    );
+    await page.locator('[data-ui="popup.video-active.cancel-button"]').click();
+    await page.locator('[data-ui="popup.video-active.cancel-delete-button"]').click();
+    await expect(page.locator('[data-ui="popup.video-active.cancel-delete-button"]')).toHaveCount(
+      0
+    );
+    await page.evaluate(() => document.dispatchEvent(new Event('release-cleanup')));
+    const failure = page.locator('[data-ui="popup.video-completion.error"]');
+    await expect(failure).toBeVisible();
+    await expect(
+      failure.getByRole('button', { name: translate('popup.video.completionRetry', 'ru') })
+    ).toBeEnabled();
+    await page.screenshot({
+      path: info.outputPath(`cleanup-failure-${viewport.name}.png`),
+      fullPage: false,
+    });
+
+    const reopened = await context.newPage();
+    await reopened.setViewportSize(viewport.size);
+    await applyHarnessBootstrap(reopened, {
+      ...bootstrap,
+      runtimeResponses: {
+        ...bootstrap.runtimeResponses,
+        [VideoMessageType.GET_RECORDING_STATE]: {
+          success: true,
+          recordingHealth: 'degraded',
+          state: failedState,
+          ...capability,
+        },
+      },
+    });
+    await openPopupHarness(reopened, hostOrigin);
+    await reopened.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+    const retry = reopened.locator('[data-ui="popup.video-completion.retry"]');
+    await expect(retry).toBeEnabled();
+    await reopened.evaluate((idle) => {
+      window.__sniptaleHarness?.setRuntimeResponse('STOP_RECORDING', () => {
+        window.__sniptaleHarness?.setRuntimeResponse('GET_RECORDING_STATE', {
+          success: true,
+          recordingHealth: 'healthy',
+          state: idle,
+        });
+        return { success: true, result: 'accepted' };
+      });
+    }, createRecordingRuntimeState(VideoRecordingStatus.IDLE));
+    await retry.click();
+    await expect(
+      reopened.locator('[data-ui="popup.video-setup.start-recording-button"]')
+    ).toBeVisible();
+    expect(await getRuntimeMessagesByType(reopened, VideoMessageType.STOP_RECORDING)).toEqual([
+      expect.objectContaining({ ...capability, discard: true }),
+    ]);
+    await emitHarnessRuntimeMessage(reopened, {
+      type: VideoMessageType.RECORDING_STATE_SYNC,
+      state: {
+        ...failedState,
+        completion: { discard: true, outcome: 'failed', pending: false },
+      },
+    });
+    await expect(
+      reopened.getByText(translate('popup.video.completionFailedDescription', 'ru'))
+    ).toBeVisible();
+    await expect(
+      reopened.getByRole('button', { name: translate('popup.video.completionRetry', 'ru') })
+    ).toHaveCount(0);
+    await reopened.screenshot({
+      path: info.outputPath(`cleanup-terminal-failure-${viewport.name}.png`),
+      fullPage: false,
+    });
+    await reopened.close();
+  });
+}

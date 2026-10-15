@@ -156,7 +156,7 @@ export function EditorInspectorLayersHeader({
   );
 }
 
-export function EditorInspectorLayersList({
+export const EditorInspectorLayersList = React.memo(function EditorInspectorLayersList({
   layers,
   dragOverLayerId,
   setDraggedLayerId,
@@ -168,7 +168,7 @@ export function EditorInspectorLayersList({
   reserveScrollbarGutter = false,
   scrollable = false,
 }: EditorInspectorLayersListProps) {
-  useAppLocale();
+  const locale = useAppLocale();
   return (
     <div
       ref={listRef}
@@ -180,6 +180,7 @@ export function EditorInspectorLayersList({
           <div key={layer.id}>
             <LayerRow
               layer={layer}
+              locale={locale}
               dragOverLayerId={dragOverLayerId}
               setDraggedLayerId={setDraggedLayerId}
               setDragOverLayerId={setDragOverLayerId}
@@ -219,4 +220,4 @@ export function EditorInspectorLayersList({
       )}
     </div>
   );
-}
+});

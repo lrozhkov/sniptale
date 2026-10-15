@@ -18,7 +18,10 @@ const io = vi.hoisted(() => ({
   changed: vi.fn(),
 }));
 vi.mock('./source', () => ({ loadScenarioImageEditorSource: io.source }));
-vi.mock('./edits', () => ({ prepareScenarioEditedCaptureAsset: io.prepare }));
+vi.mock('./edits', async (original) => ({
+  ...(await original<typeof import('./edits')>()),
+  prepareScenarioEditedCaptureAsset: io.prepare,
+}));
 vi.mock('../../composition/persistence/scenario/aggregate-mutations', () => ({
   commitScenarioAggregateMutation: io.commit,
 }));
@@ -96,7 +99,7 @@ beforeEach(() => {
     asset: { id: 'new-image', width: 100, height: 80 },
     entry: { assetId: 'prepared' },
   });
-  io.commit.mockImplementation(async (project) => ({ project }));
+  io.commit.mockImplementation(async (project) => ({ project, workspaceRevision: 2 }));
   io.reject.mockImplementation(async (_children, error) => {
     throw error;
   });

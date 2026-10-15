@@ -186,3 +186,35 @@ it('throws when prompt query responses omit their payloads', async () => {
     'Chrome AI content system prompt response missing payload'
   );
 });
+
+it('filters text and audio selectors before presentation and never adds Chrome AI to audio', async () => {
+  const text = { id: 'text', providerId: 'p', modelCode: 'same', displayName: 'Text' };
+  const speech = {
+    ...text,
+    id: 'speech',
+    operation: 'speech',
+    audio: { speech: { voiceId: 'custom', responseFormat: 'mp3' } },
+  };
+  queryMocks.loadChromeAiAvailability.mockResolvedValue('available');
+  queryMocks.sendRuntimeMessage.mockResolvedValue({
+    success: true,
+    modelSelection: {
+      chromeAiEnabled: true,
+      defaultModelId: 'text',
+      globalSystemPrompt: 'Global',
+      providers: [],
+      models: [text, speech],
+    },
+  });
+  expect((await requestAIModelSelectionBootstrap()).models.map((model) => model.id)).not.toContain(
+    'speech'
+  );
+  await expect(requestAIModelSelectionBootstrap('speech')).resolves.toMatchObject({
+    models: [speech],
+    defaultModelId: 'speech',
+  });
+  await expect(requestAIModelSelectionBootstrap('transcription')).resolves.toMatchObject({
+    models: [],
+    defaultModelId: null,
+  });
+});

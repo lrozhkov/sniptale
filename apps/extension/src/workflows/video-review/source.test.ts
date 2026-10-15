@@ -1,3 +1,4 @@
+import { VideoWorkspaceError } from '../../composition/persistence/review-workspaces/store';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   media: vi.fn(),
@@ -6,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   export: vi.fn(),
   telemetry: vi.fn(),
   open: vi.fn(),
+  publish: vi.fn(),
   dispose: vi.fn(),
   duration: vi.fn(),
   metadataDuration: vi.fn(),
@@ -38,6 +40,9 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
     typeof import('../../composition/persistence/review-workspaces/store')
   >()),
   openVideoWorkspace: mocks.open,
+}));
+vi.mock('../../features/media-hub/events', () => ({
+  publishMediaHubLibraryChanged: mocks.publish,
 }));
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
@@ -110,7 +115,14 @@ it('loads saved action history using the recording identity and exposes its sour
   expect(mocks.telemetry).toHaveBeenCalledWith('r');
   expect(result.telemetry).toEqual(telemetry);
   expect(projectReviewTelemetry(result.telemetry!, result.source.duration).markers).toEqual([
-    { ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 2, end: 2.2 },
+    {
+      ref: { kind: 'action', id: 'click' },
+      eventType: 'CLICK',
+      audio: { family: 'mouse' },
+      start: 2,
+      end: 2.2,
+      targetSemantics: { kind: 'unknown', source: 'unknown' },
+    },
   ]);
 });
 
@@ -157,7 +169,7 @@ it('opens project exports and ready project assets without inferring recording t
   mocks.asset.mockResolvedValue({ status: 'missing' });
   await expect(
     loadVideoReviewSource('project-asset:asset', new AbortController().signal)
-  ).rejects.toThrow('Video source');
+  ).rejects.toThrow('video-review-open:source:unavailable');
 });
 
 it('rejects unavailable, non-video and invalid-duration sources before persisting a session', async () => {
@@ -200,4 +212,72 @@ it('preserves exported acquisition facts without rebuilding them from current te
   const result = await loadVideoReviewSource('recording:copy', new AbortController().signal);
   expect(result.recordingMetadata).toEqual(recordingMetadata);
   expect(result.telemetry).toBeNull();
+});
+
+it.each([
+  ['library', 'media'],
+  ['source', 'recording'],
+  ['metadata', 'metadata'],
+  ['telemetry', 'telemetry'],
+  ['workspace', 'open'],
+] as const)('reports fixed %s stage without retaining exception data', async (stage, method) => {
+  mocks[method].mockRejectedValueOnce(new Error('private-file-name SECRET_PAYLOAD'));
+  await expect(
+    loadVideoReviewSource('private-id', new AbortController().signal)
+  ).rejects.toMatchObject({
+    stage,
+    reason: 'unknown',
+    message: `video-review-open:${stage}:unknown`,
+  });
+});
+it.each(['invalid', 'conflict', 'missing-media', 'changed-source'] as const)(
+  'preserves typed workspace refusal %s',
+  async (code) => {
+    mocks.open.mockRejectedValueOnce({ code, secret: 'private-content' });
+    await expect(
+      loadVideoReviewSource('private-id', new AbortController().signal)
+    ).rejects.toMatchObject({ stage: 'workspace', reason: code });
+  }
+);
+it('keeps aborted workspace admission a cancellation', async () => {
+  const controller = new AbortController();
+  mocks.open.mockImplementationOnce(() => {
+    controller.abort();
+    throw new Error('private');
+  });
+  await expect(loadVideoReviewSource('private-id', controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+});
+
+it('carries structured workspace validation details without raw errors', async () => {
+  const diagnostic = {
+    check: 'history-replay' as const,
+    reason: 'no-change' as const,
+    operationIndex: 2,
+    target: 'advancedContent' as const,
+    cursor: 3,
+    historyLength: 4,
+  };
+  mocks.open.mockRejectedValueOnce(new VideoWorkspaceError('invalid', diagnostic));
+  await expect(
+    loadVideoReviewSource('private-id', new AbortController().signal)
+  ).rejects.toMatchObject({ stage: 'workspace', reason: 'invalid', diagnostic });
+});
+
+it('publishes project admission only after commit, including cancellation after commit', async () => {
+  const abort = new AbortController();
+  mocks.open.mockImplementationOnce(async () => {
+    expect(mocks.publish).not.toHaveBeenCalled();
+    abort.abort();
+    return { workspace: {}, draft: null };
+  });
+  await expect(loadVideoReviewSource('recording:r', abort.signal)).rejects.toThrow();
+  expect(mocks.publish).toHaveBeenCalledWith('update', ['recording:r']);
+  mocks.publish.mockClear();
+  mocks.open.mockRejectedValueOnce(new Error('commit refused'));
+  await expect(
+    loadVideoReviewSource('recording:r', new AbortController().signal)
+  ).rejects.toThrow();
+  expect(mocks.publish).not.toHaveBeenCalled();
 });

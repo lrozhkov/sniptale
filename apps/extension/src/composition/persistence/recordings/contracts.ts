@@ -6,6 +6,9 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   RecordingTelemetrySignal,
+  RecordingTelemetryCapabilities,
+  RecordingObservationClock,
+  RecordingTelemetryProvenance,
   RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
@@ -36,13 +39,10 @@ export interface RecordingEntry extends StoredRecordingEntry {
 }
 
 export interface RecordingTelemetryEntry {
-  /** Present only when source time semantics were verified at native ingestion. */
-  provenance?: {
-    source: 'native';
-    normalizationVersion: 1;
-    timeUnit: 'seconds';
-    coordinateSpace: 'desktop';
-  };
+  capabilities?: RecordingTelemetryCapabilities;
+  observationClock?: RecordingObservationClock;
+  /** Captured source clock/coordinates; absence means legacy provenance is unknown. */
+  provenance?: RecordingTelemetryProvenance;
   recordingId: string;
   createdAt: number;
   updatedAt: number;

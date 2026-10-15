@@ -74,3 +74,15 @@ it('validates the explicit HTML conversion format at the offscreen boundary', ()
   });
   expect(() => parseRuntimeRequestMessage({ ...request, downloadFormat: 'exe' })).toThrow();
 });
+
+it('parses signed preparation independently of staged asset identities', () => {
+  const type = MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD;
+  expect(parseRuntimeRequestMessage({ type, capabilityToken: 'capability' })).toMatchObject({
+    type,
+  });
+  expect(() => parseRuntimeRequestMessage({ type })).toThrow();
+  expect(parseRuntimeResponseForMessage(type, { success: true, result: 'accepted' })).toMatchObject(
+    { success: true }
+  );
+  expect(() => parseRuntimeResponseForMessage(type, { success: true, result: 'leased' })).toThrow();
+});

@@ -1,9 +1,14 @@
+import { readAllWorkspaceStorage } from '../review-workspaces/storage';
+import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
+import { completePhysicalDeleteOperations } from '../assets/operations';
+import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { sameMediaSource } from '../media-library/dependencies';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import {
   cancelAssetPublication,
   deleteReadyJournal,
   listReadyJournals,
+  listAssetObjectIds,
   parseBackupAssetOperation,
   parseArchiveRestoreSession,
   parsePhysicalDeleteAssetOperation,
@@ -11,6 +16,7 @@ import {
   collectQuiescentWritingObjects,
   recoverStandaloneAssetPublications,
   type AssetOperation,
+  type PhysicalDeleteAssetOperation,
   type AssetOperationCompensation,
   type ArchiveRestoreSession,
   clearArchiveRestoreCurrentRoot,
@@ -26,6 +32,7 @@ import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core';
 import {
   ASSET_OPERATIONS_STORE,
@@ -62,6 +69,8 @@ import { imageWorkspacePublicationAdapter } from '../image-aggregates/mutations'
 import { webSnapshotPublicationAdapter } from '../web-snapshots/publication';
 export { auditDurableAssets, collectOrphanAssetObjects } from './audit';
 import { collectOrphanAssetObjects } from './audit';
+
+const maintenanceLog = createMaintenanceLog();
 
 async function restorePreviousRecord(
   store: { put(value: unknown): Promise<unknown> },
@@ -198,7 +207,7 @@ async function compensationIsStillExclusive(
         assets: tx.objectStore(PROJECT_ASSETS_STORE),
         projects: tx.objectStore(VIDEO_PROJECTS_STORE),
         scenarioAssets: tx.objectStore(SCENARIO_ASSETS_STORE),
-        videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+        videoWorkspaces: { getAll: () => readAllWorkspaceStorage(tx) },
       });
     } catch (error) {
       if (error instanceof MediaAssetDeletionBlockedError) return false;
@@ -231,6 +240,7 @@ async function compensateRestoreOperation(
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
         VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
       ],
       'readwrite'
     );
@@ -344,22 +354,54 @@ async function deleteOperation(operationId: string): Promise<void> {
   await runWithIndexedDbMutation(async (db) => db.delete(ASSET_OPERATIONS_STORE, operationId));
 }
 
+/** Settle absent targets and replay existing bytes before any compensation changes authority. */
+async function replayPendingPhysicalDeletes(
+  operations: unknown[],
+  lifecyclePermit: DurableAssetLifecyclePermit
+): Promise<void> {
+  const physicalDeletes = operations.flatMap((raw) => {
+    const operation = parsePhysicalDeleteAssetOperation(raw);
+    return operation ? [operation] : [];
+  });
+  // An absent object already satisfies its delete intent, even if unrelated metadata is invalid.
+  // Enumeration failure propagates: an unavailable directory is not evidence of absence.
+  if (physicalDeletes.length) {
+    const objects = new Set(await listAssetObjectIds());
+    const pending: PhysicalDeleteAssetOperation[] = [];
+    for (const operation of physicalDeletes) {
+      const assetIds = operation.assetIds.filter((id) => objects.has(id));
+      if (assetIds.length || operation.privateSources?.length)
+        pending.push({ ...operation, assetIds });
+      else {
+        await deleteOperation(operation.operationId);
+        void maintenanceLog.append({
+          operation: 'physical-delete',
+          code: 'absent',
+          counts: { absent: operation.assetIds.length },
+        });
+      }
+    }
+    // No snapshot escapes this batch or crosses compensation/publication graph mutations.
+    if (pending.length)
+      await runStorageStartupPhase('asset-physical-delete-replay', () =>
+        completePhysicalDeleteOperations(pending, lifecyclePermit)
+      );
+  }
+}
+
 async function recoverBackupRestoreOperations(
   lifecyclePermit: DurableAssetLifecyclePermit
 ): Promise<void> {
-  const operations = await runWithIndexedDbMutation(async (db) =>
-    db.getAll(ASSET_OPERATIONS_STORE)
+  const operations = await runStorageStartupPhase('asset-operation-list', () =>
+    runWithIndexedDbMutation(async (db) => db.getAll(ASSET_OPERATIONS_STORE))
   );
   const byId = new Map<string, AssetOperation>();
   const blockedCompensations = new Set<string>();
   const archiveSessions = new Map<string, ArchiveRestoreSession>();
   const archiveSessionsWithAmbiguousJournals = new Set<string>();
+  await replayPendingPhysicalDeletes(operations, lifecyclePermit);
   for (const raw of operations) {
-    const physicalDelete = parsePhysicalDeleteAssetOperation(raw);
-    if (physicalDelete) {
-      await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
-      continue;
-    }
+    if (parsePhysicalDeleteAssetOperation(raw)) continue;
     const archiveSession = parseArchiveRestoreSession(raw);
     if (archiveSession) {
       archiveSessions.set(archiveSession.operationId, archiveSession);
@@ -386,7 +428,10 @@ async function recoverBackupRestoreOperations(
         blockedCompensations.add(operation.operationId);
     }
   }
-  for (const journal of await listReadyJournals()) {
+  for (const journal of await runStorageStartupPhase(
+    'asset-ready-journal-list',
+    listReadyJournals
+  )) {
     if (!journal.operationId) continue;
     if (blockedCompensations.has(journal.operationId)) continue;
     const operation = byId.get(journal.operationId);
@@ -488,24 +533,30 @@ async function recoverPublications(
   // the durable operation and lifecycle locks are held or nested IndexedDB mutations would
   // queue it behind this context's own holds.
   await initDB();
-  return runWithDurableAssetOperationRecovery(permit, async () => {
-    await collectQuiescentWritingObjects();
-    await runWithDurableAssetLifecycleLock((permit) => recoverBackupRestoreOperations(permit));
-    const recovered = await recoverStandaloneAssetPublications(
-      [
-        recordingAssetPublicationAdapter,
-        projectAssetPublicationAdapter,
-        projectExportPublicationAdapter,
-        scenarioAssetPublicationAdapter,
-        scenarioHtmlPublicationAdapter,
-        imageWorkspacePublicationAdapter,
-        webSnapshotPublicationAdapter,
-      ],
-      transitionPermit
-    );
-    if (collectOrphans) await collectOrphanAssetObjects();
-    return recovered;
-  });
+  return runStorageStartupPhase('asset-recovery', () =>
+    runWithDurableAssetOperationRecovery(permit, async () => {
+      await runStorageStartupPhase('asset-writing-cleanup', () => collectQuiescentWritingObjects());
+      await runStorageStartupPhase('asset-backup-recovery', () =>
+        runWithDurableAssetLifecycleLock((permit) => recoverBackupRestoreOperations(permit))
+      );
+      const recovered = await runStorageStartupPhase('asset-publication-replay', () =>
+        recoverStandaloneAssetPublications(
+          [
+            recordingAssetPublicationAdapter,
+            projectAssetPublicationAdapter,
+            projectExportPublicationAdapter,
+            scenarioAssetPublicationAdapter,
+            scenarioHtmlPublicationAdapter,
+            imageWorkspacePublicationAdapter,
+            webSnapshotPublicationAdapter,
+          ],
+          transitionPermit
+        )
+      );
+      if (collectOrphans) await collectOrphanAssetObjects();
+      return recovered;
+    })
+  );
 }
 
 /** Preserve the full maintenance behavior for existing explicit recovery consumers. */

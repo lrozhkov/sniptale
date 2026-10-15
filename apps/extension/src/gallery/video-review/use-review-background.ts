@@ -22,7 +22,7 @@ export function useReviewBackgroundImport(args: {
     },
     []
   );
-  const importImage = async (file: File) => {
+  const importImage = async (file: File, originMediaId?: string) => {
     if (running.current || !args.allowed()) return;
     const controller = new AbortController();
     running.current = controller;
@@ -32,6 +32,7 @@ export function useReviewBackgroundImport(args: {
       await args.advanced.flush();
       await importReviewBackgroundImage({
         file,
+        ...(originMediaId ? { originMediaId } : {}),
         signal: controller.signal,
         attach: async (assetId) => {
           controller.signal.throwIfAborted();

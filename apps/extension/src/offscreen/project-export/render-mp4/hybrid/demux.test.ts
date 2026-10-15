@@ -250,13 +250,17 @@ it('decodes source samples and forwards frames into the existing encoder', async
   await expect(
     encodeCleanSourceMp4Span({
       span: createSpan() as never,
+      encodeOptions: { avc: { quantizer: 20 } },
       throwIfPipelineFailed: vi.fn(),
       videoEncoder: { encode: encodeMock } as never,
     })
   ).resolves.toBe(true);
 
   expect(waitForEncoderQueueCapacityMock).toHaveBeenCalledOnce();
-  expect(encodeMock).toHaveBeenCalledWith(expect.any(VideoFrameMock), { keyFrame: true });
+  expect(encodeMock).toHaveBeenCalledWith(expect.any(VideoFrameMock), {
+    keyFrame: true,
+    avc: { quantizer: 20 },
+  });
   expect(closeFrameMock).toHaveBeenCalledOnce();
 });
 

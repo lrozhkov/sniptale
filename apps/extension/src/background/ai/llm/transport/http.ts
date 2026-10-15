@@ -88,9 +88,13 @@ export async function postJsonWithTimeout(args: {
   headers: Record<string, string>;
   timeoutErrorMessage: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
   url: string;
 }): Promise<{ data: unknown; ok: boolean; status: number }> {
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  args.signal?.throwIfAborted();
+  args.signal?.addEventListener('abort', abort, { once: true });
   const timeoutMs = args.timeoutMs ?? DEFAULT_LLM_REQUEST_TIMEOUT_MS;
   const timeoutId = setTimeout(() => {
     controller.abort();
@@ -119,11 +123,13 @@ export async function postJsonWithTimeout(args: {
     };
   } catch (error) {
     if (isAbortError(error)) {
+      if (args.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
       throw new Error(args.timeoutErrorMessage, { cause: error });
     }
 
     throw error;
   } finally {
     clearTimeout(timeoutId);
+    args.signal?.removeEventListener('abort', abort);
   }
 }

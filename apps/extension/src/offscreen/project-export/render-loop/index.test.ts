@@ -1,3 +1,4 @@
+import { createExportTimeEstimator } from '../../../features/video/project/export/time-estimate';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
@@ -204,4 +205,25 @@ it('keeps MP4 frame-driven progress based on frame indexes and sends the final f
   expectMp4FrameSyncTimes();
   expectMp4RenderProgressCalls();
   expect(videoFrameCloseMock).toHaveBeenCalledTimes(6);
+});
+
+it('sends actual measured ETA from the frame-driven producer and clears the last frame', async () => {
+  let clock = 0;
+  const estimator = createExportTimeEstimator([{ start: 0, end: 1, cost: 1 }], () => clock);
+  drawProjectFrameMock.mockImplementation(() => {
+    clock += 600;
+  });
+  installVideoFrameMock(vi.fn());
+  await runFrameDrivenCompositeRenderLoop(
+    { ...createJob('eta'), timeEstimator: estimator } as never,
+    createProject(1) as never,
+    createSettings(VideoExportFormat.MP4, 6),
+    {} as HTMLCanvasElement,
+    {} as CanvasRenderingContext2D,
+    {},
+    { encode: vi.fn() } as never,
+    vi.fn()
+  );
+  expect(sendProgressMock.mock.calls.some((call) => call[4]?.remainingMs > 0)).toBe(true);
+  expect(sendProgressMock.mock.calls.at(-1)).toHaveLength(4);
 });

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../page-session/document.test-support';
 import { createEditorSessionAutosaveService } from './';
@@ -26,7 +27,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('serializes caption history snapshots while an earlier save is pending', async () => {
+it('coalesces uncaptured caption autosaves while retaining the latest published history document', async () => {
   const autosave = createEditorSessionAutosaveService();
   autosave.activate({
     aggregateId: 'image-1',
@@ -52,21 +53,18 @@ it('serializes caption history snapshots while an earlier save is pending', asyn
   });
   for (const displayName of ['First', 'Second', 'Third']) {
     publisher.publishHistoryDocument({ ...createEditorDocumentFixture(), displayName });
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   }
   expect(commitWorkspaceMock).toHaveBeenCalledOnce();
   finishFirst();
   await vi.advanceTimersByTimeAsync(0);
-  expect(commitWorkspaceMock.mock.calls.map(([input]) => input.expectedRevision)).toEqual([
-    0, 1, 2,
-  ]);
+  expect(commitWorkspaceMock.mock.calls.map(([input]) => input.expectedRevision)).toEqual([0, 1]);
   expect(commitWorkspaceMock.mock.calls.map(([input]) => input.sourceTitle)).toEqual([
     'First',
-    'Second',
     'Third',
   ]);
   expect(autosave.getLastWriteError()).toBeNull();
-  expect(autosave.getDurableRevision()).toBe(3);
+  expect(autosave.getDurableRevision()).toBe(2);
   autosave.dispose();
 });
 
@@ -96,6 +94,7 @@ it('flushes edits arriving during the awaited write before allowing the document
     return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
   });
   let current = createDocument('first');
+  autosave.scheduleAutosave(current);
   const closing = autosave.flushAutosave(() => current);
   await vi.advanceTimersByTimeAsync(0);
   expect(commitWorkspaceMock).toHaveBeenCalledOnce();
@@ -140,6 +139,7 @@ it('refuses an old close flush when its in-flight atomic write finishes after a 
     });
     return { revision: 9, documentAssetsByRuntimeUrl: new Map() };
   });
+  autosave.scheduleAutosave(createDocument('old'));
   const closing = autosave.flushAutosave(() => createDocument('old'));
   const refused = expect(closing).rejects.toThrow('Editor document changed');
   await vi.advanceTimersByTimeAsync(0);
@@ -158,7 +158,7 @@ it('refuses an old close flush when its in-flight atomic write finishes after a 
   autosave.dispose();
 });
 
-it('finishes the atomic write when input resumes, then saves the newest snapshot after release', async () => {
+it('finishes the atomic write and saves the newest admitted snapshot during input', async () => {
   const autosave = createEditorSessionAutosaveService();
   activate(autosave);
   let finishWrite: () => void = () => undefined;
@@ -169,18 +169,18 @@ it('finishes the atomic write when input resumes, then saves the newest snapshot
     return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
   });
   autosave.scheduleAutosave(createDocument('first'));
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   autosave.scheduleAutosave(createDocument('queued'));
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   autosave.setInteractionActive(true);
   autosave.scheduleAutosave(createDocument('newest'));
   finishWrite();
   await vi.advanceTimersByTimeAsync(20_000);
-  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
-  expect(autosave.getDurableRevision()).toBe(1);
+  expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+  expect(autosave.getDurableRevision()).toBe(2);
   expect(autosave.hasUnsavedChanges()).toBe(true);
   autosave.setInteractionActive(false);
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
   expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
     expect.objectContaining({ document: createDocument('newest'), expectedRevision: 1 })

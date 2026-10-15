@@ -115,7 +115,10 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
         item={props.item}
         fit="contain"
         deferUntilVisible={
-          isList && (props.item.type === 'scenario' || props.item.type === 'video-project')
+          isList &&
+          (props.item.type === 'scenario' ||
+            props.item.type === 'video-project' ||
+            props.item.type === 'quick-edit-project')
         }
       />
       {!isList && isGalleryPreviewUnavailable(props.item) ? (
@@ -293,7 +296,9 @@ const GalleryGridCard = memo(
               selected={props.selected}
               viewMode={props.viewMode}
             />
-            {props.item.type !== 'scenario' && props.item.type !== 'video-project' ? (
+            {props.item.type !== 'scenario' &&
+            props.item.type !== 'video-project' &&
+            props.item.type !== 'quick-edit-project' ? (
               <GalleryGridDetails
                 compact={props.viewMode === 'compact-grid'}
                 item={props.item}

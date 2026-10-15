@@ -1,5 +1,12 @@
+import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
+import {
+  quickEditFocusType,
+  quickEditFocusConflicts,
+  resolveQuickEditFocusLink,
+} from './focus-layout';
 import type {
   QuickEditSpotlight,
+  QuickEditBorder,
   QuickEditZoomLinkEasing,
   QuickEditZoomRegion,
   QuickEditZoomTransition,
@@ -81,7 +88,13 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  cameraFollow?: QuickEditZoomRegion['cameraFollow'] | null;
+  followCursor?: boolean;
+  perspective?: QuickEditZoomRegion['perspective'];
+  depthOfField?: QuickEditZoomRegion['depthOfField'];
+  motionBlur?: QuickEditZoomRegion['motionBlur'];
   spotlight?: QuickEditSpotlight | null;
+  border?: QuickEditBorder | null;
   start?: number;
   end?: number;
   scale?: number;
@@ -99,17 +112,45 @@ export function updateQuickEditZoomRegion(
   id: string,
   patch: QuickEditZoomRegionPatch
 ): QuickEditZoomRegion[] {
+  if (
+    parseQuickEditPerspective(patch.perspective) === null ||
+    parseQuickEditDepth(patch.depthOfField) === null
+  )
+    return [...regions];
   const changesPhases = Boolean(patch.enter || patch.exit);
   const changesTiming = changesPhases || patch.start !== undefined || patch.end !== undefined;
   const updated = regions.map((region) => {
     if (region.id !== id) return region;
     const timing = changesPhases ? fitQuickEditZoomTransitions(region) : region;
-    const { linkTo: previousLink, spotlight: previousSpotlight, ...rest } = timing;
-    const spotlight = patch.spotlight === undefined ? previousSpotlight : patch.spotlight;
+    const {
+      linkTo: previousLink,
+      spotlight: previousSpotlight,
+      border: previousBorder,
+      cameraFollow: previousCameraFollow,
+      ...rest
+    } = timing;
+    const spotlight = patch.border
+      ? undefined
+      : patch.spotlight === undefined
+        ? previousSpotlight
+        : patch.spotlight;
+    const border = patch.spotlight
+      ? undefined
+      : patch.border === undefined
+        ? previousBorder
+        : patch.border;
     const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
+    const cameraFollow =
+      patch.cameraFollow === undefined ? previousCameraFollow : patch.cameraFollow;
     const updated = {
       ...rest,
+      ...(cameraFollow ? { cameraFollow } : {}),
+      ...(patch.followCursor === undefined ? {} : { followCursor: patch.followCursor }),
+      ...(patch.perspective ? { perspective: patch.perspective } : {}),
+      ...(patch.depthOfField ? { depthOfField: patch.depthOfField } : {}),
+      ...(patch.motionBlur ? { motionBlur: normalizeMotionBlur(patch.motionBlur) } : {}),
       ...(spotlight ? { spotlight } : {}),
+      ...(border ? { border } : {}),
       ...(linkTo ? { linkTo } : {}),
       ...(patch.start === undefined ? {} : { start: Math.max(0, patch.start) }),
       ...(patch.end === undefined ? {} : { end: Math.max(0, patch.end) }),
@@ -127,10 +168,19 @@ export function updateQuickEditZoomRegion(
     };
     return changesTiming ? fitZoomTimingPatch(updated, patch) : updated;
   });
+  const candidate = updated.find((region) => region.id === id);
+  if (candidate && quickEditFocusConflicts(updated, candidate)) return [...regions];
+  if (patch.linkTo && !resolveQuickEditFocusLink(updated, id, { sourceTime: true }))
+    return [...regions];
   return updated.map((region) => {
     if (!region.linkTo) return region;
     const target = updated.find((item) => item.id === region.linkTo);
-    if (!target || !!target.spotlight === !!region.spotlight) return region;
+    if (
+      target &&
+      quickEditFocusType(region) !== 'border' &&
+      quickEditFocusType(target) === quickEditFocusType(region)
+    )
+      return region;
     const { linkTo: _linkTo, linkEasing: _linkEasing, ...unlinked } = region;
     return unlinked;
   });
@@ -145,19 +195,7 @@ export function resolveQuickEditZoomLink(
   regions: readonly QuickEditZoomRegion[],
   id: string
 ): { source: QuickEditZoomRegion; target: QuickEditZoomRegion } | null {
-  const active = regions.filter((region) => !region.dormant);
-  const index = active.findIndex((region) => region.id === id);
-  const source = index >= 0 ? active[index] : undefined;
-  const target = index >= 0 ? active[index + 1] : undefined;
-  if (
-    !source?.linkTo ||
-    !target ||
-    source.linkTo !== target.id ||
-    target.start <= source.end ||
-    !!source.spotlight !== !!target.spotlight
-  )
-    return null;
-  return { source, target };
+  return resolveQuickEditFocusLink(regions, id);
 }
 
 /**
@@ -170,6 +208,17 @@ export function clampQuickEditZoomRegion(
   start: number,
   end: number
 ): { start: number; end: number } {
+  const selected = regions.find((region) => region.id === id);
+  regions = regions
+    .filter(
+      (region) =>
+        region.id === id ||
+        (selected &&
+          quickEditFocusType(selected) === 'zoom' &&
+          quickEditFocusType(region) === 'zoom' &&
+          !region.dormant)
+    )
+    .toSorted((a, b) => a.start - b.start);
   const index = regions.findIndex((region) => region.id === id);
   if (index < 0) return { start, end };
   const windowStart = index > 0 ? regions[index - 1]!.end : 0;
@@ -188,6 +237,7 @@ export function insertQuickEditZoomRegion(
   regions: readonly QuickEditZoomRegion[],
   region: QuickEditZoomRegion
 ): QuickEditZoomRegion[] {
+  if (quickEditFocusConflicts(regions, region)) return [...regions];
   const index = regions.findIndex((item) => item.start > region.start);
   if (index < 0) return [...regions, region];
   return [...regions.slice(0, index), region, ...regions.slice(index)];
@@ -199,9 +249,19 @@ export function availableQuickEditZoomRange(args: {
   at: number;
   timelineDuration: number;
   preferredLength?: number;
+  type?: 'zoom' | 'spotlight' | 'border';
 }): { start: number; end: number } | null {
   const preferredLength = args.preferredLength ?? DEFAULT_REGION_SECONDS;
-  const active = args.regions.filter((region) => !region.dormant);
+  const active = args.regions
+    .filter(
+      (region) =>
+        !region.dormant && (args.type ?? 'zoom') === 'zoom' && quickEditFocusType(region) === 'zoom'
+    )
+    .toSorted((a, b) => a.start - b.start)
+    .map((region) => {
+      const link = resolveQuickEditFocusLink(args.regions, region.id);
+      return link ? { ...region, end: link.target.start } : region;
+    });
   if (
     !Number.isFinite(args.at) ||
     args.at < 0 ||
@@ -222,9 +282,7 @@ export function moveQuickEditZoomRegion(args: {
   timelineDuration: number;
 }): { start: number; end: number } {
   // Dormant placements keep unproven values; only active neighbors bound the window.
-  const active = args.regions.filter((region) => !region.dormant || region.id === args.id);
-  const index = active.findIndex((region) => region.id === args.id);
-  const region = active[index];
+  const { active, index, region } = activeQuickEditZoomWindow(args.regions, args.id);
   if (!region) return { start: args.requestedStart, end: args.requestedStart };
   const length = region.end - region.start;
   const windowStart = index > 0 ? active[index - 1]!.end : 0;
@@ -244,9 +302,7 @@ export function trimQuickEditZoomRegion(args: {
   time: number;
   timelineDuration: number;
 }): { start: number; end: number } {
-  const active = args.regions.filter((region) => !region.dormant || region.id === args.id);
-  const index = active.findIndex((region) => region.id === args.id);
-  const region = active[index];
+  const { active, index, region } = activeQuickEditZoomWindow(args.regions, args.id);
   if (!region) return { start: 0, end: 0 };
   const windowStart = index > 0 ? active[index - 1]!.end : 0;
   const windowEnd = index < active.length - 1 ? active[index + 1]!.start : args.timelineDuration;
@@ -259,4 +315,33 @@ export function trimQuickEditZoomRegion(args: {
     start: region.start,
     end: Math.max(region.start + MIN_REGION_SECONDS, Math.min(args.time, windowEnd)),
   };
+}
+
+function normalizeMotionBlur(value: NonNullable<QuickEditZoomRegion['motionBlur']>) {
+  const result: NonNullable<QuickEditZoomRegion['motionBlur']> = {};
+  for (const phase of ['enter', 'exit', 'link'] as const) {
+    const setting = value[phase];
+    if (setting)
+      result[phase] = {
+        enabled: setting.enabled,
+        strength: Number.isFinite(setting.strength) ? clampUnit(setting.strength) : 0,
+      };
+  }
+  return result;
+}
+
+function activeQuickEditZoomWindow(regions: readonly QuickEditZoomRegion[], id: string) {
+  const selected = regions.find((region) => region.id === id);
+  const active = regions
+    .filter(
+      (region) =>
+        region.id === id ||
+        (!region.dormant &&
+          selected &&
+          quickEditFocusType(selected) === 'zoom' &&
+          quickEditFocusType(region) === 'zoom')
+    )
+    .toSorted((a, b) => a.start - b.start);
+  const index = active.findIndex((region) => region.id === id);
+  return { active, index, region: active[index] };
 }

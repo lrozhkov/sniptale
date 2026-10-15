@@ -9,6 +9,7 @@ import {
   resumeMediaHubBackupImport,
   type MediaHubBackupExportOptions,
   type MediaHubImportConflictStrategy,
+  backupFailure,
 } from '../../../workflows/media-hub-backup/index';
 import type { GalleryBackupExportController, GalleryImportController } from './controller-types';
 import type { GalleryItem } from '../items';
@@ -22,9 +23,27 @@ function buildSelectedBackupScope(
   items: GalleryItem[]
 ): NonNullable<MediaHubBackupExportOptions['selected']> {
   return {
-    mediaAssetIds: items.filter(isGalleryMediaItem).map((item) => item.entityId ?? item.id),
-    scenarioProjectIds: items.filter(isGalleryScenarioItem).map((item) => item.entityId),
-    videoProjectIds: items.filter(isGalleryVideoProjectItem).map((item) => item.entityId),
+    mediaAssetIds: [
+      ...new Set(
+        items
+          .filter((item) => isGalleryMediaItem(item) || item.type === 'quick-edit-project')
+          .map((item) => item.entityId ?? item.id)
+      ),
+    ],
+    scenarioProjectIds: [
+      ...new Set(
+        items.flatMap((item) =>
+          item.type === 'scenario-export'
+            ? [item.project.id]
+            : isGalleryScenarioItem(item)
+              ? [item.entityId]
+              : []
+        )
+      ),
+    ],
+    videoProjectIds: [
+      ...new Set(items.filter(isGalleryVideoProjectItem).map((item) => item.entityId)),
+    ],
   };
 }
 
@@ -46,7 +65,11 @@ export function createSelectedBackupExportOptions(
   if (!hasSelectedBackupScope(selected)) return null;
 
   return createMediaHubBackupExportOptions({
-    includeDrafts: items.some((item) => item.lifecycle?.storageClass === 'temporary'),
+    includeDrafts: items.some(
+      (item) =>
+        item.lifecycle?.storageClass === 'temporary' ||
+        (item.type === 'scenario-export' && item.project.lifecycle?.storageClass === 'temporary')
+    ),
     scope: 'selected',
     selected,
   });
@@ -68,35 +91,51 @@ export function createExportBackupAction(
   return async () => {
     const activeImport = controller.state.storage.activeImport;
     if (activeImport?.status === 'running' || activeImport?.status === 'cancelling') return;
-    await withBusy(async () => {
-      const options = createInitialBackupExportOptions(controller);
-      const summary = await inspectLocalMediaHubBackup(options);
-      controller.actions.surface.setPendingExport({ options, summary });
-    });
+    await withBusy(
+      async () => {
+        try {
+          const options = createInitialBackupExportOptions(controller);
+          const summary = await inspectLocalMediaHubBackup(options);
+          controller.actions.surface.setPendingExport({ options, summary });
+        } catch (error) {
+          throw backupFailure(error, 'prepare');
+        }
+      },
+      { stage: 'backup-prepare', materialType: 'mixed' }
+    );
   };
 }
 
 export function createConfirmExportBackupAction(controller: GalleryBackupExportController) {
   return async (options: MediaHubBackupExportOptions, withBusy: GalleryBusyAction) => {
-    await withBusy(async () => {
-      const abortController = new AbortController();
-      controller.actions.surface.replaceActiveBackupExport(abortController);
-      try {
-        const summary = await inspectLocalMediaHubBackup(options);
-        if (abortController.signal.aborted) {
-          return;
+    await withBusy(
+      async () => {
+        const abortController = new AbortController();
+        controller.actions.surface.replaceActiveBackupExport(abortController);
+        let phase: 'prepare' | 'write' = 'prepare';
+        try {
+          const summary = await inspectLocalMediaHubBackup(options);
+          if (abortController.signal.aborted) {
+            return;
+          }
+          controller.actions.surface.setPendingExport({ options, summary });
+          phase = 'write';
+          await exportMediaHubBackup(options, { signal: abortController.signal });
+          if (abortController.signal.aborted) {
+            return;
+          }
+          controller.actions.surface.setPendingExport(null);
+          await controller.actions.storage.refresh();
+        } catch (error) {
+          if (abortController.signal.aborted)
+            throw new DOMException('Media backup export cancelled.', 'AbortError');
+          throw backupFailure(error, phase);
+        } finally {
+          controller.actions.surface.releaseActiveBackupExport(abortController);
         }
-        controller.actions.surface.setPendingExport({ options, summary });
-        await exportMediaHubBackup(options, { signal: abortController.signal });
-        if (abortController.signal.aborted) {
-          return;
-        }
-        controller.actions.surface.setPendingExport(null);
-        await controller.actions.storage.refresh();
-      } finally {
-        controller.actions.surface.releaseActiveBackupExport(abortController);
-      }
-    });
+      },
+      { stage: 'backup-export', materialType: 'mixed' }
+    );
   };
 }
 
@@ -121,22 +160,29 @@ export function createImportSelectedFileAction(controller: GalleryImportControll
       return;
     }
 
-    await withBusy(async () => {
-      const summary = await inspectMediaHubBackup(file);
-      const resumable = (await listResumableMediaHubRestores()).find(
-        (session) => session.archiveFingerprint === summary.archiveFingerprint
-      );
-      controller.actions.surface.setPendingImport({
-        file,
-        ...(resumable
-          ? {
-              resumeOperationId: resumable.operationId,
-              resumeStrategy: resumable.strategy,
-            }
-          : {}),
-        summary,
-      });
-    });
+    await withBusy(
+      async () => {
+        try {
+          const summary = await inspectMediaHubBackup(file);
+          const resumable = (await listResumableMediaHubRestores()).find(
+            (session) => session.archiveFingerprint === summary.archiveFingerprint
+          );
+          controller.actions.surface.setPendingImport({
+            file,
+            ...(resumable
+              ? {
+                  resumeOperationId: resumable.operationId,
+                  resumeStrategy: resumable.strategy,
+                }
+              : {}),
+            summary,
+          });
+        } catch (error) {
+          throw backupFailure(error, 'read');
+        }
+      },
+      { stage: 'backup-import', materialType: 'mixed' }
+    );
 
     if (controller.refs.importInputRef.current) {
       controller.refs.importInputRef.current.value = '';
@@ -165,81 +211,84 @@ export function createImportAction(controller: GalleryImportController) {
     });
     controller.refs.importTriggerRef.current?.focus();
 
-    await withBusy(async () => {
-      const abortController = new AbortController();
-      let operationId = pendingImport.resumeOperationId ?? null;
-      activeImportAbortControllers.set(runId, abortController);
-      try {
-        const onProgress = (progress: {
-          bytesRead: number;
-          bytesWritten: number;
-          currentFilename: string | null;
-          rootsComplete: number;
-        }) => {
+    await withBusy(
+      async () => {
+        const abortController = new AbortController();
+        let operationId = pendingImport.resumeOperationId ?? null;
+        activeImportAbortControllers.set(runId, abortController);
+        try {
+          const onProgress = (progress: {
+            bytesRead: number;
+            bytesWritten: number;
+            currentFilename: string | null;
+            rootsComplete: number;
+          }) => {
+            controller.actions.surface.setActiveImport((current) =>
+              current?.id === runId ? { ...current, progress } : current
+            );
+          };
+          const result = pendingImport.resumeOperationId
+            ? await resumeMediaHubBackupImport({
+                file: pendingImport.file,
+                operationId: pendingImport.resumeOperationId,
+                onProgress,
+                signal: abortController.signal,
+              })
+            : await importMediaHubBackup(pendingImport.file, strategy, {
+                onSessionCreated: (createdOperationId) => {
+                  operationId = createdOperationId;
+                },
+                onProgress,
+                signal: abortController.signal,
+              });
+          if (abortController.signal.aborted) {
+            controller.actions.surface.setActiveImport((current) =>
+              current?.id === runId ? { ...current, result, status: 'cancelled' } : current
+            );
+            return;
+          }
           controller.actions.surface.setActiveImport((current) =>
-            current?.id === runId ? { ...current, progress } : current
+            current?.id === runId ? { ...current, result, status: 'completed' } : current
           );
-        };
-        const result = pendingImport.resumeOperationId
-          ? await resumeMediaHubBackupImport({
-              file: pendingImport.file,
-              operationId: pendingImport.resumeOperationId,
-              onProgress,
-              signal: abortController.signal,
-            })
-          : await importMediaHubBackup(pendingImport.file, strategy, {
-              onSessionCreated: (createdOperationId) => {
-                operationId = createdOperationId;
-              },
-              onProgress,
-              signal: abortController.signal,
-            });
-        if (abortController.signal.aborted) {
-          controller.actions.surface.setActiveImport((current) =>
-            current?.id === runId ? { ...current, result, status: 'cancelled' } : current
-          );
-          return;
-        }
-        controller.actions.surface.setActiveImport((current) =>
-          current?.id === runId ? { ...current, result, status: 'completed' } : current
-        );
-        await controller.actions.filters.reloadSavedViews();
-        await controller.actions.storage.refresh();
-      } catch {
-        let partialResult:
-          | {
-              conflictsResolved: number;
-              imported: number;
-              operationId: string;
-              skipped: number;
+          await controller.actions.filters.reloadSavedViews();
+          await controller.actions.storage.refresh();
+        } catch {
+          let partialResult:
+            | {
+                conflictsResolved: number;
+                imported: number;
+                operationId: string;
+                skipped: number;
+              }
+            | undefined;
+          if (operationId) {
+            const session = await readMediaHubRestoreSummary(operationId).catch(() => null);
+            if (session) {
+              partialResult = {
+                conflictsResolved: session.conflictedRootCount,
+                imported: session.committedRootCount - session.skippedRootCount,
+                operationId: session.operationId,
+                skipped: session.skippedRootCount,
+              };
             }
-          | undefined;
-        if (operationId) {
-          const session = await readMediaHubRestoreSummary(operationId).catch(() => null);
-          if (session) {
-            partialResult = {
-              conflictsResolved: session.conflictedRootCount,
-              imported: session.committedRootCount - session.skippedRootCount,
-              operationId: session.operationId,
-              skipped: session.skippedRootCount,
-            };
+          }
+          controller.actions.surface.setActiveImport((current) =>
+            current?.id === runId
+              ? {
+                  ...current,
+                  ...(partialResult ? { result: partialResult } : {}),
+                  status: abortController.signal.aborted ? 'cancelled' : 'failed',
+                }
+              : current
+          );
+        } finally {
+          if (activeImportAbortControllers.get(runId) === abortController) {
+            activeImportAbortControllers.delete(runId);
           }
         }
-        controller.actions.surface.setActiveImport((current) =>
-          current?.id === runId
-            ? {
-                ...current,
-                ...(partialResult ? { result: partialResult } : {}),
-                status: abortController.signal.aborted ? 'cancelled' : 'failed',
-              }
-            : current
-        );
-      } finally {
-        if (activeImportAbortControllers.get(runId) === abortController) {
-          activeImportAbortControllers.delete(runId);
-        }
-      }
-    });
+      },
+      { stage: 'backup-import', materialType: 'mixed' }
+    );
   };
 }
 

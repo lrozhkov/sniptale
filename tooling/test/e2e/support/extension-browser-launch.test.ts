@@ -72,3 +72,21 @@ it('rejects invalid run presets before starting Chromium', async () => {
   await expect(launchExtensionBrowser()).rejects.toThrow(/SNIPTALE_E2E_VIEWPORT/u);
   expect(browserIo.launch).not.toHaveBeenCalled();
 });
+
+it('isolates fake camera and named window selection to the requested browser profile', async () => {
+  preparePersistentBrowser();
+  await launchExtensionBrowser({
+    userDataDir: '/tmp/camera-profile',
+    fakeMediaDevices: true,
+    windowCaptureTitle: 'Native recording window',
+  });
+  const args = browserIo.launch.mock.calls[0]?.[1]?.args;
+  expect(args).toContain('--use-fake-device-for-media-stream=fps=30');
+  expect(args).toContain('--use-fake-ui-for-media-stream');
+  expect(args).toContain('--auto-select-window-capture-source-by-title=Native recording window');
+  expect(args).not.toContain('--auto-select-screen-capture-source');
+  await launchExtensionBrowser({ userDataDir: '/tmp/tab-profile' });
+  const tabArgs = browserIo.launch.mock.calls[1]?.[1]?.args;
+  expect(tabArgs).not.toContain('--use-fake-device-for-media-stream=fps=30');
+  expect(tabArgs).toContain('--auto-select-screen-capture-source');
+});

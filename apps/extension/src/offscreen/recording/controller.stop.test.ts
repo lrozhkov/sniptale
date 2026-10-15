@@ -62,3 +62,17 @@ it('publishes stopped with the session id when cancelling before recorder bindin
     recordingId: 'recording-race',
   });
 });
+
+it('refuses an idle stop without exact retained evidence of cleanup', async () => {
+  await expect(
+    stopRecording(
+      {
+        generation: 8,
+        recordingId: 'unknown-recording',
+        streamInstanceId: 'unknown-source',
+      },
+      true
+    )
+  ).rejects.toThrow('Recording source binding is unavailable');
+  expect(cleanupResourcesMock).not.toHaveBeenCalled();
+});

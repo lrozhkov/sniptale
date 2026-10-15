@@ -11,6 +11,7 @@ import {
   SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE,
   SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE,
   SETTINGS_TRANSFER_VIEW_COVERAGE,
+  SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE,
 } from './settings-coverage';
 
 describe('visible Settings transfer coverage guard', () => {
@@ -30,13 +31,35 @@ describe('visible Settings transfer coverage guard', () => {
 
   it('keeps surface and gradient views in the same route and transfer catalog', () => {
     for (const [section, viewCoverage] of Object.entries(SETTINGS_TRANSFER_VIEW_COVERAGE)) {
-      expect(Object.keys(viewCoverage)).toEqual(
+      const excluded =
+        Object.entries(SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE).find(
+          ([excludedSection]) => excludedSection === section
+        )?.[1] ?? {};
+      expect(Object.keys({ ...viewCoverage, ...excluded })).toEqual(
         SETTINGS_SECTION_VIEWS[section as keyof typeof SETTINGS_SECTION_VIEWS]
       );
       for (const domainId of Object.values(viewCoverage)) {
         expect(SETTINGS_TRANSFER_REGISTRY_BY_ID.has(domainId), domainId).toBe(true);
       }
     }
+  });
+
+  it('declares only the policy-excluded local background catalog as a non-transferable view', () => {
+    expect(SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE).toEqual({
+      'editor-resources': {
+        backgrounds: {
+          storageKey: 'sniptale_background_presets',
+          policy: 'docs/security/data-handling.md',
+          reason: 'Local-only background preset metadata is excluded from settings transfer.',
+        },
+      },
+    });
+    const policy = readFileSync(join(process.cwd(), 'docs/security/data-handling.md'), 'utf8');
+    const backgroundPolicy = policy
+      .split('\n\n')
+      .find((paragraph) => paragraph.startsWith('Background preset metadata'));
+    expect(backgroundPolicy).toContain('sniptale_background_presets');
+    expect(backgroundPolicy).toContain('Exclude it from sync, settings transfer');
   });
 
   it('classifies every Settings persistence mutation callsite exactly', () => {

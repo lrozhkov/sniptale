@@ -1,3 +1,5 @@
+import { windowHeaderGeometry, type WindowHeader } from '../../../browser-frame/header';
+import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
 import { cameraContentFrame, type CameraAppearance } from '../../project/camera/appearance';
 import { VideoMediaFitMode, type VideoMediaShadowMode } from '../../project/types/index';
 import { drawMediaFrameShadow, traceCameraShape } from './media-shadow';
@@ -18,7 +20,8 @@ type MediaFrameRenderer = (
   drawX: number,
   drawY: number,
   drawWidth: number,
-  drawHeight: number
+  drawHeight: number,
+  context?: CanvasRenderingContext2D
 ) => void;
 
 function shouldDrawFittedMediaDirectly(params: {
@@ -64,11 +67,26 @@ function getFittedMediaFrame(params: {
 }
 
 export function getFittedMediaContentFrame(params: {
+  windowHeader?: WindowHeader;
   fitMode: VideoMediaFitMode;
   frame: MediaFrame;
   sourceHeight: number;
   sourceWidth: number;
 }): MediaFrame {
+  if (params.windowHeader) {
+    const headerHeight = windowHeaderGeometry(params.windowHeader, {
+      width: params.sourceWidth,
+      height: params.sourceHeight,
+    }).height;
+    const plane = getFittedMediaContentFrame({
+      fitMode: params.fitMode,
+      frame: params.frame,
+      sourceWidth: params.sourceWidth,
+      sourceHeight: params.sourceHeight + headerHeight,
+    });
+    const inset = (plane.height * headerHeight) / (params.sourceHeight + headerHeight);
+    return { ...plane, y: plane.y + inset, height: plane.height - inset };
+  }
   if (
     shouldDrawFittedMediaDirectly({
       fitMode: params.fitMode,
@@ -92,13 +110,7 @@ export function getFittedMediaContentFrame(params: {
   });
 }
 
-export function mapSourcePointToFittedMediaFrame(params: {
-  fitMode: VideoMediaFitMode;
-  frame: MediaFrame;
-  point: SourcePoint;
-  sourceHeight: number;
-  sourceWidth: number;
-}): SourcePoint {
+export function mapSourcePointToFittedMediaFrame(params: FittedMediaPointMapping): SourcePoint {
   const frame = getFittedMediaContentFrame(params);
   const sourceWidth = Math.max(1, params.sourceWidth);
   const sourceHeight = Math.max(1, params.sourceHeight);
@@ -109,13 +121,7 @@ export function mapSourcePointToFittedMediaFrame(params: {
   };
 }
 
-export function mapFittedMediaFramePointToSource(params: {
-  fitMode: VideoMediaFitMode;
-  frame: MediaFrame;
-  point: SourcePoint;
-  sourceHeight: number;
-  sourceWidth: number;
-}): SourcePoint {
+export function mapFittedMediaFramePointToSource(params: FittedMediaPointMapping): SourcePoint {
   const frame = getFittedMediaContentFrame(params);
   const sourceWidth = Math.max(1, params.sourceWidth);
   const sourceHeight = Math.max(1, params.sourceHeight);
@@ -159,6 +165,9 @@ export function drawFittedMediaFrame(
 
 export function drawFittedMediaLayer(params: {
   cameraAppearance?: CameraAppearance;
+  windowHeaderImage?: HTMLImageElement;
+  windowHeader?: WindowHeader;
+  hideWindowHeader?: boolean;
   camera?: boolean;
   context: CanvasRenderingContext2D;
   displayScale: number;
@@ -188,12 +197,26 @@ export function drawFittedMediaLayer(params: {
     params.context,
     params.shadowIntensity,
     params.shadowMode,
-    params.frame,
+    params.windowHeader && params.windowHeaderImage && params.fitMode !== VideoMediaFitMode.COVER
+      ? getFittedMediaContentFrame({
+          fitMode: params.fitMode,
+          frame: params.frame,
+          sourceWidth: params.sourceWidth,
+          sourceHeight:
+            params.sourceHeight +
+            windowHeaderGeometry(params.windowHeader, {
+              width: params.sourceWidth,
+              height: params.sourceHeight,
+            }).height,
+        })
+      : params.frame,
     params.displayScale,
     params.cameraAppearance,
     params.camera
   );
-  if (params.cameraAppearance) {
+  if (params.windowHeaderImage) {
+    drawWindowMediaPlane(params);
+  } else if (params.cameraAppearance) {
     const content = cameraContentFrame(
       params.frame.width,
       params.frame.height,
@@ -215,8 +238,69 @@ export function drawFittedMediaLayer(params: {
   } else drawFitted(params.render);
 }
 
+/** Rasterize adjoining edges before the clip transform, so subpixel scaling cannot open a seam. */
+function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]): void {
+  const header = params.windowHeaderImage;
+  if (!header) return;
+  const rasterScale = Math.min(1, 4096 / Math.max(params.frame.width, params.frame.height));
+  const width = Math.max(1, Math.ceil(params.frame.width * rasterScale));
+  const height = Math.max(1, Math.ceil(params.frame.height * rasterScale));
+  const lease = acquireVideoCompositionBuffer(width, height, params.context.canvas.ownerDocument);
+  const context = lease?.canvas.getContext('2d');
+  if (!lease || !context || !('setTransform' in context)) {
+    lease?.release();
+    throw new Error('Window header composition surface is unavailable.');
+  }
+  const plane = context as CanvasRenderingContext2D;
+  try {
+    plane.reset?.();
+    plane.setTransform(1, 0, 0, 1, 0, 0);
+    plane.clearRect(0, 0, width, height);
+    const sourceHeaderHeight = params.windowHeader
+      ? windowHeaderGeometry(params.windowHeader, {
+          width: params.sourceWidth,
+          height: params.sourceHeight,
+        }).height
+      : header.naturalHeight;
+    drawFittedMediaFrame(
+      plane,
+      params.sourceWidth,
+      params.sourceHeight + sourceHeaderHeight,
+      0,
+      0,
+      width,
+      height,
+      params.fitMode,
+      (x, y, w, h) => {
+        const join = Math.round(
+          y + (h * sourceHeaderHeight) / (params.sourceHeight + sourceHeaderHeight)
+        );
+        if (!params.hideWindowHeader) plane.drawImage(header, x, y, w, join - y);
+        plane.save();
+        plane.beginPath();
+        plane.rect(x, join, w, y + h - join);
+        plane.clip();
+        // Keep callback coordinates in the composition frame for source-anchored actions.
+        plane.translate(-params.frame.x, -params.frame.y);
+        params.render(params.frame.x + x, params.frame.y + join, w, y + h - join, plane);
+        plane.restore();
+      }
+    );
+    params.context.drawImage(
+      lease.canvas,
+      params.frame.x,
+      params.frame.y,
+      params.frame.width,
+      params.frame.height
+    );
+  } finally {
+    lease.release();
+  }
+}
+
 /** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
 export interface VisualLayerSourcePointMapping {
+  windowHeader?: WindowHeader;
   point: { x: number; y: number };
   frame: MediaFrame & { rotation: number };
   fitMode: VideoMediaFitMode;
@@ -272,11 +356,7 @@ export function mapSourceNormalizedPointToVisualLayer(
     y: content.y + params.point.y * content.height,
   };
   if (!isInsideFrame(point, params.frame)) return null;
-  const center = {
-    x: params.frame.x + params.frame.width / 2,
-    y: params.frame.y + params.frame.height / 2,
-  };
-  const angle = (params.frame.rotation * Math.PI) / 180;
+  const { center, angle } = visualLayerRotation(params.frame);
   const x = point.x - center.x;
   const y = point.y - center.y;
   return {
@@ -296,11 +376,7 @@ export function mapVisualLayerPointToSourceNormalized(
   params: VisualLayerSourcePointMapping
 ): SourcePoint | null {
   if (!isValidPointMapping(params)) return null;
-  const center = {
-    x: params.frame.x + params.frame.width / 2,
-    y: params.frame.y + params.frame.height / 2,
-  };
-  const angle = (params.frame.rotation * Math.PI) / 180;
+  const { center, angle } = visualLayerRotation(params.frame);
   const x = (params.point.x - center.x - params.renderState.translateX) / params.renderState.scaleX;
   const y = (params.point.y - center.y - params.renderState.translateY) / params.renderState.scaleY;
   const point = {
@@ -313,4 +389,19 @@ export function mapVisualLayerPointToSourceNormalized(
     x: Math.min(1, Math.max(0, (point.x - content.x) / content.width)),
     y: Math.min(1, Math.max(0, (point.y - content.y) / content.height)),
   };
+}
+
+function visualLayerRotation(frame: MediaFrame & { rotation: number }) {
+  return {
+    center: { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 },
+    angle: (frame.rotation * Math.PI) / 180,
+  };
+}
+
+interface FittedMediaPointMapping {
+  fitMode: VideoMediaFitMode;
+  frame: MediaFrame;
+  point: SourcePoint;
+  sourceHeight: number;
+  sourceWidth: number;
 }

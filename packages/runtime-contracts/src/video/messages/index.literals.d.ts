@@ -37,6 +37,7 @@ declare module './index' {
       typeof import('./index').VideoMessageType.RECORDING_DURATION_UPDATED;
     type RECORDING_ERROR = typeof import('./index').VideoMessageType.RECORDING_ERROR;
     type READY_TO_COUNTDOWN = typeof import('./index').VideoMessageType.READY_TO_COUNTDOWN;
+    type RECORDING_OBSERVATIONS = typeof import('./index').VideoMessageType.RECORDING_OBSERVATIONS;
     type GET_RECORDING_STATE = typeof import('./index').VideoMessageType.GET_RECORDING_STATE;
     type ACKNOWLEDGE_POST_RECORD_RESULT =
       typeof import('./index').VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT;
@@ -51,6 +52,8 @@ declare module './index' {
       typeof import('./index').VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
     type OFFSCREEN_STOP_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_STOP_RECORDING;
+    type OFFSCREEN_GET_RECORDING_CLOCK_TIMING =
+      typeof import('./index').VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING;
     type OFFSCREEN_PAUSE_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_PAUSE_RECORDING;
     type OFFSCREEN_RESUME_RECORDING =

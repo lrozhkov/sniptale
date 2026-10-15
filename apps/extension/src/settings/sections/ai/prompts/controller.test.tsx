@@ -13,6 +13,7 @@ it('loads prompt values into an independent prompt-page state owner', async () =
   query.mockResolvedValue({
     selectionBootstrap: { globalSystemPrompt: 'global' },
     scenarioEditorSystemPrompt: 'scenario',
+    audioTranscriptionSystemPrompt: 'recognition',
   });
   let latest: ReturnType<typeof useAiPromptsController> | undefined;
   function Harness() {
@@ -29,6 +30,7 @@ it('loads prompt values into an independent prompt-page state owner', async () =
   expect(latest?.prompts).toMatchObject({
     globalPrompt: 'global',
     scenarioEditorPrompt: 'scenario',
+    audioTranscriptionPrompt: 'recognition',
   });
   act(() => root.unmount());
 });

@@ -261,3 +261,65 @@ it('keeps idle actions inside the setup surface', async () => {
 
   expect(container?.querySelector('section [data-testid="idle-actions"]')).not.toBeNull();
 });
+
+it.each(['unknown', 'stopped', 'failed'] as const)(
+  'offers only the supported completion action for %s and joins pending clicks',
+  async (outcome) => {
+    const props = createProps();
+    let finish: () => void = () => undefined;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const retry = vi.fn(() => pending);
+    const refresh = vi.fn(() => pending);
+    await renderBody({
+      ...props,
+      recordingState: {
+        ...props.recordingState,
+        status: VideoRecordingStatus.STOPPING,
+        completion: { discard: true, outcome, pending: false },
+      },
+      onRetryCompletion: retry,
+      onRefreshRecordingState: refresh,
+    });
+    expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+    const button = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="popup.video-completion.retry"]'
+    );
+    if (!button) throw new Error('Expected completion action');
+    await act(async () => {
+      button.click();
+    });
+    expect(button.disabled).toBe(true);
+    await act(async () => {
+      button.click();
+    });
+    expect(outcome === 'failed' ? refresh : retry).toHaveBeenCalledTimes(1);
+    expect(outcome === 'failed' ? retry : refresh).not.toHaveBeenCalled();
+    await act(async () => finish());
+    expect(button.disabled).toBe(false);
+  }
+);
+
+it('shows a refresh action when an unknown completion has no control capability', async () => {
+  const props = createProps();
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  await renderBody({ ...props, completionRequestFailed: true, onRefreshRecordingState: refresh });
+  const button = container?.querySelector<HTMLButtonElement>('button');
+  await act(async () => button?.click());
+  expect(refresh).toHaveBeenCalledOnce();
+});
+
+it('keeps failed cleanup explicit when no action is available', async () => {
+  const props = createProps();
+  await renderBody({
+    ...props,
+    recordingState: {
+      ...props.recordingState,
+      status: VideoRecordingStatus.STOPPING,
+      error: 'cleanup failed',
+    },
+  });
+  expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+  expect(container?.querySelector('button')).toBeNull();
+});

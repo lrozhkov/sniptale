@@ -169,3 +169,32 @@ function createRenderClip(
     volume: 1,
   };
 }
+
+it('keeps low blur strengths effective and increases exposure throughout the whole slider', () => {
+  const project = createEmptyVideoProject('Blur strength', 1280, 720);
+  project.duration = 8;
+  const region = {
+    duration: 3,
+    easing: VideoTemporalEasing.LINEAR,
+    focusMode: VideoMotionFocusMode.MANUAL,
+    focusPoint: { x: 900, y: 300 },
+    id: 'motion-strength',
+    motionBlurAmount: 0.1,
+    scale: 3,
+    startTime: 1,
+    targetAction: null,
+    zoomInDuration: 2,
+    zoomOutDuration: 0.25,
+  };
+  project.motionRegions = [region];
+  const exposure = (amount: number) => {
+    region.motionBlurAmount = amount;
+    const { visualPasses } = resolveVideoCompositionRenderPasses(project, 1.5);
+    return (
+      Math.max(...visualPasses.map((pass) => pass.time)) -
+      Math.min(...visualPasses.map((pass) => pass.time))
+    );
+  };
+  expect(exposure(0.1)).toBeGreaterThan(0);
+  expect(exposure(0.9)).toBeGreaterThan(exposure(0.6));
+});

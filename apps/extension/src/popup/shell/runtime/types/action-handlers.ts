@@ -6,5 +6,9 @@ export interface PopupRuntimeActionHandlers {
   handleUpdateRecordingSettings: (settings: Partial<VideoRecordingSettings>) => Promise<void>;
   handleStartRecording: () => Promise<void>;
   handlePauseResume: () => Promise<void>;
-  handleStop: (options?: { cancelStart?: boolean; discard?: boolean }) => Promise<void>;
+  handleStop: (options?: {
+    cancelStart?: boolean;
+    discard?: boolean;
+  }) => Promise<'accepted' | 'failed' | 'unknown'>;
+  handleRefreshRecordingState: () => Promise<void>;
 }

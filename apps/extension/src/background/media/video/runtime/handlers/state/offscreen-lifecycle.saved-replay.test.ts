@@ -87,6 +87,7 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../session-state')>()),
   finishVideoRecordingStop: finishVideoRecordingStopMock,
   getVideoRecordingId: getVideoRecordingIdMock,
+  setVideoRecordingTabId: resetRecordingTabIdMock,
   isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
     recordingId != null && getVideoRecordingIdMock() === recordingId,
   resetCompletedVideoRecordingSession: resetCompletedVideoRecordingSessionMock,
@@ -94,7 +95,6 @@ vi.mock('../../../session-state', async (importOriginal) => ({
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
-  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
 }));
 vi.mock('../../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-surface')>()),
@@ -363,7 +363,9 @@ it('commits staged recording A without reading or resetting newer recording B st
   await flushAsyncRoute();
 
   expect(commitPendingVideoPostRecordResultMock).toHaveBeenCalledWith('rec-a');
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-a');
+  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-a', {
+    authority: 'durable-saved-result',
+  });
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
   expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
   expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
@@ -503,3 +505,8 @@ it('covers adjacent lifecycle routes used by the saved-recording owner module', 
   });
   expect(createUnhandledRouteResult()).toEqual({ handled: false, keepChannelOpen: false });
 });
+
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));

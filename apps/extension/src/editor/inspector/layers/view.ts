@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useEditorController } from '../../application/controller-context';
 import { createLayerDropHandler } from './drop';
 import { useLayerPanelHeight } from './height';
@@ -24,16 +25,30 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
       ? {}
       : { maxExpandedHeightRatio: args.maxExpandedHeightRatio }),
   });
-  const handleLayerDrop = createLayerDropHandler({
-    controller,
-    draggedLayerId: state.draggedLayerId,
-    setDraggedLayerId: state.setDraggedLayerId,
-    setDragOverLayerId: state.setDragOverLayerId,
-  });
+  const handleLayerDrop = useMemo(
+    () =>
+      createLayerDropHandler({
+        controller,
+        draggedLayerId: state.draggedLayerId,
+        setDraggedLayerId: state.setDraggedLayerId,
+        setDragOverLayerId: state.setDragOverLayerId,
+      }),
+    [controller, state.draggedLayerId, state.setDraggedLayerId, state.setDragOverLayerId]
+  );
+  const openLayerEffects = useRef(args.onOpenLayerEffects);
+  // Stable row events call only the handler from the latest committed panel render.
+  useLayoutEffect(() => {
+    openLayerEffects.current = args.onOpenLayerEffects;
+  }, [args.onOpenLayerEffects]);
+  const handleOpenLayerEffects = useCallback<EditorInspectorLayersPanelProps['onOpenLayerEffects']>(
+    (...parameters) => openLayerEffects.current(...parameters),
+    []
+  );
 
   return {
     actions: {
       handleLayerDrop,
+      handleOpenLayerEffects,
       toggleAutoNavigateSelectedLayer: () =>
         state.setAutoNavigateSelectedLayer((enabled) => !enabled),
       toggleExpanded: () => state.setExpanded((expanded) => !expanded),

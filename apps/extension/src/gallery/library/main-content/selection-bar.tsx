@@ -1,5 +1,5 @@
-import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { isGalleryScenarioExportItem } from '../items';
+import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { Archive, Download, FolderArchive, Trash2, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -66,18 +66,16 @@ function GallerySelectionActions(
 ) {
   return (
     <>
-      {props.selectedItems.some((item) => !isGalleryScenarioExportItem(item)) ? (
-        <button
-          type="button"
-          aria-label={translate('gallery.app.selectionBackup')}
-          title={translate('gallery.app.selectionBackup')}
-          onClick={props.onSelectionBackup}
-          className={gallerySelectionActionClassName}
-        >
-          <Archive className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
-        </button>
-      ) : null}
+      <button
+        type="button"
+        aria-label={translate('gallery.app.selectionBackup')}
+        title={translate('gallery.app.selectionBackup')}
+        onClick={props.onSelectionBackup}
+        className={gallerySelectionActionClassName}
+      >
+        <Archive className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
+      </button>
       <button
         type="button"
         aria-label={translate('common.actions.delete')}

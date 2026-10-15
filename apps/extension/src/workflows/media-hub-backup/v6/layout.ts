@@ -1,9 +1,41 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   assertSafeArchivePath,
   sanitizeArchivePathSegment,
 } from '../../../composition/archive-transfer';
 
 export const MEDIA_HUB_BACKUP_LAYOUT = 'library-folders-v1';
+export const MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT = 'library-folders-v2';
+export const MEDIA_HUB_BACKUP_SHARED_LAYOUT = 'library-folders-v3';
+export const MEDIA_HUB_BACKUP_PROJECT_LAYOUT = 'library-folders-v4';
+export type MediaHubBackupLayout =
+  | typeof MEDIA_HUB_BACKUP_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT;
+
+/** Both admitted shared layouts use the same byte and alias resource profile. */
+export function isSharedBackupLayout(
+  value: unknown
+): value is typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT {
+  return value === MEDIA_HUB_BACKUP_SHARED_LAYOUT || value === MEDIA_HUB_BACKUP_PROJECT_LAYOUT;
+}
+
+/** Checks admitted JSON inventory, including reviews nested in montage resources. */
+export function hasReviewProjectMetadata(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasReviewProjectMetadata);
+  if (!isRecord(value)) return false;
+  const review = value['videoReview'];
+  if (isRecord(review) && isRecord(review['workspace']) && 'project' in review['workspace'])
+    return true;
+  return Object.values(value).some(hasReviewProjectMetadata);
+}
+
+/** Legacy layouts cannot carry the new authoritative project contract. */
+export function assertReviewProjectLayout(value: unknown, layout: MediaHubBackupLayout): void {
+  if (layout !== MEDIA_HUB_BACKUP_PROJECT_LAYOUT && hasReviewProjectMetadata(value))
+    throw new Error('Review project metadata requires library-folders-v4.');
+}
 export const MANIFEST_PATH = '_sniptale/manifest.json';
 export const CATALOG_ROOT = '_sniptale/catalog';
 export const METADATA_ROOT = '_sniptale/metadata';

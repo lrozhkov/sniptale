@@ -113,7 +113,7 @@ describe('migrates v1 source-time placements to result time (R03)', () => {
       },
     };
     const migrated = loadQuickEditAdvancedState(legacy, segments);
-    expect(migrated?.schemaVersion).toBe(2);
+    expect(migrated?.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
     expect(migrated?.zoom.regions[0]).toMatchObject({ start: 4, end: 6 });
     // Source 2 maps to the start of the sped segment at result time 0.
     expect(migrated?.audio.voiceover[0]).toMatchObject({ timelineStart: 0 });
@@ -194,7 +194,10 @@ describe('rejects malformed persisted state', () => {
     expect(loadQuickEditAdvancedState(null)).toBeNull();
     expect(loadQuickEditAdvancedState('state')).toBeNull();
     expect(
-      loadQuickEditAdvancedState({ ...structuredClone(advanced()), schemaVersion: 3 })
+      loadQuickEditAdvancedState({
+        ...structuredClone(advanced()),
+        schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION + 1,
+      })
     ).toBeNull();
     expect(
       loadQuickEditAdvancedState({ ...structuredClone(advanced()), schemaVersion: 0 })
@@ -411,7 +414,7 @@ it('loads content snapshots and rejects ui leakage or schema drift', () => {
   const content = { zoom: state.zoom, background: state.background, audio: state.audio };
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 2 })).toEqual({
     ...content,
-    schemaVersion: 2,
+    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
   });
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 1 })).toBeNull();
   expect(loadQuickEditAdvancedContentState({ ...state, schemaVersion: 2 })).toBeNull();
@@ -524,4 +527,111 @@ it('retains explicit audio tempo across storage parsing and rejects malformed te
   );
   content.audio.music = [{ ...clip, tempo: 2 }];
   expect(loadQuickEditAdvancedContentState(content)).toBeNull();
+});
+
+it('round-trips independent blur phases without enabling old workspaces and rejects malformed exposure', () => {
+  const motionBlur = {
+    enter: { enabled: true, strength: 0.15 },
+    exit: { enabled: false, strength: 0.8 },
+    link: { enabled: true, strength: 0.4 },
+  };
+  const payload = {
+    ...advanced(),
+    zoom: { enabled: true, regions: [{ ...zoomRegion('a', 0, 2), motionBlur }] },
+  };
+  const parsed = loadQuickEditAdvancedState(payload);
+  expect(parsed?.zoom.regions[0]?.motionBlur).toEqual(motionBlur);
+  expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+  const legacy = loadQuickEditAdvancedState({
+    ...advanced(),
+    zoom: { enabled: true, regions: [zoomRegion('a', 0, 2)] },
+  });
+  expect(legacy?.zoom.regions[0]?.motionBlur).toBeUndefined();
+  for (const value of [
+    null,
+    true,
+    { enter: null },
+    { exit: { enabled: 1, strength: 0.5 } },
+    { link: { enabled: true, strength: -1 } },
+    { enter: { enabled: true, strength: 1.01 } },
+    { enter: { enabled: true, strength: NaN } },
+  ]) {
+    expect(
+      loadQuickEditAdvancedState({
+        ...payload,
+        zoom: { enabled: true, regions: [{ ...zoomRegion('a', 0, 2), motionBlur: value }] },
+      })
+    ).toBeNull();
+  }
+});
+
+it('round trips inactive image choices in state and history content, rejecting malformed references', () => {
+  const rememberedImage = { assetId: 'project-asset:background', imageFit: 'contain' as const };
+  for (const background of [
+    { enabled: false as const, rememberedImage },
+    { ...advanced().background, rememberedImage },
+  ]) {
+    const state = { ...advanced(), background };
+    expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+    const content = { ...createQuickEditAdvancedContent(), background };
+    expect(loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))).toEqual(content);
+  }
+  for (const rememberedImage of [
+    null,
+    {},
+    { assetId: '', imageFit: 'cover' },
+    { assetId: 'a', imageFit: 'stretch' },
+  ]) {
+    expect(
+      loadQuickEditAdvancedState({ ...advanced(), background: { enabled: false, rememberedImage } })
+    ).toBeNull();
+  }
+});
+
+it('round-trips optional background blur without rewriting legacy history layouts', () => {
+  for (const blur of [undefined, 0, 12, 25]) {
+    const state = advanced();
+    if (!state.background.enabled) throw new Error('Expected background fixture');
+    if (blur !== undefined) state.background.layout.blur = blur;
+    expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))?.background).toEqual(
+      state.background
+    );
+    const content = { ...createQuickEditAdvancedContent(), background: state.background };
+    expect(
+      loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))?.background
+    ).toEqual(state.background);
+  }
+  for (const blur of [-1, 26, NaN, Infinity, '12', null]) {
+    const state = advanced();
+    if (!state.background.enabled) throw new Error('Expected background fixture');
+    expect(
+      loadQuickEditAdvancedState({
+        ...state,
+        background: { ...state.background, layout: { ...state.background.layout, blur } },
+      })
+    ).toBeNull();
+  }
+});
+
+it('rejects unsupported schema identities and UI-bearing history content while retaining released schemas', () => {
+  const content = createQuickEditAdvancedContent();
+  for (
+    let schemaVersion = 2;
+    schemaVersion <= QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
+    schemaVersion++
+  ) {
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).not.toBeNull();
+  }
+  for (const schemaVersion of [0, 1, 2.5, '2', NaN, QUICK_EDIT_ADVANCED_SCHEMA_VERSION + 1]) {
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).toBeNull();
+  }
+  expect(loadQuickEditAdvancedContentState({ ...content, ui: advanced().ui })).toBeNull();
+  expect(loadQuickEditAdvancedState({ ...advanced(), ui: { mode: 'unknown' } })).toBeNull();
+  expect(Object.keys(loadQuickEditAdvancedState(advanced())!)).toEqual([
+    'schemaVersion',
+    'ui',
+    'zoom',
+    'background',
+    'audio',
+  ]);
 });

@@ -12,6 +12,7 @@ export async function executeOfflineAudioMixRender({
   project,
   scheduleOfflineAudioClipMix,
   signal,
+  actionRange,
   throwIfAborted,
 }: {
   buildOfflineAudioMixResult: (renderedBuffer: AudioBuffer) => {
@@ -36,6 +37,7 @@ export async function executeOfflineAudioMixRender({
     signal?: AbortSignal
   ) => void | Promise<void>;
   signal?: AbortSignal;
+  actionRange?: { start: number; end: number };
   throwIfAborted: (signal?: AbortSignal) => void;
 }): Promise<{
   buffer: AudioBuffer;
@@ -49,5 +51,11 @@ export async function executeOfflineAudioMixRender({
     throwIfAborted(signal);
   }
 
-  return buildOfflineAudioMixResult(await offlineContext.startRendering());
+  const rendered = await offlineContext.startRendering();
+  if (project.actionFeedback?.length) {
+    const { mixProjectActionAudio } = await import('../../../../action-audio');
+    await mixProjectActionAudio(rendered, project, signal, actionRange);
+    throwIfAborted(signal);
+  }
+  return buildOfflineAudioMixResult(rendered);
 }

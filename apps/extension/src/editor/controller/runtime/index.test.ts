@@ -90,7 +90,7 @@ it('syncs runtime state with selected object details and history metadata', () =
     'rectangle'
   );
   expect(storeState.syncRuntime).toHaveBeenCalledWith({
-    browserFrame: storeState.browserFrame,
+    browserFrame: { ...storeState.browserFrame, enabled: false },
     cropReady: true,
     cropSelection: { height: 10, left: 0, top: 0, width: 10 },
     frame: storeState.frame,
@@ -229,4 +229,23 @@ it('marks a homogeneous shared drawing selection for drawing-owned chrome', () =
     })
   );
   canvas.dispose();
+});
+
+it('projects actual canvas header presence even when the joined header is absent from inspector layers', () => {
+  const objects = [{ sniptaleType: 'browser-frame' }];
+  const canvas = { getObjects: () => objects, getActiveObjects: () => [] };
+  syncEditorRuntimeState(canvas as never, null, null, null, createViewportState());
+  expect(storeState.syncRuntime).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      browserFrame: { ...storeState.browserFrame, enabled: true },
+      layers: [{ id: 'layer-1' }],
+    })
+  );
+  objects.length = 0;
+  syncEditorRuntimeState(canvas as never, null, null, null, createViewportState());
+  expect(storeState.syncRuntime).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      browserFrame: { ...storeState.browserFrame, enabled: false },
+    })
+  );
 });

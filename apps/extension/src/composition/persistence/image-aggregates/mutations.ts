@@ -1,5 +1,3 @@
-import { loadSettings } from '../settings';
-import { resolveInitialStorageClass } from '../library-lifecycle/policy';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { EditorDocument } from '../../../features/editor/document/types';
@@ -111,7 +109,7 @@ function createNewImageAggregateRoot(
     id: input.aggregateId,
     imageContentState: 'original',
     kind: 'image',
-    lifecycle: createLibraryLifecycle(input.initialStorageClass ?? 'temporary', now),
+    lifecycle: createLibraryLifecycle('library', now),
     mimeType: prepared.originalBlob.type || 'image/png',
     originalFilename: filename,
     size: prepared.originalBlob.size,
@@ -152,6 +150,11 @@ async function persistImageAggregateRootIfMissing(args: {
     if (!existing || !isEditableImageAggregateRoot(existing)) {
       throw new ImageAggregateCollisionError(args.input.aggregateId);
     }
+    if (
+      existing.lifecycle?.trashedAt !== undefined &&
+      !parseImageWorkspaceEntry(await args.readWorkspace())
+    )
+      throw new ImageAggregateNotFoundError(args.input.aggregateId);
     return existing;
   }
   if (args.input.requireExistingRoot || !args.prepared || args.input.expectedRevision !== 0) {
@@ -181,7 +184,8 @@ function isEditableImageAggregateRoot(entry: MediaLibraryEntry): boolean {
   return (
     (entry.kind === 'image' || entry.kind === 'screenshot') &&
     ((entry.source.kind === 'screenshot' && entry.blob instanceof Blob) ||
-      entry.source.kind === 'stored-asset')
+      entry.source.kind === 'stored-asset' ||
+      entry.source.kind === 'project-asset')
   );
 }
 
@@ -289,7 +293,9 @@ async function commitImageWorkspaceMutation(
       imageContentState: input.imageContentState ?? 'edited',
       updatedAt: now,
       workspaceRevision: revision,
-      lifecycle: media.lifecycle ? { ...media.lifecycle, updatedAt: now } : media.lifecycle,
+      lifecycle: media.lifecycle
+        ? promoteLibraryLifecycle({ ...media.lifecycle, updatedAt: now }, now)
+        : createLibraryLifecycle('library', now),
     });
     await tx.done;
     if (physicalDelete.assetIds.length > 0) {
@@ -314,10 +320,6 @@ export async function commitImageWorkspace(
   // staged assets hold shared transition leases or admission could queue behind them.
   await initDB();
   await recoverImageWorkspacePublications();
-  const initialStorageClass =
-    input.expectedRevision === 0 && !input.requireExistingRoot
-      ? resolveInitialStorageClass(await loadSettings(), 'image')
-      : undefined;
   const preparedDocument = await preparePersistedEditorDocument(input.document, {
     ...(input.reusableAssetsByRuntimeUrl
       ? { reusableAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl }
@@ -327,7 +329,6 @@ export async function commitImageWorkspace(
   const preparedInput: PreparedImageWorkspaceInput = {
     ...serializableInput,
     document: preparedDocument.document,
-    ...(initialStorageClass === undefined ? {} : { initialStorageClass }),
     refs: preparedDocument.refs,
   };
   let journalCreated = false;
@@ -434,7 +435,6 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
   }
   return {
     aggregateId: value['aggregateId'],
-    ...(initialStorageClass === undefined ? {} : { initialStorageClass }),
     document,
     expectedRevision: value['expectedRevision'],
     ...(captureTime === undefined ? {} : { captureTime }),

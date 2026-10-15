@@ -1,6 +1,9 @@
+import { readScenarioStorage } from '../scenario/storage';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   VIDEO_PROJECTS_STORE,
   initDB,
 } from '../infrastructure/indexed-db/core';
@@ -53,8 +56,19 @@ export async function commitProjectAggregatePresentation(args: {
   return runWithIndexedDbMutation(async (db) => {
     const rootStoreName =
       args.ref.kind === 'scenario' ? SCENARIO_PROJECTS_STORE : VIDEO_PROJECTS_STORE;
-    const tx = db.transaction([rootStoreName, AGGREGATE_PRESENTATIONS_STORE], 'readwrite');
-    const rawRoot: unknown = await tx.objectStore(rootStoreName).get(args.ref.id);
+    const tx = db.transaction(
+      [
+        rootStoreName,
+        SCENARIO_PROJECT_HISTORY_STORE,
+        SCENARIO_PROJECT_UNITS_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+      ],
+      'readwrite'
+    );
+    const rawRoot: unknown =
+      args.ref.kind === 'scenario'
+        ? (await readScenarioStorage(tx, args.ref.id)).logical
+        : await tx.objectStore(rootStoreName).get(args.ref.id);
     const root =
       args.ref.kind === 'scenario'
         ? parseScenarioProjectEntry(rawRoot)

@@ -45,6 +45,7 @@ export function prepareBrowserFrameLayerReplacement(args: {
       object.visible = args.header.visible;
     },
     top: args.header.top ?? args.nextSource.top,
-    width: args.header.getScaledWidth(),
+    width: args.nextSource.displayWidth,
+    sourceHeight: args.nextSource.displayHeight,
   });
 }

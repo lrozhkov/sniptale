@@ -1,3 +1,4 @@
+import { isOptionalRecordingFrameClockAnchor } from '../../../../../video/recording-frame-clock';
 import { VideoCursorCaptureMode } from '../../../../../../features/video/project/types';
 import { VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -96,6 +97,7 @@ export const runtimeVideoOffscreenEventMessageContracts = {
         type: V.OFFSCREEN_RECORDING_STARTED,
         required: { recordingId: isString },
         optional: {
+          frameClock: isOptionalRecordingFrameClockAnchor,
           cursorCaptureMode: isVideoCursorCaptureMode,
           displaySurface: isVideoDisplaySurface,
           webcamSettings: isWebcamActualSettings,
@@ -141,6 +143,7 @@ export const runtimeVideoOffscreenEventMessageContracts = {
       createMessageGuard({
         type: V.OFFSCREEN_RECORDING_PAUSED,
         required: { recordingId: isString },
+        optional: { frameClock: isOptionalRecordingFrameClockAnchor },
       })
     ),
     parseResponse: createGuardParser(
@@ -154,6 +157,7 @@ export const runtimeVideoOffscreenEventMessageContracts = {
       createMessageGuard({
         type: V.OFFSCREEN_RECORDING_RESUMED,
         required: { recordingId: isString },
+        optional: { frameClock: isOptionalRecordingFrameClockAnchor },
       })
     ),
     parseResponse: createGuardParser(

@@ -1,3 +1,5 @@
+import { normalizeMediabunny } from '../../tooling/ci/mediabunny/normalize.mjs';
+import { createZodRuntimeFallbackPlugin } from './build/injected-build-support.ts';
 import { tourPlayerScript } from './build/tour-player-script.ts';
 import { videoEffectResources } from './build/video-effect-resources.ts';
 import { copyFile, mkdir } from 'node:fs/promises';
@@ -23,6 +25,7 @@ import { buildManifestForMode, CHROME_BUILD_TARGET } from './build/manifest.ts';
 
 const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
 const BUILD_LAYOUT = createExtensionBuildLayout(APP_ROOT);
+normalizeMediabunny({ root: BUILD_LAYOUT.repositoryRoot, check: true });
 const REQUIRED_APP_HTML_OUTPUTS = [
   'apps/extension/src/camera-recorder/index.html',
   'apps/extension/src/design-system/index.html',
@@ -153,6 +156,7 @@ export default defineConfig(({ mode }) => ({
   publicDir: resolvePath(BUILD_LAYOUT.appRoot, 'public'),
   base: './',
   plugins: [
+    createZodRuntimeFallbackPlugin(),
     tourPlayerScript(),
     videoEffectResources(join(APP_ROOT, 'public/video-effects')),
     extensionHtmlInputs(BUILD_LAYOUT),

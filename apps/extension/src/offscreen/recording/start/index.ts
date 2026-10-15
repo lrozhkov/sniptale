@@ -1,5 +1,6 @@
 import { createFilenameSession } from '../../../workflows/file-naming/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { CaptureMode as RecordingCaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   CaptureMode,
   VideoRecordingSettings,
@@ -159,6 +160,10 @@ async function startRecordingInternal(
     cursorCaptureMode: prepared.cursorCaptureMode,
     encoderFrameTransform: prepared.encoderFrameTransform,
     onVideoFrameGeometry,
+    ...(params.captureMode === RecordingCaptureMode.TAB ||
+    params.captureMode === RecordingCaptureMode.TAB_CROP
+      ? { sourceClockCalibration: prepared.sourceClockCalibration ?? null }
+      : {}),
     sourceContext: params.sourceContext ?? null,
     sourceLabel: params.sourceContext?.title ?? prepared.sourceLabel,
     trackSettings: prepared.trackSettings,

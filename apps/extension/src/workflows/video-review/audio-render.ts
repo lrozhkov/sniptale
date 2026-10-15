@@ -1,3 +1,4 @@
+import type { ReviewAudioClipInput } from './audio-clip-source';
 import type { QuickEditOriginalAudioRange } from '../../features/video/review/advanced/types';
 import { createTempoProcessor } from '../../features/video/audio/tempo';
 import {
@@ -9,14 +10,23 @@ import {
   type InputAudioTrack,
 } from 'mediabunny';
 import type { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { buildQuickEditClipEnvelope } from '../../features/video/review/advanced/audio-plan';
+import {
+  buildQuickEditClipEnvelope,
+  quickEditAudioSourceKey,
+  iterateQuickEditActionAudioPlan,
+  type QuickEditActionAudioSchedule,
+} from '../../features/video/review/advanced/audio-plan';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
 
 export interface ReviewExportClipPlan {
   /** Fragment-local entries: output time is already shifted into the fragment. */
   entries: readonly QuickEditAudioPlanEntry[];
-  buffers: ReadonlyMap<string, AudioBuffer>;
+  /** Compact globally admitted action cues; never expands a whole typing interval. */
+  action?: QuickEditActionAudioSchedule;
+  buffers: ReadonlyMap<string, ReviewAudioClipInput>;
+  /** Releases job-owned decoder inputs; supplied AudioBuffer plans have no resources. */
+  dispose?(): void;
   originalVolume: number;
   originalRanges?: readonly QuickEditOriginalAudioRange[];
   originalMuted: boolean;
@@ -154,7 +164,7 @@ async function renderWindow(args: AudioRenderWindow) {
 /** Apply source-time automation only to the original PCM, before adding external clips. */
 function applySourceRangeGains(
   buffer: AudioBuffer,
-  ranges: ReviewExportClipPlan['originalRanges'],
+  ranges: readonly QuickEditOriginalAudioRange[] | undefined,
   start: number,
   rate: number
 ) {
@@ -196,22 +206,35 @@ async function scheduleClipWindows(
 ) {
   const { frame, count } = args;
   const plan = args.exportAudio;
-  if (!plan || !plan.entries.length) return;
+  if (!plan || (!plan.entries.length && !plan.action)) return;
   const outStart = frame / outputRate;
   const outEnd = (frame + count) / outputRate;
-  for (const entry of plan.entries) {
+  for (const entry of clipWindowEntries(plan, { start: outStart, end: outEnd })) {
     const audibleFrom = Math.max(outStart, entry.timelineStart);
     const audibleTo = Math.min(outEnd, entry.timelineStart + entry.duration);
     if (audibleTo <= audibleFrom) continue;
-    const buffer = plan.buffers.get(entry.assetId);
-    if (!buffer) continue;
+    const buffer = plan.buffers.get(quickEditAudioSourceKey(entry.source));
+    if (!buffer) {
+      continue;
+    }
     const rate = entry.playbackRate ?? 1;
     const localFrom = Math.max(0, audibleFrom - entry.timelineStart);
     const localTo = Math.max(0, audibleTo - entry.timelineStart);
-    const prepared =
-      rate === 1
-        ? buffer
-        : await args.clipRenderer.render(entry, buffer, localFrom, localTo, args.signal);
+    let offset = entry.sourceOffset + localFrom;
+    let prepared: AudioBuffer;
+    if (rate === 1 && 'read' in buffer) {
+      const first = Math.floor((offset - leadSeconds) * buffer.sampleRate);
+      const last = Math.ceil((entry.sourceOffset + localTo + leadSeconds) * buffer.sampleRate);
+      const window = await buffer.read(first, last, args.signal);
+      prepared = new AudioBuffer({
+        length: Math.max(1, last - first),
+        sampleRate: buffer.sampleRate,
+        numberOfChannels: buffer.numberOfChannels,
+      });
+      window.planes.forEach((plane, channel) => prepared.getChannelData(channel).set(plane));
+      offset -= first / buffer.sampleRate;
+    } else if (rate === 1 && !('read' in buffer)) prepared = buffer;
+    else prepared = await args.clipRenderer.render(entry, buffer, localFrom, localTo, args.signal);
     args.signal.throwIfAborted();
     const source = offline.createBufferSource();
     source.buffer = prepared;
@@ -256,10 +279,16 @@ async function scheduleClipWindows(
     else gain.gain.linearRampToValueAtTime(tailGain, windowEndAt);
     source.start(
       (rate === 1 ? leadSeconds : 0) + (audibleFrom - outStart),
-      rate === 1 ? entry.sourceOffset + localFrom : 0,
+      rate === 1 ? offset : 0,
       audibleTo - audibleFrom + (rate === 1 ? 0 : 2 * leadSeconds)
     );
   }
+}
+
+function* clipWindowEntries(plan: ReviewExportClipPlan, window: { start: number; end: number }) {
+  yield* plan.entries;
+  if (plan.action)
+    for (const batch of iterateQuickEditActionAudioPlan(plan.action, window)) yield* batch;
 }
 
 /** Use codec sample duration, not muxer timestamps or a fixed assumed Opus frame size. */
@@ -294,31 +323,51 @@ async function fillWindow(
   const codec = track.codec;
   if (codec !== 'aac' && codec !== 'opus') throw new Error('Unsupported processed audio codec.');
   const packets = new EncodedPacketSink(track);
-  let packet = (await packets.getPacket(bounds.start)) ?? (await packets.getFirstPacket());
+  // Opus needs decoder preroll after seeking; discard it rather than mixing it across edits.
+  const decodeStart = codec === 'opus' ? Math.max(0, bounds.start - 0.08) : bounds.start;
+  let packet = (await packets.getPacket(decodeStart)) ?? (await packets.getFirstPacket());
   let run: { start: number; end: number } | null = null;
   while (packet && packet.timestamp < bounds.end) {
     bounds.signal.throwIfAborted();
     const duration = audioPacketDuration(packet, codec, pcm.sampleRate);
-    if (packet.timestamp + duration > bounds.start) {
+    if (packet.timestamp + duration > decodeStart) {
       if (run && packet.timestamp - run.end > duration / 2) {
         // Chromium can smooth discontinuous audio timestamps. Restart decoding across real packet gaps.
-        await fillRun(sink, pcm, { ...bounds, ...run });
+        await fillRun(sink, pcm, {
+          ...bounds,
+          decodeStart: run.start,
+          start: Math.max(bounds.start, run.start),
+          end: run.end,
+        });
         run = null;
       }
-      run ??= { start: Math.max(bounds.start, packet.timestamp), end: bounds.start };
+      run ??= { start: Math.max(decodeStart, packet.timestamp), end: decodeStart };
       run.end = Math.min(bounds.end, packet.timestamp + duration);
     }
     packet = await packets.getNextPacket(packet);
   }
-  if (run) await fillRun(sink, pcm, { ...bounds, ...run });
+  if (run)
+    await fillRun(sink, pcm, {
+      ...bounds,
+      decodeStart: run.start,
+      start: Math.max(bounds.start, run.start),
+      end: run.end,
+    });
 }
 
 async function fillRun(
   sink: AudioSampleSink,
   pcm: AudioBuffer,
-  bounds: { windowStart: number; start: number; end: number; signal: AbortSignal }
+  bounds: {
+    windowStart: number;
+    decodeStart: number;
+    start: number;
+    end: number;
+    signal: AbortSignal;
+  }
 ) {
-  for await (const sample of sink.samples(bounds.start, bounds.end)) {
+  if (bounds.end <= bounds.start) return;
+  for await (const sample of sink.samples(bounds.decodeStart, bounds.end)) {
     try {
       bounds.signal.throwIfAborted();
       if (sample.sampleRate !== pcm.sampleRate || sample.numberOfChannels !== pcm.numberOfChannels)

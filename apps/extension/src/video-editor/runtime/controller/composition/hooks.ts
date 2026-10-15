@@ -133,6 +133,7 @@ export function useVideoEditorStartActions() {
 }
 
 export function useVideoEditorOverlaysController() {
+  const { assetUrls } = useRuntimePreviewContext();
   const exportPort = useVideoEditorExportPort((port) => port);
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);
   const selectedClipId = useVideoEditorClipSelectionPort((port) => port.selectedClipId);
@@ -142,6 +143,7 @@ export function useVideoEditorOverlaysController() {
   const actions = useExportCommandContext();
   return createVideoEditorOverlaysController({
     actions,
+    assetUrls,
     store: { ...exportPort, project, selectedClipId },
     workspace,
   });

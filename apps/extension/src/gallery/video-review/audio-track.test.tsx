@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -73,28 +74,38 @@ const renderTrack = (
   assets?: Parameters<typeof ReviewAudioTrack>[0]['assets'],
   projection?: Parameters<typeof ReviewAudioTrack>[0]['projection'],
   waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms'],
-  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction']
+  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction'],
+  onOpenMusic?: Parameters<typeof ReviewAudioTrack>[0]['onOpenMusic']
 ) => {
   act(() => {
     root.render(
-      <ReviewAudioTrack
-        beforeAction={beforeAction}
-        projection={projection}
-        waveforms={waveforms}
-        assets={assets}
-        hasOriginalAudio={hasOriginalAudio}
-        audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
-        snapTimes={snapTimes}
+      <ReviewTimelineResizeGuide
+        hover={null}
+        viewport={{ current: null }}
+        gutter={0}
+        width={1000}
         duration={10}
-        selectedId={null}
-        busy={busy}
-        onSelect={onSelect}
-        onMoveClip={onMoveClip}
-        onTrimClip={onTrimClip}
-        onOriginal={onOriginal}
-        onImportFile={onImportFile}
-        onRecordVoiceover={onRecordVoiceover}
-      />
+      >
+        <ReviewAudioTrack
+          beforeAction={beforeAction}
+          onOpenMusic={onOpenMusic}
+          projection={projection}
+          waveforms={waveforms}
+          assets={assets}
+          hasOriginalAudio={hasOriginalAudio}
+          audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
+          snapTimes={snapTimes}
+          duration={10}
+          selectedId={null}
+          busy={busy}
+          onSelect={onSelect}
+          onMoveClip={onMoveClip}
+          onTrimClip={onTrimClip}
+          onOriginal={onOriginal}
+          onImportFile={onImportFile}
+          onRecordVoiceover={onRecordVoiceover}
+        />
+      </ReviewTimelineResizeGuide>
     );
   });
   for (const block of host.querySelectorAll('[data-audio-id]'))
@@ -124,8 +135,8 @@ it('stacks overlapping voiceovers without moving neighbors and retains rows duri
   });
   const lane = lanes[1]!;
   const blocks = [...lane.querySelectorAll<HTMLDivElement>('[role="button"]')];
-  expect(blocks.map((block) => block.style.top)).toEqual(['0px', '36px', '72px', '0px']);
-  expect((lane as HTMLElement).style.height).toBe('104px');
+  expect(blocks.map((block) => block.style.top)).toEqual(['2px', '38px', '74px', '2px']);
+  expect((lane as HTMLElement).style.height).toBe('108px');
   vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 104));
   const moving = blocks[1]!;
   Object.assign(moving, { setPointerCapture: vi.fn() });
@@ -137,7 +148,7 @@ it('stacks overlapping voiceovers without moving neighbors and retains rows duri
       new MouseEvent('pointermove', { bubbles: true, clientX: 300, shiftKey: true })
     )
   );
-  expect(moving.style.top).toBe('36px');
+  expect(moving.style.top).toBe('38px');
   expect(blocks[0]!.style.left).toBe('10%');
   await act(async () =>
     moving.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 300 }))
@@ -221,17 +232,6 @@ it('splits the displayed music at cuts while keeping continuous sample offsets',
   expect(blocks.map((block) => block.dataset['musicOffset'])).toEqual(['0', '1']);
   expect(blocks[0]!.querySelector('[data-audio-edge="end"]')).toBeNull();
   expect(blocks[1]!.querySelector('[data-audio-edge="start"]')).toBeNull();
-});
-
-it('imports audio through the hidden file picker', async () => {
-  renderTrack();
-  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-  expect(input.accept).toBe('audio/*');
-  Object.defineProperty(input, 'files', {
-    value: [new File([new Uint8Array(2)], 'song.mp3', { type: 'audio/mpeg' })],
-  });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(onImportFile).toHaveBeenCalled();
 });
 
 function dispatchDrag(
@@ -337,7 +337,9 @@ it('trims the right edge through its drag handle', async () => {
     );
   await send('pointerdown', edge, 0);
   await send('pointermove', edge, 100);
+  expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('600px');
   await send('pointerup', block, 100);
+  expect(host.querySelector('[data-resizing]')).toBeNull();
   expect(onTrimClip).toHaveBeenCalledWith('voiceover', 'a1', 'end', 6, undefined);
 });
 
@@ -763,3 +765,40 @@ it.each(['voiceover', 'music'] as const)(
     }
   }
 );
+
+it('opens the shared audio picker for the captured lane after note admission', async () => {
+  const openMusic = vi.fn();
+  let admit!: () => void;
+  renderTrack(
+    undefined,
+    false,
+    [],
+    true,
+    undefined,
+    undefined,
+    undefined,
+    (action) => {
+      admit = action;
+    },
+    openMusic
+  );
+  const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const pickFile = vi.spyOn(fileInput, 'click');
+  const music = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.musicLibrary"]'
+  )!;
+  act(() => music.click());
+  expect(openMusic).not.toHaveBeenCalled();
+  expect(pickFile).not.toHaveBeenCalled();
+  act(() => admit());
+  expect(openMusic).toHaveBeenCalledExactlyOnceWith(music, 'music');
+  const voiceover = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.audioImport"]'
+  )!;
+  act(() => voiceover.click());
+  expect(openMusic).toHaveBeenCalledTimes(1);
+  act(() => admit());
+  expect(openMusic).toHaveBeenLastCalledWith(voiceover, 'voiceover');
+  expect(pickFile).not.toHaveBeenCalled();
+  expect(fileInput.accept).toBe('audio/*');
+});

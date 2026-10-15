@@ -28,6 +28,10 @@ const {
   repairTemporaryProjectLifecyclesMock: vi.fn().mockResolvedValue(0),
 }));
 
+vi.mock('../../composition/persistence/review-workspaces/summaries', () => ({
+  listVideoWorkspaceSummaries: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('../../composition/persistence/library-lifecycle/project-retention', () => ({
   repairTemporaryProjectLifecycles: repairTemporaryProjectLifecyclesMock,
 }));
@@ -98,7 +102,7 @@ vi.mock('../library/items', async (importOriginal) => ({
 import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
 
 describe('loadGalleryLibrarySnapshot', () => {
-  it('repairs legacy projects before loading mixed gallery items and storage estimates', async () => {
+  it('loads committed gallery items without global repair or cleanup', async () => {
     const mediaItems = [{ id: 'asset-1' }];
     const scenarioProjects = [
       { id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2 },
@@ -131,21 +135,12 @@ describe('loadGalleryLibrarySnapshot', () => {
       },
     });
 
-    await expect(loadGalleryLibrarySnapshot()).resolves.toEqual({ estimate, nextItems });
-    expect(repairTemporaryProjectLifecyclesMock).toHaveBeenCalled();
-    expect(repairTemporaryProjectLifecyclesMock.mock.invocationCallOrder[0]).toBeLessThan(
-      listVideoProjectsMock.mock.invocationCallOrder[0]!
-    );
-    expect(backfillScenarioLibraryAssetsMock).toHaveBeenCalledOnce();
-    expect(backfillScenarioLibraryAssetsMock.mock.invocationCallOrder[0]).toBeLessThan(
-      listMediaLibraryMock.mock.invocationCallOrder[0]!
-    );
-    expect(cleanupDraftsMock).toHaveBeenCalledWith({
-      policy: expect.objectContaining({ cleanupEnabled: true }),
-    });
-    expect(cleanupDraftsMock.mock.invocationCallOrder[0]).toBeLessThan(
-      listMediaLibraryMock.mock.invocationCallOrder[0]!
-    );
+    const snapshot = await loadGalleryLibrarySnapshot();
+    expect(snapshot.nextItems).toEqual(nextItems);
+    await expect(snapshot.estimate).resolves.toEqual(estimate);
+    expect(repairTemporaryProjectLifecyclesMock).not.toHaveBeenCalled();
+    expect(backfillScenarioLibraryAssetsMock).not.toHaveBeenCalled();
+    expect(cleanupDraftsMock).not.toHaveBeenCalled();
     expect(listMediaLibraryMock).toHaveBeenCalledTimes(1);
     expect(listVideoProjectsMock).toHaveBeenCalledTimes(1);
     expect(listScenarioProjectSummariesMock).toHaveBeenCalledTimes(1);
@@ -156,6 +151,7 @@ describe('loadGalleryLibrarySnapshot', () => {
     expect(createGalleryItemsMock).toHaveBeenCalledWith({
       mediaItems,
       presentations: [],
+      quickEditProjects: [],
       scenarioExportsByProjectId: new Map([
         ['project-1', [scenarioExports[0]]],
         ['project-2', [scenarioExports[1]]],
@@ -221,15 +217,15 @@ describe('loadGalleryLibrarySnapshot', () => {
     createGalleryItemsMock.mockReturnValue([]);
 
     await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({ nextItems: [] });
-    expect(repairTemporaryProjectLifecyclesMock).toHaveBeenCalledOnce();
+    expect(repairTemporaryProjectLifecyclesMock).not.toHaveBeenCalled();
     expect(cleanupDraftsMock).not.toHaveBeenCalled();
   });
 
-  it('does not list projects when authoritative lifecycle repair fails', async () => {
+  it('lists committed projects independently of unavailable lifecycle maintenance', async () => {
     listVideoProjectsMock.mockClear();
     repairTemporaryProjectLifecyclesMock.mockRejectedValueOnce(new Error('repair unavailable'));
-    await expect(loadGalleryLibrarySnapshot()).rejects.toThrow('repair unavailable');
-    expect(listVideoProjectsMock).not.toHaveBeenCalled();
+    await expect(loadGalleryLibrarySnapshot()).resolves.toHaveProperty('nextItems');
+    expect(listVideoProjectsMock).toHaveBeenCalled();
   });
 
   it('still shows library items when draft maintenance is blocked by an image journal', async () => {
@@ -254,4 +250,10 @@ describe('loadGalleryLibrarySnapshot', () => {
     await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({ nextItems });
     expect(listMediaLibraryMock).toHaveBeenCalledWith();
   });
+});
+
+it('returns library items while the storage estimate remains pending', async () => {
+  getStorageEstimateInfoMock.mockReturnValueOnce(new Promise(() => undefined));
+  const snapshot = await loadGalleryLibrarySnapshot();
+  expect(snapshot.nextItems).toBeDefined();
 });

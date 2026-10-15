@@ -35,6 +35,7 @@ export interface GetViewportCoordsMessage {
 
 export interface GetRecordingStateMessage {
   type: typeof VideoMessageType.GET_RECORDING_STATE;
+  recordingClock?: { recordingId: string; generation: number; streamInstanceId: string };
 }
 
 export interface RegisterCameraRecorderControlMessage {

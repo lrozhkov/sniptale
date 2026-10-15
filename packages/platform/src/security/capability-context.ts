@@ -6,6 +6,7 @@ export type CapabilityScope =
   | 'ipc:popup-export-tab-route'
   | 'llm:content-ai-pick'
   | 'llm:scenario-editor'
+  | 'llm:review-text'
   | 'offscreen:command'
   | 'offscreen:runtime';
 

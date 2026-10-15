@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { createStore } from 'zustand/vanilla';
 import {
   createEmptyVideoProject,
+  createVideoProjectFromRecording,
   createVideoProjectAsset,
   createVideoProjectTrack,
 } from '../../../../features/video/project/factories/creation';
@@ -12,7 +13,17 @@ import {
   VideoTrackKind,
 } from '../../../../features/video/project/types';
 import { canSplitProjectClipAtTime } from '../../../../features/video/project/timeline/split-eligibility';
-import { splitProjectClipsAtTimeWithResult } from './split';
+import { splitProjectClipsAtTimeWithResult, duplicateProjectClipsWithResult } from './split';
+import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
+import {
+  deriveProjectCursorFocusPath,
+  resolveProjectCursorFocusPath,
+} from '../../../../features/video/project/cursor-focus-path/projection';
+import {
+  authoredCursorFocusPath,
+  insertCursorFocusKey,
+  updateCursorFocusKey,
+} from '../../../../features/video/project/cursor-focus-path/authoring';
 import { moveProjectClip } from './mutations';
 import { createVideoEditorProjectActions } from '../actions';
 import type { VideoEditorProjectState } from '../contracts';
@@ -144,3 +155,233 @@ it('commits the partial group through the editor action and restores it with one
     expect(undone.project.assets).toEqual(project.assets);
   }
 });
+
+it('duplicates source-bound click, release, dwell and manual keys with independent retained identity', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'take',
+    filename: 'take.webm',
+    width: 100,
+    height: 100,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 10,
+    cursorTrack: {
+      captureMode: 'embedded-fallback',
+      skin: normalizeVideoProjectCursorSkin(undefined),
+      samples: [0, 1, 2, 3].map((time) => ({
+        id: `fact:${time}`,
+        time,
+        x: 20,
+        y: 30,
+        visible: true,
+        captureSegment: 0,
+        observation: 'observed',
+        recordingPoint: { x: 0.2, y: 0.3 },
+      })),
+    },
+    sourceNormalizedActionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        time: 0.5,
+        duration: 0.5,
+        point: { x: 0.2, y: 0.3 },
+        label: 'Click',
+        preset: 'NONE',
+        data: {
+          gestureId: 'click',
+          gestureType: 'hold',
+          completion: 'released',
+          downTime: 0.5,
+          upTime: 1,
+          pressDuration: 0.5,
+          recordingUpX: 0.4,
+          recordingUpY: 0.5,
+        },
+      },
+    ],
+    recordingSignals: [
+      {
+        id: 'dwell',
+        kind: 'cursor-idle',
+        startTime: 2,
+        endTime: 3,
+        point: null,
+        recordingPoint: { x: 0.2, y: 0.3 },
+        data: {},
+      },
+    ],
+  });
+  const original = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  project.clips.push({
+    ...original,
+    id: 'other-clip',
+    sourceInstanceId: 'other-instance',
+    startTime: 5,
+  });
+  project.duration = 9;
+  project.actionEvents.push(
+    {
+      ...project.actionEvents[0]!,
+      id: 'other-action',
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'take',
+        sourceInstanceId: 'other-instance',
+        sourceEventId: 'other',
+        sourceTime: 1,
+      },
+    },
+    {
+      id: 'scene-action',
+      kind: 'CLICK',
+      anchor: { kind: 'project', time: 1 },
+      point: null,
+      label: '',
+      data: {},
+    }
+  );
+  project.actionFeedback!.push({
+    recordingId: 'take',
+    sourceInstanceId: 'other-instance',
+    signals: [],
+    settings: [],
+  });
+  let path = deriveProjectCursorFocusPath(project);
+  const segment = path.segments[0]!;
+  for (const key of segment.keys)
+    path = updateCursorFocusKey(path, key.id, { interpolation: 'linear' });
+  path = insertCursorFocusKey(path, segment.id, { id: 'manual', time: 0.75, x: 0.6, y: 0.7 });
+  path = updateCursorFocusKey(path, 'manual', {
+    incoming: { x: 0.4, y: 0.5 },
+    outgoing: { x: 0.8, y: 0.9 },
+  });
+  path.segments.push({
+    id: 'scene-path',
+    binding: { kind: 'project' },
+    start: 0,
+    end: 9,
+    keys: [{ id: 'scene-key', time: 2, x: 0.5, y: 0.5, anchor: 'manual', interpolation: 'linear' }],
+  });
+  project.cursorFocusPath = authoredCursorFocusPath(path);
+  const facts = structuredClone(project);
+  const result = duplicateProjectClipsWithResult(project, original.id)!;
+  expect(result).not.toBeNull();
+  const copiedClip = result.project.clips.find((clip) => clip.id === result.duplicateClipId)!;
+  if (copiedClip.type !== 'VIDEO') throw new Error('Expected duplicated video');
+  expect(copiedClip.sourceInstanceId).not.toBe(original.sourceInstanceId);
+  const copied = result.project.cursorFocusPath!.segments.find(
+    (item) =>
+      item.binding.kind === 'recording-source' &&
+      item.binding.sourceInstanceId === copiedClip.sourceInstanceId
+  )!;
+  expect(copied.keys.map(({ id: _id, ...key }) => key)).toEqual(
+    project
+      .cursorFocusPath!.segments.find((item) => item.id === segment.id)!
+      .keys.map(({ id: _id, ...key }) => key)
+  );
+  expect(
+    copied.keys.every(
+      (key) =>
+        !project
+          .cursorFocusPath!.segments.flatMap((item) => item.keys)
+          .some((originalKey) => originalKey.id === key.id)
+    )
+  ).toBe(true);
+  const copiedAction = result.project.actionEvents.find(
+    (event) =>
+      event.anchor.kind === 'recording-source' &&
+      event.anchor.sourceInstanceId === copiedClip.sourceInstanceId
+  )!;
+  expect(copied.keys.some((key) => key.id === `click:${copiedAction.id}`)).toBe(true);
+  expect(copied.keys.some((key) => key.id === `release:${copiedAction.id}`)).toBe(true);
+  expect(
+    copied.keys.some((key) => key.id === `dwell-start:${copiedClip.sourceInstanceId}:dwell`)
+  ).toBe(true);
+  expect(
+    result.project.cursorFocusPath!.segments.filter((item) => item.binding.kind === 'project')
+  ).toHaveLength(1);
+  expect(result.project.actionFeedback).toHaveLength(3);
+  expect(project).toEqual(facts);
+});
+
+it.each(['boundary', 'click', 'dwell'] as const)(
+  'reuses the copied %s focus override when its captured anchor is edited again',
+  (anchor) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'take',
+      filename: 'take.webm',
+      width: 100,
+      height: 100,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 10,
+      cursorTrack: {
+        captureMode: 'embedded-fallback',
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [0, 1, 2, 3].map((time) => ({
+          id: `sample:${time}`,
+          time,
+          x: 20,
+          y: 30,
+          visible: true,
+          captureSegment: 0,
+          observation: 'observed',
+          recordingPoint: { x: 0.2, y: 0.3 },
+        })),
+      },
+      sourceNormalizedActionEvents: [
+        {
+          id: 'click',
+          kind: 'CLICK',
+          time: 0.5,
+          duration: 0.3,
+          point: { x: 0.2, y: 0.3 },
+          label: 'Click',
+          data: {},
+          preset: 'NONE',
+        },
+      ],
+      recordingSignals: [
+        {
+          id: 'idle',
+          kind: 'cursor-idle',
+          startTime: 1,
+          endTime: 2,
+          point: null,
+          recordingPoint: { x: 0.2, y: 0.3 },
+          data: {},
+        },
+      ],
+    });
+    const initial = deriveProjectCursorFocusPath(project);
+    const key = initial.segments
+      .flatMap((segment) => segment.keys)
+      .find((item) => item.anchor === anchor)!;
+    project.cursorFocusPath = authoredCursorFocusPath(
+      updateCursorFocusKey(initial, key.id, { x: 0.7 })
+    );
+    const copy = duplicateProjectClipsWithResult(project, project.clips[0]!.id)!;
+    const clip = copy.project.clips.find((item) => item.id === copy.duplicateClipId)!;
+    if (clip.type !== 'VIDEO') throw new Error('Expected copied video');
+    const path = resolveProjectCursorFocusPath(copy.project);
+    const segment = path.segments.find(
+      (item) =>
+        item.binding.kind === 'recording-source' &&
+        item.binding.sourceInstanceId === clip.sourceInstanceId
+    )!;
+    const captured = segment.keys.find((item) => item.anchor === anchor && item.time === key.time)!;
+    expect(segment.keys.filter((item) => item.anchor === 'manual')).toHaveLength(1);
+    const changed = updateCursorFocusKey(path, captured.id, { x: 0.8 });
+    const edited = changed.segments.find((item) => item.id === segment.id)!;
+    expect(edited.keys.filter((item) => item.anchor === 'manual')).toEqual([
+      expect.objectContaining({ id: `focus-override:${captured.id}`, x: 0.8 }),
+    ]);
+    expect(segment.keys.filter((item) => item.anchor === 'manual')[0]!.x).toBe(0.7);
+    expect(
+      project.cursorFocusPath.segments
+        .flatMap((item) => item.keys)
+        .filter((item) => item.anchor === 'manual')
+    ).toHaveLength(1);
+  }
+);

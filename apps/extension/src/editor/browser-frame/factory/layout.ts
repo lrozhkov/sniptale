@@ -1,5 +1,7 @@
 import type { BrowserFrameState } from '../../../features/editor/document/types';
-import { BROWSER_HEADER_HEIGHT, MIN_CANVAS_SIZE } from '../../document/model';
+import { windowHeaderGeometry } from '../../../features/browser-frame/header';
+import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
+import { MIN_CANVAS_SIZE } from '../../document/model';
 import type { BrowserFrameMockupLayout, BrowserFrameSourceRect } from './types';
 
 const BROWSER_WINDOW_RADIUS = 12;
@@ -22,7 +24,10 @@ export function resolveBrowserFrameMockupLayout(args: {
   source: BrowserFrameSourceRect;
 }): BrowserFrameMockupLayout {
   const source = roundRect(args.source);
-  const headerHeight = BROWSER_HEADER_HEIGHT;
+  const headerHeight = windowHeaderGeometry(
+    resolveEditorWindowHeader(args.browserFrame),
+    source
+  ).height;
 
   return {
     chrome: {

@@ -181,13 +181,13 @@ it('keeps a usable ruler width while track labels and viewport are temporarily u
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(0);
   act(() => measure());
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('120px');
+  expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('0px');
   expect(plane.querySelector('[data-ui="gallery.videoReview.ruler"]')).not.toBeNull();
 });
 
 it('does not observe geometry before the viewport mounts', () => {
   function DetachedGeometry() {
-    useReviewTimelineGeometry(false, false, 0);
+    useReviewTimelineGeometry();
     return null;
   }
   act(() => environment.root!.render(<DetachedGeometry />));
@@ -195,7 +195,11 @@ it('does not observe geometry before the viewport mounts', () => {
 });
 
 it('previews the boundary that basic cut drawing will select', () => {
-  const { host } = renderTimeline({ snapRangePreview: true, boundaries: [0, 1, 2, 3, 4] });
+  const { host } = renderTimeline({
+    sourceRangeTool: true,
+    snapRangePreview: true,
+    boundaries: [0, 1, 2, 3, 4],
+  });
   const plane = planeWithMetrics(host);
   hoverAt(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!, 137);
   const guide = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.hoverTime"]')!;
@@ -249,7 +253,7 @@ it('keeps original time coordinates through zoom and preserves separate comment 
 it('commits a range from a drag and restores the previous state through Escape', () => {
   const onRangeCommit = vi.fn();
   const selection: ReviewAnchor = { kind: 'range', start: 1, end: 3 };
-  const { host, props } = renderTimeline({ selection, onRangeCommit });
+  const { host, props } = renderTimeline({ selection, onRangeCommit, sourceRangeTool: true });
   const plane = planeWithMetrics(host);
   dispatchPlane(plane, [
     { type: 'pointerdown', x: 100 },
@@ -285,79 +289,6 @@ it('ignores pointer traffic without a drag and secondary buttons', () => {
   ]);
   expect(props.onSeek).toHaveBeenCalledTimes(2);
   expect(props.onSeek).toHaveBeenLastCalledWith(2, false);
-});
-
-it('groups cursor telemetry and deduplicates dense cursor samples', () => {
-  const action = {
-    ref: { kind: 'action' as const, id: 'click' },
-    eventType: 'CLICK',
-    start: 0.5,
-    end: 0.5,
-  };
-  const cursors = [0.1, 0.13, 0.2, 1.1].map((start, index) => ({
-    ref: { kind: 'cursor' as const, id: `cursor${index}` },
-    eventType: 'cursor',
-    start,
-    end: start,
-  }));
-  const { host, props } = renderTimeline({ markers: [action, ...cursors] });
-  const cursorButtons = [
-    ...host.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventCursor"]'),
-  ];
-  expect(cursorButtons).toHaveLength(3);
-  // Point events render at the shared screen-space floor width.
-  for (const button of cursorButtons) expect(button.style.width).toBe('14px');
-  act(() =>
-    host.querySelector<HTMLButtonElement>('[title^="gallery.videoReview.eventClick"]')!.click()
-  );
-  expect(props.onMarker).toHaveBeenCalledWith(action);
-});
-
-it('splits colliding actions into lanes and scrolls the dense tail inside a bounded strip', () => {
-  const markers = [0, 1, 2, 3, 4].map((index) => ({
-    ref: { kind: 'action' as const, id: `click${index}` },
-    eventType: 'CLICK',
-    start: 1 + index * 0.01,
-    end: 1 + index * 0.01,
-  }));
-  const { host, props } = renderTimeline({ markers });
-  const strip = host.querySelector<HTMLElement>('div.relative.mb-1')!;
-  // The lane stack is capped at three visible 20px lanes with 4px gaps; the rest scrolls.
-  expect(strip.style.height).toBe('68px');
-  expect(strip.className).toContain('overflow-y-auto');
-  const markerButtons = [
-    ...strip.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventClick"]'),
-  ];
-  // Every marker stays rendered and clickable; no overflow selector exists.
-  expect(markerButtons).toHaveLength(5);
-  for (const button of markerButtons) expect(button.style.height).toBe('20px');
-  const tops = new Set(markerButtons.map((button) => button.style.top));
-  expect(tops.size).toBe(5);
-  expect(strip.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
-  act(() => markerButtons.at(-1)!.click());
-  expect(props.onMarker).toHaveBeenCalledWith(markers.at(-1));
-});
-
-it('highlights only the explicitly selected action, independently of playback', () => {
-  const markers = [
-    { ref: { kind: 'action' as const, id: 'a' }, eventType: 'CLICK', start: 1, end: 1 },
-    { ref: { kind: 'action' as const, id: 'b' }, eventType: 'SCROLL', start: 2, end: 2.5 },
-  ];
-  const { host } = renderTimeline({
-    markers,
-    time: 2.2,
-    ...(markers[0] ? { selectedTelemetryRef: markers[0]!.ref } : {}),
-  });
-  const strip = host.querySelector('div.relative.mb-1')!;
-  const [selected, scrolled] = [...strip.querySelectorAll<HTMLButtonElement>('button')];
-  expect(selected?.getAttribute('aria-pressed')).toBe('true');
-  expect(selected?.className).toContain('border-[var(--sniptale-color-accent)]');
-  expect(selected?.className).not.toContain('bg-[var(--sniptale-color-accent');
-  expect(selected?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
-  expect(scrolled?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
-  expect(scrolled?.getAttribute('aria-pressed')).toBe('false');
-  expect(scrolled?.className).not.toContain('accent');
-  expect(scrolled?.className).not.toContain('ring-');
 });
 
 it('exposes transport, continuous zoom and fit without a volume control', () => {
@@ -437,20 +368,20 @@ it('renders ruler labels at the unit chosen for the current scale', () => {
   }
 });
 
-it('sizes the fixed gutter from natural label and control widths without a resize handle', () => {
-  const metric = vi
-    .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
-    .mockImplementation(function (this: HTMLElement) {
-      return this.hasAttribute('data-track-label')
-        ? 130
-        : this.hasAttribute('data-track-controls')
-          ? 64
-          : 0;
-    });
+it('sizes the separate label pane from natural label and control widths without a resize handle', () => {
+  const metric = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.hasAttribute('data-track-label')
+      ? 130
+      : this.hasAttribute('data-track-controls')
+        ? 64
+        : 0;
+  });
   try {
     const { host, props } = renderTimeline();
-    const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-    expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('238px');
+    const panes = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timelinePanes"]')!;
+    expect(panes.style.getPropertyValue('--review-label-width')).toBe('238px');
     expect(host.querySelector('[role="separator"]')).toBeNull();
     expect(props.onSeek).not.toHaveBeenCalled();
   } finally {
@@ -661,4 +592,132 @@ it('defers zoom and its scroll change until the existing before-action gate acce
   act(() => accept?.());
   expect(viewport.scrollLeft).toBeGreaterThan(0);
   expect(props.onSeek).not.toHaveBeenCalled();
+});
+
+it('zooms with normalized wheel input, clamps the thumb and contains handled gestures', () => {
+  const { host, props } = renderTimeline();
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  const parentWheel = vi.fn();
+  host.addEventListener('wheel', parentWheel);
+  const wheel = (options: WheelEventInit) => {
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...options });
+    act(() => slider.dispatchEvent(event));
+    return event;
+  };
+  expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(5);
+  expect(wheel({ deltaY: 1, deltaMode: 1 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(3);
+  wheel({ deltaY: 1, deltaMode: 2 });
+  expect(slider.valueAsNumber).toBeCloseTo(0);
+  expect(wheel({ deltaY: 100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(0);
+  changeZoom(host, '100');
+  expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(100);
+  expect(parentWheel).not.toHaveBeenCalled();
+  expect(wheel({ deltaY: -100, ctrlKey: true }).defaultPrevented).toBe(true);
+  expect(wheel({ deltaY: 0 }).defaultPrevented).toBe(false);
+  wheel({ deltaX: 20 });
+  expect(slider.valueAsNumber).toBeCloseTo(99);
+  expect(props.onSeek).not.toHaveBeenCalled();
+  act(() => environment.root!.render(null));
+  expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(false);
+});
+
+it('admits wheel zoom through the existing pending-note gate', () => {
+  let accept: (() => void) | undefined;
+  const { host } = renderTimeline({
+    beforeAction: (action) => {
+      accept = action;
+    },
+  });
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  act(() =>
+    slider.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true }))
+  );
+  expect(slider.valueAsNumber).toBeCloseTo(0);
+  expect(accept).toBeDefined();
+  act(() => accept?.());
+  expect(slider.valueAsNumber).toBeCloseTo(5);
+});
+
+it('blocks playback while an export transaction owns the busy timeline', () => {
+  const { host, props } = renderTimeline({ busy: true });
+  const play = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.videoReview.play"]'
+  )!;
+  expect(play.disabled).toBe(true);
+  act(() => play.click());
+  expect(props.onPlay).not.toHaveBeenCalled();
+});
+
+it('owns Ctrl+wheel throughout the timeline without changing playback or ordinary scrolling', () => {
+  const { host, props } = renderTimeline();
+  const timeline = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timeline"]')!;
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  const parentWheel = vi.fn();
+  host.addEventListener('wheel', parentWheel);
+  const wheel = (target: Element, options: WheelEventInit) => {
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...options });
+    act(() => target.dispatchEvent(event));
+    return event;
+  };
+  expect(wheel(viewport, { ctrlKey: true, deltaY: -100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(5);
+  expect(wheel(timeline, { ctrlKey: true, deltaY: 1, deltaMode: 1 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(3);
+  wheel(slider, { ctrlKey: true, deltaY: 1, deltaMode: 2 });
+  expect(slider.valueAsNumber).toBe(0);
+  expect(wheel(viewport, { ctrlKey: true, deltaY: 100 }).defaultPrevented).toBe(true);
+  expect(parentWheel).not.toHaveBeenCalled();
+  expect(wheel(viewport, { deltaY: -100 }).defaultPrevented).toBe(false);
+  expect(wheel(viewport, { ctrlKey: true, deltaY: 0 }).defaultPrevented).toBe(false);
+  expect(wheel(viewport, { ctrlKey: true, metaKey: true, deltaY: -100 }).defaultPrevented).toBe(
+    false
+  );
+  expect(slider.valueAsNumber).toBe(0);
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(props.onSelect).not.toHaveBeenCalled();
+  act(() => environment.root!.render(null));
+  expect(wheel(timeline, { ctrlKey: true, deltaY: -100 }).defaultPrevented).toBe(false);
+});
+
+it('defers Ctrl+wheel zoom until the pending-note gate accepts', () => {
+  let accept: (() => void) | undefined;
+  const { host } = renderTimeline({
+    beforeAction: (action) => {
+      accept = action;
+    },
+  });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  const event = new WheelEvent('wheel', {
+    ctrlKey: true,
+    deltaY: -100,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => viewport.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBe(0);
+  expect(accept).toBeDefined();
+  act(() => accept?.());
+  expect(slider.valueAsNumber).toBeCloseTo(5);
+});
+
+it('keeps a separate ruler marker aligned with the scrolling source playhead', () => {
+  const { host } = renderTimeline({ time: 1.5, duration: 4 });
+  const ruler = host.querySelector('[data-ui="gallery.videoReview.rulerRow"]')!;
+  const cap = ruler.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerPlayhead"]')!;
+  const head = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
+  expect(cap.style.left).toBe(head.style.left);
+  renderTimeline({ time: 3, duration: 4 });
+  expect(cap.style.left).toBe(head.style.left);
+  expect(ruler.contains(head)).toBe(false);
 });

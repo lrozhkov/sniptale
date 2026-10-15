@@ -1,3 +1,6 @@
+import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
+import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
+import { applyRecordingReviewInteractions } from '../../../features/video/review/standalone-interactions';
 import {
   createEmptyVideoProject,
   createVideoProjectFromRecording,
@@ -17,7 +20,6 @@ import {
   type VideoProjectAsset,
 } from '../../../features/video/project/types';
 import { ensureRecordingAssets } from './assets';
-import { loadVideoMetadata } from '../media-metadata';
 import {
   normalizeRecordingActionEventsToProjectSpace,
   normalizeRecordingCursorTrackToProjectSpace,
@@ -29,8 +31,12 @@ async function buildRecordingProject(
   sourceRecordingId: string,
   sidecarVideos: RecordingSidecarVideoProjectInput[]
 ): Promise<VideoProject> {
-  const metadata = await loadVideoMetadata(entry.file);
-  const telemetry = await getRecordingTelemetry(sourceRecordingId);
+  const metadata = asset.metadata;
+  const duration = metadata.duration;
+  if (duration === null || !Number.isFinite(duration) || duration <= 0)
+    throw new Error('Recording video metadata is unavailable.');
+  const rawTelemetry = await getRecordingTelemetry(sourceRecordingId);
+  const telemetry = rawTelemetry ? projectRecordingObservationClock(rawTelemetry) : undefined;
   const normalizedTelemetryParams = {
     captureMode: telemetry?.captureMode ?? null,
     displaySurface: telemetry?.displaySurface ?? null,
@@ -39,18 +45,19 @@ async function buildRecordingProject(
     viewport: telemetry?.viewport ?? null,
   };
 
-  return createVideoProjectFromRecording({
+  const project = createVideoProjectFromRecording({
     recordingId: sourceRecordingId,
     filename: entry.filename,
     width: metadata.width,
     height: metadata.height,
-    duration: metadata.duration,
+    duration,
     mimeType: metadata.mimeType,
     size: entry.size,
     hasAudio: metadata.hasAudio,
     audioPeaks: metadata.audioPeaks,
     asset,
     sidecarVideos,
+    ...(telemetry ? { recordingSignals: telemetry.signals } : {}),
     ...(telemetry?.actionEvents === undefined
       ? {}
       : {
@@ -68,6 +75,19 @@ async function buildRecordingProject(
           ),
         }),
   });
+  const snapshot = await readVideoWorkspace(`recording:${sourceRecordingId}`);
+  if (!snapshot) return project;
+  const { source, sourceAssetId } = snapshot.workspace;
+  if (
+    sourceAssetId !== entry.assetId ||
+    source.size !== entry.size ||
+    source.mimeType !== metadata.mimeType ||
+    source.width !== metadata.width ||
+    source.height !== metadata.height ||
+    Math.abs(source.duration - duration) > 0.001
+  )
+    throw new Error('Review interaction source has changed.');
+  return applyRecordingReviewInteractions(project, sourceRecordingId, snapshot.workspace.advanced);
 }
 
 function buildWebcamSidecarVideo(

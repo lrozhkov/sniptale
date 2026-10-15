@@ -25,3 +25,15 @@ it('builds codec options from available MP4 capabilities in priority order', () 
     { value: VideoMp4Codec.HEVC, label: 'videoEditor.exportDialog.codecHevcLabel' },
   ]);
 });
+
+it('keeps an explicitly selected unavailable codec visible', () => {
+  const capabilities = createVideoExportCapabilities({
+    mp4Codecs: [
+      { codec: VideoMp4Codec.AVC, available: true },
+      { codec: VideoMp4Codec.HEVC, available: false, reason: 'CODEC_UNSUPPORTED' },
+    ],
+  });
+  expect(
+    getMp4CodecOptions(capabilities, VideoMp4Codec.HEVC).map((option) => option.value)
+  ).toEqual(['AVC', 'HEVC']);
+});

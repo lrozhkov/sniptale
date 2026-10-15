@@ -4,19 +4,19 @@ import { createTempRoot, importFresh, writeFile } from '../../../../test-support
 
 function createPassingPackageJson() {
   return {
-    packageManager: 'npm@11.19.1',
-    engines: { node: '>=24.18.0 <25' },
+    packageManager: 'npm@12.2.0',
+    engines: { node: '>=24.21.0 <25' },
     devEngines: {
-      runtime: { name: 'node', version: '>=24.18.0 <25', onFail: 'error' },
-      packageManager: { name: 'npm', version: '11.19.1', onFail: 'error' },
+      runtime: { name: 'node', version: '>=24.21.0 <25', onFail: 'error' },
+      packageManager: { name: 'npm', version: '12.2.0', onFail: 'error' },
     },
     dependencies: {
-      react: '^19.2.5',
-      'react-dom': '^19.2.5',
+      react: '^19.3.0',
+      'react-dom': '^19.3.0',
     },
     devDependencies: {
-      '@types/react': '^19.2.14',
-      '@types/react-dom': '^19.2.3',
+      '@types/react': '^19.3.0',
+      '@types/react-dom': '^19.3.0',
       '@vitejs/plugin-react': '^6.1.0',
     },
   };
@@ -38,7 +38,7 @@ function createFailingPackageJson() {
 
 function writeConfigPolicyPackageJson(root, packageJson) {
   writeFile(root, 'package.json', JSON.stringify(packageJson, null, 2));
-  writeFile(root, '.nvmrc', '24.18.0\n');
+  writeFile(root, '.nvmrc', '24.21.0\n');
   writeFile(root, '.npmrc', 'loglevel=error\nmin-release-age=7\n');
   writeFile(
     root,
@@ -108,11 +108,11 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'package.json',
-        message: 'engines.node must be ">=24.18.0 <25"',
+        message: 'engines.node must be ">=24.21.0 <25"',
       }),
       expect.objectContaining({
         file: 'package-lock.json',
-        message: 'packages[""].engines.node must be ">=24.18.0 <25"',
+        message: 'packages[""].engines.node must be ">=24.21.0 <25"',
       }),
       expect.objectContaining({
         file: 'package.json',
@@ -195,14 +195,14 @@ it('rejects lockfile engine drift independently from the root package', async ()
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
     rule: 'config-policy',
     file: 'package-lock.json',
-    message: 'packages[""].engines.node must be ">=24.18.0 <25"',
+    message: 'packages[""].engines.node must be ">=24.21.0 <25"',
   });
 });
 
 it('rejects malformed versions that merely share the governed prefix', async () => {
   const root = createTempRoot('verify-config-policy-version-prefix-');
   const packageJson = createPassingPackageJson();
-  packageJson.dependencies.react = '^19.2.not-semver';
+  packageJson.dependencies.react = '^19.3.not-semver';
   packageJson.devDependencies['@vitejs/plugin-react'] = '^6.1.preview';
   writePassingConfigPolicyFixture(root);
   writeConfigPolicyPackageJson(root, packageJson);
@@ -227,7 +227,7 @@ it('rejects Node version-manager drift independently from package metadata', asy
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toContainEqual({
     rule: 'config-policy',
     file: '.nvmrc',
-    message: '.nvmrc must contain exactly 24.18.0',
+    message: '.nvmrc must contain exactly 24.21.0',
   });
 });
 

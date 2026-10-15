@@ -379,3 +379,17 @@ describe('shared db core privacy erasure', () => {
     await expect(module.verifySniptaleDatabaseAbsentAfterPrivacyErasure()).resolves.toBe(true);
   });
 });
+
+it('admits a new capture without scanning provenance across the existing library', async () => {
+  stubPersistentStorage();
+  dbMocks.openDB.mockResolvedValue(createCompleteDb());
+  const module = await importDbModule();
+  const maintenance = await import('./maintenance/provenance');
+  const scan = vi.spyOn(maintenance, 'runProvenanceUrlMaintenance').mockResolvedValue();
+  try {
+    await module.initDB();
+    expect(scan).not.toHaveBeenCalled();
+  } finally {
+    scan.mockRestore();
+  }
+});

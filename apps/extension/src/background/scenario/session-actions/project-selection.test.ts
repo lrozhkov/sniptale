@@ -49,8 +49,11 @@ beforeEach(() => {
   buildScenarioPayloadResponseMock.mockResolvedValue({ success: true });
   flushScenarioProjectCaptureMock.mockResolvedValue({});
   createScenarioProjectRecordMock.mockResolvedValue({
-    id: 'project-created',
-    name: 'Created project',
+    project: {
+      id: 'project-created',
+      name: 'Created project',
+    },
+    workspaceRevision: 2,
   });
   resolveProjectSelectionMock.mockResolvedValue({
     id: 'project-9',

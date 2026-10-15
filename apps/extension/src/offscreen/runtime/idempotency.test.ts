@@ -13,6 +13,7 @@ const handledCommandTypes = [
   MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
   MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD,
   MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
   MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE,
   MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE,
@@ -197,4 +198,15 @@ it('replays the exact response produced by a signed voice command', async () => 
     success: true,
     snapshot: { phase: 'idle' },
   });
+});
+
+it('rechecks data preparation instead of replaying readiness from an old connection', () => {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    expect(
+      markOffscreenSideEffectCommand({
+        capabilityGeneration: 'page-preparation',
+        message: { type: MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD },
+      })
+    ).toEqual({ duplicate: false, tracked: false });
+  }
 });

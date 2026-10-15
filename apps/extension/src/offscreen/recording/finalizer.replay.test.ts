@@ -25,7 +25,6 @@ vi.mock('../../composition/persistence/recordings/completion-outbox', async (imp
   readVideoRecordingCompletionOutbox: vi.fn(async () => saveBatchMock.mock.lastCall?.[1]),
   removeVideoRecordingCompletionOutbox: vi.fn().mockResolvedValue(true),
 }));
-vi.mock('./signals/static-frame', () => ({ persistStaticFrameSignals: vi.fn() }));
 
 import { finalizeRecording } from './finalizer';
 

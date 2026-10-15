@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { InspectorActionButton } from '../shared/actions';
+import { useEffect, useState } from 'react';
+import { BackgroundImagePicker } from '../../../../../composition/background-resources/picker';
 import { createSceneGradientBackground } from '../../../../../features/video/project/scene/background-gradient';
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
@@ -26,7 +26,11 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
         }}
         options={getSceneBackgroundKindOptions(props.imageAssets)}
       />
-      {imageRequested ? <ImageBackgroundEditor {...props} /> : <SceneBackgroundEditor {...props} />}
+      {imageRequested || props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? (
+        <ImageBackgroundEditor {...props} />
+      ) : (
+        <SceneBackgroundEditor {...props} />
+      )}
     </div>
   );
 }
@@ -43,8 +47,6 @@ function SceneBackgroundEditor(props: SceneBackgroundFieldProps) {
 }
 
 function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
-  const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
   return (
     <div className="grid gap-3">
       {props.imageAssets.length > 0 && (
@@ -60,29 +62,14 @@ function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
         />
       )}
       {props.onImportImage && (
-        <>
-          <input
-            ref={input}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            aria-label={translate('videoEditor.sidebar.sceneBackgroundImageUpload')}
-            onChange={async (event) => {
-              const file = event.currentTarget.files?.[0];
-              event.currentTarget.value = '';
-              if (!file || busy) return;
-              setBusy(true);
-              try {
-                await props.onImportImage?.(file, { destination: 'background' });
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-          <InspectorActionButton separated disabled={busy} onClick={() => input.current?.click()}>
-            {translate('videoEditor.sidebar.sceneBackgroundImageUpload')}
-          </InspectorActionButton>
-        </>
+        <BackgroundImagePicker
+          onSelect={({ file, originMediaId }) =>
+            props.onImportImage?.(file, {
+              destination: 'background',
+              ...(originMediaId ? { backgroundOriginMediaId: originMediaId } : {}),
+            })
+          }
+        />
       )}
       {props.imageAssets.length === 0 && (
         <p className={PANEL_META_CLASS_NAME}>

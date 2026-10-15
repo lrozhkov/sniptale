@@ -1,3 +1,4 @@
+import { RECORDING_OFFSCREEN_READY_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
 import {
   ensureOffscreenDocument,
   hasOffscreenDocument,
@@ -25,5 +26,5 @@ export async function ensureOffscreenDocumentReady(
     return;
   }
 
-  await deps.waitForOffscreenReady();
+  await deps.waitForOffscreenReady(RECORDING_OFFSCREEN_READY_TIMEOUT_MS);
 }

@@ -1,3 +1,4 @@
+import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
 import { expect, it } from 'vitest';
 import { harness, mediaId, physicalId, mediaEntry, rows } from './delete-cascade.test-support';
 import {
@@ -6,6 +7,16 @@ import {
 } from './delete-cascade';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { createQuickEditAdvancedContent } from '../../../features/video/review/advanced/defaults';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
+import { buildReviewTimeMap } from '../../../features/video/review/timeline';
+import { withReviewWorkspaceUsage } from './usage-index-keys';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
+import { workspaceStorageHead, workspaceStorageRows } from '../review-workspaces/storage-format';
 
 it('atomically removes placements, library metadata and the last physical owner', async () => {
   const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
@@ -92,9 +103,15 @@ it('fails closed on an invalid project row without deleting the file', async () 
   expect(harness.complete).not.toHaveBeenCalled();
 });
 
-it.each(['music', 'voiceover'] as const)(
-  'removes an auxiliary quick-edit %s reference and retains its workspace',
-  async (lane) => {
+it.each([
+  ['music', 1, false],
+  ['voiceover', 1, false],
+  ['music', 2, false],
+  ['voiceover', 2, false],
+  ['music', 2, true],
+] as const)(
+  'purges auxiliary %s in format %i, invalid baseline=%s',
+  async (lane, formatVersion, invalidBaseline) => {
     const advanced = createQuickEditAdvancedState();
     advanced.audio[lane].push({
       id: 'music',
@@ -107,6 +124,13 @@ it.each(['music', 'voiceover'] as const)(
       fadeIn: 0,
       fadeOut: 0,
     });
+    advanced.audio.original.mutes = [
+      { id: 'detached', kind: 'range', start: 1, end: 2, volume: 0.5 },
+    ];
+    if (lane === 'voiceover') {
+      advanced.audio.voiceoverSegments = buildReviewTimeMap(2, []);
+      advanced.audio.original.mutes.push({ id: 'take-mute', kind: 'take', clipId: 'music' });
+    }
     rows.set(
       'video_workspaces',
       new Map([
@@ -127,23 +151,135 @@ it.each(['music', 'voiceover'] as const)(
         ],
       ])
     );
+    if (formatVersion === 2) {
+      const previous = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+      if (!previous) throw new Error('Invalid review fixture');
+      const workspace = {
+        ...previous,
+        formatVersion: 2 as const,
+        baseline: replayReviewHistory(
+          [],
+          0,
+          previous.source,
+          reviewAdvancedContentBaseline(previous.advanced)
+        ),
+      };
+      rows
+        .get('video_workspaces')!
+        .set(
+          workspace.aggregateId,
+          workspaceStorageHead(workspace, withReviewWorkspaceUsage(workspace).usageReferenceKeys)
+        );
+      const historyRows = workspaceStorageRows(workspace);
+      if (invalidBaseline) {
+        const baselineRow = historyRows.find((row) => 'baseline' in row);
+        if (!baselineRow || !('baseline' in baselineRow)) throw new Error('Missing baseline');
+        baselineRow.baseline.edits = [
+          { id: 'invalid-cut', kind: 'cut', start: 2, end: 1, requestedStart: 2, requestedEnd: 1 },
+        ];
+      }
+      rows.set(
+        'video_workspace_history',
+        new Map(historyRows.map((row) => [JSON.stringify([row.aggregateId, row.ordinal]), row]))
+      );
+    }
     const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
       typeof createVideoProjectEntryWithMediaClip
     >;
+    if (invalidBaseline) {
+      const snapshot = structuredClone(rows);
+      await expect(
+        deleteMediaAssetWithProjectCascade(mediaId, [
+          { id: project.id, kind: 'video', name: project.project.name, primary: false },
+          { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
+        ])
+      ).rejects.toMatchObject({ reason: 'invalid-graph' });
+      expect([...rows].map(([name, store]) => [name, [...store]])).toEqual(
+        [...snapshot].map(([name, store]) => [name, [...store]])
+      );
+      expect(harness.complete).not.toHaveBeenCalled();
+      return;
+    }
     await deleteMediaAssetWithProjectCascade(mediaId, [
       { id: project.id, kind: 'video', name: project.project.name, primary: false },
       { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
     ]);
-    const review = rows.get('video_workspaces')!.get('recording:other') as {
-      advanced: { audio: { music: unknown[]; voiceover: unknown[] } };
-      revision: number;
-    };
-    expect(review.advanced.audio[lane]).toEqual([]);
-    expect(review.revision).toBe(2);
+    const review = parseVideoWorkspace(readReviewWorkspaceFixture('recording:other'));
+    expect(review).not.toBeNull();
+    expect(review!.advanced.audio[lane]).toEqual([]);
+    expect(review!.advanced.audio.original.mutes).toEqual([
+      { id: 'detached', kind: 'range', start: 1, end: 2, volume: 0.5 },
+    ]);
+    expect(review!.revision).toBe(2);
+    expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+    expect(harness.complete).toHaveBeenCalledTimes(1);
   }
 );
 
-it('deletes the media own quick-edit workspace together with its root', async () => {
+it('detaches a disabled webcam held only by redo history when its Library origin is deleted', async () => {
+  const source = { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' };
+  const before = createQuickEditAdvancedContent();
+  const webcam = {
+    ...createQuickEditWebcam('project-asset:private-camera', source, source),
+    enabled: false,
+  };
+  rows.get('project_assets')!.set('private-camera', {
+    id: 'private-camera',
+    assetId: 'camera-body',
+    mimeType: 'video/webm',
+    size: 5,
+    createdAt: 1,
+    originMediaId: mediaId,
+  });
+  rows.get('asset_refs')!.set('camera-body', { assetId: 'camera-body' });
+  rows.get('asset_owners')!.set(JSON.stringify(['project-asset', 'private-camera', 'body']), {
+    ownerKind: 'project-asset',
+    ownerId: 'private-camera',
+    role: 'body',
+    assetId: 'camera-body',
+  });
+  rows.set(
+    'video_workspaces',
+    new Map([
+      [
+        'recording:other',
+        {
+          aggregateId: 'recording:other',
+          formatVersion: 1,
+          sourceAssetId: 'primary-physical',
+          source,
+          revision: 1,
+          cursor: 0,
+          advanced: createQuickEditAdvancedState(),
+          createdAt: 1,
+          updatedAt: 1,
+          history: [
+            {
+              id: 'attach',
+              at: 1,
+              target: 'advancedContent',
+              before,
+              after: { ...before, webcam },
+            },
+          ],
+        },
+      ],
+    ])
+  );
+  rows.get('video_projects')!.clear();
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
+  ]);
+  const review = parseVideoWorkspace(readReviewWorkspaceFixture('recording:other'));
+  expect(review).not.toBeNull();
+  expect(review!.history).toEqual([]);
+  expect(review!.advanced.webcam).toBeUndefined();
+  expect(review!.cursor).toBe(0);
+  expect(rows.get('project_assets')!.has('private-camera')).toBe(false);
+  expect(rows.get('asset_refs')!.has('camera-body')).toBe(false);
+});
+
+it('retains a primary source while its own quick-edit project exists', async () => {
   rows.get('video_projects')!.clear();
   rows.set(
     'video_workspaces',
@@ -165,9 +301,9 @@ it('deletes the media own quick-edit workspace together with its root', async ()
       ],
     ])
   );
-  await deleteMediaAssetWithProjectCascade(mediaId, []);
-  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
-  expect(rows.get('video_workspaces')?.has(mediaId)).toBe(false);
+  const before = structuredClone(rows);
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toThrow('primary source');
+  expect(rows).toEqual(before);
 });
 
 it('ignores unrelated invalid scenario metadata with a known disjoint project identity', async () => {
@@ -198,11 +334,12 @@ it('ignores invalid metadata on a scenario child with disjoint dependency locato
   expect(rows.get('scenario_assets')?.has('other')).toBe(true);
 });
 
-it('deletes its own invalid quick-edit sidecar without validating it as an external dependency', async () => {
+it('retains a source when its own quick-edit project evidence is invalid', async () => {
   rows.get('video_projects')!.clear();
   rows.set('video_workspaces', new Map([[mediaId, { aggregateId: mediaId, invalid: true }]]));
-  await deleteMediaAssetWithProjectCascade(mediaId, []);
-  expect(rows.get('video_workspaces')?.has(mediaId)).toBe(false);
+  const before = structuredClone(rows);
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toThrow();
+  expect(rows).toEqual(before);
 });
 
 it('does not validate unrelated quick-edit rows for a stored image source', async () => {

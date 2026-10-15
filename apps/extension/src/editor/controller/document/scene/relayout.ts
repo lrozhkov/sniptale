@@ -1,4 +1,4 @@
-import type { Canvas } from 'fabric';
+import { ActiveSelection, type Canvas } from 'fabric';
 import type {
   BrowserFrameState,
   EditorFrameSettings,
@@ -37,30 +37,41 @@ export function relayoutEditorScene(
     source,
   });
   const currentSource = { ...source };
-  syncManagedBackgroundLayerLayout({
-    canvas,
-    canvasSize: {
-      height: layout.canvas.height,
-      width: layout.canvas.width,
-    },
-    frame,
-  });
-  updateUserObjectLayout({
-    canvas,
-    currentSource,
-    sourceSizeChanged:
-      options.sourceSize !== undefined &&
-      (layout.source.width !== currentSource.displayWidth ||
-        layout.source.height !== currentSource.displayHeight),
-    layoutSource: layout.source,
-  });
-  const nextSource = resolveRelayoutSourceState(canvas, currentSource, layout.source);
+  const activeObject = canvas.getActiveObject?.();
+  const selection = activeObject instanceof ActiveSelection ? activeObject : null;
+  // Scene layout uses canvas coordinates; ActiveSelection members use its local plane.
+  const selectedObjects = selection?.removeAll() ?? [];
+  try {
+    syncManagedBackgroundLayerLayout({
+      canvas,
+      canvasSize: {
+        height: layout.canvas.height,
+        width: layout.canvas.width,
+      },
+      frame,
+    });
+    updateUserObjectLayout({
+      canvas,
+      currentSource,
+      sourceSizeChanged:
+        options.sourceSize !== undefined &&
+        (layout.source.width !== currentSource.displayWidth ||
+          layout.source.height !== currentSource.displayHeight),
+      layoutSource: layout.source,
+    });
+    const nextSource = resolveRelayoutSourceState(canvas, currentSource, layout.source);
 
-  return {
-    canvasSize: {
-      width: layout.canvas.width,
-      height: layout.canvas.height,
-    },
-    source: nextSource,
-  };
+    return {
+      canvasSize: {
+        width: layout.canvas.width,
+        height: layout.canvas.height,
+      },
+      source: nextSource,
+    };
+  } finally {
+    if (selection) {
+      selection.add(...selectedObjects);
+      selection.setCoords();
+    }
+  }
 }

@@ -18,13 +18,13 @@ it.each([
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('innerWidth', expected.viewportWidth);
   vi.stubGlobal('innerHeight', 800);
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      return this.tagName === 'BUTTON'
-        ? new DOMRect(expected.toolbarLeft + 7, 183, 36, 36)
-        : new DOMRect(expected.toolbarLeft, 176, 52, 52);
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.tagName === 'BUTTON'
+      ? new DOMRect(expected.toolbarLeft + 7, 183, 36, 36)
+      : new DOMRect(expected.toolbarLeft, 176, 52, 52);
+  });
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);

@@ -1,211 +1,23 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { drawReviewSceneFrame } from './scene-frame';
+import { state, contextFixture, argsFixture } from './render-export.test-support';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
-import { drawReviewSpotlight } from './render-spotlight';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { drawReviewSpotlights } from './render-spotlight';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
-import {
-  drawReviewSceneFrame,
-  drainSegmentAudio,
-  renderRenderWindowFrames,
-  reviewRenderFrameSchedule,
-  writeReviewFrames,
-} from './render-export';
-
-vi.mock('./render-spotlight', () => ({ drawReviewSpotlight: vi.fn() }));
-
-const state = vi.hoisted(() => ({
-  configurations: [] as unknown[],
-  encoded: [] as {
-    timestamp: number;
-    duration: number;
-    close: unknown;
-    width: number;
-    height: number;
-  }[],
-  composited: [] as unknown[][],
-  drawn: [] as { draw: unknown; close: unknown }[],
-  audioTrack: null as null | {
-    codec: 'opus';
-    getDecoderConfig(): Promise<AudioDecoderConfig>;
-    getSampleRate(): Promise<number>;
-  },
+import { drainSegmentAudio, renderRenderWindowFrames, writeReviewFrames } from './render-export';
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+const presentationExport = vi.hoisted(() => vi.fn());
+const annotationMain = vi.hoisted(() => ({ open: vi.fn() }));
+vi.mock('./presentation-main', () => ({ createReviewPresentationMain: annotationMain.open }));
+vi.mock('./render-presentation-export', () => ({
+  writeReviewPresentationFrames: presentationExport,
 }));
-
-vi.mock('mediabunny', () => {
-  class VideoSample {
-    timestamp: number;
-    duration: number;
-    width: number;
-    height: number;
-    close = vi.fn();
-    draw = vi.fn();
-    constructor(source: HTMLCanvasElement | null, init: { timestamp: number; duration?: number }) {
-      this.timestamp = init.timestamp;
-      this.duration = init.duration ?? 0;
-      this.width = source?.width ?? 0;
-      this.height = source?.height ?? 0;
-    }
-  }
-  class VideoSampleSink {
-    async getSample(time: number) {
-      const sample = new VideoSample(null, { timestamp: Math.floor(time * 2) / 2 });
-      state.drawn.push({ draw: sample.draw, close: sample.close });
-      return sample;
-    }
-    async *samples(start: number, end: number) {
-      const timestamp = Math.ceil(start * 2) / 2;
-      if (timestamp >= end) return;
-      const sample = new VideoSample(null, { timestamp });
-      state.drawn.push({ draw: sample.draw, close: sample.close });
-      yield sample;
-    }
-    async *samplesAtTimestamps(times: readonly number[]) {
-      for (const time of times) {
-        const sample = new VideoSample(null, { timestamp: time });
-        state.drawn.push({ draw: sample.draw, close: sample.close });
-        yield sample;
-      }
-    }
-  }
-  class Input {
-    async getPrimaryVideoTrack() {
-      return {
-        codec: 'vp9',
-        canDecode: async () => true,
-        getDisplayWidth: async () => 320,
-        getDisplayHeight: async () => 180,
-      };
-    }
-    async getPrimaryAudioTrack() {
-      return state.audioTrack;
-    }
-    dispose(): void {}
-  }
-  class Output {
-    start = vi.fn();
-    finalize = vi.fn();
-    cancel = vi.fn(async () => undefined);
-    addVideoTrack = vi.fn();
-    addAudioTrack = vi.fn();
-    setMetadataTags = vi.fn();
-  }
-  class VideoSampleSource {
-    constructor(config: unknown) {
-      state.configurations.push(config);
-    }
-    add = vi.fn(async (sample: VideoSample) => {
-      state.encoded.push({
-        timestamp: sample.timestamp,
-        duration: sample.duration,
-        close: sample.close,
-        width: sample.width,
-        height: sample.height,
-      });
-    });
-    close(): void {}
-  }
-  return {
-    ALL_FORMATS: [],
-    BlobSource: class {},
-    Input,
-    Output,
-    StreamTarget: class {},
-    Mp4OutputFormat: class {},
-    WebMOutputFormat: class {},
-    VideoSample,
-    VideoSampleSink,
-    VideoSampleSource,
-    EncodedVideoPacketSource: class {},
-    EncodedAudioPacketSource: class {},
-    AudioSampleSource: class {},
-    EncodedPacketSink: class {},
-  };
-});
-
-const realDocument = globalThis.document;
-const realVideoEncoder = globalThis.VideoEncoder;
-const realCreateImageBitmap = globalThis.createImageBitmap;
-
-function contextFixture() {
-  return {
-    translate: vi.fn(),
-    scale: vi.fn(),
-    fillStyle: '',
-    globalAlpha: 1,
-    font: '',
-    textBaseline: '',
-    save: vi.fn(),
-    restore: vi.fn(),
-    beginPath: vi.fn(),
-    rect: vi.fn(),
-    roundRect: vi.fn(),
-    clip: vi.fn(),
-    fillRect: vi.fn(),
-    fill: vi.fn(),
-    stroke: vi.fn(),
-    arc: vi.fn(),
-    fillText: vi.fn(),
-    measureText: vi.fn((text: string) => ({ width: text.length * 6 })),
-    drawImage: vi.fn((...args: unknown[]) => state.composited.push(args)),
-  } as unknown as CanvasRenderingContext2D;
-}
-
-beforeAll(() => {
-  globalThis.VideoEncoder = {
-    isConfigSupported: async (config: VideoEncoderConfig) => ({ config, supported: true }),
-  } as unknown as typeof VideoEncoder;
-  globalThis.document = {
-    createElement: () => ({ width: 0, height: 0, getContext: () => contextFixture() }),
-  } as unknown as Document;
-  globalThis.createImageBitmap = (async () => {
-    throw new Error('decode failed');
-  }) as typeof createImageBitmap;
-});
-
-afterAll(() => {
-  globalThis.document = realDocument;
-  globalThis.VideoEncoder = realVideoEncoder;
-  globalThis.createImageBitmap = realCreateImageBitmap;
-});
-
-function writerFixture() {
-  return { writeAt: vi.fn(async () => undefined) };
-}
-
-function argsFixture(overrides?: {
-  advanced?: ReturnType<typeof createQuickEditAdvancedState>;
-  processedVideoCodec?: 'avc' | 'vp8' | 'vp9' | null;
-  audioCodec?: 'aac' | 'opus' | null;
-  frameRate?: number;
-}) {
-  const advanced = overrides?.advanced ?? createQuickEditAdvancedState();
-  advanced.ui.mode = 'advanced';
-  return {
-    file: new Blob(['video']),
-    index: {
-      duration: 2,
-      boundaries: [0, 2],
-      videoCodec: 'vp9' as const,
-      audioCodec: overrides?.audioCodec ?? null,
-      container: 'webm' as const,
-      rotation: 0 as const,
-      processedVideoCodec:
-        overrides && overrides.processedVideoCodec !== undefined
-          ? overrides.processedVideoCodec
-          : ('vp9' as const),
-      frameRate: overrides?.frameRate ?? 2,
-    },
-    edits: [] as ReviewEdit[],
-    advanced,
-    fragmentOffset: 0,
-    writer: writerFixture(),
-    signal: new AbortController().signal,
-    readProjectAsset: vi.fn(async (): Promise<Blob | null> => null),
-  };
-}
 
 function segmentStub(sourceStart: number, sourceEnd: number) {
   return {
@@ -229,70 +41,143 @@ function cutEdit(start: number, end: number) {
   };
 }
 
-function speedEdit(start: number, end: number) {
-  return {
-    id: `speed-${start}`,
-    kind: 'speed' as const,
-    start,
-    end,
-    requestedStart: start,
-    requestedEnd: end,
-    rate: 0.5 as const,
-    audio: 'speed' as const,
+function annotationExportArgs() {
+  const args = argsFixture();
+  args.advanced.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 2,
+        attachment: 'viewport',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
   };
+  return args;
 }
 
-describe('reviewRenderFrameSchedule', () => {
-  it('covers an unedited duration exactly on the fps lattice', () => {
-    const windows = reviewRenderFrameSchedule(2.5, [], 10);
-    expect(windows).toHaveLength(1);
-    expect(windows[0]!.timestamps).toHaveLength(25);
-    expect(windows[0]!.timestamps[0]).toBe(0);
-    expect(windows[0]!.timestamps.at(-1)).toBe(2.4);
-    expect(windows[0]!.sourceTimes[0]).toBe(0);
-    expect(windows[0]!.sourceTimes.at(-1)).toBeCloseTo(2.4, 9);
+it('composes annotations without extra decoding and preserves fractional cadence', async () => {
+  const args = annotationExportArgs();
+  args.edits = [cutEdit(0.2, 0.5)];
+  const frames: { release: ReturnType<typeof vi.fn> }[] = [];
+  const main = {
+    renderAtTime: vi.fn(async (_time: number) => {
+      const canvas = { width: 320, height: 180 } as HTMLCanvasElement;
+      const frame = { canvas, context: contextFixture(), release: vi.fn() };
+      frames.push(frame);
+      return frame;
+    }),
+    dispose: vi.fn(),
+  };
+  annotationMain.open.mockReset().mockResolvedValue(main);
+  const effectSnapshots = [
+    {
+      id: 'effect:frame',
+      schemaVersion: 'sniptale.effect.v1' as const,
+      kind: 'standalone' as const,
+      documentId: 'frame',
+      sha256: '0'.repeat(64),
+      source: '{}',
+      retainedByteLength: 2,
+      assets: [],
+    },
+  ];
+  const fullMap = buildReviewTimeMap(10, []);
+  const receipt = await writeReviewFrames({
+    ...args,
+    fragmentOffset: 5,
+    effectSnapshots,
+    captionTimeMap: fullMap,
   });
-
-  it('shifts timestamps across cuts and resamples speed segments', () => {
-    const windows = reviewRenderFrameSchedule(10, [cutEdit(1, 3), speedEdit(5, 7)], 2);
-    expect(windows).toHaveLength(4);
-    expect(windows[0]!.segment).toMatchObject({ sourceStart: 0, sourceEnd: 1, resultStart: 0 });
-    expect(windows[1]!.segment).toMatchObject({ sourceStart: 3, sourceEnd: 5, resultStart: 1 });
-    expect(windows[2]!.segment).toMatchObject({
-      sourceStart: 5,
-      sourceEnd: 7,
-      resultStart: 3,
-      rate: 0.5,
-    });
-    expect(windows[3]!.segment).toMatchObject({ sourceStart: 7, sourceEnd: 10, resultStart: 7 });
-    expect(windows[2]!.timestamps).toHaveLength(8);
-    expect(windows[2]!.timestamps[0]).toBe(3);
-    expect(windows[2]!.sourceTimes[2]).toBeCloseTo(5.5, 9);
-  });
-
-  it('renders both visible speed fragments around a cut with a continuous output clock', () => {
-    const windows = reviewRenderFrameSchedule(10, [speedEdit(1, 7), cutEdit(3, 5)], 2);
-    expect(
-      windows.map((window) => ({
-        start: window.segment.sourceStart,
-        end: window.segment.sourceEnd,
-        kind: window.segment.kind,
-        resultStart: window.segment.resultStart,
-      }))
-    ).toEqual([
-      { start: 0, end: 1, kind: 'keep', resultStart: 0 },
-      { start: 1, end: 3, kind: 'speed', resultStart: 1 },
-      { start: 5, end: 7, kind: 'speed', resultStart: 5 },
-      { start: 7, end: 10, kind: 'keep', resultStart: 9 },
-    ]);
-  });
-
-  it('keeps frames over a sub-frame tail and rejects invalid frame rates', () => {
-    const windows = reviewRenderFrameSchedule(0.1, [], 30);
-    expect(windows[0]!.timestamps).toHaveLength(3);
-    expect(() => reviewRenderFrameSchedule(1, [], 0)).toThrow('Render frame rate is invalid.');
-  });
+  expect(main.renderAtTime.mock.calls.map(([time]) => time)).toEqual([0, 0.2, 0.7, 1.2]);
+  expect(state.encoded.map((sample) => [sample.timestamp, sample.duration])).toEqual([
+    [0, 0.2],
+    [0.2, 0.5],
+    [0.7, 0.5],
+    [1.2, 0.5],
+  ]);
+  expect(annotationMain.open).toHaveBeenCalledWith(
+    expect.objectContaining({
+      effectSnapshots,
+      captionTimeMap: fullMap,
+      fragmentOffset: 5,
+      fps: 2,
+      effective: expect.objectContaining({ annotationEffects: args.advanced.annotationEffects }),
+      dimensions: { canonical: { width: 320, height: 180 }, backing: { width: 320, height: 180 } },
+    })
+  );
+  expect(state.drawn).toHaveLength(0);
+  expect(args.readProjectAsset).not.toHaveBeenCalled();
+  expect(frames.every((frame) => frame.release.mock.calls.length === 1)).toBe(true);
+  expect(main.dispose).toHaveBeenCalledOnce();
+  expect(receipt).toMatchObject({ videoPackets: 4, audioReencoded: false });
 });
+
+it('keeps original audio copy admission for annotation-only probes without requiring an audio encoder', async () => {
+  const args = annotationExportArgs();
+  state.audioTrack = {
+    codec: 'opus',
+    getDecoderConfig: async () => ({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2 }),
+    getSampleRate: async () => 48000,
+  };
+  const main = {
+    renderAtTime: vi.fn(async () => ({
+      canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+      context: contextFixture(),
+      release: vi.fn(),
+    })),
+    dispose: vi.fn(),
+  };
+  annotationMain.open.mockReset().mockResolvedValue(main);
+  const probe = vi.fn(async () => undefined);
+  const receipt = await writeReviewFrames({
+    ...args,
+    index: { ...args.index, audioCodec: 'opus' },
+    frameProbe: { add: probe },
+  });
+  expect(receipt).toMatchObject({ audioReencoded: false, outputAudioCodec: 'opus' });
+  expect(probe).toHaveBeenCalled();
+  expect(args.writer.writeAt).not.toHaveBeenCalled();
+  expect(main.dispose).toHaveBeenCalledOnce();
+});
+
+it.each(['compose', 'encode', 'abort'] as const)(
+  'releases shared annotation frame ownership after %s failure',
+  async (failure) => {
+    const args = annotationExportArgs();
+    const controller = new AbortController();
+    const release = vi.fn();
+    const main = {
+      renderAtTime: vi.fn(async () => {
+        if (failure === 'compose') throw new Error('effect source unavailable');
+        if (failure === 'abort') controller.abort();
+        return {
+          canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+          context: contextFixture(),
+          release,
+        };
+      }),
+      dispose: vi.fn(),
+    };
+    annotationMain.open.mockReset().mockResolvedValue(main);
+    const encode = vi.fn(async () => {
+      throw new Error('encode failed');
+    });
+    await expect(
+      writeReviewFrames({ ...args, signal: controller.signal, frameProbe: { add: encode } })
+    ).rejects.toThrow();
+    expect(release).toHaveBeenCalledTimes(failure === 'compose' ? 0 : 1);
+    expect(main.dispose).toHaveBeenCalledOnce();
+    expect(state.drawn).toHaveLength(0);
+    if (failure !== 'encode') expect(encode).not.toHaveBeenCalled();
+  }
+);
 
 describe('drawReviewSceneFrame', () => {
   const layout = {
@@ -465,12 +350,6 @@ describe('drainSegmentAudio', () => {
 });
 
 describe('writeReviewFrames', () => {
-  afterEach(() => {
-    state.encoded.length = 0;
-    state.drawn.length = 0;
-    state.audioTrack = null;
-  });
-
   it('blocks the render without a probed video encoder', async () => {
     await expect(
       writeReviewFrames(argsFixture({ processedVideoCodec: null }))
@@ -531,12 +410,6 @@ describe('writeReviewFrames', () => {
 });
 
 describe('writeReviewFrames background lifecycle', () => {
-  afterEach(() => {
-    state.encoded.length = 0;
-    state.drawn.length = 0;
-    state.audioTrack = null;
-  });
-
   it('closes a decoded background image after a successful render', async () => {
     const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
     vi.stubGlobal(
@@ -688,6 +561,26 @@ it('encodes the selected portrait canvas while fitting the native landscape sour
   ]);
 });
 
+it('shares the rational Current rate with the output profile', async () => {
+  const args = argsFixture({ frameRate: 30000 / 1001 + 1e-10 });
+  const { resolveReviewOutputProfile } = await import('./render-settings');
+  const profile = resolveReviewOutputProfile(args.index, args.advanced);
+  state.encoded.length = 0;
+  await writeReviewFrames(args);
+  expect(state.encoded[1]!.timestamp).toBe(1 / profile.fps);
+});
+
+it.each([NaN, Infinity, 0, 121])(
+  'rejects an invalid Current rate before decoding: %s',
+  async (frameRate) => {
+    state.drawn.length = 0;
+    await expect(writeReviewFrames(argsFixture({ frameRate }))).rejects.toThrow(
+      'Invalid output frame rate.'
+    );
+    expect(state.drawn).toHaveLength(0);
+  }
+);
+
 it('renders exact non-keyframe cuts while keeping output timestamps continuous', async () => {
   state.encoded.length = 0;
   const args = argsFixture();
@@ -711,7 +604,7 @@ it('isolates the visible source pixels before filtering a scaled composition', a
   );
 });
 
-it('passes the calibrated variable-rate quality profile to the actual encoder source', async () => {
+it('passes constant quality with the calibrated VBR fallback to the actual encoder source', async () => {
   const args = argsFixture({ frameRate: 30 });
   args.advanced.canvas = { width: 1920, height: 1080 };
   await writeReviewFrames({
@@ -720,7 +613,7 @@ it('passes the calibrated variable-rate quality profile to the actual encoder so
   });
   expect(state.configurations.at(-1)).toMatchObject({
     codec: 'vp9',
-    bitrate: 5_000_000,
+    quality: expect.objectContaining({ _quantizer: 24, _bitrate: 5_000_000 }),
     bitrateMode: 'variable',
     latencyMode: 'quality',
     hardwareAcceleration: 'no-preference',
@@ -729,6 +622,7 @@ it('passes the calibrated variable-rate quality profile to the actual encoder so
 });
 
 it('scales spotlight blur with export resolution, preserving the scene effect', async () => {
+  vi.mocked(drawReviewSpotlights).mockClear();
   const args = argsFixture({ frameRate: 30 });
   args.advanced.canvas = { width: 1920, height: 1080 };
   args.advanced.zoom.enabled = true;
@@ -742,12 +636,9 @@ it('scales spotlight blur with export resolution, preserving the scene effect', 
     ...args,
     renderSettings: { quality: 'HIGH', frameRate: 30, resolution: '720P' },
   });
-  expect(drawReviewSpotlight).toHaveBeenCalledWith(
-    expect.anything(),
-    expect.anything(),
-    expect.anything(),
-    expect.objectContaining({ blur: 8 })
-  );
+  const frames = vi.mocked(drawReviewSpotlights).mock.calls.flatMap((call) => call[3]);
+  expect(frames.length).toBeGreaterThan(0);
+  for (const frame of frames) expect(frame.blur).toBe(8);
 });
 
 it.each(['fixed', 'follow-video'] as const)(
@@ -844,4 +735,200 @@ it('ends the final rendered frame at the exact retained duration instead of addi
   await writeReviewFrames(args);
   const last = state.encoded.at(-1)!;
   expect(last.timestamp + last.duration).toBeCloseTo(2.03, 8);
+});
+
+it.each([false, true])(
+  'uses identical probe and rendered HEVC parameters at explicit 30fps (header=%s)',
+  async (header) => {
+    const probe = vi.fn(async (config: VideoEncoderConfig) => ({
+      config,
+      supported:
+        config.codec.startsWith('hvc1') &&
+        config.framerate === 30 &&
+        config.width <= 1920 &&
+        config.height <= 1080,
+    }));
+    vi.stubGlobal('VideoEncoder', { isConfigSupported: probe });
+    state.sourceWidth = 1904;
+    state.sourceHeight = 1064;
+    state.encoded.length = 0;
+    const args = argsFixture({ frameRate: 40 });
+    if (header)
+      args.advanced.windowHeader = {
+        ...DEFAULT_WINDOW_HEADER,
+        kind: 'browser' as const,
+        title: 'Header',
+      };
+    const { resolveReviewOutputProfile } = await import('./render-settings');
+    const index = {
+      ...args.index,
+      width: 1904,
+      height: 1064,
+      outputCodecs: { mp4: ['hevc' as const], webm: [] },
+    };
+    const renderSettings = {
+      format: 'mp4' as const,
+      codec: 'hevc' as const,
+      resolution: '1080P' as const,
+      quality: 'HIGH' as const,
+      frameRate: 30 as const,
+    };
+    const profile = resolveReviewOutputProfile(index, args.advanced, renderSettings);
+    await writeReviewFrames({ ...args, index, renderSettings });
+    expect(profile.width).toBeLessThanOrEqual(1920);
+    expect(profile.height).toBeLessThanOrEqual(1080);
+    if (!header) expect(profile).toMatchObject({ width: 1904, height: 1064 });
+    expect(probe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: profile.width,
+        height: profile.height,
+        framerate: 30,
+        bitrateMode: 'quantizer',
+      })
+    );
+    expect(state.encoded).toHaveLength(60);
+    for (const frame of state.encoded) {
+      expect(frame.width).toBe(profile.width);
+      expect(frame.height).toBe(profile.height);
+      expect(frame.duration).toBeCloseTo(1 / 30);
+    }
+    expect(state.configurations.at(-1)).toMatchObject({
+      codec: 'hevc',
+      quality: expect.objectContaining({ _quantizer: 20 }),
+    });
+  }
+);
+
+it('publishes a warmed estimate during rendering and clears it before returning', async () => {
+  const args = argsFixture();
+  const onTimeEstimate = vi.fn();
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => state.encoded.length * 1000);
+  state.encoded.length = 0;
+  try {
+    await writeReviewFrames({
+      ...args,
+      onTimeEstimate,
+      renderSettings: { quality: 'MEDIUM', frameRate: 24 },
+    });
+    expect(onTimeEstimate.mock.calls.some(([estimate]) => estimate?.remainingMs > 0)).toBe(true);
+    expect(onTimeEstimate).toHaveBeenLastCalledWith(null);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it('does not publish a render time estimate for the size-only frame probe', async () => {
+  const onTimeEstimate = vi.fn();
+  await writeReviewFrames({
+    ...argsFixture(),
+    onTimeEstimate,
+    frameProbe: { add: async () => undefined },
+  });
+  expect(onTimeEstimate.mock.calls.every(([estimate]) => estimate === null)).toBe(true);
+});
+
+it('clears a render estimate on cancellation without retaining machine state', async () => {
+  const controller = new AbortController();
+  const onTimeEstimate = vi.fn();
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => state.encoded.length * 1000);
+  state.encoded.length = 0;
+  try {
+    await expect(
+      writeReviewFrames({
+        ...argsFixture(),
+        signal: controller.signal,
+        onTimeEstimate,
+        renderSettings: { quality: 'MEDIUM', frameRate: 24 },
+        onProgress: () => {
+          if (state.encoded.length >= 5) controller.abort();
+        },
+      })
+    ).rejects.toThrow();
+    expect(onTimeEstimate).toHaveBeenLastCalledWith(null);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it('routes only effective advanced presentation through the sequence writer', async () => {
+  const args = argsFixture();
+  args.advanced.presentation = createNewWorkspacePresentationSettings();
+  const receipt = { resultDuration: 3, videoPackets: 90, audioPackets: 0, audioRanges: [] };
+  presentationExport.mockResolvedValueOnce(receipt);
+  expect(await writeReviewFrames({ ...args, includeBookends: false })).toBe(receipt);
+  expect(presentationExport).toHaveBeenLastCalledWith(
+    expect.objectContaining({ includeBookends: false })
+  );
+  presentationExport.mockClear();
+  args.advanced.ui.mode = 'basic';
+  const basic = await writeReviewFrames(args);
+  expect(presentationExport).not.toHaveBeenCalled();
+  expect(basic.resultDuration).toBe(2);
+});
+
+it('applies each dissolve side camera on the global clock during a fragment render', async () => {
+  const left = { timestamp: 1.9, draw: vi.fn(), close: vi.fn() };
+  const right = { timestamp: 4, draw: vi.fn(), close: vi.fn() };
+  const context = contextFixture();
+  const canvas = { width: 320, height: 180 } as HTMLCanvasElement;
+  const { VideoSample } = await import('mediabunny');
+  const moving = new VideoSample(canvas, { timestamp: 4.1 });
+  const movingDraw = vi.spyOn(moving, 'draw');
+  const movingClose = vi.spyOn(moving, 'close');
+  const regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'left', at: 10, duration: 2 }),
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+    },
+    {
+      ...createQuickEditZoomRegion({ id: 'right', at: 12, duration: 2 }),
+      transform: { scale: 3, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+    },
+  ];
+  await renderRenderWindowFrames({
+    window: {
+      segment: { ...segmentStub(4, 6), resultStart: 2, resultEnd: 4 },
+      timestamps: [2.1],
+      sourceTimes: [4.1],
+    },
+    fps: 30,
+    fragmentOffset: 10,
+    zoomRegions: regions,
+    background: { enabled: false },
+    comments: [],
+    canvas,
+    context,
+    sourceSize: canvas,
+    image: null,
+    frameSink: {
+      async *samplesAtTimestamps() {
+        yield moving;
+      },
+    },
+    transitions: [
+      {
+        id: 'cut',
+        type: 'dissolve',
+        seam: 2,
+        before: 0.5,
+        after: 0.5,
+        left: { start: 0, end: 2 },
+        right: { start: 4, end: 6 },
+      },
+    ],
+    transitionFrames: { load: async () => ({ left, right }), dispose: vi.fn() },
+    videoOut: { add: vi.fn(), close: vi.fn() },
+    resultDuration: 4,
+    onProgress: undefined,
+    signal: new AbortController().signal,
+  });
+  expect(left.draw.mock.calls[0]!.slice(3)).toEqual([640, 360]);
+  expect(movingDraw.mock.calls[0]!.slice(3)).toEqual([960, 540]);
+  expect(movingClose).toHaveBeenCalledOnce();
+  expect(left.close).not.toHaveBeenCalled();
+  expect(right.close).not.toHaveBeenCalled();
 });

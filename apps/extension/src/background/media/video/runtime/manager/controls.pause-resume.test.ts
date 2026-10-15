@@ -104,7 +104,7 @@ function registerActiveTabGuardTest() {
 }
 
 function registerSyncTests() {
-  it('forwards pause and resume commands to offscreen and controlled cursor capture transports', async () => {
+  it('forwards TAB controls to offscreen while authoritative lifecycle events own telemetry clocks', async () => {
     await pauseRecording();
     await resumeRecording();
 
@@ -120,25 +120,24 @@ function registerSyncTests() {
         capabilityToken: expect.any(String),
       })
     );
-    expect(syncControlledCursorCaptureMock).toHaveBeenCalledWith(17, 'pause');
-    expect(syncControlledCursorCaptureMock).toHaveBeenCalledWith(17, 'resume');
+    expect(syncControlledCursorCaptureMock).not.toHaveBeenCalled();
     expect(markTabRecordingManuallyPausedMock).toHaveBeenCalledOnce();
   });
 
-  it('also syncs telemetry pause and resume for plain tab recordings without controlled cursor capture', async () => {
+  it('does not reset plain TAB telemetry from parallel control receipt clocks', async () => {
     isControlledCursorCaptureEnabledMock.mockReturnValue(false);
     getVideoRecordingCaptureModeMock.mockReturnValue(CaptureMode.TAB);
 
     await pauseRecording();
     await resumeRecording();
 
-    expect(syncControlledCursorCaptureMock).toHaveBeenCalledWith(17, 'pause');
-    expect(syncControlledCursorCaptureMock).toHaveBeenCalledWith(17, 'resume');
+    expect(syncControlledCursorCaptureMock).not.toHaveBeenCalled();
   });
 }
 
 function registerErrorHandlingTests() {
-  it('rethrows pause and resume runtime transport failures', async () => {
+  it('rethrows primary transport and legacy non-TAB telemetry transport failures', async () => {
+    getVideoRecordingCaptureModeMock.mockReturnValue(CaptureMode.SCREEN);
     sendRuntimeMessageMock.mockRejectedValueOnce(new Error('pause failed'));
     syncControlledCursorCaptureMock
       .mockResolvedValueOnce(undefined)

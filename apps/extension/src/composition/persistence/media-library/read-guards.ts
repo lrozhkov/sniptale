@@ -1,3 +1,4 @@
+import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   MediaAssetKind,
@@ -62,7 +63,9 @@ function parseImageContentState(
 ): ImageContentState | null | undefined {
   const isEditableImage =
     (kind === 'image' || kind === 'screenshot') &&
-    (source.kind === 'screenshot' || source.kind === 'stored-asset');
+    (source.kind === 'screenshot' ||
+      source.kind === 'stored-asset' ||
+      source.kind === 'project-asset');
   if (!isEditableImage) return value === undefined ? undefined : null;
   if (value === undefined) return workspaceRevision === 0 ? 'original' : 'edited';
   return value === 'edited' || value === 'original' ? value : null;
@@ -192,9 +195,9 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     originalFilename: value['originalFilename'],
     size: value['size'],
     source,
-    sourceFavicon: value['sourceFavicon'],
+    sourceFavicon: sanitizeProvenanceUrl(value['sourceFavicon']),
     sourceTitle: value['sourceTitle'],
-    sourceUrl: value['sourceUrl'],
+    sourceUrl: sanitizeProvenanceUrl(value['sourceUrl']),
     tags: value['tags'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
     ...(recordingGroup === undefined ? {} : { recordingGroup }),

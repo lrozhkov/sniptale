@@ -1,4 +1,5 @@
-import { BlobSource, Input, VideoSampleSink, WEBM, type VideoSample } from 'mediabunny';
+import { prepareDecodedVideoSample } from '../../../../features/video/composition/draw/decoded-sample';
+import { BlobSource, Input, VideoSampleSink, MP4, WEBM, type VideoSample } from 'mediabunny';
 
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import {
@@ -32,12 +33,26 @@ export interface WebmFrameProvider {
   prepareFrame: (frameIndex: number) => Promise<PreparedWebmProviderFrame | null>;
 }
 
-function createSampleSource(sample: VideoSample): VideoCompositionFrameSource {
+function createSampleSource(
+  sample: VideoSample,
+  canvas: HTMLCanvasElement
+): VideoCompositionFrameSource {
+  // Upload normalized pixels once; motion-blur passes reuse this bounded raster.
+  const rotated = sample.rotation % 180 !== 0;
+  const width = rotated ? sample.codedHeight : sample.codedWidth;
+  const height = rotated ? sample.codedWidth : sample.codedHeight;
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  const context = canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
+  if (!context) throw new Error('Decoded frame canvas is unavailable.');
+  context.imageSmoothingEnabled = false;
+  context.clearRect(0, 0, width, height);
+  sample.draw(context, 0, 0, width, height);
   return {
     sourceHeight: sample.displayHeight,
     sourceWidth: sample.displayWidth,
-    draw: (context, drawX, drawY, drawWidth, drawHeight) => {
-      sample.draw(context, drawX, drawY, drawWidth, drawHeight);
+    draw: (target, x, y, drawWidth, drawHeight) => {
+      target.drawImage(canvas, x, y, drawWidth, drawHeight);
     },
   };
 }
@@ -45,9 +60,10 @@ function createSampleSource(sample: VideoSample): VideoCompositionFrameSource {
 async function createWebmVideoSampleSink(asset: VideoProjectAsset): Promise<{
   input: Input;
   sink: VideoSampleSink;
+  timeResolution: number;
 } | null> {
   const input = new Input({
-    formats: [WEBM],
+    formats: [WEBM, MP4],
     source: new BlobSource(await loadBlobForAsset(asset)),
   });
   try {
@@ -69,7 +85,11 @@ async function createWebmVideoSampleSink(asset: VideoProjectAsset): Promise<{
       return null;
     }
 
-    return { input, sink: new VideoSampleSink(track) };
+    return {
+      input,
+      sink: new VideoSampleSink(track),
+      timeResolution: await track.getTimeResolution(),
+    };
   } catch (error) {
     input.dispose();
     throw error;
@@ -81,32 +101,59 @@ function createProviderFromSink(params: {
   input: Input;
   requests: FrameRequest[];
   sink: VideoSampleSink;
+  signal: AbortSignal;
+  timeResolution: number;
+  sourceEnd: number;
 }): WebmFrameProvider {
   const iterator = params.sink.samplesAtTimestamps(
-    params.requests.map((request) => request.sourceTime)
+    params.requests.map((request) =>
+      Math.min(
+        (Math.ceil(params.sourceEnd * params.timeResolution) - 1) / params.timeResolution,
+        Math.round(request.sourceTime * params.timeResolution) / params.timeResolution
+      )
+    )
   );
+  const raster = document.createElement('canvas');
   let requestIndex = 0;
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    params.signal.removeEventListener('abort', dispose);
+    params.input.dispose();
+    raster.width = 0;
+    raster.height = 0;
+  };
+  if (params.signal.aborted) dispose();
+  else params.signal.addEventListener('abort', dispose, { once: true });
   return {
     clipId: params.clipId,
-    dispose: () => params.input.dispose(),
+    dispose,
     prepareFrame: async (frameIndex) => {
       const request = params.requests[requestIndex];
       if (!request || request.frameIndex !== frameIndex) {
         return null;
       }
 
+      params.signal.throwIfAborted();
       const result = await iterator.next();
       if (result.done || !result.value) {
         throw new Error('WebM frame provider missed a requested frame.');
       }
 
       requestIndex += 1;
-      const sample = result.value;
-      return {
-        clipId: params.clipId,
-        release: () => sample.close(),
-        source: createSampleSource(sample),
-      };
+      const sample = await prepareDecodedVideoSample(result.value, params.signal);
+      try {
+        params.signal.throwIfAborted();
+        return {
+          clipId: params.clipId,
+          release: () => sample.close(),
+          source: createSampleSource(sample, raster),
+        };
+      } catch (error) {
+        sample.close();
+        throw error;
+      }
     },
   };
 }
@@ -143,11 +190,13 @@ function disposeProviders(providers: WebmFrameProvider[]) {
 
 export async function createWebmFrameProviders(
   project: VideoProject,
-  projectTimes: number[]
+  projectTimes: number[],
+  signal: AbortSignal = new AbortController().signal
 ): Promise<WebmFrameProvider[] | null> {
   const providers: WebmFrameProvider[] = [];
   try {
     for (const clip of getVisibleVideoClips(project)) {
+      signal.throwIfAborted();
       const requests = createClipFrameRequests(clip, projectTimes);
       if (requests.length === 0) {
         continue;
@@ -165,7 +214,15 @@ export async function createWebmFrameProviders(
         return null;
       }
 
-      providers.push(createProviderFromSink({ clipId: clip.id, requests, ...source }));
+      providers.push(
+        createProviderFromSink({
+          clipId: clip.id,
+          requests,
+          signal,
+          sourceEnd: getMediaClipSourceTime(clip, clip.startTime + clip.duration),
+          ...source,
+        })
+      );
     }
   } catch (error) {
     disposeProviders(providers);

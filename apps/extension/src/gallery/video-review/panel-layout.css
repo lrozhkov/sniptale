@@ -1,0 +1,29 @@
+/* Both hit targets straddle the seam; passing pointers do not flash resize chrome. */
+.review-panel-resize {
+  cursor: default;
+}
+.review-panel-resize[aria-orientation='vertical'] {
+  --review-resize-cursor: col-resize;
+}
+.review-panel-resize[aria-orientation='horizontal'] {
+  --review-resize-cursor: row-resize;
+}
+.review-panel-resize:hover {
+  animation: review-panel-resize-ready 70ms step-end forwards;
+}
+.review-panel-resize:active,
+.review-panel-resize:focus-visible {
+  animation: none;
+  cursor: var(--review-resize-cursor);
+  background: var(--sniptale-color-surface-hover);
+}
+@keyframes review-panel-resize-ready {
+  from {
+    cursor: default;
+    background: transparent;
+  }
+  to {
+    cursor: var(--review-resize-cursor);
+    background: var(--sniptale-color-surface-hover);
+  }
+}

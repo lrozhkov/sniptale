@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 
 import {
   disableVideoTelemetry,
@@ -35,11 +35,22 @@ it('clears stale controlled cursor overlay artifacts when enabling the lazy tele
 });
 
 it('proxies enable pause resume and disable through the lazy telemetry owner', () => {
+  const listeners = vi.spyOn(document, 'addEventListener');
   enableVideoTelemetry('recording-2');
   pauseVideoTelemetry();
   resumeVideoTelemetry();
 
-  document.dispatchEvent(createPointerLikeEvent(12, 14));
+  const event = createPointerLikeEvent(12, 14);
+  const listener = listeners.mock.calls.toReversed().find(([type]) => type === event.type)?.[1];
+  const delivered = new Proxy(event, {
+    get(target, key) {
+      if (key === 'isTrusted') return true;
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  if (typeof listener === 'function') listener.call(document, delivered);
+  listeners.mockRestore();
 
   const snapshot = disableVideoTelemetry();
   expect(snapshot?.cursorTrack?.samples[0]).toEqual(

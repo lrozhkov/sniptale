@@ -16,7 +16,6 @@ for (const variant of [
     const host = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
-      await page.setViewportSize({ width: 1280, height: 720 });
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
         storage: {
@@ -40,6 +39,27 @@ for (const variant of [
       });
       const inspector = dialog.locator('aside');
       const exporting = inspector.locator('[data-ui="gallery.videoReview.exportSection"]');
+      const close = inspector.getByRole('button', {
+        name: label('common.actions.close'),
+        exact: true,
+      });
+      const closeIdleColor = await close.evaluate((node) => getComputedStyle(node).color);
+      await close.hover();
+      await expect(close).not.toHaveCSS('color', closeIdleColor);
+      const danger = await close.evaluate((node) => {
+        const probe = document.createElement('span');
+        probe.style.color = getComputedStyle(node).getPropertyValue('--sniptale-color-danger');
+        return probe.style.color;
+      });
+      await expect(close).toHaveCSS('color', danger);
+      await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(close).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await page.screenshot({ path: testInfo.outputPath('close-hover.png'), fullPage: false });
+
+      await expect(inspector.locator('header h2')).toHaveText('beta-v1.webm');
+      await expect(inspector.locator('header h2')).toHaveAttribute('title', 'beta-v1.webm');
+      await expect(inspector.locator('[title="beta-v1.webm"]')).toHaveCount(1);
+      await expect(inspector.locator('header h2')).toHaveCSS('text-overflow', 'ellipsis');
       const navigation = inspector.locator('[data-ui="gallery.videoReview.inspectorNavigation"]');
       await expect(
         navigation.getByRole('button', {
@@ -67,6 +87,11 @@ for (const variant of [
       await expect(exporting.locator('[data-ui="gallery.videoReview.exportSettings"]')).toHaveCount(
         0
       );
+      await expect(exporting.locator('[data-ui="gallery.videoReview.exportActions"]')).toHaveCSS(
+        'border-top-width',
+        '0px'
+      );
+      await page.screenshot({ path: testInfo.outputPath('basic-export.png'), fullPage: false });
       await expect(button('gallery.videoReview.exportVideo')).toBeEnabled();
       await expect(button('gallery.videoReview.downloadVideo')).toBeEnabled();
       await expect(dialog.locator('[data-ui="gallery.videoReview.exportFooter"]')).toHaveCount(0);
@@ -114,6 +139,10 @@ for (const variant of [
       await opener.click();
       const settings = exporting.locator('[data-ui="gallery.videoReview.exportSettings"]');
       await expect(settings).toBeVisible();
+      await expect(exporting.locator('[data-ui="gallery.videoReview.exportActions"]')).toHaveCSS(
+        'border-top-width',
+        '1px'
+      );
       await button('gallery.videoReview.exportQuality').click();
       await page
         .getByRole('option', { name: label('videoEditor.exportDialog.qualityMedium'), exact: true })
@@ -162,12 +191,27 @@ for (const variant of [
         )
       ).toBe(label('gallery.videoReview.undo'));
       for (const [width, height, fullHeight] of [
-        [1280, 720, false],
-        [1920, 1080, false],
-        [1280, 720, true],
+        [1280, 560, false],
+        [1920, 900, false],
+        [1200, 560, false],
+        [1280, 560, true],
       ] as const) {
         await page.setViewportSize({ width, height });
         if (fullHeight) await button('videoEditor.app.panelFullHeight').click();
+        const scroll = dialog.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
+        if (width < 1280) {
+          await expect
+            .poll(() => scroll.evaluate((node) => node.scrollWidth - node.clientWidth))
+            .toBeGreaterThan(0);
+          await scroll.evaluate((node) => {
+            node.scrollLeft = node.scrollWidth;
+          });
+          await expect.poll(() => scroll.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+        } else {
+          await scroll.evaluate((node) => {
+            node.scrollLeft = 0;
+          });
+        }
         await expect
           .poll(async () => toolbar.evaluate((node) => node.scrollWidth - node.clientWidth))
           .toBeLessThanOrEqual(1);
@@ -217,12 +261,17 @@ for (const variant of [
           'gallery.videoReview.exportVideo',
           'gallery.videoReview.downloadVideo',
         ] as const) {
-          await button(destination).scrollIntoViewIfNeeded();
-          await expect(button(destination)).toBeInViewport({ ratio: 1 });
+          await expect(async () => {
+            await button(destination).scrollIntoViewIfNeeded();
+            await expect(button(destination)).toBeInViewport({ ratio: 1, timeout: 100 });
+          }).toPass({ timeout: 10_000 });
           await expect(button(destination)).toBeEnabled();
         }
         await expect(inspector.locator('header h2')).toBeInViewport();
-        await page.screenshot({ path: testInfo.outputPath(`export-${width}-${fullHeight}.png`) });
+        await page.screenshot({
+          path: testInfo.outputPath(`export-${width}-${fullHeight}.png`),
+          fullPage: false,
+        });
       }
       await button('videoEditor.app.panelRestoreHeight').click();
       await button('gallery.videoReview.speedMode').click();
@@ -251,7 +300,7 @@ for (const variant of [
         label('videoEditor.exportDialog.qualityMedium')
       );
       await expect(button('gallery.videoReview.exportFrameRate')).toContainText('30');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -308,6 +357,16 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
     await expect(button('gallery.videoReview.exportQuality')).toContainText(
       label('videoEditor.exportDialog.qualityHigh')
     );
+    const nativeAacSupported = await page.evaluate(async () => {
+      if (typeof AudioEncoder === 'undefined') return false;
+      const support = await AudioEncoder.isConfigSupported({
+        codec: 'mp4a.40.2',
+        sampleRate: 48000,
+        numberOfChannels: 2,
+        bitrate: 128_000,
+      });
+      return support.supported === true;
+    });
     for (const format of ['mp4', 'webm'] as const) {
       await button('videoEditor.exportDialog.formatLabel').click();
       await page
@@ -317,8 +376,23 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
         format === 'mp4' ? 'H.264' : 'VP9'
       );
       await page.screenshot({ path: testInfo.outputPath(`export-profile-${format}.png`) });
-      const downloading = page.waitForEvent('download');
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+      if (format === 'mp4' && !nativeAacSupported) {
+        await button('gallery.videoReview.downloadVideo').click();
+        await expect(button('gallery.videoReview.downloadVideo')).toBeDisabled();
+        await expect(
+          dialog.getByRole('status').filter({
+            hasText: label('gallery.videoReview.exportBlockerAudioEncoder'),
+          })
+        ).toBeVisible();
+        await page.screenshot({
+          path: testInfo.outputPath('export-profile-mp4-unavailable.png'),
+          fullPage: false,
+        });
+        continue;
+      }
+      await expect(button('gallery.videoReview.downloadVideo')).toBeEnabled();
+      const downloading = page.waitForEvent('download');
       await button('gallery.videoReview.downloadVideo').click();
       const download = await downloading;
       expect(download.suggestedFilename().endsWith(`.${format}`)).toBe(true);

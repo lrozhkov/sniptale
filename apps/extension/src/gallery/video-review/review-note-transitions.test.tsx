@@ -6,6 +6,12 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+// These integration fixtures contain synthetic bytes, not a decodable media stream.
+vi.mock('./use-zoom-preview-source', async (original) => ({
+  ...(await original<typeof import('./use-zoom-preview-source')>()),
+  useZoomPreviewSource: () => null,
+}));
+
 const integration = vi.hoisted(() => ({
   load: vi.fn(),
   index: vi.fn(),
@@ -14,6 +20,7 @@ const integration = vi.hoisted(() => ({
   history: vi.fn(),
   read: vi.fn(),
   advanced: vi.fn(),
+  snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
 }));
@@ -37,7 +44,13 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   >()),
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
+  saveVideoWorkspaceSnapshot: integration.snapshot,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<
+      typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspaceWithProjection
+    >[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
@@ -75,7 +88,10 @@ vi.mock('../shared/download', async (importOriginal) => ({
   downloadGalleryBlob: integration.download,
 }));
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
 
 it('saves a new note before editing an existing one and preserves the chosen edit', async () => {
   const fixture = createEditorFixture(integration);
@@ -110,11 +126,11 @@ it('retains failed new-note text and blocks Back until retry succeeds', async ()
     await fixture.click('addComment');
     await fixture.fill('Keep on failure');
     integration.commit.mockRejectedValueOnce(new Error('Quota'));
-    await fixture.click('back');
+    await fixture.click('common.actions.close');
     expect(fixture.back).not.toHaveBeenCalled();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Keep on failure');
     expect(fixture.host.textContent).toContain('gallery.videoReview.saveFailed');
-    await fixture.click('back');
+    await fixture.click('common.actions.close');
     expect(fixture.back).toHaveBeenCalledOnce();
     expect(fixture.snapshot.workspace.history).toHaveLength(1);
   } finally {
@@ -126,7 +142,11 @@ it('saves before Home, a tool shortcut and history while existing edits stay exp
   const fixture = createEditorFixture(integration);
   const key = async (key: string, code = key, ctrlKey = false) =>
     act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key, code, ctrlKey }));
+      const plane = fixture.host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.timePlane"]'
+      )!;
+      plane.focus();
+      plane.dispatchEvent(new KeyboardEvent('keydown', { key, code, ctrlKey, bubbles: true }));
     });
   try {
     await act(async () =>
@@ -194,6 +214,158 @@ it('keeps Scene and Export after the accompanying draft context reset', async ()
       fixture.host.querySelector('[data-ui="gallery.videoReview.exportSection"]')
     ).not.toBeNull();
   } finally {
+    await fixture.cleanup();
+  }
+});
+
+it.each(['success', 'cancel', 'failure'] as const)(
+  'keeps Export available during playback and releases the editor after %s',
+  async (outcome) => {
+    vi.useFakeTimers();
+    const fixture = createEditorFixture(integration);
+    // Synthetic media verifies transport controls; native browser proof owns raster painting.
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    integration.index.mockResolvedValue({
+      duration: 4,
+      width: 320,
+      height: 180,
+      boundaries: [0, 2, 4],
+      videoCodec: 'vp8',
+      audioCodec: null,
+      container: 'webm',
+      rotation: 0,
+      processedVideoCodec: 'vp9',
+    });
+    let finish!: () => void;
+    integration.export.mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          finish = () =>
+            outcome === 'success'
+              ? resolve({
+                  file: new File(['copy'], 'copy.webm'),
+                  receipt: { filename: 'copy.webm' },
+                })
+              : reject(new Error(outcome));
+        })
+    );
+    try {
+      await act(async () =>
+        fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+      );
+      await fixture.click('advancedEditing');
+      await fixture.addFocus();
+      await act(async () => vi.advanceTimersByTimeAsync(300));
+      await fixture.click('exportSection');
+      await fixture.click('play');
+      expect(fixture.button('exportVideo').disabled).toBe(false);
+      await fixture.click('exportVideo');
+      expect(fixture.button('play').disabled).toBe(true);
+      expect(fixture.button('advancedEditing').disabled).toBe(true);
+      const calls = vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length;
+      await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })));
+      expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(calls);
+      const revision = fixture.snapshot.workspace.revision;
+      await act(async () =>
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true })
+        )
+      );
+      expect(fixture.snapshot.workspace.revision).toBe(revision);
+      if (outcome === 'cancel') await fixture.click('cancelExport');
+      await act(async () => finish());
+      expect(fixture.button('play').disabled).toBe(false);
+      expect(fixture.button('advancedEditing').disabled).toBe(false);
+      expect(fixture.button('exportVideo').disabled).toBe(false);
+      expect(fixture.host.textContent?.includes('gallery.videoReview.exportFailed')).toBe(
+        outcome === 'failure'
+      );
+    } finally {
+      finish?.();
+      await fixture.cleanup();
+      vi.useRealTimers();
+    }
+  }
+);
+
+it.each(['toolbar', 'shortcut'] as const)(
+  'anchors %s Notes to the ruler range, then the playhead with action history hidden',
+  async (entry) => {
+    const fixture = createEditorFixture(integration);
+    const add = async () => {
+      if (entry === 'toolbar') await fixture.click('addComment');
+      else
+        await act(async () =>
+          fixture.key(new KeyboardEvent('keydown', { key: 'm', code: 'KeyM' }))
+        );
+    };
+    try {
+      await act(async () =>
+        fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+      );
+      await fixture.click('telemetry');
+      await fixture.selectRulerRange(1, 3);
+      await add();
+      await fixture.fill('Ruler note');
+      await fixture.click('save');
+      expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+        target: 'annotation',
+        after: { anchor: { kind: 'range', start: 1, end: 3 } },
+      });
+      expect(fixture.host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
+      const marker = fixture.host.querySelector<HTMLButtonElement>(
+        '[data-ui="gallery.videoReview.sourceLane"] button[title="Ruler note"]'
+      )!;
+      expect(marker).not.toBeNull();
+      await act(async () => marker.click());
+      await fixture.click('clearPlaybackRange');
+      await fixture.selectRulerRange(2, 2);
+      await add();
+      await fixture.fill('Playhead note');
+      await fixture.click('save');
+      expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+        target: 'annotation',
+        after: { anchor: { kind: 'point', time: 2 } },
+      });
+    } finally {
+      await fixture.cleanup();
+    }
+  }
+);
+
+it('retains the requested playhead while admission finishes the previous draft', async () => {
+  const fixture = createEditorFixture(integration);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.selectRulerRange(2, 2);
+    await fixture.click('addComment');
+    await fixture.fill('Previous draft');
+    const commit = integration.commit.getMockImplementation()!;
+    integration.commit.mockImplementationOnce(async (...args) => {
+      await gate;
+      return commit(...args);
+    });
+    await fixture.click('addComment');
+    const video = fixture.host.querySelector('video')!;
+    await act(async () => {
+      video.currentTime = 3;
+      video.dispatchEvent(new Event('timeupdate'));
+    });
+    await act(async () => release());
+    await fixture.fill('Captured request');
+    await fixture.click('save');
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'annotation',
+      after: { text: 'Captured request', anchor: { kind: 'point', time: 2 } },
+    });
+  } finally {
+    release();
     await fixture.cleanup();
   }
 });

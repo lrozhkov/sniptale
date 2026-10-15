@@ -1,7 +1,15 @@
+import { createQuickEditZoomRegion } from './advanced/zoom';
+import { createQuickEditWatermark } from './advanced/watermark';
+import { reviewAdvancedContentBaseline } from './document';
 import { projectReviewVoiceover } from './voiceover-edits';
 import { buildReviewTimeMap } from './timeline';
-import { describe, expect, it } from 'vitest';
-import { applyReviewOperation, replayReviewHistory } from './document';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  applyReviewOperation,
+  createReviewAdvancedContentOperation,
+  replayReviewHistory,
+  ReviewHistoryError,
+} from './document';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import type { QuickEditAdvancedContent } from './advanced/types';
 import { createCanvasComment } from './comments';
@@ -27,6 +35,119 @@ const added: ReviewOperation = {
   before: null,
   after: annotation,
 };
+
+it('preserves authored cursor keys and handles in the accepted baseline and every replay cursor', () => {
+  const content = createQuickEditAdvancedContent();
+  content.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    segments: [
+      {
+        id: 'segment',
+        binding: { kind: 'project' },
+        start: 1,
+        end: 8,
+        keys: [
+          {
+            id: 'manual-key',
+            time: 3,
+            x: 0.2,
+            y: 0.3,
+            anchor: 'manual',
+            interpolation: 'smooth',
+            outgoing: { x: 0.4, y: 0.5 },
+          },
+        ],
+      },
+    ],
+  };
+  content.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'local-camera', at: 1, duration: 2, endMax: 12 }),
+      followCursor: true,
+    },
+  ];
+  const frozen = structuredClone(content);
+  const baseline = reviewAdvancedContentBaseline(content);
+  expect(baseline.cursorFocusPath).toEqual(content.cursorFocusPath);
+  const after = structuredClone(content);
+  after.cursorFocusPath!.segments[0]!.keys[0]!.x = 0.8;
+  after.zoom.regions[0]!.followCursor = false;
+  const operation = createReviewAdvancedContentOperation({
+    id: 'path-edit',
+    at: 1,
+    before: baseline,
+    after,
+  });
+  expect(operation).not.toBeNull();
+  expect(
+    replayReviewHistory([operation!], 0, source, baseline).advancedContent.cursorFocusPath
+  ).toEqual(content.cursorFocusPath);
+  expect(
+    replayReviewHistory([operation!], 1, source, baseline).advancedContent.cursorFocusPath
+  ).toEqual(after.cursorFocusPath);
+  expect(
+    replayReviewHistory([operation!], 0, source, baseline).advancedContent.zoom.regions[0]
+      ?.followCursor
+  ).toBe(true);
+  expect(
+    replayReviewHistory([operation!], 1, source, baseline).advancedContent.zoom.regions[0]
+      ?.followCursor
+  ).toBe(false);
+  expect(content).toEqual(frozen);
+});
+
+it.each(['advancedContent', 'annotation', 'canvasComment', 'edit'] as const)(
+  'traverses the before-value once while applying a %s operation',
+  (target) => {
+    const document = replayReviewHistory([], 0, source);
+    let operation: ReviewOperation;
+    if (target === 'advancedContent') {
+      const before = createQuickEditAdvancedContent();
+      const after = {
+        ...before,
+        audio: { ...before.audio, original: { ...before.audio.original, muted: true } },
+      };
+      document.advancedContent = structuredClone(before);
+      operation = { id: 'change', at: 1, target, before, after };
+    } else if (target === 'annotation') {
+      document.annotations = [structuredClone(annotation)];
+      operation = { ...added, before: annotation, after: { ...annotation, text: 'Changed' } };
+    } else if (target === 'canvasComment') {
+      const before = createCanvasComment({ id: 'comment', at: 2 });
+      document.canvasComments = [structuredClone(before)];
+      operation = { id: 'change', at: 1, target, before, after: { ...before, text: 'Changed' } };
+    } else {
+      const before = {
+        id: 'cut',
+        kind: 'cut' as const,
+        start: 2,
+        end: 3,
+        requestedStart: 2,
+        requestedEnd: 3,
+      };
+      document.edits = [structuredClone(before)];
+      operation = {
+        id: 'change',
+        at: 1,
+        target,
+        before,
+        after: { ...before, end: 4, requestedEnd: 4 },
+      };
+    }
+    const stringify = vi.spyOn(JSON, 'stringify');
+    try {
+      applyReviewOperation(document, operation, source);
+      expect(stringify.mock.calls.filter(([value]) => value === operation.before)).toHaveLength(1);
+      expect(stringify).toHaveBeenCalledTimes(3);
+    } finally {
+      stringify.mockRestore();
+    }
+  }
+);
 
 describe('video review history', () => {
   it('replays canvas comment operations like other targets at every cursor', () => {
@@ -312,4 +433,101 @@ it('replays own audio tempo, reset and video Speed independently at every histor
     expect(output.every((clip) => clip.playbackRate === tempo)).toBe(true);
   }
   expect(baseline.audio.voiceover[0]).not.toHaveProperty('tempo');
+});
+
+it('preserves watermark settings and remembered logo across baseline, undo and redo', () => {
+  const before = createQuickEditAdvancedContent();
+  const watermark = {
+    ...createQuickEditWatermark('Автор'),
+    mode: 'image' as const,
+    image: { assetId: 'project-asset:logo', width: 200, height: 100, size: 0.2, opacity: 0.5 },
+  };
+  const after = { ...before, watermark };
+  const off = { ...after, watermark: { ...watermark, mode: 'none' as const } };
+  const reset = { ...before, watermark: createQuickEditWatermark('Made with Sniptale') };
+  const operations: ReviewOperation[] = [
+    { id: 'logo', at: 1, target: 'advancedContent', before, after },
+    { id: 'off', at: 2, target: 'advancedContent', before: after, after: off },
+    { id: 'reset', at: 3, target: 'advancedContent', before: off, after: reset },
+  ];
+  expect(reviewAdvancedContentBaseline(after)).toEqual(after);
+  expect(replayReviewHistory(operations, 0, source).advancedContent.watermark).toBeUndefined();
+  expect(replayReviewHistory(operations, 1, source).advancedContent).toEqual(after);
+  expect(replayReviewHistory(operations, 2, source).advancedContent).toEqual(off);
+  expect(replayReviewHistory(operations, 3, source).advancedContent).toEqual(reset);
+  expect(replayReviewHistory(operations, 1, source).advancedContent.watermark?.image).toEqual(
+    watermark.image
+  );
+});
+
+it('replays presentation removal without resurrecting the baseline and retains independent slot variants', async () => {
+  const { createNewWorkspacePresentationSettings } = await import('./advanced/presentation');
+  const baseline = {
+    ...createQuickEditAdvancedContent(),
+    presentation: createNewWorkspacePresentationSettings(),
+  };
+  const { presentation: _removed, ...after } = baseline;
+  const history: ReviewOperation[] = [
+    { id: 'remove-presentation', at: 1, target: 'advancedContent', before: baseline, after },
+  ];
+  expect(reviewAdvancedContentBaseline(baseline)).toEqual(baseline);
+  expect(replayReviewHistory(history, 0, source, baseline).advancedContent.presentation).toEqual(
+    baseline.presentation
+  );
+  expect(
+    replayReviewHistory(history, 1, source, baseline).advancedContent.presentation
+  ).toBeUndefined();
+  expect(replayReviewHistory(history, 0, source, baseline).advancedContent.presentation).toEqual(
+    baseline.presentation
+  );
+});
+
+it('encodes only admitted source master gain while retaining compound content edits', () => {
+  const before = createQuickEditAdvancedContent();
+  before.audio.original.ranges = [{ id: 'manual', start: 1, end: 3, volume: 0.25 }];
+  const after = {
+    ...before,
+    audio: { ...before.audio, original: { ...before.audio.original, muted: true, volume: 0.5 } },
+  };
+  const args = { id: 'gain', at: 1, before, after };
+  const operation = createReviewAdvancedContentOperation(args);
+  expect(operation).toEqual({
+    id: 'gain',
+    at: 1,
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 0.5 },
+  });
+  expect(
+    createReviewAdvancedContentOperation({ ...args, after: structuredClone(before) })
+  ).toBeNull();
+  for (const compound of [
+    { ...after, actionsEnabled: !before.actionsEnabled },
+    { ...after, audio: { ...after.audio, original: { ...after.audio.original, ranges: [] } } },
+    { ...after, audio: { ...after.audio, original: { ...after.audio.original, mutes: [] } } },
+  ]) {
+    expect(createReviewAdvancedContentOperation({ ...args, after: compound })).toEqual({
+      ...args,
+      after: compound,
+      target: 'advancedContent',
+    });
+  }
+  const original = structuredClone(before);
+  const document = replayReviewHistory([], 0, source, before);
+  if (!operation || operation.target !== 'sourceAudio')
+    throw new Error('Missing gain fixture operation');
+  const changed = applyReviewOperation(document, operation, source);
+  expect(changed.advancedContent).toEqual(after);
+  expect(changed.annotations).toBe(document.annotations);
+  expect(changed.edits).toBe(document.edits);
+  expect(changed.advancedContent.audio.original.ranges).toBe(before.audio.original.ranges);
+  expect(before).toEqual(original);
+  expect(replayReviewHistory([operation], 0, source, before).advancedContent).toEqual(before);
+  expect(replayReviewHistory([operation], 1, source, before).advancedContent).toEqual(after);
+  expect(() => applyReviewOperation(changed, operation, source)).toThrow(
+    new ReviewHistoryError('before-mismatch')
+  );
+  expect(() =>
+    applyReviewOperation(document, { ...operation, after: operation.before }, source)
+  ).toThrow(new ReviewHistoryError('no-change'));
 });

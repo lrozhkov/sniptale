@@ -1,3 +1,9 @@
+import {
+  inventoryProjectThumbnail,
+  projectInventoryDescriptor,
+  projectInventoryLoader,
+} from './helpers';
+import { getAllScenarioStoredProjects } from '../../../../composition/persistence/scenario/storage';
 import { scenarioLibraryMediaId } from '../../../../composition/persistence/scenario/library-publication';
 import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
@@ -6,7 +12,6 @@ import {
   MEDIA_LIBRARY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
-  SCENARIO_PROJECTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   THUMBNAILS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
@@ -27,7 +32,7 @@ import {
   type PortableScenarioProjectMetadata,
 } from '../root-codecs/projects';
 import { projectScenarioPrivacy, projectStoredEditorDocumentPrivacy } from '../privacy';
-import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
+import type { MediaHubBackupExportOptions } from '../contracts';
 import type { MediaHubBackupRootInventoryItem } from '../export';
 import {
   createObjectCollector,
@@ -197,7 +202,7 @@ async function buildScenarioExports(
         objectId: collector.addObject(
           file,
           row.filename,
-          file.type,
+          'text/html',
           withDraftRoot(project.lifecycle?.storageClass === 'temporary', [
             'Scenarios',
             project.project.name,
@@ -225,19 +230,12 @@ async function buildScenarioProjectRoot(args: {
   const exports = await buildScenarioExports(args.db, args.entry, collector);
   const stepDocuments = await buildScenarioDocuments(args.db, args.entry, collector, args.options);
   const exportThumbnails = await buildScenarioExportThumbnails(args.db, exports, collector);
-  const storedProjectThumbnail = parseMediaThumbnailEntry(
-    await args.db.get(THUMBNAILS_STORE, `scenario:${args.entry.id}`)
+  const projectThumbnail = await inventoryProjectThumbnail(
+    args.db,
+    `scenario:${args.entry.id}`,
+    args.entry.id,
+    collector
   );
-  const projectThumbnail = storedProjectThumbnail
-    ? encodePortableThumbnail(
-        storedProjectThumbnail,
-        collector.addObject(
-          storedProjectThumbnail.blob,
-          `${args.entry.id}-thumbnail`,
-          storedProjectThumbnail.blob.type || 'image/png'
-        )
-      )
-    : undefined;
   const presentation = await buildPortableAggregatePresentation({
     addObject: collector.addObject,
     aggregateId: args.entry.id,
@@ -265,14 +263,13 @@ async function buildScenarioProjectRoot(args: {
     ...(presentation ? { presentation } : {}),
   };
   return {
-    descriptor: {
-      metadataPath: `${METADATA_ROOT}/scenario-projects/${encodeURIComponent(args.entry.id)}.json`,
-      objectCount: collector.objects.length,
-      rootId: args.entry.id,
-      rootKind: 'scenario-project',
-      totalBytes: collector.objects.reduce((sum, object) => sum + object.ref.size, 0),
-    },
-    load: async () => ({ metadata: metadata as unknown as JsonValue, objects: collector.objects }),
+    descriptor: projectInventoryDescriptor(
+      'scenario-project',
+      args.entry.id,
+      `${METADATA_ROOT}/scenario-projects/${encodeURIComponent(args.entry.id)}.json`,
+      collector.objects
+    ),
+    load: projectInventoryLoader(metadata, collector.objects),
     summary: {
       draftCount: args.entry.lifecycle?.storageClass === 'temporary' ? 1 : 0,
       recordingCount: 0,
@@ -288,12 +285,12 @@ async function buildScenarioProjectRoot(args: {
 }
 
 export async function buildScenarioProjectRootInventory(args: {
-  db: InventoryDatabase;
+  db: InventoryDatabase & Parameters<typeof getAllScenarioStoredProjects>[0];
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const projects = readSelectedScenarioProjects(
-    await args.db.getAll(SCENARIO_PROJECTS_STORE),
+    await getAllScenarioStoredProjects(args.db),
     args.options
   );
   const roots: MediaHubBackupRootInventoryItem[] = [];

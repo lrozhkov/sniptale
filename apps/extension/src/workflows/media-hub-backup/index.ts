@@ -1,4 +1,5 @@
 export type { MediaHubBackupExportOptions } from './v6/contracts';
+export { MediaBackupFailure, backupFailure } from './v6/errors';
 export type { MediaHubLocalBackupSummary } from './v6/contracts';
 export type {
   MediaHubBackupSummaryV6 as MediaHubBackupSummary,

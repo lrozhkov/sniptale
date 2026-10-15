@@ -1,3 +1,4 @@
+import { installDiagnosticPortCapture } from '../../platform/runtime-messaging/diagnostic-capture';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { initTracer } from '@sniptale/platform/observability/message-tracer';
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
@@ -8,6 +9,7 @@ let currentStartupId: string | null = null;
 
 /** Publish transport readiness only after both runtime listeners have been registered. */
 export function bootstrapOffscreenDocument(): void {
+  installDiagnosticPortCapture();
   initTracer('off');
   try {
     currentStartupId = new URL(globalThis.location.href).searchParams.get('offscreenStartupId');

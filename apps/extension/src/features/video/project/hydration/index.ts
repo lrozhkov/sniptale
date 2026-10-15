@@ -158,7 +158,7 @@ export function hydrateVideoProject(
 
   const hydratedProject = {
     ...project,
-    version: 2 as const,
+    version: project.version,
     source,
     baseRecordingId:
       source.kind === VideoProjectSourceKind.RECORDING

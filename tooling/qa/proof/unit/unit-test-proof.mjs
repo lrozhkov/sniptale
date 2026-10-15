@@ -244,8 +244,11 @@ export function recordSuccessfulFullUnitProof({
   suite = 'product',
   source = 'unknown',
   reusedFrom = null,
+  expectedInputDigest = null,
 } = {}) {
   const inputs = createFullUnitProofInputs({ cwd, maxWorkers, pool, suite });
+  if (expectedInputDigest !== null && inputs.inputDigest !== expectedInputDigest)
+    throw new Error('Full unit inputs changed since coverage execution or admission.');
   const controlDigest = resolveProofControlDigest({ cwd });
   const proof = {
     schemaVersion: 1,

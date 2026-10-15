@@ -7,6 +7,8 @@ import {
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers.ts';
 import { reconcileRecordingInteractionAnchors } from '../../../project/operations/source-timed-clips';
+import { projectCursorFocusTimelineKeys } from '../../../../features/video/project/cursor-focus-path/timeline';
+import { cursorFocusOverrideId } from '../../../../features/video/project/cursor-focus-path/authoring';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type { ClipSelectionPort } from '../../../contracts/controller-store';
 import { useVideoEditorStore, type VideoEditorState } from '../../../state/store';
@@ -207,6 +209,7 @@ it('preserves captured facts while cursor moves remain explicit', () => {
         },
         time: 1,
         visible: true,
+        recordingPoint: { x: 0.1, y: 0.2 },
         x: 10,
         y: 20,
       },
@@ -229,6 +232,10 @@ it('preserves captured facts while cursor moves remain explicit', () => {
 
   actions.onMoveCursorSegment('cursor-1', null, 4, null);
   const detachedProject = store.project!;
+  expect(detachedProject.cursorTrack).toEqual(project.cursorTrack);
+  expect(projectCursorFocusTimelineKeys(detachedProject)).toContainEqual(
+    expect.objectContaining({ id: cursorFocusOverrideId('cursor-1'), time: 4, sourceTime: 4 })
+  );
   const sourceEdited = reconcileRecordingInteractionAnchors(detachedProject, {
     ...detachedProject,
     clips: detachedProject.clips.map((clip) => ({ ...clip, startTime: 2 })),
@@ -236,10 +243,14 @@ it('preserves captured facts while cursor moves remain explicit', () => {
 
   expect(sourceEdited.actionEvents).toEqual(project.actionEvents);
   expect(store.updateActionEventDetails).not.toHaveBeenCalled();
-  expect(sourceEdited.cursorTrack?.samples[0]).toEqual(
-    expect.objectContaining({ time: 4, timeBasis: 'project' })
+  expect(sourceEdited.cursorTrack?.samples[0]).toEqual({
+    ...project.cursorTrack.samples[0],
+    time: 3,
+  });
+  expect(sourceEdited.cursorFocusPath).toEqual(detachedProject.cursorFocusPath);
+  expect(projectCursorFocusTimelineKeys(sourceEdited)).toContainEqual(
+    expect.objectContaining({ id: cursorFocusOverrideId('cursor-1'), time: 6, sourceTime: 4 })
   );
-  expect(sourceEdited.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
 });
 
 it('clears the playback interval only for seeks outside its inclusive boundaries', () => {

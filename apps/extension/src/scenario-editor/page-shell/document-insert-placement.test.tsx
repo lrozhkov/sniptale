@@ -53,11 +53,11 @@ beforeEach(() => {
   bounds.set('a', new DOMRect(100, 100, 200, 160));
   bounds.set('b', new DOMRect(340, 100, 200, 80));
   bounds.set('c', new DOMRect(580, 100, 200, 120));
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      return bounds.get(this.dataset['blockId'] ?? '') ?? new DOMRect(100, 100, 680, 160);
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return bounds.get(this.dataset['blockId'] ?? '') ?? new DOMRect(100, 100, 680, 160);
+  });
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);

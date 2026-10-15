@@ -1,3 +1,5 @@
+import { recordingIdForProjectAsset } from '../../../../features/video/project/source-interactions';
+import { projectRecordingObservationClock } from '../../../../features/video/project/observation-clock';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
@@ -42,6 +44,7 @@ export function addMaterialCapturedActions(
   telemetry: RecordingTelemetryEntry | undefined
 ): VideoProject {
   if (!telemetry) return project;
+  telemetry = projectRecordingObservationClock(telemetry);
   const events = normalizeRecordingActionEventsToProjectSpace(
     telemetry.actionEvents,
     createRecordingTelemetryNormalizationParams(telemetry, project)
@@ -49,12 +52,7 @@ export function addMaterialCapturedActions(
   const added = addedClips.flatMap((clip) => {
     if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) return [];
     const asset = project.assets.find((item) => item.id === clip.assetId);
-    const recordingId =
-      asset?.source.kind === 'recording'
-        ? asset.source.recordingId
-        : asset?.source.kind === 'project-asset'
-          ? asset.source.originRecordingId
-          : null;
+    const recordingId = recordingIdForProjectAsset(asset);
     if (recordingId !== telemetry.recordingId) return [];
     const sourceInstanceId = clip.sourceInstanceId;
     return events.flatMap<VideoProjectActionEvent>((event) => {
@@ -76,6 +74,9 @@ export function addMaterialCapturedActions(
           data: { ...event.data },
           point: event.point ? { ...event.point } : null,
           capturedDuration: event.duration,
+          ...(event.keyboardRepeats
+            ? { keyboardRepeats: structuredClone(event.keyboardRepeats) }
+            : {}),
           ...(event.kind !== 'CLICK' && event.kind !== 'KEY'
             ? { presentation: { preset: event.preset } }
             : {}),
@@ -90,10 +91,32 @@ export function addMaterialCapturedActions(
       ];
     });
   });
-  return added.length === 0
+  const feedback = [...(project.actionFeedback ?? [])];
+  for (const clip of addedClips) {
+    if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) continue;
+    const asset = project.assets.find((item) => item.id === clip.assetId);
+    const recordingId = recordingIdForProjectAsset(asset);
+    if (
+      recordingId !== telemetry.recordingId ||
+      feedback.some(
+        (group) =>
+          group.recordingId === recordingId && group.sourceInstanceId === clip.sourceInstanceId
+      )
+    )
+      continue;
+    feedback.push({
+      recordingId,
+      sourceInstanceId: clip.sourceInstanceId,
+      settings: [],
+      signals: structuredClone(telemetry.signals),
+    });
+  }
+  return added.length === 0 && feedback.length === (project.actionFeedback?.length ?? 0)
     ? project
     : {
         ...project,
         actionEvents: [...project.actionEvents, ...added],
+        version: project.version === 4 ? 4 : 3,
+        actionFeedback: feedback,
       };
 }

@@ -1,4 +1,5 @@
 export const PERSISTENCE_AUTHORITY_OWNER_PATTERNS = [
+  /^apps\/extension\/src\/composition\/persistence\/diagnostics\/event-history-database\.ts$/u,
   /^apps\/extension\/src\/composition\/persistence\/infrastructure\/indexed-db\/admission\.ts$/u,
   /^apps\/extension\/src\/composition\/persistence\/infrastructure\/indexed-db\/core\.ts$/u,
   /^apps\/extension\/src\/composition\/persistence\/editor-bootstrap\/retention\.ts$/u,

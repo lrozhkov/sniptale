@@ -1,3 +1,9 @@
+import { parseCameraFollowSettings } from '../camera/cursor-policy';
+import { isRecordingInteractionMetadata } from './recording-telemetry';
+import {
+  isRecordingKeyboardRhythmBlocks,
+  areRecordingKeyboardRhythmBlocksWithin,
+} from '../keyboard-rhythm';
 import { isActionClickStyle, isActionKeyStyle } from './action-style';
 import { isMotionAnimation } from '../motion/timing';
 import { parseMotionSourceBinding } from '../motion/source-binding';
@@ -108,9 +114,23 @@ export function isActionEvent(value: unknown): boolean {
     ) &&
     isActionIdentity(value['id']) &&
     isActionAnchor(value['anchor']) &&
+    (value['keyboardRepeats'] === undefined ||
+      isRecordingKeyboardRhythmBlocks(value['keyboardRepeats'])) &&
     isEnumValue(value['kind'], VideoProjectActionEventKind) &&
     isBoundedString(value['label']) &&
     isPrimitiveRecord(value['data']) &&
+    isRecordingInteractionMetadata(value['data']) &&
+    (value['keyboardRepeats'] === undefined ||
+      (isRecord(value['data']) &&
+        areRecordingKeyboardRhythmBlocksWithin(
+          value['keyboardRepeats'],
+          typeof value['data']['downTime'] === 'number' ? value['data']['downTime'] : 0,
+          typeof value['data']['upTime'] === 'number'
+            ? value['data']['upTime']
+            : typeof value['data']['lastObservedTime'] === 'number'
+              ? value['data']['lastObservedTime']
+              : 86400
+        ))) &&
     isNullable(value['point'], isPoint) &&
     (value['capturedDuration'] === undefined ||
       isBoundedNumber(value['capturedDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS)) &&
@@ -177,6 +197,8 @@ export function isVideoProjectActionPresentationOverride(value: unknown): boolea
 export function isMotionRegion(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['cameraFollow'] === undefined ||
+      parseCameraFollowSettings(value['cameraFollow']) !== null) &&
     (value['sourceBinding'] === undefined ||
       parseMotionSourceBinding(value['sourceBinding']) !== null) &&
     isString(value['id']) &&

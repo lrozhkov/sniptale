@@ -1,15 +1,15 @@
+import {
+  handleRecordingFailure,
+  releaseSavedRecordingAuthority,
+  finishSavedRecording,
+} from '../../recording-completion';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../../../contracts/video/types/messages';
-import { translate } from '../../../../../../platform/i18n';
+
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessage } from '../../../../../../platform/runtime-messaging';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  finishVideoRecordingStop,
-  getVideoRecordingId,
-  isCurrentVideoRecordingId,
-  resetCompletedVideoRecordingSession,
-} from '../../../session-state';
+import { getVideoRecordingId } from '../../../session-state';
 import {
   loadActiveProjectExportJobLedgerEntry,
   markProjectExportJobTerminal,
@@ -17,17 +17,10 @@ import {
   type ProjectExportJobLedgerEntry,
 } from '../../../../../../composition/persistence/export-ledger';
 import { coordinateProjectExportLifecycle } from '../../../application/export/coordination';
-import {
-  clearActiveVideoRecordingLease,
-  restoreCurrentRecordingFromLease,
-} from '../../../recording-control-lease';
-import { resetVideoRecordingRuntimeState } from '../../session-state';
-import {
-  notifyRecordingStartFailed,
-  getRecordingTabId,
-  resetRecordingTabId,
-  finalizeRecordingDiagnostics,
-} from '../../manager';
+
+import { restoreCurrentRecordingFromLease } from '../../recording-completion';
+
+import { getRecordingTabId, finalizeRecordingDiagnostics } from '../../manager';
 import { browserAction } from '@sniptale/platform/browser/action';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserWindows } from '@sniptale/platform/browser/windows';
@@ -41,7 +34,7 @@ import {
   type StoredVideoPostRecordResult,
   type VideoPostRecordResultStatus,
 } from '../../../../../storage/video/post-record-result';
-import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
+
 import { acquireMediaMutationPermit } from '../../../../../mutation-exclusion/media-activity';
 import { removeVideoRecordingCompletionOutbox } from '../../../../../../composition/persistence/recordings/completion-outbox';
 import { consumePostRecordPopupActivationOwnedByPopup } from '../../post-record-popup-activation';
@@ -50,7 +43,6 @@ import {
   createAsyncLifecycleOutcomeRoute,
   HANDLED_SYNC_RESULT,
   UNHANDLED_RESULT,
-  shouldNotifyRecordingFailure,
   type RouteResult,
 } from '../shared';
 
@@ -82,67 +74,13 @@ export function handleOffscreenError(
   },
   sendResponse: ResponseSender
 ): RouteResult {
+  if (message.phase !== 'export') clearRecordingStartActivationWatchdog(message.recordingId);
   return createAsyncLifecycleRoute(
-    handleOffscreenErrorAsync(message),
+    handleRecordingFailure(message),
     sendResponse,
     logger,
     'Failed to process offscreen error lifecycle event'
   );
-}
-
-async function handleOffscreenErrorAsync(message: {
-  error?: string;
-  phase?: 'start' | 'stop' | 'runtime' | 'export';
-  recordingId?: string;
-}): Promise<void> {
-  logger.error('Offscreen error', message.error);
-  if (message.phase !== 'export') {
-    const currentRecordingId = getVideoRecordingId();
-    if (
-      (!currentRecordingId || message.recordingId !== currentRecordingId) &&
-      (!message.recordingId || !(await restoreCurrentRecordingFromLease(message.recordingId)))
-    ) {
-      logger.warn('Ignoring stale offscreen recording error', {
-        currentRecordingId,
-        eventRecordingId: message.recordingId,
-      });
-      return;
-    }
-
-    if (message.recordingId) {
-      await clearCameraRecorderControlGrant(message.recordingId);
-      if (!isCurrentVideoRecordingId(message.recordingId)) {
-        logger.warn('Ignoring stale offscreen recording error after camera grant cleanup', {
-          eventRecordingId: message.recordingId,
-        });
-        await clearActiveVideoRecordingLease(message.recordingId);
-        return;
-      }
-    }
-    if (shouldNotifyRecordingFailure(message.phase)) {
-      clearRecordingStartActivationWatchdog(message.recordingId);
-      await notifyRecordingStartFailed(
-        message.error || translate('background.runtime.recordingError'),
-        message.recordingId ? { recordingId: message.recordingId } : undefined
-      );
-      await clearActiveVideoRecordingLease(message.recordingId);
-      return;
-    }
-
-    await releaseVideoCaptureSurface(message.recordingId);
-    if (message.recordingId && !isCurrentVideoRecordingId(message.recordingId)) {
-      logger.warn('Ignoring stale offscreen stop error after surface cleanup', {
-        eventRecordingId: message.recordingId,
-      });
-      await clearActiveVideoRecordingLease(message.recordingId);
-      return;
-    }
-    finishVideoRecordingStop();
-    resetCompletedVideoRecordingSession(message.recordingId);
-    resetRecordingTabId();
-    resetVideoRecordingRuntimeState();
-    await clearActiveVideoRecordingLease(message.recordingId);
-  }
 }
 
 export function handleVideoSavedToIdb(
@@ -328,8 +266,7 @@ async function authorizeSavedRecordingCompletion(
 }
 
 async function completeSavedRecordingPersistence(recordingId: string): Promise<void> {
-  await releaseVideoCaptureSurface(recordingId);
-  await clearActiveVideoRecordingLease(recordingId);
+  await releaseSavedRecordingAuthority(recordingId);
   const committed = await commitPendingVideoPostRecordResult(recordingId);
   if (committed !== 'ready' && committed !== 'acknowledged') {
     throw new Error('The post-record result could not be committed after terminal cleanup.');
@@ -337,15 +274,7 @@ async function completeSavedRecordingPersistence(recordingId: string): Promise<v
 }
 
 function finalizeSavedRecordingCompletion(message: SavedRecordingMessage): void {
-  if (getVideoRecordingId() !== message.recordingId) {
-    void finalizeRecordingDiagnostics(message.recordingId);
-    return;
-  }
-
-  finishVideoRecordingStop();
-  resetCompletedVideoRecordingSession(message.recordingId);
-  resetRecordingTabId();
-  resetVideoRecordingRuntimeState();
+  finishSavedRecording(message.recordingId);
   void finalizeRecordingDiagnostics(message.recordingId);
 }
 

@@ -1,3 +1,5 @@
+import { sanitizeLogText } from '../../runtime/observability/sanitize.mjs';
+import { collectProcessDiagnosticLocations } from './process-diagnostics.mjs';
 import { findObservedQaRule } from '../../composition/catalog/runtime-registry.mjs';
 import { formatDuration } from '../../runtime/observability/run-metrics.helpers.mjs';
 import { summarizeTimeline } from '../../runtime/observability/timeline-metrics.mjs';
@@ -87,7 +89,10 @@ function structuredLocations(step) {
     line: null,
     message: String(failure),
   }));
-  const advisories = (step.advisories ?? []).map((finding) => {
+  const advisoryFindings = ['failed', 'blocked'].includes(step.status)
+    ? []
+    : (step.advisories ?? []);
+  const advisories = advisoryFindings.map((finding) => {
     const id = finding.id ?? finding.family ?? finding.rule ?? 'advisory';
     const reason = finding.reason ?? finding.message ?? 'review requested';
     return {
@@ -96,7 +101,47 @@ function structuredLocations(step) {
       message: `${id}: ${reason}`,
     };
   });
-  return [...violations, ...failures, ...advisories];
+  const processLocations = violations.length === 0 ? collectProcessDiagnosticLocations(step) : [];
+  return [...violations, ...failures, ...advisories, ...processLocations];
+}
+
+function oneLine(value, sanitizeText) {
+  return sanitizeText(String(value ?? ''))
+    .replace(/\s+/gu, ' ')
+    .slice(0, 800);
+}
+
+/** Show failed proof before the full log without interpreting the test's invariant. */
+export function formatObservedBlocker(step, sanitizeText = sanitizeLogText) {
+  const lines = [
+    `- ${step.label}: ${oneLine(step.summary || step.detail || step.status, sanitizeText)}`,
+  ];
+  const locations = structuredLocations(step);
+  const shown = locations.slice(0, SUMMARY_PROBLEM_LIMIT);
+  const testFiles = new Set();
+  for (const location of shown) {
+    const line = location.line == null ? '' : `:${location.line}`;
+    lines.push(
+      `  ${oneLine(location.file, sanitizeText)}${line}: ${oneLine(location.message, sanitizeText)}`
+    );
+    if (step.label === 'Unit tests' && /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(location.file)) {
+      testFiles.add(location.file);
+    }
+  }
+  if (locations.length > shown.length)
+    lines.push(`  +${locations.length - shown.length} more in the run log`);
+  for (const file of testFiles) {
+    const safeFile = sanitizeText(file);
+    const operand = safeFile.startsWith('-') ? `./${safeFile}` : safeFile;
+    const quoted = "'" + operand.replaceAll("'", "'\"'\"'") + "'";
+    const command = `  Reproduce: npm exec vitest run -- --maxWorkers=1 ${quoted}`;
+    lines.push(
+      sanitizeText(command) === command
+        ? command
+        : '  Reproduction command omitted because redaction changes shell syntax.'
+    );
+  }
+  return lines.join('\n');
 }
 
 function createStructuredDiagnostic(step, definition, failed) {
@@ -106,10 +151,18 @@ function createStructuredDiagnostic(step, definition, failed) {
   return {
     summary: step.summary ?? step.detail ?? (failed ? 'step failed' : null),
     locations,
-    remediation: step.advice ?? definition.remediation,
+    remediation: step.advice || definition.remediation,
     ruleDoc: definition.ruleDoc,
     evidence,
   };
+}
+
+export function hasCanonicalAdvisoryLog(step) {
+  return (
+    ['Advisory report', 'QA checkpoint'].includes(step.label) &&
+    typeof step.stdout === 'string' &&
+    step.stdout.includes('Advisory log:')
+  );
 }
 
 export function renderObservedStepLog(step, definition) {
@@ -120,7 +173,7 @@ export function renderObservedStepLog(step, definition) {
     step.summary ? `summary: ${step.summary}` : '',
     step.detail ? `detail: ${step.detail}` : '',
     ...renderViolations(step.violations),
-    ...renderAdvisories(step.advisories),
+    ...(hasCanonicalAdvisoryLog(step) ? [] : renderAdvisories(step.advisories)),
     ...(step.failures ?? []).map((failure) => `- ${failure}`),
     step.stdout ? `stdout:\n${step.stdout}` : '',
     step.stderr ? `stderr:\n${step.stderr}` : '',

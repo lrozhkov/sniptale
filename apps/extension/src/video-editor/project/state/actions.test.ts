@@ -364,3 +364,70 @@ it('renames a material reversibly without changing its media or existing clips',
   if (redo?.status !== 'applied') throw new Error('Expected redo');
   expect(redo.project.assets[0]?.name).toBe('Interview');
 });
+
+it('restores removed source authoring through editor Undo and Redo', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../features/video/project/factories/creation');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 100,
+    height: 100,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 100,
+    recordingSignals: [],
+  });
+  const group = project.actionFeedback![0]!;
+  const key = {
+    id: 'key',
+    time: 1,
+    x: 0.2,
+    y: 0.3,
+    anchor: 'manual' as const,
+    interpolation: 'smooth' as const,
+  };
+  project.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'source',
+        binding: {
+          kind: 'recording-source',
+          recordingId: group.recordingId,
+          sourceInstanceId: group.sourceInstanceId,
+        },
+        start: 0,
+        end: 5,
+        keys: [key],
+      },
+      {
+        id: 'manual',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 5,
+        keys: [{ ...key, id: 'manual' }],
+      },
+    ],
+  };
+  const store = createVideoEditorTestStore();
+  store.getState().setProject(project);
+  store.getState().deleteClip(project.clips[0]!.id);
+  const deleted = store.getState().project!;
+  expect(deleted.actionFeedback).toEqual([]);
+  expect(deleted.cursorFocusPath?.segments.map(({ id }) => id)).toEqual(['manual']);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, deleted);
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.actionFeedback).toEqual(project.actionFeedback);
+  expect(undo.project.cursorFocusPath).toEqual(project.cursorFocusPath);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project).toEqual(deleted);
+  store.getState().removeUnusedAssets();
+  expect(store.getState().project?.assets).toEqual([]);
+  expect(store.getState().project?.cursorFocusPath).toEqual(deleted.cursorFocusPath);
+});

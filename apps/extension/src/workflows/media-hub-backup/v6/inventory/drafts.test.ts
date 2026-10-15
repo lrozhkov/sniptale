@@ -8,7 +8,7 @@ import { buildVideoProjectRootInventory } from './video-projects';
 
 function database(rows: unknown[]) {
   return {
-    transaction: emptyReviewTransaction,
+    transaction: () => emptyReviewTransaction(rows),
     get: vi.fn(async () => undefined),
     getAll: vi.fn(async () => rows),
     getAllFromIndex: vi.fn(async () => []),
@@ -66,8 +66,15 @@ describe('project draft archive inventory', () => {
   });
 });
 
-function emptyReviewTransaction() {
-  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+function emptyReviewTransaction(scenarioRoots: unknown[] = []) {
+  return {
+    objectStore: (store: string) => ({
+      getAll: async () => (store === 'scenario_projects' ? scenarioRoots : []),
+      index: () => ({ getAll: async () => [] }),
+      get: async () => undefined,
+    }),
+    done: Promise.resolve(),
+  };
 }
 
 it.each([2, 3, 99])(

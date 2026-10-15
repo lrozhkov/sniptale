@@ -175,7 +175,7 @@ it('logs browser-frame and editor trace events through the shared logger', () =>
 });
 
 it('keeps browser chrome attached to the source without placing it above every annotation', () => {
-  const header = { set: vi.fn(), setCoords: vi.fn() };
+  const header = { set: vi.fn(), setCoords: vi.fn(), getScaledHeight: () => 32 };
   const source = { dirty: false };
   const canvas = createProjectCanvas();
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   captureFrozenSelectionGeometry,
   mountFrozenSelectionFrame,
@@ -29,6 +29,11 @@ function page() {
   Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest });
   return { background, menu, item, hitTest };
 }
+
+beforeEach(() => {
+  // Geometry assertions use a fixed clock; the probe-budget test advances it explicitly.
+  vi.spyOn(performance, 'now').mockReturnValue(0);
+});
 
 afterEach(() => {
   document.body.replaceChildren();

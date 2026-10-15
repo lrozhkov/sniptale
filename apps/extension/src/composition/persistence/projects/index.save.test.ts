@@ -74,7 +74,7 @@ function createDb() {
       done: Promise.resolve(),
       objectStore: vi.fn(() => ({
         delete: projectsDbMocks.txDeleteMock,
-        index: () => ({ count: async () => 0 }),
+        index: () => ({ count: async () => 0, getAll: async () => [], getAllKeys: async () => [] }),
         get: projectsDbMocks.txGetMock,
         getAll: projectsDbMocks.txGetAllMock,
         put: projectsDbMocks.txPutMock,
@@ -115,7 +115,7 @@ beforeEach(() => {
   projectsDbMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
 });
 
-it('deletes removed project-owned assets while saving the next project snapshot', async () => {
+it('journals removed project-owned assets while saving without revoking mounted Undo sources', async () => {
   const { saveVideoProject } = await import('./index');
   const existingProject = createVideoProject({
     assets: [createProjectOwnedVideoAsset('asset-a'), createProjectOwnedVideoAsset('asset-b')],
@@ -142,8 +142,14 @@ it('deletes removed project-owned assets while saving the next project snapshot'
       updatedAt: 1000,
     })
   );
-  expect(projectsDbMocks.txDeleteMock).toHaveBeenCalledWith('asset-b');
-  expect(projectsDbMocks.txDeleteMock).toHaveBeenCalledWith('project-asset:asset-b');
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      kind: 'physical-delete',
+      assetIds: [],
+      privateSources: [{ projectAssetId: 'asset-b', expectedAssetId: 'asset-b-bytes' }],
+    })
+  );
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'video-project:project-1',
   ]);

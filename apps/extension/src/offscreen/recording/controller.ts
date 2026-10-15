@@ -1,4 +1,12 @@
-import { OFFSCREEN_RECORDING_START_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
+import {
+  matchesRecordingFrameClockBinding,
+  type RecordingClockTiming,
+} from '../../contracts/video/recording-frame-clock';
+import {
+  OFFSCREEN_RECORDING_START_TIMEOUT_MS,
+  RECORDING_SOURCE_PREPARATION_TIMEOUT_MS,
+  RECORDING_START_DELIVERY_TIMEOUT_MS,
+} from '@sniptale/runtime-contracts/video/types/timeouts';
 import { reserveRecordingBegin, cancelRecordingBegin } from './start/gate';
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
 import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
@@ -8,6 +16,7 @@ import { startRecording as startRecordingImpl } from './start/index';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../platform/i18n';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { RecordingFrameClockAnchor } from '../../contracts/video/recording-frame-clock';
 import {
   hasActiveSidecarSession,
   pauseActiveSidecarRecorders,
@@ -38,6 +47,8 @@ const STOP_RECORDING_TIMEOUT_MS = 10_000;
 let pendingRecordingStart: Promise<void> | null = null;
 let pendingRecordingStop: Promise<RecordingStopOutcome> | null = null;
 let activeRecordingBinding: RecordingSourceBinding | null = null;
+let terminalRecording: { binding: RecordingSourceBinding; outcome: RecordingStopOutcome } | null =
+  null;
 let pendingDataPreparation: {
   binding: RecordingSourceBinding;
   abort: AbortController;
@@ -86,7 +97,10 @@ export function startRecording(
   params: Parameters<typeof startRecordingImpl>[0],
   prepareData?: () => Promise<void>
 ): Promise<void> {
-  if (pendingRecordingStart || hasActiveRecordingSession()) {
+  if (terminalRecording?.outcome.result === 'terminal-failure') {
+    return Promise.reject(new Error('Recording cleanup failed. Local data cleanup is required.'));
+  }
+  if (pendingRecordingStart || pendingRecordingStop || hasActiveRecordingSession()) {
     return Promise.reject(new Error(translate('background.runtime.recordingAlreadyRunning')));
   }
 
@@ -103,6 +117,7 @@ export function startRecording(
     streamInstanceId: params.streamInstanceId,
   };
   activeRecordingBinding = binding;
+  terminalRecording = null;
   const work = startRecordingAfterPendingPublication(params, binding, previousBinding, prepareData);
   const tracked = work.finally(() => {
     if (pendingRecordingStart === tracked) {
@@ -138,12 +153,16 @@ async function startRecordingAfterPendingPublication(
     } else {
       await startRecordingImpl(params, runtimeMessaging);
     }
-    if (!hasActiveRecordingSession() && matchesActiveRecordingBinding(binding)) {
+    if (
+      !pendingRecordingStop &&
+      !hasActiveRecordingSession() &&
+      matchesActiveRecordingBinding(binding)
+    ) {
       activeRecordingBinding = null;
     }
   } catch (error) {
     if (prepareData) cancelRecordingBegin();
-    if (matchesActiveRecordingBinding(binding)) {
+    if (!pendingRecordingStop && matchesActiveRecordingBinding(binding)) {
       activeRecordingBinding = previousBindingRetired ? null : previousBinding;
     }
     throw error;
@@ -173,7 +192,13 @@ async function prepareRecordingData(
   });
   try {
     if ((params.settings.sourceCount ?? 1) <= 1) {
-      const begin = reserveRecordingBegin(binding, timeoutMs);
+      // BEGIN arrives only after source admission and the background countdown.
+      const begin = reserveRecordingBegin(
+        binding,
+        RECORDING_SOURCE_PREPARATION_TIMEOUT_MS +
+          RECORDING_START_DELIVERY_TIMEOUT_MS +
+          Math.max(0, params.settings.countdownSeconds ?? 0) * 1000
+      );
       void begin.catch((error) => preparation.abort.abort(error));
     }
     await Promise.race([prepareData(), aborted]);
@@ -374,8 +399,15 @@ export function stopRecording(
   binding: RecordingSourceBinding,
   discard = false
 ): Promise<RecordingStopOutcome> {
+  if (
+    terminalRecording &&
+    matchesRecordingFrameClockBinding(terminalRecording.binding, binding) &&
+    (!activeRecordingBinding || matchesActiveRecordingBinding(binding))
+  ) {
+    return Promise.resolve(terminalRecording.outcome);
+  }
   try {
-    assertActiveRecordingBinding(binding, { allowIdleStop: true });
+    assertActiveRecordingBinding(binding);
   } catch (error) {
     return Promise.reject(error);
   }
@@ -383,13 +415,23 @@ export function stopRecording(
     pendingDataPreparation.cancelled = true;
     pendingDataPreparation.abort.abort(new Error('Recording preparation cancelled'));
     cancelRecordingBegin();
-    return Promise.resolve({ result: 'stopped' });
+    const outcome: RecordingStopOutcome = { result: 'stopped' };
+    terminalRecording = { binding: { ...binding }, outcome };
+    return Promise.resolve(outcome);
   }
   if (pendingRecordingStop) {
     return pendingRecordingStop;
   }
 
-  const work = stopRecordingOnce(discard);
+  const work = stopRecordingOnce(discard)
+    .catch((error: unknown): RecordingStopOutcome => {
+      if (error instanceof PostRecordPublicationError) throw error;
+      return { result: 'terminal-failure', error: 'Recording cleanup failed.' };
+    })
+    .then((outcome) => {
+      terminalRecording = { binding: { ...binding }, outcome };
+      return outcome;
+    });
   const tracked = work.finally(() => {
     if (pendingRecordingStop === tracked) {
       pendingRecordingStop = null;
@@ -446,14 +488,15 @@ async function waitForPendingStart(pendingStart: Promise<void>): Promise<boolean
 function notifyState(
   type: StateMessage,
   action: 'paused' | 'resumed',
-  recordingId: string | null
+  recordingId: string | null,
+  frameClock?: RecordingFrameClockAnchor | null
 ): void {
   if (!recordingId) return;
   sendRuntimeMessageBestEffort({
     context: { recordingId },
     logger,
     logMessage: `Failed to notify runtime that recording ${action}`,
-    payload: { type, recordingId },
+    payload: { type, recordingId, ...(frameClock === undefined ? {} : { frameClock }) },
   });
 }
 
@@ -471,13 +514,9 @@ function matchesActiveRecordingBinding(binding: RecordingSourceBinding): boolean
   );
 }
 
-function assertActiveRecordingBinding(
-  binding: RecordingSourceBinding,
-  options: { allowIdleStop?: boolean } = {}
-): void {
+function assertActiveRecordingBinding(binding: RecordingSourceBinding): void {
   if (!activeRecordingBinding) {
     if (recordingContext.matchesSourceBinding(binding)) return;
-    if (options.allowIdleStop && !pendingRecordingStart && !hasActiveRecordingSession()) return;
     throw new Error('Recording source binding is unavailable');
   }
   if (!matchesActiveRecordingBinding(binding)) {
@@ -519,7 +558,8 @@ export function pauseRecording(binding: RecordingSourceBinding): void {
   notifyState(
     VideoMessageType.OFFSCREEN_RECORDING_PAUSED,
     'paused',
-    recordingContext.currentRecordingId
+    recordingContext.currentRecordingId,
+    artifactSession.frameClock
   );
 }
 
@@ -546,11 +586,13 @@ export function resumeRecording(binding: RecordingSourceBinding): void {
   resumeActiveSidecarRecorders();
   durationTracker.startSegment();
 
-  notifyState(
-    VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
-    'resumed',
-    recordingContext.currentRecordingId
-  );
+  if (artifactSession.frameClock === undefined) {
+    notifyState(
+      VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
+      'resumed',
+      recordingContext.currentRecordingId
+    );
+  }
 }
 
 export function updateRecordingSettings(
@@ -559,4 +601,23 @@ export function updateRecordingSettings(
 ): Promise<void> {
   assertActiveRecordingBinding(binding);
   return applyRecordingSettings(patch);
+}
+
+/** Read-only timestamps; source lifecycle and command authority remain unchanged. */
+export function getRecordingClockTiming(
+  binding: RecordingSourceBinding
+): RecordingClockTiming | null {
+  const receivedAtMs = performance.timeOrigin + performance.now();
+  if (!matchesActiveRecordingBinding(binding) || !recordingContext.matchesSourceBinding(binding))
+    return null;
+  const anchor = recordingContext.artifactSession?.frameClock;
+  if (!anchor || !matchesRecordingFrameClockBinding(binding, anchor)) return null;
+  return {
+    recordingId: binding.recordingId,
+    generation: binding.generation,
+    streamInstanceId: binding.streamInstanceId,
+    receivedAtMs,
+    repliedAtMs: performance.timeOrigin + performance.now(),
+    maximumUncertaintyMs: anchor.maximumUncertaintyMs ?? 1000 / 120,
+  };
 }

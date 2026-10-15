@@ -2,24 +2,24 @@
   "schemaVersion": 1,
   "platform": "linux/amd64",
   "node": {
-    "version": "24.18.0",
-    "npmVersion": "11.19.1",
-    "npmLockSha256": "6bb959f89366ba722b8e0d7ec2cf31e7556cce84d0a7738381b7a8f5e7b74e15",
-    "image": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
-    "baseDebianSnapshot": "20260829T000000Z"
+    "version": "24.21.0",
+    "npmVersion": "12.2.0",
+    "npmLockSha256": "2ae240f88f4b3ced8b77b7fdff7dadd57326477b217ff653bfa50176605dfaae",
+    "image": "node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20",
+    "baseDebianSnapshot": "20261008T000000Z"
   },
   "projectToolchain": {
     "oxfmt": {
       "packagePath": "node_modules/oxfmt",
-      "version": "0.64.0"
+      "version": "0.72.0"
     },
     "oxlint": {
       "packagePath": "node_modules/oxlint",
-      "version": "1.79.0"
+      "version": "1.87.0"
     },
     "oxlintTsgolint": {
       "packagePath": "node_modules/oxlint-tsgolint",
-      "version": "7.0.2001"
+      "version": "7.0.2004"
     },
     "typescriptNative": {
       "packagePath": "node_modules/@typescript/native",
@@ -40,65 +40,65 @@
   },
   "dependencyGraph": {
     "packagePath": "node_modules/dependency-cruiser",
-    "version": "18.2.0"
+    "version": "18.5.0"
   },
   "openstackController": {
-    "pythonVersion": "3.12.13",
-    "image": "python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2",
-    "openstacksdkVersion": "4.18.0",
-    "requirementsSha256": "df86d7f1ea14e50e1fbabdfdfb8efc4af76bb9ab8c91955f04707f97e350a7f4"
+    "pythonVersion": "3.14.8",
+    "image": "python:3.14.8-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83",
+    "openstacksdkVersion": "4.21.0",
+    "requirementsSha256": "640b8fd88450f47598a0d7e400089f427ca9a993ea3cba2376fe3e021074bd3c"
   },
   "debian": {
-    "snapshot": "20260829T000000Z",
-    "archiveUrl": "https://snapshot.debian.org/archive/debian/20260829T000000Z",
-    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20260829T000000Z",
+    "snapshot": "20261008T000000Z",
+    "archiveUrl": "https://snapshot.debian.org/archive/debian/20261008T000000Z",
+    "securityArchiveUrl": "https://snapshot.debian.org/archive/debian-security/20261008T000000Z",
     "suites": [
       "bookworm",
       "bookworm-updates",
       "bookworm-security"
     ],
     "caCertificatesBootstrap": {
-      "url": "https://snapshot.debian.org/archive/debian/20260829T000000Z/pool/main/c/ca-certificates/ca-certificates_20230311%2Bdeb12u1_all.deb",
+      "url": "https://snapshot.debian.org/archive/debian/20261008T000000Z/pool/main/c/ca-certificates/ca-certificates_20230311%2Bdeb12u1_all.deb",
       "sha256": "0d5f444f594e48c1e16a41d8fc628a09b24c658916a1274025c2330f2a802bed"
     }
   },
   "playwright": {
-    "version": "1.62.1",
-    "npmLockSha256": "6595faa266799d7485828963aada5aae944cdf0c9128408aead5832f8cfffabb",
+    "version": "1.64.0",
+    "npmLockSha256": "f7aa01093f08797cf23dd35f4ca1ee26e66455a3a23c70531c48327f79816464",
     "browser": "chromium",
-    "browserRevision": "1234",
-    "browserVersion": "151.0.7922.34",
+    "browserRevision": "1248",
+    "browserVersion": "156.0.8078.4",
     "assets": [
       {
-        "id": "chromium-1234",
-        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip",
-        "sha256": "ae8736ac28bc69278551500f219fc749575648263c43ec5990749eff43b9fcf8",
-        "executable": "chrome-linux64/chrome"
+        "id": "chromium-1248",
+        "url": "https://cdn.playwright.dev/builds/cft/156.0.8078.4/linux64/chrome-linux64.zip",
+        "executable": "chrome-linux64/chrome",
+        "sha256": "43fd31766c7533a02dda2ded5ad50c2f861cd5400be7509c0abad71129f79d79"
       },
       {
-        "id": "chromium_headless_shell-1234",
-        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-headless-shell-linux64.zip",
-        "sha256": "3cfc2bd00d1bafcf8a68dc74c9c92bb7150ddc8d26ade948a776316e1cec4f14",
-        "executable": "chrome-headless-shell-linux64/chrome-headless-shell"
+        "id": "chromium_headless_shell-1248",
+        "url": "https://cdn.playwright.dev/builds/cft/156.0.8078.4/linux64/chrome-headless-shell-linux64.zip",
+        "executable": "chrome-headless-shell-linux64/chrome-headless-shell",
+        "sha256": "c3e50596aef52c58f8fda3c6b3411c33d34c88b177b3ed1c2243359fd3b8ba20"
       },
       {
-        "id": "ffmpeg-1011",
-        "url": "https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-linux.zip",
-        "sha256": "ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc",
-        "executable": "ffmpeg-linux"
+        "id": "ffmpeg-1013",
+        "url": "https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1013/ffmpeg-linux.zip",
+        "executable": "ffmpeg-linux",
+        "sha256": "ee986434d158f74fb5d9c5ff1092026ceedb63f324fe90b5be89460926b7b679"
       }
     ]
   },
   "codeql": {
-    "version": "2.26.3",
-    "url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.26.3/codeql-bundle-linux64.tar.gz",
-    "sha256": "77e5be1b550d66662e600e795b6cf2ea1729e853e3dc79e02594f767039d2a29",
+    "version": "2.27.2",
+    "url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.2/codeql-bundle-linux64.tar.gz",
+    "sha256": "f002864be6dd8d5d7bdb123aaf7291ec8e291012bd9f70b6d2362f730db52aeb",
     "querySuite": "codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls"
   },
   "osvScanner": {
-    "version": "2.5.1",
-    "url": "https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64",
-    "sha256": "f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be"
+    "version": "2.6.0",
+    "url": "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64",
+    "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
   },
   "gitleaks": {
     "version": "8.30.1",
@@ -111,7 +111,7 @@
     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
   },
   "mutationRunner": {
-    "packageJsonSha256": "8f796a9278d7205228d12055b64ec792151d0b61fa0785dedef8b56c2bf7f1b7",
-    "packageLockSha256": "0d136b303c788fae07aa94abc8be14ada2ac77605eb6644dbefedfb9707a20d2"
+    "packageJsonSha256": "c454333b8542a3e8f3e1e985b0f826850be93d0e48271aedbb154efa93b5a260",
+    "packageLockSha256": "8d586c603f347232ae9c620a601a9824ff32a683fca72d70d1da1a72a7c2397a"
   }
 }

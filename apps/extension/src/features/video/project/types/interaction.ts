@@ -118,6 +118,11 @@ export type VideoProjectInteractionTimeBasis =
   (typeof VideoProjectInteractionTimeBasis)[keyof typeof VideoProjectInteractionTimeBasis];
 
 export interface VideoProjectCursorSample {
+  /** Original client point projected only by an admitted source transform. */
+  readonly recordingPoint?: Readonly<{ x: number; y: number }> | null;
+  observationClockId?: string;
+  captureSegment?: number;
+  observation?: 'observed' | 'outside' | 'hidden' | 'blur' | 'paused';
   /** Retained normalized interval of the easing curve toward the following key. */
   interpolationRange?: { start: number; end: number };
   id: string;
@@ -202,6 +207,47 @@ export interface VideoProjectActionPresentationOverride {
 }
 
 /** Raw recording telemetry. Its clock and coordinates belong to the capture. */
+export interface RecordingTelemetryCapabilities {
+  version: 1;
+  pointer: 'available' | 'unavailable' | 'unknown';
+  keyboard: 'available' | 'unavailable' | 'unknown';
+  wheel: 'available' | 'unavailable' | 'unknown';
+  coverage: 'document' | 'desktop' | 'unknown';
+  timing?: { mode: 'bounded' | 'approximate'; accuracyMs: number | null };
+}
+
+/** Original document observations and independently replaceable source-media bindings. */
+export interface RecordingObservationClock {
+  version: 1;
+  domain: 'observation' | 'media';
+  segments: RecordingObservationClockSegment[];
+}
+
+export interface RecordingObservationClockSegment {
+  id: string;
+  documentId: string;
+  timeOriginMs: number;
+  startedAtTimestampMs: number;
+  observationStartSeconds: number;
+  mediaStartEstimateSeconds: number;
+  mapping: null | {
+    captureEpochMs: number;
+    mediaTimeSeconds: number;
+    uncertaintyMs: number;
+    maximumUncertaintyMs?: number;
+  };
+  mediaEndSeconds?: number;
+}
+
+export type RecordingTelemetryProvenance =
+  | {
+      source: 'browser';
+      normalizationVersion: 1;
+      timeUnit: 'seconds';
+      coordinateSpace: 'client-css';
+    }
+  | { source: 'native'; normalizationVersion: 1; timeUnit: 'seconds'; coordinateSpace: 'desktop' };
+
 export type RecordingViewportGeometry = Readonly<{
   width: number;
   height: number;
@@ -226,6 +272,7 @@ export type RecordingPointTransform = Readonly<{
 }>;
 
 export interface RecordingActionEvent {
+  keyboardRepeats?: RecordingKeyboardRhythmBlock[];
   readonly recordingPoint?: Readonly<{ x: number; y: number }> | null;
   animation?: { start: number; end: number; duration: number };
   id: string;
@@ -243,7 +290,7 @@ export interface RecordingActionEvent {
 /** Capture facts after explicit source geometry projection; point is normalized [0, 1] or unavailable. */
 export type SourceNormalizedRecordingActionEvent = Pick<
   RecordingActionEvent,
-  'id' | 'kind' | 'time' | 'duration' | 'point' | 'label' | 'data' | 'preset'
+  'id' | 'kind' | 'time' | 'duration' | 'point' | 'label' | 'data' | 'preset' | 'keyboardRepeats'
 >;
 
 export type VideoProjectActionAnchor =
@@ -258,6 +305,7 @@ export type VideoProjectActionAnchor =
 
 /** Authored fact; visible occurrences are derived from the current source fragments. */
 export interface VideoProjectActionEvent {
+  keyboardRepeats?: RecordingKeyboardRhythmBlock[];
   id: string;
   anchor: VideoProjectActionAnchor;
   kind: VideoProjectActionEventKind;
@@ -277,7 +325,21 @@ export const RecordingTelemetrySignalKind = {
 export type RecordingTelemetrySignalKind =
   (typeof RecordingTelemetrySignalKind)[keyof typeof RecordingTelemetrySignalKind];
 
+/** Anonymous delivered keyboard times; ticks are deltas or flattened delta/run pairs. */
+export interface RecordingKeyboardRhythmBlock {
+  version: 1;
+  id: string;
+  startTime: number;
+  quantumMs: 1;
+  count: number;
+  encoding: 'delta' | 'rle';
+  ticks: number[];
+}
+
 export interface RecordingTelemetrySignal {
+  readonly recordingPoint?: Readonly<{ x: number; y: number }> | null;
+  keyboardRhythm?: RecordingKeyboardRhythmBlock[];
+  keyboardRepeats?: RecordingKeyboardRhythmBlock[];
   id: string;
   kind: RecordingTelemetrySignalKind;
   startTime: number;
@@ -299,6 +361,8 @@ export interface VideoProjectMotionArea {
 }
 
 export interface VideoProjectMotionRegion {
+  /** Absent settings inherit the project policy or the retained legacy path coefficients. */
+  cameraFollow?: import('../camera/cursor-policy').CameraFollowSettings;
   /** Authored interval tied to one source clip, retained while its visible part is trimmed. */
   sourceBinding?: {
     animationGroupId?: string;

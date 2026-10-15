@@ -1,3 +1,4 @@
+import { createRuntimeParityReceipt } from './runtime-parity.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,34 +38,37 @@ function runSmoke(metadataReachable = false, nodeFailure = false, staleHostNpx =
     'tooling/test/mutation/package.json',
     path.join(root, 'tooling/test/mutation/package.json')
   );
+  const lock = JSON.parse(fs.readFileSync('tooling/configs/ci/toolchain.lock.json', 'utf8'));
+  const runtime = createRuntimeParityReceipt({ lock });
+  const mutation = JSON.parse(fs.readFileSync('tooling/test/mutation/package.json', 'utf8'));
   const docker = path.join(root, 'bin/docker');
   fs.writeFileSync(
     docker,
     `#!/bin/sh
-browser_json='{"revision":"1234",'\
-'"browserVersion":"151.0.7922.34",'\
+browser_json='{"revision":"1248",'\
+'"browserVersion":"156.0.8078.4",'\
 '"assets":[{"exists":true},{"exists":true},{"exists":true}]}'
 runtime_json='{"schemaVersion":1,"artifactKind":"sniptale-runtime-parity",'\
 '"platform":"linux/amd64","runtimeRoot":"/usr/local",'\
 '"packageManagerRoot":"/opt/sniptale-npm/node_modules/npm","commands":{'\
-'"node":{"realPath":"/usr/local/bin/node","version":"v24.18.0"},'\
-'"npm":{"realPath":"/opt/sniptale-npm/node_modules/npm/bin/npm-cli.js","version":"11.19.1"},'\
-'"npx":{"realPath":"/opt/sniptale-npm/node_modules/npm/bin/npx-cli.js","version":"11.19.1"}}}'
+'"node":{"realPath":"/usr/local/bin/node","version":"v${lock.node.version}"},'\
+'"npm":{"realPath":"/opt/sniptale-npm/node_modules/npm/bin/npm-cli.js","version":"${lock.node.npmVersion}"},'\
+'"npx":{"realPath":"/opt/sniptale-npm/node_modules/npm/bin/npx-cli.js","version":"${lock.node.npmVersion}"}}}'
 case "$*" in
   --version) printf '%s\n' 'Docker version 28.0.0' ;;
   *"image inspect"*) printf '%s\n' '["${image}"]' ;;
   *"runtime-parity.mjs"*) [ "$MOCK_NODE_FAILURE" = 1 ] && exit 124 || printf '%s\n' "$runtime_json" ;;
-  *"codeql --version"*) printf '%s\n' '2.26.3' ;;
-  *"osv-scanner --version"*) printf '%s\n' '2.5.1' ;;
+  *"codeql --version"*) printf '%s\n' '${lock.codeql.version}' ;;
+  *"osv-scanner --version"*) printf '%s\n' '${lock.osvScanner.version}' ;;
   *"gitleaks --version"*) printf '%s\n' '8.30.1' ;;
   *"actionlint --version"*) printf '%s\n' '1.7.12' ;;
-  *"playwright --version"*) printf '%s\n' '1.62.1' ;;
-  *"/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js --version"*) printf '%s\n' '9.6.1' ;;
+  *"playwright --version"*) printf '%s\n' '1.64.0' ;;
+  *"/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js --version"*) printf '%s\n' '${mutation.devDependencies['@stryker-mutator/core']}' ;;
   *"ps --version"*) printf '%s\n' 'ps from procps-ng 4.0.2' ;;
   *"node -e"*) printf '%s\n' "$browser_json" ;;
-  *"/opt/playwright/chromium-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
-  *"/opt/playwright/chromium_headless_shell-1234/"*) printf '%s\n' 'Chromium 151.0.7922.34' ;;
-  *"/opt/playwright/ffmpeg-1011/"*) printf '%s\n' 'ffmpeg version 7' ;;
+  *"/opt/playwright/chromium-1248/"*) printf '%s\n' 'Chromium 156.0.8078.4' ;;
+  *"/opt/playwright/chromium_headless_shell-1248/"*) printf '%s\n' 'Chromium 156.0.8078.4' ;;
+  *"/opt/playwright/ffmpeg-1013/"*) printf '%s\n' 'ffmpeg version 7' ;;
   *"curl --silent"*) [ "$MOCK_METADATA_REACHABLE" = 1 ] && exit 0 || exit 7 ;;
   *) exit 2 ;;
 esac
@@ -82,15 +86,16 @@ esac
   }
   for (const command of ['node', 'npm', 'npx']) {
     if (command === 'npx' && staleHostNpx) {
-      fs.writeFileSync(path.join(root, 'bin', command), "#!/bin/sh\nprintf '%s\\n' '11.19.1'\n", {
-        mode: 0o755,
-      });
+      fs.writeFileSync(
+        path.join(root, 'bin', command),
+        `#!/bin/sh\nprintf '%s\\n' '${lock.node.npmVersion}'\n`,
+        {
+          mode: 0o755,
+        }
+      );
       continue;
     }
-    const source =
-      command === 'node'
-        ? process.execPath
-        : fs.realpathSync(path.join(path.dirname(process.execPath), command));
+    const source = runtime.commands[command].realPath;
     fs.symlinkSync(source, path.join(root, 'bin', command));
   }
   const script = path.resolve('tooling/ci/infrastructure-smoke.mjs');
@@ -107,14 +112,14 @@ esac
   const receipt = JSON.parse(
     fs.readFileSync(path.join(root, 'build/selectel-controller/infrastructure-smoke.json'), 'utf8')
   );
-  return { receipt, result };
+  return { receipt, result, lock };
 }
 
 describe('Selectel infrastructure smoke', () => {
   it('bounds only the immutable image cold start above the default smoke timeout', () => {
     expect(getInfrastructureSmokeTimeoutMs('container-runtime-parity')).toBe(180_000);
     expect(getInfrastructureSmokeTimeoutMs('codeql')).toBe(30_000);
-    expect(getInfrastructureSmokeTimeoutMs('playwright-asset-chromium-1234')).toBe(30_000);
+    expect(getInfrastructureSmokeTimeoutMs('playwright-asset-chromium-1248')).toBe(30_000);
   });
 
   it('does not inject tool-specific network environment into offline checks', () => {
@@ -122,7 +127,7 @@ describe('Selectel infrastructure smoke', () => {
   });
 
   it('admits the immutable image, locked toolchain, browser assets, and metadata deny', () => {
-    const { receipt, result } = runSmoke();
+    const { receipt, result, lock } = runSmoke();
     expect(result.status).toBe(0);
     expect(receipt.status).toBe('passed');
     expect(receipt.checks.map((check: { id: string }) => check.id)).toEqual([
@@ -147,19 +152,25 @@ describe('Selectel infrastructure smoke', () => {
       'stryker',
       'process-tools',
       'playwright-chromium',
-      'playwright-asset-chromium-1234',
-      'playwright-asset-chromium_headless_shell-1234',
-      'playwright-asset-ffmpeg-1011',
+      'playwright-asset-chromium-1248',
+      'playwright-asset-chromium_headless_shell-1248',
+      'playwright-asset-ffmpeg-1013',
       'container-metadata-denied',
     ]);
     expect(receipt.runtimeParity).toMatchObject({
       host: {
         surface: 'selectel-host',
-        commands: { node: { version: 'v24.18.0' }, npx: { version: '11.19.1' } },
+        commands: {
+          node: { version: `v${lock.node.version}` },
+          npx: { version: lock.node.npmVersion },
+        },
       },
       container: {
         surface: 'qa-container',
-        commands: { node: { version: 'v24.18.0' }, npx: { version: '11.19.1' } },
+        commands: {
+          node: { version: `v${lock.node.version}` },
+          npx: { version: lock.node.npmVersion },
+        },
       },
     });
   });

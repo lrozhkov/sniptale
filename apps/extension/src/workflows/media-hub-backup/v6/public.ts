@@ -1,3 +1,4 @@
+import type { VideoWorkspaceSnapshot } from '../../../composition/persistence/review-workspaces/contracts';
 import { createOutputFilename } from '../../file-naming/index';
 import {
   createDirectFileSink,
@@ -121,6 +122,8 @@ export async function inspectLocalMediaHubBackup(
 export async function exportMediaHubBackup(
   rawOptions: Partial<MediaHubBackupExportOptions> = {},
   runtime: {
+    expectedReview?: VideoWorkspaceSnapshot;
+    requireSelected?: boolean;
     filename?: string;
     onProgress?: (progress: ArchiveTransferProgress) => void;
     signal?: AbortSignal;
@@ -128,32 +131,32 @@ export async function exportMediaHubBackup(
 ): Promise<void> {
   const options = createMediaHubBackupExportOptions(rawOptions);
   await backfillScenarioLibraryAssets();
-  const sink = await createDirectFileSink({
-    description: translate('gallery.backupExportModal.archiveDescription'),
-    extension: '.zip',
-    filename:
-      runtime.filename ??
-      (await createOutputFilename({
-        category: 'archives',
-        type: 'media-hub-backup',
-        extension: 'zip',
-      })),
-    mimeType: 'application/zip',
-  });
-  try {
-    await runWithScenarioResourceRead(async () => {
-      const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options);
+  await runWithScenarioResourceRead(async () => {
+    const sink = await createDirectFileSink({
+      description: translate('gallery.backupExportModal.archiveDescription'),
+      extension: '.zip',
+      filename:
+        runtime.filename ??
+        (await createOutputFilename({
+          category: 'archives',
+          type: 'media-hub-backup',
+          extension: 'zip',
+        })),
+      mimeType: 'application/zip',
+    });
+    try {
+      const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options, runtime);
       await exportMediaHubBackupV6({
         plan,
         sink,
         ...(runtime.onProgress ? { onProgress: runtime.onProgress } : {}),
         ...(runtime.signal ? { signal: runtime.signal } : {}),
       });
-    });
-  } catch (error) {
-    await sink.abort(error).catch(() => undefined);
-    throw error;
-  }
+    } catch (error) {
+      await sink.abort(error).catch(() => undefined);
+      throw error;
+    }
+  });
 }
 
 type PortablePackageRuntime = Parameters<typeof exportMediaHubBackup>[1];

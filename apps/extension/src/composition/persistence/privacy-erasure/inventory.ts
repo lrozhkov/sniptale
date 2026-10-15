@@ -23,6 +23,7 @@ import type {
   BrowserStorageErasurePlan,
   LocalExtensionDataErasureOptions,
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
+import { QUICK_PREVIEW_PREFERENCES_STORAGE_KEY } from '../quick-preview-preferences';
 import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
@@ -50,6 +51,7 @@ const localPreferenceKeys = [
   POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY,
   'sniptale_popup_startup',
   'sniptale_video_editor_preview_preferences',
+  QUICK_PREVIEW_PREFERENCES_STORAGE_KEY,
   'sniptale_scenario_editor_navigator_collapsed',
   'sniptale_video_settings',
   'sniptale_video_ui_state',
@@ -93,12 +95,17 @@ const aiProviderSecretKeys = [
 ] as const;
 
 const localSensitiveKeys = [
+  'sniptale_background_presets',
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
   DATABASE_RESET_JOURNAL_KEY,
   'llm_request_history',
+  'sniptale_export_time_history',
+  'sniptale_library_maintenance_log',
+  'sniptale_runtime_diagnostic_log',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
+  'sniptale_ai_audio_transcription_prompt',
   'sniptale_last_save_as_dir',
   'sniptale_prompt_templates',
   'sniptale_template_order',

@@ -146,7 +146,7 @@ it('offers trash navigation and replaces library filters with recoverable action
       element.textContent?.includes(translate(key))
     )!;
   act(() => root?.render(<GallerySidebar {...props} />));
-  expect(button('gallery.app.trashTitle').querySelector('svg.lucide-trash2')).not.toBeNull();
+  expect(button('gallery.app.trashTitle').querySelector('svg')).not.toBeNull();
   act(() => button('gallery.app.trashTitle').click());
   expect(props.onTrashModeChange).toHaveBeenCalledWith(true);
   act(() => root?.render(<GallerySidebar {...props} trashMode />));

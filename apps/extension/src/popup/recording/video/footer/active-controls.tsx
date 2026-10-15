@@ -122,7 +122,7 @@ export function VideoActiveFooterControls(props: {
     onPauseResume: props.onPauseResume,
   });
 
-  if (cancelConfirmation.isConfirmingCancel) {
+  if (cancelConfirmation.isConfirmingCancel && canCancel) {
     return (
       <div className={actionFooterSurfaceClassName}>
         <div className="grid grid-cols-2 gap-1.5">

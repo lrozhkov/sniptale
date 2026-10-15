@@ -283,3 +283,33 @@ it('cascades provider deletion and keeps the queue usable after a rejected write
   expect(models).toEqual([]);
   expect(defaultModelId).toBeNull();
 });
+
+it('atomically removes the text default and prompt when changing its operation to speech', async () => {
+  models = [{ ...createModel('model-1'), systemPrompt: 'Text-only prompt' }];
+  defaultModelId = 'model-1';
+  const speech: AIModel = {
+    ...createModel('model-1'),
+    operation: 'speech',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+  };
+  await mutateStoredAISettings({ operation: 'update-model', model: speech });
+  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith([speech], null);
+  expect(defaultModelId).toBeNull();
+  await expect(
+    mutateStoredAISettings({ operation: 'save-default-model', defaultModelId: 'model-1' })
+  ).rejects.toThrow();
+  await mutateStoredAISettings({ operation: 'update-model', model: createModel('model-1') });
+  expect(models).toEqual([createModel('model-1')]);
+});
+
+it('rejects incompatible audio parameters before any graph write', async () => {
+  const invalid: AIModel = {
+    ...createModel('invalid'),
+    operation: 'transcription',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+  };
+  await expect(mutateStoredAISettings({ operation: 'add-model', model: invalid })).rejects.toThrow(
+    'Invalid AI model operation configuration'
+  );
+  expect(coreMocks.saveAIModels).not.toHaveBeenCalled();
+});

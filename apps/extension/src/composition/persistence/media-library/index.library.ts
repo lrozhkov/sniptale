@@ -1,3 +1,4 @@
+import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import {
   initDB,
   ASSET_REFS_STORE,
@@ -16,10 +17,7 @@ import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-ur
 import { listMediaAssetProjectUsage } from './usage';
 import type { MediaAssetProjectUsage } from './usage';
 import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
-import {
-  recoverMediaSourcePublications,
-  mediaHasPendingPublication,
-} from './delete-cascade.sources';
+import { mediaHasPendingPublication } from './delete-cascade.sources';
 import { MediaAssetDeletionBlockedError } from './deletion-errors';
 import { listReadyJournals } from '../assets';
 

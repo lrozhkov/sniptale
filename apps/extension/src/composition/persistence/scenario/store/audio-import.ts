@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../contracts';
 import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
@@ -26,13 +27,14 @@ import { createScenarioAudioAssetEntry } from './capture-step/asset-entry';
 export async function importScenarioNarration(args: {
   project: GuideProject;
   baseUpdatedAt: number;
+  expectedRevision?: number;
   slideId: string | null;
   objectId?: string | null;
   expectedNarration: TourNarration | TourObjectNarration | null;
   destination?: { kind: 'background-music'; expected: TourBackgroundMusic | null };
   blob: Blob;
   signal: AbortSignal;
-}): Promise<GuideProject> {
+}): Promise<ScenarioProjectSnapshot> {
   args.signal.throwIfAborted();
   const parsed = parseGuideProject(args.project);
   if (parsed.status !== 'ok') throw new Error('Invalid scenario project.');
@@ -131,10 +133,11 @@ export async function importScenarioNarration(args: {
     handedOff = true;
     const result = await commitScenarioAggregateMutation(next, {
       expectedUpdatedAt: args.baseUpdatedAt,
+      ...(args.expectedRevision === undefined ? {} : { expectedRevision: args.expectedRevision }),
       children: { assetPuts: assets },
     });
     publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
-    return result.project;
+    return result;
   } catch (error) {
     if (!handedOff) return rejectScenarioMutationBeforeHandoff({ assetPuts: assets }, error);
     throw error;

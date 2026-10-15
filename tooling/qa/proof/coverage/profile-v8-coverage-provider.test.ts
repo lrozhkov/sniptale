@@ -82,8 +82,8 @@ it('rejects processing passes whose coverage output differs', () => {
 });
 
 it('fails closed when the private Vitest provider contract changes version', () => {
-  expect(() => assertSupportedVitestVersion('4.2.0')).toThrow('requires');
-  expect(() => assertSupportedVitestVersion('4.1.11')).not.toThrow();
+  expect(() => assertSupportedVitestVersion('4.1.11')).toThrow('requires');
+  expect(() => assertSupportedVitestVersion('5.0.3')).not.toThrow();
 });
 
 it('accumulates raw merge timing across environment batches', () => {

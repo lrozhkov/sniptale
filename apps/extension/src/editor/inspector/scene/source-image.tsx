@@ -139,8 +139,6 @@ function SourceImageShadowSection(args: {
         recentColors={props.recentColors}
         palette={props.shapeStrokePalette ?? []}
         onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
-        onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
-        onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor })}
       />
     </section>
   );
@@ -195,8 +193,6 @@ function SourceImageBorderColor(args: {
         recentColors={props.recentColors}
         palette={props.shapeStrokePalette ?? []}
         onChange={(strokeColor) => patchSourceImage(props, { strokeColor })}
-        onPreviewChange={(strokeColor) => patchSourceImage(props, { strokeColor })}
-        onPreviewReset={(strokeColor) => patchSourceImage(props, { strokeColor })}
       />
       <SourceImageRangeControl
         label={translate('editor.compact.opacity')}

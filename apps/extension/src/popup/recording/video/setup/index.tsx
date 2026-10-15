@@ -31,7 +31,10 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
   const footer =
     postRecord.postRecordResult ||
     postRecord.isVerificationPending ||
-    postRecord.hasVerificationError ? null : (
+    postRecord.hasVerificationError ||
+    postRecord.showSavingState ||
+    postRecord.hasStopRequestFailure ||
+    props.recordingState.status === VideoRecordingStatus.STOPPING ? null : (
       <VideoSetupFooter
         canStart={viewModel.canStart}
         startButtonLabel={viewModel.startButtonLabel}
@@ -56,6 +59,15 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
           postRecordResult={postRecord.postRecordResult}
           onAcknowledgePostRecord={postRecord.acknowledgePostRecord}
           showSavingState={postRecord.showSavingState}
+          completionRequestFailed={postRecord.hasStopRequestFailure}
+          onRetryCompletion={
+            props.activeRecordingId
+              ? props.recordingState.completion?.discard || postRecord.hasStopRequestFailure
+                ? postRecord.handleCancel
+                : props.onStop
+              : undefined
+          }
+          onRefreshRecordingState={props.onRefreshRecordingState}
           viewModel={viewModel}
           idleActions={isIdle ? footer : null}
         />
@@ -72,7 +84,7 @@ function useVideoPostRecordState(props: VideoSetupPageProps) {
     props.initialPostRecordResult ?? null,
     props.initialPostRecordVerified === true ? verificationKey : null
   );
-  const displayProps = createPostRecordDisplayProps(props, state);
+  const displayProps = props;
   const hasVerificationError = state.failedVerificationKey === verificationKey;
   const isVerificationPending =
     state.verifiedRecordingKey !== verificationKey && !hasVerificationError;
@@ -99,6 +111,8 @@ function useVideoPostRecordState(props: VideoSetupPageProps) {
       setIsCancellingStart: state.setIsCancellingStart,
       setIsDiscardingRecording: state.setIsDiscardingRecording,
       setPostRecordResult: state.setPostRecordResult,
+      setStopRequestFailure: (failed) =>
+        state.setStopRequestFailure(failed ? verificationKey : null),
     });
 
   const acknowledgePostRecord = async () => {
@@ -123,7 +137,10 @@ function useVideoPostRecordState(props: VideoSetupPageProps) {
       state.setFailedVerificationKey(null);
       state.setVerificationAttempt((attempt) => attempt + 1);
     },
-    showSavingState: state.isDiscardingRecording,
+    hasStopRequestFailure:
+      state.stopRequestFailure === verificationKey &&
+      props.recordingState.status !== VideoRecordingStatus.IDLE,
+    showSavingState: state.isDiscardingRecording || state.isCancellingStart,
   };
 }
 
@@ -131,6 +148,7 @@ function usePostRecordLocalState(
   initialPostRecordResult: VideoPostRecordResult | null,
   initialVerifiedRecordingKey: string | null
 ) {
+  const [stopRequestFailure, setStopRequestFailure] = useState<string | null>(null);
   const [isCancellingStart, setIsCancellingStart] = useState(false);
   const [isDiscardingRecording, setIsDiscardingRecording] = useState(false);
   const [failedVerificationKey, setFailedVerificationKey] = useState<string | null>(null);
@@ -143,6 +161,8 @@ function usePostRecordLocalState(
   );
 
   return {
+    stopRequestFailure,
+    setStopRequestFailure,
     failedVerificationKey,
     isCancellingStart,
     isDiscardingRecording,
@@ -252,53 +272,35 @@ function createPostRecordVerificationKey(props: VideoSetupPageProps): string {
   return props.activeRecordingId ?? 'none';
 }
 
-function handlePostRecordCancel({
+async function handlePostRecordCancel({
   onCancel,
   recordingStatus,
   setIsCancellingStart,
   setIsDiscardingRecording,
   setPostRecordResult,
+  setStopRequestFailure,
 }: {
-  onCancel: () => void;
+  onCancel: VideoSetupPageProps['onCancel'];
   recordingStatus: VideoRecordingStatus;
   setIsCancellingStart: (value: boolean) => void;
   setIsDiscardingRecording: (value: boolean) => void;
   setPostRecordResult: (value: VideoPostRecordResult | null) => void;
-}): void {
+  setStopRequestFailure: (value: boolean) => void;
+}): Promise<void> {
   setPostRecordResult(null);
-  if (isStartInProgress(recordingStatus)) {
-    setIsCancellingStart(true);
+  setStopRequestFailure(false);
+  const cancellingStart = isStartInProgress(recordingStatus);
+  setIsCancellingStart(cancellingStart);
+  setIsDiscardingRecording(!cancellingStart);
+  try {
+    const result = await onCancel();
+    setStopRequestFailure(result === 'failed' || result === 'unknown');
+  } catch {
+    setStopRequestFailure(true);
+  } finally {
+    setIsCancellingStart(false);
     setIsDiscardingRecording(false);
-    onCancel();
-    return;
   }
-
-  setIsDiscardingRecording(true);
-  onCancel();
-}
-
-function createPostRecordDisplayProps(
-  props: VideoSetupPageProps,
-  state: {
-    isCancellingStart: boolean;
-    isDiscardingRecording: boolean;
-  }
-): VideoSetupPageProps {
-  if (!state.isDiscardingRecording && !state.isCancellingStart) {
-    return props;
-  }
-
-  return {
-    ...props,
-    isStartPending: state.isDiscardingRecording,
-    recordingState: {
-      ...props.recordingState,
-      countdownEndsAt: null,
-      duration: 0,
-      error: null,
-      status: VideoRecordingStatus.IDLE,
-    },
-  };
 }
 
 function isStartInProgress(status: VideoRecordingStatus) {

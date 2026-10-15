@@ -23,6 +23,10 @@ import {
 } from '../../../composition/persistence/export-ledger';
 import type { ExportJobState } from '../types';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import {
+  acquireAssetResourceSession,
+  type AssetResourceSession,
+} from '../../../composition/persistence/assets/resource-sessions';
 
 const EXPORT_INTERRUPTED_ERROR_KEY = 'offscreenExport.interruptedByRuntimeRestart';
 const logger = createLogger({ namespace: 'OffscreenProjectExportService' });
@@ -61,6 +65,7 @@ async function startProjectExportWithState(
   const abort = new AbortController();
   jobState.exportAbortController = abort;
   let detached = false;
+  let reader: AssetResourceSession | undefined;
   let rejectCancellation!: (reason: unknown) => void;
   const cancelled = new Promise<never>((_, reject) => {
     rejectCancellation = reject;
@@ -72,6 +77,7 @@ async function startProjectExportWithState(
       throw new Error('PROJECT_EXPORT_CANCELLED');
   };
   try {
+    reader = await acquireAssetResourceSession();
     await Promise.race([prepareData?.() ?? Promise.resolve(), cancelled]);
     assertCurrent();
     const project = await Promise.race([
@@ -91,8 +97,8 @@ async function startProjectExportWithState(
     assertCurrent();
     if (admitted.status !== 'running' || admitted.cancelRequested) return;
     detached = true;
-    void runAcceptedProjectExportWithState(state, jobId, project, settings, jobState).catch(() =>
-      logger.error('Accepted project export detached lifecycle failed')
+    void runAcceptedProjectExportWithState(state, jobId, project, settings, jobState, reader).catch(
+      () => logger.error('Accepted project export detached lifecycle failed')
     );
   } catch (error) {
     if (jobState.cancelled) {
@@ -106,6 +112,7 @@ async function startProjectExportWithState(
       releaseProjectExportJob(jobState);
       if (state.activeJobs.get(jobId) === jobState)
         releaseProjectExportJobRegistration(state, jobId);
+      await reader?.release();
     }
   }
 }
@@ -115,7 +122,8 @@ async function runAcceptedProjectExportWithState(
   jobId: string,
   project: VideoProject,
   settings: VideoProjectExportSettings,
-  jobState: ExportJobState
+  jobState: ExportJobState,
+  reader: AssetResourceSession
 ): Promise<void> {
   try {
     await runProjectExport(jobId, project, settings, jobState);
@@ -129,6 +137,7 @@ async function runAcceptedProjectExportWithState(
   } finally {
     releaseProjectExportJob(jobState);
     releaseProjectExportJobRegistration(state, jobId);
+    await reader.release();
   }
 }
 

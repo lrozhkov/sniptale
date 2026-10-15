@@ -179,3 +179,46 @@ it('bounds output phases by each surviving cut slice', () => {
     expect(item.enter.duration + item.exit.duration).toBeLessThanOrEqual(item.end - item.start);
   expect(original.enter.duration).toBe(5);
 });
+
+it('keeps the authored zoom link across a partially removed gap and restores it on undo', () => {
+  const regions = [
+    {
+      ...focus('left', 0, 2),
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      linkTo: 'right',
+      linkEasing: 'linear' as const,
+    },
+    { ...focus('right', 6, 8), transform: { scale: 3, centerX: 0.5, centerY: 0.5 } },
+  ];
+  const edit = cut(3, 5);
+  const authored = reconcileReviewFocus({
+    regions,
+    duration: 10,
+    before: [],
+    after: [edit],
+    edit,
+    preserveUnderCuts: true,
+  });
+  const projected = projectReviewFocus(authored, buildReviewTimeMap(10, [edit]));
+  expect(projected[0]).toMatchObject({ linkTo: 'right', linkEasing: 'linear', end: 2 });
+  expect(projected[1]).toMatchObject({ start: 4 });
+  expect(evaluateQuickEditCameraAtTime(projected, 3).scale).toBeCloseTo(2.5);
+  const restored = reconcileReviewFocus({
+    regions: authored,
+    duration: 10,
+    before: [edit],
+    after: [],
+    edit: null,
+    preserveUnderCuts: true,
+  });
+  expect(projectReviewFocus(restored, buildReviewTimeMap(10, []))).toMatchObject(
+    regions.map(({ id, start, end, transform }) => ({ id, start, end, transform }))
+  );
+  expect(projectReviewFocus(restored, buildReviewTimeMap(10, []))[0]).toMatchObject({
+    linkTo: 'right',
+    linkEasing: 'linear',
+  });
+  const touching = projectReviewFocus(authored, buildReviewTimeMap(10, [cut(2, 6)]));
+  expect(touching[0]).toMatchObject({ linkTo: 'right', end: 2 });
+  expect(touching[1]).toMatchObject({ start: 2 });
+});

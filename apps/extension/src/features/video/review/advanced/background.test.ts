@@ -27,10 +27,14 @@ describe('updateQuickEditBackground', () => {
         enabled: true,
         type: 'solid',
         color: '#000000ff',
-        layout: { padding: 40, cornerRadius: 24 },
+        layout: { padding: 40, cornerRadius: 12 },
       }
     );
-    expect(updateQuickEditBackground(solid, { enabled: false })).toEqual({ enabled: false });
+    expect(updateQuickEditBackground(solid, { enabled: false })).toEqual({
+      enabled: false,
+      rememberedPaint: { kind: 'solid', color: solid.color },
+      rememberedLayout: solid.layout,
+    });
   });
 
   it('keeps the paint and layout while the type stays and clamps new layout values', () => {
@@ -49,7 +53,7 @@ describe('updateQuickEditBackground', () => {
     expect(fromDisabled.type).toBe('gradient');
     if (fromDisabled.type !== 'gradient') throw new Error('expected gradient');
     expect(fromDisabled.gradient.stops).toHaveLength(2);
-    expect(fromDisabled.layout).toEqual({ padding: 40, cornerRadius: 24 });
+    expect(fromDisabled.layout).toEqual({ padding: 40, cornerRadius: 12 });
     const fromSolid = updateQuickEditBackground(solid, { type: 'gradient' });
     if (!fromSolid.enabled) throw new Error('expected enabled background');
     expect(fromSolid.type).toBe('gradient');
@@ -109,4 +113,69 @@ it('preserves background motion across paint, layout, disable and re-enable chan
   expect(updateQuickEditBackground(background, { zoomBehavior: 'fixed' }).zoomBehavior).toBe(
     'fixed'
   );
+});
+
+it('restores the same image and fit after inactive paint changes without importing again', () => {
+  const image: QuickEditBackgroundSettings = {
+    enabled: true,
+    type: 'image',
+    assetId: 'project-asset:custom',
+    imageFit: 'contain',
+    layout: { padding: 40, cornerRadius: 12 },
+  };
+  let background: QuickEditBackgroundSettings = image;
+  for (const patch of [
+    { type: 'gradient' as const },
+    { type: 'solid' as const },
+    { enabled: false },
+  ]) {
+    background = updateQuickEditBackground(background, patch);
+    expect(updateQuickEditBackground(background, { enabled: true, type: 'image' })).toMatchObject({
+      enabled: true,
+      type: 'image',
+      assetId: image.assetId,
+      imageFit: 'contain',
+    });
+  }
+});
+
+it('replaces the remembered image with the latest choice without retaining an extra reference', () => {
+  const first = updateQuickEditBackground({ enabled: false }, { type: 'image', assetId: 'first' });
+  const inactive = updateQuickEditBackground(first, { type: 'solid' });
+  const second = updateQuickEditBackground(inactive, { type: 'image', assetId: 'second' });
+  expect(second).not.toHaveProperty('rememberedImage');
+  const restored = updateQuickEditBackground(
+    updateQuickEditBackground(second, { enabled: false }),
+    { type: 'image' }
+  );
+  expect(restored).toMatchObject({ type: 'image', assetId: 'second' });
+  expect(restored).not.toHaveProperty('rememberedImage');
+});
+
+it('preserves blur between paints, clamps updates and leaves legacy layouts untouched', () => {
+  const blurred = updateQuickEditBackground(solid, { layout: { ...solid.layout, blur: 12 } });
+  const image = updateQuickEditBackground(blurred, { type: 'image', assetId: 'test' });
+  expect(image.enabled && image.layout.blur).toBe(12);
+  const high = updateQuickEditBackground(image, { layout: { ...solid.layout, blur: 100 } });
+  expect(high.enabled && high.layout.blur).toBe(25);
+  const low = updateQuickEditBackground(image, { layout: { ...solid.layout, blur: -5 } });
+  expect(low.enabled && low.layout.blur).toBe(0);
+  const legacy = updateQuickEditBackground(solid, { layout: solid.layout });
+  expect(legacy.enabled && legacy.layout).not.toHaveProperty('blur');
+});
+
+it('retains authored paint and geometry through image and disabled modes', () => {
+  const painted = updateQuickEditBackground(solid, {
+    color: '#123456ff',
+    layout: { padding: 91, cornerRadius: 17, blur: 6 },
+  });
+  const image = updateQuickEditBackground(painted, { type: 'image', assetId: 'project-asset:one' });
+  const disabled = updateQuickEditBackground(image, { enabled: false });
+  const restored = updateQuickEditBackground(disabled, { enabled: true, type: 'solid' });
+  expect(restored).toMatchObject({
+    type: 'solid',
+    color: '#123456ff',
+    layout: { padding: 91, cornerRadius: 17, blur: 6 },
+    rememberedImage: { assetId: 'project-asset:one', imageFit: 'cover' },
+  });
 });

@@ -50,6 +50,11 @@ it.each([{}, { ...pointTransform, scaleX: Infinity }, { ...pointTransform, viewp
 
 const validCompletions = [
   [
+    MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD,
+    'accepted',
+    { result: 'accepted', success: true },
+  ],
+  [
     MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
     { leaseId: 'lease-1', result: 'leased', url: 'blob:lease-1' },
     { leaseId: 'lease-1', result: 'leased', success: true, url: 'blob:lease-1' },
@@ -212,4 +217,10 @@ it('preserves only a bounded correlated raster preparation completion', () => {
     { result: 'prepared', leaseId: 'lease-1', extra: true },
   ])
     expect(() => buildOffscreenCommandResponse(type, invalid)).toThrow();
+});
+
+it('rejects a preparation acknowledgement before preparation completes', () => {
+  expect(() =>
+    buildOffscreenCommandResponse(MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD, undefined)
+  ).toThrow('Invalid OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD completion');
 });

@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('video editor project history', () => {
-  it('retains exactly the latest 100 undoable actions and evicts the oldest snapshot', () => {
+  it('retains exactly the latest 50 undoable actions and evicts the oldest snapshot', () => {
     let project = createEmptyVideoProject('Edit 0');
     let history = resetVideoEditorProjectHistory(project.id);
 

@@ -6,6 +6,8 @@ import type {
 /** Decoded raster with its actual presentation timestamp; a seek request is not frame authority. */
 export interface ReviewTransitionSample {
   timestamp: number;
+  /** Actual decoded payload accounting, available on native VideoSample instances. */
+  allocationSize?(): number;
   draw(
     context: CanvasRenderingContext2D,
     x: number,
@@ -120,6 +122,81 @@ export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSigna
   };
 }
 
+/** Each side holds its own retained source frame and result-clock camera at the seam. */
+export function reviewCutTransitionSides(
+  blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>,
+  frames: ReviewTransitionFrames,
+  moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>,
+  resultTime: number,
+  resultOffset = 0
+) {
+  const seam = blend.plan.seam + resultOffset;
+  const range = blend.beforeSeam ? blend.plan.left : blend.plan.right;
+  const current = isReviewTransitionFrame(moving.timestamp, range)
+    ? moving
+    : blend.beforeSeam
+      ? frames.left
+      : frames.right;
+  return [
+    {
+      sample: blend.beforeSeam ? current : frames.left,
+      resultTime: blend.beforeSeam ? resultTime : beforeEndpoint(seam),
+    },
+    {
+      sample: blend.beforeSeam ? frames.right : current,
+      resultTime: blend.beforeSeam ? seam : resultTime,
+    },
+  ] as const;
+}
+
+/** Dissolve decorated scenes after each side has applied its own camera and focus effects. */
+export function paintReviewCutDissolve(
+  target: CanvasRenderingContext2D,
+  scratch: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D },
+  incoming: number,
+  draw: (
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    side: 0 | 1
+  ) => Promise<void>,
+  canvas: HTMLCanvasElement
+): Promise<void>;
+export function paintReviewCutDissolve(
+  target: CanvasRenderingContext2D,
+  scratch: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D },
+  incoming: number,
+  draw: (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement, side: 0 | 1) => void,
+  canvas: HTMLCanvasElement
+): void;
+export function paintReviewCutDissolve(
+  target: CanvasRenderingContext2D,
+  scratch: { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D },
+  incoming: number,
+  draw: (
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    side: 0 | 1
+  ) => void | Promise<void>,
+  canvas: HTMLCanvasElement
+) {
+  const blend = () => {
+    target.save();
+    try {
+      target.globalCompositeOperation = 'source-over';
+      target.globalAlpha = incoming;
+      target.drawImage(scratch.canvas, 0, 0);
+    } finally {
+      target.restore();
+    }
+  };
+  const second = () => {
+    const completed = draw(scratch.context, scratch.canvas, 1);
+    return completed ? completed.then(blend) : blend();
+  };
+  const completed = draw(target, canvas, 0);
+  return completed ? completed.then(second) : second();
+}
+
 /** Blends only admitted source rasters; camera, background, overlays and audio stay with callers. */
 export function paintReviewCutTransition(
   context: CanvasRenderingContext2D,
@@ -145,13 +222,30 @@ export function paintReviewCutTransition(
     context.fillRect(0, 0, size.width, size.height);
     if (blend.plan.type === 'fade-black') {
       draw(current);
-      context.globalAlpha = blend.black;
-      context.fillRect(0, 0, size.width, size.height);
     } else {
       draw(before ? current : frames.left);
       context.globalAlpha = blend.incoming;
       draw(before ? frames.right : current);
     }
+  } finally {
+    context.restore();
+  }
+}
+
+/** Apply after all scene layers so header, background and overlays share one fade. */
+export function paintReviewCutBlackout(
+  context: CanvasRenderingContext2D,
+  size: { width: number; height: number },
+  blend: ReturnType<typeof reviewCutTransitionAt>
+) {
+  if (!blend || blend.plan.type !== 'fade-black' || blend.black <= 0) return;
+  context.save();
+  try {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.globalCompositeOperation = 'source-over';
+    context.globalAlpha = blend.black;
+    context.fillStyle = blend.plan.color ?? '#000000';
+    context.fillRect(0, 0, size.width, size.height);
   } finally {
     context.restore();
   }

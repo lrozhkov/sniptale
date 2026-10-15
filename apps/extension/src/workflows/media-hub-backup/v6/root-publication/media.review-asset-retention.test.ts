@@ -1,3 +1,10 @@
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
+import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
+import {
+  workspaceStorageHead,
+  workspaceStorageRows,
+} from '../../../../composition/persistence/review-workspaces/storage-format';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -162,8 +169,23 @@ function createTables(metadata: ReturnType<typeof portableMetadata>) {
   ]);
 }
 
-function installDatabase(metadata: ReturnType<typeof portableMetadata>, retainPublished = false) {
+function installDatabase(
+  metadata: ReturnType<typeof portableMetadata>,
+  retainPublished = false,
+  physical = false
+) {
   const tables = createTables(metadata);
+  if (physical) {
+    const history = new Map<string, unknown>();
+    for (const [id, value] of tables.get('video_workspaces')!) {
+      const workspace = parseVideoWorkspace(value);
+      if (!workspace) throw new Error('Invalid retained physical workspace fixture');
+      tables.get('video_workspaces')!.set(id, workspaceStorageHead(workspace, []));
+      for (const row of workspaceStorageRows(workspace))
+        history.set(JSON.stringify([row.aggregateId, row.ordinal]), row);
+    }
+    tables.set('video_workspace_history', history);
+  }
   if (!retainPublished) {
     for (const entry of oldReviewAssets)
       tables.get('media_library')!.delete(`project-asset:${entry.id}`);
@@ -172,17 +194,41 @@ function installDatabase(metadata: ReturnType<typeof portableMetadata>, retainPu
     const table = tables.get(name) ?? new Map<string, unknown>();
     tables.set(name, table);
     return {
-      get: async (key: IDBValidKey) => table.get(String(key)),
+      get: async (key: IDBValidKey) =>
+        table.get(
+          name === 'video_workspace_history' && Array.isArray(key)
+            ? JSON.stringify(key)
+            : String(key)
+        ),
       getAll: async () => [...table.values()],
-      delete: async (key: IDBValidKey) => table.delete(String(key)),
+      delete: async (key: IDBValidKey) =>
+        table.delete(
+          name === 'video_workspace_history' && Array.isArray(key)
+            ? JSON.stringify(key)
+            : String(key)
+        ),
       put: async (value: Record<string, unknown>) => {
         mocks.failWrite(name, value);
-        const key = value['ownerKind']
-          ? String([value['ownerKind'], value['ownerId'], value['role']])
-          : (value['aggregateId'] ?? value['id'] ?? value['assetId'] ?? 'other');
+        const key =
+          name === 'video_workspace_history'
+            ? JSON.stringify([value['aggregateId'], value['ordinal']])
+            : value['ownerKind']
+              ? String([value['ownerKind'], value['ownerId'], value['role']])
+              : (value['aggregateId'] ?? value['id'] ?? value['assetId'] ?? 'other');
         table.set(String(key), structuredClone(value));
       },
-      index: () => ({
+      index: (indexName: string) => ({
+        getAll: async (key: IDBValidKey) =>
+          [...table.values()].filter(isRecord).filter((row) => row[indexName] === key),
+        getAllKeys: async (key: IDBValidKey) =>
+          [...table.values()]
+            .filter(isRecord)
+            .filter((row) => row[indexName] === key)
+            .map((row) => {
+              if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
+                throw new Error('Invalid history fixture key');
+              return [row['aggregateId'], row['ordinal']];
+            }),
         count: async (assetId: string) =>
           [...table.values()].filter(
             (value) =>
@@ -217,9 +263,9 @@ beforeEach(() => {
   mocks.failWrite.mockReset();
 });
 
-it('removes the obsolete exclusive review graph and journals its bytes on replace', async () => {
+it('retains independent quick-edit projects and their bytes on root replacement', async () => {
   const metadata = portableMetadata(true);
-  const tables = installDatabase(metadata);
+  const tables = installDatabase(metadata, false, true);
   await mediaLibraryRootPublisher.publish({
     envelope: {
       descriptor: {
@@ -240,26 +286,18 @@ it('removes the obsolete exclusive review graph and journals its bytes on replac
 
   for (const entry of oldReviewAssets) {
     const aggregateId = `project-asset:${entry.id}`;
-    expect(tables.get('project_assets')?.has(entry.id)).toBe(false);
-    expect(tables.get('media_library')?.has(aggregateId)).toBe(false);
-    expect(tables.get('video_workspaces')?.has(aggregateId)).toBe(false);
-    expect(tables.get('video_workspace_drafts')?.has(aggregateId)).toBe(false);
-    expect(
-      [...(tables.get('asset_owners')?.values() ?? [])].some(
-        (value) =>
-          typeof value === 'object' &&
-          value !== null &&
-          (value as Record<string, unknown>)['ownerId'] === entry.id
-      )
-    ).toBe(false);
-    expect(tables.get('asset_refs')?.has(entry.assetId)).toBe(false);
+    expect(tables.get('project_assets')?.get(entry.id)).toEqual(entry);
+    expect(tables.get('video_workspaces')?.has(aggregateId)).toBe(true);
+    expect(tables.get('video_workspace_drafts')?.has(aggregateId)).toBe(true);
+    expect(tables.get('asset_refs')?.has(entry.assetId)).toBe(true);
+    expect(tables.get('asset_owners')?.has(String(['project-asset', entry.id, 'body']))).toBe(true);
   }
-  expect(mocks.completeDelete).toHaveBeenCalledWith(
-    expect.objectContaining({
-      assetIds: expect.arrayContaining(oldReviewAssets.map((entry) => entry.assetId)),
-    }),
-    undefined
-  );
+  for (const entry of oldReviewAssets) {
+    expect(mocks.completeDelete).not.toHaveBeenCalledWith(
+      expect.objectContaining({ assetIds: expect.arrayContaining([entry.assetId]) }),
+      undefined
+    );
+  }
 });
 
 it('preserves independently published auxiliary materials when replacing their former review root', async () => {
@@ -358,7 +396,7 @@ it('retains the auxiliaries of an independently retained review source', async (
   expect(tables.get('asset_refs')?.has('old-music-bytes')).toBe(true);
 });
 
-it('reclaims nested private resources before replacing their source workspace', async () => {
+it('retains an independent quick-edit project and its nested resources on replacement', async () => {
   const metadata = portableMetadata(true);
   const tables = installDatabase(metadata);
   for (const entry of oldReviewAssets)
@@ -401,17 +439,20 @@ it('reclaims nested private resources before replacing their source workspace', 
     session: session('replace'),
     staged: stagedObjects(),
   });
-  expect(tables.get('project_assets')?.has('nested')).toBe(false);
-  expect(tables.get('asset_refs')?.has('nested-bytes')).toBe(false);
+  expect(tables.get('project_assets')?.has('nested')).toBe(true);
+  expect(tables.get('asset_refs')?.has('nested-bytes')).toBe(true);
+  expect(tables.get('video_workspaces')?.has(workspace.aggregateId)).toBe(true);
 });
 
 it('aborts replacement after a failed publication write and preserves the original graph', async () => {
   const metadata = portableMetadata(true);
-  const tables = installDatabase(metadata);
+  const tables = installDatabase(metadata, false, true);
   const names = [
     'media_library',
     'project_assets',
     'video_workspaces',
+    'video_workspace_history',
+    'video_workspace_drafts',
     'asset_owners',
     'asset_refs',
   ];
@@ -688,3 +729,58 @@ it.each(['canonical', 'borrowed'] as const)(
     expect(tables.get('asset_refs')!.get(oldRef.assetId)).toEqual(oldRef);
   }
 );
+
+it('retains a remapped Library origin when standalone restore accepts private review history resources', async () => {
+  const base = portableMetadata(true);
+  const metadata = {
+    ...base,
+    reviewAssets: base.reviewAssets.map((item) =>
+      item.entry.id === 'music'
+        ? {
+            ...item,
+            entry: { ...item.entry, originMediaId: 'archived-origin' },
+            publishToLibrary: false,
+          }
+        : item
+    ),
+  };
+  const tables = installDatabase(metadata);
+  const origin = {
+    ...base.entry,
+    id: 'origin-music',
+    kind: 'audio',
+    mimeType: 'audio/mpeg',
+    size: 10,
+    duration: 1,
+    width: null,
+    height: null,
+    source: { kind: 'stored-asset', assetId: 'origin-music-object' },
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  tables.get('media_library')!.set(origin.id, origin);
+  const result = await mediaLibraryRootPublisher.publish({
+    envelope: {
+      descriptor: {
+        rootKind: 'media',
+        mediaSubtype: 'library-item',
+        rootId: metadata.entry.id,
+        metadataPath: '_sniptale/metadata/media/export-e.json',
+        objectCount: 4,
+        totalBytes: 36,
+      },
+      metadata: portableJson(metadata),
+      objects: [],
+    },
+    journal,
+    session: {
+      ...session('replace'),
+      rootIdMap: { 'media:library-item:archived-origin': origin.id },
+    },
+    staged: stagedObjects(),
+  });
+  expect(result.imported).toBe(true);
+  expect(tables.get('media_library')!.get(origin.id)).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+    source: origin.source,
+  });
+});

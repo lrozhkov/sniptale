@@ -17,6 +17,18 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/background/page-access/readiness.test.ts'],
   },
   {
+    owner: 'background-context-menu-service',
+    productionFile: 'apps/extension/src/background/runtime/context-menu/service.ts',
+    exclusive: true,
+    reason:
+      'Service suites prove menu creation, serialized rebuilds, visibility and listener ownership.',
+    testFiles: [
+      'apps/extension/src/background/runtime/context-menu/service.rebuild.test.ts',
+      'apps/extension/src/background/runtime/context-menu/service.listeners.test.ts',
+      'apps/extension/src/background/runtime/context-menu/service.no-tab.test.ts',
+    ],
+  },
+  {
     owner: 'background-context-menu-messaging',
     productionPrefix: 'apps/extension/src/background/runtime/context-menu/',
     exclusive: true,
@@ -94,9 +106,9 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/messages.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation-effects.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.pause-resume.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controls.start-failure.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.test.ts',
+      'apps/extension/src/background/media/video/runtime/recording-completion.start-failure.test.ts',
+      'apps/extension/src/background/media/video/runtime/recording-completion.privacy-erasure.test.ts',
+      'apps/extension/src/background/media/video/runtime/recording-completion.stop.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.test.ts',
     ],

@@ -1,10 +1,124 @@
+import * as sceneCamera from '../../features/video/review/advanced/scene';
+import { quickEditAudioSourceKey } from '../../features/video/review/advanced/audio-plan';
 import { createReviewExportFixture as fixture } from './export-lifecycle.test-support';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { expect, it, vi } from 'vitest';
 import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecycle';
+
 import { createCanvasComment } from '../../features/video/review/comments';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
+
+it('rejects a camera plan conflict before audio acquisition, staging, or publication', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
+  advanced.zoom = {
+    enabled: true,
+    regions: [
+      {
+        ...createQuickEditZoomRegion({ id: 'too-fast', at: 0, duration: 2 }),
+        transform: { scale: 3, centerX: 0.7, centerY: 0.7 },
+        enter: { type: 'ease-in-out', duration: 0.001 },
+      },
+    ],
+  };
+  advanced.cursorFocusPath = {
+    version: 1,
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'authored',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 6,
+        keys: [{ id: 'focus', time: 0, x: 0.7, y: 0.7, anchor: 'manual', interpolation: 'hold' }],
+      },
+    ],
+  };
+  args.index.processedVideoCodec = 'vp8';
+  const conflict = vi
+    .spyOn(sceneCamera, 'resolveReviewCameraConflicts')
+    .mockReturnValueOnce([
+      { regionId: 'too-fast', interval: { start: 0, end: 2 }, time: 0, reason: 'viewport' },
+    ]);
+  const before = structuredClone(args.snapshot);
+  await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
+    reasons: ['camera-follow'],
+  });
+  expect(deps.openAudioSource).not.toHaveBeenCalled();
+  expect(deps.createActionSource).not.toHaveBeenCalled();
+  expect(deps.assertAssetWriteAdmission).not.toHaveBeenCalled();
+  expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+  expect(args.snapshot).toEqual(before);
+  conflict.mockRestore();
+});
+
+it('routes annotation-only fragments with immutable workspace sources and the full main clock', async () => {
+  const { args, deps } = fixture();
+  args.snapshot.workspace.advanced.ui.mode = 'advanced';
+  args.snapshot.workspace.advanced.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 6,
+        attachment: 'content',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
+  args.snapshot.workspace.effectSnapshots = [
+    {
+      id: 'effect:frame',
+      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      documentId: 'frame',
+      sha256: '0'.repeat(64),
+      source: '{}',
+      retainedByteLength: 2,
+      assets: [],
+    },
+  ];
+  args.index.processedVideoCodec = 'vp8';
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 10,
+    audioPackets: 0,
+    resultDuration: 2,
+    audioRanges: [],
+  });
+  const before = structuredClone(args.snapshot);
+  await exportReviewedVideo(
+    { ...args, destination: 'download', selection: { kind: 'range', start: 4, end: 6 } },
+    deps
+  );
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+    expect.objectContaining({
+      effectSnapshots: before.workspace.effectSnapshots,
+      captionTimeMap: buildReviewTimeMap(6, [
+        { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+      ]),
+      fragmentOffset: 2,
+      advanced: expect.objectContaining({
+        annotationEffects: before.workspace.advanced.annotationEffects,
+      }),
+    })
+  );
+  expect(args.snapshot).toEqual(before);
+  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+  expect(deps.openAudioSource).not.toHaveBeenCalled();
+});
 
 it('publishes a new prepared asset once and returns a separate downloadable file and revision receipt', async () => {
   const { args, deps, writer, original, result } = fixture();
@@ -199,7 +313,11 @@ it('mixes applied external audio and original settings into an audio-only export
     expect(exported.exportAudio!.entries).toEqual([
       expect.objectContaining({ clipId: 'm', timelineStart: 1, volume: 0.2 }),
     ]);
-    expect(exported.exportAudio!.buffers.get('project-asset:m')).toBeDefined();
+    expect(
+      exported.exportAudio!.buffers.get(
+        quickEditAudioSourceKey({ kind: 'project', assetId: 'project-asset:m' })
+      )
+    ).toBeDefined();
   } finally {
     vi.unstubAllGlobals();
   }
@@ -341,62 +459,6 @@ it('routes stored in-frame comments into rendered exports', async () => {
   expect(args.snapshot.workspace.history.at(-1)?.target).toBe('canvasComment');
 });
 
-it('shifts fragment clip placements across a leading cut to global output time', async () => {
-  const { args, deps } = fixture();
-  args.snapshot.workspace.history[0]!.after = {
-    id: 'cut',
-    kind: 'cut',
-    start: 1,
-    end: 3,
-    requestedStart: 1,
-    requestedEnd: 3,
-  };
-  args.index.processedVideoCodec = 'vp8';
-  deps.writeReviewFrames.mockResolvedValue({
-    videoPackets: 40,
-    audioPackets: 0,
-    resultDuration: 3,
-    audioRanges: [],
-  });
-  const advanced = args.snapshot.workspace.advanced;
-  advanced.ui.mode = 'advanced';
-  advanced.ui.tracks.audio = true;
-  advanced.audio.music = [
-    {
-      id: 'm',
-      assetId: 'project-asset:m',
-      timelineStart: 1.5,
-      sourceOffset: 0,
-      duration: 2,
-      volume: 1,
-      muted: false,
-      fadeIn: 0,
-      fadeOut: 0,
-    },
-  ];
-  vi.stubGlobal(
-    'OfflineAudioContext',
-    class {
-      async decodeAudioData() {
-        return { duration: 2, numberOfChannels: 2, getChannelData: () => new Float32Array(96_000) };
-      }
-    }
-  );
-  try {
-    await exportReviewedVideo(
-      { ...args, destination: 'download', selection: { kind: 'range', start: 2, end: 6 } },
-      deps
-    );
-  } finally {
-    vi.unstubAllGlobals();
-  }
-  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
-  const call = (deps.writeReviewFrames.mock.calls[0] ?? []) as unknown as Record<string, unknown>[];
-  const exported = (call[0] ?? {}) as { exportAudio?: ReviewExportClipPlan };
-  // Full-output time of source 2 is 1; the clip plays at 1.5 globally → 0.5 fragment-local.
-  expect(exported.exportAudio!.entries[0]).toMatchObject({ timelineStart: 0.5 });
-});
-
 it('blocks the export with the audio-encoder reason when the indexed probe failed', async () => {
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
@@ -479,39 +541,6 @@ it('publishes the effective canvas dimensions instead of the original source met
   ]);
 });
 
-it('plans exact advanced fragment cuts before selecting the frame renderer', async () => {
-  const { args, deps } = fixture();
-  args.snapshot.workspace.advanced.ui.mode = 'advanced';
-  args.snapshot.workspace.history = [];
-  args.snapshot.workspace.cursor = 0;
-  args.index.processedVideoCodec = 'vp8';
-  deps.writeReviewFrames.mockResolvedValue({
-    videoPackets: 20,
-    audioPackets: 0,
-    resultDuration: 2,
-    audioRanges: [],
-  });
-  const before = structuredClone(args.snapshot);
-  const result = await exportReviewedVideo(
-    { ...args, destination: 'download', selection: { kind: 'range', start: 0.1, end: 2.1 } },
-    deps
-  );
-  expect(result.receipt.filename).toMatch(
-    /^Sniptale_video-review_.*_fragment-0\.100-2\.100\.webm$/
-  );
-  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
-  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
-    expect.objectContaining({
-      edits: [
-        expect.objectContaining({ kind: 'cut', start: 0, end: 0.1 }),
-        expect.objectContaining({ kind: 'cut', start: 2.1, end: 6 }),
-      ],
-    })
-  );
-  expect(args.snapshot).toEqual(before);
-  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
-});
-
 it('does not load hidden audio assets or render hidden focus during export', async () => {
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
@@ -570,3 +599,70 @@ it('publishes the chosen container, resolution and matching filename for a conve
   ]);
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
 });
+
+it('copies Basic video with source gain while ignoring stored external audio', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.audio.original = {
+    muted: false,
+    volume: 0.5,
+    ranges: [{ id: 'quiet', start: 0, end: 1, volume: 0 }],
+  };
+  advanced.audio.music = [
+    {
+      id: 'hidden',
+      assetId: 'missing',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  vi.stubGlobal('OfflineAudioContext', class {});
+  try {
+    await exportReviewedVideo(
+      { ...args, destination: 'download', selection: { kind: 'range', start: 0, end: 6 } },
+      deps
+    );
+    expect(deps.writeReviewFrames).not.toHaveBeenCalled();
+    expect(deps.readProjectAsset).not.toHaveBeenCalled();
+    expect(deps.writeReviewPackets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exportAudio: expect.objectContaining({
+          originalVolume: 0.5,
+          originalMuted: false,
+          originalRanges: advanced.audio.original.ranges,
+          entries: [],
+        }),
+      })
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it.each([false, true])(
+  'mutes disabled original audio in actual export without changing stored gain (fragment %s)',
+  async (fragment) => {
+    const { args, deps } = fixture();
+    args.snapshot.workspace.advanced.ui.tracks.originalAudio = false;
+    const before = structuredClone(args.snapshot);
+    await exportReviewedVideo(
+      {
+        ...args,
+        destination: 'download',
+        ...(fragment ? { selection: { kind: 'range' as const, start: 0, end: 2 } } : {}),
+      },
+      deps
+    );
+    expect(deps.writeReviewPackets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exportAudio: expect.objectContaining({ originalMuted: true, originalVolume: 1 }),
+      })
+    );
+    expect(args.snapshot).toEqual(before);
+  }
+);

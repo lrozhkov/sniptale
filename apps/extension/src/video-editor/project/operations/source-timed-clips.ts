@@ -22,6 +22,7 @@ import {
 } from '../../../features/video/project/types/model';
 import { projectSourceTimeAnchor, type SourceTimedClip } from './source-timed-anchor-projection';
 import { reconcileSourceBoundObjectTracks } from './source-timed-object-tracks';
+import { reconcileVideoProjectInteractionSources } from '../../../features/video/project/source-interactions';
 
 export type { SourceTimedClip } from './source-timed-anchor-projection';
 
@@ -356,6 +357,7 @@ export function reconcileRecordingInteractionAnchors(
   }
   return {
     ...nextProject,
+    ...reconcileVideoProjectInteractionSources(previousProject, nextProject),
     actionEvents: events,
     cursorTrack: reconcileCursorTrack(previousProject, nextProject, timelines, splitLineage),
     ...(objectTracks === undefined ? {} : { objectTracks }),

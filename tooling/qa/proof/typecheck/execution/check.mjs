@@ -1,3 +1,4 @@
+import { normalizeMediabunny } from '../../../../ci/mediabunny/normalize.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -333,6 +334,8 @@ export function runTypecheck({
     return createSkippedTypecheckResult(metadata);
   }
 
+  normalizeMediabunny({ root: cwd, check: true });
+
   if (metadata.mode === 'full') {
     const result = runCommand(
       process.execPath,
@@ -380,6 +383,7 @@ export async function runTypecheckAsync({
     targetFiles,
   });
   if (metadata.mode === 'skip') return createSkippedTypecheckResult(metadata);
+  normalizeMediabunny({ root: cwd, check: true });
   if (metadata.mode === 'full') {
     return runTypecheck({
       checkerCount: resolvedCheckerCount,

@@ -64,6 +64,7 @@ import {
   setupEditorPageRuntimeBootstrapTestScope,
 } from './runtime.bootstrap.test-support';
 import { useEditorStore } from '../../state/useEditorStore';
+import { beginEditorDocumentOpenOperation } from '../../document/file-actions/operation';
 
 async function verifiesBootstrapPayloadOpen() {
   const controller = createEditorPageController();
@@ -81,14 +82,17 @@ async function verifiesBootstrapPayloadOpen() {
     { autosaveService, controller } as never
   );
 
-  expect(autosaveService.activate).toHaveBeenCalledWith({
-    aggregateId: 'session-1',
-    capturedAt: 111,
-    durableRevision: 0,
-    renderPresentation: expect.any(Function),
-    sourceUrl: 'https://example.com',
-    sourceTitle: 'Example page',
-  });
+  expect(autosaveService.activate).toHaveBeenCalledWith(
+    {
+      aggregateId: 'session-1',
+      capturedAt: 111,
+      durableRevision: 0,
+      renderPresentation: expect.any(Function),
+      sourceUrl: 'https://example.com',
+      sourceTitle: 'Example page',
+    },
+    { preserveMode: true }
+  );
   expect(autosaveService.updateContext).toHaveBeenCalledWith({
     sourceUrl: 'https://example.com',
     sourceTitle: 'Example page',
@@ -162,13 +166,16 @@ async function verifiesDraftRestore() {
 
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
 
-  expect(autosaveService.activate).toHaveBeenCalledWith({
-    aggregateId: 'session-1',
-    durableRevision: 0,
-    renderPresentation: expect.any(Function),
-    sourceUrl: null,
-    sourceTitle: null,
-  });
+  expect(autosaveService.activate).toHaveBeenCalledWith(
+    {
+      aggregateId: 'session-1',
+      durableRevision: 0,
+      renderPresentation: expect.any(Function),
+      sourceUrl: null,
+      sourceTitle: null,
+    },
+    { preserveMode: true }
+  );
   expect(runtime.setPageTitle).toHaveBeenCalledWith('Draft title');
   expect(controller.loadDocument).toHaveBeenCalledWith({ version: 2 });
   expect(useEditorStore.getState().capturedAt).toBe(222);
@@ -318,6 +325,31 @@ describe('editor-page.runtime bootstrap flows', () => {
     ensureEditorPageAggregateIdMock,
     readEditorPageLocationStateMock,
     waitForEditorControllerCanvasMock,
+  });
+
+  it('does not load a late bootstrap over a newer manual file selection', async () => {
+    const controller = createEditorPageController();
+    const autosaveService = createEditorPageAutosaveService();
+    let resolveRestore: (value: unknown) => void = () => undefined;
+    resolveEditorPageRestoreSourceMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRestore = resolve;
+      })
+    );
+    const boot = bootstrapEditorPageSession(createEditorPageRuntime(), {
+      autosaveService,
+      controller,
+      bootstrapRevision: 0,
+    } as never);
+    beginEditorDocumentOpenOperation(controller);
+    resolveRestore({
+      kind: 'draft',
+      entry: { document: createEditorPageDocument() },
+      capturedAt: 1,
+    });
+    await boot;
+    expect(controller.loadDocument).not.toHaveBeenCalled();
+    expect(autosaveService.saveNow).not.toHaveBeenCalled();
   });
 
   it(

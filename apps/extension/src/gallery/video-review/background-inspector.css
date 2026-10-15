@@ -1,0 +1,19 @@
+.review-background-kinds [data-ui='shared.ui.compact-inspector.segmented-row'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+}
+.review-background-kinds [data-ui='shared.ui.compact-inspector.segmented-row'] > button {
+  padding-inline: 4px !important;
+  white-space: nowrap;
+}
+.review-background-paint .paint-inspector-field {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.review-background-paint .paint-inspector-field > button {
+  width: auto;
+  max-width: 200px;
+  justify-self: end;
+}
+.review-background-paint .paint-inspector-field > button > svg {
+  display: none;
+}

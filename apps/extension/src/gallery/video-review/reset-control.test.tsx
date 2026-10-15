@@ -11,6 +11,7 @@ afterEach(() => {
 it('requires confirmation, isolates shortcuts, cancels with Escape and restores trigger focus', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('dialog');
+  host.open = true;
   document.body.append(host);
   const root = createRoot(host);
   const reset = vi.fn(async () => undefined);
@@ -93,6 +94,7 @@ it('requires confirmation, isolates shortcuts, cancels with Escape and restores 
 it('keeps failed actions retryable, traps focus and discloses local reset', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('dialog');
+  host.open = true;
   document.body.append(host);
   const root = createRoot(host);
   const start = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);

@@ -33,7 +33,8 @@ it('offers a fragment only for a retained range and blocks it during pending edi
       root.render(<ReviewFragmentAction {...props} selection={{ kind: 'point', time: 2 }} />)
     );
     expect(host.querySelector('button')).toBeNull();
-    act(() => root.render(<ReviewFragmentAction {...props} />));
+    act(() => root.render(<ReviewFragmentAction {...props} showLabel />));
+    expect(host.textContent).toBe(translate('gallery.videoReview.exportSelection'));
     act(() => host.querySelector('button')!.click());
     expect(onDownload).toHaveBeenCalledWith(selection);
     act(() => root.render(<ReviewFragmentAction {...props} busy />));
@@ -59,6 +60,7 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
   const cancel = vi.fn();
   const props = {
     indexing: false,
+    timeEstimate: null,
     checkingCodecs: false,
     available: true,
     cutting: true,
@@ -78,9 +80,19 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
     onDownload: vi.fn(),
   };
   const button = (key: Parameters<typeof translate>[0]) =>
-    host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`);
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`);
   try {
     act(() => root.render(<ReviewEditActions {...props} />));
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportActions"]')?.className
+    ).not.toContain('border-t');
+    act(() => root.render(<ReviewEditActions {...props} settings={<div>Settings</div>} />));
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportActions"]')?.className
+    ).toContain('border-t');
+    const progress = host.querySelector('[role="progressbar"]');
+    expect(progress).not.toBeNull();
+    expect(progress?.getAttribute('aria-valuenow')).toBe('25');
     expect(button('gallery.videoReview.applyCut')).toBeNull();
     expect(button('gallery.videoReview.downloadVideo')?.disabled).toBe(true);
     act(() => button('gallery.videoReview.cancelExport')!.click());
@@ -88,6 +100,50 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
     act(() => root.render(<ReviewEditActions {...props} phase="publishing" />));
     expect(button('gallery.videoReview.cancelExport')).toBeNull();
     expect(button('gallery.videoReview.exportVideo')?.disabled).toBe(true);
+    const open = vi.fn();
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          phase="idle"
+          completion={{ destination: 'gallery', mediaId: 'recording:copy' }}
+          settings={<div>Settings</div>}
+          timeEstimate={{ remainingMs: 5000 }}
+          onOpenResult={open}
+        />
+      )
+    );
+    expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('100');
+    expect(host.querySelector('[role="status"]')?.textContent).toBe(
+      `${translate('gallery.videoReview.exporting')} 100%${translate('gallery.videoReview.exportFinished')}`
+    );
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportProgress"]')?.className
+    ).toContain('border-b');
+    expect(host.textContent).toContain(translate('gallery.videoReview.exportAdded'));
+    const notice = host.querySelectorAll('[role="status"]')[1]!;
+    expect(
+      host.querySelector('[role="progressbar"]')!.compareDocumentPosition(notice) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(button('gallery.videoReview.cancelExport')).toBeNull();
+    expect(host.querySelector('[data-ui="video.exportTimeEstimate"]')).toBeNull();
+    act(() => button('gallery.videoReview.openExportInLibrary')!.click());
+    expect(open).toHaveBeenCalledWith('recording:copy');
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          phase="idle"
+          completion={{ destination: 'download', mediaId: null }}
+        />
+      )
+    );
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportProgress"]')?.className
+    ).not.toContain('border-b');
+    expect(host.textContent).toContain(translate('gallery.videoReview.exportCompleted'));
+    expect(button('gallery.videoReview.openExportInLibrary')).toBeNull();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
@@ -110,7 +166,7 @@ it('sets speed creation defaults without a toolbar delete action', () => {
     onAudio: vi.fn(),
   };
   const button = (key: Parameters<typeof translate>[0]) =>
-    host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`)!;
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`)!;
   try {
     act(() => root.render(<ReviewTimelineTools {...props} />));
     act(() => button('gallery.videoReview.pointerTool').click());
@@ -168,6 +224,56 @@ it('offers independent initial downloads and shows actionable processing failure
   try {
     act(() => root.render(<ReviewEditActions {...props} />));
     expect(download().disabled).toBe(false);
+    act(() => root.render(<ReviewEditActions {...props} advancedBlockers={['watermark']} />));
+    expect(host.textContent).toContain(translate('gallery.videoReview.watermark'));
+    act(() => root.render(<ReviewEditActions {...props} advancedBlockers={['presentation']} />));
+    expect(host.textContent).toContain(translate('gallery.videoReview.presentation'));
+    expect(host.textContent).not.toContain('gallery.videoReview.presentation');
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          advancedBlockers={['camera-follow']}
+          cameraConflicts={[
+            { regionId: 'zoom', interval: { start: 1.5, end: 4 }, time: 2, reason: 'dynamics' },
+          ]}
+        />
+      )
+    );
+    expect(host.textContent).toContain(translate('gallery.videoReview.cameraConflictDynamics'));
+    expect(host.textContent).not.toContain(translate('gallery.videoReview.cameraFollowConflict'));
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportBlockers"]')?.textContent
+    ).toContain('0:02');
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          available
+          hasEdits
+          advancedBlockers={['action-audio-resource']}
+        />
+      )
+    );
+    expect(
+      host.querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('gallery.videoReview.exportVideo')}"]`
+      )?.disabled
+    ).toBe(false);
+    expect(download().disabled).toBe(false);
+    expect(host.querySelector('[role="status"]')?.textContent).toContain(
+      translate('gallery.videoReview.actionAudioResource')
+    );
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          advancedBlockers={['action-audio-resource', 'asset-missing']}
+        />
+      )
+    );
+    expect(download().disabled).toBe(true);
+    act(() => root.render(<ReviewEditActions {...props} />));
     act(() => download().click());
     expect(props.onDownload).toHaveBeenCalledOnce();
     act(() => root.render(<ReviewEditActions {...props} hasEdits audioUnavailable failed />));
@@ -190,7 +296,7 @@ it('shows expanded export settings before both destination actions', () => {
   const root = createRoot(host);
   const onDownload = vi.fn();
   const button = (key: Parameters<typeof translate>[0]) =>
-    host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`)!;
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`)!;
   try {
     act(() =>
       root.render(
@@ -268,6 +374,9 @@ it('applies export frame rate and quality options without adding section divider
   const host = document.createElement('div');
   const root = createRoot(host);
   const exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'] = {
+    hasBookends: false,
+    sourceVideoAvailable: false,
+    presentationDuration: null,
     index: {
       duration: 12,
       boundaries: [0, 12],
@@ -278,32 +387,59 @@ it('applies export frame rate and quality options without adding section divider
       processedVideoCodec: 'avc',
     },
     indexing: false,
+    timeEstimate: null,
     checkingCodecs: false,
     phase: 'idle',
     progress: 0,
     failed: false,
     blocked: [],
+    cameraConflicts: [],
     result: null,
+    completion: null,
+    dismissCompletion: vi.fn(),
     plan: () => ({ kind: 'ready', video: 'render', audio: 'copy', reasons: [] }),
     renderSettings: { frameRate: 0, quality: 'HIGH' },
     setRenderSettings: vi.fn(),
+    sizeEstimate: {
+      kind: 'ready',
+      estimate: { bytes: 1000000, lowerBytes: 750000, upperBytes: 1350000, sampledSeconds: 2 },
+    },
+    setSizeEstimateVisible: vi.fn(),
     start: vi.fn(async () => {}),
+    retryAssetAvailability: vi.fn(),
     downloadSelection: vi.fn(async () => {}),
     cancel: vi.fn(),
     download: vi.fn(async () => {}),
   };
   try {
     await act(async () => root.render(<ReviewRenderOptions exporter={exporter} busy={false} />));
+    expect(exporter.setSizeEstimateVisible).toHaveBeenCalledWith(true);
+    expect(host.querySelector('[data-ui="video.exportSizeEstimate"]')?.textContent).toContain('≈');
     const [, , , rate, quality] = host.querySelectorAll<HTMLButtonElement>(
       '[aria-haspopup="listbox"]'
     );
     await act(async () => rate!.click());
     await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[2]!.click()
+    );
+    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
+      frameRate: 24,
+      quality: 'HIGH',
+      frameRateMode: 'constant',
+    });
+    await act(async () => rate!.click());
+    await act(async () =>
       document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
     );
-    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({ frameRate: 24, quality: 'HIGH' });
+    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
+      frameRate: 60,
+      quality: 'HIGH',
+      frameRateMode: 'adaptive',
+    });
     await act(async () => quality!.click());
-    await act(async () => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
+    );
     expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
       frameRate: 0,
       quality: 'LOW',

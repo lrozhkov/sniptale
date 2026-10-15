@@ -8,6 +8,7 @@ export type AIProviderSelectorEntry = Pick<
   'connectionType' | 'createdAt' | 'hasStoredApiKey' | 'id' | 'name'
 > & {
   destinationKind: AIProviderDestinationKind;
+  destinationBinding?: string | undefined;
 };
 
 export type AIModelSelectionBootstrapPayload = {
@@ -41,6 +42,7 @@ export type AISecretProtectionStatusPayload = {
 };
 
 export type AISettingsPageRuntimeDataPayload = {
+  audioTranscriptionSystemPrompt?: string | undefined;
   scenarioEditorSystemPrompt: string;
   secretProtectionStatus: AISecretProtectionStatusPayload;
   selectionBootstrap: AISettingsPageModelSelectionBootstrapPayload;
@@ -83,6 +85,8 @@ type AiSettingsMutationOperation =
   | 'delete-model'
   | 'move-model'
   | 'save-default-model'
+  | 'save-audio-transcription-prompt'
+  | 'reset-audio-transcription-prompt'
   | 'save-global-prompt'
   | 'save-scenario-editor-prompt'
   | 'reset-global-prompt'
@@ -116,10 +120,14 @@ export type AiSettingsMutationMessage =
   | (AiSettingsMutationBase<'save-default-model'> & {
       defaultModelId: string | null;
     })
-  | (AiSettingsMutationBase<'save-global-prompt' | 'save-scenario-editor-prompt'> & {
+  | (AiSettingsMutationBase<
+      'save-global-prompt' | 'save-scenario-editor-prompt' | 'save-audio-transcription-prompt'
+    > & {
       prompt: string;
     })
-  | AiSettingsMutationBase<'reset-global-prompt' | 'reset-scenario-editor-prompt'>
+  | AiSettingsMutationBase<
+      'reset-global-prompt' | 'reset-scenario-editor-prompt' | 'reset-audio-transcription-prompt'
+    >
   | (AiSettingsMutationBase<'save-chrome-ai-enabled'> & { enabled: boolean })
   | (AiSettingsMutationBase<'enable-secret-passphrase-protection'> & { passphrase: string })
   | (AiSettingsMutationBase<'disable-secret-passphrase-protection'> & {

@@ -194,13 +194,15 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const npmPackage = JSON.parse(fs.readFileSync('tooling/configs/ci/npm/package.json', 'utf8'));
   expect(npmPackage.dependencies.npm).toBe(lock.node.npmVersion);
   expect(npmPackage.dependencies['brace-expansion']).toBe('5.0.12');
-  expect(npmPackage.dependencies.undici).toBe('6.28.1');
+  expect(npmPackage.dependencies.undici).toBe('6.29.0');
   expect(npmPackage.dependencies['http-cache-semantics']).toBe('4.3.0');
   const canonicalNpmLock = JSON.parse(npmLock.toString());
   expect(canonicalNpmLock.packages).not.toHaveProperty(
     'node_modules/npm/node_modules/brace-expansion'
   );
   expect(canonicalNpmLock.packages).not.toHaveProperty('node_modules/npm/node_modules/undici');
+  for (const name of ['ip-address', 'postcss-selector-parser'])
+    expect(canonicalNpmLock.packages).not.toHaveProperty(`node_modules/npm/node_modules/${name}`);
   expect(canonicalNpmLock.packages).not.toHaveProperty(
     'node_modules/npm/node_modules/http-cache-semantics'
   );
@@ -233,9 +235,9 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
     'viteReact',
   ]);
   const expectedToolchainPackages = {
-    oxfmt: ['node_modules/oxfmt', '0.64.0'],
-    oxlint: ['node_modules/oxlint', '1.79.0'],
-    oxlintTsgolint: ['node_modules/oxlint-tsgolint', '7.0.2001'],
+    oxfmt: ['node_modules/oxfmt', '0.72.0'],
+    oxlint: ['node_modules/oxlint', '1.87.0'],
+    oxlintTsgolint: ['node_modules/oxlint-tsgolint', '7.0.2004'],
     typescriptCompilerApi: ['node_modules/@typescript/old', '6.0.3'],
     typescriptCompilerApiShim: ['node_modules/typescript', '6.0.2'],
     typescriptNative: ['node_modules/@typescript/native', '7.0.2'],
@@ -255,7 +257,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   }
   expect(lock.dependencyGraph).toEqual({
     packagePath: 'node_modules/dependency-cruiser',
-    version: '18.2.0',
+    version: '18.5.0',
   });
   expect(projectLock.packages[lock.dependencyGraph.packagePath].version).toBe(
     lock.dependencyGraph.version

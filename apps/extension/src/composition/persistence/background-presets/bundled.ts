@@ -1,0 +1,123 @@
+/** Immutable backgrounds shipped with the extension, in their initial catalog order. */
+export const BUNDLED_BACKGROUNDS = [
+  {
+    id: 'builtin:cobalt-silk',
+    path: 'backgrounds/01-cobalt-silk.webp',
+    en: 'Cobalt Silk',
+    ru: 'Кобальтовый шёлк',
+  },
+  {
+    id: 'builtin:peach-dunes',
+    path: 'backgrounds/02-peach-dunes.webp',
+    en: 'Peach Dunes',
+    ru: 'Персиковые дюны',
+  },
+  {
+    id: 'builtin:midnight-aurora',
+    path: 'backgrounds/03-midnight-aurora.webp',
+    en: 'Midnight Aurora',
+    ru: 'Полярное сияние',
+  },
+  {
+    id: 'builtin:pearl-arches',
+    path: 'backgrounds/04-pearl-arches.webp',
+    en: 'Pearl Arches',
+    ru: 'Жемчужные арки',
+  },
+  {
+    id: 'builtin:orchid-glass',
+    path: 'backgrounds/05-orchid-glass.webp',
+    en: 'Orchid Glass',
+    ru: 'Сиреневое стекло',
+  },
+  {
+    id: 'builtin:sage-valley',
+    path: 'backgrounds/06-sage-valley.webp',
+    en: 'Sage Valley',
+    ru: 'Шалфейная долина',
+  },
+  {
+    id: 'builtin:solar-eclipse',
+    path: 'backgrounds/07-solar-eclipse.webp',
+    en: 'Solar Eclipse',
+    ru: 'Солнечное затмение',
+  },
+  {
+    id: 'builtin:arctic-fold',
+    path: 'backgrounds/08-arctic-fold.webp',
+    en: 'Arctic Fold',
+    ru: 'Арктические складки',
+  },
+  {
+    id: 'builtin:graphite-satin',
+    path: 'backgrounds/09-graphite-satin.webp',
+    en: 'Graphite Satin',
+    ru: 'Графитовый атлас',
+  },
+  {
+    id: 'builtin:apricot-orbit',
+    path: 'backgrounds/10-apricot-orbit.webp',
+    en: 'Apricot Orbit',
+    ru: 'Абрикосовая орбита',
+  },
+  {
+    id: 'builtin:blue-hour',
+    path: 'backgrounds/01-blue-hour.svg',
+    en: 'Blue Hour',
+    ru: 'Синий час',
+  },
+  {
+    id: 'builtin:pearl-bloom',
+    path: 'backgrounds/02-pearl-bloom.svg',
+    en: 'Pearl Bloom',
+    ru: 'Жемчужное цветение',
+  },
+  {
+    id: 'builtin:amber-haze',
+    path: 'backgrounds/03-amber-haze.svg',
+    en: 'Amber Haze',
+    ru: 'Янтарная дымка',
+  },
+  {
+    id: 'builtin:jade-air',
+    path: 'backgrounds/04-jade-air.svg',
+    en: 'Jade Air',
+    ru: 'Нефритовая воздушность',
+  },
+  {
+    id: 'builtin:orchid-veil',
+    path: 'backgrounds/05-orchid-veil.svg',
+    en: 'Orchid Veil',
+    ru: 'Сиреневая вуаль',
+  },
+  {
+    id: 'builtin:deep-tide',
+    path: 'backgrounds/06-deep-tide.svg',
+    en: 'Deep Tide',
+    ru: 'Глубокий прилив',
+  },
+  {
+    id: 'builtin:rose-dawn',
+    path: 'backgrounds/07-rose-dawn.svg',
+    en: 'Rose Dawn',
+    ru: 'Розовый рассвет',
+  },
+  {
+    id: 'builtin:glacier-light',
+    path: 'backgrounds/08-glacier-light.svg',
+    en: 'Glacier Light',
+    ru: 'Ледниковый свет',
+  },
+  {
+    id: 'builtin:chroma-mist',
+    path: 'backgrounds/09-chroma-mist.svg',
+    en: 'Chroma Mist',
+    ru: 'Цветной туман',
+  },
+  {
+    id: 'builtin:sunset-mist',
+    path: 'backgrounds/10-sunset-mist.svg',
+    en: 'Sunset Mist',
+    ru: 'Закатная дымка',
+  },
+] as const;

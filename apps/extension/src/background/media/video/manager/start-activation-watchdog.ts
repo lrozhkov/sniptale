@@ -3,42 +3,21 @@ import { translate } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { RECORDING_START_ACTIVATION_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
 import { getVideoRecordingId, isVideoRecordingPreparationInProgress } from '../session-state';
-import { notifyRecordingStartFailed } from '../runtime/manager';
-import { clearActiveVideoRecordingLease } from '../recording-control-lease';
-import { getActiveVideoRecordingLeaseSnapshot } from '../recording-control-lease';
-import {
-  requestBoundOffscreenRecordingStop,
-  type RecordingSourceBinding,
-} from '../offscreen-recording-stop';
+import { failRecordingStartAfterTimeout } from '../runtime/recording-completion';
 
 const logger = createLogger({ namespace: 'BackgroundVideoStartActivationWatchdog' });
 
 type WatchdogDeps = {
   getRecordingId: () => string | null;
   isPreparing: () => boolean;
-  clearActiveLease: (
-    recordingId?: string,
-    options?: { shouldClear?: () => boolean }
-  ) => Promise<void>;
-  notifyStartFailed: (error: string) => void | Promise<void>;
-  getSourceBinding: (recordingId: string) => RecordingSourceBinding | null;
-  stopOffscreenRecording: (binding: RecordingSourceBinding) => Promise<boolean>;
+  failStart: (recordingId: string, error: string) => Promise<void>;
   translate: (key: 'background.runtime.recordingStartTimeout') => string;
 };
 
 const defaultDeps: WatchdogDeps = {
   getRecordingId: getVideoRecordingId,
   isPreparing: isVideoRecordingPreparationInProgress,
-  clearActiveLease: clearActiveVideoRecordingLease,
-  notifyStartFailed: notifyRecordingStartFailed,
-  getSourceBinding: (recordingId) => {
-    const lease = getActiveVideoRecordingLeaseSnapshot();
-    return lease?.recordingId === recordingId && lease.surfaceBinding
-      ? { recordingId, ...lease.surfaceBinding }
-      : null;
-  },
-  stopOffscreenRecording: (binding) =>
-    requestBoundOffscreenRecordingStop(binding, true).then(() => true),
+  failStart: failRecordingStartAfterTimeout,
   translate,
 };
 
@@ -47,34 +26,6 @@ let activationRecordingId: string | null = null;
 
 function isRecordingStartActivationStillTimedOut(recordingId: string, deps: WatchdogDeps): boolean {
   return deps.getRecordingId() === recordingId && deps.isPreparing();
-}
-
-async function handleRecordingStartActivationTimeout(
-  recordingId: string,
-  deps: WatchdogDeps
-): Promise<void> {
-  const binding = deps.getSourceBinding(recordingId);
-  if (!binding) {
-    logger.warn('Retaining recording authority after activation timeout without source binding', {
-      recordingId,
-    });
-    return;
-  }
-
-  try {
-    if ((await deps.stopOffscreenRecording(binding)) !== true) {
-      throw new Error('Offscreen recording stop acknowledgement missing');
-    }
-  } catch (error) {
-    logger.warn('Retaining recording authority after activation-timeout cleanup failure', {
-      error,
-      recordingId,
-    });
-    return;
-  }
-
-  await deps.notifyStartFailed(deps.translate('background.runtime.recordingStartTimeout'));
-  await deps.clearActiveLease(recordingId);
 }
 
 export function clearRecordingStartActivationWatchdog(recordingId?: string): void {
@@ -103,7 +54,7 @@ export function scheduleRecordingStartActivationWatchdog(
     }
 
     runBestEffort(
-      handleRecordingStartActivationTimeout(recordingId, deps),
+      deps.failStart(recordingId, deps.translate('background.runtime.recordingStartTimeout')),
       logger,
       'Failed to complete recording start timeout cleanup',
       { recordingId }

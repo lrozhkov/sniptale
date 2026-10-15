@@ -113,6 +113,7 @@ async function verifyChildHandoff(root: string) {
       rootRunId: 'closeout-run',
       parentRunId: 'closeout-run',
     });
+    expect(claimedLock.handoff).toBe(true);
     expectInvalidClaim(module, { token: 'forged-token', runId: 'build-run' });
 
     expect(() => module.acquireBlockingWrapperLock('qa:checkpoint')).toThrow(

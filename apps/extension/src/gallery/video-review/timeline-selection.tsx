@@ -1,3 +1,5 @@
+import { reviewTrackGestureLocked } from './track-row';
+import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
@@ -12,8 +14,11 @@ import { useReviewDragEscape } from './timeline-drag';
 import { snapReviewEditDrag } from './timeline-edit-snap';
 
 type SelectionProps = {
+  sourceCompact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   rangeEnabled?: boolean;
+  drawingRange?: Extract<ReviewAnchor, { kind: 'range' }> | null | undefined;
+  drawingKind?: 'cut' | 'speed' | undefined;
   duration: number;
   time: number;
   selection: ReviewAnchor;
@@ -33,14 +38,17 @@ const percent = (time: number, duration: number) => `${(time / duration) * 100}%
 /** One source lane; existing edits can be moved or resized directly. */
 export function ReviewSourceLane(props: SelectionProps) {
   const [guide, setGuide] = useState<number | null>(null);
+  const stacked = props.edits?.some((edit) => hasReviewEditOverlap(edit, props.edits));
+  const height = stacked ? 'h-[60px]' : props.sourceCompact ? 'h-8' : 'h-12';
   return (
     <ReviewTrackRow
+      track="source"
       label={translate('gallery.videoReview.sourceVideo')}
       icon={<Film size={14} aria-hidden="true" />}
     >
       <div
         data-ui="gallery.videoReview.sourceLane"
-        className={`relative h-12 rounded bg-[var(--sniptale-color-surface-hover)]
+        className={`relative ${height} rounded bg-[var(--sniptale-color-surface-hover)]
           ${props.annotations.length ? 'mt-6' : 'mt-1'}`}
       >
         {guide !== null ? (
@@ -51,16 +59,17 @@ export function ReviewSourceLane(props: SelectionProps) {
             style={{ left: percent(guide, props.duration) }}
           />
         ) : null}
-        {props.rangeEnabled !== false &&
-        props.selection.kind === 'range' &&
-        !props.selectedEditId ? (
+        {props.drawingRange ? (
           <div
-            data-ui="gallery.videoReview.sourceRange"
-            className="pointer-events-none absolute inset-y-0 border
-              border-[var(--sniptale-color-accent)] bg-transparent"
+            data-ui="gallery.videoReview.sourceDrawPreview"
+            aria-hidden="true"
+            className={[
+              'pointer-events-none absolute inset-y-0 rounded border',
+              reviewTimelineItemTone(false, props.drawingKind),
+            ].join(' ')}
             style={{
-              left: percent(props.selection.start, props.duration),
-              width: percent(props.selection.end - props.selection.start, props.duration),
+              left: percent(props.drawingRange.start, props.duration),
+              width: percent(props.drawingRange.end - props.drawingRange.start, props.duration),
             }}
           />
         ) : null}
@@ -94,7 +103,20 @@ function ReviewEditBlock(
     setDragEdge(null);
     onSnap(null);
   });
+  const boundary = drag.current;
+  useReviewResizeBoundary(
+    boundary,
+    boundary && boundary.edge !== 'move' ? boundary.range[boundary.edge] : null
+  );
   const committing = useRef(false);
+  const cancel = () => {
+    if (!drag.current) return;
+    drag.current.admission.cancel();
+    drag.current = null;
+    setDragEdge(null);
+    setPreview(null);
+    onSnap(null);
+  };
   const range = preview ?? edit;
   const { name, value, caption, covered, position } = reviewEditPresentation(edit, props.edits);
   const selected = props.selectedEditId === edit.id;
@@ -113,6 +135,10 @@ function ReviewEditBlock(
       onPointerDown={(event) => {
         if (props.rangeEnabled === false || event.button !== 0 || committing.current) return;
         event.stopPropagation();
+        if (reviewTrackGestureLocked(event.currentTarget)) {
+          props.onEdit?.(edit);
+          return;
+        }
         const target = event.target;
         const edge =
           target instanceof Element
@@ -147,7 +173,7 @@ function ReviewEditBlock(
           current: edit,
           keyframeMove: !!props.snapToKeyframes,
         });
-        onSnap(snapped.guide);
+        onSnap(current.edge === 'move' ? snapped.guide : null);
         if (snapped.start < snapped.end) {
           current.range = { start: snapped.start, end: snapped.end };
           setPreview(current.range);
@@ -175,13 +201,8 @@ function ReviewEditBlock(
           }
         });
       }}
-      onPointerCancel={() => {
-        drag.current?.admission.cancel();
-        drag.current = null;
-        setDragEdge(null);
-        setPreview(null);
-        onSnap(null);
-      }}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
     >
       <button
         type="button"
@@ -217,13 +238,18 @@ function ReviewEditBlock(
   );
 }
 
+function hasReviewEditOverlap(edit: ReviewEdit, edits: readonly ReviewEdit[] | undefined) {
+  return (
+    edits?.some(
+      (item) => item.kind !== edit.kind && item.start < edit.end && item.end > edit.start
+    ) ?? false
+  );
+}
+
 /** Source-lane cut/speed geometry keeps both edit kinds selectable during an overlap. */
 function reviewEditPresentation(edit: ReviewEdit, edits: readonly ReviewEdit[] | undefined) {
   const { name, value, label } = reviewEditCaption(edit);
-  const overlap =
-    edits?.some(
-      (item) => item.kind !== edit.kind && item.start < edit.end && item.end > edit.start
-    ) ?? false;
+  const overlap = hasReviewEditOverlap(edit, edits);
   const covered =
     edit.kind === 'speed'
       ? (edits?.filter(
@@ -233,8 +259,8 @@ function reviewEditPresentation(edit: ReviewEdit, edits: readonly ReviewEdit[] |
   const hint = covered.length ? ` · ${translate('gallery.videoReview.cutOverlapHint')}` : '';
   const position = overlap
     ? edit.kind === 'cut'
-      ? 'top-1 bottom-[52%] z-[6]'
-      : 'top-[52%] bottom-1 z-[5]'
+      ? 'top-1 h-6 z-[6]'
+      : 'top-8 h-6 z-[5]'
     : 'inset-y-1 z-[5]';
   return {
     name,

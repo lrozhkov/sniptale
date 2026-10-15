@@ -8,6 +8,8 @@ import {
   type VideoProjectVideoClip,
 } from '../../../../features/video/project/types';
 import { buildProjectTimelineClipViewModel } from './model';
+import { getTrackJunctions } from '../../../../features/video/project/transition/junctions';
+import { createTimelineProjection } from '../interaction-state/projection';
 
 function createVideoClip(trackId: string): VideoProjectVideoClip {
   return {
@@ -32,6 +34,34 @@ function createVideoClip(trackId: string): VideoProjectVideoClip {
     sourceDuration: 3,
   };
 }
+
+it('retains clipped overlap insets with a supplied current projection', () => {
+  const project = createEmptyVideoProject('Projected overlaps');
+  const leading = { ...createVideoClip(project.tracks[0]!.id), startTime: 30, duration: 30 };
+  const trailing = { ...leading, id: 'trailing', startTime: 40 };
+  project.clips = [leading, trailing];
+  const args = {
+    clip: trailing,
+    project,
+    projection: createTimelineProjection({
+      extentSeconds: 100,
+      pixelsPerSecond: 10,
+      viewportWidth: 200,
+      startTime: 55,
+    }),
+    pixelsPerSecond: 10,
+    isHovered: false,
+    isSelected: false,
+    trackLocked: false,
+  };
+  const supplied = buildProjectTimelineClipViewModel({
+    ...args,
+    junctions: getTrackJunctions(project),
+  });
+  expect(supplied.offsetSeconds).toBe(3);
+  expect(supplied.bodyInsetLeft).toBe(70);
+  expect(supplied).toEqual(buildProjectTimelineClipViewModel(args));
+});
 
 it('builds clip timeline view models with crossfade metadata and temporal width', () => {
   const project = createEmptyVideoProject('Timeline');

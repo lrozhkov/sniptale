@@ -63,23 +63,23 @@ function mediaClock() {
     return id;
   });
   vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
-  vi.spyOn(HTMLMediaElement.prototype, 'paused', 'get').mockImplementation(
-    function (this: HTMLMediaElement) {
-      return paused.get(this) ?? true;
-    }
-  );
-  const play = vi
-    .spyOn(HTMLMediaElement.prototype, 'play')
-    .mockImplementation(async function (this: HTMLMediaElement) {
-      paused.set(this, false);
-      this.dispatchEvent(new Event('playing'));
-    });
-  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(
-    function (this: HTMLMediaElement) {
-      paused.set(this, true);
-      this.dispatchEvent(new Event('pause'));
-    }
-  );
+  vi.spyOn(HTMLMediaElement.prototype, 'paused', 'get').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    return paused.get(this) ?? true;
+  });
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
+    this: HTMLMediaElement
+  ) {
+    paused.set(this, false);
+    this.dispatchEvent(new Event('playing'));
+  });
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    paused.set(this, true);
+    this.dispatchEvent(new Event('pause'));
+  });
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   return {
     play,

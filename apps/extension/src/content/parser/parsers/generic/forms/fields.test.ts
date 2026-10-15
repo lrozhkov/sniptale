@@ -1,12 +1,20 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { installDiagnosticLogObserver } from '@sniptale/platform/observability/logger';
+import {
+  createRuntimeLog,
+  RUNTIME_LOG_STORAGE_KEY,
+} from '../../../../../composition/persistence/diagnostics/runtime-log';
+import { runtimeLogJsonl } from '../../../../../composition/persistence/diagnostics/model';
+import { parseDiagnosticLogEvent } from '../../../../../contracts/diagnostics';
 import type { FieldNode } from '@sniptale/runtime-contracts/dom-tree';
 import {
   createParserContext,
   createParserSection,
 } from '../../../../../../../../tooling/test/support/content/parsers/generic/form-fields';
 import { FormFieldsParser } from './fields';
+import { parseGwtSectionElement } from '../../gwt/section';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -188,4 +196,44 @@ describe('FormFieldsParser', () => {
   registerOrphanSectionCreationTest();
   registerDefaultTitleFallbackTest();
   registerPortalSkipParseTest();
+});
+
+it('keeps private parser headings out of persisted and exported runtime summaries', async () => {
+  const privateHeading = 'Patient Alice Smith';
+  let stored: Record<string, unknown> = {};
+  const log = createRuntimeLog({
+    area: {
+      get: async () => stored,
+      set: async (value) => {
+        stored = value;
+      },
+    },
+    withLock: async (work) => work(),
+    delay: async () => undefined,
+  });
+  const dispose = installDiagnosticLogObserver((raw) => {
+    const event = parseDiagnosticLogEvent(raw);
+    if (event) log.append(event, 'content');
+  });
+  try {
+    const ctx = createParserContext(
+      'https://example.test/form/',
+      createParserSection(privateHeading)
+    );
+    new FormFieldsParser().parse(document.createElement('div'), ctx);
+    const gwt = document.createElement('div');
+    gwt.id = privateHeading;
+    const title = document.createElement('h2');
+    title.textContent = privateHeading;
+    gwt.append(title);
+    parseGwtSectionElement(gwt, createParserContext());
+    await log.settled();
+    const rows = await log.read();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(JSON.stringify(stored[RUNTIME_LOG_STORAGE_KEY])).not.toContain(privateHeading);
+    expect(runtimeLogJsonl(rows)).not.toContain(privateHeading);
+    expect(ctx.currentSection?.title).toBe(privateHeading);
+  } finally {
+    dispose();
+  }
 });

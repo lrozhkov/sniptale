@@ -7,7 +7,7 @@ import { mergeProcessCovs } from '@bcoe/v8-coverage';
 import v8CoverageRuntime from '@vitest/coverage-v8';
 import { V8CoverageProvider } from '@vitest/coverage-v8/dist/provider.js';
 
-const SUPPORTED_VITEST_VERSION = '4.1.11';
+const SUPPORTED_VITEST_VERSION = '5.0.3';
 const DEFAULT_CONCURRENCIES = [4, 8, 12];
 const PROFILE_FILENAME = 'coverage-profile.json';
 const SLOW_FILE_LIMIT = 50;
@@ -150,38 +150,7 @@ export async function readRawCoverageGroup({
   return results;
 }
 
-class BatchedV8CoverageProvider extends V8CoverageProvider {
-  async readCoverageFiles({ onFileRead, onFinished, onDebug }) {
-    let completed = 0;
-    const total = this.pendingPromises.length;
-    await Promise.all(this.pendingPromises);
-    this.pendingPromises = [];
-    for (const [projectName, coveragePerProject] of this.coverageFiles.entries()) {
-      for (const [environment, coverageByTestfiles] of Object.entries(coveragePerProject)) {
-        const processCoverages = await readRawCoverageGroup({
-          concurrency: this.options.processingConcurrency,
-          filenames: Object.values(coverageByTestfiles),
-          onChunk: (count) => {
-            completed += count;
-            if (onDebug.enabled) onDebug(`Reading coverage results ${completed}/${total}`);
-          },
-          readFile: (filename, encoding) =>
-            fs.promises.readFile(filename, encoding).catch((error) => {
-              throw this.normalizeCoverageFileError(error);
-            }),
-        });
-        onFileRead(this.mergeRawCoverage(processCoverages));
-        await onFinished(this.ctx.getProjectByName(projectName), environment);
-      }
-    }
-  }
-
-  mergeRawCoverage(processCoverages) {
-    return mergeRawProcessCoverages(processCoverages);
-  }
-}
-
-class ProfilingV8CoverageProvider extends BatchedV8CoverageProvider {
+class ProfilingV8CoverageProvider extends V8CoverageProvider {
   initialize(ctx) {
     assertSupportedVitestVersion();
     super.initialize(ctx);
@@ -197,14 +166,14 @@ class ProfilingV8CoverageProvider extends BatchedV8CoverageProvider {
 
   async readCoverageFiles(callbacks) {
     const startedAt = performance.now();
-    let mergeMs = 0;
+    let rawMergeMs = 0;
     let coveredConversionMs = 0;
     await super.readCoverageFiles({
       ...callbacks,
       onFileRead: (coverage) => {
         const callbackStartedAt = performance.now();
         callbacks.onFileRead(coverage);
-        mergeMs += performance.now() - callbackStartedAt;
+        rawMergeMs += performance.now() - callbackStartedAt;
       },
       onFinished: async (...args) => {
         const callbackStartedAt = performance.now();
@@ -218,27 +187,12 @@ class ProfilingV8CoverageProvider extends BatchedV8CoverageProvider {
       },
     });
     const totalMs = performance.now() - startedAt;
-    const rawMergeMs = this.activePass.stages.rawMergeMs ?? 0;
     Object.assign(this.activePass.stages, {
+      rawMergeMs: roundDuration(rawMergeMs),
       coveredConversionMs: roundDuration(coveredConversionMs),
-      rawReadAndParseMs: roundDuration(
-        Math.max(0, totalMs - mergeMs - coveredConversionMs - rawMergeMs)
-      ),
-      finalAccumulatorMergeMs: roundDuration(mergeMs),
+      rawReadAndParseMs: roundDuration(Math.max(0, totalMs - coveredConversionMs - rawMergeMs)),
       rawReadMergeAndCoveredConversionMs: roundDuration(totalMs),
     });
-  }
-
-  mergeRawCoverage(processCoverages) {
-    const startedAt = performance.now();
-    try {
-      return super.mergeRawCoverage(processCoverages);
-    } finally {
-      this.activePass.stages.rawMergeMs = accumulateDuration(
-        this.activePass.stages.rawMergeMs,
-        performance.now() - startedAt
-      );
-    }
   }
 
   async getCoverageMapForUncoveredFiles(testedFiles) {
@@ -327,6 +281,6 @@ export default {
     assertSupportedVitestVersion();
     return process.env.SNIPTALE_COVERAGE_PROFILE === '1'
       ? new ProfilingV8CoverageProvider()
-      : new BatchedV8CoverageProvider();
+      : new V8CoverageProvider();
   },
 };

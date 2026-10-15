@@ -81,8 +81,8 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
   };
 });
 
-import { pauseRecording, resumeRecording, startRecording, stopRecording } from './controller';
-import { recordingContext } from './context';
+let controller: typeof import('./controller');
+let recordingContext: (typeof import('./context'))['recordingContext'];
 import { createRecordingStagingCoordinatorTestDouble } from './encoding/artifact-session.test-support';
 
 function createDurationTracker() {
@@ -137,7 +137,10 @@ function bindActiveArtifactSession(binding: {
   return artifactStop;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  controller = await import('./controller');
+  ({ recordingContext } = await import('./context'));
   vi.clearAllMocks();
   hasActiveMultiSourceRecordingMock.mockReturnValue(false);
   hasActiveSidecarSessionMock.mockReturnValue(false);
@@ -150,7 +153,7 @@ beforeEach(() => {
 it('rejects duplicate starts when only a webcam sidecar session is active', async () => {
   hasActiveSidecarSessionMock.mockReturnValueOnce(true);
 
-  await expect(startRecording({ streamId: 'stream-2' } as never)).rejects.toThrow(
+  await expect(controller.startRecording({ streamId: 'stream-2' } as never)).rejects.toThrow(
     't:background.runtime.recordingAlreadyRunning'
   );
 
@@ -167,7 +170,7 @@ it('delegates main and sidecar finalization to the artifact lifecycle owner', as
   recordingContext.bindStreamInstance(binding);
   const artifactStop = bindActiveArtifactSession(binding);
 
-  await expect(stopRecording(binding)).resolves.toEqual({
+  await expect(controller.stopRecording(binding)).resolves.toEqual({
     result: 'stopped',
     recordingPointTransform: null,
   });
@@ -187,7 +190,7 @@ it('does not start a competing sidecar stop when the artifact lifecycle owns com
   recordingContext.bindStreamInstance(binding);
   const artifactStop = bindActiveArtifactSession(binding);
 
-  await expect(stopRecording(binding)).resolves.toEqual({
+  await expect(controller.stopRecording(binding)).resolves.toEqual({
     result: 'stopped',
     recordingPointTransform: null,
   });
@@ -214,7 +217,7 @@ it('routes pause and resume to active webcam sidecars', () => {
     stop: vi.fn(),
   };
 
-  pauseRecording(binding);
+  controller.pauseRecording(binding);
   expect(pauseActiveSidecarRecordersMock).toHaveBeenCalledOnce();
 
   recordingContext.artifactSession = {
@@ -222,6 +225,6 @@ it('routes pause and resume to active webcam sidecars', () => {
     state: 'paused',
   } as NonNullable<typeof recordingContext.artifactSession>;
 
-  resumeRecording(binding);
+  controller.resumeRecording(binding);
   expect(resumeActiveSidecarRecordersMock).toHaveBeenCalledOnce();
 });

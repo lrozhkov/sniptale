@@ -1,8 +1,12 @@
+import {
+  BackgroundImagePicker,
+  backgroundActionClassName,
+} from '../../../../composition/background-resources/picker';
+import { blobToDataUrl } from '../../../../platform/media-utils/data-url';
 import type React from 'react';
 import { translate } from '../../../../platform/i18n';
 
 import type { EditorFrameSettings } from '../../../../features/editor/document/types';
-import { EditorInspectorFrameBackgroundImageActions } from './image-actions';
 import { EditorInspectorFrameBackgroundImageMode } from './image-mode';
 
 type EditorInspectorFrameBackgroundImageEditorProps = {
@@ -19,13 +23,8 @@ type EditorInspectorFrameBackgroundImageEditorProps = {
 export function EditorInspectorFrameBackgroundImageEditor(
   props: EditorInspectorFrameBackgroundImageEditorProps
 ): React.ReactElement {
-  const {
-    applyFramePatch,
-    frameBackgroundImageFitOptions,
-    frameDraft,
-    onClearBackgroundImage,
-    onPickBackgroundImage,
-  } = props;
+  const { applyFramePatch, frameBackgroundImageFitOptions, frameDraft, onClearBackgroundImage } =
+    props;
 
   return (
     <div className="space-y-3">
@@ -36,11 +35,22 @@ export function EditorInspectorFrameBackgroundImageEditor(
           className="h-28 w-full rounded-lg border border-[var(--sniptale-color-border-soft)] object-contain"
         />
       ) : null}
-      <EditorInspectorFrameBackgroundImageActions
-        hasImage={Boolean(frameDraft.backgroundImageData)}
-        onClearBackgroundImage={onClearBackgroundImage}
-        onPickBackgroundImage={onPickBackgroundImage}
+      <BackgroundImagePicker
+        onSelect={async ({ file }, signal) => {
+          const backgroundImageData = await blobToDataUrl(file);
+          signal.throwIfAborted();
+          applyFramePatch({ backgroundImageData, backgroundMode: 'image' });
+        }}
       />
+      {frameDraft.backgroundImageData && (
+        <button
+          type="button"
+          className={backgroundActionClassName}
+          onClick={onClearBackgroundImage}
+        >
+          {translate('editor.scene.clearImage')}
+        </button>
+      )}
       {frameDraft.backgroundImageData ? (
         <EditorInspectorFrameBackgroundImageMode
           applyFramePatch={applyFramePatch}

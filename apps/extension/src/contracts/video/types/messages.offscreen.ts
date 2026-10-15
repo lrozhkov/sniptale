@@ -1,3 +1,4 @@
+import type { RecordingFrameClockAnchor } from '../recording-frame-clock';
 import type { VideoProjectExportSettings } from '../../../features/video/project/types/index';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type {
@@ -57,6 +58,7 @@ export interface OffscreenRecordingStartedMessage {
   cursorCaptureMode?: VideoCursorCaptureMode;
   displaySurface?: VideoDisplaySurface;
   webcamSettings?: WebcamActualSettings;
+  frameClock?: RecordingFrameClockAnchor | null;
 }
 
 export interface OffscreenSourceReadyMessage {
@@ -78,11 +80,13 @@ export interface OffscreenRecordingStoppedMessage {
 export interface OffscreenRecordingPausedMessage {
   type: typeof VideoMessageType.OFFSCREEN_RECORDING_PAUSED;
   recordingId: string;
+  frameClock?: RecordingFrameClockAnchor | null;
 }
 
 export interface OffscreenRecordingResumedMessage {
   type: typeof VideoMessageType.OFFSCREEN_RECORDING_RESUMED;
   recordingId: string;
+  frameClock?: RecordingFrameClockAnchor | null;
 }
 
 export interface OffscreenErrorMessage {

@@ -1,3 +1,5 @@
+import { verifyPreparedMediaReviewAnnotations } from './media-review-assets';
+import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import {
   STORE_NAME,
   IMAGE_WORKSPACES_STORE,
@@ -11,6 +13,7 @@ import {
 } from './shared-project-media';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import { prepareVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
@@ -56,6 +59,7 @@ const VIDEO_PROJECT_RESTORE_STORES = [
   PROJECT_EXPORTS_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   THUMBNAILS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -215,6 +219,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           : null;
         if (videoReview && videoReview.workspace.source.size !== object.ref.size)
           throw new Error('Video review source bytes are inconsistent.');
+        if (videoReview) await verifyPreparedMediaReviewAnnotations(videoReview, assets);
         return {
           entry: parsed,
           ref: object.ref,
@@ -261,7 +266,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             assets: tx.objectStore(PROJECT_ASSETS_STORE),
             exports: tx.objectStore(PROJECT_EXPORTS_STORE),
             media: tx.objectStore(MEDIA_LIBRARY_STORE),
-            videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+            videoWorkspaces: createVideoWorkspaceStore(tx),
             videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
             operations: tx.objectStore(ASSET_OPERATIONS_STORE),
             owners: tx.objectStore(ASSET_OWNERS_STORE),
@@ -358,5 +363,9 @@ async function prepareProjectAssets(
       };
     })
   );
+  for (const asset of preparedAssets) {
+    if ('videoReview' in asset && asset.videoReview)
+      await verifyPreparedMediaReviewAnnotations(asset.videoReview, preparedAssets);
+  }
   return preparedAssets.filter((asset): asset is NonNullable<typeof asset> => asset !== null);
 }

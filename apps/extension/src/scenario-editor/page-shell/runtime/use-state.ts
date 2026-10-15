@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../../../composition/persistence/scenario/contracts';
 import { getTourImages, getTourNarrationTargets } from '../../../features/scenario/project/public';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -42,24 +43,39 @@ type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit' | 't
 type GuideCommitCommand =
   | {
       kind: 'narration';
-      input: Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>;
+      input: Omit<
+        Parameters<typeof importScenarioNarration>[0],
+        'project' | 'baseUpdatedAt' | 'expectedRevision'
+      >;
     }
   | {
       kind: 'template';
-      input: Omit<Parameters<typeof applyScenarioStepTemplate>[0], 'project' | 'baseUpdatedAt'>;
+      input: Omit<
+        Parameters<typeof applyScenarioStepTemplate>[0],
+        'project' | 'baseUpdatedAt' | 'expectedRevision'
+      >;
     }
   | {
       kind: 'import';
-      input: Omit<Parameters<typeof importScenarioImages>[0], 'project' | 'baseUpdatedAt'>;
+      input: Omit<
+        Parameters<typeof importScenarioImages>[0],
+        'project' | 'baseUpdatedAt' | 'expectedRevision'
+      >;
     }
   | {
       kind: 'edit';
-      input: Omit<Parameters<typeof applyScenarioImageEdit>[0], 'project' | 'baseUpdatedAt'>;
+      input: Omit<
+        Parameters<typeof applyScenarioImageEdit>[0],
+        'project' | 'baseUpdatedAt' | 'expectedRevision'
+      >;
     };
 
 type TourImageEditCommand = {
   kind: 'tour-edit';
-  input: Omit<Parameters<typeof applyTourImageEdit>[0], 'project' | 'baseUpdatedAt'>;
+  input: Omit<
+    Parameters<typeof applyTourImageEdit>[0],
+    'project' | 'baseUpdatedAt' | 'expectedRevision'
+  >;
 };
 
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
@@ -68,17 +84,19 @@ export function useGuidePageState() {
   const [autosaveEnabled, setAutosaveEnabled] = useState(true);
   const [status, setStatus] = useState<GuidePageStatus>('loading');
   const [actionError, setActionError] = useState<GuideActionError | null>(null);
-  const saved = useRef<GuideProject | null>(null);
+  const saved = useRef<ScenarioProjectSnapshot | null>(null);
   const busy = useRef(false);
   const autosaving = useRef(false);
-  const { project, reset, commit, publish, ...editing } = useGuideHistory({
-    canEdit: () => (!busy.current || autosaving.current) && status !== 'loading',
-    onEdit: () => {
-      setActionError(null);
-      setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
-    },
-    onFailure: () => setActionError('structure'),
-  });
+  const { project, reset, commit, publish, actionId, closedCaptures, ...editing } = useGuideHistory(
+    {
+      canEdit: () => (!busy.current || autosaving.current) && status !== 'loading',
+      onEdit: () => {
+        setActionError(null);
+        setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
+      },
+      onFailure: () => setActionError('structure'),
+    }
+  );
   const { clearSelection, ...selection } = useGuideSelection(project);
   const generation = useRef(0);
   const requestedId = useRef(readScenarioEditorProjectId(window.location.search));
@@ -103,17 +121,17 @@ export function useGuidePageState() {
         return;
       }
       if (turn !== generation.current) return;
-      const history = await getScenarioSavedVersions(requestedId.current);
-      const [current, ...previous] = history?.versions ?? [];
-      const loaded = current?.project ?? null;
+      const { loaded, savedSnapshot, previousProjects } = await readGuideHistoryProjection(
+        requestedId.current
+      );
       if (turn !== generation.current) return;
       if (!loaded && retained.project) {
         rejectLoad();
         return;
       }
       setActionError(null);
-      saved.current = loaded ?? null;
-      reset(loaded, previous.map((version) => version.project).reverse());
+      saved.current = savedSnapshot;
+      reset(loaded, previousProjects);
       setStatus(loaded ? 'ready' : 'missing');
     } catch {
       rejectLoad();
@@ -126,15 +144,20 @@ export function useGuidePageState() {
     };
   }, [load]);
   const mutate = createGuideMutationRunner({ busy, generation, setStatus, setActionError });
-  const acceptProject = (committed: GuideProject, reversible = false) => {
+  const acceptProject = (committed: ScenarioProjectSnapshot, reversible = false) => {
     saved.current = committed;
-    commit(committed, reversible);
+    commit(committed.project, reversible);
     setStatus('saved');
   };
-  const openProject = async (committed: GuideProject | null, previous: GuideProject[] = []) => {
+  const openProject = async (
+    snapshot: ScenarioProjectSnapshot | null,
+    previous: GuideProject[] = []
+  ) => {
+    const committed = snapshot?.project ?? null;
     if (!(await enterResourceSession(committed?.id ?? null))) return;
+    generation.current += 1;
     requestedId.current = committed?.id ?? null;
-    saved.current = committed;
+    saved.current = snapshot;
     reset(committed, previous);
     setStatus(committed ? 'saved' : 'empty');
     clearSelection();
@@ -142,6 +165,9 @@ export function useGuidePageState() {
   };
   const autosave = useGuideAutosave({
     project,
+    actionId,
+    closedCaptures,
+    onSealEdit: editing.sealEdit,
     enabled: autosaveEnabled,
     dirty: status === 'dirty',
     conflict: status === 'conflict',
@@ -149,7 +175,7 @@ export function useGuidePageState() {
       status === 'dirty' ||
       status === 'failed' ||
       status === 'conflict' ||
-      (status === 'loading' && project !== saved.current),
+      (status === 'loading' && project !== saved.current?.project),
     saved,
     busy,
     autosaving,
@@ -167,6 +193,7 @@ export function useGuidePageState() {
   const commitChange = createGuideCommitDispatcher({
     project,
     saved,
+    generation,
     status,
     mutate,
     setStatus,
@@ -213,7 +240,7 @@ function createGuideProjectCommands({
   project: GuideProject | null;
   status: GuidePageStatus;
   mutate: ReturnType<typeof createGuideMutationRunner>;
-  openProject: (project: GuideProject | null) => Promise<void>;
+  openProject: (project: ScenarioProjectSnapshot | null) => Promise<void>;
   setStatus: (status: GuidePageStatus) => void;
   rejectAction: (action: Exclude<GuideActionError, 'structure'>) => void;
 }) {
@@ -341,19 +368,40 @@ function isRevisionConflict(error: unknown): boolean {
 function runGuideCommitCommand(
   command: GuideCommitCommand,
   project: GuideProject,
-  baseUpdatedAt: number
+  base: ScenarioProjectSnapshot
 ) {
   if (command.kind === 'narration')
-    return importScenarioNarration({ ...command.input, project, baseUpdatedAt });
+    return importScenarioNarration({
+      ...command.input,
+      project,
+      baseUpdatedAt: base.project.updatedAt,
+      expectedRevision: base.workspaceRevision,
+    });
   if (command.kind === 'template')
-    return applyScenarioStepTemplate({ ...command.input, project, baseUpdatedAt });
+    return applyScenarioStepTemplate({
+      ...command.input,
+      project,
+      baseUpdatedAt: base.project.updatedAt,
+      expectedRevision: base.workspaceRevision,
+    });
   if (command.kind === 'edit')
-    return applyScenarioImageEdit({ ...command.input, project, baseUpdatedAt });
+    return applyScenarioImageEdit({
+      ...command.input,
+      project,
+      baseUpdatedAt: base.project.updatedAt,
+      expectedRevision: base.workspaceRevision,
+    });
   const placement =
     project.purpose === 'step-template' && command.input.placement.kind === 'steps'
       ? { kind: 'blocks' as const, stepId: project.items[0]!.id }
       : command.input.placement;
-  return importScenarioImages({ ...command.input, placement, project, baseUpdatedAt });
+  return importScenarioImages({
+    ...command.input,
+    placement,
+    project,
+    baseUpdatedAt: base.project.updatedAt,
+    expectedRevision: base.workspaceRevision,
+  });
 }
 
 /** One command admission owner rejects duplicate and stale asynchronous page mutations. */
@@ -396,6 +444,7 @@ function createGuideMutationRunner({
 function createGuideCommitDispatcher({
   project,
   saved,
+  generation,
   status,
   mutate,
   setStatus,
@@ -403,30 +452,46 @@ function createGuideCommitDispatcher({
   rejectAction,
 }: {
   project: GuideProject | null;
-  saved: { current: GuideProject | null };
+  saved: { current: ScenarioProjectSnapshot | null };
+  generation: { current: number };
   status: GuidePageStatus;
   mutate: ReturnType<typeof createGuideMutationRunner>;
   setStatus: (status: GuidePageStatus) => void;
-  acceptProject: (project: GuideProject, addHistory: boolean) => void;
+  acceptProject: (project: ScenarioProjectSnapshot, addHistory: boolean) => void;
   rejectAction: (kind: Exclude<GuideActionError, 'structure'>) => void;
 }) {
+  const turn = generation.current;
   function commitChange(command: TourImageEditCommand): Promise<boolean | 'requires-target-review'>;
   function commitChange(command: GuideCommitCommand): Promise<boolean>;
   async function commitChange(command: GuideCommitCommand | TourImageEditCommand) {
     const base = saved.current;
-    if (!project || !base || status === 'conflict') return false;
+    if (
+      turn !== generation.current ||
+      !project ||
+      !base ||
+      project.id !== base.project.id ||
+      status === 'conflict'
+    )
+      return false;
     let targetReview = false;
-    const accepted = await mutate<GuideProject | Awaited<ReturnType<typeof applyTourImageEdit>>>(
+    const accepted = await mutate<
+      ScenarioProjectSnapshot | Awaited<ReturnType<typeof applyTourImageEdit>>
+    >(
       () =>
         command.kind === 'tour-edit'
-          ? applyTourImageEdit({ ...command.input, project, baseUpdatedAt: base.updatedAt })
-          : runGuideCommitCommand(command, project, base.updatedAt),
+          ? applyTourImageEdit({
+              ...command.input,
+              project,
+              baseUpdatedAt: base.project.updatedAt,
+              expectedRevision: base.workspaceRevision,
+            })
+          : runGuideCommitCommand(command, project, base),
       (result) => {
         if ('status' in result) {
           if (result.status === 'requires-target-review') {
             targetReview = true;
             setStatus(status);
-          } else acceptProject(result.project, true);
+          } else acceptProject(result, true);
         } else acceptProject(result, true);
       },
       (error) => {
@@ -446,4 +511,18 @@ function createGuideCommitDispatcher({
   }
 
   return commitChange;
+}
+
+/** Reads the canonical saved versions without changing the page's generation or load policy. */
+async function readGuideHistoryProjection(id: string) {
+  const history = await getScenarioSavedVersions(id);
+  const [current, ...previous] = history?.versions ?? [];
+  return {
+    loaded: current?.project ?? null,
+    savedSnapshot:
+      history && current
+        ? { project: current.project, workspaceRevision: history.currentRevision }
+        : null,
+    previousProjects: previous.map((version) => version.project).reverse(),
+  };
 }

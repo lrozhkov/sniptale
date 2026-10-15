@@ -24,8 +24,15 @@ it('renders both prompt mutation surfaces', () => {
   };
   const node = document.createElement('div');
   const root = createRoot(node);
-  act(() => root.render(<AiPromptsContent prompts={{ global: prompt, scenarioEditor: prompt }} />));
+  act(() =>
+    root.render(
+      <AiPromptsContent
+        prompts={{ global: prompt, scenarioEditor: prompt, audioTranscription: prompt }}
+      />
+    )
+  );
   expect(node.textContent).toContain('globalPromptDescription');
   expect(node.textContent).toContain('scenarioEditorPromptDescription');
+  expect(node.textContent).toContain('audioTranscriptionPromptDescription');
   act(() => root.unmount());
 });

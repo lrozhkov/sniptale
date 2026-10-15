@@ -39,7 +39,11 @@ export type EditorSceneCanvasResizeApi = EditorSceneResizeApi &
 
 export type EditorBrowserFrameApi = Pick<
   EditorControllerPublicApiAdapter,
-  'ensureBrowserFrameOnTop' | 'nextLabelIndex' | 'prepareObject'
+  | 'ensureBrowserFrameOnTop'
+  | 'nextLabelIndex'
+  | 'prepareObject'
+  | 'createLayerMutationToken'
+  | 'isLayerMutationTokenCurrent'
 > &
   EditorSceneViewportApi &
   EditorSceneRelayoutApi &

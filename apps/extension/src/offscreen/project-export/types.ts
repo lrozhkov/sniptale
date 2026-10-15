@@ -1,3 +1,4 @@
+import type { ExportTimeEstimator } from '../../features/video/project/export/time-estimate';
 import type { ExportAudioSettings } from './codecs/types';
 import { type ClipAudioNode } from './media';
 
@@ -17,5 +18,6 @@ export interface ProjectExportRuntimeState {
 export interface ExportJobState extends ProjectExportRuntimeState {
   jobId: string;
   cancelled: boolean;
+  timeEstimator?: ExportTimeEstimator;
   renderProgressRange?: { start: number; end: number };
 }

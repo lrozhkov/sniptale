@@ -85,6 +85,17 @@ function isIndexedDbEntrypoint(node) {
     ts.isStringLiteral(node.moduleSpecifier) &&
     node.moduleSpecifier.text === 'idb'
   ) {
+    const clause = node.importClause;
+    if (clause?.isTypeOnly) return false;
+    if (
+      clause &&
+      !clause.name &&
+      clause.namedBindings &&
+      ts.isNamedImports(clause.namedBindings) &&
+      clause.namedBindings.elements.length > 0 &&
+      clause.namedBindings.elements.every((element) => element.isTypeOnly)
+    )
+      return false;
     return true;
   }
   return (

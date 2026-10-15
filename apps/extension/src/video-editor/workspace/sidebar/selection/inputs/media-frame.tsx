@@ -1,3 +1,4 @@
+import { WindowHeaderSettings } from '../../../../../workflows/browser-frame/settings';
 import { getMediaFramingPresets } from '../../../../../features/video/project/factories/framing-presets';
 import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
@@ -24,6 +25,7 @@ type MediaFrameControlsProps = Pick<
   | 'onUpdateMediaClipFitScalePercent'
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
+  | 'onUpdateMediaClipWindowHeader'
 > & {
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>;
   locked: boolean;
@@ -87,6 +89,12 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           onUpdateMediaClipShadowMode={props.onUpdateMediaClipShadowMode}
         />
       </InspectorDetails>
+      <WindowHeaderSettings
+        key={props.clip.id}
+        header={props.clip.windowHeader}
+        disabled={props.locked || !props.onUpdateMediaClipWindowHeader}
+        onChange={(header) => props.onUpdateMediaClipWindowHeader?.(props.clip.id, header)}
+      />
       <MediaApplyVisualsButton
         clip={props.clip}
         disabled={props.locked}

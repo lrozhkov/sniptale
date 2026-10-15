@@ -77,3 +77,22 @@ describe('AISettingsSchema', () => {
     ).toBe(true);
   });
 });
+
+it('validates the same audio operation constraints in runtime models and the model form', async () => {
+  const { AIModelSchema, ModelFormSchema } = await import('./ai-settings');
+  const model = {
+    id: '00000000-0000-4000-8000-000000000001',
+    providerId: '00000000-0000-4000-8000-000000000002',
+    modelCode: 'custom',
+    displayName: 'Speech',
+    operation: 'speech',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+  };
+  expect(AIModelSchema.strict().safeParse(model).success).toBe(true);
+  expect(ModelFormSchema.safeParse(model).success).toBe(true);
+  expect(AIModelSchema.strict().safeParse({ ...model, operation: 'text' }).success).toBe(false);
+  expect(
+    ModelFormSchema.safeParse({ ...model, audio: { speech: { ...model.audio.speech, speed: 5 } } })
+      .success
+  ).toBe(false);
+});

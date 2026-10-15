@@ -1,8 +1,16 @@
+import { createCameraFollowSettings } from '../../project/camera/cursor-policy';
+import { resolveProjectCursorCameraPlan } from './project-follow';
+import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
 import { createVideoClipFromAsset } from '../../project/factories/clip';
 import { resolveVideoCompositionActions } from '../timeline/frame/actions';
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject, createVideoProjectAsset } from '../../project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+  createVideoProjectFromRecording,
+} from '../../project/factories/creation';
+import {
+  VideoCursorCaptureMode,
   VideoMotionFocusMode,
   VideoMotionOverlayZoomMode,
   VideoProjectActionEventKind,
@@ -61,7 +69,35 @@ function createCameraProject() {
   ];
   return project;
 }
-function createCursorCameraProjectResult() {
+function createCursorCameraProjectResult(point = { x: 100, y: 200 }) {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'retained-camera',
+    filename: 'camera.webm',
+    width: 1000,
+    height: 800,
+    duration: 6,
+    mimeType: 'video/webm',
+    size: 10,
+    cursorTrack: {
+      captureMode: VideoCursorCaptureMode.EMBEDDED_FALLBACK,
+      skin: normalizeVideoProjectCursorSkin(undefined),
+      samples: [0, 6].map((time) => ({
+        id: `retained-${time}`,
+        time,
+        x: 600,
+        y: 440,
+        visible: true,
+        captureSegment: 0,
+        recordingPoint: { x: 0.6, y: 0.55 },
+      })),
+    },
+  });
+  project.motionRegions = createCameraProject().motionRegions ?? [];
+  project.version = 4;
+  project.cameraFollowDefaults = createCameraFollowSettings('fast');
+  expect(resolveProjectCursorCameraPlan(project, project.motionRegions![0]!)).toMatchObject({
+    status: 'ready',
+  });
   return resolveVideoCompositionCamera({
     actions: [],
     cursorSample: {
@@ -69,11 +105,10 @@ function createCursorCameraProjectResult() {
       interpolation: VideoTemporalEasing.LINEAR,
       time: 2,
       visible: true,
-      x: 100,
-      y: 200,
+      ...point,
     },
     currentTime: 2,
-    project: createCameraProject(),
+    project,
   });
 }
 function createActionCameraProjectResult() {
@@ -110,19 +145,20 @@ it('applies each temporal easing variant deterministically', () => {
   expect(applyTemporalEasing(0.5, VideoTemporalEasing.EASE_IN_OUT)).toBe(0.5);
   expect(applyTemporalEasing(0.5, VideoTemporalEasing.INSTANT)).toBe(1);
 });
-it('resolves camera focus for cursor and action driven motion regions', () => {
+it('uses retained camera observations and preserves action focus', () => {
   const cursorCamera = createCursorCameraProjectResult();
   const actionCamera = createActionCameraProjectResult();
 
   expect(cursorCamera).toEqual(
     expect.objectContaining({
-      focusPoint: expect.objectContaining({ x: 100, y: 200 }),
+      focusPoint: expect.objectContaining({ x: expect.closeTo(600, 6), y: expect.closeTo(440, 6) }),
       motionBlurAmount: 0,
       overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
       regionId: 'motion-cursor',
       scale: 2,
     })
   );
+  expect(createCursorCameraProjectResult({ x: 900, y: 700 })).toEqual(cursorCamera);
   expect(actionCamera).toEqual(
     expect.objectContaining({
       focusPoint: { x: 750, y: 500 },

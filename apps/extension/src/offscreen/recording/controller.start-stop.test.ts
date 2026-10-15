@@ -57,16 +57,10 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: vi.fn((key: string) => key),
 }));
 
-import {
-  pauseRecording,
-  resumeRecording,
-  startRecording,
-  stopRecording,
-  updateRecordingSettings,
-} from './controller';
-import { recordingContext } from './context';
+let controller: typeof import('./controller');
+let recordingContext: (typeof import('./context'))['recordingContext'];
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { PostRecordPublicationError } from './post-record-publication';
+let PostRecordPublicationError: (typeof import('./post-record-publication'))['PostRecordPublicationError'];
 import { createRecordingStagingCoordinatorTestDouble } from './encoding/artifact-session.test-support';
 
 class ActiveMediaRecorderFixture extends EventTarget implements MediaRecorder {
@@ -95,7 +89,7 @@ class ActiveMediaRecorderFixture extends EventTarget implements MediaRecorder {
   }
 }
 
-function createStartParams(): Parameters<typeof startRecording>[0] {
+function createStartParams(): Parameters<typeof controller.startRecording>[0] {
   return {
     generation: 1,
     recordingId: 'recording-delayed',
@@ -173,7 +167,14 @@ async function flushPromises(): Promise<void> {
   await Promise.resolve();
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  controller = await import('./controller');
+  ({ recordingContext } = await import('./context'));
+  ({ PostRecordPublicationError } = await import('./post-record-publication'));
+  startRecordingImplMock.mockReset();
+  retryPendingPostRecordResultMock.mockReset();
+  cleanupResourcesMock.mockReset();
   vi.useRealTimers();
   vi.clearAllMocks();
   recordingContext.resetRecordingSession();
@@ -199,8 +200,8 @@ it('waits for a delayed start and terminates activation before acknowledging sto
       })
   );
 
-  const start = startRecording(createStartParams());
-  const stop = stopRecording(sourceBinding, true);
+  const start = controller.startRecording(createStartParams());
+  const stop = controller.stopRecording(sourceBinding, true);
   let stopSettled = false;
   void stop.then(() => {
     stopSettled = true;
@@ -228,8 +229,10 @@ it('cancels a bound recorder that has not emitted its native start event', async
     );
   });
 
-  await startRecording(createStartParams());
-  await expect(stopRecording(sourceBinding, true)).resolves.toEqual({ result: 'stopped' });
+  await controller.startRecording(createStartParams());
+  await expect(controller.stopRecording(sourceBinding, true)).resolves.toEqual({
+    result: 'stopped',
+  });
 
   expect(cancelStartingRecorder).toHaveBeenCalledOnce();
   expect(cleanupResourcesMock).toHaveBeenCalledOnce();
@@ -262,8 +265,8 @@ it('delegates normal STOP to the artifact session as the only raw recorder stop 
     recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
-  await startRecording(createStartParams());
-  await expect(stopRecording(sourceBinding)).resolves.toEqual({
+  await controller.startRecording(createStartParams());
+  await expect(controller.stopRecording(sourceBinding)).resolves.toEqual({
     result: 'stopped',
     recordingPointTransform: null,
   });
@@ -294,10 +297,10 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
     recordingContext.activateRecorder(requireBoundArtifactSession(firstRecorder));
   });
 
-  await startRecording(createStartParams());
+  await controller.startRecording(createStartParams());
   recordingContext.beginStopRequest({ discard: false, reject: vi.fn(), resolve: vi.fn() });
   const sourceEndedStop = recordingContext.artifactSession?.stop();
-  const backgroundStop = stopRecording(sourceBinding);
+  const backgroundStop = controller.stopRecording(sourceBinding);
   await flushPromises();
 
   expect(firstArtifactStop).toHaveBeenCalledTimes(2);
@@ -334,8 +337,8 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
     recordingContext.activateRecorder(requireBoundArtifactSession(nextRecorder));
   });
 
-  await expect(startRecording(nextParams)).resolves.toBeUndefined();
-  await expect(stopRecording(nextBinding)).resolves.toEqual({
+  await expect(controller.startRecording(nextParams)).resolves.toBeUndefined();
+  await expect(controller.stopRecording(nextBinding)).resolves.toEqual({
     result: 'stopped',
     recordingPointTransform: null,
   });
@@ -354,10 +357,10 @@ it('reports a source-ended finalization failure to the joining background STOP',
     recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
-  await startRecording(createStartParams());
+  await controller.startRecording(createStartParams());
   recordingContext.beginStopRequest({ discard: false, reject: vi.fn(), resolve: vi.fn() });
 
-  await expect(stopRecording(sourceBinding)).resolves.toEqual({
+  await expect(controller.stopRecording(sourceBinding)).resolves.toEqual({
     error: finalizationError.message,
     result: 'terminal-failure',
   });
@@ -386,9 +389,9 @@ it('keeps stop pending after recorder terminal progress until durable publicatio
     recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
-  await startRecording(createStartParams());
-  const stop = stopRecording(sourceBinding);
-  const duplicateStop = stopRecording(sourceBinding);
+  await controller.startRecording(createStartParams());
+  const stop = controller.stopRecording(sourceBinding);
+  const duplicateStop = controller.stopRecording(sourceBinding);
   let stopSettlementCount = 0;
   void stop.finally(() => {
     stopSettlementCount += 1;
@@ -427,9 +430,17 @@ it('fails once without recorder terminal progress and prevents late media public
     recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
 
-  await startRecording(createStartParams());
-  const stop = stopRecording(sourceBinding);
+  await controller.startRecording(createStartParams());
+  const stop = controller.stopRecording(sourceBinding);
   let stopSettlementCount = 0;
+  await expect(
+    controller.startRecording({
+      ...createStartParams(),
+      recordingId: 'recording-b',
+      generation: 2,
+      streamInstanceId: 'source-b',
+    })
+  ).rejects.toThrow();
   void stop.finally(() => {
     stopSettlementCount += 1;
   });
@@ -450,8 +461,10 @@ it('fails once without recorder terminal progress and prevents late media public
   expect(stopSettlementCount).toBe(1);
   expect(publishCommittedMedia).not.toHaveBeenCalled();
 
-  retryPendingPostRecordResultMock.mockResolvedValueOnce(true);
-  await expect(stopRecording(sourceBinding)).resolves.toEqual({ result: 'stopped' });
+  await expect(controller.stopRecording(sourceBinding)).resolves.toEqual({
+    error: 'background.runtime.recordingStopTimeout',
+    result: 'terminal-failure',
+  });
 });
 
 it('retries an already-saved result without restarting finalization or losing the binding', async () => {
@@ -464,8 +477,8 @@ it('retries an already-saved result without restarting finalization or losing th
   });
   retryPendingPostRecordResultMock.mockResolvedValueOnce(true);
 
-  await startRecording(createStartParams());
-  await expect(stopRecording(sourceBinding)).resolves.toEqual({ result: 'stopped' });
+  await controller.startRecording(createStartParams());
+  await expect(controller.stopRecording(sourceBinding)).resolves.toEqual({ result: 'stopped' });
 
   expect(retryPendingPostRecordResultMock).toHaveBeenCalledWith(
     'recording-delayed',
@@ -490,7 +503,7 @@ it('reconciles a committed result with a lost response before accepting the next
     bindArtifactSession(recorder);
     recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
-  await startRecording(createStartParams());
+  await controller.startRecording(createStartParams());
 
   retryPendingPostRecordResultMock.mockRejectedValueOnce(
     new PostRecordPublicationError(
@@ -502,7 +515,9 @@ it('reconciles a committed result with a lost response before accepting the next
       new Error('response channel closed')
     )
   );
-  await expect(stopRecording(sourceBinding)).rejects.toBeInstanceOf(PostRecordPublicationError);
+  await expect(controller.stopRecording(sourceBinding)).rejects.toBeInstanceOf(
+    PostRecordPublicationError
+  );
   recordingContext.resetRecordingSession();
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
@@ -514,7 +529,7 @@ it('reconciles a committed result with a lost response before accepting the next
     recordingId: 'recording-next',
     streamInstanceId: 'stream-instance-next',
   };
-  await expect(startRecording(nextParams)).resolves.toBeUndefined();
+  await expect(controller.startRecording(nextParams)).resolves.toBeUndefined();
 
   expect(retryPendingPostRecordResultMock).toHaveBeenLastCalledWith(
     'recording-delayed',
@@ -542,7 +557,7 @@ it('does not resurrect a retired previous binding when the next start fails', as
     bindArtifactSession(recorder);
     recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
   });
-  await startRecording(createStartParams());
+  await controller.startRecording(createStartParams());
   retryPendingPostRecordResultMock.mockRejectedValueOnce(
     new PostRecordPublicationError(
       {
@@ -553,7 +568,9 @@ it('does not resurrect a retired previous binding when the next start fails', as
       new Error('response channel closed')
     )
   );
-  await expect(stopRecording(sourceBinding)).rejects.toBeInstanceOf(PostRecordPublicationError);
+  await expect(controller.stopRecording(sourceBinding)).rejects.toBeInstanceOf(
+    PostRecordPublicationError
+  );
   recordingContext.resetRecordingSession();
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
@@ -565,15 +582,19 @@ it('does not resurrect a retired previous binding when the next start fails', as
     recordingId: 'recording-next',
     streamInstanceId: 'stream-instance-next',
   };
-  await expect(startRecording({ ...createStartParams(), ...nextBinding })).rejects.toThrow(
-    'next source failed'
-  );
+  await expect(
+    controller.startRecording({ ...createStartParams(), ...nextBinding })
+  ).rejects.toThrow('next source failed');
 
-  await expect(stopRecording(nextBinding, true)).resolves.toEqual({ result: 'stopped' });
-  expect(() => pauseRecording(sourceBinding)).toThrow('Recording source binding is unavailable');
+  await expect(controller.stopRecording(nextBinding, true)).rejects.toThrow(
+    'Recording source binding is unavailable'
+  );
+  expect(() => controller.pauseRecording(sourceBinding)).toThrow(
+    'Recording source binding is unavailable'
+  );
 });
 
-it('fails a stuck start cancellation within a deadline and allows a safe retry', async () => {
+it('retains a failed start cancellation when a later inactive Stop cannot prove cleanup', async () => {
   vi.useFakeTimers();
   let completeStart!: () => void;
   startRecordingImplMock.mockImplementationOnce(
@@ -583,8 +604,8 @@ it('fails a stuck start cancellation within a deadline and allows a safe retry',
       })
   );
 
-  const start = startRecording(createStartParams());
-  const stopExpectation = expect(stopRecording(sourceBinding, true)).resolves.toEqual({
+  const start = controller.startRecording(createStartParams());
+  const stopExpectation = expect(controller.stopRecording(sourceBinding, true)).resolves.toEqual({
     error: 'background.runtime.recordingStopTimeout',
     result: 'terminal-failure',
   });
@@ -594,7 +615,10 @@ it('fails a stuck start cancellation within a deadline and allows a safe retry',
 
   completeStart();
   await start;
-  await expect(stopRecording(sourceBinding, true)).resolves.toEqual({ result: 'stopped' });
+  await expect(controller.stopRecording(sourceBinding, true)).resolves.toEqual({
+    error: 'background.runtime.recordingStopTimeout',
+    result: 'terminal-failure',
+  });
 });
 
 it('rejects a delayed stop whose source identity belongs to another start', async () => {
@@ -605,10 +629,10 @@ it('rejects a delayed stop whose source identity belongs to another start', asyn
         completeStart = resolve;
       })
   );
-  const start = startRecording(createStartParams());
+  const start = controller.startRecording(createStartParams());
 
   await expect(
-    stopRecording(
+    controller.stopRecording(
       {
         generation: 1,
         recordingId: 'recording-stale',
@@ -631,16 +655,16 @@ it('rejects delayed pause, resume, and settings commands from another recording 
         completeStart = resolve;
       })
   );
-  const start = startRecording(createStartParams());
+  const start = controller.startRecording(createStartParams());
   const stale = {
     generation: 0,
     recordingId: 'recording-stale',
     streamInstanceId: 'stream-instance-stale',
   };
 
-  expect(() => pauseRecording(stale)).toThrow('Stale recording source binding');
-  expect(() => resumeRecording(stale)).toThrow('Stale recording source binding');
-  expect(() => updateRecordingSettings(stale, { microphoneEnabled: false })).toThrow(
+  expect(() => controller.pauseRecording(stale)).toThrow('Stale recording source binding');
+  expect(() => controller.resumeRecording(stale)).toThrow('Stale recording source binding');
+  expect(() => controller.updateRecordingSettings(stale, { microphoneEnabled: false })).toThrow(
     'Stale recording source binding'
   );
 
@@ -680,9 +704,9 @@ it.each(['stable', 'late-change', 'no-frame', 'discard'] as const)(
       recordingContext.recordingPointObservation = observation;
       recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
     });
-    await startRecording(createStartParams());
-    const stop = stopRecording(sourceBinding, mode === 'discard');
-    const duplicate = stopRecording(sourceBinding, mode === 'discard');
+    await controller.startRecording(createStartParams());
+    const stop = controller.stopRecording(sourceBinding, mode === 'discard');
+    const duplicate = controller.stopRecording(sourceBinding, mode === 'discard');
     expect(duplicate).toBe(stop);
     await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
     const complete = recordingContext.stopRecordingResolve;
@@ -707,13 +731,17 @@ it.each([1, 2])(
     });
     const params = createStartParams();
     params.settings.sourceCount = sourceCount;
-    const pending = startRecording(params, () => data);
+    const pending = controller.startRecording(params, () => data);
     if (sourceCount === 1) {
       const { allowRecordingBegin } = await import('./start/gate');
       allowRecordingBegin(sourceBinding);
     }
-    await expect(stopRecording({ ...sourceBinding, generation: 0 })).rejects.toThrow('Stale');
-    await expect(stopRecording(sourceBinding, true)).resolves.toEqual({ result: 'stopped' });
+    await expect(controller.stopRecording({ ...sourceBinding, generation: 0 })).rejects.toThrow(
+      'Stale'
+    );
+    await expect(controller.stopRecording(sourceBinding, true)).resolves.toEqual({
+      result: 'stopped',
+    });
     await pending;
     resolve();
     await Promise.resolve();
@@ -734,7 +762,7 @@ it.each([1, 2])(
       });
       const params = createStartParams();
       params.settings.sourceCount = sourceCount;
-      const pending = startRecording(params, () => data);
+      const pending = controller.startRecording(params, () => data);
       const failed = expect(pending).rejects.toThrow('timed out');
       await vi.advanceTimersByTimeAsync(15_000);
       await failed;
@@ -749,10 +777,35 @@ it.each([1, 2])(
 
 it('releases a failed admission so a subsequent start can retry', async () => {
   await expect(
-    startRecording(createStartParams(), async () => {
+    controller.startRecording(createStartParams(), async () => {
       throw new Error('storage failed');
     })
   ).rejects.toThrow('storage failed');
-  await startRecording(createStartParams());
+  await controller.startRecording(createStartParams());
   expect(startRecordingImplMock).toHaveBeenCalledOnce();
+});
+
+it('keeps BEGIN available through slow preparation and the full countdown', async () => {
+  vi.useFakeTimers();
+  const { waitForRecordingBegin, allowRecordingBegin, cancelRecordingBegin } =
+    await import('./start/gate');
+  try {
+    const params = createStartParams();
+    params.settings.countdownSeconds = 10;
+    startRecordingImplMock.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 33_000));
+      await waitForRecordingBegin(sourceBinding, 10_000);
+    });
+    const pending = controller.startRecording(
+      params,
+      () => new Promise<void>((resolve) => setTimeout(resolve, 11_000))
+    );
+    const observed = pending.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(54_000);
+    allowRecordingBegin(sourceBinding);
+    await expect(observed).resolves.toBeUndefined();
+  } finally {
+    cancelRecordingBegin();
+    vi.useRealTimers();
+  }
 });

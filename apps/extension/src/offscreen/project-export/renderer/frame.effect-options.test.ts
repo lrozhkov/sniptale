@@ -58,6 +58,7 @@ it('forwards precomputed composition and effect state to the export owners', asy
   });
 
   expect(mocks.resolveRenderPasses).toHaveBeenCalledWith(project, 3, {
+    cameraViewport: { width: 200, height: 100, resolution: 'SOURCE' },
     includeSubtitles: false,
     timelineIndex: compositionIndex,
   });

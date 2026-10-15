@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { FabricImage } from 'fabric';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import {
   collectLayers,
   findObjectById,
@@ -8,6 +8,15 @@ import {
   getObjectDimensions,
   getSourceObject,
 } from './layers';
+
+const hostCrypto = globalThis.crypto;
+const originalRandomUUID = hostCrypto.randomUUID;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  expect(hostCrypto.randomUUID).toBe(originalRandomUUID);
+});
 
 function createCanvas(objects: unknown[], activeObjects: unknown[] = []) {
   return {
@@ -236,12 +245,7 @@ it('keeps the source layer immutable even when it is currently unlocked', () => 
 });
 
 it('collects effect counts without retaining raster previews for the layer list', () => {
-  vi.stubGlobal(
-    'crypto',
-    Object.assign(globalThis.crypto, {
-      randomUUID: () => 'generated-id',
-    })
-  );
+  vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
   const image = createRasterImage();
   const [layer] = collectLayers(createCanvas([image]));
 

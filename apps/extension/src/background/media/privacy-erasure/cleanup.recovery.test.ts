@@ -46,7 +46,7 @@ const {
 vi.mock('../video/recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
-  ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+  ensureVideoRecordingLeaseCache: ensureActiveVideoRecordingLeaseHydratedMock,
 }));
 vi.mock('../video/content-surface/surface-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/content-surface/surface-lease')>()),
@@ -337,4 +337,57 @@ it('keeps corrupt durable state visible when offscreen quiescence cannot be veri
   );
   expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
   expect(clearProjectExportJobLedgerForPrivacyErasureMock).not.toHaveBeenCalled();
+});
+
+it.each(['failed', 'unknown'] as const)(
+  'erases %s terminal authority through verified containment and permits a repeated erasure',
+  async (outcome) => {
+    const failedLease = {
+      ...recordingLease,
+      phase: 'terminal',
+      terminal: { discard: true, outcome, cleanupStep: 'surface' },
+    };
+    inspectPersistedLeaseMock.mockResolvedValueOnce({ lease: failedLease, status: 'entry' });
+    ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValue(null);
+    getCurrentRecordingIdMock.mockReturnValue(failedLease.recordingId);
+    stopRecordingForPrivacyErasureMock.mockResolvedValue({
+      result: 'failed',
+      error: 'terminal failure',
+    });
+    const first = await mediaPrivacyErasureCleanupAdapter.cleanup();
+    expect(first).toContainEqual(
+      expect.objectContaining({ id: 'recording-runtime-state', status: 'verified-empty' })
+    );
+    expect(stopRecordingForPrivacyErasureMock).not.toHaveBeenCalled();
+    expect(closeOffscreenDocumentForPrivacyErasureMock.mock.invocationCallOrder[0]).toBeLessThan(
+      clearActiveVideoRecordingLeaseMock.mock.invocationCallOrder[0]!
+    );
+    getCurrentRecordingIdMock.mockReturnValue(null);
+    const retry = await mediaPrivacyErasureCleanupAdapter.cleanup();
+    expect(retry).toContainEqual(
+      expect.objectContaining({ id: 'recording-runtime-state', status: 'verified-empty' })
+    );
+  }
+);
+
+it('retains failed terminal authority until erasure containment succeeds on retry', async () => {
+  const lease = {
+    ...recordingLease,
+    phase: 'terminal',
+    terminal: { discard: true, outcome: 'failed', cleanupStep: 'surface' },
+  };
+  inspectPersistedLeaseMock.mockResolvedValueOnce({ lease, status: 'entry' });
+  closeOffscreenDocumentForPrivacyErasureMock.mockRejectedValueOnce(new Error('still active'));
+  const first = await mediaPrivacyErasureCleanupAdapter.cleanup();
+  expect(first).toContainEqual(
+    expect.objectContaining({ id: 'recording-runtime-state', status: 'failed' })
+  );
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  inspectPersistedLeaseMock.mockResolvedValueOnce({ lease, status: 'entry' });
+  const retry = await mediaPrivacyErasureCleanupAdapter.cleanup();
+  expect(retry).toContainEqual(
+    expect.objectContaining({ id: 'recording-runtime-state', status: 'verified-empty' })
+  );
+  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledOnce();
 });

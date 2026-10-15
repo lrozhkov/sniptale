@@ -17,6 +17,7 @@ type VideoEditorProjectClipPropertyActionKeys =
   | 'updateMediaClipFitScalePercent'
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
+  | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
   | 'convertTextClipToAnnotation'
   | 'updateTextClipContent'

@@ -279,3 +279,56 @@ it('rejects malformed cut transitions without silently dropping authored setting
     expect(parseReviewOperation({ ...operation, after }, source.duration)?.after).toEqual(after);
   }
 });
+
+it('preserves custom cut colors in history and rejects nonopaque or malformed colors', () => {
+  const cut = { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 };
+  const transition = { type: 'fade-black', before: 0.5, after: 0.5 };
+  const operation = { id: 'op', at: 1, target: 'edit', before: { ...cut, transition } };
+  for (const color of ['#12abEF', '#123456ff']) {
+    const after = { ...cut, transition: { ...transition, color } };
+    const parsed = parseReviewOperation({ ...operation, after }, source.duration);
+    expect(parsed?.before).toEqual(operation.before);
+    expect(parsed?.after).toEqual(after);
+  }
+  for (const color of ['red', '#12345600', '#xyzxyz', '', null, 12]) {
+    expect(
+      parseReviewOperation(
+        { ...operation, after: { ...cut, transition: { ...transition, color } } },
+        source.duration
+      )
+    ).toBeNull();
+  }
+});
+
+it('admits bounded source master gain operations without retaining extension fields', () => {
+  const value = {
+    id: 'gain',
+    at: 1,
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 0.5 },
+  };
+  expect(
+    parseReviewOperation(
+      { ...value, after: { ...value.after, assetId: 'untrusted', ranges: [] } },
+      10
+    )
+  ).toEqual(value);
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { volume: 1 },
+    { muted: true },
+    { muted: 'true', volume: 1 },
+    { muted: true, volume: '1' },
+    ...[-1, 2.1, NaN, Infinity].map((volume) => ({ muted: true, volume })),
+  ]) {
+    expect(parseReviewOperation({ ...value, before: invalid }, 10)).toBeNull();
+    expect(parseReviewOperation({ ...value, after: invalid }, 10)).toBeNull();
+  }
+  for (const volume of [0, 2])
+    expect(parseReviewOperation({ ...value, after: { muted: true, volume } }, 10)).toMatchObject({
+      after: { muted: true, volume },
+    });
+});

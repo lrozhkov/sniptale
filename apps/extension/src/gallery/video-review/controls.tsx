@@ -1,6 +1,11 @@
+import { InspectorDisclosureView } from '../../ui/compact-inspector-controls/disclosure';
+import type { InspectorDisclosureProps } from '../../ui/compact-inspector-controls/shared';
+import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
-import { translate } from '../../platform/i18n';
-import { ChevronDown, type LucideIcon } from 'lucide-react';
+import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
+import { useContext } from 'react';
+import { ReviewIntervalMap, reviewIntervalDuration } from './interval-timing';
+import { Clock3 } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 import {
@@ -63,27 +68,119 @@ export const reviewTrackStatusButtonClassName =
 export const reviewTextButtonClassName =
   reviewIconButtonClassName + ' !w-auto gap-2 !text-xs [&_svg]:shrink-0';
 
+/** Keeps a timeline tool and its contextual values on one surface without disabling its options. */
+export function ReviewToolGroup({
+  active,
+  label,
+  children,
+}: {
+  active: boolean;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <ContentToolbarGroup
+      dataUi="gallery.videoReview.toolGroup"
+      className="review-tool-group"
+      data-active={active ? 'true' : undefined}
+      role={active ? 'group' : undefined}
+      aria-label={active ? label : undefined}
+    >
+      {children}
+    </ContentToolbarGroup>
+  );
+}
+
 /** Reversible delete actions keep the same geometry with a distinct danger tone. */
 export const reviewDeleteButtonClassName =
   reviewTextButtonClassName +
-  ' review-inspector-danger !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
+  ' review-inspector-danger enabled:hover:!text-[var(--sniptale-color-danger)] ' +
+  'enabled:hover:!border-[var(--sniptale-color-danger)]';
 
-/** Read-only timing uses the same label/value row as editable inspector parameters. */
-export function ReviewInterval({ start, end }: { start: number; end: number }) {
+/** Source placement and playback duration remain distinct without adding inspector rows. */
+export function ReviewInterval({
+  start,
+  end,
+  timeBasis = 'source',
+  duration = end - start,
+  resultDuration,
+}: {
+  start: number;
+  end: number;
+  timeBasis?: 'source' | 'result';
+  duration?: number;
+  resultDuration?: number;
+}) {
+  const map = useContext(ReviewIntervalMap);
+  const locale = useAppLocale();
+  const format = (value: number) => formatNumber(value, { maximumFractionDigits: 2 }, locale);
+  const seconds = (value: number) =>
+    translate('gallery.videoReview.intervalSeconds').replace(
+      '{value}',
+      value > 0 && value < 0.005 ? `<${format(0.01)}` : format(Math.max(0, value))
+    );
+  const result =
+    resultDuration ?? (timeBasis === 'source' ? reviewIntervalDuration(start, end, map) : duration);
+  const originalLabel = seconds(duration);
+  const resultLabel = seconds(result);
+  const changed = start !== end && originalLabel !== resultLabel;
+  const range =
+    start === end ? reviewTimeLabel(start) : `${reviewTimeLabel(start)} – ${reviewTimeLabel(end)}`;
+  const rangeLabel = translate(
+    timeBasis === 'source'
+      ? 'gallery.videoReview.sourceInterval'
+      : 'gallery.videoReview.resultInterval'
+  );
+  const rangeTitle = `${rangeLabel}: ${range}`;
   return (
     <div
-      className="flex min-h-8 items-center justify-between gap-3 py-0.5"
+      className="flex min-h-8 min-w-0 items-center justify-between gap-2 py-0.5 text-xs tabular-nums"
       data-ui="gallery.videoReview.interval"
     >
-      <span className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
+      <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
         {translate(
           start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
         )}
       </span>
-      <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
-        {start === end
-          ? reviewTimeLabel(start)
-          : `${reviewTimeLabel(start)} – ${reviewTimeLabel(end)}`}
+      <span
+        data-ui="gallery.videoReview.intervalValues"
+        className="flex min-w-0 items-center gap-2"
+      >
+        <span
+          data-ui="gallery.videoReview.intervalRange"
+          className="min-w-0 truncate text-[var(--sniptale-color-text-secondary)]"
+          title={rangeTitle}
+        >
+          {range}
+        </span>
+        {start !== end ? (
+          <span
+            data-ui="gallery.videoReview.intervalDuration"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[var(--sniptale-color-text-primary)]"
+          >
+            <span aria-hidden="true" className="mr-1 text-[var(--sniptale-color-text-muted)]">
+              ·
+            </span>
+            <Clock3
+              size={12}
+              aria-hidden="true"
+              className="text-[var(--sniptale-color-text-muted)]"
+            />
+            <span title={translate('gallery.videoReview.intervalDuration')}>{originalLabel}</span>
+            {changed ? (
+              <span
+                data-ui="gallery.videoReview.intervalResult"
+                title={translate('gallery.videoReview.resultDuration')}
+              >
+                <span aria-hidden="true" className="text-[var(--sniptale-color-text-muted)]">
+                  {' '}
+                  →{' '}
+                </span>
+                <span className="font-medium">{resultLabel}</span>
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </span>
     </div>
   );
@@ -147,12 +244,20 @@ export function reviewEventLabel(kind: string): string {
     CLICK: 'gallery.videoReview.eventClick',
     DOUBLE_CLICK: 'gallery.videoReview.eventDoubleClick',
     SCROLL: 'gallery.videoReview.eventScroll',
+    WHEEL: 'gallery.videoReview.eventWheel',
+    HOLD: 'gallery.videoReview.eventHold',
+    PRESS_UNRESOLVED: 'gallery.videoReview.eventIncompletePress',
+    DRAG: 'gallery.videoReview.eventDrag',
+    SELECTION: 'gallery.videoReview.eventSelection',
+    NATIVE_DRAG: 'gallery.videoReview.eventNativeDrag',
+    'cursor-gap': 'gallery.videoReview.eventCursorGap',
     KEY: 'gallery.videoReview.eventKey',
+    KEY_HOLD: 'gallery.videoReview.eventKeyHold',
+    KEY_MODIFIERS: 'gallery.videoReview.eventKeyModifiers',
     PAUSE: 'gallery.videoReview.eventPause',
     CALLOUT: 'gallery.videoReview.eventCallout',
     typing: 'gallery.videoReview.eventTyping',
     'cursor-idle': 'gallery.videoReview.eventCursorIdle',
-    'static-frame': 'gallery.videoReview.eventStatic',
     cursor: 'gallery.videoReview.eventCursor',
   } as const;
   return translate(
@@ -160,39 +265,34 @@ export function reviewEventLabel(kind: string): string {
   );
 }
 
+/** DOM button identity is displayed only when capture actually recorded it. */
+export function reviewMouseButtonLabel(button: number | undefined): string {
+  if (button === undefined || !Number.isInteger(button) || button < 0 || button > 31) return '';
+  const labels = [
+    'gallery.videoReview.historyButtonLeft',
+    'gallery.videoReview.historyButtonMiddle',
+    'gallery.videoReview.historyButtonRight',
+    'gallery.videoReview.historyButtonBack',
+    'gallery.videoReview.historyButtonForward',
+  ] as const;
+  return button < labels.length
+    ? translate(labels[button]!)
+    : translate('gallery.videoReview.historyButtonOther').replace(
+        '{number}',
+        formatNumber(button + 1)
+      );
+}
+
 /** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */
-export function ReviewDetails({
-  label,
-  preferenceId,
-  children,
-  icon: Icon,
-  level = 'group',
-  initiallyOpen,
-}: {
-  label: string;
-  preferenceId: string;
-  children: ReactNode;
-  icon?: LucideIcon;
-  level?: 'section' | 'group';
-  initiallyOpen?: boolean;
-}) {
-  const [open, setOpen] = useInspectorDisclosure(preferenceId, initiallyOpen ?? false);
-  const Heading = level === 'section' ? 'h3' : 'h4';
+export function ReviewDetails(props: InspectorDisclosureProps) {
+  const [open, setOpen] = useInspectorDisclosure(props.preferenceId, props.initiallyOpen ?? false);
   return (
-    <details
-      data-ui="gallery.videoReview.disclosure"
-      data-level={level}
+    <InspectorDisclosureView
+      {...props}
       open={open}
-      onToggle={(event) => {
-        if (event.currentTarget.open !== open) setOpen(event.currentTarget.open);
-      }}
-    >
-      <summary>
-        {Icon ? <Icon size={16} aria-hidden="true" /> : null}
-        <Heading>{label}</Heading>
-        <ChevronDown size={level === 'section' ? 16 : 14} aria-hidden="true" />
-      </summary>
-      <div className="review-inspector-section-body">{children}</div>
-    </details>
+      onOpenChange={setOpen}
+      dataUi="gallery.videoReview.disclosure"
+      bodyClassName="review-inspector-section-body"
+    />
   );
 }

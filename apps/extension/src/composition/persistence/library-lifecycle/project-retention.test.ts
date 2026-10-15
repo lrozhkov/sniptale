@@ -1,3 +1,10 @@
+import { materializeWorkspaceStorage } from '../review-workspaces/storage-format';
+import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { materializeScenarioUnitStorage } from '../scenario/storage-units';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { expect, it, vi } from 'vitest';
 import {
   createVideoProjectEntry,
@@ -17,7 +24,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({ runWithIndexedDbMutati
 
 import { repairTemporaryProjectLifecycles } from './project-retention';
 
-function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
+function createProjectStores(options: { failScenarioPut?: boolean; failReviewPut?: boolean } = {}) {
   const video = {
     ...createVideoProjectEntry({ id: 'video-1' }),
     lifecycle: createLibraryLifecycle('temporary', 10),
@@ -38,10 +45,15 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
   const persisted = new Map([
     ['video_projects', new Map<string, unknown>([[video.id, video]])],
     ['scenario_projects', new Map<string, unknown>([[scenario.id, scenario]])],
+    ['scenario_project_history', new Map<string, unknown>()],
+    ['scenario_project_units', new Map<string, unknown>()],
     ['media_library', new Map<string, unknown>()],
     ['project_assets', new Map<string, unknown>()],
     ['scenario_assets', new Map<string, unknown>()],
     ['recordings', new Map<string, unknown>()],
+    ['image_workspaces', new Map<string, unknown>()],
+    ['video_workspaces', new Map<string, unknown>()],
+    ['video_workspace_history', new Map<string, unknown>()],
   ]);
   const abort = vi.fn();
   runWithIndexedDbMutation.mockImplementation(async (effect) => {
@@ -57,11 +69,51 @@ function createProjectStores(options: { failScenarioPut?: boolean } = {}) {
       objectStore: (name: string) => ({
         get: async (id: string) => pending.get(name)?.get(id),
         getAll: async () => [...(pending.get(name)?.values() ?? [])],
-        put: async (entry: { id: string }) => {
+        index: () => ({
+          getAll: async (id: string) =>
+            [...(pending.get(name)?.values() ?? [])]
+              .filter(isRecord)
+              .filter(
+                (row) =>
+                  row[name === 'video_workspace_history' ? 'aggregateId' : 'projectId'] === id
+              ),
+          getAllKeys: async (id: string) =>
+            [...(pending.get(name)?.values() ?? [])].flatMap((row) =>
+              isRecord(row) && row['aggregateId'] === id && typeof row['ordinal'] === 'number'
+                ? [[id, row['ordinal']]]
+                : []
+            ),
+        }),
+        delete: async (key: IDBValidKey) => pending.get(name)?.delete(JSON.stringify(key)),
+        put: async (entry: {
+          id?: string;
+          aggregateId?: string;
+          ordinal?: number;
+          projectId?: string;
+          revision?: number;
+          unitId?: string;
+        }) => {
           if (name === 'scenario_projects' && options.failScenarioPut) {
             throw new Error('scenario write failed');
           }
-          pending.get(name)?.set(entry.id, entry);
+          if (name === 'video_workspaces' && options.failReviewPut)
+            throw new Error('review write failed');
+          let key = entry.id!;
+          switch (name) {
+            case 'video_workspace_history':
+              key = JSON.stringify([entry.aggregateId, entry.ordinal]);
+              break;
+            case 'video_workspaces':
+              key = entry.aggregateId!;
+              break;
+            case 'scenario_project_units':
+              key = JSON.stringify([entry.projectId, entry.unitId, entry.revision]);
+              break;
+            case 'scenario_project_history':
+              key = JSON.stringify([entry.projectId, entry.revision]);
+              break;
+          }
+          pending.get(name)?.set(key, entry);
         },
       }),
     };
@@ -77,8 +129,15 @@ it('promotes both legacy project roots once without changing documents, revision
     ...video,
     lifecycle: { savedAt: 100, storageClass: 'library', updatedAt: 100 },
   });
-  expect(persisted.get('scenario_projects')?.get(scenario.id)).toEqual({
+  expect(
+    materializeScenarioUnitStorage(
+      persisted.get('scenario_projects')?.get(scenario.id),
+      [...persisted.get('scenario_project_history')!.values()],
+      [...persisted.get('scenario_project_units')!.values()]
+    )
+  ).toEqual({
     ...scenario,
+    history: undefined,
     lifecycle: { savedAt: 100, storageClass: 'library', trashedAt: 20, updatedAt: 100 },
   });
   expect(await repairTemporaryProjectLifecycles(200)).toBe(0);
@@ -179,3 +238,149 @@ it.each(['current', 'history'] as const)('retains scenario source used in %s', a
     lifecycle: { storageClass: 'library', savedAt: 100 },
   });
 });
+
+it('promotes legacy review auxiliary origins without promoting an unrelated draft', async () => {
+  const { persisted } = createProjectStores();
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.music.push({
+    id: 'music',
+    assetId: 'project-asset:audio',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  });
+  persisted.set(
+    'video_workspaces',
+    new Map([
+      [
+        'root',
+        {
+          aggregateId: 'root',
+          formatVersion: 1,
+          sourceAssetId: 'root-bytes',
+          source: { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' },
+          revision: 1,
+          cursor: 0,
+          history: [],
+          advanced,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    ])
+  );
+  for (const id of ['origin', 'unrelated'])
+    persisted
+      .get('media_library')!
+      .set(id, createMediaLibraryEntry({ id, lifecycle: createLibraryLifecycle('temporary', 1) }));
+  persisted
+    .get('project_assets')!
+    .set('audio', createProjectAssetEntry({ id: 'audio', originMediaId: 'origin' }));
+  await repairTemporaryProjectLifecycles(100);
+  expect(persisted.get('media_library')!.get('origin')).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+  });
+  expect(persisted.get('media_library')!.get('unrelated')).toMatchObject({
+    lifecycle: { storageClass: 'temporary' },
+  });
+});
+
+it.each(['image', 'review', 'review-missing', 'review-failure'] as const)(
+  'repairs the primary Library root of a saved legacy %s project',
+  async (kind) => {
+    const { persisted } = createProjectStores({ failReviewPut: kind === 'review-failure' });
+    const recording = betaV1Fixture.records.recordings[0]!;
+    const media =
+      kind === 'image'
+        ? createMediaLibraryEntry({
+            id: 'legacy-image',
+            lifecycle: createLibraryLifecycle('temporary', 1),
+          })
+        : {
+            ...betaV1Fixture.records.media_library[0]!,
+            lifecycle: createLibraryLifecycle('temporary', 1),
+          };
+    persisted.get('media_library')!.set(media.id, media);
+    let workspace: unknown;
+    if (kind === 'image') {
+      workspace = {
+        aggregateId: media.id,
+        createdAt: 1,
+        updatedAt: 1,
+        revision: 1,
+        sourceTitle: null,
+        sourceUrl: null,
+        document: createPersistedEditorDocumentFixture(createEditorDocumentFixture()),
+      };
+      persisted.set('image_workspaces', new Map([[media.id, workspace]]));
+    } else {
+      persisted
+        .get('recordings')!
+        .set(recording.id, { ...recording, lifecycle: createLibraryLifecycle('temporary', 1) });
+      workspace = {
+        aggregateId: media.id,
+        formatVersion: 1,
+        sourceAssetId: recording.assetId,
+        source: {
+          duration: media.duration ?? 1,
+          width: media.width ?? 640,
+          height: media.height ?? 360,
+          size: media.size,
+          mimeType: media.mimeType,
+        },
+        revision: 1,
+        cursor: 0,
+        history: [],
+        advanced: createQuickEditAdvancedState(),
+        createdAt: 1,
+        updatedAt: 1,
+      };
+      persisted.set('video_workspaces', new Map([[media.id, workspace]]));
+    }
+    const before = structuredClone(workspace);
+    if (kind === 'review-missing') {
+      persisted.get('media_library')!.delete(media.id);
+      await repairTemporaryProjectLifecycles(100);
+      expect(persisted.get('media_library')!.has(media.id)).toBe(false);
+      expect(persisted.get('video_workspaces')!.get(media.id)).toEqual(before);
+      return;
+    }
+    if (kind === 'review-failure') {
+      const allBefore = structuredClone(persisted);
+      await expect(repairTemporaryProjectLifecycles(100)).rejects.toThrow('review write failed');
+      expect(persisted).toEqual(allBefore);
+      return;
+    }
+    await repairTemporaryProjectLifecycles(100);
+    expect(persisted.get('media_library')!.get(media.id)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
+    if (kind === 'image') expect(persisted.get('image_workspaces')!.get(media.id)).toEqual(before);
+    else {
+      if (!isRecord(before)) throw new Error('Missing fixture workspace');
+      const repaired = materializeWorkspaceStorage(
+        persisted.get('video_workspaces')!.get(media.id),
+        [...persisted.get('video_workspace_history')!.values()]
+      );
+      expect(repaired).toEqual(
+        expect.objectContaining({
+          ...before,
+          formatVersion: 3,
+          revision: 2,
+          updatedAt: 100,
+          project: {
+            name: media.filename,
+            lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+          },
+        })
+      );
+      const after = structuredClone(persisted);
+      expect(await repairTemporaryProjectLifecycles(200)).toBe(0);
+      expect(persisted).toEqual(after);
+    }
+  }
+);

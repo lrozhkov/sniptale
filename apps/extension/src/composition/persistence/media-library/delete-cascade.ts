@@ -1,3 +1,7 @@
+import { recoverMediaSourcePublications } from './delete-cascade.recovery';
+import { createScenarioProjectStore } from '../scenario/storage';
+import { createVideoWorkspaceStore } from '../review-workspaces/storage';
+import { withVideoProjectUsage, withReviewWorkspaceUsage } from './usage-index-keys';
 import { sameMediaSource } from './dependencies';
 import {
   MediaAssetDeletionBlockedError,
@@ -22,11 +26,15 @@ import {
   RECORDING_TELEMETRY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
+  type IndexedDbWriteTransaction,
 } from '../infrastructure/indexed-db/core';
 import {
   buildPhysicalDeleteOperation,
@@ -46,7 +54,6 @@ import {
   deleteMediaSidecars,
   releaseMediaSource,
   releaseUnpublishedProjectAssets,
-  recoverMediaSourcePublications,
   mediaHasPendingPublication,
 } from './delete-cascade.sources';
 import {
@@ -61,9 +68,7 @@ import {
   type MediaDependencyTarget,
 } from './dependencies';
 
-type CascadeTransaction = ReturnType<
-  Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>['transaction']
->;
+type CascadeTransaction = IndexedDbWriteTransaction;
 type PhysicalDelete = ReturnType<typeof buildPhysicalDeleteOperation>;
 type CascadeDatabase = Awaited<
   ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>
@@ -158,9 +163,9 @@ async function loadCascadeGraph(
   const target = mediaDependencyTarget(media, await tx.objectStore(PROJECT_ASSETS_STORE).getAll());
   const [rawVideo, rawScenario, rawChildren, rawReview] = await Promise.all([
     tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
-    tx.objectStore(SCENARIO_PROJECTS_STORE).getAll(),
+    createScenarioProjectStore(tx).getAll(),
     tx.objectStore(SCENARIO_ASSETS_STORE).getAll(),
-    tx.objectStore(VIDEO_WORKSPACES_STORE).getAll(),
+    createVideoWorkspaceStore(tx).getAll(),
   ]);
   const children = requireVerifiedGraphEntries(
     rawChildren,
@@ -183,16 +188,15 @@ async function loadCascadeGraph(
     'scenario-project',
     (value) => isRecord(value) && typeof value['id'] === 'string' && !scenarioIds.has(value['id'])
   );
-  // Auxiliary review references admit only project-assets; the root's own sidecar is purged.
-  const reviews =
-    reviewReferencesForMedia(target).size > 0
-      ? requireVerifiedGraphEntries(
-          rawReview.filter((value) => !isRecord(value) || value['aggregateId'] !== media.id),
-          parseVideoWorkspace,
-          'quick-edit',
-          () => false
-        )
-      : [];
+  const externalReferences = reviewReferencesForMedia(target).size > 0;
+  const reviews = requireVerifiedGraphEntries(
+    rawReview.filter(
+      (value) => externalReferences || (isRecord(value) && value['aggregateId'] === media.id)
+    ),
+    parseVideoWorkspace,
+    'quick-edit',
+    () => false
+  );
   return { media: { ...media, ...target }, videos, scenarios, scenarioChildren, reviews };
 }
 
@@ -212,12 +216,14 @@ async function detachVideoProjects(
     affected.push({ id: entry.id, kind: 'video', name: entry.project.name, primary });
     if (primary) throw new PrimaryMediaAssetDeleteError();
     const project = removeVideoProjectLibrarySources(entry.project, sources);
-    await tx.objectStore(VIDEO_PROJECTS_STORE).put!({
-      ...entry,
-      project: { ...project, updatedAt: now },
-      updatedAt: now,
-      workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
-    });
+    await tx.objectStore(VIDEO_PROJECTS_STORE).put!(
+      withVideoProjectUsage({
+        ...entry,
+        project: { ...project, updatedAt: now },
+        updatedAt: now,
+        workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
+      })
+    );
   }
   return affected;
 }
@@ -240,7 +246,7 @@ async function detachScenarioProjects(
     if (!childIds?.size) continue;
     affected.push({ id: entry.id, kind: 'scenario', name: entry.project.name, primary: false });
     const next = removeScenarioAssetReferences(entry, childIds, now);
-    await tx.objectStore(SCENARIO_PROJECTS_STORE).put!(next);
+    await createScenarioProjectStore(tx).put(next);
     await applyScenarioAssetMutations(
       tx,
       entry.id,
@@ -258,19 +264,21 @@ async function detachReviewWorkspaces(
 ): Promise<MediaAssetProjectUsage[]> {
   const affected: MediaAssetProjectUsage[] = [];
   for (const workspace of graph.reviews) {
-    if (workspace.aggregateId === graph.media.id) continue;
+    if (workspace.aggregateId === graph.media.id) throw new PrimaryMediaAssetDeleteError();
     const attached = reviewWorkspaceUsesMedia(workspace, graph.media);
     if (!attached) continue;
     affected.push({
       id: workspace.aggregateId,
       kind: 'review',
-      name: 'filename' in graph.media ? graph.media.filename : graph.media.id,
+      name:
+        workspace.project?.name ??
+        ('filename' in graph.media ? graph.media.filename : graph.media.id),
       primary: false,
     });
     let next = workspace;
     for (const ref of reviewReferencesForMedia(graph.media))
       next = stripReviewAssetReference(next, ref, now);
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).put!(next);
+    await createVideoWorkspaceStore(tx).put(withReviewWorkspaceUsage(next));
   }
   return affected;
 }
@@ -287,8 +295,11 @@ async function commitCascadeTransaction(
       MEDIA_LIBRARY_STORE,
       VIDEO_PROJECTS_STORE,
       SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
       SCENARIO_ASSETS_STORE,
       VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
       VIDEO_WORKSPACE_DRAFTS_STORE,
       PROJECT_ASSETS_STORE,
       PROJECT_EXPORTS_STORE,

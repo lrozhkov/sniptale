@@ -1,3 +1,6 @@
+import { createQuickEditWatermark } from './watermark';
+import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
+import { reviewAdvancedContentBaseline } from '../document';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from './defaults';
 import {
@@ -8,6 +11,88 @@ import {
 } from './effective';
 import { createCanvasComment } from '../comments';
 import type { QuickEditAdvancedState } from './types';
+import { createQuickEditWebcam } from './webcam';
+
+it('keeps authored annotations editable while application is disabled and forces only video rendering', () => {
+  const state = createQuickEditAdvancedState();
+  state.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'frame',
+        snapshotId: 'effect:frame',
+        enabled: true,
+        start: 0,
+        end: 2,
+        attachment: 'content',
+        transform: { x: 0.1, y: 0.2, width: 0.4, height: 0.3, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
+  const document = { edits: [], canvasComments: [] };
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  expect(resolveQuickEditEffectiveState(state).annotationEffects).toBeUndefined();
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state).annotationEffects).toBe(state.annotationEffects);
+  expect(
+    resolveQuickEditExportPlan({ document, advanced: state, audioProcessingAvailable: false })
+  ).toEqual({
+    kind: 'ready',
+    video: 'render',
+    audio: 'copy',
+    reasons: ['annotation-effects'],
+  });
+  state.annotationEffects.enabled = false;
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    annotationEffectsTrackVisible: true,
+    annotationEffectsApplied: false,
+  });
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  state.annotationEffects.enabled = true;
+  state.annotationEffects.instances[0]!.enabled = false;
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  state.annotationEffects.instances[0]!.enabled = true;
+  state.ui.tracks.annotationEffects = false;
+  expect(resolveQuickEditEffectiveState(state).annotationEffects).toBeUndefined();
+  expect(state.annotationEffects.instances).toHaveLength(1);
+});
+
+it('keeps the camera lane visible when application is disabled and retains its asset', () => {
+  const state = createQuickEditAdvancedState();
+  state.webcam = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 480 },
+    { width: 1920, height: 1080 }
+  );
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveState(state).webcam).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    webcamTrackVisible: true,
+    webcam: state.webcam,
+  });
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'render',
+    reasons: ['webcam'],
+  });
+  state.webcam.enabled = false;
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({ webcamTrackVisible: true });
+  expect(resolveQuickEditEffectiveState(state).webcam).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  expect(state.webcam.assetId).toBe('project-asset:camera');
+});
 
 const advancedWithContent = (): QuickEditAdvancedState => ({
   ...createQuickEditAdvancedState(),
@@ -55,7 +140,7 @@ it('keeps track visibility independent of mode and suppresses effects in basic m
     overlaysVisible: false,
     zoomApplied: false,
     backgroundApplied: false,
-    originalAudioApplied: false,
+    originalAudioApplied: true,
   });
 });
 
@@ -83,7 +168,7 @@ it('returns the applied configuration for stage, mixer, and exporter (R04)', () 
   const basic = resolveQuickEditEffectiveState({ ...stored, ui: { ...stored.ui, mode: 'basic' } });
   expect(basic.zoomRegions).toEqual([]);
   expect(basic.background).toEqual({ enabled: false });
-  expect(basic.originalAudio).toEqual({ muted: false, volume: 1 });
+  expect(basic.originalAudio).toEqual(stored.audio.original);
   expect(basic.voiceover).toEqual([]);
   expect(basic.music).toEqual([]);
 
@@ -407,3 +492,315 @@ it.each(['basic', 'advanced'] as const)(
     });
   }
 );
+
+it('applies Basic original gain independently of suppressed visuals and added audio', () => {
+  const state = advancedWithContent();
+  state.ui.mode = 'basic';
+  state.audio.original = {
+    muted: false,
+    volume: 0.5,
+    ranges: [{ id: 'quiet', start: 1, end: 2, volume: 0 }],
+  };
+  state.audio.music = [musicStub()];
+  state.audio.voiceover = [voiceClipStub()];
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    originalAudio: state.audio.original,
+    voiceover: [],
+    music: [],
+    zoomRegions: [],
+    background: { enabled: false },
+  });
+  expect(
+    resolveQuickEditExportPlan({ document, advanced: state, videoRenderAvailable: false })
+  ).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'process',
+    reasons: ['original-audio'],
+  });
+  expect(
+    resolveQuickEditExportPlan({ document, advanced: state, audioProcessingAvailable: false })
+  ).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  const originalOnly = createQuickEditAdvancedState();
+  originalOnly.audio.original = state.audio.original;
+  expect(hasSuppressedAdvancedFeatures(originalOnly)).toBe(false);
+  originalOnly.audio.original = { muted: false, volume: 1 };
+  expect(
+    resolveQuickEditExportPlan({
+      document,
+      advanced: originalOnly,
+      audioProcessingAvailable: false,
+    })
+  ).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});
+
+it('suppresses action presentations independently of their visible lane and keeps legacy defaults', () => {
+  const state = advancedWithContent();
+  state.background = { enabled: false };
+  expect(resolveQuickEditEffectiveFeatures(state).actionsApplied).toBe(true);
+  state.actionsEnabled = false;
+  expect(resolveQuickEditEffectiveFeatures(state)).toMatchObject({
+    actionsApplied: false,
+    actionsTrackVisible: true,
+  });
+  state.actionsEnabled = true;
+  state.ui.tracks.actions = false;
+  expect(resolveQuickEditEffectiveFeatures(state)).toMatchObject({
+    actionsApplied: false,
+    actionsTrackVisible: false,
+  });
+  state.ui.tracks.actions = true;
+  state.ui.mode = 'basic';
+  expect(resolveQuickEditEffectiveFeatures(state).actionsApplied).toBe(false);
+});
+
+it('hidden camera is not rendered even if its authored enablement is true', () => {
+  const state = advancedWithContent();
+  state.webcam = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 480 },
+    { width: 1920, height: 1080 }
+  );
+  state.ui.tracks.webcam = false;
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    webcamTrackVisible: false,
+    webcamApplied: false,
+  });
+  expect(resolveQuickEditEffectiveState(state).webcam).toBeUndefined();
+  state.ui.tracks.webcam = true;
+  expect(resolveQuickEditEffectiveState(state).webcam).toEqual(state.webcam);
+});
+
+it('validates optional track flags and preserves the absent legacy history shape', () => {
+  const state = createQuickEditAdvancedState();
+  expect(loadQuickEditAdvancedState(state)).toEqual(state);
+  expect(
+    loadQuickEditAdvancedContentState(reviewAdvancedContentBaseline(state))
+  ).not.toHaveProperty('actionsEnabled');
+  state.actionsEnabled = false;
+  state.ui.tracks.webcam = false;
+  state.ui.advancedTracksInitialized = true;
+  expect(loadQuickEditAdvancedState(state)).toEqual(state);
+  expect(loadQuickEditAdvancedContentState(reviewAdvancedContentBaseline(state))).toHaveProperty(
+    'actionsEnabled',
+    false
+  );
+  for (const invalid of [null, 'false', 0, {}]) {
+    expect(loadQuickEditAdvancedState({ ...state, actionsEnabled: invalid })).toBeNull();
+    expect(
+      loadQuickEditAdvancedState({
+        ...state,
+        ui: { ...state.ui, advancedTracksInitialized: invalid },
+      })
+    ).toBeNull();
+    expect(
+      loadQuickEditAdvancedContentState({
+        ...reviewAdvancedContentBaseline(state),
+        actionsEnabled: invalid,
+      })
+    ).toBeNull();
+    expect(
+      loadQuickEditAdvancedState({
+        ...state,
+        ui: { ...state.ui, tracks: { ...state.ui.tracks, webcam: invalid } },
+      })
+    ).toBeNull();
+  }
+});
+
+it('applies watermark consistently in advanced preview/export and retains it while basic', () => {
+  const state = createQuickEditAdvancedState();
+  state.watermark = { ...createQuickEditWatermark('Text'), mode: 'text' };
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveFeatures(state).watermarkApplied).toBe(false);
+  expect(resolveQuickEditEffectiveState(state).watermark).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'copy',
+  });
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state).watermark).toEqual(state.watermark);
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'render',
+    reasons: ['watermark'],
+  });
+  state.watermark.mode = 'none';
+  expect(resolveQuickEditEffectiveState(state).watermark).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'copy',
+  });
+  expect(state.watermark.text.value).toBe('Text');
+});
+
+it('keeps image acquisition neutral until a logo is selected and never hides a referenced logo failure', () => {
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.watermark = { ...createQuickEditWatermark('Text'), mode: 'image' };
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveFeatures(state).watermarkApplied).toBe(false);
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'copy',
+  });
+  state.watermark.image = {
+    assetId: 'project-asset:missing',
+    width: 200,
+    height: 100,
+    size: 0.2,
+    opacity: 0.5,
+  };
+  expect(resolveQuickEditEffectiveState(state).watermark?.image?.assetId).toBe(
+    'project-asset:missing'
+  );
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'render',
+  });
+});
+
+it('suppresses presentation processing in Basic while retaining authored defaults and dormant resources', async () => {
+  const { createNewWorkspacePresentationSettings } = await import('./presentation');
+  const state = createQuickEditAdvancedState();
+  state.presentation = createNewWorkspacePresentationSettings();
+  const saved = structuredClone(state.presentation);
+  expect(resolveQuickEditEffectiveState(state).presentation).toBeUndefined();
+  expect(resolveQuickEditEffectiveFeatures(state).presentationApplied).toBe(false);
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state).presentation).toEqual(saved);
+  state.ui.mode = 'basic';
+  expect(state.presentation).toEqual(saved);
+  expect(
+    resolveQuickEditExportPlan({ document: { edits: [], canvasComments: [] }, advanced: state })
+  ).toMatchObject({ video: 'copy', audio: 'copy' });
+});
+
+it('routes outer fades and sequence bookends independently from global audio processing', async () => {
+  const { createNeutralPresentationSettings } = await import('./presentation');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.presentation = createNeutralPresentationSettings();
+  const args = { advanced, document: { edits: [], canvasComments: [] } };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+  advanced.presentation.fadeIn.enabled = true;
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    video: 'render',
+    audio: 'copy',
+    reasons: ['presentation'],
+  });
+  advanced.presentation.audioFade = true;
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    video: 'render',
+    audio: 'process',
+    reasons: ['presentation'],
+  });
+  advanced.presentation.fadeIn.enabled = false;
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+  advanced.presentation.intro = {
+    mode: 'image',
+    image: {
+      assetId: 'project-asset:still',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    video: 'render',
+    audio: 'process',
+    reasons: ['presentation'],
+  });
+  advanced.presentation.intro = { mode: 'none', image: advanced.presentation.intro.image };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+  advanced.presentation.fadeOut = { enabled: true, duration: 0 };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+});
+
+it('defers unknown sequence audio capability but blocks a confirmed composed audio track', async () => {
+  const { createNewWorkspacePresentationSettings } = await import('./presentation');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.presentation = { ...createNewWorkspacePresentationSettings(), audioFade: true };
+  const args = {
+    advanced,
+    document: { edits: [], canvasComments: [] },
+    audioProcessingAvailable: false,
+  };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  expect(resolveQuickEditExportPlan({ ...args, presentationAudioPresent: false })).toMatchObject({
+    kind: 'ready',
+  });
+  expect(resolveQuickEditExportPlan({ ...args, presentationAudioPresent: true })).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  expect(resolveQuickEditExportPlan({ ...args, videoRenderAvailable: false })).toMatchObject({
+    kind: 'unavailable',
+    reasons: expect.arrayContaining(['video-encoder']),
+  });
+  advanced.ui.mode = 'basic';
+  expect(resolveQuickEditExportPlan({ ...args, presentationAudioPresent: true })).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});
+
+it('admits alpha replacement metadata without another audio lane or implicit gain', async () => {
+  const { resolveQuickEditEffectiveState } = await import('./effective');
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.ui.tracks.audio = false;
+  state.audio.originalSpeech = {
+    enabled: true,
+    transcript: {
+      version: 1,
+      phrases: [],
+      replacements: [
+        {
+          id: 'accepted',
+          phraseId: 'p',
+          start: 2,
+          end: 8,
+          duration: 4,
+          enabled: true,
+          originalVolume: 0.25,
+          assetId: 'project-asset:accepted',
+          revision: 0,
+          text: 'accepted',
+          textSignature: 'test',
+          profile: { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' },
+        },
+      ],
+    },
+  };
+  const before = structuredClone(state);
+  for (const mode of ['advanced', 'basic'] as const) {
+    state.ui.mode = mode;
+    const effective = resolveQuickEditEffectiveState(state);
+    expect(effective.voiceover).toEqual([]);
+    expect(effective.music).toEqual([]);
+    expect(effective.originalAudio).toEqual(before.audio.original);
+    expect(effective).not.toHaveProperty('revoice');
+    expect(effective).not.toHaveProperty('automaticOriginalRanges');
+    expect(
+      resolveQuickEditExportPlan({ advanced: state, document: { edits: [], canvasComments: [] } })
+    ).toEqual({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
+    expect(state.audio).toEqual(before.audio);
+  }
+});

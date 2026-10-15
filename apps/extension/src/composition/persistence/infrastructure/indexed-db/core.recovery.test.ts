@@ -143,3 +143,71 @@ it('distinguishes a post-journal alpha interruption from a pre-effect connection
   });
   expect(mocks.openDB).not.toHaveBeenCalled();
 });
+
+it('keeps admission available when the browser persistence grant throws synchronously', async () => {
+  vi.stubGlobal('navigator', {
+    storage: {
+      persist: () => {
+        throw new Error('grant unavailable');
+      },
+    },
+  });
+  mocks.openDB.mockResolvedValue(createDatabase());
+  mocks.inspect.mockReset().mockResolvedValue({ databaseVersion: DB_VERSION, status: 'ready' });
+  const module = await import('./core');
+  await expect(module.prepareDatabaseForRecovery()).resolves.toEqual({
+    databaseVersion: DB_VERSION,
+    status: 'ready',
+  });
+});
+
+it.each(['alpha-reset-required', 'recovery-reset-required'] as const)(
+  'verifies schema again after %s instead of admitting a failed reset',
+  async (reason) => {
+    mocks.resetAlpha.mockResolvedValue(undefined);
+    mocks.resetRecovery.mockResolvedValue(undefined);
+    mocks.inspect
+      .mockReset()
+      .mockResolvedValueOnce({ databaseVersion: null, reason, status: 'blocked' })
+      .mockResolvedValueOnce({
+        databaseVersion: DB_VERSION,
+        reason: 'domain-contracts',
+        status: 'corrupt',
+      });
+    const module = await import('./core');
+    await expect(module.prepareDatabaseForRecovery()).resolves.toMatchObject({
+      reason: 'domain-contracts',
+      status: 'corrupt',
+    });
+    expect(mocks.openDB).not.toHaveBeenCalled();
+  }
+);
+
+it('preserves an ordinary alpha-reset failure without replacing its cause', async () => {
+  const error = new Error('reset not started');
+  mocks.inspect.mockReset().mockResolvedValue({
+    databaseVersion: null,
+    reason: 'alpha-reset-required',
+    status: 'blocked',
+  });
+  mocks.resetAlpha.mockRejectedValueOnce(error);
+  const module = await import('./core');
+  await expect(module.prepareDatabaseForRecovery()).rejects.toBe(error);
+});
+
+it('refuses a database whose schema changes during opening', async () => {
+  mocks.openDB.mockResolvedValue(createDatabase());
+  mocks.inspect
+    .mockReset()
+    .mockResolvedValueOnce({ databaseVersion: DB_VERSION, status: 'ready' })
+    .mockResolvedValueOnce({
+      databaseVersion: DB_VERSION,
+      reason: 'domain-contracts',
+      status: 'corrupt',
+    });
+  const module = await import('./core');
+  await expect(module.prepareDatabaseForRecovery()).resolves.toMatchObject({
+    reason: 'domain-contracts',
+    status: 'corrupt',
+  });
+});

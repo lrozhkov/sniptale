@@ -1,24 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { NumericRow } from '../../ui/compact-inspector-controls';
 import type { CompactInspectorUnit } from '../../ui/compact-inspector-controls/shared';
 
-/**
- * Preview and commit share one deduped sink: a repeated proposal never stages the
- * same mutation twice, and an externally restored value becomes editable again.
- */
-function useDedupedNumber(applied: number, onChange: (value: number) => void) {
-  const last = useRef<number | null>(null);
-  useEffect(() => {
-    if (last.current !== applied) last.current = null;
-  }, [applied]);
-  return (value: number) => {
-    if (last.current === value) return;
-    last.current = value;
-    onChange(value);
-  };
-}
-
-/** Full-width NumericRow matching the video-editor slider geometry. */
+/** Numeric gestures remain local until release or accepted text input. */
 export function ReviewNumberRow(props: {
   label: string;
   unit?: CompactInspectorUnit;
@@ -27,32 +11,95 @@ export function ReviewNumberRow(props: {
   max: number;
   step: number;
   precision?: number;
+  enterBehavior?: ComponentProps<typeof NumericRow>['enterBehavior'];
   scrubStep?: number;
   scrubMax?: number;
+  scrubMin?: number;
   disabled?: boolean;
   onChange(value: number): void;
 }) {
-  const apply = useDedupedNumber(props.value, props.onChange);
+  return <ReviewPreviewNumberRow {...props} />;
+}
+
+/** Numeric preview gestures share cancellation and commit ownership across effect inspectors. */
+export function ReviewPreviewNumberRow(
+  props: ComponentProps<typeof ReviewNumberRow> & {
+    onPreview?(value: number | null): void;
+    title?: string;
+    /** Optional external visual draft, separate from the supplied value. */
+    previewValue?: number | undefined;
+  }
+) {
+  const displayed = props.previewValue ?? props.value;
+  const [draft, setDraft] = useState(displayed);
+  const cancelled = useRef(false);
+  const initial = useRef<number | null>(null);
+  const last = useRef<number | null>(null);
+  useEffect(() => {
+    if (last.current !== props.value) last.current = null;
+  }, [props.value]);
+  useEffect(() => setDraft(displayed), [displayed]);
+  const cancel = () => {
+    cancelled.current = true;
+    initial.current = null;
+    setDraft(props.value);
+    props.onPreview?.(null);
+  };
   return (
-    <NumericRow
-      appearance="plain"
-      focusAppearance="accent-box"
-      className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
-      label={props.label}
-      min={props.min}
-      max={props.max}
-      step={props.step}
-      precision={props.precision}
-      unit={props.unit}
-      value={props.value}
-      disabled={props.disabled}
-      scrub={{
-        min: props.min,
-        max: props.scrubMax ?? props.max,
-        step: props.scrubStep ?? props.step,
+    <div
+      title={props.title}
+      onPointerDownCapture={() => {
+        cancelled.current = false;
+        initial.current = props.value;
       }}
-      onPreviewValue={apply}
-      onCommitValue={apply}
-    />
+      onPointerCancelCapture={cancel}
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape') {
+          cancel();
+          event.preventDefault();
+        } else cancelled.current = false;
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') event.stopPropagation();
+      }}
+    >
+      <NumericRow
+        appearance="plain"
+        focusAppearance="accent-box"
+        className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+        label={props.label}
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        enterBehavior={props.enterBehavior}
+        precision={props.precision}
+        unit={props.unit}
+        value={draft}
+        disabled={props.disabled}
+        scrub={{
+          min: props.scrubMin ?? props.min,
+          max: props.scrubMax ?? props.max,
+          step: props.scrubStep ?? props.step,
+        }}
+        onPreviewValue={(value) => {
+          if (!cancelled.current) {
+            initial.current ??= props.value;
+            setDraft(value);
+            props.onPreview?.(value);
+          }
+        }}
+        onCommitValue={(value) => {
+          if (cancelled.current) return;
+          const baseline = initial.current ?? props.value;
+          initial.current = null;
+          setDraft(value);
+          props.onPreview?.(null);
+          // An echoed preview is not authored; compare with the captured gesture origin.
+          if (value === baseline || value === last.current) return;
+          last.current = value;
+          props.onChange(value);
+        }}
+      />
+    </div>
   );
 }

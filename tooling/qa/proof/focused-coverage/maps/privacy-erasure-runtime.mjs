@@ -20,7 +20,7 @@ export const PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS = [
     reason: 'Privacy stop awaits strict recording-surface cleanup before state erasure.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',
+      'apps/extension/src/background/media/video/runtime/recording-completion.privacy-erasure.test.ts',
     ],
   },
   {

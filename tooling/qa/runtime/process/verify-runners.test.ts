@@ -1,6 +1,8 @@
 import path from 'node:path';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+
+vi.mock('../../../ci/mediabunny/normalize.mjs', () => ({ normalizeMediabunny: vi.fn() }));
 
 import { createTempRoot, writeFile, writeJson } from '../../test-support/test-helpers';
 

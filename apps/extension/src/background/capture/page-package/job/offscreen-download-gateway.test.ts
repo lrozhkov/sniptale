@@ -126,3 +126,76 @@ describe('Page Package offscreen download gateway', () => {
     ).rejects.toThrow('lease release failed');
   });
 });
+
+it('prepares storage before collection rather than treating transport readiness as data readiness', async () => {
+  sendMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+  const { preparePagePackageDownloadRuntime } = await import('./offscreen-download-gateway');
+  await preparePagePackageDownloadRuntime(signal);
+  expect(sendMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD',
+      capabilityToken: 'token',
+    })
+  );
+});
+
+it('rejects preparation errors before exporting bytes', async () => {
+  const { preparePagePackageDownloadRuntime } = await import('./offscreen-download-gateway');
+  sendMock.mockResolvedValueOnce({ success: false, error: 'storage admission rejected' });
+  await expect(preparePagePackageDownloadRuntime(signal)).rejects.toThrow(
+    'storage admission rejected'
+  );
+  sendMock.mockResolvedValueOnce({ success: true });
+  await expect(preparePagePackageDownloadRuntime(signal)).rejects.toThrow('preparation failed');
+});
+
+it('bounds stalled preparation and does not retain its deadline after completion', async () => {
+  vi.useFakeTimers();
+  try {
+    const { preparePagePackageDownloadRuntime } = await import('./offscreen-download-gateway');
+    sendMock.mockImplementationOnce(() => new Promise(() => undefined));
+    const pending = expect(preparePagePackageDownloadRuntime(signal)).rejects.toThrow(
+      'preparation timed out'
+    );
+    await vi.advanceTimersByTimeAsync(30_000);
+    await pending;
+    expect(vi.getTimerCount()).toBe(0);
+    sendMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+    await preparePagePackageDownloadRuntime(signal);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('cancels a stalled preparation and skips a command after cancellation during document creation', async () => {
+  const { preparePagePackageDownloadRuntime } = await import('./offscreen-download-gateway');
+  const controller = new AbortController();
+  let finish!: () => void;
+  ensureMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const pending = expect(preparePagePackageDownloadRuntime(controller.signal)).rejects.toThrow(
+    'cancelled'
+  );
+  controller.abort(new Error('cancelled'));
+  await pending;
+  finish();
+  await Promise.resolve();
+  expect(sendMock).not.toHaveBeenCalled();
+});
+
+it('cancels after sending preparation without waiting for shared storage admission', async () => {
+  const { preparePagePackageDownloadRuntime } = await import('./offscreen-download-gateway');
+  const controller = new AbortController();
+  sendMock.mockImplementationOnce(() => new Promise(() => undefined));
+  const pending = expect(preparePagePackageDownloadRuntime(controller.signal)).rejects.toThrow(
+    'cancelled'
+  );
+  await vi.waitFor(() => expect(sendMock).toHaveBeenCalledOnce());
+  controller.abort(new Error('cancelled'));
+  await pending;
+});

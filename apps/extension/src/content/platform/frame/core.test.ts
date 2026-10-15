@@ -97,9 +97,11 @@ function createBrokenIframe(src: string): HTMLIFrameElement {
   });
   Object.defineProperty(iframe, 'contentWindow', {
     configurable: true,
-    get: () => {
-      throw new Error('cross-origin');
-    },
+    get: () => ({
+      get document() {
+        throw new Error('cross-origin');
+      },
+    }),
   });
 
   return iframe;
@@ -117,6 +119,9 @@ describe('iframe-utils-core accessibility helpers', () => {
     const fallbackIframe = createFallbackIframeWithWindow(fallbackDoc);
     const brokenIframe = createBrokenIframe('https://example.com/frame');
     const aboutIframe = createBrokenIframe('about:blank');
+    vi.spyOn(brokenIframe, 'contentWindow', 'get').mockImplementation(() => {
+      throw new Error('cross-origin');
+    });
 
     expect(getIframeDocument(directIframe)).toBe(iframeDoc);
     expect(getIframeDocument(fallbackIframe)).toBe(fallbackDoc);

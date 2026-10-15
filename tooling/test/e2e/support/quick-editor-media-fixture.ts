@@ -1,3 +1,4 @@
+import { readNativeReviewWorkspace } from './native-review-workspace';
 import { expect, type Page, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { readFile } from 'node:fs/promises';
@@ -13,19 +14,27 @@ import {
   WebMOutputFormat,
 } from 'mediabunny';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
+
+/** The immutable fixture writer needs page evaluation, never a browser or worker attachment. */
+export interface ReviewMediaFixtureWriter {
+  evaluate<Arg>(writer: (argument: Arg) => Promise<void>, argument: Arg): Promise<void>;
+}
 
 export async function seedReviewVideo(
-  page: Page,
+  page: ReviewMediaFixtureWriter,
   filename: string,
   dimensions: { width: number; height: number; duration: number },
   gaps = false,
-  history = false
+  history = false,
+  source?: { bytes: Uint8Array; mimeType: 'video/webm' | 'video/mp4' },
+  recordingPoint?: { x: number; y: number }
 ) {
-  let bytes = await readFile(new URL(`../fixtures/${filename}`, import.meta.url));
+  let bytes = source
+    ? Buffer.from(source.bytes)
+    : await readFile(new URL(`../fixtures/${filename}`, import.meta.url));
   if (gaps) bytes = await withAudioGaps(bytes);
   await page.evaluate(
-    async ({ fixture, encoded, dimensions, mimeType, history }) => {
+    async ({ fixture, encoded, dimensions, mimeType, history, recordingPoint }) => {
       const body = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
       const directory = await (
         await navigator.storage.getDirectory()
@@ -76,8 +85,13 @@ export async function seedReviewVideo(
               kind: 'CLICK',
               time: 1,
               duration: 0.2,
-              point: { x: 40, y: 30 },
-              recordingPoint: { x: 0.25, y: 0.33 },
+              point: recordingPoint
+                ? {
+                    x: recordingPoint.x * dimensions.width,
+                    y: recordingPoint.y * dimensions.height,
+                  }
+                : { x: 40, y: 30 },
+              recordingPoint: recordingPoint ?? { x: 0.25, y: 0.33 },
               label: '',
               data: {},
               preset: 'NONE',
@@ -92,8 +106,99 @@ export async function seedReviewVideo(
       encoded: bytes.toString('base64'),
       dimensions,
       history,
-      mimeType: filename.endsWith('.mp4') ? 'video/mp4' : 'video/webm',
+      recordingPoint,
+      mimeType: source?.mimeType ?? (filename.endsWith('.mp4') ? 'video/mp4' : 'video/webm'),
     }
+  );
+}
+
+/** Linked immutable recording bodies exercise first camera acquisition, not a prefilled project. */
+export async function seedReviewWebcamBundle(
+  page: Page,
+  cameraFilename = 'review-webcam-clock.webm'
+) {
+  await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+  const bytes = await readFile(new URL(`../fixtures/${cameraFilename}`, import.meta.url));
+  await page.evaluate(
+    async ({ fixture, encoded }) => {
+      const body = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+      const objects = await (
+        await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
+      ).getDirectoryHandle('objects');
+      const writer = await (
+        await objects.getFileHandle('webcam-clock-asset', { create: true })
+      ).createWritable();
+      await writer.write(body);
+      await writer.close();
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(fixture.databaseName);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = db.transaction(
+        ['recordings', 'media_library', 'asset_refs', 'asset_owners'],
+        'readwrite'
+      );
+      const done = new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+      });
+      for (const store of ['recordings', 'media_library']) {
+        const request = transaction
+          .objectStore(store)
+          .get(store === 'recordings' ? 'beta-v1-recording' : 'recording:beta-v1-recording');
+        request.onsuccess = () =>
+          transaction.objectStore(store).put({
+            ...request.result,
+            recordingGroup: {
+              groupId: 'webcam-proof',
+              role: 'display',
+              order: 0,
+              sourceLabel: 'Screen',
+            },
+          });
+      }
+      const recordingGroup = {
+        groupId: 'webcam-proof',
+        role: 'webcam',
+        order: 1,
+        sourceLabel: 'Camera clock',
+      };
+      transaction.objectStore('recordings').put({
+        ...fixture.records.recordings[0],
+        id: 'webcam-clock',
+        assetId: 'webcam-clock-asset',
+        filename: 'camera-clock.webm',
+        size: body.length,
+        recordingGroup,
+      });
+      transaction.objectStore('media_library').put({
+        ...fixture.records.media_library[0],
+        id: 'recording:webcam-clock',
+        filename: 'camera-clock.webm',
+        originalFilename: 'camera-clock.webm',
+        source: { kind: 'recording', recordingId: 'webcam-clock' },
+        recordingGroup,
+        width: 160,
+        height: 90,
+        duration: 12,
+        size: body.length,
+      });
+      transaction.objectStore('asset_refs').put({
+        ...fixture.records.asset_refs[0],
+        assetId: 'webcam-clock-asset',
+        location: { kind: 'opfs', objectKey: 'objects/webcam-clock-asset' },
+        size: body.length,
+      });
+      transaction.objectStore('asset_owners').put({
+        ...fixture.records.asset_owners[0],
+        assetId: 'webcam-clock-asset',
+        ownerId: 'webcam-clock',
+      });
+      await done;
+      db.close();
+    },
+    { fixture: betaV1Fixture, encoded: bytes.toString('base64') }
   );
 }
 
@@ -131,32 +236,10 @@ async function withAudioGaps(bytes: Uint8Array) {
 }
 
 export async function persistedFocus(page: Page) {
-  const raw = await page.evaluate(
-    async ({ databaseName, aggregateId }) => {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(databaseName);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      try {
-        return await new Promise<unknown>((resolve, reject) => {
-          const request = db
-            .transaction('video_workspaces')
-            .objectStore('video_workspaces')
-            .get(aggregateId);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-      } finally {
-        db.close();
-      }
-    },
-    {
-      databaseName: betaV1Fixture.databaseName,
-      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
-    }
+  const workspace = await readNativeReviewWorkspace(
+    page,
+    `recording:${betaV1Fixture.records.recordings[0].id}`
   );
-  const workspace = parseVideoWorkspace(raw);
   const latest = workspace?.history
     .slice(0, workspace.cursor)
     .findLast((operation) => operation.target === 'advancedContent');
@@ -237,4 +320,127 @@ export async function recordedAudioResources(page: Page, excludedKeys: string[] 
       await context.close();
     }
   }, excludedKeys);
+}
+
+/** Create focus through its supported toolbar and ruler interval, including occupied lanes. */
+export async function addReviewFocus(page: Page) {
+  const dialog = page.locator('dialog');
+  const tool = dialog.locator(
+    '[data-ui="gallery.videoReview.editingTools"] button:has(svg.lucide-focus)'
+  );
+  const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+  const duration = Number(await plane.getAttribute('aria-valuemax'));
+  const start = Number(await plane.getAttribute('aria-valuenow'));
+  const end = Math.min(duration, start + 2);
+  const before = await dialog.locator('[data-zoom-edge="start"]').count();
+  const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+  await ruler.scrollIntoViewIfNeeded();
+  const box = (await ruler.boundingBox())!;
+  const x = (time: number) => box.x + (box.width * time) / duration;
+  await page.mouse.move(x(start) + 0.1, box.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(x(end), box.y + 15, { steps: 8 });
+  await page.mouse.up();
+  await tool.click();
+  await expect(dialog.locator('[data-zoom-edge="start"]')).toHaveCount(before + 1);
+  await dialog.locator('[data-ui="gallery.videoReview.loopSummary"] button').click();
+  if ((await tool.getAttribute('aria-pressed')) === 'true') await tool.click();
+}
+
+export async function seedReviewHistory(
+  page: Page,
+  detailed = false,
+  clickCount = 6,
+  timeStep = 0.01
+) {
+  await page.evaluate(
+    async ({ fixture, detailed, clickCount, timeStep }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(fixture.databaseName);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = db.transaction('recording_telemetry', 'readwrite');
+      const done = new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+      });
+      transaction.objectStore('recording_telemetry').put({
+        recordingId: fixture.records.recordings[0].id,
+        captureMode: 'TAB',
+        createdAt: 1,
+        updatedAt: 1,
+        viewport: null,
+        cursorTrack: null,
+        signals: [
+          ...[
+            [0.13, 3.27],
+            [3.27, 6.41],
+          ].map(([startTime, endTime], index) => ({
+            id: `idle-${index}`,
+            kind: 'cursor-idle',
+            startTime,
+            endTime,
+            point: null,
+            data: {},
+          })),
+          ...(detailed
+            ? [
+                {
+                  id: 'static',
+                  kind: 'static-frame',
+                  startTime: 7,
+                  endTime: 9,
+                  point: null,
+                  data: {},
+                },
+                {
+                  id: 'typing',
+                  kind: 'typing',
+                  startTime: 6.5,
+                  endTime: 12.01,
+                  point: null,
+                  data: { targetName: 'Search field' },
+                },
+              ]
+            : []),
+        ],
+        actionEvents: Array.from({ length: clickCount }, (_, index) => ({
+          id: `click-${index}`,
+          kind: 'CLICK',
+          time: 1 + index * timeStep,
+          duration: 0,
+          point: { x: 40, y: 30 },
+          recordingPoint: { x: 0.25, y: 0.33 },
+          label: detailed ? 'Save recording' : '',
+          data: {},
+          preset: 'NONE',
+        })),
+      });
+      await done;
+      db.close();
+    },
+    { fixture: betaV1Fixture, detailed, clickCount, timeStep }
+  );
+}
+
+export async function expectAnimatedReviewHistory(page: Page, count: number) {
+  const strip = page.locator('[data-ui="gallery.videoReview.historyStrip"]');
+  await expect(strip.locator('button[data-animated="true"]').first()).toBeVisible();
+  const buttons = strip.locator('button[data-animated="true"]');
+  expect(await buttons.count()).toBeLessThanOrEqual(3);
+  let represented = 0;
+  for (const button of await buttons.all()) {
+    const grouped = await button.evaluate((node) =>
+      Boolean(node.closest('[data-ui="gallery.videoReview.historyCluster"]'))
+    );
+    if (grouped) {
+      await button.click();
+      const options = page.getByRole('listbox').getByRole('option');
+      await expect(options.first()).toBeVisible();
+      represented += await options.count();
+      await page.keyboard.press('Escape');
+    } else represented++;
+  }
+  expect(represented).toBe(count);
 }

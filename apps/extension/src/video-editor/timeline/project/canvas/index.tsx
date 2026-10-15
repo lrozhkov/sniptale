@@ -307,6 +307,7 @@ function ProjectTimelineCanvasContent(
               props.cursorLaneVisible ? (
                 <ProjectTimelineCursorLane
                   embedded
+                  recordingTelemetry={props.recordingTelemetry}
                   project={props.project}
                   pixelsPerSecond={props.pixelsPerSecond}
                   projection={props.projection}

@@ -18,7 +18,7 @@ import { GuideDefaultAppearance } from './default-appearance';
 import { getHtmlImagePreferences } from './html-image-settings';
 import { applyGuideDefaultStyle } from '../../features/scenario/project/public';
 import { GuidePageHeader, GuidePageFeedback } from './header';
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { GuideImageControls } from './image-controls';
 import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
@@ -43,7 +43,8 @@ export { ScenarioEditorViewport as ScenarioEditorPage };
 
 /** Composes the local guide workspace around its single edit/save state owner. */
 function ScenarioEditorPage() {
-  const t = createTranslator(useAppLocale());
+  const locale = useAppLocale();
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const state = useGuidePageState();
   const panels = useGuidePanels();
   const [representation, setRepresentation] = useState<'guide' | 'tour'>('guide');

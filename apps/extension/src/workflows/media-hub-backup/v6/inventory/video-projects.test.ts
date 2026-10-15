@@ -61,6 +61,7 @@ function database(
     getAllFromIndex: async () => [],
     transaction: (_stores: string[]) => ({
       objectStore: (name: string) => ({
+        index: () => ({ getAll: async () => [] }),
         get: async (key: string) =>
           rows.get(name)?.find((row) => (row as { aggregateId: string }).aggregateId === key),
       }),

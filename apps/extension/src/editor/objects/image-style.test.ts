@@ -417,6 +417,9 @@ it('renders chrome and source through one rounded window contour and outer borde
     shadowOffsetY: 5,
     stroke: vi.fn(),
   };
+  const planeContext = { drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), translate: vi.fn() };
+  const plane = { getContext: () => planeContext, width: 0, height: 0 };
+  vi.stubGlobal('document', { createElement: () => plane });
   applyImageSettings(image as never, {
     ...DEFAULT_EDITOR_IMAGE_SETTINGS,
     radius: 12,
@@ -428,10 +431,32 @@ it('renders chrome and source through one rounded window contour and outer borde
   image._render(context as never);
   expect(context.drawImage).toHaveBeenCalledOnce();
   expect(baseRender).toHaveBeenCalledOnce();
-  expect(context.clip).toHaveBeenCalledTimes(2);
+  expect(context.clip).toHaveBeenCalledTimes(3);
   expect(context.clip).toHaveBeenCalledWith('evenodd');
   expect(context.roundRect).toHaveBeenCalledWith(-80, -232, 160, 292, 12);
   expect(context.fill).toHaveBeenCalledOnce();
   expect(context.moveTo).toHaveBeenCalledWith(-68, -232);
   expect(context.stroke).toHaveBeenCalledOnce();
+  image._render(context as never);
+  expect(baseRender).toHaveBeenCalledOnce();
+  expect(planeContext.drawImage).toHaveBeenCalledOnce();
+  Object.assign(image, { getElement: () => ({ width: 160, height: 120 }) });
+  image._render(context as never);
+  expect(baseRender).toHaveBeenCalledTimes(2);
+  attachBrowserHeaderToImage(image as never, null, 0);
+  image._render(context as never);
+  expect(baseRender).toHaveBeenCalledTimes(3);
+  attachBrowserHeaderToImage(image as never, header, 86.3);
+  image._render(context as never);
+  // Local height is 172.6 at scaleY=.5: source rows stay fixed, only the top inset is fractional.
+  expect(context.drawImage).toHaveBeenLastCalledWith(plane, -80, -233);
+  expect(planeContext.translate).toHaveBeenLastCalledWith(80, 233);
+  expect(planeContext.drawImage).toHaveBeenLastCalledWith(
+    header,
+    0,
+    expect.closeTo(0.4),
+    160,
+    172.6
+  );
+  vi.unstubAllGlobals();
 });

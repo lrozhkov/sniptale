@@ -1,60 +1,52 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { DEFAULT_BROWSER_FRAME_STATE } from '../../../../features/editor/document/constants';
 import { renderExactBrowserFrameToDataUrl } from './renderer';
 
-it('renders the exact preset as an svg data url without a DOM host', async () => {
+it.each(['windows', 'macos', 'linux'] as const)(
+  'renders %s application chrome offline with escaped title',
+  async (style) => {
+    const fetch = vi.spyOn(globalThis, 'fetch');
+    const dataUrl = await renderExactBrowserFrameToDataUrl({
+      browserFrame: {
+        ...DEFAULT_BROWSER_FRAME_STATE,
+        kind: 'application',
+        style,
+        theme: 'dark',
+        title: 'Report <one>',
+      },
+      width: 1200,
+      sourceHeight: 900,
+      height: 32,
+      headerHeight: 32,
+      radius: 0,
+    });
+    const svg = decodeURIComponent(dataUrl).split('<style>')[0];
+    expect(svg).toContain('Report &lt;one&gt;');
+    expect(svg).toContain('width="1200"');
+    expect(fetch).not.toHaveBeenCalled();
+    fetch.mockRestore();
+  }
+);
+
+it('retains only enabled persisted PNG favicon bytes and escapes the address', async () => {
   const dataUrl = await renderExactBrowserFrameToDataUrl({
     browserFrame: {
       ...DEFAULT_BROWSER_FRAME_STATE,
-      faviconDataUrl: 'data:image/png;base64,favicon',
-      title: 'Exact proof',
-      url: 'https://sniptale.app',
+      faviconEnabled: true,
+      faviconDataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=',
+      title: 'A title',
+      url: 'example.com/?a=<x>',
     },
-    headerHeight: 88,
-    height: 808,
-    radius: 12,
-    width: 1180,
-  });
-
-  expect(dataUrl.startsWith('data:image/svg+xml')).toBe(true);
-  expect(decodeURIComponent(dataUrl)).toContain('data:image/png;base64,favicon');
-});
-
-it('renders wide browser headers without falling back to symbol/use slice clones', async () => {
-  const dataUrl = await renderExactBrowserFrameToDataUrl({
-    browserFrame: {
-      ...DEFAULT_BROWSER_FRAME_STATE,
-      title: 'Wide exact proof',
-      url: 'https://sniptale.app/wide-proof',
-    },
-    headerHeight: 86,
+    width: 900,
+    sourceHeight: 900,
     height: 86,
+    headerHeight: 86,
     radius: 0,
-    width: 1920,
   });
-  const svg = decodeURIComponent(dataUrl);
-  const svgMarkup = svg.slice(svg.indexOf(',') + 1);
-
-  expect(svg).toContain('id="tab-title"');
-  expect(svg).toContain('id="address-url"');
-  expect(svg).toContain('viewBox="527 0 267 86"');
-  expect(svg).not.toContain('<symbol id="browser-header-template"');
-  expect(svg).not.toContain('href="#browser-header-template"');
-  expect(svgMarkup).not.toContain('data:image/svg+xml;charset=utf-8,');
-});
-
-it('omits the favicon layer when the browser-frame draft has no favicon payload', async () => {
-  const dataUrl = await renderExactBrowserFrameToDataUrl({
-    browserFrame: {
-      ...DEFAULT_BROWSER_FRAME_STATE,
-      title: 'Exact proof',
-      url: 'https://sniptale.app',
-    },
-    headerHeight: 88,
-    height: 808,
-    radius: 12,
-    width: 1180,
-  });
-
-  expect(decodeURIComponent(dataUrl)).not.toContain('data:image/png;base64,favicon');
+  const svg = decodeURIComponent(dataUrl).replace(/<style>[\s\S]*?<\/style>/, '');
+  expect(svg).toContain(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII='
+  );
+  expect(svg).toContain('example.com/?a=&lt;x&gt;');
 });

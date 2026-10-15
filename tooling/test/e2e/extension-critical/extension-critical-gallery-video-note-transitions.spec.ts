@@ -69,7 +69,7 @@ for (const variant of [
       await expect(field).toHaveCount(0);
       await button('gallery.videoReview.addComment').first().click();
       await field.fill('Before Back');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.comments').click();
       await expect(rows).toHaveCount(6);
@@ -85,11 +85,11 @@ for (const variant of [
       }
       await button('gallery.videoReview.addComment').first().click();
       await field.fill('   ');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.comments').click();
       await expect(rows).toHaveCount(6);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

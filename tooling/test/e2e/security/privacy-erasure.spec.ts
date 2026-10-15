@@ -1,4 +1,18 @@
 import { test, expect } from '../support/extension-fixture';
+import type { Page } from '@playwright/test';
+import { DB_NAME } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
+import { createQuickEditAdvancedState } from '../../../../apps/extension/src/features/video/review/advanced/defaults';
+import {
+  workspaceStorageHead,
+  workspaceStorageRows,
+} from '../../../../apps/extension/src/composition/persistence/review-workspaces/storage-format';
+import type { VideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/contracts';
+import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
+import { createScenarioProjectEntry } from '../../../../apps/extension/src/composition/persistence/scenario/projects/entry';
+import {
+  scenarioStorageHead,
+  scenarioStorageRows,
+} from '../../../../apps/extension/src/composition/persistence/scenario/storage-format';
 import {
   collectRetentionText,
   controlCheckpoint,
@@ -27,6 +41,101 @@ const ERASURE_MODES = [
   },
 ] as const;
 
+async function seedRetainedEditorHistory(page: Page, canary: string) {
+  const first = createScenarioProjectEntry({
+    existing: undefined,
+    project: createGuideProject(canary, `scenario-${canary}`, 1),
+    updatedAt: 1,
+  });
+  const scenario = createScenarioProjectEntry({
+    existing: first,
+    project: first.project,
+    updatedAt: 2,
+  });
+  const workspace: VideoWorkspace = {
+    aggregateId: `erasure-${canary}`,
+    formatVersion: 1,
+    sourceAssetId: 'erasure-bytes',
+    source: { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 },
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    cursor: 1,
+    advanced: createQuickEditAdvancedState(),
+    history: [
+      {
+        id: 'retained',
+        at: 1,
+        target: 'annotation',
+        before: null,
+        after: { id: 'text', text: canary, anchor: { kind: 'point', time: 2 } },
+      },
+    ],
+  };
+  await page.evaluate(
+    ({ databaseName, head, rows, orphan, scenarioHead, scenarioRows, scenarioOrphan }) =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open(databaseName);
+        request.onupgradeneeded = () => {
+          request.transaction?.abort();
+          reject(new Error('Product database was not admitted'));
+        };
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction(
+            [
+              'video_workspaces',
+              'video_workspace_history',
+              'scenario_projects',
+              'scenario_project_history',
+              'scenario_project_units',
+            ],
+            'readwrite'
+          );
+          tx.objectStore('video_workspaces').put(head);
+          for (const row of rows) tx.objectStore('video_workspace_history').put(row);
+          tx.objectStore('video_workspace_history').put(orphan);
+          tx.objectStore('scenario_projects').put(scenarioHead);
+          for (const row of scenarioRows) tx.objectStore('scenario_project_history').put(row);
+          tx.objectStore('scenario_project_history').put(scenarioOrphan);
+          tx.objectStore('scenario_project_units').put({
+            projectId: scenarioOrphan.projectId,
+            unitId: 'guide:erasure-orphan',
+            revision: 1,
+            value: { retainedEvidence: scenarioOrphan.project.retainedEvidence },
+          });
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onabort = () => {
+            db.close();
+            reject(tx.error);
+          };
+        };
+      }),
+    {
+      databaseName: DB_NAME,
+      scenarioHead: scenarioStorageHead(scenario),
+      scenarioRows: scenarioStorageRows(scenario),
+      scenarioOrphan: {
+        projectId: `scenario-orphan-${canary}`,
+        revision: 1,
+        savedAt: 1,
+        project: { retainedEvidence: canary },
+      },
+      head: workspaceStorageHead(workspace, ['indexed:v1']),
+      rows: workspaceStorageRows(workspace),
+      orphan: {
+        aggregateId: `orphan-${canary}`,
+        ordinal: 0,
+        advanced: { retainedEvidence: canary },
+      },
+    }
+  );
+}
+
 for (const mode of ERASURE_MODES) {
   test(`privacy erasure (${mode.label}) waits for a write and prevents late recreation`, async ({
     context,
@@ -35,6 +144,23 @@ for (const mode of ERASURE_MODES) {
     const control = await openSecurityControl(context, extensionId);
     const writer = await openRealExtensionPage(context, extensionId, SETTINGS_PATH);
     const eraser = await openRealExtensionPage(context, extensionId, SETTINGS_PATH);
+    const gallery = await openRealExtensionPage(
+      context,
+      extensionId,
+      'apps/extension/src/gallery/index.html'
+    );
+    await expect
+      .poll(() =>
+        eraser.evaluate(
+          async (name) => (await indexedDB.databases()).some((db) => db.name === name),
+          DB_NAME
+        )
+      )
+      .toBe(true);
+    await gallery.close();
+    const historyCanary = `review-history-${mode.providerId}`;
+    await seedRetainedEditorHistory(eraser, historyCanary);
+    expect(await collectRetentionText(eraser)).toContain(historyCanary);
     await eraser.evaluate(() =>
       localStorage.setItem('sniptale-theme-preference', 'security-preserved-theme')
     );
@@ -98,6 +224,13 @@ for (const mode of ERASURE_MODES) {
     ) {
       throw new Error(`Privacy erasure failed: ${JSON.stringify(erasure)}`);
     }
+    expect(
+      await eraser.evaluate(
+        async (name) => (await indexedDB.databases()).some((db) => db.name === name),
+        DB_NAME
+      )
+    ).toBe(false);
+    expect(await collectRetentionText(eraser)).not.toContain(historyCanary);
     const writerResult = await writer.evaluate(
       () => (window as typeof window & { securityWriter: Promise<unknown> }).securityWriter
     );
@@ -111,6 +244,7 @@ for (const mode of ERASURE_MODES) {
     expect(JSON.stringify(runtimeData)).not.toContain(mode.providerId);
     expect(await collectRetentionText(eraser)).not.toContain(mode.providerId);
     expect(await collectRetentionText(eraser)).not.toContain(`race-secret-${mode.providerId}`);
+    expect(await collectRetentionText(eraser)).not.toContain(historyCanary);
     expect(await eraser.evaluate(() => localStorage.getItem('sniptale-theme-preference'))).toBe(
       mode.preservePreferences ? 'security-preserved-theme' : null
     );

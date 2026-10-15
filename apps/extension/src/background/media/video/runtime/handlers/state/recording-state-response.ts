@@ -1,3 +1,12 @@
+import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  matchesRecordingFrameClockBinding,
+  type RecordingFrameClockBinding,
+} from '../../../../../../contracts/video/recording-frame-clock';
+import { getRecordingFrameClock, getVideoRecordingTabId } from '../../../session-state';
+import { requireActiveVideoRecordingSourceBinding } from '../../../recording-control-lease';
+import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/runtime-messaging/services';
 import type { RecordingStateHealth } from '../../../../../../contracts/messaging/contracts/response-types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -7,10 +16,11 @@ import {
   isAuthorizedCameraRecorderDocument,
   restoreAuthorizedCameraRecorderDocument,
 } from '../../camera-recorder-control';
+import { getActiveVideoRecordingLeaseSnapshot } from '../../../recording-control-lease';
 import {
-  getActiveVideoRecordingLeaseSnapshot,
   ensureActiveVideoRecordingLeaseHydrated,
-} from '../../../recording-control-lease';
+  getRecordingCompletionState,
+} from '../../recording-completion';
 import {
   resolveTrustedCameraRecorderRuntimeSenderUrl,
   resolveTrustedPopupRuntimeSenderUrl,
@@ -112,7 +122,10 @@ function sendRecordingStateResponse(
   sender?: chrome.runtime.MessageSender,
   postRecordResult: Awaited<ReturnType<typeof readPendingVideoPostRecordResult>> = null
 ): void {
-  const recordingState = getVideoRecordingRuntimeState() as VideoRecordingRuntimeState;
+  const recordingState: VideoRecordingRuntimeState = {
+    ...getVideoRecordingRuntimeState(),
+    completion: getRecordingCompletionState(),
+  };
   const controlCapability = resolveRecordingControlCapabilityForSender(sender);
   sendResponse({
     success: true,
@@ -170,4 +183,58 @@ async function acknowledgePostRecordResult(
     success: true,
     result,
   });
+}
+
+/** Only the current top source document may measure the optional native recording clock. */
+export function handleRecordingClockTiming(
+  binding: RecordingFrameClockBinding,
+  sendResponse: ResponseSender,
+  sender?: chrome.runtime.MessageSender
+): RouteResult {
+  void (async () => {
+    const anchor = getRecordingFrameClock();
+    if (
+      sender?.id !== chrome.runtime.id ||
+      sender.frameId !== 0 ||
+      typeof sender.documentId !== 'string' ||
+      sender.documentId.length === 0 ||
+      sender.documentLifecycle !== 'active' ||
+      sender.tab?.id !== getVideoRecordingTabId() ||
+      !anchor ||
+      !matchesRecordingFrameClockBinding(binding, anchor)
+    ) {
+      sendResponse({ success: false, error: 'RECORDING_CLOCK_SOURCE_UNAVAILABLE' });
+      return;
+    }
+    // The first trusted native anchor can precede completion of activation persistence.
+    // This query reads clocks only; primary recording controls still require an active lease.
+    const lease = getActiveVideoRecordingLeaseSnapshot();
+    const prepared =
+      lease?.phase === 'prepared' && lease.recordingTabId === sender.tab?.id && lease.surfaceBinding
+        ? {
+            recordingId: lease.recordingId,
+            generation: lease.surfaceBinding.generation,
+            streamInstanceId: lease.surfaceBinding.streamInstanceId,
+          }
+        : null;
+    const active = prepared ?? (await requireActiveVideoRecordingSourceBinding().catch(() => null));
+    if (!active || !matchesRecordingFrameClockBinding(binding, active)) {
+      sendResponse({ success: false, error: 'RECORDING_CLOCK_BINDING_UNAVAILABLE' });
+      return;
+    }
+    const reply = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+      attachOffscreenCommandCapability({
+        type: VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING,
+        ...active,
+      })
+    );
+    sendResponse({
+      success: true,
+      recordingHealth: 'healthy',
+      clockTiming: reply.clockTiming ?? null,
+    });
+  })().catch(() =>
+    sendResponse({ success: false, error: 'RECORDING_CLOCK_TRANSPORT_UNAVAILABLE' })
+  );
+  return HANDLED_ASYNC_RESULT;
 }

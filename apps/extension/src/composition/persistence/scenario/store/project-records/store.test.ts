@@ -37,7 +37,10 @@ import { createScenarioStoreProjectFixture } from '../test.helpers.ts';
 beforeEach(() => {
   vi.clearAllMocks();
   listScenarioProjectsMock.mockResolvedValue([]);
-  saveScenarioProjectMock.mockImplementation(async (project) => project);
+  saveScenarioProjectMock.mockImplementation(async (project) => ({
+    project: project,
+    workspaceRevision: 2,
+  }));
   getScenarioProjectMock.mockResolvedValue(undefined);
 });
 
@@ -54,11 +57,15 @@ async function verifyProjectCrudLifecycle() {
   ]);
   getScenarioProjectMock.mockResolvedValue(project);
 
-  await expect(createScenarioProjectRecord('Scenario')).resolves.toEqual(
-    expect.objectContaining({ name: 'Scenario', version: 4, items: [] })
-  );
+  await expect(createScenarioProjectRecord('Scenario')).resolves.toEqual({
+    project: expect.objectContaining({ name: 'Scenario', version: 4, items: [] }),
+    workspaceRevision: 2,
+  });
   await expect(getScenarioProjectRecord('project-1')).resolves.toEqual(project);
-  await expect(saveScenarioProjectRecord(project)).resolves.toEqual(project);
+  await expect(saveScenarioProjectRecord(project)).resolves.toEqual({
+    project,
+    workspaceRevision: 2,
+  });
   await expect(listScenarioProjectSummaries()).resolves.toEqual([
     {
       availability: 'available' as const,
@@ -72,7 +79,7 @@ async function verifyProjectCrudLifecycle() {
   expect(saveScenarioProjectMock).toHaveBeenCalled();
   expect(saveScenarioProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({ name: 'Scenario' }),
-    { baseUpdatedAt: null, storageClass: 'library' }
+    { expectedRevision: null, storageClass: 'library' }
   );
   expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('create', [
     expect.stringMatching(/^scenario:/),
@@ -126,6 +133,7 @@ async function verifyConcurrentMetadataMutationsPreserveEarlierWrites() {
   getScenarioProjectMock.mockImplementation(async () => storedProject);
   saveScenarioProjectMock.mockImplementation(async (nextProject) => {
     storedProject = nextProject;
+    return { project: storedProject, workspaceRevision: 2 };
   });
 
   await Promise.all([
@@ -152,7 +160,7 @@ async function verifyMetadataReturnsPersistedRevisionForFollowUpSave() {
   if (!renamedProject) {
     throw new Error('Expected renamed project');
   }
-  const taggedProject = await saveScenarioProjectRecord(
+  const { project: taggedProject } = await saveScenarioProjectRecord(
     { ...renamedProject, tags: ['draft'] },
     { baseUpdatedAt: renamedProject.updatedAt }
   );
@@ -174,7 +182,7 @@ function installRevisionCheckedProjectSaveMock(
       throw new Error('stale test project save');
     }
     storedProject = { ...nextProject, updatedAt: storedProject.updatedAt + 1 };
-    return storedProject;
+    return { project: storedProject, workspaceRevision: 2 };
   });
 }
 

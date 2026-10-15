@@ -1,3 +1,4 @@
+import { recordingIdForProjectAsset } from './source-interactions';
 import type { VideoProject, VideoProjectActionEvent, VideoProjectVideoClip } from './types';
 
 /** One appearance of an authored fact on the current timeline. Never persisted. */
@@ -5,6 +6,7 @@ export interface VideoProjectActionOccurrence {
   event: VideoProjectActionEvent;
   eventId: string;
   clipId: string | null;
+  /** Captured down time projected through the owning run, including before a retained tail. */
   time: number;
   sourceInstanceId: string | null;
   playbackRun: { id: string; clipIds: readonly string[] } | null;
@@ -62,7 +64,7 @@ function resolveRuns(clips: readonly VideoProjectVideoClip[]) {
   return runs;
 }
 
-/** Resolve every real appearance; a trimmed-away fact deliberately produces no row. */
+/** Resolve retained points and observed gesture continuations without moving their source anchors. */
 export function resolveVideoProjectActionOccurrences(
   project: VideoProject
 ): VideoProjectActionOccurrence[] {
@@ -70,12 +72,7 @@ export function resolveVideoProjectActionOccurrences(
   for (const clip of project.clips) {
     if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) continue;
     const asset = project.assets.find((item) => item.id === clip.assetId);
-    const recordingId =
-      asset?.source.kind === 'recording'
-        ? asset.source.recordingId
-        : asset?.source.kind === 'project-asset'
-          ? asset.source.originRecordingId
-          : null;
+    const recordingId = recordingIdForProjectAsset(asset);
     if (!recordingId) continue;
     const key = JSON.stringify([recordingId, clip.sourceInstanceId]);
     const group = instances.get(key) ?? [];
@@ -98,12 +95,52 @@ export function resolveVideoProjectActionOccurrences(
       ];
     }
     const key = JSON.stringify([anchor.recordingId, anchor.sourceInstanceId]);
-    return (instances.get(key) ?? []).flatMap((clip) => {
-      if (
-        anchor.sourceTime < clip.sourceStart ||
-        anchor.sourceTime >= clip.sourceStart + clip.sourceDuration
-      )
-        return [];
+    const clips = instances.get(key) ?? [];
+    const containsDown = (clip: VideoProjectVideoClip) =>
+      anchor.sourceTime >= clip.sourceStart &&
+      anchor.sourceTime < clip.sourceStart + clip.sourceDuration;
+    const clipRuns = runs.get(key);
+    const gesture = event.data['gestureType'];
+    const down = event.data['downTime'];
+    const ends = [
+      event.data['upTime'],
+      event.data['semanticEndTime'],
+      event.data['lastObservedTime'],
+    ].filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const observedEnd =
+      event.kind === 'CLICK' &&
+      typeof gesture === 'string' &&
+      ['hold', 'drag', 'selection', 'native-drag'].includes(gesture) &&
+      typeof down === 'number' &&
+      Number.isFinite(down) &&
+      down === anchor.sourceTime &&
+      ends.length
+        ? Math.max(...ends)
+        : anchor.sourceTime;
+    const anchoredRuns = new Set(
+      clips.filter(containsDown).map((clip) => clipRuns?.get(clip.id)?.id ?? clip.id)
+    );
+    const continuations = new Map<string, VideoProjectVideoClip>();
+    if (observedEnd > anchor.sourceTime)
+      for (const clip of clips) {
+        const runId = clipRuns?.get(clip.id)?.id ?? clip.id;
+        if (
+          anchoredRuns.has(runId) ||
+          anchor.sourceTime >= clip.sourceStart + clip.sourceDuration ||
+          observedEnd <= clip.sourceStart
+        )
+          continue;
+        const previous = continuations.get(runId);
+        if (
+          !previous ||
+          clip.startTime < previous.startTime ||
+          (clip.startTime === previous.startTime && clip.id.localeCompare(previous.id) < 0)
+        )
+          continuations.set(runId, clip);
+      }
+    return clips.flatMap((clip) => {
+      const runId = clipRuns?.get(clip.id)?.id ?? clip.id;
+      if (!containsDown(clip) && continuations.get(runId)?.id !== clip.id) return [];
       return [
         {
           event,

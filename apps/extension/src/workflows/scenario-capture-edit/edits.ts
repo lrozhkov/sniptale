@@ -1,3 +1,4 @@
+import type { ScenarioProjectSnapshot } from '../../composition/persistence/scenario/contracts';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
@@ -42,10 +43,11 @@ export function buildScenarioEditedImageBlock(
 export async function applyScenarioImageEdit(args: {
   project: GuideProject;
   baseUpdatedAt: number;
+  expectedRevision?: number;
   target: GuideImageEditTarget;
   dataUrl: string;
   document: EditorDocument;
-}): Promise<GuideProject> {
+}): Promise<ScenarioProjectSnapshot> {
   const parsed = parseGuideProject(args.project);
   if (parsed.status !== 'ok' || !isImageDataUrl(args.dataUrl) || !isEditorDocument(args.document))
     throw new Error('Invalid image edit.');
@@ -73,26 +75,41 @@ export async function applyScenarioImageEdit(args: {
     if (item?.kind === 'step')
       item.blocks = item.blocks.map((entry) => (entry.id === block.id ? replacement : entry));
     handedOff = true;
-    const result = await commitScenarioAggregateMutation(project, {
-      expectedUpdatedAt: args.baseUpdatedAt,
-      children: {
-        assetPuts: [prepared.entry],
-        editorDocumentPuts: [
-          {
-            projectId: project.id,
-            stepId: documentId,
-            document: args.document,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-        ],
-      },
-    });
-    publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
-    return result.project;
+    const result = await commitScenarioEditedImage(project, args, documentId, prepared.entry);
+    return result;
   } catch (error) {
     if (!handedOff)
       return rejectScenarioMutationBeforeHandoff({ assetPuts: [prepared.entry] }, error);
     throw error;
   }
+}
+
+function scenarioEditedImageChildren(
+  projectId: string,
+  documentId: string,
+  document: EditorDocument,
+  entry: PreparedScenarioAssetEntry
+) {
+  return {
+    assetPuts: [entry],
+    editorDocumentPuts: [
+      { projectId, stepId: documentId, document, createdAt: Date.now(), updatedAt: Date.now() },
+    ],
+  };
+}
+
+/** Commit handoff precedes notification; failed CAS never publishes a library update. */
+export async function commitScenarioEditedImage(
+  project: Parameters<typeof commitScenarioAggregateMutation>[0],
+  args: { baseUpdatedAt: number; expectedRevision?: number; document: EditorDocument },
+  documentId: string,
+  entry: PreparedScenarioAssetEntry
+) {
+  const result = await commitScenarioAggregateMutation(project, {
+    expectedUpdatedAt: args.baseUpdatedAt,
+    ...(args.expectedRevision === undefined ? {} : { expectedRevision: args.expectedRevision }),
+    children: scenarioEditedImageChildren(project.id, documentId, args.document, entry),
+  });
+  publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
+  return result;
 }

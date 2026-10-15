@@ -1,3 +1,4 @@
+import { parseWindowHeader } from '../../../browser-frame/header';
 import { isCameraAppearance } from '../camera/appearance';
 import type { VideoProjectClip } from '../types/index';
 import {
@@ -101,6 +102,7 @@ function hasCameraPositions(value: unknown): boolean {
 
 function hasMediaVisualFields(value: Record<string, unknown>): boolean {
   return (
+    (value['windowHeader'] === undefined || parseWindowHeader(value['windowHeader']) !== null) &&
     isEnumValue(value['fitMode'], VideoMediaFitMode) &&
     (value['fitScalePercent'] === undefined ||
       isBoundedNumber(value['fitScalePercent'], 1, 1000)) &&

@@ -288,7 +288,14 @@ export interface VideoRecordingState {
   startTime?: number;
 }
 
+export interface VideoRecordingCompletionState {
+  discard: boolean;
+  outcome: 'unknown' | 'stopped' | 'failed';
+  pending: boolean;
+}
+
 export interface VideoRecordingRuntimeState {
+  completion?: VideoRecordingCompletionState | null;
   status: VideoRecordingStatus;
   duration: number;
   countdownEndsAt: number | null;

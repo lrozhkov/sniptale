@@ -1,7 +1,44 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { expect, it, vi } from 'vitest';
 import { deleteProjectAssetsUnreferencedByOtherProjects } from './asset-references';
 import { buildPhysicalDeleteOperation } from '../assets';
 import { createProjectAssetEntry, createVideoProjectEntry } from './index.test-support';
+
+it('defers an ordinary save release until mounted Undo readers have drained', async () => {
+  const remove = vi.fn();
+  const asset = createProjectAssetEntry({ id: 'private', assetId: 'held-bytes' });
+  const tables: Record<string, unknown> = {
+    media_library: { get: async () => undefined, delete: remove },
+    project_assets: { get: async () => asset, delete: remove },
+    video_projects: { getAll: async () => [] },
+    scenario_assets: { getAll: async () => [] },
+    video_workspaces: { getAll: async () => [], get: async () => undefined, delete: remove },
+    video_workspace_history: {
+      getAll: async () => [],
+      index: () => ({ getAll: async () => [], getAllKeys: async () => [] }),
+    },
+    image_workspaces: { get: async () => undefined, delete: remove },
+    aggregate_presentations: { delete: remove },
+    thumbnails: { delete: remove },
+    video_workspace_drafts: { delete: remove },
+    asset_owners: { delete: remove, index: () => ({ count: async () => 0 }) },
+    asset_refs: { delete: remove },
+  };
+  const operation = buildPhysicalDeleteOperation([]);
+  await deleteProjectAssetsUnreferencedByOtherProjects({
+    tx: { objectStore: (name: string) => tables[name] } as Parameters<
+      typeof deleteProjectAssetsUnreferencedByOtherProjects
+    >[0]['tx'],
+    operation,
+    projectAssetIds: ['private'],
+    deferForReaders: true,
+  });
+  expect(remove).not.toHaveBeenCalled();
+  expect(operation).toMatchObject({
+    assetIds: [],
+    privateSources: [{ projectAssetId: 'private', expectedAssetId: 'held-bytes' }],
+  });
+});
 
 it.each(['unknown-video', 'scenario', 'review'] as const)(
   'retains a private resource used by an external %s consumer',
@@ -40,6 +77,7 @@ it.each(['unknown-video', 'scenario', 'review'] as const)(
       video_projects: args.projectStore,
       scenario_assets: args.scenarioAssetStore,
       video_workspaces: args.videoWorkspaceStore,
+      video_workspace_history: { getAll: async () => [] },
     };
     await deleteProjectAssetsUnreferencedByOtherProjects({
       tx: { objectStore: (name: string) => stores[name] } as Parameters<
@@ -52,7 +90,7 @@ it.each(['unknown-video', 'scenario', 'review'] as const)(
   }
 );
 
-it('reclaims private nested auxiliaries after their parent placement is removed', async () => {
+it('retains an independent quick-edit project and its nested auxiliaries after placement removal', async () => {
   const { createQuickEditAdvancedState } =
     await import('../../../features/video/review/advanced/defaults');
   const advanced = createQuickEditAdvancedState();
@@ -90,8 +128,22 @@ it('reclaims private nested auxiliaries after their parent placement is removed'
     get: async (key: string) => table(name).get(key),
     getAll: async () => [...table(name).values()],
     put: vi.fn(),
-    delete: async (key: string) => table(name).delete(key),
-    index: () => ({ count: async () => 0 }),
+    delete: async (key: IDBValidKey) =>
+      table(name).delete(Array.isArray(key) ? JSON.stringify(key) : String(key)),
+    index: (indexName: string) => ({
+      count: async () => 0,
+      getAll: async (key: IDBValidKey) =>
+        [...table(name).values()].filter(isRecord).filter((row) => row[indexName] === key),
+      getAllKeys: async (key: IDBValidKey) =>
+        [...table(name).values()]
+          .filter(isRecord)
+          .filter((row) => row[indexName] === key)
+          .map((row) => {
+            if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
+              throw new Error('Invalid history fixture key');
+            return [row['aggregateId'], row['ordinal']];
+          }),
+    }),
   });
   await deleteProjectAssetsUnreferencedByOtherProjects({
     tx: { objectStore: store } as unknown as Parameters<
@@ -100,6 +152,7 @@ it('reclaims private nested auxiliaries after their parent placement is removed'
     operation: buildPhysicalDeleteOperation([]),
     projectAssetIds: ['parent'],
   });
-  expect(table('project_assets').has('parent')).toBe(false);
-  expect(table('project_assets').has('child')).toBe(false);
+  expect(table('project_assets').has('parent')).toBe(true);
+  expect(table('project_assets').has('child')).toBe(true);
+  expect(table('video_workspaces').has('project-asset:parent')).toBe(true);
 });

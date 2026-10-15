@@ -33,6 +33,10 @@ function createErasureDeps() {
       countRoots: vi.fn<() => Promise<number>>().mockResolvedValue(0),
       erase: vi.fn<() => Promise<number>>().mockResolvedValue(0),
     },
+    eventHistory: {
+      erase: vi.fn().mockResolvedValue(undefined),
+      verifyEmpty: vi.fn().mockResolvedValue(true),
+    },
     videoPreviewCache: {
       erase: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       verifyEmpty: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
@@ -172,6 +176,7 @@ it('does not remove browser storage when a plan has no direct or prefix keys', a
       editorBootstrapRetention: deps.editorBootstrapRetention,
       assetStorage: deps.assetStorage,
       videoPreviewCache: deps.videoPreviewCache,
+      eventHistory: deps.eventHistory,
     }
   );
 
@@ -250,4 +255,21 @@ it('queues persistent recreation until final participant verification completes'
   await expect(erasure).resolves.toEqual(expect.objectContaining({ success: true }));
   await expect(lateMutation).resolves.toBeUndefined();
   expect(lateWriter).toHaveBeenCalledOnce();
+});
+
+it('requires event history erasure and verifies the archive store twice', async () => {
+  const result = await erasePersistentLocalExtensionData(
+    { includeAiProviderSecrets: false, preservePreferences: true },
+    deps
+  );
+  expect(result.success).toBe(true);
+  expect(deps.eventHistory.erase).toHaveBeenCalledOnce();
+  expect(deps.eventHistory.verifyEmpty).toHaveBeenCalledTimes(2);
+  deps.eventHistory.verifyEmpty.mockResolvedValue(false);
+  const failed = await erasePersistentLocalExtensionData(
+    { includeAiProviderSecrets: false, preservePreferences: true },
+    deps
+  );
+  expect(failed.success).toBe(false);
+  expect(failed.failedRequiredParticipantIds).toContain('indexed-db:event-history');
 });

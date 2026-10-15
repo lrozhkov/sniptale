@@ -1,3 +1,4 @@
+export { parseCutTransition } from './cut-transition';
 import { buildReviewTimeMap } from './timeline';
 import { isReviewSpeedRate } from './speed';
 import type { ReviewAnchor, ReviewEdit } from './types';
@@ -79,14 +80,7 @@ function reviewRange(args: Parameters<typeof createReviewCut>[0], kind: ReviewEd
     selection.start >= selection.end
   )
     return null;
-  const start =
-    args.snapToKeyframes === false
-      ? selection.start
-      : nearestReviewBoundary(selection.start, boundaries);
-  const end =
-    args.snapToKeyframes === false
-      ? selection.end
-      : nearestReviewBoundary(selection.end, boundaries);
+  const { start, end } = snapReviewRange(selection, boundaries, args.snapToKeyframes);
   if (start < 0 || end > duration || start >= end) return null;
   if (edits.some((edit) => edit.kind === kind && edit.start < end && edit.end > start)) return null;
   return {
@@ -123,6 +117,8 @@ export function reviewPlaybackTime(time: number, edits: readonly ReviewEdit[]): 
 export interface ReviewCutTransitionPlan {
   id: string;
   type: 'dissolve' | 'fade-black';
+  /** Absent in legacy transitions; resolves to opaque black without rewriting history. */
+  color?: string;
   seam: number;
   before: number;
   after: number;
@@ -158,6 +154,7 @@ export function planReviewCutTransitions(
     plans.push({
       id: cut.id,
       type: cut.transition.type,
+      ...(cut.transition.color === undefined ? {} : { color: cut.transition.color }),
       seam,
       left,
       right,
@@ -198,4 +195,21 @@ export function reviewCutTransitionAt(time: number, plans: readonly ReviewCutTra
         ? 1 - (time - plan.seam) / plan.after
         : 0;
   return { plan, incoming, beforeSeam: time < plan.seam, black: Math.max(0, Math.min(1, black)) };
+}
+
+/** Invalid authored transitions refuse the operation instead of degrading it to a hard cut. */
+
+export function snapReviewRange(
+  selection: { start: number; end: number },
+  boundaries: readonly number[],
+  snapToKeyframes?: boolean
+) {
+  return {
+    start:
+      snapToKeyframes === false
+        ? selection.start
+        : nearestReviewBoundary(selection.start, boundaries),
+    end:
+      snapToKeyframes === false ? selection.end : nearestReviewBoundary(selection.end, boundaries),
+  };
 }

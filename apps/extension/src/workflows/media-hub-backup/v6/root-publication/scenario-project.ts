@@ -1,8 +1,11 @@
+import { createScenarioProjectStore } from '../../../../composition/persistence/scenario/storage';
 import { appendCommittedArchiveRootInTransaction } from '../../../../composition/persistence/assets';
 import {
   ASSET_OPERATIONS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import {
@@ -21,11 +24,17 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
     const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);
     return runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(
-        [SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE, ASSET_OPERATIONS_STORE],
+        [
+          SCENARIO_PROJECTS_STORE,
+          SCENARIO_PROJECT_HISTORY_STORE,
+          SCENARIO_PROJECT_UNITS_STORE,
+          SCENARIO_ASSETS_STORE,
+          ASSET_OPERATIONS_STORE,
+        ],
         'readwrite'
       );
       const existingProject = parseScenarioProjectEntry(
-        await tx.objectStore(SCENARIO_PROJECTS_STORE).get(metadata.entry.id)
+        await createScenarioProjectStore(tx).get(metadata.entry.id)
       );
       if (!existingProject || existingProject.id !== metadata.entry.id) {
         await tx.done;

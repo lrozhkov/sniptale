@@ -1,4 +1,5 @@
 import { stopRecorderStreams } from './recorders';
+import { notifyMultiSourceStopped } from './messages';
 import {
   getActiveMultiSourceSession,
   setActiveMultiSourceSession,
@@ -58,6 +59,7 @@ async function stopAndFinalizeSession(params: {
     retireMultiSourceSession(session);
     if (discard) {
       await abortSession(session);
+      await notifyMultiSourceStopped(session.recordingId);
       return;
     }
     await finalizeSession(session);
@@ -87,14 +89,23 @@ export function stopMultiSourceSession(params: {
   const previousPhase = session.lifecycle.beginStop();
   if (previousPhase === null) return Promise.resolve();
   if (previousPhase === 'starting') {
-    getSessionRecorders(session).forEach((source) => {
-      void source.artifactSession.abort().catch(() => undefined);
-    });
-    retireMultiSourceSession(session);
-    session.stopPromise = abortSession(session);
+    session.stopPromise = cancelStartingSession(session);
     return session.stopPromise;
   }
 
   session.stopPromise = stopAndFinalizeSession(params);
   return session.stopPromise;
+}
+
+async function cancelStartingSession(session: MultiSourceSession): Promise<void> {
+  const aborts = getSessionRecorders(session).map(async (source) => source.artifactSession.abort());
+  retireMultiSourceSession(session);
+  const results = await Promise.allSettled([...aborts, abortSession(session)]);
+  const errors = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+  if (errors.length > 0) {
+    throw new AggregateError(errors, 'Failed to cancel multi-source recording cleanup.');
+  }
+  await notifyMultiSourceStopped(session.recordingId);
 }

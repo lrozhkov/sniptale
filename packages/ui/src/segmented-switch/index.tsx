@@ -4,6 +4,7 @@ import { getControlSegmentedOptionClassName } from '../control-language';
 export type SegmentedSwitchOption<TId extends string> = {
   id: TId;
   label: string;
+  disabled?: boolean;
 };
 
 type SegmentedSwitchProps<TId extends string> = {
@@ -53,6 +54,7 @@ function WrappedSegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<
             key={option.id}
             type="button"
             aria-pressed={active}
+            disabled={option.disabled}
             title={option.label}
             onClick={() => props.onChange(option.id)}
             className={[
@@ -93,6 +95,7 @@ function InlineSegmentedSwitch<TId extends string>(
           key={option.id}
           active={option.id === props.activeId}
           compact={compact}
+          disabled={!!option.disabled}
           label={option.label}
           onClick={() => props.onChange(option.id)}
         />
@@ -103,6 +106,7 @@ function InlineSegmentedSwitch<TId extends string>(
 
 function InlineSegmentedSwitchOption(props: {
   active: boolean;
+  disabled: boolean;
   compact: boolean;
   label: string;
   onClick: () => void;
@@ -111,6 +115,7 @@ function InlineSegmentedSwitchOption(props: {
     <button
       type="button"
       aria-pressed={props.active}
+      disabled={props.disabled}
       title={props.label}
       onClick={props.onClick}
       className={[

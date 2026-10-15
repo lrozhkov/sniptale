@@ -18,9 +18,19 @@ export async function renderOfflineAudioMix(
   const settings = settingsOrSignal instanceof AbortSignal ? undefined : settingsOrSignal;
   const resolvedSignal = settingsOrSignal instanceof AbortSignal ? settingsOrSignal : signal;
   const clipsWithAudio = collectRenderableAudioClips(project, settings);
-  if (clipsWithAudio.length === 0) {
-    return null;
-  }
+  const actionAudioEnabled =
+    project.actionPresentation?.enabled !== false &&
+    project.actionFeedback?.some((group) =>
+      group.settings.some(
+        (setting) => setting.enabled && setting.presetId !== null && setting.volume > 0
+      )
+    );
+  const actionAudioPresent = actionAudioEnabled
+    ? (
+        await import('../../../../../../features/video/review/project-action-audio')
+      ).buildProjectActionAudioPlan(project).descriptors.length > 0
+    : false;
+  if (clipsWithAudio.length === 0 && !actionAudioPresent) return null;
 
   const range = settings ? resolveProjectExportRange(project, settings) : null;
   const { decodeContext, decodedBuffers, offlineContext } = createOfflineAudioMixContext(
@@ -33,6 +43,7 @@ export async function renderOfflineAudioMix(
     decodedBuffers,
     offlineContext,
     project,
+    ...(range ? { actionRange: { start: range.start, end: range.end } } : {}),
     ...(resolvedSignal === undefined ? {} : { signal: resolvedSignal }),
   });
 }

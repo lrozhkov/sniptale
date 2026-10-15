@@ -1,6 +1,5 @@
 import { maintainLibraryAssets } from '../../workflows/media-hub/maintenance';
-import { loadSettings } from '../../composition/persistence/settings';
-import { cleanupLibraryTrash } from '../../workflows/media-hub/trash';
+import { subscribeToAssetResourceRelease } from '../../composition/persistence/assets/resource-sessions';
 import { getLibraryStorageUsage } from '../../composition/persistence/library-lifecycle';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
@@ -64,15 +63,12 @@ function createMediaHubEventHandler(
 }
 
 function applyGalleryRefreshResult(props: {
-  estimate: StorageEstimateInfo;
   itemsRef: React.MutableRefObject<GalleryItem[]>;
   nextItems: GalleryItem[];
   onPreviewItemRefresh: (items: GalleryItem[]) => void;
   onSelectionRefresh: (items: GalleryItem[]) => void;
   setHasLoadedLibrarySnapshot: (hasLoaded: boolean) => void;
   setItems: (items: GalleryItem[]) => void;
-  setStorageInfo: (value: StorageEstimateInfo | null) => void;
-  storageInfoRef: React.MutableRefObject<StorageEstimateInfo | null>;
 }) {
   const resolvedItems = resolveStableGalleryItems(props.itemsRef.current, props.nextItems);
   const itemsChanged = resolvedItems !== props.itemsRef.current;
@@ -84,10 +80,6 @@ function applyGalleryRefreshResult(props: {
     props.onPreviewItemRefresh(resolvedItems);
   }
 
-  if (!isStorageEstimateEqual(props.storageInfoRef.current, props.estimate)) {
-    props.storageInfoRef.current = props.estimate;
-    props.setStorageInfo(props.estimate);
-  }
   props.setHasLoadedLibrarySnapshot(true);
 }
 
@@ -236,6 +228,11 @@ function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | und
       areRecordingGroupViewsEqual(left.recordingGroupView, right.recordingGroupView)
     );
   }
+  if (left.type === 'quick-edit-project') {
+    return (
+      right.type === 'quick-edit-project' && left.unavailableReason === right.unavailableReason
+    );
+  }
   if (isGalleryScenarioItem(left)) {
     return (
       isGalleryScenarioItem(right) &&
@@ -374,31 +371,31 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
     args.setIsLoading(true);
   }
   try {
-    const settings = await loadSettings().catch(() => null);
-    if (settings) {
-      const maintenance = await cleanupLibraryTrash(settings.localStoragePolicy).catch(() => ({
-        failedCount: 1,
-      }));
-      if (maintenance.failedCount > 0) args.onBanner(translate('gallery.app.trashCleanupFailed'));
-    }
     const { estimate, nextItems } = await loadGalleryLibrarySnapshot();
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
       return;
     }
 
     applyGalleryRefreshResult({
-      estimate,
       itemsRef: args.itemsRef,
       nextItems,
       onPreviewItemRefresh: args.onPreviewItemRefresh,
       onSelectionRefresh: args.onSelectionRefresh,
       setHasLoadedLibrarySnapshot: args.setHasLoadedLibrarySnapshot,
       setItems: args.setItems,
-      setStorageInfo: args.setStorageInfo,
-      storageInfoRef: args.storageInfoRef,
+    });
+    void Promise.resolve(estimate).then((value) => {
+      if (
+        usageController.signal.aborted ||
+        !isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })
+      )
+        return;
+      if (value && !isStorageEstimateEqual(args.storageInfoRef.current, value)) {
+        args.storageInfoRef.current = value;
+        args.setStorageInfo(value);
+      }
     });
     loadGalleryTrashUsage(args, nextItems, refreshEpoch, usageController.signal);
-    void maintainLibraryAssets(usageController.signal);
     args.onRefresh?.();
   } catch (error) {
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
@@ -497,6 +494,43 @@ export function useGalleryLibraryState({
     setStorageInfo,
     storageInfoRef,
   });
+
+  useEffect(() => {
+    if (!hasLoadedLibrarySnapshot) return;
+    const controller = new AbortController();
+    let running = false;
+    let pending = false;
+    const schedule = () => {
+      if (controller.signal.aborted || document.visibilityState === 'hidden') return;
+      pending = true;
+      if (running) return;
+      running = true;
+      void (async () => {
+        try {
+          while (pending && !controller.signal.aborted) {
+            pending = false;
+            await maintainLibraryAssets(controller.signal, () => {
+              if (!controller.signal.aborted) onBanner(translate('gallery.app.trashCleanupFailed'));
+            });
+          }
+        } catch {
+          logger.debug('Library maintenance deferred');
+        } finally {
+          running = false;
+        }
+      })();
+    };
+    const unsubscribe = subscribeToAssetResourceRelease(schedule);
+    window.addEventListener('focus', schedule);
+    document.addEventListener('visibilitychange', schedule);
+    schedule();
+    return () => {
+      controller.abort();
+      unsubscribe();
+      window.removeEventListener('focus', schedule);
+      document.removeEventListener('visibilitychange', schedule);
+    };
+  }, [hasLoadedLibrarySnapshot, onBanner]);
 
   useGalleryLibrarySubscriptions({ onBanner, refresh, refreshEpochRef });
 

@@ -1,8 +1,12 @@
+import type { RecordingClockTiming } from '../../video/recording-frame-clock';
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type { CaptureActionType } from '../../settings';
 import type { ProjectExportCapabilitiesPayload } from './types';
 import type {
   RecordingTelemetrySignal,
+  RecordingTelemetryCapabilities,
+  RecordingObservationClock,
+  RecordingTelemetryProvenance,
   RecordingViewportObservation,
   RecordingActionEvent,
   VideoProjectCursorTrack,
@@ -22,6 +26,7 @@ export const recordingStateHealthValues = ['healthy', 'degraded', 'failed'] as c
 export type RecordingStateHealth = (typeof recordingStateHealthValues)[number];
 
 export type RecordingStateResponse = RuntimeMessageResponse<{
+  clockTiming?: RecordingClockTiming | null;
   controlToken?: string;
   postRecordResult?: VideoPostRecordResult;
   recordingHealth: RecordingStateHealth;
@@ -102,6 +107,9 @@ export type ViewportCoordsResponse = RuntimeMessageResponse<{
 }>;
 
 export type RecordingTelemetrySnapshot = {
+  capabilities?: RecordingTelemetryCapabilities;
+  observationClock?: RecordingObservationClock;
+  provenance?: RecordingTelemetryProvenance;
   viewportObservation?: RecordingViewportObservation | null;
   viewport: ViewportInfo | null;
   cursorTrack: VideoProjectCursorTrack | null;

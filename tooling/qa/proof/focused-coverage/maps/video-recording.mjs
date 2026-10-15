@@ -4,8 +4,67 @@ import { SHARED_CONTRACT_OWNER_MAPPINGS } from './video-recording-shared-contrac
 import { POPUP_RECORDING_OWNER_MAPPINGS } from './popup-recording.mjs';
 
 export const VIDEO_RECORDING_OWNER_MAPPINGS = [
+  {
+    owner: 'background-video-recording-state-response',
+    productionFile:
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state-response.ts',
+    exclusive: true,
+    reason:
+      'State responses require completion recovery, capability, post-record, and clock proof.',
+    testFiles: [
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.clock.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/camera-recorder-registration.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/root.test.ts',
+    ],
+  },
+  {
+    owner: 'background-video-recording-completion',
+    productionFile: 'apps/extension/src/background/media/video/runtime/recording-completion.ts',
+    exclusive: true,
+    reason:
+      'The completion owner requires Stop, startup, recovery, saved-result, and persistence concurrency proof.',
+    testFiles: [
+      'apps/extension/src/background/media/video/runtime/recording-completion.stop.test.ts',
+      'apps/extension/src/background/media/video/runtime/recording-completion.privacy-erasure.test.ts',
+      'apps/extension/src/background/media/video/runtime/recording-completion.start-failure.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.saved-replay.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.stop-error.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.stale-events.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/camera-recorder-registration.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/control-route.capability.test.ts',
+      'apps/extension/src/background/media/video/recording-control-lease.test.ts',
+      'apps/extension/src/background/media/video/recording-control-lease.conditional-cleanup.test.ts',
+      'apps/extension/src/background/media/video/manager/start-owner.test.ts',
+      'apps/extension/src/background/media/video/manager/start.cleanup.test.ts',
+      'apps/extension/src/background/media/video/manager/start-activation-watchdog.default.test.ts',
+      'apps/extension/src/background/media/video/capture-surface.recovery.window-only.test.ts',
+      'apps/extension/src/background/media/privacy-erasure/cleanup.test.ts',
+      'apps/extension/src/background/media/privacy-erasure/cleanup.recovery.test.ts',
+    ],
+  },
   ...VIDEO_RECORDING_LEASE_OWNER_MAPPINGS,
   ...VIDEO_RECORDING_RUNTIME_ROUTING_OWNER_MAPPINGS,
+  {
+    owner: 'background-video-offscreen-lifecycle',
+    productionFile:
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ts',
+    exclusive: true,
+    reason:
+      'The lifecycle owner requires its ready, export, saved-result and terminal recovery tests.',
+    testFiles: [
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.project-export.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ready.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.saved-replay.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.stop-error.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts',
+    ],
+  },
   {
     owner: 'background-video-capture-surface-session',
     productionPrefix: 'apps/extension/src/background/media/video/capture-surface/',
@@ -125,6 +184,7 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.project-export.test.ts',
       'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ready.test.ts',
       'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.saved-replay.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.stop-error.test.ts',
     ],
   },
   {

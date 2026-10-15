@@ -1,3 +1,4 @@
+import { guideParagraphText } from '../../features/scenario/project/public';
 import { GuideVoiceField } from './voice-field';
 import { Check, Info, StickyNote, TriangleAlert, CircleAlert } from 'lucide-react';
 import type { GuideBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -67,9 +68,7 @@ export function GuideNoteBlock({
         className="guide-note"
         style={guideTextAppearance(block)}
         rows={1}
-        value={block.paragraphs
-          .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-          .join('\n')}
+        value={guideParagraphText(block.paragraphs)}
         onValueChange={(value) => onChange({ ...block, paragraphs: createGuideParagraphs(value) })}
       />
     </aside>

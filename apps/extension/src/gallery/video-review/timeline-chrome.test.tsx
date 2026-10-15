@@ -2,7 +2,13 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewHistoryControls, ReviewRuler, ReviewToolbar } from './timeline-chrome';
+import {
+  ReviewHistoryControls,
+  ReviewRuler,
+  ReviewRulerRow,
+  ReviewPlayhead,
+  ReviewToolbar,
+} from './timeline-chrome';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -130,6 +136,16 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
     const end = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.timelineEnd"]'
     )!;
+    const sample = () =>
+      host.querySelector('.review-playback-clock > [aria-hidden="true"]')!.textContent;
+    act(() => root.render(<ReviewToolbar {...props} duration={599.999} />));
+    expect(sample()).toBe('88:88.88 / 10:00.00');
+    act(() => root.render(<ReviewToolbar {...props} duration={599.999} time={599.994} />));
+    expect(sample()).toBe('88:88.88 / 10:00.00');
+    expect(host.querySelector('.review-playback-clock-value')?.textContent).toBe(
+      '9:59.99 / 10:00.00'
+    );
+    act(() => root.render(<ReviewToolbar {...props} />));
     expect(start.disabled).toBe(true);
     act(() => play.click());
     act(() => end.click());
@@ -145,9 +161,60 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
       host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.fit"]')!.click()
     );
     expect(onZoom).toHaveBeenCalledWith(1);
+    act(() =>
+      root.render(
+        <ReviewToolbar
+          {...props}
+          time={3}
+          resultDuration={8}
+          playbackRange={{ start: 1, end: 2 }}
+        />
+      )
+    );
+    expect(host.querySelector('[data-toolbar-transport]')?.textContent).toContain(
+      '0:01.00 – 0:02.00'
+    );
+    expect(host.querySelector('[data-toolbar-transport]')?.textContent).not.toContain('0:03.00');
+    expect(host.querySelector('[title="gallery.videoReview.resultDuration"]')).toBeNull();
   } finally {
     act(() => root.unmount());
     host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps ruler and lane markers aligned across source-time bounds without capturing input', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    for (const [time, left] of [
+      [-1, 187],
+      [5, 587],
+      [11, 987],
+    ]) {
+      const geometry = { time: time!, duration: 10, gutter: 192, width: 800 };
+      act(() =>
+        root.render(
+          <>
+            <ReviewRulerRow {...geometry} controls={<button>Tracks</button>} interaction={{}} />
+            <ReviewPlayhead {...geometry} />
+          </>
+        )
+      );
+      const cap = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerPlayhead"]')!;
+      const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
+      expect(cap.style.left).toBe(`${left}px`);
+      expect(lane.style.left).toBe(cap.style.left);
+      expect(cap.classList.contains('bottom-0')).toBe(true);
+      expect(lane.classList.contains('bottom-2')).toBe(true);
+      for (const marker of [cap, lane]) {
+        expect(marker.getAttribute('aria-hidden')).toBe('true');
+        expect(marker.classList.contains('pointer-events-none')).toBe(true);
+      }
+    }
+  } finally {
+    act(() => root.unmount());
     vi.unstubAllGlobals();
   }
 });

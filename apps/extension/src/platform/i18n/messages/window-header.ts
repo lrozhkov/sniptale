@@ -1,0 +1,36 @@
+import { defineMessageSource } from './source';
+export const windowHeaderMessages = defineMessageSource({
+  enabled: { en: 'Window header', ru: 'Шапка окна' },
+  reset: { en: 'Reset', ru: 'Сбросить' },
+  none: { en: 'Off', ru: 'Выключено' },
+  type: { en: 'Type', ru: 'Тип' },
+  browser: { en: 'Browser', ru: 'Браузер' },
+  application: { en: 'Application', ru: 'Приложение' },
+  style: { en: 'Style', ru: 'Стиль' },
+  windows: { en: 'Windows', ru: 'Windows' },
+  macos: { en: 'macOS', ru: 'macOS' },
+  linux: { en: 'Linux', ru: 'Linux' },
+  theme: { en: 'Theme', ru: 'Тема' },
+  light: { en: 'Light', ru: 'Светлая' },
+  dark: { en: 'Dark', ru: 'Тёмная' },
+  tabTitle: { en: 'Tab title', ru: 'Название вкладки' },
+  windowTitle: { en: 'Window title', ru: 'Заголовок окна' },
+  address: { en: 'Website address', ru: 'Адрес сайта' },
+  favicon: { en: 'Use website icon', ru: 'Использовать иконку сайта' },
+  fileIcon: { en: 'Upload icon from computer', ru: 'Загрузить иконку с компьютера' },
+  fileRemove: { en: 'Remove uploaded icon', ru: 'Убрать загруженную иконку' },
+  fileLoading: { en: 'Loading icon…', ru: 'Загрузка иконки…' },
+  fileUnavailable: {
+    en: 'Could not load the icon. Choose an ICO, PNG, SVG, WebP or JPEG file up to 2 MB and 4096 × 4096 px.',
+    ru: 'Не удалось загрузить иконку. Выберите ICO, PNG, SVG, WebP или JPEG до 2 МБ и 4096 × 4096 пикселей.',
+  },
+  loading: { en: 'Loading website icon…', ru: 'Загрузка иконки сайта…' },
+  unavailable: {
+    en: 'Could not load the website icon. Check the address and turn the icon off and on to retry.',
+    ru: 'Не удалось загрузить иконку сайта. Проверьте адрес и выключите и включите иконку для повтора.',
+  },
+  updateFailed: {
+    en: 'Could not update the window header. Try again.',
+    ru: 'Не удалось обновить шапку окна. Попробуйте ещё раз.',
+  },
+});

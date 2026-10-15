@@ -1,4 +1,5 @@
 import { beforeEach, vi } from 'vitest';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
   DEFAULT_EDITOR_FRAME_SETTINGS,
@@ -46,6 +47,18 @@ const db = {
               [...getStore(name).values()].filter(
                 (value) => (value as { projectId?: string }).projectId === projectId
               ),
+            getAllKeys: async (projectId: string) =>
+              [...getStore(name).values()].flatMap((value) =>
+                isRecord(value) &&
+                value['projectId'] === projectId &&
+                typeof value['revision'] === 'number'
+                  ? [
+                      typeof value['unitId'] === 'string'
+                        ? [projectId, value['unitId'], value['revision']]
+                        : [projectId, value['revision']],
+                    ]
+                  : []
+              ),
           }),
           put: async (value: {
             assetId?: string;
@@ -55,8 +68,18 @@ const db = {
             ownerKind?: string;
             role?: string;
             stepId?: string;
+            projectId?: string;
+            revision?: number;
+            unitId?: string;
           }) => {
             const key =
+              (value.projectId && value.revision !== undefined
+                ? JSON.stringify(
+                    value.unitId
+                      ? [value.projectId, value.unitId, value.revision]
+                      : [value.projectId, value.revision]
+                  )
+                : undefined) ??
               value.id ??
               value.stepId ??
               value.operationId ??
@@ -196,6 +219,8 @@ beforeEach(() => {
     'scenario_assets',
     'scenario_exports',
     'scenario_projects',
+    'scenario_project_history',
+    'scenario_project_units',
     'scenario_step_editor_documents',
     'prepared_editor_assets',
   ])

@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 
 const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
   initDB: vi.fn(),
   runMutation: vi.fn(),
   journals: vi.fn(),
+  writing: vi.fn(),
+  log: vi.fn(),
 }));
 
+vi.mock('../library-lifecycle/maintenance-log', () => ({
+  createMaintenanceLog: () => ({ append: mocks.log }),
+}));
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: mocks.initDB,
@@ -18,12 +24,15 @@ vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteAssetObject: mocks.deleteObject,
   listReadyJournals: mocks.journals,
+  listWritingAssetIds: mocks.writing,
 }));
 
 import {
   appendAssetOperationCompensation,
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
+  completePhysicalDeleteOperations,
+  deleteOrphanAssetObjectBatch,
   createBackupRestoreOperation,
   readAssetOperation,
   transitionAssetOperation,
@@ -51,6 +60,7 @@ beforeEach(() => {
   vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
 });
 
 function installMutationHarness(current: unknown = operation) {
@@ -341,5 +351,137 @@ it.each(['recording', 'invalid-source'] as const)(
     await completePhysicalDeleteOperation(intent);
     expect(mocks.deleteObject).not.toHaveBeenCalled();
     expect(harness.db.delete).not.toHaveBeenCalled();
+  }
+);
+
+it('reads retention once for an entire physical-delete operation', async () => {
+  const { db } = installMutationHarness();
+  await completePhysicalDeleteOperation(
+    buildPhysicalDeleteOperation(Array.from({ length: 32 }, (_, i) => `asset-${i}`))
+  );
+  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(mocks.deleteObject).toHaveBeenCalledTimes(32);
+});
+
+it('retains the failing and unprocessed intents after a partial replay batch', async () => {
+  const { db } = installMutationHarness();
+  const intents = ['a', 'b', 'c'].map((id) => ({
+    ...buildPhysicalDeleteOperation([id]),
+    operationId: `delete-${id}`,
+  }));
+  mocks.deleteObject.mockImplementation(async (id: string) => {
+    if (id === 'b') throw new Error('storage failure');
+  });
+  await expect(completePhysicalDeleteOperations(intents)).rejects.toThrow('storage failure');
+  expect(mocks.log).toHaveBeenCalledWith(
+    expect.objectContaining({ code: 'delete-failed', counts: { deleted: 0, failed: 1 } })
+  );
+  expect(mocks.log).toHaveBeenCalledWith(
+    expect.objectContaining({ code: 'deleted', counts: { deleted: 1 } })
+  );
+  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-a']]);
+  expect(mocks.deleteObject.mock.calls).toEqual([['a'], ['b']]);
+});
+
+it('does not scan for an empty replay batch', async () => {
+  const { db } = installMutationHarness();
+  await completePhysicalDeleteOperations([]);
+  expect(db.getAll).not.toHaveBeenCalled();
+  expect(db.delete).not.toHaveBeenCalled();
+});
+
+it('keeps busy logical-only retirement without scanning Library during an editor save', async () => {
+  const { db } = installMutationHarness();
+  const request = vi.fn(
+    async (name: string, _options: unknown, action: (lock: unknown) => Promise<unknown>) =>
+      action(name === 'sniptale:assets:resource-readers' ? null : {})
+  );
+  vi.stubGlobal('navigator', { locks: { request } });
+  try {
+    await completePhysicalDeleteOperation({
+      ...buildPhysicalDeleteOperation([]),
+      privateSources: [{ projectAssetId: 'held', expectedAssetId: 'bytes' }],
+    });
+    expect(db.getAll).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('retains physical-delete intent without scanning while an editor is open, then retries', async () => {
+  const { db } = installMutationHarness();
+  let readerOpen = true;
+  const request = vi.fn(
+    async (name: string, _options: unknown, action: (lock: unknown) => Promise<unknown>) =>
+      action(name === 'sniptale:assets:resource-readers' && readerOpen ? null : {})
+  );
+  vi.stubGlobal('navigator', { locks: { request } });
+  const intent = buildPhysicalDeleteOperation(['obsolete']);
+  try {
+    await completePhysicalDeleteOperation(intent);
+    expect(db.getAll).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+    readerOpen = false;
+    await completePhysicalDeleteOperation(intent);
+    expect(mocks.deleteObject).toHaveBeenCalledExactlyOnceWith('obsolete');
+    expect(db.delete).toHaveBeenCalledWith('asset_operations', intent.operationId);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps projected targets pending while completing unrelated intents in the same batch', async () => {
+  const { db } = installMutationHarness();
+  db.getAll.mockImplementation(async (store: string) =>
+    store === 'recordings'
+      ? [
+          {
+            id: 'retained',
+            assetId: 'protected',
+            createdAt: 1,
+            filename: 'r.webm',
+            mimeType: 'video/webm',
+            size: 1,
+          },
+        ]
+      : []
+  );
+  await completePhysicalDeleteOperations(
+    ['protected', 'unowned'].map((id) => ({
+      ...buildPhysicalDeleteOperation([id]),
+      operationId: `delete-${id}`,
+    }))
+  );
+  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(mocks.deleteObject.mock.calls).toEqual([['unowned']]);
+  expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-unowned']]);
+  expect(mocks.log).toHaveBeenCalledWith(
+    expect.objectContaining({ code: 'referenced', counts: { retained: 1 } })
+  );
+});
+
+it.each(['complete', 'writing', 'cancel-before', 'cancel-after-intent'] as const)(
+  'keeps orphan batch intent and physical effects ordered: %s',
+  async (mode) => {
+    const { db } = installMutationHarness();
+    const controller = new AbortController();
+    const put = vi.fn(async () => {
+      if (mode === 'cancel-after-intent') controller.abort();
+    });
+    mocks.runMutation.mockImplementation(async (callback) => callback({ ...db, put }));
+    if (mode === 'writing') mocks.writing.mockResolvedValue(['orphan']);
+    if (mode === 'cancel-before') controller.abort();
+    await runWithDurableAssetLifecycleLock((permit) =>
+      deleteOrphanAssetObjectBatch(['orphan'], controller.signal, permit)
+    );
+    expect(put).toHaveBeenCalledTimes(
+      mode === 'complete' || mode === 'cancel-after-intent' ? 1 : 0
+    );
+    expect(mocks.deleteObject).toHaveBeenCalledTimes(mode === 'complete' ? 1 : 0);
+    expect(db.delete).toHaveBeenCalledTimes(mode === 'complete' ? 1 : 0);
   }
 );

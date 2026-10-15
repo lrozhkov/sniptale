@@ -196,7 +196,7 @@ it('preserves text settings across presentations and commits one scrubbed minimu
     await act(async () => categoryButtons()[0]!.click());
     expect(range().min).toBe('0');
     expect(range().max).toBe('7680');
-    expect(range().step).toBe('1');
+    expect(range().step).toBe('any');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
         range(),

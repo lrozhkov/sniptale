@@ -17,6 +17,7 @@ import {
 } from './shared';
 
 interface NumericValueStateParams {
+  enterBehavior?: 'next' | 'blur' | undefined;
   max?: number | undefined;
   min?: number | undefined;
   normalizeValue?: ((value: number) => number) | undefined;
@@ -84,6 +85,7 @@ function useNumericDraftState({
 type NumericDraftState = ReturnType<typeof useNumericDraftState>;
 
 function useNumericFieldActions({
+  enterBehavior,
   draftState,
   max,
   min,
@@ -119,7 +121,7 @@ function useNumericFieldActions({
     updateNumericDraft({ draftState, event, max, min, precision, unit });
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    handleNumericKeyDown({ commitDraft, draftState, event });
+    handleNumericKeyDown({ commitDraft, draftState, event, enterBehavior });
   };
   const handlePointerDown = (event: PointerEvent<HTMLInputElement>) => {
     event.stopPropagation();
@@ -261,10 +263,12 @@ function cancelNumericEditing(draftState: NumericDraftState) {
 }
 
 function handleNumericKeyDown({
+  enterBehavior,
   commitDraft,
   draftState,
   event,
 }: {
+  enterBehavior: NumericValueStateParams['enterBehavior'];
   commitDraft: () => void;
   draftState: NumericDraftState;
   event: KeyboardEvent<HTMLInputElement>;
@@ -272,7 +276,8 @@ function handleNumericKeyDown({
   if (event.key === 'Enter') {
     event.preventDefault();
     commitDraft();
-    focusNextCompactInput(event.currentTarget);
+    if (enterBehavior === 'blur') event.currentTarget.blur();
+    else focusNextCompactInput(event.currentTarget);
   } else if (event.key === 'Escape') {
     event.preventDefault();
     cancelNumericEditing(draftState);

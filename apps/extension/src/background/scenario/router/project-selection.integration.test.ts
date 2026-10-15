@@ -20,8 +20,11 @@ import { createScenarioSessionServiceStub } from '../../../../../../tooling/test
 beforeEach(() => {
   vi.clearAllMocks();
   createScenarioProjectRecordMock.mockResolvedValue({
-    id: 'project-auto',
-    name: 'Release dashboard • Mar 30, 2026, 1:00 AM',
+    project: {
+      id: 'project-auto',
+      name: 'Release dashboard • Mar 30, 2026, 1:00 AM',
+    },
+    workspaceRevision: 2,
   });
 });
 

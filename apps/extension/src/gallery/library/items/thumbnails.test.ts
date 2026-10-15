@@ -228,3 +228,32 @@ it('does not read an old aggregate poster for a current video project', async ()
   expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
   expect(result?.blob).not.toBe(thumbnailBlob);
 });
+
+it('uses the existing source thumbnail for quick-edit without decoding or copying source bytes', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('./adapters');
+  const { ensureGalleryItemThumbnail } = await import('./thumbnails');
+  const item = createQuickEditProjectGalleryItem({
+    aggregateId: 'source',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  });
+  const thumbnail = {
+    assetId: 'source',
+    blob: new Blob(['thumbnail']),
+    createdAt: 1,
+    updatedAt: 1,
+    width: 320,
+    height: 180,
+  };
+  getMediaThumbnailMock.mockResolvedValue(thumbnail);
+  expect(await ensureGalleryItemThumbnail(item)).toEqual({ ...thumbnail, assetId: item.id });
+  expect(getMediaThumbnailMock).toHaveBeenCalledWith('source');
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+  expect(createVideoThumbnailBlobMock).not.toHaveBeenCalled();
+  expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
+});

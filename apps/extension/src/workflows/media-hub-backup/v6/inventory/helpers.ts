@@ -1,3 +1,6 @@
+import { THUMBNAILS_STORE } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
+import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
+import { encodePortableThumbnail } from '../root-codecs/media';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import type { ArchiveRootObjectSource } from '../export';
@@ -61,4 +64,36 @@ export function createReadableAssetFilename(index: number, mimeType: string): st
       } as Record<string, string>
     )[mimeType.toLocaleLowerCase('en-US')] ?? '';
   return `Asset ${String(index + 1).padStart(3, '0')}${extension}`;
+}
+
+export async function inventoryProjectThumbnail(
+  db: Pick<InventoryDatabase, 'get'>,
+  mediaId: string,
+  projectId: string,
+  collector: ReturnType<typeof createObjectCollector>
+) {
+  const stored = parseMediaThumbnailEntry(await db.get(THUMBNAILS_STORE, mediaId));
+  return stored
+    ? encodePortableThumbnail(
+        stored,
+        collector.addObject(stored.blob, `${projectId}-thumbnail`, stored.blob.type || 'image/png')
+      )
+    : undefined;
+}
+export function projectInventoryDescriptor<Kind extends 'scenario-project' | 'video-project'>(
+  rootKind: Kind,
+  rootId: string,
+  metadataPath: string,
+  objects: readonly ArchiveRootObjectSource[]
+) {
+  return {
+    metadataPath,
+    objectCount: objects.length,
+    rootId,
+    rootKind,
+    totalBytes: objects.reduce((sum, object) => sum + object.ref.size, 0),
+  };
+}
+export function projectInventoryLoader(metadata: unknown, objects: ArchiveRootObjectSource[]) {
+  return async () => ({ metadata: metadata as import('../contracts').JsonValue, objects });
 }

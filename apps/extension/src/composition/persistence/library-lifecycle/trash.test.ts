@@ -1,3 +1,5 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { materializeScenarioUnitStorage } from '../scenario/storage-units';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../../features/scenario/project/factories';
 import { createMediaLibraryEntry, createVideoProjectEntry } from '../projects/index.test-support';
@@ -43,6 +45,8 @@ beforeEach(() => {
     ['media_library', new Map([[media.id, media]])],
     ['video_projects', new Map([[video.id, video]])],
     ['scenario_projects', new Map([[scenario.id, scenario]])],
+    ['scenario_project_history', new Map()],
+    ['scenario_project_units', new Map()],
     [
       'scenario_exports',
       new Map([
@@ -77,7 +81,29 @@ beforeEach(() => {
       objectStore(name: string) {
         return {
           get: async (id: string) => staged.get(name)?.get(id),
-          put: async (entry: { id: string }) => staged.get(name)?.set(entry.id, entry),
+          getAll: async () => [...(staged.get(name)?.values() ?? [])],
+          index: () => ({
+            getAll: async (id: string) =>
+              [...(staged.get(name)?.values() ?? [])]
+                .filter(isRecord)
+                .filter((row) => row['projectId'] === id),
+          }),
+          put: async (entry: {
+            id?: string;
+            projectId?: string;
+            revision?: number;
+            unitId?: string;
+          }) =>
+            staged
+              .get(name)
+              ?.set(
+                name === 'scenario_project_units'
+                  ? JSON.stringify([entry.projectId, entry.unitId, entry.revision])
+                  : name === 'scenario_project_history'
+                    ? JSON.stringify([entry.projectId, entry.revision])
+                    : entry.id!,
+                entry
+              ),
         };
       },
     };
@@ -96,13 +122,21 @@ it('retains each aggregate graph and original destination through duplicate tras
   await moveStoredItemsToTrash(targets, 200);
   expect(rows.get('media_library')?.get(media.id)).toEqual({
     ...media,
+    imageContentState: 'original',
     lifecycle: { ...media.lifecycle, trashedAt: 100 },
   });
   expect(rows.get('video_projects')?.get(video.id)).toEqual({
     ...video,
+    usageReferenceKeys: ['indexed:v2'],
     lifecycle: { ...video.lifecycle, trashedAt: 100 },
   });
-  expect(rows.get('scenario_projects')?.get(scenario.id)).toEqual({
+  expect(
+    materializeScenarioUnitStorage(
+      rows.get('scenario_projects')?.get(scenario.id),
+      [...rows.get('scenario_project_history')!.values()],
+      [...rows.get('scenario_project_units')!.values()]
+    )
+  ).toEqual({
     ...scenario,
     lifecycle: { ...scenario.lifecycle, trashedAt: 100 },
   });
@@ -111,13 +145,21 @@ it('retains each aggregate graph and original destination through duplicate tras
   await restoreStoredItemsFromTrash(targets, 400);
   expect(rows.get('media_library')?.get(media.id)).toEqual({
     ...media,
+    imageContentState: 'original',
     lifecycle: { ...media.lifecycle, updatedAt: 300 },
   });
   expect(rows.get('video_projects')?.get(video.id)).toEqual({
     ...video,
+    usageReferenceKeys: ['indexed:v2'],
     lifecycle: { ...video.lifecycle, updatedAt: 300 },
   });
-  expect(rows.get('scenario_projects')?.get(scenario.id)).toEqual({
+  expect(
+    materializeScenarioUnitStorage(
+      rows.get('scenario_projects')?.get(scenario.id),
+      [...rows.get('scenario_project_history')!.values()],
+      [...rows.get('scenario_project_units')!.values()]
+    )
+  ).toEqual({
     ...scenario,
     lifecycle: { ...scenario.lifecycle, updatedAt: 300 },
   });
@@ -201,7 +243,10 @@ it('admits active permanent deletion without changing its lifecycle or retained 
     );
   }
   expect(deletion).toHaveBeenCalledTimes(3);
-  expect(transaction).not.toHaveBeenCalled();
+  expect(transaction).toHaveBeenCalledExactlyOnceWith(
+    ['scenario_projects', 'scenario_project_history', 'scenario_project_units'],
+    'readonly'
+  );
   expect(rows.get('media_library')?.get(media.id)).toEqual(media);
 });
 

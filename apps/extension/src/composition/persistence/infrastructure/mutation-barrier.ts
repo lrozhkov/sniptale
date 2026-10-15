@@ -340,6 +340,7 @@ export type PersistenceMutationDomain =
   | 'drawing-palette'
   | 'drawing-tool-preferences'
   | 'gradient-presets'
+  | 'background-presets'
   | 'highlighter-settings'
   | 'popup-startup'
   | 'screenshot-setup'

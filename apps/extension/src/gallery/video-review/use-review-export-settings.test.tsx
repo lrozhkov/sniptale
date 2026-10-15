@@ -33,6 +33,7 @@ it('reprobes output dimensions and rejects stale or failed capability results', 
   }
   try {
     await act(async () => root.render(<Harness />));
+    expect(hook.renderSettings).toEqual({ frameRate: 0 });
     expect(hook.index?.outputCodecs?.mp4).toEqual([]);
     expect(probe).toHaveBeenCalledWith('mp4', {
       width: 1920,
@@ -61,6 +62,61 @@ it('reprobes output dimensions and rejects stale or failed capability results', 
       requests[5]!.resolve([]);
     });
     expect(hook.index?.outputCodecs?.mp4).toEqual([]);
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('probes 1904x1064 at explicit 30fps and retains HEVC for a 40fps source', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  probe.mockReset();
+  probe.mockImplementation(
+    async (format: string, settings: { fps: number; width: number; height: number }) =>
+      format === 'mp4' && settings.fps === 30 && settings.width === 1904 && settings.height === 1064
+        ? ['hevc']
+        : []
+  );
+  const root = createRoot(document.createElement('div'));
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  const index: ReviewMediaIndex = {
+    duration: 2,
+    boundaries: [0, 2],
+    videoCodec: 'avc',
+    audioCodec: null,
+    container: 'mp4',
+    rotation: 0,
+    width: 1904,
+    height: 1064,
+    frameRate: 40,
+  };
+  let hook!: ReturnType<typeof useReviewExportSettings>;
+  function Harness() {
+    hook = useReviewExportSettings(index, advanced);
+    return null;
+  }
+  try {
+    await act(async () => root.render(<Harness />));
+    await act(async () =>
+      hook.setRenderSettings({
+        format: 'mp4',
+        codec: 'hevc',
+        quality: 'HIGH',
+        resolution: '1080P',
+        frameRate: 30,
+      })
+    );
+    expect(probe).toHaveBeenLastCalledWith(
+      'webm',
+      expect.objectContaining({ width: 1904, height: 1064, fps: 30 })
+    );
+    expect(hook.index?.outputCodecs?.mp4).toEqual(['hevc']);
+    expect(hook.renderSettings).toMatchObject({
+      codec: 'hevc',
+      frameRate: 30,
+      resolution: '1080P',
+    });
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

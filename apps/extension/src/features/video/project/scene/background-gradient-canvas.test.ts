@@ -134,3 +134,152 @@ it('uses integer raster rows for fractional preview bounds and scales back to th
   expect(pixels.filter((_, index) => index % 4 === 3).every((alpha) => alpha === 255)).toBe(true);
   expect(calls.drawImage).toHaveBeenCalledWith(expect.any(RasterSurface), 0, 0, 8.5, 4.5);
 });
+
+function managedFixture() {
+  const events: string[] = [];
+  const releaseCanvas = vi.fn(() => events.push('release canvas'));
+  const releasePixels = vi.fn(() => events.push('release pixels'));
+  const releaseColors = vi.fn(() => events.push('release colors'));
+  const createImageData = vi.fn((width: number, height: number) => {
+    events.push('allocate pixels');
+    return { data: new Uint8ClampedArray(width * height * 4) };
+  });
+  const putImageData = vi.fn();
+  const canvas = {} as HTMLCanvasElement;
+  const resources = {
+    canvas: vi.fn(() => {
+      events.push('reserve canvas');
+      return {
+        canvas,
+        context: { createImageData, putImageData } as unknown as CanvasRenderingContext2D,
+        release: releaseCanvas,
+      };
+    }),
+    bytes: vi.fn((role: string) => {
+      events.push(`reserve ${role}`);
+      return { release: role === 'gradient-pixels' ? releasePixels : releaseColors };
+    }),
+  };
+  return {
+    resources,
+    canvas,
+    events,
+    createImageData,
+    putImageData,
+    releaseCanvas,
+    releasePixels,
+    releaseColors,
+  };
+}
+
+it.each(['system-ocean', 'system-radial-glow', 'system-conic-spectrum'] as const)(
+  'samples canonical %s geometry into an anisotropic managed backing',
+  (id) => {
+    const gradient = getShowcaseGradient(id);
+    gradient.repeat = { enabled: true, span: 0.01 };
+    const reference = managedFixture();
+    class RasterSurface {
+      getContext() {
+        return reference.resources.canvas().context;
+      }
+    }
+    vi.stubGlobal('OffscreenCanvas', RasterSurface);
+    drawSceneGradient(contextFixture().context, gradient, 9, 15);
+    const expected = reference.putImageData.mock.calls[0]![0].data as Uint8ClampedArray;
+    const managed = managedFixture();
+    const { context, calls } = contextFixture();
+    drawSceneGradient(context, gradient, 9, 15, {
+      backing: { width: 3, height: 3 },
+      resources: managed.resources,
+    });
+    const actual = managed.putImageData.mock.calls[0]![0].data as Uint8ClampedArray;
+    for (let y = 0; y < 3; y++) {
+      for (let x = 0; x < 3; x++) {
+        const offset = ((y * 5 + 2) * 9 + x * 3 + 1) * 4;
+        expect(actual.slice((y * 3 + x) * 4, (y * 3 + x + 1) * 4)).toEqual(
+          expected.slice(offset, offset + 4)
+        );
+      }
+    }
+    expect(managed.resources.canvas).toHaveBeenCalledWith('gradient-dense', {
+      width: 3,
+      height: 3,
+    });
+    expect(managed.resources.bytes.mock.calls).toEqual([
+      ['gradient-pixels', 36],
+      ['gradient-colors', 4097 * 4],
+    ]);
+    expect(managed.events).toEqual([
+      'reserve canvas',
+      'reserve gradient-pixels',
+      'reserve gradient-colors',
+      'allocate pixels',
+      'release colors',
+      'release pixels',
+      'release canvas',
+    ]);
+    expect(calls.drawImage).toHaveBeenCalledWith(managed.canvas, 0, 0, 9, 15);
+  }
+);
+
+it.each(['reservation', 'color reservation', 'image allocation', 'destination paint'] as const)(
+  'propagates managed %s failure and releases acquired reservations',
+  (failure) => {
+    const gradient = getShowcaseGradient('system-ocean');
+    gradient.repeat = { enabled: true, span: 0.01 };
+    const managed = managedFixture();
+    const { context, calls } = contextFixture();
+    const error = new Error('resource failure');
+    if (failure === 'reservation')
+      managed.resources.bytes.mockImplementationOnce(() => {
+        throw error;
+      });
+    if (failure === 'color reservation')
+      managed.resources.bytes.mockImplementation((role) => {
+        if (role === 'gradient-colors') throw error;
+        return { release: managed.releasePixels };
+      });
+    if (failure === 'image allocation')
+      managed.createImageData.mockImplementationOnce(() => {
+        throw error;
+      });
+    if (failure === 'destination paint')
+      calls.drawImage.mockImplementationOnce(() => {
+        throw error;
+      });
+    expect(() =>
+      drawSceneGradient(context, gradient, 100, 50, {
+        backing: { width: 4, height: 2 },
+        resources: managed.resources,
+      })
+    ).toThrow(error);
+    expect(managed.releaseCanvas).toHaveBeenCalledOnce();
+    if (failure === 'reservation') {
+      expect(managed.createImageData).not.toHaveBeenCalled();
+      expect(managed.releasePixels).not.toHaveBeenCalled();
+      expect(managed.releaseColors).not.toHaveBeenCalled();
+    } else if (failure === 'color reservation') {
+      expect(managed.createImageData).not.toHaveBeenCalled();
+      expect(managed.releasePixels).toHaveBeenCalledOnce();
+      expect(managed.releaseColors).not.toHaveBeenCalled();
+    } else {
+      expect(managed.releasePixels).toHaveBeenCalledOnce();
+      expect(managed.releaseColors).toHaveBeenCalledOnce();
+    }
+  }
+);
+
+it('leaves native gradients allocation-free and rejects invalid dense backing explicitly', () => {
+  const gradient = getShowcaseGradient('system-ocean');
+  const managed = managedFixture();
+  const raster = { backing: { width: 0, height: 2 }, resources: managed.resources };
+  const { context, calls } = contextFixture();
+  drawSceneGradient(context, gradient, 100, 50, raster);
+  expect(calls.createLinearGradient).toHaveBeenCalledOnce();
+  expect(managed.resources.canvas).not.toHaveBeenCalled();
+  gradient.repeat = { enabled: true, span: 0.01 };
+  expect(() => drawSceneGradient(context, gradient, 100, 50, raster)).toThrow(
+    'Invalid managed gradient raster'
+  );
+  expect(managed.resources.canvas).not.toHaveBeenCalled();
+});

@@ -28,18 +28,15 @@ export function useVideoEditorBootstrap(
 
         if (resolved.project) applyLoadedProject(resolved.project, resolved.recordingId);
 
+        setReady(true);
         if (resolved.project) {
-          await Promise.all([
+          await Promise.allSettled([
             refreshRecordings(),
             refreshProjects(),
             refreshProjectExports(resolved.project.id),
           ]);
         } else {
           await Promise.allSettled([refreshRecordings(), refreshProjects()]);
-        }
-
-        if (!cancelled) {
-          setReady(true);
         }
       } catch (bootstrapError) {
         if (!cancelled) {

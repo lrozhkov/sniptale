@@ -5,6 +5,7 @@ import {
   resolveAIProviderBaseUrlPolicy,
   resolveAIProviderCanonicalOrigin,
   resolveAIProviderChatCompletionsUrl,
+  resolveAIProviderAudioUrl,
 } from './provider-base-url-policy';
 
 describe('AI provider base URL policy', () => {
@@ -53,5 +54,39 @@ describe('AI provider base URL policy', () => {
       resolveAIProviderChatCompletionsUrl('https://api.example.com/v1?token=secret')
     ).toBeNull();
     expect(resolveAIProviderChatCompletionsUrl('not-a-url')).toBeNull();
+  });
+});
+
+describe('audio provider endpoint construction', () => {
+  it.each([
+    [
+      'https://audio.example.test/custom/v1/',
+      'https://audio.example.test/custom/v1/audio/transcriptions',
+      'https://audio.example.test/custom/v1/audio/speech',
+    ],
+    [
+      'https://audio.example.test',
+      'https://audio.example.test/audio/transcriptions',
+      'https://audio.example.test/audio/speech',
+    ],
+    [
+      'http://127.0.0.1:11434/v1///',
+      'http://127.0.0.1:11434/v1/audio/transcriptions',
+      'http://127.0.0.1:11434/v1/audio/speech',
+    ],
+  ])('keeps both operation paths under the configured base %s', (base, transcription, speech) => {
+    expect(resolveAIProviderAudioUrl(base, 'transcription')).toBe(transcription);
+    expect(resolveAIProviderAudioUrl(base, 'speech')).toBe(speech);
+  });
+
+  it.each([
+    'not-a-url',
+    'http://audio.example.test/v1',
+    'https://user:password@audio.example.test/v1',
+    'https://audio.example.test/v1?query=1',
+    'https://audio.example.test/v1#fragment',
+  ])('applies the provider URL policy before constructing either endpoint: %s', (base) => {
+    expect(resolveAIProviderAudioUrl(base, 'transcription')).toBeNull();
+    expect(resolveAIProviderAudioUrl(base, 'speech')).toBeNull();
   });
 });

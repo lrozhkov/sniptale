@@ -1,3 +1,4 @@
+import { isRecordingClockTiming } from '../../../../../video/recording-frame-clock';
 import { isRecordingPointTransform } from '../../../../../../features/video/project/validation/recording-telemetry';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
@@ -12,6 +13,26 @@ import {
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
 
 export const runtimeVideoOffscreenControlMessageContracts = {
+  [VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_GET_RECORDING_CLOCK_TIMING message',
+      createMessageGuard({
+        type: VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING,
+        required: {
+          capabilityToken: isString,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_GET_RECORDING_CLOCK_TIMING response',
+      createRuntimeResponseGuard({
+        required: { clockTiming: (value) => value === null || isRecordingClockTiming(value) },
+      })
+    ),
+  },
   [VideoMessageType.OFFSCREEN_READINESS_PROBE]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_READINESS_PROBE message',

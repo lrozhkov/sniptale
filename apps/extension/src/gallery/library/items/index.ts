@@ -8,6 +8,7 @@ export { ensureGalleryItemThumbnail } from './thumbnails';
 export {
   createGalleryMediaItem,
   isGalleryMediaItem,
+  isGalleryQuickEditProjectItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
   isGallerySelectableItem,
@@ -18,6 +19,7 @@ export type {
   GalleryItem,
   GalleryItemKind,
   GalleryMediaItem,
+  GalleryQuickEditProjectItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,
   GalleryVideoProjectItem,

@@ -3,16 +3,22 @@ import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { reviewTimeLabel } from './controls';
 import { planeTime, reviewPlaneLane } from './timeline-drag';
 
-type HoverLane = 'source' | 'focus' | 'original' | 'seek';
+type HoverLane = 'annotation' | 'source' | 'focus' | 'original' | 'seek' | 'ruler';
 type Hover = { time: number; x: number; snapped: boolean; lane: HoverLane };
+export type ReviewPlacementHints = Partial<
+  Record<'source' | 'focus' | 'original', string | undefined>
+>;
 type HoverOptions = {
+  placementHints?: ReviewPlacementHints | undefined;
   busy: boolean;
   duration: number;
   gutter: number;
   width: number;
   zoom: number;
+  annotationEnabled?: boolean;
   focusEnabled: boolean;
   originalEnabled: boolean;
+  sourceRangeTool: boolean;
   snapRangePreview: boolean;
   boundaries: readonly number[] | undefined;
 };
@@ -38,8 +44,10 @@ export function useReviewTimelineHover(options: HoverOptions) {
       options.gutter,
       options.width,
       options.busy,
+      options.annotationEnabled,
       options.focusEnabled,
       options.originalEnabled,
+      options.sourceRangeTool,
     ]
   );
   const move = (event: PointerEvent<HTMLDivElement>, activeLane?: HoverLane) => {
@@ -50,12 +58,29 @@ export function useReviewTimelineHover(options: HoverOptions) {
       setHover(null);
       return;
     }
-    const lane =
-      activeLane ?? reviewPlaneLane(event.target, options.focusEnabled, options.originalEnabled);
-    if (lane === 'control' || lane === 'item' || lane === 'gap') {
+    if (
+      event.target instanceof Element &&
+      event.target.closest(
+        '[data-ui="gallery.videoReview.webcamTrack"],[data-ui="gallery.videoReview.historyTrack"]'
+      )
+    ) {
       setHover(null);
       return;
     }
+    const hit =
+      activeLane ??
+      reviewPlaneLane(
+        event.target,
+        options.focusEnabled,
+        options.originalEnabled,
+        options.sourceRangeTool,
+        options.annotationEnabled
+      );
+    if (hit === 'control' || hit === 'item') {
+      setHover(null);
+      return;
+    }
+    const lane = hit === 'gap' ? 'seek' : hit;
     const pointerTime = planeTime(event, options.duration, options.gutter);
     const time =
       lane === 'source' && options.snapRangePreview && options.boundaries?.length
@@ -71,17 +96,27 @@ export function useReviewTimelineHover(options: HoverOptions) {
       lane,
     });
   };
+  const blocked =
+    hover && (hover.lane === 'source' || hover.lane === 'focus' || hover.lane === 'original')
+      ? options.placementHints?.[hover.lane]
+      : undefined;
   return {
+    reason: blocked,
     move,
     clear: () => setHover(null),
-    cursor: !options.busy && hover && hover.lane !== 'seek' ? rangeCursor : 'default',
+    cursor: blocked
+      ? 'crosshair'
+      : !options.busy && hover && hover.lane !== 'seek'
+        ? rangeCursor
+        : 'default',
     hover,
   };
 }
 
-/** Preview marker stays over the plane and never captures input. */
+/** Preview marker stays above the sticky ruler (z-40) and never captures input. */
 export function ReviewTimelineHoverGuide(props: {
   hover: Hover | null;
+  resizing?: boolean;
   viewport: RefObject<HTMLDivElement | null>;
   gutter: number;
   width: number;
@@ -91,16 +126,20 @@ export function ReviewTimelineHoverGuide(props: {
   const viewportRight =
     (props.viewport.current?.scrollLeft ?? 0) +
     (props.viewport.current?.clientWidth ?? props.gutter + props.width);
+  if (hover.x < (props.viewport.current?.scrollLeft ?? 0) + props.gutter || hover.x > viewportRight)
+    return null;
   return (
     <div
       data-ui="gallery.videoReview.hoverTime"
+      data-resizing={props.resizing ? 'true' : undefined}
       aria-hidden="true"
       data-snapped={hover.snapped ? 'true' : undefined}
-      className="pointer-events-none absolute bottom-2 top-0 z-[19] w-px bg-[var(--sniptale-color-accent-emphasis)]/70"
+      className="pointer-events-none absolute bottom-2 top-0 z-[41] w-px
+        bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_60%,transparent)]"
       style={{ left: hover.x }}
     >
       <span
-        className="absolute top-0 whitespace-nowrap rounded bg-[var(--sniptale-color-surface-panel)]
+        className="sticky top-0 block w-max whitespace-nowrap rounded bg-[var(--sniptale-color-surface-panel)]
           px-1 text-[11px] text-[var(--sniptale-color-text-primary)] shadow-sm"
         style={{
           transform:

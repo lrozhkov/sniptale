@@ -1,9 +1,10 @@
+import { resolveQuickEditFocusLink } from './focus-layout';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../../project/validation/primitives';
 import { sampleQuickEditFocusAtTime, type QuickEditRect } from './scene';
 import type { QuickEditSpotlight, QuickEditZoomRegion } from './types';
 
-/** Validates persisted source coordinates and bounded scene effects without coercion. */
+/** Validates persisted window coordinates and bounded scene effects without coercion. */
 export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | null {
   if (!isRecord(value) || !isRecord(value['area'])) return null;
   const area = value['area'];
@@ -48,7 +49,7 @@ export function createQuickEditSpotlight(): QuickEditSpotlight {
   };
 }
 
-/** Clamp a dragged or numerically edited opening within the source frame. */
+/** Clamp a dragged or numerically edited opening within the decorated window. */
 export function clampQuickEditSpotlightArea(area: QuickEditRect): QuickEditRect {
   const width = Math.max(0.01, Math.min(1, area.width));
   const height = Math.max(0.01, Math.min(1, area.height));
@@ -66,6 +67,11 @@ export interface QuickEditSpotlightFrame {
   radius: number;
   dim: number;
   blur: number;
+  protectionOpening?: QuickEditRect;
+  protectionRadius?: number;
+  presence?: number;
+  /** Contract clips expand by the same distance as the opening, keeping its center fixed. */
+  openingClipProgress?: number;
 }
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -96,16 +102,21 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   video: QuickEditRect;
   scale: number;
 }): QuickEditSpotlightFrame | null {
-  const sample = sampleQuickEditFocusAtTime(args.regions, args.time);
+  const sample = sampleQuickEditFocusAtTime(
+    args.regions.filter((region) => region.spotlight),
+    args.time,
+    args.regions
+  );
   if (!sample?.to.spotlight) return null;
   const end = targetFrame(sample.to.spotlight, args.video, args.scale);
   const animation =
     sample.phase === 'exit' ? sample.to.spotlight.exitReveal : sample.to.spotlight.reveal;
+  const expanded = expandSpotlightOpening(end, args.output);
   const start = sample.from?.spotlight
     ? targetFrame(sample.from.spotlight, args.video, args.scale)
     : {
-        opening: animation === 'contract' ? { x: 0, y: 0, ...args.output } : end.opening,
-        radius: 0,
+        opening: animation === 'contract' ? expanded.opening : end.opening,
+        radius: animation === 'contract' ? expanded.radius : 0,
         dim: 0,
         blur: 0,
       };
@@ -123,16 +134,87 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   };
 }
 
+/** Parallel outward edges and rounded corners cover the farthest output corner without panning. */
+function expandSpotlightOpening(
+  frame: QuickEditSpotlightFrame,
+  output: { width: number; height: number }
+) {
+  const { opening, radius } = frame;
+  const distance =
+    Math.hypot(
+      Math.max(0, opening.x, output.width - opening.x - opening.width),
+      Math.max(0, opening.y, output.height - opening.y - opening.height)
+    ) + radius;
+  return {
+    opening: {
+      x: opening.x - distance,
+      y: opening.y - distance,
+      width: opening.width + 2 * distance,
+      height: opening.height + 2 * distance,
+    },
+    radius: radius + distance,
+  };
+}
+
 /** Numeric even-odd path shared by CSS clipping and Canvas Path2D. */
 export function quickEditSpotlightPath(
   output: { width: number; height: number },
   frame: QuickEditSpotlightFrame
 ): string {
+  return `M0 0H${output.width}V${output.height}H0Z ${quickEditSpotlightOpeningPath(frame)}`;
+}
+
+/** Closed hole geometry shared by the SVG preview and Canvas mask. */
+export function quickEditSpotlightOpeningPath(
+  frame: Pick<QuickEditSpotlightFrame, 'opening' | 'radius'>
+): string {
   const { x, y, width: w, height: h } = frame.opening;
   const r = Math.max(0, Math.min(frame.radius, w / 2, h / 2));
   return (
-    `M0 0H${output.width}V${output.height}H0Z M${x + r} ${y}H${x + w - r}` +
+    `M${x + r} ${y}H${x + w - r}` +
     `Q${x + w} ${y} ${x + w} ${y + r}V${y + h - r}Q${x + w} ${y + h} ${x + w - r} ${y + h}` +
     `H${x + r}Q${x} ${y + h} ${x} ${y + h - r}V${y + r}Q${x} ${y} ${x + r} ${y}Z`
   );
+}
+
+/** All independent masks, with final protection holes and linked morph presence. */
+export function evaluateQuickEditSpotlightsAtTime(
+  args: Parameters<typeof evaluateQuickEditSpotlightAtTime>[0]
+): QuickEditSpotlightFrame[] {
+  const regions = args.regions.filter((region) => !region.dormant && region.spotlight);
+  const frames: QuickEditSpotlightFrame[] = [];
+  for (const region of regions) {
+    const link = resolveQuickEditFocusLink(args.regions, region.id);
+    if (link && args.time >= region.end && args.time < link.target.start) {
+      const frame = evaluateQuickEditSpotlightAtTime({ ...args, regions: [region, link.target] });
+      if (frame)
+        frames.push({
+          ...frame,
+          protectionOpening: frame.opening,
+          protectionRadius: frame.radius,
+          presence: 1,
+          openingClipProgress: 1,
+        });
+      continue;
+    }
+    if (args.time < region.start || args.time >= region.end) continue;
+    const incoming = regions.find(
+      (item) => resolveQuickEditFocusLink(args.regions, item.id)?.target.id === region.id
+    );
+    const connected = [...(incoming ? [incoming] : []), region, ...(link ? [link.target] : [])];
+    const sample = sampleQuickEditFocusAtTime(connected, args.time);
+    const frame = evaluateQuickEditSpotlightAtTime({ ...args, regions: connected });
+    if (!frame || !sample) continue;
+    const target = targetFrame(region.spotlight!, args.video, args.scale);
+    const reveal =
+      sample.phase === 'exit' ? region.spotlight!.exitReveal : region.spotlight!.reveal;
+    frames.push({
+      ...frame,
+      protectionOpening: target.opening,
+      protectionRadius: target.radius,
+      presence: sample.progress,
+      openingClipProgress: reveal === 'contract' ? sample.progress : 1,
+    });
+  }
+  return frames;
 }

@@ -92,18 +92,18 @@ function useEditorPageBootstrapEffects(
     };
     const handlePageHide = () => flushEditorAutosaveIfNeeded(services, () => hasImageRef.current);
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        flushEditorAutosaveIfNeeded(services, () => hasImageRef.current);
-      }
+      flushEditorAutosaveIfNeeded(services, () => hasImageRef.current);
     };
 
     window.addEventListener('beforeunload', protectUnsaved);
     window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('beforeunload', protectUnsaved);
       window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [hasImageRef, services]);

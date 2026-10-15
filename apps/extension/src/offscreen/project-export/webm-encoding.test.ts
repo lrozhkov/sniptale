@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoProjectExportSettings } from '../../features/video/project/types';
 const mocks = vi.hoisted(() => ({
   add: vi.fn(),
+  track: vi.fn(),
   audio: vi.fn(),
   finalize: vi.fn(),
   cancel: vi.fn(),
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   configure: vi.fn(),
   flush: vi.fn(),
   close: vi.fn(),
+  support: vi.fn(),
 }));
 vi.mock('mediabunny', () => ({
   AudioBufferSource: class {
@@ -26,7 +28,7 @@ vi.mock('mediabunny', () => ({
   Output: class {
     state = 'started';
     target = { buffer: new ArrayBuffer(4) };
-    addVideoTrack() {}
+    addVideoTrack = mocks.track;
     addAudioTrack() {}
     start = mocks.start;
     async finalize() {
@@ -46,9 +48,14 @@ import { createWebmEncoding } from './webm-encoding';
 let callbacks: VideoEncoderInit;
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.support.mockImplementation(async (config: VideoEncoderConfig) => ({
+    config,
+    supported: true,
+  }));
   vi.stubGlobal(
     'VideoEncoder',
     class {
+      static isConfigSupported = mocks.support;
       constructor(init: VideoEncoderInit) {
         callbacks = init;
       }
@@ -97,4 +104,42 @@ it('surfaces native encoder failures', async () => {
   callbacks.error(new DOMException('encode failed'));
   expect(() => pipeline.check()).toThrow('encode failed');
   await pipeline.dispose();
+});
+
+it('prefers VP9 quantizer mode and falls back to validated VBR', async () => {
+  const quality = await createWebmEncoding(settings, false);
+  expect(mocks.configure).toHaveBeenLastCalledWith(
+    expect.objectContaining({ bitrateMode: 'quantizer', latencyMode: 'quality' })
+  );
+  await quality.dispose();
+  mocks.support.mockImplementation(async (config: VideoEncoderConfig) => ({
+    config,
+    supported: config.bitrateMode === 'variable',
+  }));
+  const fallback = await createWebmEncoding(settings, false);
+  expect(mocks.configure).toHaveBeenLastCalledWith(
+    expect.objectContaining({ bitrateMode: 'variable', bitrate: 2_000_000 })
+  );
+  await fallback.dispose();
+});
+it('rejects unsupported WebM configuration and releases its resources', async () => {
+  mocks.support.mockResolvedValue({ supported: false });
+  await expect(createWebmEncoding(settings, false)).rejects.toThrow(
+    'WEBM_VIDEO_ENCODER_UNSUPPORTED'
+  );
+  expect(mocks.configure).not.toHaveBeenCalled();
+  expect(mocks.close).toHaveBeenCalledOnce();
+  expect(mocks.cancel).toHaveBeenCalledOnce();
+});
+
+it('omits timestamp-snapping track metadata only for adaptive output', async () => {
+  const constant = await createWebmEncoding(settings, false);
+  expect(mocks.track).toHaveBeenLastCalledWith(expect.anything(), { frameRate: 30 });
+  await constant.dispose();
+  const adaptive = await createWebmEncoding(
+    { ...settings, fps: 60, frameRateMode: 'adaptive' },
+    false
+  );
+  expect(mocks.track).toHaveBeenLastCalledWith(expect.anything(), {});
+  await adaptive.dispose();
 });

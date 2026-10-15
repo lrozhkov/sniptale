@@ -11,18 +11,19 @@ const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
 
 describe('settings route codec', () => {
   it('exposes the canonical leaf and view inventory', () => {
-    expect(SETTINGS_SECTION_IDS).toHaveLength(15);
+    expect(SETTINGS_SECTION_IDS).toHaveLength(16);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
       'interface-browser': ['interface', 'context-menu'],
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
       saving: ['settings', 'files', 'drafts', 'storage', 'templates'],
-      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
+      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'],
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],
       'access-data': ['permissions', 'privacy'],
       'settings-transfer': [],
+      'events-logs': [],
     });
   });
 

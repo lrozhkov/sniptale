@@ -1,3 +1,7 @@
+import {
+  getAIModelOperation,
+  isValidAIModelOperationConfiguration,
+} from '../../../contracts/settings/model-operation';
 import type { AIModel } from '../../../contracts/settings';
 import type { AIProviderUpsertInput } from './core';
 import {
@@ -11,6 +15,8 @@ import {
   loadAIProviders,
   loadDefaultModelId,
   lockAISecretProtection,
+  resetAudioTranscriptionSystemPrompt,
+  saveAudioTranscriptionSystemPrompt,
   resetGlobalSystemPrompt,
   resetAISecretPassphraseProtection,
   resetScenarioEditorSystemPrompt,
@@ -42,6 +48,8 @@ function queueAISettingsMutation<T>(run: () => Promise<T>): Promise<T> {
 }
 
 async function assertModelProviderExists(model: AIModel): Promise<void> {
+  if (!isValidAIModelOperationConfiguration(model))
+    throw new Error('Invalid AI model operation configuration');
   const providers = await loadAIProviders();
   if (!providers.some((provider) => provider.id === model.providerId)) {
     throw new Error(`Provider ${model.providerId} not found for model ${model.id}`);
@@ -89,8 +97,24 @@ async function updateModel(model: AIModel): Promise<void> {
     throw new Error(`Model ${model.id} not found`);
   }
   const nextModels = [...models];
-  nextModels[index] = { ...nextModels[index], ...model };
-  await saveAIModels(nextModels);
+  const {
+    audio: _audio,
+    operation: _operation,
+    systemPrompt: previousPrompt,
+    ...previous
+  } = nextModels[index]!;
+  nextModels[index] = {
+    ...previous,
+    ...(getAIModelOperation(model) === 'text' && previousPrompt !== undefined
+      ? { systemPrompt: previousPrompt }
+      : {}),
+    ...model,
+  };
+  const defaultModelId = await loadDefaultModelId();
+  await saveAIModelGraph(
+    nextModels,
+    defaultModelId === model.id && getAIModelOperation(model) !== 'text' ? null : defaultModelId
+  );
 }
 
 async function deleteModel(modelId: string): Promise<void> {
@@ -128,7 +152,9 @@ async function moveModel(modelId: string, beforeModelId: string | null): Promise
 async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
   if (defaultModelId) {
     const models = await loadAIModels();
-    if (!models.some((model) => model.id === defaultModelId)) {
+    if (
+      !models.some((model) => model.id === defaultModelId && getAIModelOperation(model) === 'text')
+    ) {
       throw new Error(`Default AI model ${defaultModelId} not found`);
     }
   }
@@ -155,6 +181,10 @@ async function applyAISettingsMutation(command: AISettingsMutationCommand): Prom
       return moveModel(command.modelId, command.beforeModelId);
     case 'save-default-model':
       return saveDefaultModel(command.defaultModelId);
+    case 'save-audio-transcription-prompt':
+      return saveAudioTranscriptionSystemPrompt(command.prompt);
+    case 'reset-audio-transcription-prompt':
+      return resetAudioTranscriptionSystemPrompt();
     case 'save-global-prompt':
       return saveGlobalSystemPrompt(command.prompt);
     case 'save-scenario-editor-prompt':

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 
 import { createInspectorCommandParams } from '../../../../../../../tooling/test/harness/editor/ownership/fixtures';
+import { disableFrameBackground } from '../../scene/background/settings';
 import { buildFrameSurfaceCommands } from './frame-surface-details';
 
 it('renders frame surface commands with explicit background and padding summaries', () => {
@@ -20,4 +21,16 @@ it('renders frame surface commands with explicit background and padding summarie
   expect(backgroundControls[0].props.lastFillModeRef).toBe(lastFillModeRef);
   backgroundControls[0].props.setBackgroundMode('image');
   expect(params.setFrameDraft).toHaveBeenCalledTimes(1);
+  const noneParams = {
+    ...params,
+    richShapeSelection: null,
+    frameDraft: disableFrameBackground(params.frameDraft),
+  };
+  const noneCommands = buildFrameSurfaceCommands(
+    noneParams as Parameters<typeof buildFrameSurfaceCommands>[0]
+  );
+  expect(noneCommands.map((command) => command.id)).toEqual([
+    'frame-background-fill',
+    'frame-apply',
+  ]);
 });

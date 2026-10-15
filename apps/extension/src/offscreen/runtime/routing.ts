@@ -8,6 +8,7 @@ import {
   requestDesktopMedia,
 } from '../recording/setup/desktop-media';
 import {
+  getRecordingClockTiming,
   pauseRecording,
   resumeRecording,
   startRecording,
@@ -110,6 +111,7 @@ export function resolveOffscreenErrorPhase(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
     case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE:
@@ -117,6 +119,7 @@ export function resolveOffscreenErrorPhase(
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
@@ -149,6 +152,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
     case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
     case MessageType.OFFSCREEN_RELEASE_PAGE_PACKAGE_DOWNLOAD_LEASE:
@@ -165,6 +169,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
       return 'deferred-ack';
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
       return 'manual';
@@ -208,8 +213,11 @@ export async function handleOffscreenRuntimeMessage(
   | 'stale'
 > {
   switch (message.type) {
-    case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+    case MessageType.OFFSCREEN_PREPARE_PAGE_PACKAGE_DOWNLOAD:
       await offscreenDataReadiness.ensureAssets();
+      return 'accepted';
+    case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+      offscreenDataReadiness.requireAssets();
       return createPagePackageDownloadLease(message);
     case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
       return confirmPagePackageDownloadLease(message);
@@ -270,6 +278,12 @@ export async function handleOffscreenRuntimeMessage(
       return;
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
       disposeMultiSourceDesktopMedia();
+      return;
+    case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
+      sendResponse?.({
+        success: true,
+        clockTiming: getRecordingClockTiming(resolveRecordingSourceBinding(message)),
+      });
       return;
     case VideoMessageType.OFFSCREEN_START_RECORDING:
       await startRecording(buildStartRecordingArgs(message), prepareOffscreenRecordingData);

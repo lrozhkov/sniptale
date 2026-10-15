@@ -16,6 +16,7 @@ beforeEach(() => {
       { id: 'guide', availability: 'available', lifecycle: { trashedAt: undefined } },
     ]);
   io.history.mockReset().mockResolvedValue({
+    currentRevision: 17,
     versions: [
       { project: { id: 'guide', name: 'Current' } },
       { project: { id: 'guide', name: 'Older' } },
@@ -25,7 +26,7 @@ beforeEach(() => {
 
 it('returns saved revisions in the same order as direct-link loading', async () => {
   await expect(readAvailableScenarioHistory('guide')).resolves.toEqual({
-    current: { id: 'guide', name: 'Current' },
+    current: { project: { id: 'guide', name: 'Current' }, workspaceRevision: 17 },
     previous: [{ id: 'guide', name: 'Older' }],
   });
 });
@@ -37,9 +38,10 @@ it('acquires the resource session before reading saved history and opening the p
   expect(enter.mock.invocationCallOrder[0]).toBeLessThan(io.list.mock.invocationCallOrder[0]!);
   expect(io.list.mock.invocationCallOrder[0]).toBeLessThan(io.history.mock.invocationCallOrder[0]!);
   expect(io.history.mock.invocationCallOrder[0]).toBeLessThan(open.mock.invocationCallOrder[0]!);
-  expect(open).toHaveBeenCalledWith({ id: 'guide', name: 'Current' }, [
-    { id: 'guide', name: 'Older' },
-  ]);
+  expect(open).toHaveBeenCalledWith(
+    { project: { id: 'guide', name: 'Current' }, workspaceRevision: 17 },
+    [{ id: 'guide', name: 'Older' }]
+  );
 });
 
 it('rejects a recent project moved to trash before activation', async () => {

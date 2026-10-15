@@ -59,14 +59,16 @@ import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/v
 import {
   activateVideoRecordingLease,
   clearActiveVideoRecordingLease,
-  ensureActiveVideoRecordingLeaseHydrated,
   getActiveVideoRecordingLeaseSnapshot,
-  hydrateActiveVideoRecordingLease,
   issuePreparedVideoRecordingLease,
   resetActiveVideoRecordingLeaseForTests,
-  restoreCurrentRecordingFromLease,
   validateRecordingControlCapability,
 } from './recording-control-lease';
+import {
+  ensureActiveVideoRecordingLeaseHydrated,
+  hydrateActiveVideoRecordingLease,
+  restoreCurrentRecordingFromLease,
+} from './runtime/recording-completion';
 
 const storageKey = 'video-active-recording-lease';
 const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
@@ -107,13 +109,16 @@ it('persists an owner-bound recording control lease and validates exact controls
       surfaceBinding: { generation: 2, streamInstanceId: 'stream-instance-1' },
     })
   );
-  expect(browserStorageSessionSetMock).toHaveBeenCalledWith({
-    [storageKey]: expect.objectContaining({
-      version: 1,
-      controlToken: 'control-token-1',
-      recordingId: 'recording-1',
-    }),
-  });
+  expect(browserStorageSessionSetMock).toHaveBeenCalledWith(
+    {
+      [storageKey]: expect.objectContaining({
+        version: 1,
+        controlToken: 'control-token-1',
+        recordingId: 'recording-1',
+      }),
+    },
+    expect.anything()
+  );
   expect(
     validateRecordingControlCapability({
       controlToken: 'control-token-1',
@@ -158,13 +163,16 @@ it('persists a camera recording control lease without a recording tab id', async
       recordingTabId: null,
     })
   );
-  expect(browserStorageSessionSetMock).toHaveBeenCalledWith({
-    [storageKey]: expect.objectContaining({
-      captureMode: CaptureMode.CAMERA,
-      recordingTabId: null,
-      version: 1,
-    }),
-  });
+  expect(browserStorageSessionSetMock).toHaveBeenCalledWith(
+    {
+      [storageKey]: expect.objectContaining({
+        captureMode: CaptureMode.CAMERA,
+        recordingTabId: null,
+        version: 1,
+      }),
+    },
+    expect.anything()
+  );
 });
 
 it('does not issue non-camera recording leases without a recording tab id', async () => {
@@ -188,6 +196,7 @@ it('reads an absent persisted lease only once per worker lifetime', async () => 
 });
 
 it('hydrates active recording state from a persisted lease after restart', async () => {
+  getVideoRecordingIdMock.mockReturnValue(null);
   browserStorageSessionGetMock.mockResolvedValue({
     [storageKey]: {
       captureMode: CaptureMode.TAB_CROP,
@@ -210,6 +219,7 @@ it('hydrates active recording state from a persisted lease after restart', async
   expect(setVideoRecordingIdMock).toHaveBeenCalledWith('recording-2');
   expect(setVideoRecordingTabIdMock).toHaveBeenCalledWith(77);
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    completion: null,
     captureMode: CaptureMode.TAB_CROP,
     countdownEndsAt: null,
     cropRegion: { x: 10, y: 20, width: 300, height: 200 },
@@ -270,6 +280,7 @@ it('does not overwrite a non-idle runtime state from a cached active lease', asy
 });
 
 it('keeps a recovered prepared lease out of active runtime state', async () => {
+  getVideoRecordingIdMock.mockReturnValue(null);
   browserStorageSessionGetMock.mockResolvedValue({
     [storageKey]: {
       captureMode: CaptureMode.TAB,
@@ -313,7 +324,7 @@ it('does not expose a control capability when session lease persistence fails', 
   ).toBe(false);
 });
 
-it('drops expired or malformed persisted leases before exposing recording state', async () => {
+it('refuses expired or malformed leases without mutating storage during hydration', async () => {
   browserStorageSessionGetMock.mockResolvedValue({
     [storageKey]: {
       captureMode: CaptureMode.TAB,
@@ -330,7 +341,7 @@ it('drops expired or malformed persisted leases before exposing recording state'
 
   expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
-  expect(browserStorageSessionRemoveMock).toHaveBeenCalledWith(storageKey);
+  expect(browserStorageSessionRemoveMock).not.toHaveBeenCalled();
 });
 
 it('clears only the matching active recording lease', async () => {
@@ -343,7 +354,7 @@ it('clears only the matching active recording lease', async () => {
   expect(browserStorageSessionRemoveMock).not.toHaveBeenCalled();
 
   await clearActiveVideoRecordingLease('recording-1');
-  expect(browserStorageSessionRemoveMock).toHaveBeenCalledWith(storageKey);
+  expect(browserStorageSessionRemoveMock).toHaveBeenCalledWith(storageKey, expect.anything());
 });
 
 it('clears a matching persisted lease when no in-memory lease has hydrated yet', async () => {
@@ -365,7 +376,7 @@ it('clears a matching persisted lease when no in-memory lease has hydrated yet',
   expect(browserStorageSessionRemoveMock).not.toHaveBeenCalled();
 
   await clearActiveVideoRecordingLease('recording-4');
-  expect(browserStorageSessionRemoveMock).toHaveBeenCalledWith(storageKey);
+  expect(browserStorageSessionRemoveMock).toHaveBeenCalledWith(storageKey, expect.anything());
 });
 
 it('hydrates a persisted lease before restoring a post-restart lifecycle event', async () => {
@@ -422,7 +433,7 @@ it('retires an expired cached active lease instead of restoring stale runtime au
   expect(getActiveVideoRecordingLeaseSnapshot()).toBeNull();
   expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
-  expect(browserStorageSessionGetMock).toHaveBeenCalledOnce();
+  expect(browserStorageSessionGetMock).not.toHaveBeenCalled();
 });
 
 it('does not hydrate A when B becomes current while its durable lease is loading', async () => {

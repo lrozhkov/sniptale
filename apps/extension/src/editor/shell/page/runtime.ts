@@ -5,7 +5,10 @@ import { restoreImageAggregateOriginal } from '../../../composition/persistence/
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
 import { createImageEditorController, type ImageEditorController } from '../../controller';
 import { waitForEditorControllerCanvas } from '../../controller/canvas-ready';
-import { beginEditorDocumentOpenOperation } from '../../document/file-actions/operation';
+import {
+  beginEditorDocumentOpenOperation,
+  isCurrentEditorDocumentOpenOperation,
+} from '../../document/file-actions/operation';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   createEditorSessionAutosaveService,
@@ -52,12 +55,14 @@ function isCurrentEditorPageBootstrapRevision(
   return services.bootstrapRevision === revision;
 }
 
-function isEditorPageBootstrapAborted(
-  runtime: EditorPageSessionRuntime,
-  services: EditorPageServices,
-  revision: number
-) {
-  return runtime.isCancelled() || !isCurrentEditorPageBootstrapRevision(services, revision);
+function beginEditorPageHydration(runtime: EditorPageSessionRuntime, services: EditorPageServices) {
+  const token = beginEditorDocumentOpenOperation(services.controller);
+  const revision = beginEditorPageBootstrapRevision(services);
+  const isCurrent = () =>
+    !runtime.isCancelled() &&
+    isCurrentEditorPageBootstrapRevision(services, revision) &&
+    isCurrentEditorDocumentOpenOperation(token);
+  return { isCurrent, lease: services.autosaveService.beginHydration(isCurrent) };
 }
 
 async function openRestoredEditorAsset(
@@ -89,11 +94,11 @@ async function openRestoredEditorDraft(
   aggregateId: string,
   runtime: EditorPageSessionRuntime,
   services: EditorPageServices,
-  bootstrapRevision: number
+  isCurrent: () => boolean
 ): Promise<void> {
   runtime.setPageTitle(restoreSource.entry.sourceTitle ?? '');
   await services.controller.loadDocument(restoreSource.entry.document);
-  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
+  if (!isCurrent()) return;
   useEditorStore.getState().setCapturedAt(restoreSource.capturedAt);
 
   const durableRevision = services.autosaveService.getDurableRevision();
@@ -101,7 +106,7 @@ async function openRestoredEditorDraft(
   const presentation = await getAggregatePresentation({ id: aggregateId, kind: 'image' }).catch(
     () => null
   );
-  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
+  if (!isCurrent()) return;
   if (presentation?.presentationRevision !== durableRevision) {
     services.autosaveService.schedulePresentation();
   }
@@ -146,28 +151,54 @@ export async function openEditorBootstrapPayload(
   services: EditorPageServices,
   restoredCapturedAt: number | null = null
 ): Promise<void> {
-  beginEditorDocumentOpenOperation(services.controller);
-  const bootstrapRevision = beginEditorPageBootstrapRevision(services);
+  const hydration = beginEditorPageHydration(runtime, services);
+  try {
+    await loadEditorBootstrapPayload(
+      payload,
+      runtime,
+      services,
+      restoredCapturedAt,
+      hydration.isCurrent,
+      hydration.lease.saveNow
+    );
+    hydration.lease.finish(hydration.isCurrent());
+  } catch (error) {
+    hydration.lease.finish(false);
+    throw error;
+  }
+}
+
+async function loadEditorBootstrapPayload(
+  payload: EditorBootstrapPayload,
+  runtime: EditorPageSessionRuntime,
+  services: EditorPageServices,
+  restoredCapturedAt: number | null,
+  isCurrent: () => boolean,
+  saveInitial: EditorSessionAutosaveService['saveNow']
+): Promise<void> {
   const { aggregateId } = resolveEditorPageSessionSeed();
   const capturedAt = restoredCapturedAt ?? payload.capturedAt ?? Date.now();
 
-  services.autosaveService.activate({
-    aggregateId,
-    capturedAt,
-    durableRevision: 0,
-    renderPresentation: (signal) =>
-      services.controller.renderForExport(
-        {
-          format: 'png',
-          quality: 1,
-          ...(signal ? { signal } : {}),
-          outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
-        },
-        'committed'
-      ),
-    sourceUrl: payload.url ?? '',
-    sourceTitle: payload.title ?? '',
-  });
+  services.autosaveService.activate(
+    {
+      aggregateId,
+      capturedAt,
+      durableRevision: 0,
+      renderPresentation: (signal) =>
+        services.controller.renderForExport(
+          {
+            format: 'png',
+            quality: 1,
+            ...(signal ? { signal } : {}),
+            outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
+          },
+          'committed'
+        ),
+      sourceUrl: payload.url ?? '',
+      sourceTitle: payload.title ?? '',
+    },
+    { preserveMode: true }
+  );
   services.autosaveService.updateContext({
     sourceUrl: payload.url ?? '',
     sourceTitle: payload.title ?? '',
@@ -175,7 +206,7 @@ export async function openEditorBootstrapPayload(
 
   runtime.setPageTitle(payload.title ?? '');
   await waitForEditorControllerCanvas(services.controller);
-  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
+  if (!isCurrent()) {
     return;
   }
 
@@ -188,10 +219,10 @@ export async function openEditorBootstrapPayload(
       sourceFaviconUrl: payload.sourceFaviconUrl ?? null,
     });
   }
-  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
+  if (!isCurrent()) return;
   const initialDocument = services.controller.exportDocument();
-  await services.autosaveService.saveNow(() => initialDocument);
-  if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
+  await saveInitial(() => initialDocument);
+  if (isCurrent()) {
     useEditorStore.getState().setCapturedAt(capturedAt);
   }
 }
@@ -200,63 +231,90 @@ export async function bootstrapEditorPageSession(
   runtime: EditorPageSessionRuntime,
   services: EditorPageServices
 ): Promise<void> {
-  beginEditorDocumentOpenOperation(services.controller);
-  const bootstrapRevision = beginEditorPageBootstrapRevision(services);
+  const hydration = beginEditorPageHydration(runtime, services);
+  const isCurrent = hydration.isCurrent;
+  try {
+    const ready = await restoreEditorPageSession(
+      runtime,
+      services,
+      isCurrent,
+      hydration.lease.saveNow
+    );
+    hydration.lease.finish(ready && isCurrent());
+  } catch (error) {
+    hydration.lease.finish(false);
+    throw error;
+  }
+}
+
+async function restoreEditorPageSession(
+  runtime: EditorPageSessionRuntime,
+  services: EditorPageServices,
+  isCurrent: () => boolean,
+  saveInitial: EditorSessionAutosaveService['saveNow']
+): Promise<boolean> {
   const { aggregateId, locationState } = resolveEditorPageSessionSeed();
 
-  services.autosaveService.activate({
-    aggregateId,
-    durableRevision: 0,
-    renderPresentation: (signal) =>
-      services.controller.renderForExport(
-        {
-          format: 'png',
-          quality: 1,
-          ...(signal ? { signal } : {}),
-          outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
-        },
-        'committed'
-      ),
-    sourceUrl: null,
-    sourceTitle: null,
-  });
+  services.autosaveService.activate(
+    {
+      aggregateId,
+      durableRevision: 0,
+      renderPresentation: (signal) =>
+        services.controller.renderForExport(
+          {
+            format: 'png',
+            quality: 1,
+            ...(signal ? { signal } : {}),
+            outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
+          },
+          'committed'
+        ),
+      sourceUrl: null,
+      sourceTitle: null,
+    },
+    { preserveMode: true }
+  );
 
   const restoreSource = await resolveEditorPageRestoreSource(
     locationState,
     aggregateId,
     services.autosaveService,
-    () => !isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)
+    isCurrent
   );
-  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
-    return;
+  if (!isCurrent()) {
+    return false;
   }
 
   await waitForEditorControllerCanvas(services.controller);
-  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
-    return;
+  if (!isCurrent()) {
+    return false;
   }
 
   if (restoreSource.kind === 'draft') {
-    await openRestoredEditorDraft(restoreSource, aggregateId, runtime, services, bootstrapRevision);
-    return;
+    await openRestoredEditorDraft(restoreSource, aggregateId, runtime, services, isCurrent);
+    return isCurrent();
   }
 
   if (restoreSource.kind === 'bootstrap') {
-    await openEditorBootstrapPayload(
+    await loadEditorBootstrapPayload(
       restoreSource.payload,
       runtime,
       services,
-      restoreSource.capturedAt
+      restoreSource.capturedAt,
+      isCurrent,
+      saveInitial
     );
-    return;
+    return isCurrent();
   }
 
   if (restoreSource.kind === 'asset') {
     await openRestoredEditorAsset(restoreSource, runtime, services);
-    if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
+    if (isCurrent()) {
       useEditorStore.getState().setCapturedAt(restoreSource.capturedAt);
     }
+    return isCurrent();
   }
+  return false;
 }
 
 export function flushEditorAutosaveIfNeeded(
@@ -267,7 +325,9 @@ export function flushEditorAutosaveIfNeeded(
     return;
   }
 
-  void services.autosaveService.flushAutosave(() => services.controller.exportDocument());
+  void services.autosaveService
+    .flushAutosave(() => services.controller.exportDocument())
+    .catch(() => undefined);
 }
 
 /** Binds disposable input activity to the page-owned background scheduler. */

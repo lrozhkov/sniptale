@@ -94,3 +94,20 @@ it('keeps pointer selection and the final typed commit together while saving', (
   expect(select).toHaveBeenCalledOnce();
   expect(commit).toHaveBeenCalledOnce();
 });
+
+it('rejects actions without a pending note while the export transaction is busy, then unlocks', () => {
+  let blocked = true;
+  const action = vi.fn();
+  const owner = createReviewNoteTransitions({
+    isNew: () => false,
+    blocked: () => blocked,
+    finishNew: vi.fn(async () => {}),
+    onPending: vi.fn(),
+    onFailure: vi.fn(),
+  });
+  owner.beforeAction(action);
+  expect(action).not.toHaveBeenCalled();
+  blocked = false;
+  owner.beforeAction(action);
+  expect(action).toHaveBeenCalledOnce();
+});

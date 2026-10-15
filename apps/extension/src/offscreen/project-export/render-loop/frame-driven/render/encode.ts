@@ -1,3 +1,4 @@
+import { getProjectExportFrameOptions } from '../../../../../features/video/project/export/encoding-quality';
 import { waitForEncoderQueueCapacity } from '../../../codecs';
 import type { RenderFrameDrivenCompositeFrameArgs } from './types';
 
@@ -24,14 +25,41 @@ export async function encodeFrameDrivenCompositeFrame(
     videoEncoder,
   } = args;
 
-  const frame = new VideoFrame(canvas, {
-    timestamp: timestampOffsetUs + frameIndex * frameDurationUs,
+  const timestamp = args.frameTimestampUs ?? timestampOffsetUs + frameIndex * frameDurationUs;
+  if (args.adaptiveFrameWriter) {
+    await args.adaptiveFrameWriter.add(timestamp, frameDurationUs);
+    return;
+  }
+  await encodeCompositeCanvasFrame({
+    canvas,
+    timestamp,
     duration: frameDurationUs,
+    keyFrame: frameIndex === 0 || frameIndex % keyframeInterval === 0,
+    settings: args.settings,
+    videoEncoder,
+    ...(signal === undefined ? {} : { signal }),
+  });
+}
+
+export async function encodeCompositeCanvasFrame(args: {
+  canvas: HTMLCanvasElement | VideoFrame;
+  timestamp: number;
+  duration: number;
+  keyFrame: boolean;
+  settings: RenderFrameDrivenCompositeFrameArgs['settings'];
+  videoEncoder: VideoEncoder;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const frame = new VideoFrame(args.canvas, {
+    timestamp: args.timestamp,
+    duration: args.duration,
   });
   try {
-    await waitForEncoderQueueCapacityFrame(videoEncoder, MP4_QUEUE_CAPACITY, signal);
-    videoEncoder.encode(frame, {
-      keyFrame: frameIndex === 0 || frameIndex % keyframeInterval === 0,
+    await waitForEncoderQueueCapacityFrame(args.videoEncoder, MP4_QUEUE_CAPACITY, args.signal);
+    args.signal?.throwIfAborted();
+    args.videoEncoder.encode(frame, {
+      ...getProjectExportFrameOptions(args.settings),
+      keyFrame: args.keyFrame,
     });
   } finally {
     frame.close();

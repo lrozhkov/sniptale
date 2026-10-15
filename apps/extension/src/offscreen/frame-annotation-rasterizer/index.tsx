@@ -106,7 +106,6 @@ async function rasterizeAtScale(
         scale: 1,
         embedFonts: true,
         cache: 'disabled',
-        compress: false,
         outerShadows: true,
         reconcile: true,
       }),

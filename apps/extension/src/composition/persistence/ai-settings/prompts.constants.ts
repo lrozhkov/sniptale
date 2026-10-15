@@ -25,3 +25,7 @@ Your edit:
 {"i": "...", "f": [{"id": "field-1", "n": "Last name", "c": "Ivanov", "new": "Petrov"}]}`;
 
 export const DEFAULT_SCENARIO_EDITOR_SYSTEM_PROMPT = `Help the user improve a clear, concise step-by-step guide. Preserve meaning, language and authored content unless asked to change them. Use recorded action context and optional images as evidence. Prefer readable titles, focused explanations and consistent layouts. Suggest only necessary changes supported by the supplied editor contract.`;
+
+/** Additional audio recognition instructions; timed response structure stays code-owned. */
+export const DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT =
+  'Preserve the original language, wording, punctuation and meaningful pauses. Do not invent speech or timestamps. In correction mode, follow the requested changes while retaining the verbatim source text and timing.';

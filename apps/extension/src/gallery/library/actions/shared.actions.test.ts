@@ -11,6 +11,7 @@ import { MediaLibraryDeleteError } from '../../../composition/persistence/media-
 import { translate } from '../../../platform/i18n';
 import { createController } from './test-support/index';
 import { createBusyActionRunner, createGalleryUserFacingActionError } from './shared';
+import { MediaBackupFailure } from '../../../workflows/media-hub-backup/index';
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 vi.mock('@sniptale/platform/observability/logger', async (original) => ({
@@ -18,6 +19,31 @@ vi.mock('@sniptale/platform/observability/logger', async (original) => ({
   createLogger: () => ({ warn }),
 }));
 beforeEach(() => warn.mockClear());
+
+it('reports controlled backup phase and byte limits without retaining its raw cause', async () => {
+  const { controller } = createController();
+  await createBusyActionRunner(controller)(
+    async () => {
+      throw new MediaBackupFailure(
+        'metadata-budget',
+        'encode',
+        { bytes: 5000000, limit: 4194304 },
+        { cause: new Error('private title data:image/png URL') }
+      );
+    },
+    { stage: 'backup-export', materialType: 'media' }
+  );
+  expect(controller.state.storage.banner).toBe(translate('gallery.app.backupMetadataLimit'));
+  expect(warn).toHaveBeenCalledExactlyOnceWith('gallery-action-failed', {
+    code: 'backup-metadata-budget',
+    stage: 'backup-encode',
+    materialType: 'media',
+    bytes: 5000000,
+    limit: 4194304,
+    resourceRole: 'metadata',
+  });
+  expect(JSON.stringify(warn.mock.calls)).not.toContain('private');
+});
 
 it.each([
   [

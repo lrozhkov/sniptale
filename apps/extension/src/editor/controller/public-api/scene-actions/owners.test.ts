@@ -1,3 +1,4 @@
+import { Rect } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -14,6 +15,7 @@ const storeState = {
 const mocks = vi.hoisted(() => ({
   applyBrowserFrameMock: vi.fn(async () => undefined),
   applyFrameMock: vi.fn(),
+  removeBrowserFrameMock: vi.fn(async () => undefined),
   resizeCanvasMock: vi.fn(),
   storeGetStateMock: vi.fn(() => storeState),
   syncBackgroundLayerMock: vi.fn(async () => undefined),
@@ -26,6 +28,7 @@ vi.mock('../../../state/useEditorStore', () => ({
 vi.mock('../../public-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../public-actions')>()),
   applyEditorBrowserFrameSettings: mocks.applyBrowserFrameMock,
+  removeEditorBrowserFrameSettings: mocks.removeBrowserFrameMock,
   applyEditorFrameSceneSettings: mocks.applyFrameMock,
   resizeEditorCanvasScene: mocks.resizeCanvasMock,
 }));
@@ -35,7 +38,10 @@ vi.mock('../../background', async (importOriginal) => ({
   syncEditorBackgroundLayer: mocks.syncBackgroundLayerMock,
 }));
 
-import { applyEditorControllerBrowserFrame } from './browser-frame';
+import {
+  applyEditorControllerBrowserFrame,
+  removeEditorControllerBrowserFrame,
+} from './browser-frame';
 import { createEditorSceneMutationCallbacks } from './callbacks';
 import type { EditorBrowserFrameApi, EditorSceneCanvasResizeApi } from './contracts';
 import { applyEditorControllerFrame, resizeEditorControllerCanvas } from './resize';
@@ -66,6 +72,8 @@ function createBrowserFrameController() {
     canvasDocumentSize: { height: 80, width: 120 },
     commitHistory: vi.fn(),
     ensureBrowserFrameOnTop: vi.fn(),
+    createLayerMutationToken: vi.fn(() => 3),
+    isLayerMutationTokenCurrent: vi.fn(() => true),
     nextLabelIndex: vi.fn(() => 3),
     prepareObject: vi.fn(),
     relayoutScene: vi.fn(),
@@ -131,5 +139,58 @@ describe('public scene action role owners', () => {
       ...DEFAULT_BROWSER_FRAME_STATE,
       title: 'Next',
     });
+  });
+
+  it('binds browser-frame mutation callbacks and resolves the current frame at relayout time', async () => {
+    const controller = createBrowserFrameController();
+    const header = { ...DEFAULT_BROWSER_FRAME_STATE, title: 'Prepared header' };
+    await applyEditorControllerBrowserFrame(controller, header);
+    const mutation = readFirstCall(mocks.applyBrowserFrameMock);
+    const object = new Rect({ width: 120, height: 20 });
+    mutation.prepareObject(object);
+    expect(controller.prepareObject).toHaveBeenCalledWith(object);
+    expect(mutation.nextLabelIndex('browser-frame')).toBe(3);
+    expect(controller.nextLabelIndex).toHaveBeenCalledWith('browser-frame');
+
+    const previousFrame = storeState.frame;
+    const currentFrame = { ...previousFrame, paddingTop: 24 };
+    const layout = { preserveCanvasSize: true, fitSourceToContent: false };
+    try {
+      storeState.frame = currentFrame;
+      mutation.relayoutScene(header, layout);
+      expect(controller.relayoutScene).toHaveBeenCalledWith(currentFrame, header, layout);
+    } finally {
+      storeState.frame = previousFrame;
+    }
+    mutation.ensureBrowserFrameOnTop();
+    mutation.commitHistory();
+    mutation.syncRuntimeState();
+    expect(controller.ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
+    expect(controller.commitHistory).toHaveBeenCalledOnce();
+    expect(controller.syncRuntimeState).toHaveBeenCalledOnce();
+  });
+
+  it('invalidates pending apply tokens on removal and document replacement', async () => {
+    let revision = 0;
+    const controller = {
+      ...createBrowserFrameController(),
+      createLayerMutationToken: vi.fn(() => ++revision),
+      isLayerMutationTokenCurrent: vi.fn((token: number) => token === revision),
+    };
+    await applyEditorControllerBrowserFrame(controller, DEFAULT_BROWSER_FRAME_STATE);
+    const apply = readFirstCall(mocks.applyBrowserFrameMock);
+    expect(apply.isMutationCurrent()).toBe(true);
+    expect(controller.isLayerMutationTokenCurrent).toHaveBeenLastCalledWith(1);
+
+    await removeEditorControllerBrowserFrame(controller);
+    const remove = readFirstCall(mocks.removeBrowserFrameMock);
+    expect(controller.createLayerMutationToken).toHaveBeenCalledTimes(2);
+    expect(apply.isMutationCurrent()).toBe(false);
+    expect(remove.isMutationCurrent()).toBe(true);
+    expect(controller.isLayerMutationTokenCurrent).toHaveBeenLastCalledWith(2);
+
+    controller.createLayerMutationToken();
+    expect(apply.isMutationCurrent()).toBe(false);
+    expect(remove.isMutationCurrent()).toBe(false);
   });
 });

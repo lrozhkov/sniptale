@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react';
+import { ReviewButton } from './controls';
+import { quickEditPlaneProjection } from '../../features/video/review/advanced/spatial-geometry';
+import { createReviewSpatialRenderer } from '../../workflows/video-review/spatial-renderer';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ReviewFocusFrame, useFocusFrameHover } from './focus-area-frame';
 import { useReviewCameraGesture } from './camera-gesture';
 import { translate } from '../../platform/i18n';
@@ -8,10 +11,11 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneCamera,
-  computeQuickEditVisibleSourceRect,
+  computeQuickEditSpatialWindow,
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import {
+  computeZoomPreviewArea,
   paintZoomPreview,
   previewBackgroundPaint,
   type ZoomPreviewLayout,
@@ -21,13 +25,16 @@ import type { ZoomPreviewFrame } from './use-zoom-preview-source';
 type ZoomCanvasProps = {
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
+  headerImage?: CanvasImageSource | null | undefined;
   camera: QuickEditZoomRegion['transform'];
   disabled?: boolean | undefined;
   frame: ZoomPreviewFrame | null;
+  live?: boolean | undefined;
   layout: ZoomPreviewLayout;
   output: { width: number; height: number };
   view: 'area' | 'result';
   cornerRadius: number;
+  previewScale?: number;
   onPreview?:
     | ((center: { centerX: number; centerY: number; scale?: number } | null) => void)
     | undefined;
@@ -43,13 +50,13 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
     trackPointer,
     pointerInteraction,
     keyboardInteraction,
-    camera,
     handlers,
-    video,
     opening,
     motion,
     offsetX,
     offsetY,
+    spatialFailure,
+    retrySpatial,
   } = useZoomCanvasModel(props);
   return (
     <>
@@ -59,8 +66,14 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
         view={view}
         offsetX={offsetX}
         offsetY={offsetY}
-        scale={motion.scale}
+        scale={motion.backgroundScale}
       />
+      {spatialFailure ? (
+        <div role="alert" className="relative z-20 p-2 text-xs">
+          {translate('gallery.videoReview.spatialUnavailable')}
+          <ReviewButton label={translate('gallery.videoReview.retry')} onClick={retrySpatial} />
+        </div>
+      ) : null}
       <canvas
         ref={canvasRef}
         data-review-camera-area={view === 'area' ? '' : undefined}
@@ -112,8 +125,8 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
             pointerInteraction={pointerInteraction}
             borderWidth={2}
             center={{
-              x: video.x + camera.centerX * video.width,
-              y: video.y + camera.centerY * video.height,
+              x: opening.x + opening.width / 2,
+              y: opening.y + opening.height / 2,
             }}
             onPointerEnter={trackPointer}
             onPointerMove={trackPointer}
@@ -137,6 +150,7 @@ function ZoomPreviewBackground({
 }: {
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
+  headerImage?: CanvasImageSource | null | undefined;
   view: 'area' | 'result';
   offsetX: number;
   offsetY: number;
@@ -173,52 +187,66 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
     pointerInteraction,
     keyboardInteraction,
   } = useFocusFrameHover();
-  const video = props.layout.videoRect;
+  const windowRect = props.layout.windowRect;
   const follows = props.background.enabled && props.background.zoomBehavior === 'follow-video';
   const viewport = follows
     ? {
-        x: -video.x / video.width,
-        y: -video.y / video.height,
-        width: props.output.width / video.width,
-        height: props.output.height / video.height,
+        x: -windowRect.x / windowRect.width,
+        y: -windowRect.y / windowRect.height,
+        width: props.output.width / windowRect.width,
+        height: props.output.height / windowRect.height,
       }
     : { x: 0, y: 0, width: 1, height: 1 };
+  const projectedWindow = computeQuickEditSpatialWindow(props.layout, props.background);
+  const projection =
+    props.camera.spatial && props.view === 'result'
+      ? quickEditPlaneProjection(projectedWindow, projectedWindow, props.camera.spatial)
+      : undefined;
   const { camera, handlers } = useReviewCameraGesture({
+    pointerProjection: projection ? { matrix: projection, output: props.output } : undefined,
     ...props,
     interactionElement: canvasRef,
     viewport,
-    videoRect: props.layout.videoRect,
-    visibleArea: computeQuickEditVisibleSourceRect(props.layout, props.background, props.output),
+    videoRect: props.layout.windowRect,
+    visibleArea: computeZoomPreviewArea(props.layout, props.background, props.output),
     onCommit: props.onCenter,
   });
   const layout = useMemo(
     () => ({
       ...props.layout,
-      videoTransform: computeQuickEditVideoTransform({ videoRect: props.layout.videoRect, camera }),
+      videoTransform: computeQuickEditVideoTransform({
+        videoRect: props.layout.videoRect,
+        windowRect: props.layout.windowRect,
+        camera,
+      }),
     }),
     [props.layout, camera]
   );
-  useZoomCanvasPaint(canvasRef, { ...props, camera, layout });
+  const { spatialFailure, retrySpatial } = useZoomCanvasPaint(canvasRef, {
+    ...props,
+    camera,
+    layout,
+  });
 
-  const visible = computeQuickEditVisibleSourceRect(layout, props.background, props.output);
+  const visible = computeZoomPreviewArea(layout, props.background, props.output);
   const opening = {
-    x: video.x + visible.x * video.width,
-    y: video.y + visible.y * video.height,
-    width: visible.width * video.width,
-    height: visible.height * video.height,
+    x: windowRect.x + visible.x * windowRect.width,
+    y: windowRect.y + visible.y * windowRect.height,
+    width: visible.width * windowRect.width,
+    height: visible.height * windowRect.height,
   };
   const motion = computeQuickEditSceneCamera(layout, props.background);
   const offsetX = (motion.x / props.output.width) * 100;
   const offsetY = (motion.y / props.output.height) * 100;
   return {
+    spatialFailure,
+    retrySpatial,
     canvasRef,
     areaRef,
     trackPointer,
     pointerInteraction,
     keyboardInteraction,
-    camera,
     handlers,
-    video,
     opening,
     motion,
     offsetX,
@@ -231,30 +259,75 @@ function useZoomCanvasPaint(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   props: ZoomCanvasProps
 ) {
+  const renderer = useRef<ReturnType<typeof createReviewSpatialRenderer> | null>(null);
+  const [spatialFailure, setFailure] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const spatial = props.view === 'result' && !!props.camera.spatial;
+  useEffect(() => {
+    if (!spatial) {
+      setFailure(false);
+      return;
+    }
+    try {
+      renderer.current = createReviewSpatialRenderer(() => setFailure(true));
+      setFailure(false);
+    } catch {
+      setFailure(true);
+    }
+    return () => {
+      renderer.current?.dispose();
+      renderer.current = null;
+    };
+  }, [spatial, retry]);
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
-    paintZoomPreview(context, {
-      background: props.background,
-      accent:
-        getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() || '#4f7cff',
-      camera: props.camera,
-      cornerRadius: props.cornerRadius,
-      frame: props.frame,
-      height: canvas.height,
-      layout: props.layout,
-      view: props.view,
-      showControls: false,
-      width: canvas.width,
-    });
+    const paint = () => {
+      try {
+        paintZoomPreview(context, {
+          spatialRenderer: renderer.current ?? undefined,
+          background: props.background,
+          accent:
+            getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() ||
+            '#4f7cff',
+          camera: props.camera,
+          cornerRadius: props.cornerRadius,
+          previewScale: props.previewScale ?? 1,
+          frame: props.frame,
+          headerImage: props.headerImage,
+          height: canvas.height,
+          layout: props.layout,
+          view: props.view,
+          showControls: false,
+          width: canvas.width,
+        });
+      } catch {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        setFailure(true);
+      }
+    };
+    paint();
+    if (!props.live) return;
+    let request: number;
+    const tick = () => {
+      paint();
+      request = requestAnimationFrame(tick);
+    };
+    request = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(request);
   }, [
     canvasRef,
     props.layout,
     props.frame,
+    props.headerImage,
     props.view,
     props.camera,
     props.cornerRadius,
+    props.previewScale,
     props.background,
+    props.live,
+    retry,
   ]);
+  return { spatialFailure, retrySpatial: () => setRetry((v) => v + 1) };
 }

@@ -2,14 +2,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  useReviewAudioRuntime,
-  type ReviewAudioClipBuffer,
-  type ReviewAudioEngine,
-} from './use-review-audio-runtime';
+import type { ReviewAudioClipBuffer } from './use-review-audio-runtime';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
+import { FakeEngine, renderRuntime } from './review-audio-runtime.test-support';
 
 const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   id: 'a',
@@ -23,42 +19,6 @@ const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   fadeOut: 0,
   ...patch,
 });
-
-class FakeEngine implements ReviewAudioEngine {
-  scheduled: Array<{ schedule: unknown; buffer: unknown }> = [];
-  stops = 0;
-  gains: number[] = [];
-  currentTime = 100;
-  failResume = false;
-  dispose = vi.fn(() => this.stopAll());
-  readonly decoded = { duration: 10 } satisfies ReviewAudioClipBuffer;
-  async resume() {
-    if (this.failResume) throw new Error('autoplay failed');
-  }
-  now() {
-    return this.currentTime;
-  }
-  async decode() {
-    return this.decoded;
-  }
-  async prepareClip(
-    _buffer: ReviewAudioClipBuffer,
-    _entry: QuickEditAudioPlanEntry,
-    _signal: AbortSignal
-  ) {
-    return this.decoded;
-  }
-  scheduleClip(schedule: unknown, buffer: unknown) {
-    this.scheduled.push({ schedule, buffer });
-    return { stop: () => undefined };
-  }
-  setOriginalGain(volume: number) {
-    this.gains.push(volume);
-  }
-  stopAll() {
-    this.stops += 1;
-  }
-}
 
 it('keeps music alive through a source Cut jump and reschedules only a real output seek', async () => {
   const map = createReviewTimeMap(12, [
@@ -139,8 +99,6 @@ it.each(['pause', 'seek'] as const)(
   }
 );
 
-type RuntimeArgs = Parameters<typeof useReviewAudioRuntime>[0];
-
 let root: Root;
 let host: HTMLDivElement;
 
@@ -156,27 +114,6 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
-
-function renderRuntime(args: Partial<RuntimeArgs>) {
-  const base: RuntimeArgs = {
-    video: { current: document.createElement('video') },
-    playing: false,
-    outputTime: 0,
-    original: { muted: false, volume: 1 },
-    voiceover: [],
-    music: [],
-    resolveAsset: async () => null,
-    sessionKey: 'session-1',
-    onFailure: () => undefined,
-    createEngine: () => null,
-    ...args,
-  };
-  const Harness = (patch: Partial<RuntimeArgs>) => {
-    useReviewAudioRuntime({ ...base, ...patch });
-    return null;
-  };
-  return { Harness };
-}
 
 it('schedules a running external clip from the current output time', async () => {
   const engine = new FakeEngine();
@@ -562,4 +499,125 @@ it('schedules a zero-fade voiceover at constant volume through its end', async (
       [102, 0.7],
     ],
   });
+});
+
+it('reschedules external clips on explicit short-loop discontinuities below the clock heuristic', async () => {
+  const engine = new FakeEngine();
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2,
+    seekRevision: 0,
+    music: [clip({ timelineStart: 0, duration: 7 })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  const stops = engine.stops;
+  engine.currentTime = 100.06;
+  await act(async () => root.render(<Harness outputTime={2.06} />));
+  expect(engine.stops).toBe(stops);
+  await act(async () => root.render(<Harness outputTime={2} seekRevision={1} />));
+  expect(engine.stops).toBe(stops + 1);
+  expect(engine.scheduled).toHaveLength(2);
+  expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 2 });
+});
+
+it('uses authored native gain and updates paused amplification', async () => {
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  video.currentTime = 4;
+  const { Harness } = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    playing: true,
+    original: {
+      muted: false,
+      volume: 2,
+      ranges: [{ id: 'manual', start: 0, end: 10, volume: 0.75 }],
+    },
+  });
+  await act(async () => root.render(<Harness />));
+  expect(engine.gains.at(-1)).toBe(1.5);
+  await act(async () =>
+    root.render(<Harness playing={false} original={{ volume: 0.4, muted: false }} />)
+  );
+  expect(engine.gains.at(-1)).toBe(1);
+  await act(async () => root.render(<Harness playing={false} silent />));
+  expect(engine.gains.at(-1)).toBe(0);
+});
+
+it.each(['missing', 'decode'] as const)(
+  'keeps original transport running when an ordinary voiceover is %s',
+  async (failure) => {
+    const engine = new FakeEngine();
+    if (failure === 'decode') vi.spyOn(engine, 'decode').mockRejectedValue(new Error('bad bytes'));
+    const video = document.createElement('video');
+    const pause = vi.spyOn(video, 'pause').mockImplementation(() => undefined);
+    const onFailure = vi.fn();
+    const { Harness } = renderRuntime({
+      video: { current: video },
+      createEngine: () => engine,
+      playing: true,
+      outputTime: 3,
+      voiceover: [clip()],
+      onFailure,
+      resolveAsset: async () => (failure === 'missing' ? null : new Blob()),
+    });
+    await act(async () => root.render(<Harness />));
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(pause).not.toHaveBeenCalled();
+    expect(engine.scheduled).toHaveLength(0);
+    expect(engine.stops).toBeGreaterThanOrEqual(1);
+  }
+);
+
+it('prepares ordinary voiceover tempo once and preserves native offset across pause and restore', async () => {
+  const engine = new FakeEngine();
+  const prepare = vi.spyOn(engine, 'prepareClip');
+  const voiceover = [clip({ timelineStart: 2, duration: 2, sourceOffset: 1, playbackRate: 2 })];
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2.5,
+    voiceover,
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(prepare.mock.calls[0]![1]).toMatchObject({ sourceOffset: 1, playbackRate: 2 });
+  expect(engine.scheduled[0]!.schedule).toMatchObject({
+    offset: 0.5,
+    duration: 1.5,
+    playbackRate: 1,
+  });
+  await act(async () => root.render(<Harness voiceover={[]} />));
+  const count = engine.scheduled.length;
+  await act(async () => root.render(<Harness />));
+  expect(engine.scheduled).toHaveLength(count + 1);
+  expect(voiceover[0]!.sourceOffset).toBe(1);
+});
+
+it('retries a missing accepted asset after explicit resume instead of caching absence', async () => {
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  vi.spyOn(video, 'pause').mockImplementation(() => undefined);
+  let available = false;
+  const onFailure = vi.fn();
+  const resolveAsset = vi.fn(async () => (available ? new Blob() : null));
+  const { Harness } = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 3,
+    voiceover: [clip()],
+    resolveAsset,
+    onFailure,
+  });
+  await act(async () => root.render(<Harness />));
+  expect(onFailure).not.toHaveBeenCalled();
+  await act(async () => root.render(<Harness playing={false} />));
+  available = true;
+  await act(async () => root.render(<Harness />));
+  expect(resolveAsset).toHaveBeenCalledTimes(2);
+  expect(engine.scheduled).toHaveLength(1);
 });

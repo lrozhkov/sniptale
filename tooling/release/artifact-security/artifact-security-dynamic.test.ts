@@ -150,6 +150,8 @@ it('rejects aliased Function constructors outside vetted Zod probes', async () =
     'const F = Function; export const run = new F("return 1");',
     'const F = Function; export const run = F("return 1");',
     'try { const F = Function; new F(""); return true; } catch { return false; }',
+    'const F = Function.bind(null); new F("return 1");',
+    'const F = Function || undefined; F("return 1");',
   ]) {
     await expectVerifierRejects(text, 'aliased dynamic code execution');
   }
@@ -282,4 +284,32 @@ it('allows only vetted jitless Zod dynamic-code probes', async () => {
       repoRoot,
     })
   ).resolves.toBeUndefined();
+});
+
+const closedZodCompiler = [
+  'class X{compile(){let t=Function,n=this?.content??[""];',
+  'return new t(...Object.keys(this.closed),`return function (${this.args.join(", ")}) {\n${n.join(`\n`)}\n};`)(...Object.values(this.closed))}}',
+].join('');
+
+it('admits the bundled jitless Zod compiler with closed bindings', async () => {
+  const repoRoot = await createRepoRoot();
+  await expect(
+    verifyReleaseArtifactFiles({
+      files: createFiles(`z.config({jitless:!0});${closedZodCompiler}`),
+      repoRoot,
+    })
+  ).resolves.toBeUndefined();
+});
+
+it('rejects altered closed-binding compiler shapes and unrelated constructors', async () => {
+  for (const text of [
+    closedZodCompiler,
+    `z.config({jitless:!0});${closedZodCompiler.replace('Object.keys(this.closed)', 'Object.keys(input)')}`,
+    `z.config({jitless:!0});${closedZodCompiler.replace('Object.values(this.closed)', 'Object.values(input)')}`,
+    `z.config({jitless:!0});${closedZodCompiler.replace('new t(', 'new g(').replace('n=this?', 'g=Function,n=this?')}`,
+    `z.config({jitless:!0});${closedZodCompiler.replace('return function', 'payload; return function')}`,
+    `z.config({jitless:!0});${closedZodCompiler}let F=Function;new F("payload")`,
+  ]) {
+    await expectVerifierRejects(text, 'aliased dynamic code execution');
+  }
 });

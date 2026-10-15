@@ -6,6 +6,7 @@ import {
   getControlSecondaryButtonClassName,
 } from '@sniptale/ui/control-language';
 import {
+  Archive,
   ArrowUpRight,
   Clapperboard,
   CopyPlus,
@@ -278,36 +279,52 @@ export function PreviewProjectUsage({
   const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
   const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [usageRevision, setUsageRevision] = useState(0);
-  const invalidationRevision = useRef(0);
-
-  useEffect(() => {
-    if (!mediaId) return;
-    return subscribeToPreviewProjectUsageInvalidation(() => {
-      invalidationRevision.current += 1;
-      setUsageRevision((value) => value + 1);
-    });
-  }, [mediaId]);
-
   useEffect(() => {
     if (!mediaId) return;
     let active = true;
-    const requestRevision = invalidationRevision.current;
+    let inFlight = false;
+    let queued = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setStatus('loading');
-    void listPreviewMediaAssetProjectUsage(mediaId).then(
-      (result) => {
-        if (!active || requestRevision !== invalidationRevision.current) return;
-        setUsage(result);
-        setStatus('ready');
-      },
-      () => {
-        if (active && requestRevision === invalidationRevision.current) setStatus('error');
+    setUsage([]);
+    const refresh = async () => {
+      if (inFlight) {
+        queued = true;
+        return;
       }
-    );
+      inFlight = true;
+      try {
+        const result = await Promise.race([
+          listPreviewMediaAssetProjectUsage(mediaId),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => reject(new Error('Project usage lookup timed out.')), 8_000);
+          }),
+        ]);
+        if (active) {
+          setUsage(result);
+          setStatus('ready');
+        }
+      } catch {
+        if (active) setStatus('error');
+      } finally {
+        clearTimeout(timer);
+        inFlight = false;
+        if (active && queued) {
+          queued = false;
+          void refresh();
+        }
+      }
+    };
+    const unsubscribe = subscribeToPreviewProjectUsageInvalidation(() => {
+      void refresh();
+    });
+    void refresh();
     return () => {
       active = false;
+      clearTimeout(timer);
+      unsubscribe();
     };
-  }, [mediaId, usageRevision]);
+  }, [mediaId]);
 
   if (!mediaId) return null;
   return (
@@ -585,7 +602,9 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
     );
   const { item, onCopy, onDelete, onDownload, onResetChanges } = props;
   const canEditMetadata =
-    isMetadataEditable(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
+    isMetadataEditable(item) ||
+    item.type === 'quick-edit-project' ||
+    (isGalleryScenarioExportItem(item) && item.format === 'html');
   const canDownload =
     isGalleryMediaItem(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
@@ -593,6 +612,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
   const hasEditedImageContent = canUseImageAggregateActions && item.imageContentState === 'edited';
   const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
   const hasFileActions =
+    Boolean(props.onBackup) ||
     canDownload ||
     canCopy ||
     canOpenWebSnapshot ||
@@ -621,6 +641,11 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
         <PreviewPrimaryActions {...props} />
         {hasFileActions ? (
           <PreviewActionGroup label={translate('gallery.preview.fileActions')}>
+            {props.onBackup ? (
+              <PreviewActionButton icon={Archive} onClick={props.onBackup}>
+                {translate('gallery.app.selectionBackup')}
+              </PreviewActionButton>
+            ) : null}
             {canOpenWebSnapshot && props.onOpenSnapshotScreenshot ? (
               <PreviewActionButton
                 icon={Images}

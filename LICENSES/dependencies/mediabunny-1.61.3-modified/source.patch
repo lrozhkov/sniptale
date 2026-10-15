@@ -1,0 +1,216 @@
+--- a/src/isobmff/isobmff-muxer.ts
++++ b/src/isobmff/isobmff-muxer.ts
+@@ -528,6 +528,10 @@
+ 		assert(meta.decoderConfig);
+ 
+ 		const decoderConfig = { ...meta.decoderConfig };
++		if (track.metadata.presentationWindow && decoderConfig.sampleRate !== 48000) {
++			throw new TypeError('presentationWindow requires a 48 kHz decoder configuration.');
++		}
++
+ 		let requiresAdtsStripping = false;
+ 
+ 		if (track.source._codec === 'aac' && !decoderConfig.description) {
+@@ -588,7 +592,7 @@
+ 				requiresAdtsStripping,
+ 				primingPacket: packet,
+ 			},
+-			timescale: decoderConfig.sampleRate,
++			timescale: track.metadata.presentationWindow ? 1000000 : decoderConfig.sampleRate,
+ 			samples: [],
+ 			sampleQueue: [],
+ 			timestampProcessingQueue: [],
+--- a/src/matroska/ebml.ts
++++ b/src/matroska/ebml.ts
+@@ -61,6 +61,7 @@
+ 
+ /** Defines some of the EBML IDs used by Matroska files. */
+ export enum EBMLId {
++	DiscardPadding = 0x75a2,
+ 	EBML = 0x1a45dfa3,
+ 	EBMLVersion = 0x4286,
+ 	EBMLReadVersion = 0x42f7,
+--- a/src/matroska/matroska-muxer.ts
++++ b/src/matroska/matroska-muxer.ts
+@@ -375,6 +375,9 @@
+ 				trackData.codecPrivate
+ 					? { id: EBMLId.CodecPrivate, data: toUint8Array(trackData.codecPrivate) }
+ 					: null,
++				trackData.track.isAudioTrack() && trackData.track.metadata.presentationWindow?.kind === 'opus-webm'
++					? { id: EBMLId.CodecDelay, data: Math.round(parseOpusIdentificationHeader(toUint8Array(trackData.codecPrivate!)).preSkip * 1e9 / 48000) }
++					: null,
+ 				seekPreRollNs > 0 ? { id: EBMLId.SeekPreRoll, data: seekPreRollNs } : null,
+ 				trackData.track.metadata.name !== undefined
+ 					? { id: EBMLId.Name, data: new EBMLUnicodeString(trackData.track.metadata.name) }
+@@ -889,6 +892,15 @@
+ 		assert(meta.decoderConfig);
+ 
+ 		const decoderConfig = { ...meta.decoderConfig };
++		const window = track.metadata.presentationWindow;
++		if (window?.kind === 'opus-webm') {
++			const head = decoderConfig.description ? toUint8Array(decoderConfig.description) : null;
++			if (decoderConfig.sampleRate !== 48000 || !head || head.length < 19
++				|| String.fromCharCode(...head.subarray(0, 8)) !== 'OpusHead') {
++				throw new TypeError('presentationWindow requires a 48 kHz OpusHead configuration.');
++			}
++		}
++
+ 		let requiresAdtsStripping = false;
+ 
+ 		if (track.source._codec === 'aac' && !decoderConfig.description) {
+@@ -1270,7 +1282,11 @@
+ 		const msDuration = Math.round(1000 * chunk.duration);
+ 
+ 		// Subtitle cues need an explicit BlockDuration (a SimpleBlock has none)
+-		const needsBlockGroup = !!chunk.additions || trackData.type === 'subtitle';
++		const window = trackData.track.isAudioTrack() ? trackData.track.metadata.presentationWindow : undefined;
++		const excessFrames = window?.kind === 'opus-webm'
++			? Math.max(0, Math.round((chunk.timestamp + chunk.duration) * 48000) - parseOpusIdentificationHeader(toUint8Array(trackData.codecPrivate!)).preSkip - window.frameCount) : 0;
++		const discardPaddingNs = Math.round(excessFrames * 1e9 / 48000);
++		const needsBlockGroup = !!chunk.additions || trackData.type === 'subtitle' || discardPaddingNs > 0;
+ 
+ 		if (!needsBlockGroup) {
+ 			// No additions, we can write out a SimpleBlock
+@@ -1302,12 +1318,13 @@
+ 						] }
+ 					: null,
+ 				msDuration > 0 ? { id: EBMLId.BlockDuration, data: msDuration } : null,
++				discardPaddingNs > 0 ? { id: EBMLId.DiscardPadding, data: new EBMLSignedInt(discardPaddingNs) } : null,
+ 			] };
+ 			this.ebmlWriter.writeEBML(blockGroup);
+ 		}
+ 
+ 		this.startTimestamp = Math.min(this.startTimestamp, msTimestamp);
+-		this.endTimestamp = Math.max(this.endTimestamp, msTimestamp + msDuration);
++		this.endTimestamp = Math.max(this.endTimestamp, window ? Math.min(msTimestamp + msDuration, 1000 * window.frameCount / 48000) : msTimestamp + msDuration);
+ 		trackData.lastWrittenMsTimestamp = msTimestamp;
+ 
+ 		if (!this.trackDatasInCurrentCluster.has(trackData)) {
+--- a/src/media-source.ts
++++ b/src/media-source.ts
+@@ -42,6 +42,7 @@
+ 	UnthrottledTimerHandle,
+ 	wait,
+ } from './misc';
++import { parseOpusIdentificationHeader } from './codec-data';
+ import { Muxer } from './muxer';
+ import { SubtitleParser } from './subtitles';
+ import { toAlaw, toUlaw } from './pcm';
+@@ -1901,6 +1902,16 @@
+  * @public
+  */
+ export class EncodedAudioPacketSource extends AudioSource {
++	private presentationEnd = 0;
++	private presentationPreSkip = 0;
++	private presentationConfig: string | null = null;
++	/** @internal */
++	override async _flushAndClose(forceClose: boolean) {
++		const window = this._connectedTrack?.metadata.presentationWindow;
++		if (!forceClose && window && this.presentationEnd < window.frameCount + this.presentationPreSkip) {
++			throw new Error('presentationWindow ended before all playable samples were supplied.');
++		}
++	}
+ 	/** Creates a new {@link EncodedAudioPacketSource} whose packets are encoded using `codec`. */
+ 	constructor(codec: AudioCodec) {
+ 		super(codec);
+@@ -1927,6 +1938,34 @@
+ 		}
+ 
+ 		this._ensureValidAdd();
++		const window = this._connectedTrack!.metadata.presentationWindow;
++		if (window) {
++			const config = meta?.decoderConfig ?? this._connectedTrack!.metadata.decoderConfig;
++			if (config) {
++				const bytes = config.description ? toUint8Array(config.description) : null;
++				const signature = JSON.stringify([config.codec, config.sampleRate, config.numberOfChannels, bytes ? Array.from(bytes) : null]);
++				if (this.presentationConfig !== null && this.presentationConfig !== signature) throw new TypeError('presentationWindow decoder configuration changed.');
++				if (window.kind === 'opus-webm') {
++					if (!bytes || bytes.length < 19 || String.fromCharCode(...bytes.subarray(0, 8)) !== 'OpusHead'
++						|| bytes[8] !== 1 || bytes[9] !== config.numberOfChannels || bytes[18] !== 0) throw new TypeError('presentationWindow requires a valid family-zero OpusHead.');
++					this.presentationPreSkip = parseOpusIdentificationHeader(bytes).preSkip;
++				}
++				this.presentationConfig = signature;
++			}
++			if (this.presentationConfig === null) throw new TypeError('presentationWindow requires initial decoder metadata.');
++			const start = Math.round(packet.timestamp * 48000);
++			const end = Math.round((packet.timestamp + packet.duration) * 48000);
++			const limit = window.frameCount + (this.presentationPreSkip);
++			if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start !== this.presentationEnd
++				|| start >= limit || end <= start || (window.kind === 'aac-mp4' && end > limit)) {
++				throw new TypeError('presentationWindow packets must be contiguous from zero and intersect its endpoint.');
++			}
++			if (meta?.decoderConfig && meta.decoderConfig.sampleRate !== 48000) {
++				throw new TypeError('presentationWindow requires a 48 kHz decoder configuration.');
++			}
++			this.presentationEnd = end;
++		}
++
+ 		return this._connectedTrack!.output._muxer.addEncodedAudioPacket(this._connectedTrack!, packet, meta);
+ 	}
+ }
+--- a/src/output.ts
++++ b/src/output.ts
+@@ -19,8 +19,8 @@
+ } from './misc';
+ import { MetadataTags, TrackDisposition, validateMetadataTags, validateTrackDisposition } from './metadata';
+ import { Muxer } from './muxer';
+-import { OutputFormat } from './output-format';
+-import { AudioSource, MediaSource, SubtitleSource, VideoSource } from './media-source';
++import { OutputFormat, Mp4OutputFormat, WebMOutputFormat } from './output-format';
++import { AudioSource, EncodedAudioPacketSource, MediaSource, SubtitleSource, VideoSource } from './media-source';
+ import { PathedTarget, Target, TargetRequest } from './target';
+ import { Writer } from './writer';
+ import { Logging } from './logging';
+@@ -316,6 +316,13 @@
+  * @public
+  */
+ export type AudioTrackMetadata = BaseTrackMetadata & {
++	/** Opt-in 48 kHz processed-audio presentation window. Packets must start at zero.
++	 * AAC requires fragmented MP4; Opus requires WebM and decoder-config OpusHead pre-skip.
++	 * The caller must submit only packets intersecting this window (including Opus pre-skip).
++	 */
++	presentationWindow?:
++		| { kind: 'aac-mp4'; sampleRate: 48000; frameCount: number }
++		| { kind: 'opus-webm'; sampleRate: 48000; frameCount: number };
+ 	/**
+ 	 * The decoder config for this audio track, provided ahead of time. This is provided automatically when media data
+ 	 * added to the track, but by specifying it here, you give the muxer additional information that it can make use of.
+@@ -729,6 +736,29 @@
+ 			throw new TypeError('source must be an AudioSource.');
+ 		}
+ 		validateBaseTrackMetadata(metadata);
++		const window = metadata.presentationWindow;
++		if (window !== undefined) {
++			if (!(source instanceof EncodedAudioPacketSource)) throw new TypeError('presentationWindow requires an encoded audio packet source.');
++			if (!window || typeof window !== 'object' || Array.isArray(window)
++				|| Object.keys(window).some(key => !['kind', 'sampleRate', 'frameCount'].includes(key))
++				|| window.sampleRate !== 48000 || !Number.isSafeInteger(window.frameCount)
++				|| window.frameCount <= 0 || window.frameCount > 48000 * 93600) {
++				throw new TypeError('Invalid presentationWindow: expected a positive 48 kHz window of at most 26 hours.');
++			}
++			if (window.kind === 'aac-mp4') {
++				if (source._codec !== 'aac' || !(this.format instanceof Mp4OutputFormat)
++					|| this.format._options.fastStart !== 'fragmented') {
++					throw new TypeError('aac-mp4 presentationWindow requires AAC and fragmented MP4.');
++				}
++			} else if (window.kind === 'opus-webm') {
++				if (source._codec !== 'opus' || !(this.format instanceof WebMOutputFormat)) {
++					throw new TypeError('opus-webm presentationWindow requires Opus and WebM.');
++				}
++			} else {
++				throw new TypeError('Unsupported presentationWindow kind.');
++			}
++		}
++
+ 		if (metadata.decoderConfig !== undefined) {
+ 			validateAudioChunkMetadata({ decoderConfig: metadata.decoderConfig }, source._codec);
+ 		}
+@@ -741,7 +771,7 @@
+ 			}
+ 		}
+ 
+-		const metadataCopy = { ...metadata };
++		const metadataCopy = { ...metadata, ...(window ? { presentationWindow: Object.freeze({ ...window }) } : {}) };
+ 		metadataCopy.group ??= this.defaultTrackGroup;
+ 
+ 		return this._addTrack(new OutputAudioTrack(

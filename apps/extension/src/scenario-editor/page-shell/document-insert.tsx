@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, memo, useContext, useMemo, type ReactNode } from 'react';
 import {
   FileText,
   Heading,
@@ -26,91 +26,82 @@ export function GuideInsertScope({
   breaks?: readonly string[];
   children: ReactNode;
 }) {
-  return (
-    <InsertionAvailability value={{ blocked: value, breaks }}>{children}</InsertionAvailability>
-  );
+  const availability = useMemo(() => ({ blocked: value, breaks }), [value, breaks]);
+  return <InsertionAvailability value={availability}>{children}</InsertionAvailability>;
 }
 
 type InsertTarget =
   | { kind: 'item'; beforeItemId?: string }
   | { kind: 'block'; itemId: string; beforeBlockId?: string };
 
-/** A boundary command uses stable document identities and the existing mutation owner. */
-export function GuideDocumentInsert({
-  target,
-  end = false,
-  rowStart,
-  disabled,
-  onOperate,
-  t,
-}: {
+type GuideDocumentInsertProps = {
   target: InsertTarget;
   end?: boolean;
   rowStart?: boolean;
   disabled: boolean;
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
-}) {
-  const { blocked, breaks } = useContext(InsertionAvailability);
-  const before = target.kind === 'item' ? target.beforeItemId : target.beforeBlockId;
-  const items =
+};
+
+type InsertViewTarget =
+  | { kind: 'item'; itemId: undefined; before: string | undefined }
+  | { kind: 'block'; itemId: string; before: string | undefined };
+
+const itemInsertions = [
+  { kind: 'add-step', label: 'scenario.editor.guideAddStep', Icon: ListPlus },
+  { kind: 'add-section', label: 'scenario.editor.guideAddSection', Icon: Heading },
+] as const;
+const blockInsertions = [
+  { kind: 'image-slot', label: 'scenario.editor.guideAddImage', Icon: Image },
+  { kind: 'text', label: 'scenario.editor.guideAddText', Icon: FileText },
+  { kind: 'heading', label: 'scenario.editor.guideAddHeading', Icon: Heading },
+  { kind: 'note', label: 'scenario.editor.guideAddNote', Icon: MessageSquare },
+] as const;
+
+/** A boundary command uses stable document identities and the existing mutation owner. */
+export function GuideDocumentInsert({ target, ...props }: GuideDocumentInsertProps) {
+  const identities: InsertViewTarget =
     target.kind === 'item'
-      ? [
-          {
-            label: t('scenario.editor.guideAddStep'),
-            icon: <ListPlus size={15} aria-hidden="true" />,
-            onSelect: () =>
-              onOperate({
-                kind: 'add-step',
-                ...(before === undefined ? {} : { beforeItemId: before }),
-              }),
-          },
-          {
-            label: t('scenario.editor.guideAddSection'),
-            icon: <Heading size={15} aria-hidden="true" />,
-            onSelect: () =>
-              onOperate({
-                kind: 'add-section',
-                ...(before === undefined ? {} : { beforeItemId: before }),
-              }),
-          },
-        ]
-      : [
-          {
-            kind: 'image-slot' as const,
-            label: t('scenario.editor.guideAddImage'),
-            icon: <Image size={15} aria-hidden="true" />,
-          },
-          {
-            kind: 'text' as const,
-            label: t('scenario.editor.guideAddText'),
-            icon: <FileText size={15} aria-hidden="true" />,
-          },
-          {
-            kind: 'heading' as const,
-            label: t('scenario.editor.guideAddHeading'),
-            icon: <Heading size={15} aria-hidden="true" />,
-          },
-          {
-            kind: 'note' as const,
-            label: t('scenario.editor.guideAddNote'),
-            icon: <MessageSquare size={15} aria-hidden="true" />,
-          },
-        ].map((item) => ({
-          ...item,
+      ? { kind: target.kind, itemId: undefined, before: target.beforeItemId }
+      : { kind: target.kind, itemId: target.itemId, before: target.beforeBlockId };
+  return <GuideInsertionView {...props} {...identities} />;
+}
+
+const GuideInsertionView = memo(function GuideInsertionView({
+  kind,
+  itemId,
+  before,
+  end = false,
+  rowStart,
+  disabled,
+  onOperate,
+  t,
+}: Omit<GuideDocumentInsertProps, 'target'> & InsertViewTarget) {
+  const { blocked, breaks } = useContext(InsertionAvailability);
+  const items =
+    kind === 'item'
+      ? itemInsertions.map(({ kind: operation, label, Icon }) => ({
+          label: t(label),
+          icon: <Icon size={15} aria-hidden="true" />,
+          onSelect: () =>
+            onOperate({
+              kind: operation,
+              ...(before === undefined ? {} : { beforeItemId: before }),
+            }),
+        }))
+      : blockInsertions.map(({ kind: blockKind, label, Icon }) => ({
+          label: t(label),
+          icon: <Icon size={15} aria-hidden="true" />,
           onSelect: () =>
             onOperate({
               kind: 'add-block',
-              itemId: target.itemId,
-              blockKind: item.kind,
+              itemId,
+              blockKind,
               ...(before === undefined ? {} : { beforeBlockId: before }),
             }),
         }));
   const rowStartItem =
-    target.kind === 'block' &&
-    target.beforeBlockId &&
-    rowStart !== undefined &&
-    breaks.includes(target.beforeBlockId)
+    kind === 'block' && before && rowStart !== undefined && breaks.includes(before)
       ? {
           label: t(
             rowStart ? 'scenario.editor.guideRemoveRowStart' : 'scenario.editor.guideRowStart'
@@ -120,15 +111,15 @@ export function GuideDocumentInsert({
           onSelect: () =>
             onOperate({
               kind: 'set-row-start',
-              itemId: target.itemId,
-              blockId: target.beforeBlockId!,
+              itemId,
+              blockId: before,
               rowStart: !rowStart,
             }),
         }
       : null;
   return (
     <div
-      className={`guide-insertion guide-insertion-${target.kind}`}
+      className={`guide-insertion guide-insertion-${kind}`}
       data-end={end}
       data-blocked={blocked || undefined}
       inert={blocked}
@@ -139,9 +130,7 @@ export function GuideDocumentInsert({
         <GuideInsertActions
           icon={<Ellipsis size={16} aria-hidden="true" />}
           label={t(
-            target.kind === 'item'
-              ? 'scenario.editor.guideInsertItem'
-              : 'scenario.editor.guideAddBlock'
+            kind === 'item' ? 'scenario.editor.guideInsertItem' : 'scenario.editor.guideAddBlock'
           )}
           items={rowStartItem ? [...items, rowStartItem] : items}
           disabled={disabled || blocked}
@@ -149,4 +138,4 @@ export function GuideDocumentInsert({
       </div>
     </div>
   );
-}
+});

@@ -1,3 +1,4 @@
+import type { VideoActionKeyStyle } from '../types';
 import { parseColor } from '@sniptale/foundation/color';
 import { isRecord, isColorString, isBoundedNumber, isEnumValue } from './primitives';
 
@@ -12,7 +13,7 @@ export function isActionClickStyle(value: unknown): boolean {
   );
 }
 
-export function isActionKeyStyle(value: unknown): boolean {
+export function isActionKeyStyle(value: unknown): value is VideoActionKeyStyle {
   return (
     isRecord(value) &&
     isEnumValue(value['position'], {

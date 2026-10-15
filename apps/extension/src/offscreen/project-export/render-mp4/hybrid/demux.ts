@@ -143,6 +143,8 @@ async function waitForDecoderFlush(decoder: VideoDecoder): Promise<void> {
 }
 
 interface CleanSourceEncodeArgs {
+  onFrame?: (projectTime: number) => void;
+  encodeOptions?: VideoEncoderEncodeOptions;
   signal?: AbortSignal;
   span: Mp4CleanSourceRenderSpan;
   throwIfPipelineFailed: () => void;
@@ -173,9 +175,16 @@ function queueDecodedFrameEncode(args: {
   )
     .then(() => {
       args.request.videoEncoder.encode(outputFrame, {
+        ...args.request.encodeOptions,
         keyFrame: args.outputIndexRef.current === 0,
       });
       args.outputIndexRef.current += 1;
+      args.request.onFrame?.(
+        Math.min(
+          args.request.span.end,
+          projectTimestampUs / 1_000_000 + (outputFrame.duration ?? 0) / 1_000_000
+        )
+      );
     })
     .finally(() => outputFrame.close());
   args.encodeTasks.push(encodeTask);

@@ -13,7 +13,7 @@ vi.mock('../../../chrome/ui', async (importOriginal) => ({
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-it('restores the pre-open legacy frame value when a preview echo is cancelled', async () => {
+it('keeps color previews local and leaves the document unchanged on cancel', async () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -58,7 +58,7 @@ it('restores the pre-open legacy frame value when a preview echo is cancelled', 
   ).find((button) => button.getAttribute('aria-label')?.endsWith('#123456'));
   expect(paletteColor).toBeDefined();
   act(() => paletteColor?.click());
-  expect(host.querySelector('[data-testid="background-color"]')?.textContent).toBe('#123456ff');
+  expect(host.querySelector('[data-testid="background-color"]')?.textContent).toBe('#ffffffff');
 
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
   await act(nextFrame);

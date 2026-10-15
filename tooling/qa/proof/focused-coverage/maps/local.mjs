@@ -1,5 +1,142 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-audio-runtime-consumers',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-audio-runtime.ts',
+    reason:
+      'Playback preparation and queued audio lifetime use both runtime and action-audio suites.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-review-audio-runtime.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-action-audio-runtime.test.tsx',
+    ],
+  },
+  {
+    owner: 'project-cursor-focus-consumers',
+    productionFile: 'apps/extension/src/features/video/project/cursor-focus-path/projection.ts',
+    reason:
+      'Existing handoff and editor suites prove source projection, anchors and retained edits.',
+    testFiles: [
+      'apps/extension/src/features/video/review/standalone-interactions.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.cursor.test.ts',
+    ],
+  },
+  {
+    owner: 'review-cursor-focus-consumers',
+    productionFile: 'apps/extension/src/features/video/review/advanced/cursor-focus-path.ts',
+    reason:
+      'Handoff and camera suites prove retained anchors, cropped observations and continuity.',
+    testFiles: [
+      'apps/extension/src/features/video/review/standalone-interactions.test.ts',
+      'apps/extension/src/features/video/review/advanced/scene-camera-plan.test.ts',
+    ],
+  },
+  {
+    owner: 'review-scene-camera-consumers',
+    productionFile: 'apps/extension/src/features/video/review/advanced/scene.ts',
+    reason: 'Camera-plan consumers prove output fitting and link-gap rejection.',
+    testFiles: ['apps/extension/src/features/video/review/advanced/scene-camera-plan.test.ts'],
+  },
+  {
+    owner: 'review-project-concurrency',
+    productionFile:
+      'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-workspace-concurrency',
+    productionFile: 'apps/extension/src/composition/persistence/review-workspaces/store.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+    ],
+  },
+  {
+    owner: 'asset-reader-concurrency',
+    productionFile: 'apps/extension/src/composition/persistence/assets/resource-sessions.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-session-concurrency',
+    productionFile: 'apps/extension/src/workflows/video-review/session.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: ['apps/extension/src/workflows/video-review/session.project-purge.test.ts'],
+  },
+  {
+    owner: 'review-loading-concurrency',
+    productionFile: 'apps/extension/src/gallery/video-review/use-session.ts',
+    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.loaded.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.resources.test.tsx',
+    ],
+  },
+  {
+    owner: 'background-review-audio-authorization',
+    productionFile: 'apps/extension/src/background/ai/audio/authorization.ts',
+    reason: `Sender, durable source selection, native ranges and transcript scope are checked by
+      the authorization and provider request consumer suites.`,
+    testFiles: [
+      'apps/extension/src/background/ai/audio/authorization.test.ts',
+      'apps/extension/src/background/ai/audio/authorization.source.test.ts',
+      'apps/extension/src/background/ai/audio/chat-transcription.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.test.ts',
+    ],
+  },
+  {
+    owner: 'indexed-db-usage-index-estimation',
+    productionFile:
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/usage-index-migration.ts',
+    reason: `The schema admission and usage-index upgrade suites execute estimation through the
+      registered migration, including source failure and alias cursor validation.`,
+    testFiles: [
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/usage-index.test.ts',
+    ],
+  },
+  {
+    owner: 'video-review-session-durable-access',
+    productionFile: 'apps/extension/src/workflows/video-review/session-durable-access.ts',
+    reason: `The session suites exercise source/revision CAS, autosave, reset, retained history,
+      speech receipts and annotation acquisition through the owning session.`,
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/workflows/video-review/session.test.ts',
+      'apps/extension/src/workflows/video-review/session.autosave.test.ts',
+      'apps/extension/src/workflows/video-review/session.reset.test.ts',
+      'apps/extension/src/workflows/video-review/session.history-start.test.ts',
+      'apps/extension/src/workflows/video-review/local-session.test.ts',
+      'apps/extension/src/workflows/video-review/speech-publication.test.ts',
+      'apps/extension/src/workflows/video-review/speech-publication-state.test.ts',
+      'apps/extension/src/workflows/video-review/annotation-acquisition.test.ts',
+    ],
+  },
+  {
+    owner: 'video-review-session-private-contracts',
+    productionFile: 'apps/extension/src/workflows/video-review/session-types.ts',
+    reason: `Private session state and persistence contracts are consumed by the session and
+      durable-access suites; this module has no independent runtime.`,
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.test.ts',
+      'apps/extension/src/workflows/video-review/session.autosave.test.ts',
+      'apps/extension/src/workflows/video-review/session.reset.test.ts',
+      'apps/extension/src/workflows/video-review/session.history-start.test.ts',
+      'apps/extension/src/workflows/video-review/local-session.test.ts',
+      'apps/extension/src/workflows/video-review/speech-publication.test.ts',
+      'apps/extension/src/workflows/video-review/speech-publication-state.test.ts',
+      'apps/extension/src/workflows/video-review/annotation-acquisition.test.ts',
+    ],
+  },
+  {
     owner: 'scenario-content-capture-transport',
     productionFile: 'apps/extension/src/content/overlay/scenario/runtime/transport/capture.ts',
     reason: 'The transport suite executes capture messaging and its content intent boundary.',
@@ -62,6 +199,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason: 'IndexedDB schema and upgrade authority are exercised by the owner-local core suite.',
     testFiles: [
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.lock.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.recovery.test.ts',
     ],
   },
   {

@@ -8,10 +8,12 @@ import type { AiProvidersPromptViewState } from '../state/types';
 
 interface AiProvidersPromptCardProps {
   descriptionKey:
+    | 'settings.aiProviders.audioTranscriptionPromptDescription'
     | 'settings.aiProviders.globalPromptDescription'
     | 'settings.aiProviders.scenarioEditorPromptDescription';
   prompt: AiProvidersPromptViewState;
   titleKey:
+    | 'settings.aiProviders.audioTranscriptionPromptTitle'
     | 'settings.aiProviders.globalPromptTitle'
     | 'settings.aiProviders.scenarioEditorPromptTitle';
 }
@@ -31,6 +33,12 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
             ref={(node) => {
               props.prompt.textareaRef.current = node;
             }}
+            aria-label={translate(props.titleKey)}
+            maxLength={
+              props.titleKey === 'settings.aiProviders.audioTranscriptionPromptTitle'
+                ? 10000
+                : 50000
+            }
             value={props.prompt.value}
             onChange={(event) => props.prompt.setValue(event.currentTarget.value)}
             style={{ resize: 'none', marginBottom: 0 }}

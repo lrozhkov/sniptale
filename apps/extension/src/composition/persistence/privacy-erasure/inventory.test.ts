@@ -23,6 +23,9 @@ import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-pref
 it('uses the canonical IndexedDB store inventory for local data erasure', () => {
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toEqual(EXPECTED_STORES);
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('image_workspaces');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspace_history');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspaces');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspace_drafts');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('aggregate_presentations');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).not.toContain('editor_sessions');
 });
@@ -46,8 +49,13 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).not.toContain(AI_PROVIDERS_KEY);
   expect(plan.local).not.toContain(AI_PROVIDER_SECRETS_KEY);
   expect(plan.local).not.toContain(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
+  expect(plan.local).toContain('sniptale_background_presets');
   expect(plan.local).toContain('llm_request_history');
+  expect(plan.local).toContain('sniptale_export_time_history');
+  expect(plan.local).toContain('sniptale_library_maintenance_log');
+  expect(plan.local).toContain('sniptale_runtime_diagnostic_log');
   expect(plan.local).toContain('sniptale_prompt_templates');
+  expect(plan.local).toContain('sniptale_ai_audio_transcription_prompt');
   expect(plan.local).toContain('sniptale.gallery.command-palette');
   expect(plan.local).toContain('sniptale.settings.command-palette');
   expect(plan.local).toContain('sniptale.video-editor.command-palette');
@@ -113,4 +121,22 @@ it('includes extension-page trace localStorage in the page-local erasure invento
   expect(LOCAL_EXTENSION_PAGE_STORAGE_KEYS).toContain('sniptale:trace:namespaces');
   expect(LOCAL_EXTENSION_PAGE_STORAGE_KEYS).toContain('sniptale.gallery.filters');
   expect(LOCAL_EXTENSION_PAGE_STORAGE_KEYS).toContain('sniptale.gallery.facet-disclosures');
+});
+
+it('erases quick preview preferences only when preferences are not preserved', () => {
+  const key = 'sniptale_quick_preview_preferences';
+  const erased = buildBrowserStorageErasurePlan({
+    includeAiProviderSecrets: true,
+    preservePreferences: false,
+  });
+  const preserved = buildBrowserStorageErasurePlan({
+    includeAiProviderSecrets: true,
+    preservePreferences: true,
+  });
+  expect(erased.local).toContain(key);
+  expect(erased.local).toContain('sniptale_video_editor_preview_preferences');
+  expect(preserved.local).not.toContain(key);
+  expect(preserved.local).not.toContain('sniptale_video_editor_preview_preferences');
+  expect(erased.sync).not.toContain(key);
+  expect(erased.session).not.toContain(key);
 });

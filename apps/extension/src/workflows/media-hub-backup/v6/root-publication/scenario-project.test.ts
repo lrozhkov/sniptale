@@ -63,6 +63,7 @@ beforeEach(() => {
           get: async (key: string) =>
             deleted && store === 'media_library' ? undefined : (await io.db())?.get(store, key),
           put: vi.fn(),
+          index: () => ({ getAll: async () => [] }),
         }),
         done: Promise.resolve(),
       }),
@@ -413,6 +414,7 @@ it('keeps stable child identities and checkpoints validated children when replac
         objectStore: () => ({
           get: async () => restoredAsset ?? metadata.assets[0]?.entry,
           put: vi.fn(),
+          index: () => ({ getAll: async () => [] }),
         }),
         done: Promise.resolve(),
       }),
@@ -453,6 +455,7 @@ it('checkpoints only locally validated scenario children when skipping an existi
             return undefined;
           },
           put: vi.fn(),
+          index: () => ({ getAll: async () => [] }),
         }),
         done: Promise.resolve(),
       }),

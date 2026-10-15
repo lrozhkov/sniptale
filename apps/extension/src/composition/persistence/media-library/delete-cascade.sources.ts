@@ -1,10 +1,10 @@
+import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { removeEditorDocumentOwnership } from '../document-assets';
 import { createAggregatePresentationKey } from '../aggregate-presentations';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { AssetReadyJournal } from '../assets';
-import { recoverRecordingAssetPublications } from '../recordings/asset-publication';
 import type { MediaDependencyTarget } from './dependencies';
 import {
   scenarioChildIsUnrelated,
@@ -30,35 +30,19 @@ import {
   MEDIA_LIBRARY_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_PROJECTS_STORE,
-  VIDEO_WORKSPACES_STORE,
+  type IndexedDbWriteTransaction,
 } from '../infrastructure/indexed-db/core';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import {
-  recoverProjectMediaPublications,
-  PROJECT_EXPORT_OWNER_KIND,
-  PROJECT_MEDIA_ASSET_ROLE,
-} from '../projects/asset-publication';
-import {
-  recoverWebSnapshotPublications,
   WEB_SNAPSHOT_OWNER_KIND,
   WEB_SNAPSHOT_PACKAGE_ROLE,
   WEB_SNAPSHOT_SCREENSHOT_ROLE,
 } from '../web-snapshots/publication';
 
-type CascadeTransaction = ReturnType<
-  Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>['transaction']
->;
+type CascadeTransaction = IndexedDbWriteTransaction;
 type PhysicalDelete = PhysicalDeleteAssetOperation;
-
-/** Drain the source owner's ready publications before its root is removed. */
-export async function recoverMediaSourcePublications(media: MediaDependencyTarget): Promise<void> {
-  if (media.source.kind === 'project-export' || media.source.kind === 'project-asset')
-    await recoverProjectMediaPublications();
-  if (media.source.kind === 'recording') await recoverRecordingAssetPublications();
-  if (media.source.kind === 'web-snapshot') await recoverWebSnapshotPublications();
-}
 
 function unhandledSource(_source: never): never {
   throw new MediaAssetDeletionBlockedError('unsupported-source');
@@ -127,7 +111,7 @@ export async function releaseMediaSource(
         physicalDelete,
         id: source.exportId,
         store: PROJECT_EXPORTS_STORE,
-        ownerKind: PROJECT_EXPORT_OWNER_KIND,
+        ownerKind: 'project-export',
         parse: (raw) => {
           const entry = parseProjectExportEntry(raw);
           return entry?.projectId === source.projectId ? entry : null;
@@ -146,7 +130,7 @@ export async function deleteMediaSidecars(
   mediaId: string,
   physicalDelete: PhysicalDelete
 ): Promise<Set<string>> {
-  const review = parseVideoWorkspace(await tx.objectStore(VIDEO_WORKSPACES_STORE).get(mediaId));
+  const review = parseVideoWorkspace(await createVideoWorkspaceStore(tx).get(mediaId));
   const privateCandidates = new Set(
     [...(review ? collectReviewAssetReferences(review) : [])].map((id) =>
       id.slice('project-asset:'.length)
@@ -173,7 +157,7 @@ export async function deleteMediaSidecars(
   );
   await tx.objectStore(THUMBNAILS_STORE).delete!(mediaId);
   await tx.objectStore(MEDIA_LIBRARY_STORE).delete!(mediaId);
-  await tx.objectStore(VIDEO_WORKSPACES_STORE).delete!(mediaId);
+  await createVideoWorkspaceStore(tx).delete(mediaId);
   await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete!(mediaId);
   return privateCandidates;
 }
@@ -188,7 +172,7 @@ export async function releaseUnpublishedProjectAssets(
   const [videos, children, reviews] = await Promise.all([
     tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
     tx.objectStore(SCENARIO_ASSETS_STORE).getAll(),
-    tx.objectStore(VIDEO_WORKSPACES_STORE).getAll(),
+    createVideoWorkspaceStore(tx).getAll(),
   ]);
   const deletedIds: string[] = [];
   const pending = [...candidates];
@@ -331,7 +315,7 @@ async function releaseBodyRecord(args: {
     assetId: entry.assetId,
     ownerId: entry.id,
     ownerKind: args.ownerKind,
-    role: PROJECT_MEDIA_ASSET_ROLE,
+    role: 'body',
     tx: args.tx,
     physicalDelete: args.physicalDelete,
   });

@@ -4,7 +4,7 @@ import {
 } from '../../../composition/persistence/image-workspaces';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
-  clearPendingAutosaveTimer,
+  cancelPendingAutosaveRequest,
   interruptImagePresentation,
   releaseAutosaveInteraction,
   type ActiveEditorSessionContext,
@@ -15,9 +15,9 @@ import { setEditorSaveState } from './persistence';
 export function activateAutosaveContext(
   state: EditorSessionAutosaveState,
   context: ActiveEditorSessionContext,
-  options: { preserveHydratedDocument?: boolean } = {}
+  options: { preserveHydratedDocument?: boolean; preserveMode?: boolean } = {}
 ): void {
-  clearPendingAutosaveTimer(state);
+  cancelPendingAutosaveRequest(state);
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
   state.presentationPending = false;
@@ -32,8 +32,9 @@ export function activateAutosaveContext(
   state.hasUnsavedChanges = false;
   state.activeContext = context;
   state.contextGeneration += 1;
+  state.coordinator?.resume();
   state.presentationRetryPromise = null;
-  if (!options.preserveHydratedDocument) state.enabled = true;
+  if (!options.preserveHydratedDocument && !options.preserveMode) state.enabled = true;
   useEditorStore.getState().setSessionId(context.aggregateId);
 }
 
@@ -75,14 +76,18 @@ export async function restoreAutosaveDraft(
   }
 
   const renderPresentation = state.activeContext?.renderPresentation ?? null;
-  activateAutosaveContext(state, {
-    aggregateId: entry.aggregateId,
-    durableRevision: entry.revision,
-    requireExistingRoot: true,
-    renderPresentation,
-    sourceUrl: entry.sourceUrl,
-    sourceTitle: entry.sourceTitle,
-  });
+  activateAutosaveContext(
+    state,
+    {
+      aggregateId: entry.aggregateId,
+      durableRevision: entry.revision,
+      requireExistingRoot: true,
+      renderPresentation,
+      sourceUrl: entry.sourceUrl,
+      sourceTitle: entry.sourceTitle,
+    },
+    { preserveMode: true }
+  );
   state.releaseHydratedDocument = entry.releaseDocumentAssets ?? null;
   state.documentAssetsByRuntimeUrl = entry.documentAssetsByRuntimeUrl ?? new Map();
   setEditorSaveState('saved');
@@ -93,7 +98,9 @@ export async function discardAutosaveDraft(
   state: EditorSessionAutosaveState,
   _aggregateId?: string | null
 ): Promise<void> {
-  clearPendingAutosaveTimer(state);
+  state.hydration = null;
+  state.hydrationGeneration += 1;
+  cancelPendingAutosaveRequest(state);
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
   state.presentationPending = false;
@@ -106,6 +113,7 @@ export async function discardAutosaveDraft(
   state.hasUnsavedChanges = false;
   state.activeContext = null;
   state.contextGeneration += 1;
+  state.coordinator?.resume();
   state.presentationRetryPromise = null;
   state.enabled = true;
   useEditorStore.getState().setSessionId(null);
@@ -113,7 +121,9 @@ export async function discardAutosaveDraft(
 }
 
 export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
-  clearPendingAutosaveTimer(state);
+  state.hydration = null;
+  state.hydrationGeneration += 1;
+  state.coordinator?.dispose();
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
   state.presentationPending = false;

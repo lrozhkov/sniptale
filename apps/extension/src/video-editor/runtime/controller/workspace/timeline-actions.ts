@@ -1,3 +1,8 @@
+import { resolveProjectCursorFocusPath } from '../../../../features/video/project/cursor-focus-path/projection';
+import {
+  updateCursorFocusKey,
+  authoredCursorFocusPath,
+} from '../../../../features/video/project/cursor-focus-path/authoring';
 import { resolveMotionConnectionSource } from '../../../../features/video/project/motion';
 import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
@@ -68,6 +73,35 @@ function createCursorSegmentMover(store: TimelineActionStore) {
         return project;
       }
 
+      if (project.cursorFocusPath || project.source.kind === 'recording') {
+        let cursorFocusPath = resolveProjectCursorFocusPath(project, sampleId);
+        const move = (id: string, time: number) => {
+          const segment = cursorFocusPath.segments.find((item) =>
+            item.keys.some((key) => key.id === id)
+          );
+          if (!segment) return;
+          const binding = segment.binding;
+          const clip =
+            binding.kind === 'recording-source'
+              ? project.clips.find(
+                  (item) =>
+                    item.type === 'VIDEO' &&
+                    (item.sourceInstanceId ?? item.id) === binding.sourceInstanceId &&
+                    time >= item.startTime &&
+                    time <= item.startTime + item.duration
+                )
+              : undefined;
+          if (binding.kind === 'recording-source' && clip?.type !== 'VIDEO') return;
+          const sourceTime =
+            clip?.type === 'VIDEO'
+              ? clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1)
+              : time;
+          cursorFocusPath = updateCursorFocusKey(cursorFocusPath, id, { time: sourceTime });
+        };
+        move(sampleId, startTime);
+        if (nextSampleId && endTime !== null) move(nextSampleId, endTime);
+        return { ...project, cursorFocusPath: authoredCursorFocusPath(cursorFocusPath) };
+      }
       return {
         ...project,
         cursorTrack: {

@@ -2,9 +2,7 @@ import {
   useState,
   useRef,
   type ReactNode,
-  type ChangeEvent,
   type CSSProperties,
-  type FocusEvent,
   type KeyboardEvent,
   type PointerEvent,
 } from 'react';
@@ -80,10 +78,10 @@ function getNumericRangeScrubState(props: NumericRangeScrubProps) {
   const rangeMin = props.scrub.min;
   const rangeMax = props.scrub.max;
   const rangeStep = props.scrub.step ?? props.step ?? 1;
-  const range = Math.max(1, rangeMax - rangeMin);
-  const rangeRatio = ((rangeValue - rangeMin) / range) * 100;
-  const readValue = (event: RangeCommitEvent | ChangeEvent<HTMLInputElement>) => {
-    const scrubValue = clampNumber(Number(event.currentTarget.value), rangeMin, rangeMax);
+  const range = rangeMax - rangeMin;
+  const rangeRatio = range > 0 ? ((rangeValue - rangeMin) / range) * 100 : 0;
+  const readValue = (value: number) => {
+    const scrubValue = snapRangeProposal(value, rangeMin, rangeMax, rangeStep);
     return props.scrub.toValue ? props.scrub.toValue(scrubValue) : scrubValue;
   };
   return { rangeMax, rangeMin, rangeRatio, rangeStep, rangeValue, readValue };
@@ -138,12 +136,27 @@ function NumericRangeInput(props: {
   rangeRatio: number;
   rangeStep: number;
   rangeValue: number;
-  readValue: (event: RangeCommitEvent | ChangeEvent<HTMLInputElement>) => number;
+  readValue: (value: number) => number;
   visible: boolean;
 }) {
   const pointerFocus = useRef(false);
-  const handleRangeCommit = (event: RangeCommitEvent) => {
-    props.onCommitValue(props.readValue(event));
+  const pendingValue = useRef<number | null>(null);
+  const preview = (value: number) => {
+    pendingValue.current = props.readValue(value);
+    props.onPreviewValue(pendingValue.current);
+  };
+  const handleRangeCommit = () => {
+    if (pendingValue.current === null) return;
+    const value = pendingValue.current;
+    pendingValue.current = null;
+    props.onCommitValue(value);
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    props.onFocusChange(true);
+    const value = rangeKeyboardValue(event, props.rangeMin, props.rangeMax, props.rangeStep);
+    if (value === null) return;
+    event.preventDefault();
+    preview(value);
   };
 
   return (
@@ -152,11 +165,13 @@ function NumericRangeInput(props: {
       type="range"
       min={props.rangeMin}
       max={props.rangeMax}
-      step={props.rangeStep}
+      // Native step sanitization must not round controlled values derived from coupled fields.
+      step="any"
+      disabled={props.rangeMax <= props.rangeMin}
       value={props.rangeValue}
       onFocus={() => props.onFocusChange(!pointerFocus.current)}
-      onKeyDown={() => props.onFocusChange(true)}
-      onChange={(event) => props.onPreviewValue(props.readValue(event))}
+      onKeyDown={handleKeyDown}
+      onChange={(event) => preview(event.currentTarget.valueAsNumber)}
       onPointerDown={(event) => {
         pointerFocus.current = true;
         props.onFocusChange(false);
@@ -164,13 +179,17 @@ function NumericRangeInput(props: {
       }}
       onPointerUp={(event) => {
         handlePointerActiveChange(event, props.onActiveChange, false);
-        handleRangeCommit(event);
+        handleRangeCommit();
+      }}
+      onPointerCancel={(event) => {
+        handlePointerActiveChange(event, props.onActiveChange, false);
+        handleRangeCommit();
       }}
       onKeyUp={handleRangeCommit}
-      onBlur={(event) => {
+      onBlur={() => {
         pointerFocus.current = false;
         props.onFocusChange(false);
-        handleRangeCommit(event);
+        handleRangeCommit();
         props.onActiveChange(false);
       }}
       tabIndex={props.visible ? 0 : -1}
@@ -181,6 +200,47 @@ function NumericRangeInput(props: {
       style={getRangeInputStyle(props.rangeRatio)}
     />
   );
+}
+
+/** Snap user proposals only; derived controlled values and exact interval endpoints stay intact. */
+function snapRangeProposal(value: number, min: number, max: number, step: number): number {
+  const bounded = clampNumber(value, min, max);
+  if (bounded === min || bounded === max) return bounded;
+  const snapped = min + Math.round((bounded - min) / step) * step;
+  return clampNumber(Number(snapped.toPrecision(15)), min, max);
+}
+
+function rangeKeyboardValue(
+  event: KeyboardEvent<HTMLInputElement>,
+  min: number,
+  max: number,
+  step: number
+): number | null {
+  if (event.altKey || event.ctrlKey || event.metaKey) return null;
+  if (event.key === 'Home') return min;
+  if (event.key === 'End') return max;
+  let delta: number;
+  switch (event.key) {
+    case 'ArrowRight':
+    case 'ArrowUp':
+      delta = 1;
+      break;
+    case 'ArrowLeft':
+    case 'ArrowDown':
+      delta = -1;
+      break;
+    case 'PageUp':
+      delta = 10;
+      break;
+    case 'PageDown':
+      delta = -10;
+      break;
+    default:
+      return null;
+  }
+  const position = (Number(event.currentTarget.value) - min) / step;
+  const tick = delta > 0 ? Math.floor(position + 1e-10) : Math.ceil(position - 1e-10);
+  return snapRangeProposal(min + (tick + delta) * step, min, max, step);
 }
 
 function handlePointerActiveChange(
@@ -215,8 +275,3 @@ function getRangeInputStyle(rangeRatio: number): CSSProperties {
     '--sniptale-range-thumb-size': '16px',
   } as CSSProperties;
 }
-
-type RangeCommitEvent =
-  | FocusEvent<HTMLInputElement>
-  | KeyboardEvent<HTMLInputElement>
-  | PointerEvent<HTMLInputElement>;

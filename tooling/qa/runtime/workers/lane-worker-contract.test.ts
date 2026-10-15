@@ -32,3 +32,23 @@ it('rejects missing and malformed mode-specific lane results', () => {
     )
   ).toThrow(/failure evidence with non-failed status/u);
 });
+
+it('transfers raw structural findings separately from filtered gate violations', () => {
+  const report = {
+    advisories: [{ file: 'src/a.ts', id: 'watch' }],
+    violations: [{ file: 'src/b.ts', id: 'allowed' }],
+  };
+  const result = parseLaneResult(
+    { qualitySteps: [{ label: 'Structural risk', status: 'ok', structuralReport: report }] },
+    { lane: 'light', shapes: { light: { qualitySteps: 'steps' } } }
+  );
+  expect(result.qualitySteps[0].structuralReport).toEqual(report);
+  for (const structuralReport of [{}, { advisories: [], violations: ['invalid'] }]) {
+    expect(() =>
+      parseLaneResult(
+        { qualitySteps: [{ label: 'Structural risk', status: 'ok', structuralReport }] },
+        { lane: 'light', shapes: { light: { qualitySteps: 'steps' } } }
+      )
+    ).toThrow();
+  }
+});

@@ -15,6 +15,19 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it('keeps offscreen lifecycle recovery and saved-result proof despite the runtime export mapping', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/background/media/video/runtime/handlers/state';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/offscreen-lifecycle.ts`)).toEqual([
+    `${root}/offscreen-lifecycle.project-export.test.ts`,
+    `${root}/offscreen-lifecycle.ready.test.ts`,
+    `${root}/offscreen-lifecycle.saved-replay.test.ts`,
+    `${root}/offscreen-lifecycle.stop-error.test.ts`,
+    `${root}/offscreen-lifecycle.test.ts`,
+    `${root}/recording-state.terminal-recovery.test.ts`,
+  ]);
+});
+
 it('keeps the sender policy on its dedicated focused owner suite', async () => {
   const module = await importOwnerMap();
 
@@ -314,4 +327,61 @@ it('routes the guide page to semantic document and persistence interaction proof
       'apps/extension/src/scenario-editor/page-shell/guide-document.tsx'
     )
   ).toEqual(['apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx']);
+});
+
+it.each([
+  'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
+  'apps/extension/src/composition/persistence/review-workspaces/store.ts',
+  'apps/extension/src/composition/persistence/assets/resource-sessions.ts',
+  'apps/extension/src/workflows/video-review/session.ts',
+  'apps/extension/src/workflows/video-review/session-durable-access.ts',
+])('retains the actual delayed-writer regression for %s', async (file) => {
+  const module = await importOwnerMap();
+  expect(module.resolveMappedCoverageOwnerTests(file)).toContain(
+    'apps/extension/src/workflows/video-review/session.project-purge.test.ts'
+  );
+});
+
+it('retains pending-opening, cancellation and disposal proof for the Gallery reader owner', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests('apps/extension/src/gallery/video-review/use-session.ts')
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.loaded.test.tsx',
+      'apps/extension/src/gallery/video-review/use-session.resources.test.tsx',
+    ])
+  );
+});
+
+it('keeps actual Stop and startup concurrency proof on the completion owner', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/background/media/video';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/runtime/recording-completion.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/runtime/handlers/state/recording-state.terminal-recovery.test.ts`,
+      `${root}/runtime/recording-completion.stop.test.ts`,
+      `${root}/manager/start-owner.test.ts`,
+      `${root}/capture-surface.recovery.window-only.test.ts`,
+    ])
+  );
+});
+
+it('selects completion refresh, body states, and native clock response proof', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/popup/shell/runtime/handlers.ts`)).toEqual(
+    [`${root}/popup/shell/runtime/handlers.test.tsx`]
+  );
+  expect(
+    module.resolveMappedCoverageOwnerTests(`${root}/popup/recording/video/setup/body.tsx`)
+  ).toContain(`${root}/popup/recording/video/setup/body.states.test.tsx`);
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      `${root}/background/media/video/runtime/handlers/state/recording-state-response.ts`
+    )
+  ).toContain(
+    `${root}/background/media/video/runtime/handlers/state/recording-state.clock.test.ts`
+  );
 });

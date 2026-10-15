@@ -1,3 +1,6 @@
+import { parseVideoProjectActionFeedback } from '../action-feedback/validation';
+import { parseCursorFocusPath } from '../cursor-focus-path/validation';
+import { parseCameraFollowSettings } from '../camera/cursor-policy';
 import { resolveVideoProjectActionOccurrences } from '../action-occurrences';
 import { parsePaint } from '@sniptale/foundation/paint';
 import type { VideoProject, VideoProjectClip, VideoProjectSourceTimeAnchor } from '../types/index';
@@ -74,7 +77,19 @@ function isTransition(value: unknown): boolean {
 function isHydratableProjectShape(value: unknown): value is VideoProject {
   return (
     isRecord(value) &&
-    value['version'] === 2 &&
+    (value['version'] === 4 ||
+      value['version'] === 3 ||
+      (value['version'] === 2 &&
+        value['cursorFocusPath'] === undefined &&
+        value['actionFeedback'] === undefined)) &&
+    (value['cameraFollowDefaults'] === undefined ||
+      parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
+    (value['version'] === 4 ||
+      (value['cameraFollowDefaults'] === undefined &&
+        (!Array.isArray(value['motionRegions']) ||
+          value['motionRegions'].every(
+            (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
+          )))) &&
     isString(value['id']) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
@@ -97,6 +112,9 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     isBoundedArray(value['tracks'], isVideoProjectTrack) &&
     isBoundedArray(value['clips'], isVideoProjectClip) &&
     isNullable(value['cursorTrack'], isCursorTrack) &&
+    parseVideoProjectActionFeedback(value['actionFeedback']) !== null &&
+    (value['cursorFocusPath'] === undefined ||
+      parseCursorFocusPath(value['cursorFocusPath']) !== null) &&
     isBoundedArray(value['actionEvents'], isActionEvent) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&

@@ -370,7 +370,7 @@ def create_run_network(
     )
     record["routerId"] = router.id
     persist()
-    connection.network.add_interface_to_router(router, subnet_id=subnet.id)
+    connection.network.add_interface_to_router(router, subnet=subnet.id)
     all_router_ports = list(connection.network.ports(device_id=router.id))
     router_ports = [
         port
@@ -710,7 +710,7 @@ def cleanup(connection, policy: dict[str, Any], token: str, record: dict[str, An
         if record.get("subnetId"):
             subnet = connection.network.find_subnet(record["subnetId"], ignore_missing=True)
         if router is not None and subnet is not None:
-            connection.network.remove_interface_from_router(router, subnet_id=subnet.id)
+            connection.network.remove_interface_from_router(router, subnet=subnet.id)
         for port_id in record.get("routerInterfacePortIds", []):
             if connection.network.find_port(port_id, ignore_missing=True) is not None:
                 raise RuntimeError("Selectel runner router interface port survived cleanup.")
@@ -1336,7 +1336,7 @@ def sweep(policy: dict[str, Any]):
             subnet_ids = [fixed.get("subnet_id") for fixed in port.fixed_ips if fixed.get("subnet_id")]
             if len(subnet_ids) != 1:
                 raise RuntimeError("Expired Selectel router interface is malformed.")
-            connection.network.remove_interface_from_router(router, subnet_id=subnet_ids[0])
+            connection.network.remove_interface_from_router(router, subnet=subnet_ids[0])
             if connection.network.find_port(port.id, ignore_missing=True) is not None:
                 raise RuntimeError("Expired Selectel router interface survived sweep cleanup.")
             router_port_ids.append(port.id)

@@ -5,6 +5,91 @@ import { analyzeStructuralSource } from './report.mjs';
 const analyzeSelectionState = (source: string) =>
   analyzeStructuralSource('apps/extension/src/content/selection/state.ts', source);
 
+describe('native timer authority provenance', () => {
+  it('counts native global timers as lifecycle effects without an application state writer', () => {
+    const metric = analyzeSelectionState(`export function schedule() {
+      const interval = setInterval(() => {}, 250);
+      const timeout = setTimeout(() => {}, 1000);
+      return () => { clearInterval(interval); clearTimeout(timeout); };
+    }`);
+    expect(metric.effectFamilies).toContain('timers-lifecycle');
+    expect(metric.stateAuthorities).toBe(0);
+  });
+
+  it('admits qualified native timers only through unshadowed global roots', () => {
+    const metric = analyzeSelectionState(`export function schedule() {
+      window.setInterval(() => {}, 250);
+      globalThis.setTimeout(() => {}, 1000);
+      window['setTimeout'](() => {}, 1000);
+    }`);
+    expect(metric.effectFamilies).toContain('timers-lifecycle');
+    expect(metric.stateAuthorities).toBe(0);
+  });
+
+  it('retains imported and parameter-shadowed same-named setters', () => {
+    const metric = analyzeSelectionState(`import { setInterval } from './app-state';
+      export function update(setTimeout, window, globalThis) {
+        setInterval({ ready: true });
+        setTimeout({ ready: true });
+        window.setInterval({ ready: true });
+        globalThis.setTimeout({ ready: true });
+      }`);
+    expect(metric.stateAuthorities).toBe(4);
+    expect(metric.stateAuthorityNames).toEqual([
+      'globalThis',
+      'setInterval',
+      'setTimeout',
+      'window',
+    ]);
+  });
+
+  it('retains nested function-scoped var shadows captured by callbacks', () => {
+    const metric = analyzeSelectionState(`export function update(flag) {
+      if (flag) { var setInterval = customSetter; var window = stateStore; }
+      return () => { setInterval({ ready: true }); window.setTimeout({ ready: true }); };
+    }`);
+    expect(metric.stateAuthorities).toBe(2);
+    expect(metric.stateAuthorityNames).toEqual(['setInterval', 'window']);
+  });
+
+  it('retains block shadows and injected scheduler authorities', () => {
+    const metric = analyzeSelectionState(`export function update(scheduler) {
+      { const setTimeout = customSetter; setTimeout({ ready: true }); }
+      scheduler.setInterval({ ready: true });
+    }`);
+    expect(metric.stateAuthorities).toBe(2);
+    expect(metric.stateAuthorityNames).toEqual(['customSetter', 'scheduler']);
+  });
+
+  it('does not mistake a child function shadow for the enclosing native timer', () => {
+    const metric = analyzeSelectionState(`export function schedule() {
+      setInterval(() => {}, 250);
+      function update(setInterval) { setInterval({ ready: true }); }
+      return update;
+    }`);
+    expect(metric.effectFamilies).toContain('timers-lifecycle');
+    expect(metric.stateAuthorities).toBe(1);
+    expect(metric.stateAuthorityNames).toEqual(['setInterval']);
+  });
+
+  it('preserves the one ref and one React setter without inventing a third timer writer', () => {
+    const metric = analyzeSelectionState(`import { useRef, useState, useEffect } from 'react';
+      export function useOperation() {
+        const lifetime = useRef({ mounted: false });
+        const [state, setState] = useState({ elapsed: 0 });
+        useEffect(() => {
+          const owner = lifetime.current;
+          owner.mounted = true;
+          const timer = setInterval(() => setState({ elapsed: 1 }), 250);
+          return () => { owner.mounted = false; clearInterval(timer); };
+        }, []);
+        return state;
+      }`);
+    expect(metric.stateAuthorityNames).toEqual(['lifetime', 'setState']);
+    expect(metric.stateAuthorities).toBe(2);
+  });
+});
+
 describe('same-file state authority aliases', () => {
   it('normalizes aliases under one proven React ref current root', () => {
     const metric = analyzeSelectionState(

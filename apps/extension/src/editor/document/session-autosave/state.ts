@@ -1,5 +1,6 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { AssetRef } from '../../../composition/persistence/assets';
+import type { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 
 export interface ActiveEditorSessionContext {
   aggregateId: string;
@@ -11,14 +12,26 @@ export interface ActiveEditorSessionContext {
   renderPresentation: ((signal?: AbortSignal) => Promise<string> | string) | null;
 }
 
+export type EditorAutosaveCapture = {
+  context: ActiveEditorSessionContext;
+  contextGeneration: number;
+  hydrationGeneration: number;
+  document: EditorDocument;
+  revision: number;
+};
+
 export type EditorSessionAutosaveState = {
   activeContext: ActiveEditorSessionContext | null;
   contextGeneration: number;
+  hydrationGeneration: number;
   enabled: boolean;
+  hydration: { isCurrent: () => boolean } | null;
   hasUnsavedChanges: boolean;
   autosaveRevision: number;
   pendingDocument: EditorDocument | null;
-  pendingTimer: number;
+  coordinator: ReturnType<
+    typeof createAutosaveCoordinator<'document', EditorAutosaveCapture | null>
+  > | null;
   presentationTimer: number;
   interactionActive: boolean;
   interactionRevision: number;
@@ -30,18 +43,19 @@ export type EditorSessionAutosaveState = {
   presentationRetryPromise: Promise<void> | null;
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   releaseHydratedDocument: (() => void) | null;
-  writeChain: Promise<void>;
 };
 
 export function createAutosaveState(): EditorSessionAutosaveState {
   return {
     activeContext: null,
     contextGeneration: 0,
+    hydrationGeneration: 0,
     enabled: true,
+    hydration: null,
     hasUnsavedChanges: false,
     autosaveRevision: 0,
     pendingDocument: null,
-    pendingTimer: 0,
+    coordinator: null,
     presentationTimer: 0,
     interactionActive: false,
     interactionRevision: 0,
@@ -53,17 +67,11 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     presentationRetryPromise: null,
     documentAssetsByRuntimeUrl: new Map(),
     releaseHydratedDocument: null,
-    writeChain: Promise.resolve(),
   };
 }
 
-export function clearPendingAutosaveTimer(state: EditorSessionAutosaveState): void {
-  if (state.pendingTimer === 0) {
-    return;
-  }
-
-  window.clearTimeout(state.pendingTimer);
-  state.pendingTimer = 0;
+export function cancelPendingAutosaveRequest(state: EditorSessionAutosaveState): void {
+  state.coordinator?.cancel('document');
 }
 
 export function clearPendingPresentationTimer(state: EditorSessionAutosaveState): void {

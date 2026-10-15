@@ -77,7 +77,7 @@ function loadThumbUrl(item: GalleryItem, setThumbUrl: (value: string | null) => 
 }
 
 function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
-  if (item.type === 'video-project') {
+  if (item.type === 'video-project' || item.type === 'quick-edit-project') {
     return `${item.id}:${item.hasThumbnail}:${item.presentationRevision ?? ''}:${item.workspaceRevision ?? ''}`;
   }
   if (item.type === 'scenario' || item.type === 'scenario-export') {

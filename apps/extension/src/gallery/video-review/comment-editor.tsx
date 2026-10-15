@@ -1,7 +1,11 @@
 import { CompactPaintSelector } from '../../ui/paint-selector';
 import { ColorField } from '../../ui/compact-inspector-controls/controls';
 import { Plus, Type, Paintbrush, Play, Trash2 } from 'lucide-react';
-import { ReviewInspectorSections } from './inspector-sections';
+import {
+  reviewInspectorActions,
+  ReviewInspectorSections,
+  ReviewInspectorColumns,
+} from './inspector-sections';
 import { useEffect, useRef, useState } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { translate } from '../../platform/i18n';
@@ -292,23 +296,25 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
             label: translate('videoEditor.effectsLibrary.objectAppearance'),
             icon: Paintbrush,
             content: (
-              <>
+              <ReviewInspectorColumns>
                 <ReviewOverlayPlacementFields
                   placement={props.comment.placement}
                   busy={props.busy}
                   onPatch={patchComment}
                 />
-                <ReviewOverlayStyleRow
-                  style={props.comment.style}
-                  busy={props.busy}
-                  onPatch={patchComment}
-                />
-                <ReviewCommentStyleFields
-                  style={props.comment.style}
-                  busy={props.busy}
-                  onPatch={patchComment}
-                />
-              </>
+                <div className="min-w-0 space-y-2">
+                  <ReviewOverlayStyleRow
+                    style={props.comment.style}
+                    busy={props.busy}
+                    onPatch={patchComment}
+                  />
+                  <ReviewCommentStyleFields
+                    style={props.comment.style}
+                    busy={props.busy}
+                    onPatch={patchComment}
+                  />
+                </div>
+              </ReviewInspectorColumns>
             ),
           },
           {
@@ -316,7 +322,7 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
             label: translate('scenario.editor.tourPlayback'),
             icon: Play,
             content: (
-              <>
+              <ReviewInspectorColumns>
                 <ReviewOverlayTimeFields
                   comment={props.comment}
                   duration={props.duration}
@@ -327,48 +333,52 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
                   onInputEnd={setEnd}
                   onCommit={patchTimes}
                 />
-                <fieldset className="space-y-1">
-                  <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
-                    {translate('gallery.videoReview.behaviorAtZoom')}
-                  </legend>
-                  <div data-inspector-choices className="flex flex-wrap gap-1">
-                    <ReviewButton
-                      label={translate('gallery.videoReview.followVideo')}
-                      aria-pressed={props.comment.attachment === 'content'}
-                      disabled={props.busy}
-                      className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
-                      onClick={() => props.onSwitchAttachment('content')}
-                    />
-                    <ReviewButton
-                      label={translate('gallery.videoReview.stayOnScreen')}
-                      aria-pressed={props.comment.attachment === 'viewport'}
-                      disabled={props.busy}
-                      className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
-                      onClick={() => props.onSwitchAttachment('viewport')}
-                    />
-                  </div>
-                </fieldset>
-                <ReviewOverlayFlagRow
-                  comment={props.comment}
-                  busy={props.busy}
-                  onPatch={patchComment}
-                />
-              </>
+                <div className="min-w-0 space-y-2">
+                  <fieldset className="space-y-1">
+                    <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
+                      {translate('gallery.videoReview.behaviorAtZoom')}
+                    </legend>
+                    <div data-inspector-choices className="flex flex-wrap gap-1">
+                      <ReviewButton
+                        label={translate('gallery.videoReview.followVideo')}
+                        aria-pressed={props.comment.attachment === 'content'}
+                        disabled={props.busy}
+                        className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
+                        onClick={() => props.onSwitchAttachment('content')}
+                      />
+                      <ReviewButton
+                        label={translate('gallery.videoReview.stayOnScreen')}
+                        aria-pressed={props.comment.attachment === 'viewport'}
+                        disabled={props.busy}
+                        className={`!border-0 !bg-transparent !shadow-none !text-xs ${toggleButton}`}
+                        onClick={() => props.onSwitchAttachment('viewport')}
+                      />
+                    </div>
+                  </fieldset>
+                  <ReviewOverlayFlagRow
+                    comment={props.comment}
+                    busy={props.busy}
+                    onPatch={patchComment}
+                  />
+                </div>
+              </ReviewInspectorColumns>
             ),
           },
+          reviewInspectorActions(
+            <>
+              <ReviewButton
+                label={translate('gallery.videoReview.overlayDelete')}
+                disabled={props.busy}
+                className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+                onClick={props.onDelete}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+                <span>{translate('gallery.videoReview.overlayDelete')}</span>
+              </ReviewButton>
+            </>
+          ),
         ]}
       />
-      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate('gallery.videoReview.overlayDelete')}
-          disabled={props.busy}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={props.onDelete}
-        >
-          <Trash2 size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.overlayDelete')}</span>
-        </ReviewButton>
-      </div>
     </div>
   );
 }

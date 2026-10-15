@@ -1,4 +1,4 @@
-import { Globe } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { fireAndReportEditorAction } from '../../../runtime/async-actions';
 import { CompactCommandField, CompactCommandToken, type CompactCommand } from '..';
@@ -75,11 +75,11 @@ export function buildBrowserFrameBaseCommands(params: InspectorCommandParams): C
   return [
     {
       id: 'browser-frame-action',
-      title: translate('editor.compact.browserFrame'),
-      trigger: <Globe size={15} strokeWidth={2} />,
+      title: translate('windowHeader.reset'),
+      trigger: <RotateCcw size={15} strokeWidth={2} />,
       onClick: () =>
-        fireAndReportEditorAction('compact-browser-frame-insert-update', () =>
-          params.insertOrUpdateBrowserFrame?.()
+        fireAndReportEditorAction('compact-browser-frame-reset', () =>
+          params.syncBrowserFrame({ enabled: false })
         ),
     },
     buildBrowserFrameCanvasModeCommand(params),

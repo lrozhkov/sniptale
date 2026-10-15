@@ -1,0 +1,43 @@
+{
+  "scope": "Source-only evidence; this file is not part of extension public or release legal payload",
+  "sourceBundleRevision": 7,
+  "sources": [
+    {
+      "id": "keyboard-mechanical",
+      "author": "Trollarch2",
+      "title": "Keyboard Typing / mechanical keyboard",
+      "url": "https://freesound.org/people/Trollarch2/sounds/331656/",
+      "license": "CC0-1.0",
+      "sourceUsed": "Public HQ MP3 preview; output WAV does not restore original lossless quality"
+    },
+    {
+      "id": "mouse-logitech",
+      "author": "HunteR4708",
+      "title": "Mouse Click / Logitech MX 620",
+      "url": "https://freesound.org/people/HunteR4708/sounds/256455/",
+      "license": "CC0-1.0",
+      "sourceUsed": "Public HQ MP3 preview"
+    },
+    {
+      "id": "mouse-close",
+      "author": "D4XX",
+      "title": "Mouse Click / Shure SM7B recording",
+      "url": "https://freesound.org/people/D4XX/sounds/567265/",
+      "license": "CC0-1.0",
+      "sourceUsed": "Public HQ MP3 preview"
+    }
+  ],
+  "includedSamples": [
+    "mouse-click",
+    "mouse-click-02",
+    "mouse-click-03",
+    "key-01",
+    "key-02",
+    "key-03",
+    "key-04",
+    "chord-2-down",
+    "chord-2-up",
+    "chord-3-third"
+  ],
+  "sourceLicenseEvidence": "All shipped WAV files derive from recordings released under CC0 1.0 Universal.\nhttps://creativecommons.org/publicdomain/zero/1.0/\nCommercial use, modification and redistribution are permitted; attribution is optional.\n\nKeyboard: Trollarch2 — Keyboard Typing, mechanical keyboard\nhttps://freesound.org/people/Trollarch2/sounds/331656/\nMouse variants 1 and 3: HunteR4708 — Mouse Click, Logitech MX 620\nhttps://freesound.org/people/HunteR4708/sounds/256455/\nMouse variant 2: D4XX — Mouse Click, recorded with Shure SM7B\nhttps://freesound.org/people/D4XX/sounds/567265/\n\nInput: public HQ MP3 previews. WAV output does not restore lossless-original quality.\nSource windows and processing are recorded in manifest.json.\nVariant 3 is the softened version of variant 1, not a recording of a third mouse.\n"
+}

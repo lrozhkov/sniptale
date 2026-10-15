@@ -86,7 +86,7 @@ async function renderBootstrapHarness(props: Parameters<typeof BootstrapHarness>
   });
 }
 
-async function verifyReadyWaitsForDependentRefreshes() {
+async function verifyReadyBeforeLibraryRefreshes() {
   const project = createEmptyVideoProject('Bootstrap');
   const refreshRecordings = createDeferred<void>();
   const refreshProjects = createDeferred<void>();
@@ -111,7 +111,7 @@ async function verifyReadyWaitsForDependentRefreshes() {
   await flushEffects();
 
   expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-1');
-  expect(setReady).not.toHaveBeenCalled();
+  expect(setReady).toHaveBeenCalledWith(true);
 
   refreshRecordings.resolve();
   refreshProjects.resolve();
@@ -122,7 +122,7 @@ async function verifyReadyWaitsForDependentRefreshes() {
   expect(setReady).toHaveBeenCalledWith(true);
 }
 
-async function verifyRefreshFailuresSurfaceBeforeReady() {
+async function verifyRefreshFailuresKeepProjectReady() {
   const project = createEmptyVideoProject('Bootstrap failure');
   const applyLoadedProject = vi.fn<ApplyLoadedProject>();
   const setError = vi.fn();
@@ -144,12 +144,31 @@ async function verifyRefreshFailuresSurfaceBeforeReady() {
   await flushEffects();
 
   expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-2');
-  expect(setError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
-  expect(setError).not.toHaveBeenCalledWith(expect.stringContaining('exports failed'));
+  expect(setError).not.toHaveBeenCalled();
   expect(setReady).toHaveBeenCalledWith(true);
 }
 
 describe('useVideoEditorBootstrap', () => {
+  it('keeps source admission failure blocking and does not start advisory reads', async () => {
+    const applyLoadedProject = vi.fn<ApplyLoadedProject>();
+    const setError = vi.fn();
+    const setReady = vi.fn();
+    const refresh = vi.fn(async () => undefined);
+    loadInitialProjectFromLocationMock.mockRejectedValue(new Error('Source unavailable'));
+    await renderBootstrapHarness({
+      applyLoadedProject,
+      setError,
+      setReady,
+      refreshRecordings: refresh,
+      refreshProjects: refresh,
+      refreshProjectExports: refresh,
+    });
+    await flushEffects();
+    expect(applyLoadedProject).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(setError).toHaveBeenCalledOnce();
+    expect(setReady).toHaveBeenCalledWith(true);
+  });
   it('opens an idle start page without a project write or export refresh', async () => {
     const applyLoadedProject = vi.fn<ApplyLoadedProject>();
     const setError = vi.fn();
@@ -173,11 +192,11 @@ describe('useVideoEditorBootstrap', () => {
     expect(setReady).toHaveBeenCalledWith(true);
   });
   it(
-    'waits for dependent library refreshes before marking the editor ready',
-    verifyReadyWaitsForDependentRefreshes
+    'opens the admitted project before slow library refreshes finish',
+    verifyReadyBeforeLibraryRefreshes
   );
   it(
-    'surfaces refresh failures before switching the editor to ready',
-    verifyRefreshFailuresSurfaceBeforeReady
+    'keeps an admitted project editable when an advisory library refresh fails',
+    verifyRefreshFailuresKeepProjectReady
   );
 });

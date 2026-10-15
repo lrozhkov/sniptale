@@ -33,7 +33,7 @@ export async function ensureScenarioCaptureProject(args: {
     };
   }
 
-  const project = await createScenarioProjectRecord(
+  const { project } = await createScenarioProjectRecord(
     createAutoScenarioProjectName({
       ...(args.createdAt !== undefined ? { createdAt: args.createdAt } : {}),
       page: args.page,

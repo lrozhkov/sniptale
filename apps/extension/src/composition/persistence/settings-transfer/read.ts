@@ -161,6 +161,7 @@ export async function readSettingsTransferSnapshot(
     'ai.prompts': payload({
       global: ai.globalSystemPrompt,
       scenario: ai.scenarioEditorSystemPrompt,
+      recognition: ai.audioTranscriptionSystemPrompt ?? '',
     }),
     'ai.prompt-templates': payload({ items: promptTemplates, order: templateOrder }),
     'system.voice': payload({

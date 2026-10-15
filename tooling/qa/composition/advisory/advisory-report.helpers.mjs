@@ -4,7 +4,7 @@ import { classifyAdvisoryFindings } from './advisory-catalog.data.mjs';
 
 export function collectAndPersistAdvisoryReport(
   context,
-  { printReport = true, producerRunId } = {}
+  { printReport = true, producerRunId, structuralReport = null } = {}
 ) {
   try {
     const targetFiles = context.qualityTargetFiles ?? context.targetFiles;
@@ -12,6 +12,7 @@ export function collectAndPersistAdvisoryReport(
     const findings = collectAdvisoryFindings({
       codeFiles,
       targetFiles,
+      structuralReport,
     });
 
     const buckets = classifyAdvisoryFindings(findings, { mode: 'checkpoint' });

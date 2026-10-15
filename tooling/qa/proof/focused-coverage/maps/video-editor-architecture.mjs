@@ -40,6 +40,17 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
 }));
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
+  {
+    owner: 'video-project-camera-geometry',
+    productionFile: 'apps/extension/src/features/video/composition/motion/camera-geometry.ts',
+    reason:
+      'Geometry and composition consumers prove camera admission, retained observations, and rendered motion.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/motion/camera-geometry.test.ts',
+      'apps/extension/src/features/video/composition/motion/project-follow.test.ts',
+      'apps/extension/src/features/video/composition/motion/index.test.ts',
+    ],
+  },
   ...controllerContractMappings,
   {
     allowCrossOwner: true,

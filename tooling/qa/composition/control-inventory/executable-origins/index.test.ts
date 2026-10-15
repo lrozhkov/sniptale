@@ -201,6 +201,30 @@ await import('./child.mjs');
     ).toEqual({ origins: [], unresolved: [] });
   });
 
+  it('resolves a Node child under an exclusive flock without promoting the lock file', () => {
+    const result = collectSourceInvocationOrigins({
+      authority: 'tooling/bin/parent.mjs',
+      source: `
+const worker = fileURLToPath(new URL('./worker.mjs', import.meta.url));
+spawn('flock', ['--exclusive', lockPath, process.execPath, worker, root, name]);
+`,
+    });
+    expect(result.unresolved).toEqual([]);
+    expect(result.origins).toEqual([
+      expect.objectContaining({
+        kind: 'internal-process-target',
+        target: 'tooling/bin/worker.mjs',
+      }),
+    ]);
+    expect(
+      collectSourceInvocationOrigins({
+        authority: 'tooling/bin/parent.mjs',
+        source:
+          "spawn('flock', ['--exclusive', 'tooling/bin/worker.mjs', 'echo', 'ready']); spawn('flock', []);",
+      }).origins
+    ).toEqual([]);
+  });
+
   it('retains the bounded polygon runner dynamic execution edge', () => {
     expect(
       collectSourceInvocationOrigins({

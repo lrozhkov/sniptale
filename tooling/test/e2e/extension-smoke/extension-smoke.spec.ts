@@ -66,7 +66,7 @@ const builtExtensionPages = [
   {
     name: 'scenario-editor',
     path: '/apps/extension/src/scenario-editor/index.html',
-    selector: '[data-ui="scenario.editor.v3-page.root"]',
+    selector: 'main.guide-page',
     viewport: { width: 1600, height: 1100 },
   },
 ] as const;
@@ -257,11 +257,12 @@ async function verifyVideoEditorAddTrackMenu(
   ).toBeVisible();
   for (const key of [
     'videoEditor.timeline.addVideoTrackNote',
+    'videoEditor.timeline.addCameraTrackNote',
     'videoEditor.timeline.addAudioTrackNote',
   ] as const) {
     await expect(addTrackMenu.getByText(translate(key, 'ru'), { exact: true })).toBeVisible();
   }
-  await expect(addTrackMenu.locator('.sniptale-toolbar-menu-item')).toHaveCount(2);
+  await expect(addTrackMenu.locator('.sniptale-toolbar-menu-item')).toHaveCount(3);
   await expect(
     addTrackMenu.locator('[data-ui="video-editor.timeline.toolbar.add-track.overlay"]')
   ).toHaveCount(0);
@@ -716,9 +717,6 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await cameraGroup.focus();
   await page.keyboard.press('Enter');
   await expect(cameraGroup).toHaveAttribute('aria-pressed', 'true');
-  await expect(
-    inspector.getByText(translate('videoEditor.sidebar.cameraIntervalHint', 'ru'))
-  ).toBeVisible();
   await inspector
     .getByRole('button', {
       name: translate('videoEditor.sidebar.cameraPlacementBottomLeft', 'ru'),
@@ -812,7 +810,7 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   ).toHaveCount(0);
   await expect(addZoomButton).toBeEnabled();
   await addZoomButton.click();
-  await expect(page.locator('[data-ui="video-editor.timeline.add-zoom"]')).toBeVisible();
+  await expect(page.locator('[data-ui="video-editor.timeline.motion-lane-select"]')).toBeVisible();
   const groupLabels = inspector.locator('[data-ui="video-editor.inspector.sections"] nav button');
   await expect(groupLabels).not.toHaveCount(0);
   expect(
@@ -823,7 +821,9 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     )
   ).toEqual([]);
   await expect(
-    inspector.getByText(translate('videoEditor.sidebar.motionScaleLabel', 'ru'), { exact: true })
+    inspector
+      .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+      .getByText(translate('videoEditor.sidebar.motionScaleLabel', 'ru'), { exact: true })
   ).toBeVisible();
   await expect(
     inspector.getByText(translate('videoEditor.sidebar.motionFocusLabel', 'ru'), { exact: true })
@@ -858,6 +858,11 @@ for (const extensionPage of builtExtensionPages) {
         url.host === extensionId &&
         url.pathname === extensionPage.path
     );
+    if (extensionPage.name === 'video-editor' || extensionPage.name === 'scenario-editor') {
+      const startPage = page.locator('[data-ui="editor.start"]');
+      await startPage.getByRole('button').first().click();
+      await expect(startPage).toBeHidden();
+    }
     await expectBuiltSurfaceLayout(page, extensionPage.selector, extensionPage.viewport);
     if (extensionPage.name === 'video-editor') {
       await expectBuiltVideoEditorGeometry(

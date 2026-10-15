@@ -1,5 +1,6 @@
 import type { AISettings } from '../../../contracts/settings';
 import {
+  loadAudioTranscriptionSystemPrompt,
   loadAIModels,
   loadAIProviders,
   loadChromeAiEnabled,
@@ -15,6 +16,7 @@ export async function loadAISettings(): Promise<AISettings> {
     defaultModelId,
     globalSystemPrompt,
     scenarioEditorSystemPrompt,
+    audioTranscriptionSystemPrompt,
     chromeAiEnabled,
   ] = await Promise.all([
     loadAIProviders(),
@@ -22,6 +24,7 @@ export async function loadAISettings(): Promise<AISettings> {
     loadDefaultModelId(),
     loadGlobalSystemPrompt(),
     loadScenarioEditorSystemPrompt(),
+    loadAudioTranscriptionSystemPrompt(),
     loadChromeAiEnabled(),
   ]);
 
@@ -32,5 +35,6 @@ export async function loadAISettings(): Promise<AISettings> {
     defaultModelId,
     globalSystemPrompt,
     scenarioEditorSystemPrompt,
+    audioTranscriptionSystemPrompt,
   };
 }

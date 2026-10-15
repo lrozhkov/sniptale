@@ -166,6 +166,7 @@ export function claimBlockingWrapperLockHandoff({
   writeAtomicLockFile(absolutePath, lockData);
 
   return {
+    handoff: true,
     release() {
       const current = readLockFile(absolutePath);
       if (current?.pid === process.pid && current?.wrapperId === consumerId) {

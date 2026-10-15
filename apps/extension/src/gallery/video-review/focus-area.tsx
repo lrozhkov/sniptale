@@ -1,3 +1,5 @@
+import { captureReviewSpatialPointer } from './spatial-pointer';
+import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
 import { useRef, type PointerEvent, type KeyboardEvent } from 'react';
 import { useCapturedPreview } from './captured-preview';
 import { translate } from '../../platform/i18n';
@@ -12,17 +14,22 @@ import {
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
 type FocusAreaProps = {
-  spotlight: QuickEditSpotlight;
+  projection?: QuickEditHomography | undefined;
+  area: QuickEditSpotlight['area'];
+  label?: string;
   output: { width: number; height: number };
+  /** Transformed decorated window, including the optional header. */
   video: QuickEditRect;
   disabled?: boolean;
+  /** Optional pixel aspect; omitted for freely sized Focus areas. */
+  aspectRatio?: number | undefined;
   /** Inspector framing stays visible; the stage retains interaction-only controls. */
   alwaysVisible?: boolean;
   onInteract?(): void;
-  onPreview?: ((value: QuickEditSpotlight | null) => void) | undefined;
-  onChange(value: QuickEditSpotlight): void;
+  onPreview?: ((value: QuickEditSpotlight['area'] | null) => void) | undefined;
+  onChange(value: QuickEditSpotlight['area']): void;
 };
-/** Shared source area view; stage and inspector use one Spotlight gesture owner. */
+/** Shared window area view; stage and inspector use one Spotlight gesture owner. */
 export function ReviewFocusArea(props: FocusAreaProps) {
   const gesture = useSpotlightAreaGesture(props);
   return (
@@ -42,7 +49,7 @@ export function ReviewFocusArea(props: FocusAreaProps) {
         pointerInteraction={gesture.pointerInteraction}
         role="group"
         tabIndex={props.disabled ? -1 : 0}
-        aria-label={translate('gallery.videoReview.focusSpotlight')}
+        aria-label={props.label ?? translate('gallery.videoReview.focusSpotlight')}
         title={translate('gallery.videoReview.focusAreaHint')}
         {...gesture.frameHandlers}
       />
@@ -51,6 +58,7 @@ export function ReviewFocusArea(props: FocusAreaProps) {
 }
 
 type SpotlightCapture = {
+  pointer: ReturnType<typeof captureReviewSpatialPointer>;
   id: number;
   x: number;
   y: number;
@@ -62,7 +70,7 @@ type SpotlightCapture = {
   pending: QuickEditSpotlight['area'] | null;
 };
 
-/** Captured source geometry, preview and commit/cancel stay in this single transient owner. */
+/** Captured window geometry, preview and commit/cancel stay in this single transient owner. */
 function useSpotlightAreaGesture(props: FocusAreaProps) {
   const { onPreview } = props;
   const { frame, hovered, trackPointer, pointerInteraction, keyboardInteraction } =
@@ -72,26 +80,34 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     SpotlightCapture,
     QuickEditSpotlight['area']
   >(props.disabled, () => onPreview?.(null));
-  const value = { ...props.spotlight, area: draft ?? props.spotlight.area };
+  const areaValue = draft ?? props.area;
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     trackPointer(event);
     const active = drag.current;
     if (!active || active.id !== event.pointerId) return;
-    const dx = (event.clientX - active.x) / active.width;
-    const dy = (event.clientY - active.y) / active.height;
+    const dx = (active.pointer(event).x - active.x) / active.width;
+    const dy = (active.pointer(event).y - active.y) / active.height;
     const area = clampQuickEditSpotlightArea(
       active.resize
-        ? resizeSpotlightArea(active.area, active.resize, dx, dy)
+        ? resizeSpotlightArea(
+            active.area,
+            active.resize,
+            dx,
+            dy,
+            props.aspectRatio
+              ? (props.aspectRatio * props.video.height) / props.video.width
+              : undefined
+          )
         : { ...active.area, x: active.area.x + dx, y: active.area.y + dy }
     );
     drag.current!.pending = area;
     setDraft(area);
-    onPreview?.({ ...props.spotlight, area });
+    onPreview?.(area);
   };
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     trackPointer(event);
     if (drag.current?.id !== event.pointerId) return;
-    if (drag.current.pending) props.onChange({ ...props.spotlight, area: drag.current.pending });
+    if (drag.current.pending) props.onChange(drag.current.pending);
     cancel();
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -103,42 +119,49 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     event.currentTarget.focus();
     trackPointer(event);
     props.onInteract?.();
+    const pointer = captureReviewSpatialPointer(host.current, props.projection, props.output);
+    const point = pointer(event);
     drag.current = {
+      pointer,
       id: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      area: props.spotlight.area,
+      x: point.x,
+      y: point.y,
+      area: props.area,
       pending: null,
       resize: focusCorner(event.target),
       node: host.current,
-      width: (bounds.width * props.video.width) / props.output.width,
-      height: (bounds.height * props.video.height) / props.output.height,
+      width: props.projection
+        ? props.video.width
+        : (bounds.width * props.video.width) / props.output.width,
+      height: props.projection
+        ? props.video.height
+        : (bounds.height * props.video.height) / props.output.height,
     };
-    setDraft(props.spotlight.area);
+    setDraft(props.area);
     host.current.setPointerCapture(event.pointerId);
-    onPreview?.(props.spotlight);
+    onPreview?.(props.area);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && drag.current) {
       event.preventDefault();
       event.stopPropagation();
       cancel();
       return;
     }
-    const area = moveSpotlightWithKey(value.area, event.key, event.shiftKey);
+    const area = moveSpotlightWithKey(areaValue, event.key, event.shiftKey);
     if (props.disabled || !area) return;
     event.preventDefault();
     event.stopPropagation();
     if (drag.current) return;
     keyboardInteraction();
     props.onInteract?.();
-    props.onChange({ ...props.spotlight, area });
+    props.onChange(area);
   };
   return {
     host,
     frame,
-    area: value.area,
-    visible: hovered || !!draft,
+    area: areaValue,
+    visible: hovered && !draft,
     pointerInteraction,
     planeHandlers: {
       onPointerMove,
@@ -171,12 +194,22 @@ function resizeSpotlightArea(
   area: QuickEditSpotlight['area'],
   corner: FocusCorner,
   dx: number,
-  dy: number
+  dy: number,
+  ratio?: number
 ) {
   const west = corner.endsWith('w'),
     north = corner.startsWith('n');
   const right = area.x + area.width,
     bottom = area.y + area.height;
+  if (ratio) {
+    const horizontal = area.width + (west ? -dx : dx);
+    const vertical = (area.height + (north ? -dy : dy)) * ratio;
+    const preferred = Math.abs(dx) >= Math.abs(dy * ratio) ? horizontal : vertical;
+    const maximum = Math.min(west ? right : 1 - area.x, (north ? bottom : 1 - area.y) * ratio);
+    const width = Math.min(maximum, Math.max(Math.max(0.01, 0.01 * ratio), preferred));
+    const height = width / ratio;
+    return { x: west ? right - width : area.x, y: north ? bottom - height : area.y, width, height };
+  }
   const x = west ? Math.max(0, Math.min(right - 0.01, area.x + dx)) : area.x;
   const y = north ? Math.max(0, Math.min(bottom - 0.01, area.y + dy)) : area.y;
   return {
@@ -187,7 +220,7 @@ function resizeSpotlightArea(
   };
 }
 
-/** Keyboard source movement uses the same area bounds as pointer movement. */
+/** Keyboard window movement uses the same area bounds as pointer movement. */
 function moveSpotlightWithKey(area: QuickEditSpotlight['area'], key: string, shift: boolean) {
   if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) return null;
   const step = shift ? 0.1 : 0.01;

@@ -1,4 +1,5 @@
 import {
+  addReviewFocus,
   seedReviewVideo,
   persistedFocus,
   clickReviewExport,
@@ -8,8 +9,9 @@ import {
 } from '../support/quick-editor-media-fixture';
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createHash } from 'node:crypto';
+import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -223,7 +225,14 @@ for (const variant of [
       const report = await readFile(await (await reportDownload).path(), 'utf8');
       expect(report).toContain('Interval with region');
       expect(report).toContain('"region"');
-      await button('gallery.videoReview.back').click();
+      const payload = JSON.parse(report.split('```json\n')[1]!.split('\n```')[0]!);
+      expect(payload).toMatchObject({
+        schemaVersion: 'sniptale.video-review.v2',
+        reportKind: 'summary',
+      });
+      expect(payload.telemetry.cursorTrack).not.toHaveProperty('samples');
+      expect(Buffer.byteLength(report)).toBeLessThan(128 * 1024);
+      await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.preview.surface"] video')).toHaveJSProperty(
         'controls',
         true
@@ -509,7 +518,7 @@ for (const { container, gaps } of [
           const report = await readFile(await (await reportDownload).path(), 'utf8');
           expect(report).toContain('"audioReencoded": true');
           expect(report).toContain('"videoReencoded": false');
-          await button('gallery.videoReview.back').click();
+          await button('common.actions.close').click();
           await page.keyboard.press('Escape');
           await page
             .getByRole('button', { name: `beta-v1-edited.${container}`, exact: true })
@@ -566,7 +575,7 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
       // Two active regions with a real gap between them.
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       await timelineGesture(page, 5);
       await expect
         .poll(async () =>
@@ -577,7 +586,7 @@ for (const variant of [
           )
         )
         .toBeGreaterThan(4);
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
       await expect(link).toHaveCount(1);
@@ -763,7 +772,7 @@ for (const variant of [
       await expect(linkInspector).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath('zoom-link-minimum.png') });
       // Reopen the persisted edit and verify the authored connection parameters.
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(link).toHaveAttribute('data-connected', 'true');
       await link.click();
@@ -937,12 +946,12 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       await dialog
         .locator('[data-ui="gallery.videoReview.focusType"]')
         .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
@@ -1187,7 +1196,7 @@ for (const variant of [
       await page.setViewportSize({ width: 1280, height: 720 });
       await expect(dialog.locator('[data-ui="gallery.videoReview.focusType"]')).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('spotlight-minimum.png') });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
@@ -1200,7 +1209,7 @@ for (const variant of [
       ).toHaveAttribute('aria-pressed', 'true');
       await page.setViewportSize({ width: 1280, height: 720 });
       await timelineGesture(page, 5);
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
       await expect(link).toHaveCount(0);
@@ -1211,7 +1220,7 @@ for (const variant of [
       await expect(link).toHaveCount(1);
       await link.click();
       await expect(link).toHaveAttribute('data-connected', 'true');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await lane.locator('[role="button"]').last().click();
       await dialog
@@ -1550,7 +1559,7 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     await button('gallery.videoReview.redo').click();
     await expect(range).toHaveCount(1);
     await range.click();
-    await button('gallery.videoReview.back').click();
+    await button('common.actions.close').click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await expect(range).toHaveCount(1);
     const downloadPromise = page.waitForEvent('download');
@@ -1679,10 +1688,7 @@ for (const variant of [
           .first()
       ).toHaveCSS('font-size', '10px');
 
-      await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCSS(
-        'background-color',
-        'rgba(0, 0, 0, 0)'
-      );
+      await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
       await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
         'aria-pressed',
         'false'
@@ -1867,7 +1873,7 @@ for (const variant of [
         await pointer.click();
       }
       await page.setViewportSize({ width: 1920, height: 1080 });
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       const position = inspector.locator('details[data-level="group"]');
       await expect(position).not.toHaveAttribute('open', '');
@@ -2276,7 +2282,7 @@ for (const locale of ['ru', 'en'] as const) {
         const button = (key: Parameters<typeof translate>[0]) =>
           dialog.getByRole('button', { name: label(key), exact: true });
         await button('gallery.videoReview.advancedEditing').click();
-        await button('gallery.videoReview.zoomAdd').click();
+        await addReviewFocus(page);
         const panel = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
         const zoom = panel.locator('[data-ui="gallery.videoReview.zoomInspector"]');
         for (const width of [1280, 1920]) {
@@ -2458,7 +2464,7 @@ for (const locale of ['ru', 'en'] as const) {
         await toggle.click();
         await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
         const sceneSections = panel.locator('details[data-level="section"]');
-        await expect(sceneSections).toHaveCount(3);
+        await expect(sceneSections).toHaveCount(4);
         const background = sceneSections.filter({
           has: page.locator('[data-ui="gallery.videoReview.backgroundInspector"]'),
         });
@@ -2478,7 +2484,7 @@ for (const locale of ['ru', 'en'] as const) {
             video.currentTime = 5;
           });
         });
-        await button('gallery.videoReview.zoomAdd').click();
+        await addReviewFocus(page);
         await expect(zoom.locator('details[data-level="group"]')).toHaveAttribute('open', '');
         await panel
           .locator('[data-ui="gallery.videoReview.inspectorNavigation"]')
@@ -2558,7 +2564,7 @@ for (const variant of [
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'false');
       await button('gallery.videoReview.redo').click();
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-cut-suppressed="true"]')
@@ -2648,7 +2654,7 @@ for (const variant of [
       await button('gallery.videoReview.redo').click();
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
       expect((await focus.boundingBox())!.x).toBeCloseTo(partial.x, 0);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-cut-suppressed="true"]')
@@ -2666,12 +2672,11 @@ for (const variant of [
   { locale: 'en' as const, theme: 'dark' as const },
 ]) {
   const testName =
-    `quick editor voiceover strip supports pause and optional cap at HD ` +
+    `quick editor voiceover strip supports pause and optional cap at desktop sizes ` +
     `in ${variant.locale}/${variant.theme}`;
   test(testName, async ({ page }, testInfo) => {
     const host = await startHostServer();
     try {
-      await page.setViewportSize({ width: 1280, height: 720 });
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
         storage: {
@@ -2689,6 +2694,10 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.cutMode').click();
+      await timelineGesture(page, 2, 4);
+      await button('gallery.videoReview.pointerTool').click();
+      await timelineGesture(page, 3);
       await button('gallery.videoReview.recordVoiceover').click();
       const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverStrip"]');
       await expect(strip).toBeVisible();
@@ -2709,10 +2718,11 @@ for (const variant of [
 
       expect(Number(await numericLimit.inputValue())).toBeGreaterThan(0);
       expect((await numericLimit.inputValue()).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(3);
-      const exactMaximum = await numericLimit.getAttribute('max');
+      await expect(numericLimit).toHaveValue('60');
+      expect(await numericLimit.getAttribute('max')).toBeNull();
       await numericLimit.focus();
       await numericLimit.blur();
-      await expect(numericLimit).toHaveAttribute('max', exactMaximum!);
+      expect(await numericLimit.getAttribute('max')).toBeNull();
       const microphone = strip.getByRole('button', {
         name: translate('videoEditor.app.recordAudioDevice', variant.locale),
         exact: true,
@@ -2739,14 +2749,17 @@ for (const variant of [
       await numericLimit.fill('');
       await expect(startCapture).toBeDisabled();
       await expect(strip.getByRole('alert')).toBeVisible();
-      await numericLimit.fill('999999');
+      await numericLimit.fill('0');
       await expect(startCapture).toBeDisabled();
+      await numericLimit.fill('20');
+      await expect(startCapture).toBeEnabled();
       await numericLimit.fill('1');
       await expect(startCapture).toBeEnabled();
       await expect(numericLimit).toBeInViewport();
       await expect(startCapture).toBeInViewport();
       await expect(dialog.locator('[inert]')).toHaveCount(1);
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-ready-${variant.locale}-${variant.theme}.png`),
       });
       const durationLimit = strip.getByRole('switch', {
@@ -2825,6 +2838,7 @@ for (const variant of [
       ).toHaveCount(1);
       await expect(playback.locator('[data-review-toolbar-label]')).toHaveCount(0);
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-recording-${variant.locale}-${variant.theme}.png`),
       });
       await strip
@@ -2843,6 +2857,7 @@ for (const variant of [
       );
       await expect(playback.locator('svg.lucide-play')).toHaveCount(1);
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-paused-${variant.locale}-${variant.theme}.png`),
       });
       const confirmation = dialog.getByRole('alertdialog');
@@ -2859,6 +2874,7 @@ for (const variant of [
         })
       ).toBeFocused();
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-discard-${variant.locale}-${variant.theme}.png`),
       });
       await page.keyboard.press('Space');
@@ -2878,6 +2894,7 @@ for (const variant of [
         })
       ).toBeVisible();
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-take-${variant.locale}-${variant.theme}.png`),
       });
       await expect(strip.locator('header')).toContainText(
@@ -2951,7 +2968,7 @@ for (const variant of [
       await expect(strip).toHaveCount(0);
       await expect(dialog.locator('[inert]')).toHaveCount(0);
       await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(1);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(1);
       const retained = await recordedAudioResources(
@@ -2962,6 +2979,67 @@ for (const variant of [
       expect(retained[0]!.duration).toBeGreaterThan(0);
       expect(retained[0]!.samples).toBeGreaterThan(0);
       expect(retained[0]!.peak).toBeGreaterThan(0.01);
+      const voice = dialog.locator('[data-audio-lane="voiceover"] [data-audio-id]');
+      await expect(voice).toHaveAttribute('data-cut-suppressed', 'true');
+      const clipId = await voice.getAttribute('data-audio-id');
+      await dialog
+        .locator(
+          '[data-ui="gallery.videoReview.sourceLane"] [data-ui="gallery.videoReview.editBlock"]'
+        )
+        .click();
+      await page.keyboard.press('Delete');
+      await expect(voice).toHaveAttribute('data-cut-suppressed', 'false');
+      await expect(voice).toHaveAttribute('data-audio-id', clipId!);
+      await button('gallery.videoReview.undo').click();
+      await expect(voice).toHaveAttribute('data-cut-suppressed', 'true');
+      await timelineGesture(page, 11.8);
+      await button('gallery.videoReview.recordVoiceover').click();
+      await playVideo.check();
+      await durationLimit.uncheck();
+      await page.evaluate(() => {
+        Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+          configurable: true,
+          value: async () => {
+            const audio = new AudioContext();
+            const oscillator = audio.createOscillator();
+            const destination = audio.createMediaStreamDestination();
+            oscillator.connect(destination);
+            oscillator.start();
+            return destination.stream;
+          },
+        });
+      });
+      await startCapture.click();
+      await expect
+        .poll(() =>
+          dialog
+            .locator('video')
+            .first()
+            .evaluate((video) => video.paused && video.currentTime >= 12)
+        )
+        .toBe(true);
+      await expect(
+        strip.getByRole('button', {
+          name: translate('videoEditor.app.recordAudioPause', variant.locale),
+          exact: true,
+        })
+      ).toBeVisible();
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioStop', variant.locale),
+          exact: true,
+        })
+        .click();
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioSave', variant.locale),
+          exact: true,
+        })
+        .click();
+      await expect(strip).toHaveCount(0);
+      await button('common.actions.close').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(2);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -3195,6 +3273,7 @@ for (const variant of [
   test(`cut transition inspector and rendered export in ${variant.locale}/${variant.theme}`, async ({
     page,
   }, testInfo) => {
+    const initialViewport = page.viewportSize()!;
     const host = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
@@ -3216,7 +3295,19 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
       await button('gallery.videoReview.cutMode').click();
-      await timelineGesture(page, 2.1, 4.1);
+      const sourceLane = (await dialog
+        .locator('[data-ui="gallery.videoReview.sourceLane"]')
+        .boundingBox())!;
+      const durationSeconds = Number(
+        await dialog
+          .locator('[data-ui="gallery.videoReview.timePlane"]')
+          .getAttribute('aria-valuemax')
+      );
+      const sourceX = (time: number) => sourceLane.x + (sourceLane.width * time) / durationSeconds;
+      await page.mouse.move(sourceX(2.1), sourceLane.y + sourceLane.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(sourceX(4.1), sourceLane.y + sourceLane.height / 2, { steps: 8 });
+      await page.mouse.up();
       await dialog
         .locator('summary')
         .filter({ hasText: label('gallery.videoReview.cutTransition') })
@@ -3232,12 +3323,24 @@ for (const variant of [
         .getByRole('option', {
           name: label(
             variant.locale === 'ru'
-              ? 'gallery.videoReview.cutFadeBlack'
+              ? 'gallery.videoReview.cutFadeColor'
               : 'gallery.videoReview.cutDissolve'
           ),
           exact: true,
         })
         .click();
+      if (variant.locale === 'ru') {
+        await settings.locator('[data-ui="shared.ui.color-selector.value-trigger"]').click();
+        const color = settings.getByRole('textbox', {
+          name: label('gallery.videoReview.cutTransitionColor'),
+          exact: true,
+        });
+        await color.fill('#1248a0');
+        await color.press('Enter');
+        await expect(
+          settings.locator('[data-ui="shared.ui.color-selector.value-trigger"]')
+        ).toContainText('#1248A0');
+      }
       const duration = settings.getByRole('textbox', {
         name: label('gallery.videoReview.zoomTransitionDuration'),
         exact: true,
@@ -3269,8 +3372,25 @@ for (const variant of [
       await dialog.screenshot({
         path: testInfo.outputPath(`cut-settings-small-${variant.locale}.png`),
       });
-      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.setViewportSize(initialViewport);
       await dialog.screenshot({ path: testInfo.outputPath(`cut-settings-${variant.locale}.png`) });
+      await expect(
+        settings.getByText(label('gallery.videoReview.cutTransitionHint'), { exact: true })
+      ).toHaveCount(0);
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      await button('windowHeader.browser').click();
+      await button('gallery.videoReview.backgroundGradient').click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.gradientPresets"] button')
+        .first()
+        .click();
+      const padding = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundPadding'),
+        exact: true,
+      });
+      await padding.fill('12');
+      await padding.press('Enter');
       await button('gallery.videoReview.pointerTool').click();
       await timelineGesture(page, 1.7);
       await dialog.locator('video').evaluate(async (video: HTMLVideoElement) => {
@@ -3285,12 +3405,28 @@ for (const variant of [
       await dialog.screenshot({
         path: testInfo.outputPath(`cut-transition-${variant.locale}.png`),
       });
-      const previewPixels = await canvas.evaluate((node: HTMLCanvasElement) =>
-        Array.from(node.getContext('2d')!.getImageData(0, 0, 160, 90).data)
-      );
-      // Compare the encoded scene at a normal export resolution; the 160×90 fixture's
-      // source-size bitrate deliberately prioritizes size and obscures individual pixels.
-      await button('gallery.videoReview.advancedEditing').click();
+      const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+      const blackout = stage.locator('[data-ui="gallery.videoReview.cutBlackout"]');
+      if (variant.locale === 'ru') {
+        await expect(blackout).toBeVisible();
+        const stageBox = (await stage.boundingBox())!,
+          blackBox = (await blackout.boundingBox())!;
+        expect(blackBox).toEqual(stageBox);
+      } else await expect(blackout).toHaveCount(0);
+      await page.screenshot({
+        path: testInfo.outputPath('composed-transition.png'),
+        fullPage: false,
+      });
+      const shot = await stage.screenshot();
+      const previewPixels = await page.evaluate(async (encoded) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${encoded}`;
+        await image.decode();
+        const canvas = Object.assign(document.createElement('canvas'), { width: 160, height: 90 });
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0, 160, 90);
+        return Array.from(context.getImageData(0, 0, 160, 90).data);
+      }, shot.toString('base64'));
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await button('videoEditor.exportDialog.resolutionLabel').click();
       await page.getByRole('option', { name: '480p', exact: true }).click();
@@ -3488,4 +3624,709 @@ async function readTransitionVideoPixels(page: Page, encoded: string, times: num
     },
     { encoded, times }
   );
+}
+
+for (const variant of [
+  { locale: 'en', theme: 'light' },
+  { locale: 'ru', theme: 'dark' },
+] as const) {
+  test(`quick editor browser window header (${variant.locale})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      const section = dialog.locator('[data-ui="gallery.videoReview.windowHeader"]');
+      const choose = async (
+        key: 'gallery.videoReview.windowHeaderNone' | 'gallery.videoReview.windowHeaderBrowser'
+      ) => {
+        await section
+          .getByRole('button', {
+            name: label(
+              key === 'gallery.videoReview.windowHeaderBrowser'
+                ? 'windowHeader.browser'
+                : 'windowHeader.none'
+            ),
+            exact: true,
+          })
+          .click();
+      };
+      await choose('gallery.videoReview.windowHeaderBrowser');
+      const segmentGeometry = await section.getByRole('button').evaluateAll(
+        (buttons, labels) =>
+          buttons
+            .filter((button) => labels.includes(button.textContent ?? ''))
+            .map((button) => {
+              const css = getComputedStyle(button);
+              return {
+                label: button.textContent,
+                height: button.getBoundingClientRect().height,
+                paddingTop: css.paddingTop,
+                paddingBottom: css.paddingBottom,
+                lineHeight: css.lineHeight,
+                fontSize: css.fontSize,
+              };
+            }),
+        ['Windows', 'macOS', 'Linux', label('windowHeader.light'), label('windowHeader.dark')]
+      );
+      await writeFile(
+        info.outputPath('window-header-segment-geometry.json'),
+        JSON.stringify(segmentGeometry, null, 2)
+      );
+      expect(segmentGeometry).toHaveLength(5);
+      for (const geometry of segmentGeometry) {
+        expect(geometry.height).toBe(segmentGeometry[0]!.height);
+        expect(geometry.paddingTop).toBe(segmentGeometry[0]!.paddingTop);
+        expect(geometry.paddingBottom).toBe(segmentGeometry[0]!.paddingBottom);
+        expect(geometry.lineHeight).toBe(segmentGeometry[0]!.lineHeight);
+      }
+      const title = section.getByRole('textbox', {
+        name: label('windowHeader.tabTitle'),
+        exact: true,
+      });
+      const address = section.getByRole('textbox', {
+        name: label('windowHeader.address'),
+        exact: true,
+      });
+      await expect(address).toHaveValue('');
+      await address.fill('https://sniptale.test/?a=1&b=2');
+      await title.fill('Browser & <title>');
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
+      await title.press('Tab');
+      const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+      await expect(stage.locator('img')).toHaveCount(1);
+      await expect
+        .poll(async () => (await stage.locator('img').getAttribute('src'))?.includes('Browser'))
+        .toBe(true);
+      await expect
+        .poll(async () => {
+          const box = (await stage.boundingBox())!;
+          return Math.abs(box.width / box.height - 160 / 100);
+        })
+        .toBeLessThan(0.02);
+      const artwork = async () =>
+        decodeURIComponent((await stage.locator('img').getAttribute('src'))!);
+      await expect.poll(artwork).toContain('https://sniptale.test/?a=1&amp;b=2');
+      await address.fill('');
+      await address.press('Tab');
+      await expect.poll(artwork).not.toContain('sniptale.test');
+      await expect(title).toHaveValue('Browser & <title>');
+      await address.fill('https://sniptale.test/?a=1&b=2');
+      await address.press('Tab');
+      await expect.poll(artwork).toContain('https://sniptale.test/?a=1&amp;b=2');
+      await page.screenshot({ path: info.outputPath('browser-header-scene.png'), fullPage: false });
+      // Reopen commits the authored fields before testing removal as a separate history step.
+      await button('common.actions.close').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.scene').click();
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
+      await choose('gallery.videoReview.windowHeaderNone');
+      await expect(stage.locator('img')).toHaveCount(0);
+      await button('gallery.videoReview.undo').click();
+      await expect(title).toHaveValue('Browser & <title>');
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
+      await expect(stage.locator('img')).toHaveCount(1);
+      await timelineGesture(page, 2);
+      await addReviewFocus(page);
+      const framing = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
+      await framing.scrollIntoViewIfNeeded();
+      await expect(framing).toHaveAttribute('data-status', 'ready');
+      await expect
+        .poll(() =>
+          framing.locator('canvas').evaluate((canvas) => {
+            if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Missing framing canvas');
+            const pixel = canvas.getContext('2d')!.getImageData(80, 4, 1, 1).data;
+            return Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+          })
+        )
+        .toBeGreaterThan(170);
+      await page.screenshot({
+        path: info.outputPath('browser-header-framing-area.png'),
+        fullPage: false,
+      });
+      await framing
+        .getByRole('button', { name: label('gallery.videoReview.zoomPreviewResult'), exact: true })
+        .click();
+      await expect(framing).toHaveAttribute('data-view', 'result');
+      await button('common.actions.close').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.scene').click();
+      await expect(title).toHaveValue('Browser & <title>');
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
+      const downloading = page.waitForEvent('download');
+      await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
+      const download = await downloading;
+      await download.saveAs(info.outputPath('browser-header.webm'));
+      const headerPixel = await page.evaluate(
+        async (encoded) => {
+          const url = URL.createObjectURL(
+            new Blob([Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0))], {
+              type: 'video/webm',
+            })
+          );
+          const video = document.createElement('video');
+          video.muted = true;
+          try {
+            await new Promise<void>((resolve, reject) => {
+              video.onloadeddata = () => resolve();
+              video.onerror = () => reject(new Error('Header output decode failed'));
+              video.src = url;
+            });
+            await new Promise<void>((resolve) => {
+              video.onseeked = () => resolve();
+              video.currentTime = 0.001;
+            });
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(video, 0, 0);
+            return Array.from(context.getImageData(80, 4, 1, 1).data).slice(0, 3);
+          } finally {
+            video.removeAttribute('src');
+            video.load();
+            URL.revokeObjectURL(url);
+          }
+        },
+        (await readFile(await download.path())).toString('base64')
+      );
+      expect(Math.min(...headerPixel)).toBeGreaterThan(170);
+      expect(Math.max(...headerPixel) - Math.min(...headerPixel)).toBeLessThan(35);
+
+      const input = new Input({
+        source: new BlobSource(new Blob([Uint8Array.from(await readFile(await download.path()))])),
+        formats: ALL_FORMATS,
+      });
+      try {
+        const video = (await input.getPrimaryVideoTrack())!;
+        expect(await video.getDisplayWidth()).toBe(160);
+        expect(await video.getDisplayHeight()).toBe(100);
+      } finally {
+        input.dispose();
+      }
+      await button('gallery.videoReview.scene').click();
+      await page.setViewportSize({ width: 1100, height: 560 });
+      await address.scrollIntoViewIfNeeded();
+      await expect(address).toBeInViewport();
+      await page.screenshot({
+        path: info.outputPath('browser-header-horizontal-scroll.png'),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const locale of ['en', 'ru'] as const) {
+  test(`quick editor outer video shadow (${locale})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': locale === 'ru' ? 'dark' : 'light',
+        },
+      });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?theme=${locale === 'ru' ? 'dark' : 'light'}`
+      );
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 4 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      await button('gallery.videoReview.backgroundSolid').click();
+      const padding = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundPadding'),
+        exact: true,
+      });
+      await padding.fill('20');
+      await padding.press('Enter');
+      const intensity = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundShadow'),
+        exact: true,
+      });
+      await expect(intensity).toHaveValue('0');
+      await intensity.fill('40');
+      await intensity.press('Enter');
+      await button('gallery.videoReview.backgroundShadowColor').click();
+      const color = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundShadowColor'),
+        exact: true,
+      });
+      await color.fill('#ffffffff');
+      await color.press('Enter');
+      const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+      const window = stage.locator('video').locator('..');
+      await expect
+        .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
+        .not.toBe('none');
+      await dialog
+        .getByRole('button', { name: label('windowHeader.browser'), exact: true })
+        .click();
+      await expect(stage.locator('img')).toHaveCount(1);
+      await button('common.actions.close').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.scene').click();
+      await expect(intensity).toHaveValue('40');
+      await intensity.fill('0');
+      await intensity.press('Enter');
+      await expect
+        .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
+        .toBe('none');
+      await button('common.actions.close').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.undo').click();
+      await button('gallery.videoReview.scene').click();
+      await expect(intensity).toHaveValue('40');
+      await intensity.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('video-shadow-scene.png'), fullPage: false });
+      const downloading = page.waitForEvent('download');
+      await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
+      const download = await downloading;
+      await download.saveAs(info.outputPath('outer-shadow.webm'));
+      const pixels = await page.evaluate(
+        async (encoded) => {
+          const url = URL.createObjectURL(
+            new Blob([Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))], {
+              type: 'video/webm',
+            })
+          );
+          const video = document.createElement('video');
+          video.muted = true;
+          try {
+            await new Promise<void>((resolve, reject) => {
+              video.onloadeddata = () => resolve();
+              video.onerror = () => reject(new Error('Shadow export decode failed'));
+              video.src = url;
+            });
+            await new Promise<void>((resolve) => {
+              video.onseeked = () => resolve();
+              video.currentTime = 0.001;
+            });
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(video, 0, 0);
+            // Base 160×90, padding20: window x≈36, y20; its top includes the header.
+            return {
+              width: canvas.width,
+              side: Array.from(ctx.getImageData(31, 50, 1, 1).data),
+              top: Array.from(ctx.getImageData(80, 15, 1, 1).data),
+              far: Array.from(ctx.getImageData(2, 2, 1, 1).data),
+            };
+          } finally {
+            video.removeAttribute('src');
+            video.load();
+            URL.revokeObjectURL(url);
+          }
+        },
+        (await readFile(await download.path())).toString('base64')
+      );
+      expect(pixels.width).toBe(160);
+      expect(pixels.side[0]).toBeGreaterThan(10);
+      expect(pixels.top[0]).toBeGreaterThan(10);
+      expect(pixels.far[0]).toBeLessThan(8);
+      await button('gallery.videoReview.scene').click();
+      await page.setViewportSize({ width: 1100, height: 560 });
+      await intensity.scrollIntoViewIfNeeded();
+      await expect(intensity).toBeInViewport();
+      await page.screenshot({
+        path: info.outputPath('video-shadow-horizontal-scroll.png'),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
+  test(`quick editor zoom reaches browser header (${zoomBehavior})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      await button('gallery.videoReview.backgroundSolid').click();
+      const padding = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundPadding'),
+        exact: true,
+      });
+      await padding.fill('8');
+      await padding.press('Enter');
+      const corners = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundCornerRadius'),
+        exact: true,
+      });
+      await corners.fill('0');
+      await corners.press('Enter');
+      const chooseHeader = async (on: boolean) => {
+        await dialog
+          .getByRole('button', {
+            name: label(on ? 'windowHeader.browser' : 'windowHeader.none'),
+            exact: true,
+          })
+          .click();
+      };
+      const chooseMotion = async (follows: boolean) => {
+        await button(
+          follows
+            ? 'gallery.videoReview.backgroundZoomWindow'
+            : 'gallery.videoReview.backgroundZoomContent'
+        ).click();
+      };
+      await chooseHeader(true);
+      await chooseMotion(zoomBehavior === 'follow-video');
+      await timelineGesture(page, 2);
+      await addReviewFocus(page);
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
+      const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
+      await expect(preview).toHaveAttribute('data-status', 'ready');
+      const scale = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomScale'),
+        exact: true,
+      });
+      await scale.fill('4');
+      await scale.press('Enter');
+      await inspector
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.precisePosition') })
+        .click();
+      const y = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomFocusY'),
+        exact: true,
+      });
+      await y.fill('20');
+      await y.press('Enter');
+      const target = dialog.locator('[data-ui="gallery.videoReview.zoomTarget"]');
+      const rect = (await target.boundingBox())!;
+      // Begin inside the header strip: it must be part of the main pan hit target.
+      await page.mouse.move(rect.x + rect.width / 2, rect.y + 5);
+      await page.mouse.down();
+      await page.mouse.move(rect.x + rect.width / 2, rect.y + 5 + rect.height * 0.4, { steps: 5 });
+      await page.mouse.up();
+      await expect.poll(async () => Number(await y.inputValue())).toBeCloseTo(10, 0);
+      const topAligned = async () => {
+        const header = dialog.locator('[data-ui="gallery.videoReview.stage"] img');
+        const [head, plane] = await Promise.all([header.boundingBox(), target.boundingBox()]);
+        return Math.abs(head!.y - plane!.y);
+      };
+      await expect.poll(topAligned).toBeLessThan(1.5);
+      await preview.scrollIntoViewIfNeeded();
+      await button('gallery.videoReview.zoomPreviewResult').click();
+      const headerPixel = () =>
+        preview.locator('canvas').evaluate((node) => {
+          const c = node as HTMLCanvasElement;
+          const pixel = c
+            .getContext('2d')!
+            .getImageData(Math.floor(c.width / 2), Math.floor(c.height * 0.12), 1, 1).data;
+          return Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+        });
+      await expect.poll(headerPixel).toBeGreaterThan(170);
+      await preview.locator('canvas').focus();
+      await page.keyboard.press('Shift+ArrowUp');
+      await expect(y).toHaveValue('0');
+      await expect.poll(topAligned).toBeLessThan(1.5);
+      const headerBounds = (await dialog
+        .locator('[data-ui="gallery.videoReview.stage"] img')
+        .boundingBox())!;
+      const stageBounds = (await dialog
+        .locator('[data-ui="gallery.videoReview.stage"]')
+        .boundingBox())!;
+      const screenshot = await page.screenshot({
+        path: info.outputPath('maximum-zoom-header.png'),
+        fullPage: false,
+      });
+      const seam = await page.evaluate(
+        async ({ encoded, x, y }) => {
+          const image = new Image();
+          image.src = `data:image/png;base64,${encoded}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(image, 0, 0);
+          return Array.from(ctx.getImageData(x, y, 1, 1).data).slice(0, 3);
+        },
+        {
+          encoded: screenshot.toString('base64'),
+          x: Math.floor(stageBounds.x + stageBounds.width / 2),
+          y: Math.floor(headerBounds.y + headerBounds.height - 3),
+        }
+      );
+      expect(Math.min(...seam)).toBeGreaterThan(150);
+      const region = dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first();
+      for (const enabled of [false, true]) {
+        await button('gallery.videoReview.scene').click();
+        await chooseHeader(enabled);
+        await chooseMotion(zoomBehavior !== 'follow-video');
+        await chooseMotion(zoomBehavior === 'follow-video');
+        await region.click();
+        await expect(scale).toHaveValue('4');
+        await expect(y).toHaveValue('0');
+        if (enabled) await expect.poll(topAligned).toBeLessThan(1.5);
+      }
+      await button('common.actions.close').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await region.click();
+      await expect(scale).toHaveValue('4');
+      await expect(y).toHaveValue('0');
+      await expect.poll(topAligned).toBeLessThan(1.5);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+test('Gallery downloads a compact summary while retaining a dense recorded trajectory', async ({
+  page,
+}) => {
+  const host = await startHostServer();
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(
+      page,
+      'review-vp8-opus.webm',
+      { width: 160, height: 90, duration: 12 },
+      false,
+      true
+    );
+    await page.evaluate(async (trackTemplate) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        const transaction = database.transaction('recording_telemetry', 'readwrite');
+        const done = new Promise<void>((resolve, reject) => {
+          transaction.oncomplete = () => resolve();
+          transaction.onabort = () => reject(transaction.error);
+        });
+        const store = transaction.objectStore('recording_telemetry');
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const entry = request.result[0];
+          entry.cursorTrack = {
+            ...trackTemplate,
+            samples: Array.from({ length: 64688 }, (_, index) => ({
+              id: `dense-cursor-${index}`,
+              time: (index * 12) / 64688,
+              x: index % 160,
+              y: index % 90,
+              visible: true,
+            })),
+          };
+          store.put(entry);
+        };
+        await done;
+      } finally {
+        database.close();
+      }
+    }, createVideoProjectCursorTrack('embedded-fallback'));
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const download = page.waitForEvent('download');
+    await page
+      .getByRole('button', {
+        name: translate('gallery.videoReview.downloadReport', 'en'),
+        exact: true,
+      })
+      .click();
+    const report = await readFile(await (await download).path(), 'utf8');
+    const payload = JSON.parse(report.split('```json\n')[1]!.split('\n```')[0]!);
+    expect(payload).toMatchObject({
+      schemaVersion: 'sniptale.video-review.v2',
+      reportKind: 'summary',
+      telemetry: {
+        cursorTrack: {
+          availability: 'present',
+          representation: 'summary',
+          sampleCount: 64688,
+          includedSampleCount: 0,
+          omittedReason: 'summary-report',
+        },
+      },
+    });
+    expect(report).not.toContain('dense-cursor-');
+    expect(Buffer.byteLength(report)).toBeLessThan(128 * 1024);
+    expect(report).toContain('The trajectory is omitted from this report.');
+    const retained = await page.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        return await new Promise<number>((resolve, reject) => {
+          const request = database
+            .transaction('recording_telemetry')
+            .objectStore('recording_telemetry')
+            .getAll();
+          request.onsuccess = () => resolve(request.result[0].cursorTrack.samples.length);
+          request.onerror = () => reject(request.error);
+        });
+      } finally {
+        database.close();
+      }
+    });
+    expect(retained).toBe(64688);
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});
+
+for (const variant of [
+  { locale: 'ru', theme: 'light', width: 1280, height: 560 },
+  { locale: 'en', theme: 'dark', width: 1920, height: 900 },
+] as const) {
+  test(`scene camera segments and fine tuning (${variant.locale})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await page.setViewportSize({ width: variant.width, height: variant.height });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+        .click();
+      const sections = dialog.locator('section.review-inspector-section');
+      const order = await sections.evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('data-section'))
+      );
+      expect(order.at(-1)).toBe('cursor-path');
+      expect(order.indexOf('captions')).toBeGreaterThan(order.indexOf('watermark'));
+      expect(order.indexOf('captions')).toBeLessThan(order.indexOf('audio'));
+      await expect(
+        dialog.getByRole('switch', { name: label('gallery.videoReview.captionsEnabled') })
+      ).toBeAttached();
+      const settings = dialog.locator('[data-ui="cursorFocusPath.settings"]');
+      await settings.scrollIntoViewIfNeeded();
+      const mode = settings.getByRole('group', {
+        name: label('videoEditor.sidebar.cursorFocusMode'),
+        exact: true,
+      });
+      await mode
+        .getByRole('button', { name: label('videoEditor.sidebar.cursorFocusFixed'), exact: true })
+        .click();
+      await expect(
+        mode.getByRole('button', {
+          name: label('videoEditor.sidebar.cursorFocusFixed'),
+          exact: true,
+        })
+      ).toHaveAttribute('aria-pressed', 'true');
+      await mode
+        .getByRole('button', { name: label('videoEditor.sidebar.cursorFocusFollow'), exact: true })
+        .click();
+      const movement = settings.getByRole('group', {
+        name: label('videoEditor.sidebar.cameraMovement'),
+        exact: true,
+      });
+      await expect(movement.getByRole('button')).toHaveCount(3);
+      await expect(
+        movement.getByRole('button', { name: label('videoEditor.sidebar.cameraCalm'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
+      await movement
+        .getByRole('button', { name: label('videoEditor.sidebar.cameraFast'), exact: true })
+        .click();
+      await settings
+        .getByRole('button', { name: label('videoEditor.sidebar.cameraZoneLarge'), exact: true })
+        .click();
+      const fine = settings.locator('details');
+      await expect(fine).toHaveCount(1);
+      await fine.locator('summary').click();
+      await expect(
+        fine.getByRole('switch', { name: label('videoEditor.sidebar.cameraPreservePointer') })
+      ).toHaveAttribute('aria-checked', 'true');
+      await expect(
+        fine.getByRole('switch', { name: label('videoEditor.sidebar.cameraAllowExpansion') })
+      ).toHaveAttribute('aria-checked', 'true');
+      const duration = fine.getByRole('textbox', {
+        name: label('videoEditor.sidebar.cameraTransitionDuration'),
+        exact: true,
+      });
+      await duration.fill('0.42');
+      await duration.press('Enter');
+      await expect(movement.locator('[aria-pressed="true"]')).toHaveCount(0);
+      await expect(
+        fine.getByRole('textbox', {
+          name: label('videoEditor.sidebar.cursorFocusSmoothing'),
+          exact: true,
+        })
+      ).toBeAttached();
+      await fine.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('scene-camera-fine.png'), fullPage: false });
+      await fine.locator('summary').click();
+      await settings.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('scene-camera-segments.png'),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
 }

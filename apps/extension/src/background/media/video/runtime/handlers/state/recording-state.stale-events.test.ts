@@ -27,7 +27,6 @@ vi.mock('../../../session-state', async (importOriginal) => ({
 }));
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
-  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
 }));
 
 import {
@@ -100,3 +99,8 @@ async function expectStaleUpdateAccepted(
   await flushAsyncRoute();
   expectAcceptedLifecycleResponse(sendResponse);
 }
+
+vi.mock('../../recording-completion', async (original) => ({
+  ...(await original<typeof import('../../recording-completion')>()),
+  restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));

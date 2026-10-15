@@ -1,6 +1,9 @@
+import { readWorkspaceStorage, type WorkspaceStorageReadTransaction } from './storage';
+import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import type { VideoWorkspace, VideoWorkspaceDraft, VideoWorkspaceSnapshot } from './contracts';
@@ -13,7 +16,7 @@ import {
 
 /** Portable review includes all history and field recovery, but no local OPFS identity. */
 export interface PortableVideoReview {
-  workspace: Omit<VideoWorkspace, 'sourceAssetId'>;
+  workspace: Omit<VideoWorkspace, 'sourceAssetId' | 'typing'>;
   draft: VideoWorkspaceDraft | null;
 }
 
@@ -27,7 +30,12 @@ function parsePortableVideoReviewShape(
   aggregateId: string,
   allowLocalAssetIds: boolean
 ): PortableVideoReview {
-  if (!isRecord(value) || !isRecord(value['workspace']) || 'sourceAssetId' in value['workspace']) {
+  if (
+    !isRecord(value) ||
+    !isRecord(value['workspace']) ||
+    'sourceAssetId' in value['workspace'] ||
+    'typing' in value['workspace']
+  ) {
     throw new Error('Portable video review is invalid.');
   }
   if (!allowLocalAssetIds) assertPortableReviewAssetRefs(value['workspace']);
@@ -55,10 +63,7 @@ export interface VideoReviewBackupDatabase {
   transaction(
     stores: string[],
     mode: 'readonly'
-  ): {
-    objectStore(name: string): { get(key: string): Promise<unknown> };
-    done: Promise<unknown>;
-  };
+  ): WorkspaceStorageReadTransaction & { done: Promise<unknown> };
 }
 
 /** Reads both authoritative sidecars, refusing corrupt or stale-source backups. */
@@ -66,27 +71,43 @@ export async function readVideoReviewForBackup(args: {
   db: VideoReviewBackupDatabase;
   aggregateId: string;
   sourceAssetId: string;
+  expectedSnapshot?: VideoWorkspaceSnapshot | undefined;
 }): Promise<PortableVideoReview | undefined> {
   const tx = args.db.transaction(
-    [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
     'readonly'
   );
   const [raw, rawDraft] = await Promise.all([
-    tx.objectStore(VIDEO_WORKSPACES_STORE).get(args.aggregateId),
+    readWorkspaceStorage(tx, args.aggregateId).then((stored) => stored.logical),
     tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(args.aggregateId),
   ]);
   await tx.done;
-  if (raw === undefined && rawDraft === undefined) return undefined;
+  if (raw === undefined && rawDraft === undefined && !args.expectedSnapshot) return undefined;
   const workspace = parseVideoWorkspace(raw);
   if (!workspace || workspace.sourceAssetId !== args.sourceAssetId) {
     throw new Error('Video review source is missing or changed.');
   }
-  const { sourceAssetId: _localId, ...portable } = workspace;
-  return parsePortableVideoReviewShape(
+  const { sourceAssetId: _localId, typing: _typing, ...portable } = workspace;
+  const result = parsePortableVideoReviewShape(
     { workspace: portable, draft: rawDraft === undefined ? null : rawDraft },
     args.aggregateId,
     true
   );
+  if (args.expectedSnapshot) {
+    const {
+      sourceAssetId,
+      typing: _expectedTyping,
+      ...expectedWorkspace
+    } = args.expectedSnapshot.workspace;
+    const expected = parsePortableVideoReviewShape(
+      { workspace: expectedWorkspace, draft: args.expectedSnapshot.draft },
+      args.aggregateId,
+      true
+    );
+    if (sourceAssetId !== args.sourceAssetId || JSON.stringify(result) !== JSON.stringify(expected))
+      throw new Error('Video review changed before backup. Retry the backup.');
+  }
+  return result;
 }
 
 /** Rebinds a verified portable review to the restored video and its new local byte object. */
@@ -121,7 +142,7 @@ export async function putVideoReviewRestore(args: {
     delete(key: string): Promise<unknown>;
   };
 }): Promise<void> {
-  await args.workspaces.put(args.review.workspace);
+  await args.workspaces.put(withReviewWorkspaceUsage(args.review.workspace));
   if (args.review.draft) await args.drafts.put(args.review.draft);
   else await args.drafts.delete(args.review.workspace.aggregateId);
 }

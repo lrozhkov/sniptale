@@ -1,4 +1,6 @@
+import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import { originalAudioRangeViews } from '../../features/video/review/advanced/original-audio-mutes';
 import { createTrackProjection } from './track-projection';
 import { reviewVoiceoverRange } from '../../features/video/review/voiceover-edits';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
@@ -39,9 +41,27 @@ export function reviewSelectionExists(
   selection: ReviewSelection,
   document: ReviewDocument,
   advanced: QuickEditAdvancedState,
-  markers: readonly ReviewTelemetryMarker[] = []
+  markers: readonly ReviewTelemetryMarker[] = [],
+  cursorFocusPath?: CursorFocusPath
 ): boolean {
   if (selection.kind === 'none') return false;
+  if (selection.kind === 'cursor-focus')
+    return (
+      (cursorFocusPath ?? advanced.cursorFocusPath)?.segments.some((segment) =>
+        segment.keys.some((key) => key.id === selection.id)
+      ) ?? false
+    );
+  if (selection.kind === 'webcam') return !!advanced.webcam?.enabled;
+  if (selection.kind === 'webcam-position')
+    return (
+      !!advanced.webcam?.enabled &&
+      advanced.webcam.positions.some((item) => item.id === selection.id)
+    );
+  if (selection.kind === 'webcam-hidden')
+    return (
+      !!advanced.webcam?.enabled &&
+      advanced.webcam.hiddenRanges.some((item) => item.id === selection.id)
+    );
   if (selection.kind === 'telemetry')
     return markers.some(
       (marker) => marker.ref.kind === selection.ref.kind && marker.ref.id === selection.ref.id
@@ -51,12 +71,19 @@ export function reviewSelectionExists(
     return document.annotations.some((item) => item.id === selection.id);
   if (selection.kind === 'canvas-comment')
     return document.canvasComments.some((item) => item.id === selection.id);
+  if (selection.kind === 'annotation-effect')
+    return !!advanced.annotationEffects?.instances.some((item) => item.id === selection.id);
+  if (selection.kind === 'text')
+    return !!advanced.text?.fragments.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom')
     return advanced.zoom.regions.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom-link')
     return resolveQuickEditZoomLink(advanced.zoom.regions, selection.id) !== null;
   if (selection.kind === 'original-audio')
-    return !!advanced.audio.original.ranges?.some((range) => range.id === selection.id);
+    return originalAudioRangeViews(
+      advanced.audio,
+      resolveQuickEditEffectiveFeatures(advanced).voiceoverApplied
+    ).some((range) => range.id === selection.id);
   if (selection.kind === 'audio')
     return advanced.audio[selection.lane].some((item) => item.id === selection.id);
   return false;
@@ -79,24 +106,50 @@ export function useReviewSelectionLifecycle(args: {
   document: ReviewDocument;
   advanced: QuickEditAdvancedState;
   markers?: readonly ReviewTelemetryMarker[];
+  cursorFocusPath?: CursorFocusPath;
+  deleteCursorFocus?(id: string): void;
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
+  deleteText?(id: string): void;
+  deleteAnnotationEffect?(id: string): void;
   deleteZoom(id: string): void;
   deleteZoomLink(id: string): void;
   deleteAudio(lane: 'voiceover' | 'music', id: string): void;
   deleteOriginalAudio?(id: string): void;
+  deleteWebcam?(
+    selection: Extract<ReviewSelection, { kind: 'webcam' | 'webcam-position' | 'webcam-hidden' }>
+  ): void;
   clearAnnotation(): void;
 }) {
   const remove = () => {
     if (args.selection.kind === 'none' || args.selection.kind === 'telemetry') return;
+    if (args.selection.kind === 'cursor-focus') {
+      const selectedId = args.selection.id;
+      const key = args.cursorFocusPath?.segments
+        .flatMap((segment) => segment.keys)
+        .find((key) => key.id === selectedId);
+      if (key?.anchor !== 'manual') return;
+      args.deleteCursorFocus?.(args.selection.id);
+      args.setSelection({ kind: 'none' });
+      return;
+    }
     const historyRemoval = selectedHistoryRemoval(args.selection, args.document);
     if (historyRemoval) void args.run(() => args.commit(historyRemoval));
     else if (args.selection.kind === 'canvas-comment') args.deleteCanvas(args.selection.id);
+    else if (args.selection.kind === 'annotation-effect')
+      args.deleteAnnotationEffect?.(args.selection.id);
+    else if (args.selection.kind === 'text') args.deleteText?.(args.selection.id);
     else if (args.selection.kind === 'zoom') args.deleteZoom(args.selection.id);
     else if (args.selection.kind === 'zoom-link') args.deleteZoomLink(args.selection.id);
     else if (args.selection.kind === 'original-audio')
       args.deleteOriginalAudio?.(args.selection.id);
+    else if (
+      args.selection.kind === 'webcam' ||
+      args.selection.kind === 'webcam-position' ||
+      args.selection.kind === 'webcam-hidden'
+    )
+      args.deleteWebcam?.(args.selection);
     else if (args.selection.kind === 'audio')
       args.deleteAudio(args.selection.lane, args.selection.id);
     args.setSelection({ kind: 'none' });
@@ -104,7 +157,13 @@ export function useReviewSelectionLifecycle(args: {
   useEffect(() => {
     if (
       args.selection.kind !== 'none' &&
-      !reviewSelectionExists(args.selection, args.document, args.advanced, args.markers)
+      !reviewSelectionExists(
+        args.selection,
+        args.document,
+        args.advanced,
+        args.markers,
+        args.cursorFocusPath
+      )
     )
       args.setSelection({ kind: 'none' });
   }, [args]);
@@ -127,8 +186,16 @@ export function reviewSelectionSourceTime(
   const midpoint = (range: { start: number; end: number } | undefined) =>
     range ? (range.start + range.end) / 2 : null;
   switch (selection.kind) {
+    case 'cursor-focus':
+      return selection.time;
     case 'none':
       return null;
+    case 'webcam':
+      return null;
+    case 'webcam-position':
+      return advanced.webcam?.positions.find((item) => item.id === selection.id)?.time ?? null;
+    case 'webcam-hidden':
+      return midpoint(advanced.webcam?.hiddenRanges.find((item) => item.id === selection.id));
     case 'edit':
       return midpoint(document.edits.find((item) => item.id === selection.id));
     case 'annotation': {
@@ -138,6 +205,17 @@ export function reviewSelectionSourceTime(
     case 'canvas-comment': {
       const comment = document.canvasComments.find((item) => item.id === selection.id);
       return comment?.visible ? ((comment.start ?? 0) + (comment.end ?? duration)) / 2 : null;
+    }
+    case 'annotation-effect':
+      return midpoint(
+        advanced.annotationEffects?.instances.find((item) => item.id === selection.id)
+      );
+    case 'text': {
+      const fragment = advanced.text?.fragments.find((item) => item.id === selection.id);
+      if (!fragment) return null;
+      if (fragment.timeDomain === 'source') return midpoint(fragment);
+      const projection = createTrackProjection(duration, document.edits);
+      return (projection.source(fragment.start) + projection.source(fragment.end, 'end')) / 2;
     }
     case 'telemetry':
       return midpoint(
@@ -158,7 +236,12 @@ export function reviewSelectionSourceTime(
       return link ? focusLinkSourceTime(link, duration, document.edits) : null;
     }
     case 'original-audio':
-      return midpoint(advanced.audio.original.ranges?.find((item) => item.id === selection.id));
+      return midpoint(
+        originalAudioRangeViews(
+          advanced.audio,
+          resolveQuickEditEffectiveFeatures(advanced).voiceoverApplied
+        ).find((item) => item.id === selection.id)
+      );
     case 'audio': {
       const clip = advanced.audio[selection.lane].find(
         (item) => item.id === selection.id && !item.dormant
@@ -194,6 +277,12 @@ function selectionTrackVisible(
 ) {
   const features = resolveQuickEditEffectiveFeatures(advanced);
   switch (selection.kind) {
+    case 'webcam':
+    case 'webcam-position':
+    case 'webcam-hidden':
+      return features.webcamTrackVisible;
+    case 'annotation-effect':
+      return features.annotationEffectsTrackVisible;
     case 'zoom':
       return features.zoomTrackVisible;
     case 'zoom-link':
@@ -205,7 +294,7 @@ function selectionTrackVisible(
     case 'canvas-comment':
       return features.overlaysVisible;
     case 'original-audio':
-      return features.mode === 'advanced' && originalAudioVisible;
+      return originalAudioVisible;
     default:
       return true;
   }

@@ -233,11 +233,13 @@ it('resolves exact cut boundaries when timestamp seeks return the preceding key 
   const signal = new AbortController().signal;
   const index = await inspectReviewMedia(file, signal);
   const getKeyPacket = EncodedPacketSink.prototype.getKeyPacket;
-  const seek = vi
-    .spyOn(EncodedPacketSink.prototype, 'getKeyPacket')
-    .mockImplementation(function (this: EncodedPacketSink, timestamp, options) {
-      return getKeyPacket.call(this, timestamp - 0.001, options);
-    });
+  const seek = vi.spyOn(EncodedPacketSink.prototype, 'getKeyPacket').mockImplementation(function (
+    this: EncodedPacketSink,
+    timestamp,
+    options
+  ) {
+    return getKeyPacket.call(this, timestamp - 0.001, options);
+  });
   let bytes = new Uint8Array(0);
   try {
     const receipt = await writeReviewPackets({
@@ -287,7 +289,9 @@ it('rejects forged non-key cuts and propagates streamed quota failure', async ()
   await expect(
     writeReviewPackets({ file, index, signal, writer, edits: [{ ...edits[0]!, start: 1 }] })
   ).rejects.toThrow('verified');
-  await expect(writeReviewPackets({ file, index, signal, writer, edits })).rejects.toThrow('Quota');
+  const failed = writeReviewPackets({ file, index, signal, writer, edits });
+  await expect(failed).rejects.toThrow('Quota');
+  await expect(failed).rejects.toMatchObject({ stage: 'mux-finalize' });
 });
 it('copies packets when an off-keyframe speed edit is entirely inside a cut', async () => {
   const file = new Blob([await readFile('tooling/test/e2e/fixtures/review-vp8-opus.webm')]);

@@ -1,7 +1,7 @@
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 4;
+export const DB_VERSION = 32;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -13,6 +13,8 @@ export const DIAGNOSTICS_META_STORE = 'diagnostics_meta';
 export const DIAGNOSTICS_EVENTS_STORE = 'diagnostics_events';
 export const VIDEO_PROJECTS_STORE = 'video_projects';
 export const SCENARIO_PROJECTS_STORE = 'scenario_projects';
+export const SCENARIO_PROJECT_HISTORY_STORE = 'scenario_project_history';
+export const SCENARIO_PROJECT_UNITS_STORE = 'scenario_project_units';
 export const PROJECT_ASSETS_STORE = 'project_assets';
 export const SCENARIO_ASSETS_STORE = 'scenario_assets';
 export const SCENARIO_PENDING_ASSETS_STORE = 'scenario_pending_assets';
@@ -23,6 +25,7 @@ export const MEDIA_LIBRARY_STORE = 'media_library';
 export const THUMBNAILS_STORE = 'thumbnails';
 export const IMAGE_WORKSPACES_STORE = 'image_workspaces';
 export const VIDEO_WORKSPACES_STORE = 'video_workspaces';
+export const VIDEO_WORKSPACE_HISTORY_STORE = 'video_workspace_history';
 export const VIDEO_WORKSPACE_DRAFTS_STORE = 'video_workspace_drafts';
 export const AGGREGATE_PRESENTATIONS_STORE = 'aggregate_presentations';
 export const WEB_SNAPSHOTS_STORE = 'web_snapshots';
@@ -45,6 +48,8 @@ export const EXPECTED_STORES = [
   DIAGNOSTICS_EVENTS_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
@@ -55,6 +60,7 @@ export const EXPECTED_STORES = [
   THUMBNAILS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -76,10 +82,12 @@ export const EXPECTED_INDEXES = {
   [RECORDING_TELEMETRY_STORE]: ['updatedAt'],
   [DIAGNOSTICS_META_STORE]: [],
   [DIAGNOSTICS_EVENTS_STORE]: ['recordingId'],
-  [VIDEO_PROJECTS_STORE]: ['updatedAt'],
+  [VIDEO_PROJECTS_STORE]: ['updatedAt', 'usageReferenceKeys'],
   [SCENARIO_PROJECTS_STORE]: ['updatedAt'],
-  [PROJECT_ASSETS_STORE]: ['createdAt'],
-  [SCENARIO_ASSETS_STORE]: ['projectId', 'createdAt'],
+  [SCENARIO_PROJECT_HISTORY_STORE]: ['projectId'],
+  [SCENARIO_PROJECT_UNITS_STORE]: ['projectId'],
+  [PROJECT_ASSETS_STORE]: ['createdAt', 'originMediaId'],
+  [SCENARIO_ASSETS_STORE]: ['projectId', 'createdAt', 'borrowedMediaId', 'galleryAssetId'],
   [SCENARIO_PENDING_ASSETS_STORE]: ['tabId', 'createdAt'],
   [PROJECT_EXPORTS_STORE]: ['projectId', 'createdAt'],
   [SCENARIO_EXPORTS_STORE]: ['projectId', 'createdAt'],
@@ -87,7 +95,8 @@ export const EXPECTED_INDEXES = {
   [MEDIA_LIBRARY_STORE]: ['createdAt', 'kind'],
   [THUMBNAILS_STORE]: [],
   [IMAGE_WORKSPACES_STORE]: ['updatedAt'],
-  [VIDEO_WORKSPACES_STORE]: ['updatedAt'],
+  [VIDEO_WORKSPACES_STORE]: ['updatedAt', 'usageReferenceKeys'],
+  [VIDEO_WORKSPACE_HISTORY_STORE]: ['aggregateId'],
   [VIDEO_WORKSPACE_DRAFTS_STORE]: ['updatedAt'],
   [AGGREGATE_PRESENTATIONS_STORE]: ['updatedAt'],
   [WEB_SNAPSHOTS_STORE]: ['createdAt'],

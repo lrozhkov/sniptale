@@ -147,7 +147,8 @@ it('falls back to the next source coordinates when the previous header has no fi
       existingObject: header,
       left: 40,
       top: 60,
-      width: 280,
+      width: 320,
+      sourceHeight: 180,
     })
   );
 });

@@ -1,3 +1,4 @@
+import type { CameraOutputViewport } from '../../../project/export/output-dimensions';
 import type { VideoProject } from '../../../project/types/index';
 import { resolveVideoCompositionCamera } from '../../motion/index';
 import { resolveEffectRuntimeFramePlans } from '../../effect-runtime/frame/plan';
@@ -21,7 +22,11 @@ export { resolveVideoCompositionCursor } from './cursor';
 export function resolveVideoCompositionFrame(
   project: VideoProject,
   currentTime: number,
-  options: { includeSubtitles?: boolean; timelineIndex?: VideoCompositionTimelineIndex } = {}
+  options: {
+    includeSubtitles?: boolean;
+    timelineIndex?: VideoCompositionTimelineIndex;
+    cameraViewport?: CameraOutputViewport;
+  } = {}
 ): VideoCompositionFrame {
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   const actions = resolveVideoCompositionActions(project, currentTime);
@@ -36,6 +41,7 @@ export function resolveVideoCompositionFrame(
       cursorSample,
       currentTime,
       project,
+      ...(options.cameraViewport ? { cameraViewport: options.cameraViewport } : {}),
     }),
     cursor: resolveVideoCompositionCursor(project, currentTime, actions),
     effectInputLayers: resolveVideoCompositionEffectInputLayers(

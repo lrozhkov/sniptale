@@ -731,11 +731,11 @@ it('downloads a single HTML beside ZIP and PDF and releases the download URL', a
     }
   );
   const clicks: string[] = [];
-  const click = vi
-    .spyOn(HTMLAnchorElement.prototype, 'click')
-    .mockImplementation(function (this: HTMLAnchorElement) {
-      clicks.push(this.download);
-    });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement
+  ) {
+    clicks.push(this.download);
+  });
   const blob = new Blob(['<!doctype html><p>Saved</p>'], { type: 'text/html' });
   mocks.createWebSnapshotHtmlExport.mockResolvedValue({ blob, filename: 'Saved.html' });
   mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));

@@ -1,3 +1,4 @@
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
 import { createPersistedEditorDocumentFixture } from '../../../../composition/persistence/document-assets/test-support';
@@ -19,12 +20,18 @@ import { mediaLibraryRootPublisher } from './media';
 it.each([false, true])(
   'retains the restored stored image original, workspace=%s',
   async (edited) => {
-    const stores = new Map<
-      string,
-      { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> }
-    >();
+    const createStore = () => ({
+      get: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+      index: vi.fn(() => ({
+        getAll: vi.fn(async () => []),
+        getAllKeys: vi.fn(async () => []),
+      })),
+    });
+    const stores = new Map<string, ReturnType<typeof createStore>>();
     const storeFor = (name: string) => {
-      const store = stores.get(name) ?? { get: vi.fn(), put: vi.fn() };
+      const store = stores.get(name) ?? createStore();
       stores.set(name, store);
       return store;
     };
@@ -75,6 +82,7 @@ it.each([false, true])(
             updatedAt: 2,
             width: 100,
             workspaceRevision: edited ? 1 : 0,
+            lifecycle: { ...createLibraryLifecycle('temporary', 1), trashedAt: 3 },
           },
           originalObjectId: 'original',
           ...(edited
@@ -102,6 +110,10 @@ it.each([false, true])(
     expect(storeFor('media_library').put).toHaveBeenCalledWith(
       expect.objectContaining({
         source: { kind: 'stored-asset', assetId: 'restored-original' },
+        lifecycle: expect.objectContaining({
+          storageClass: edited ? 'library' : 'temporary',
+          ...(edited ? { trashedAt: 3 } : {}),
+        }),
       })
     );
     expect(storeFor('asset_owners').put).toHaveBeenCalledWith(

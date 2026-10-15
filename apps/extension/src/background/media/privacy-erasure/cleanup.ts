@@ -11,7 +11,7 @@ import { reserveMediaErasureExclusion } from '../../mutation-exclusion/media-act
 import { closeOffscreenDocumentForPrivacyErasure } from '../../offscreen-document/service';
 import { cleanupProjectExport } from './project-export';
 import { cleanupRecording } from './recording';
-import { recoverInvalidDurableMediaState } from './recovery';
+import { recoverDurableMediaStateForErasure } from './recovery';
 import {
   failed,
   failedExportParticipants,
@@ -54,8 +54,16 @@ export const mediaPrivacyErasureCleanupAdapter = {
         ...failedExportParticipants('media-authority-read-unavailable'),
       ];
     }
-    if (persistedLease.status === 'invalid' || exportLedger.status === 'invalid') {
-      return [voiceInputResult, ...(await recoverInvalidDurableMediaState())];
+    const requiresTerminalContainment =
+      persistedLease.status === 'entry' &&
+      persistedLease.lease.phase === 'terminal' &&
+      persistedLease.lease.terminal.outcome !== 'stopped';
+    if (
+      persistedLease.status === 'invalid' ||
+      exportLedger.status === 'invalid' ||
+      requiresTerminalContainment
+    ) {
+      return [voiceInputResult, ...(await recoverDurableMediaStateForErasure())];
     }
 
     const [recording, projectExport] = await Promise.all([

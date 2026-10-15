@@ -11,8 +11,8 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(packageJson.scripts['ci:proof']).toBe('node tooling/ci/proof.mjs');
   expect(packageJson.scripts['ci:release']).toBe('node tooling/ci/release.mjs');
   const release = fs.readFileSync('tooling/ci/release.mjs', 'utf8');
-  expect(release).toContain('prepareLocalFastProofAdmission({');
-  expect(release).toContain('expectedExecutionEnvironmentDigest: executionEnvironment.digest');
+  expect(local).toContain('prepareLocalFastProofAdmission({');
+  expect(local).toContain('expectedExecutionEnvironmentDigest: runtimeIdentity.digest');
   expect(release).toContain("'tooling/ci/local.mjs'");
   expect(packageJson.scripts['ci:proof:container']).toBe(
     'node tooling/ci/local-container.mjs proof'

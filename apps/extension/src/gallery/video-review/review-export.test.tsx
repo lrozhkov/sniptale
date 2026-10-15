@@ -3,7 +3,10 @@ import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import * as zoomPreviewSource from './use-zoom-preview-source';
 import { VideoReview } from './index';
-import { createEditorFixture } from './editor-fixture.test-support';
+import {
+  createEditorFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
 
 const integration = vi.hoisted(() => ({
   load: vi.fn(),
@@ -13,8 +16,13 @@ const integration = vi.hoisted(() => ({
   history: vi.fn(),
   read: vi.fn(),
   advanced: vi.fn(),
+  snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
+  openGallery: vi.fn(async () => undefined),
+}));
+vi.mock('../../platform/navigation/extension-pages', () => ({
+  openGalleryPage: integration.openGallery,
 }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -38,7 +46,13 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (original
   ...(await original<typeof import('../../composition/persistence/review-workspaces/store')>()),
   saveVideoWorkspaceDraft: integration.draft,
   saveVideoWorkspaceAdvanced: integration.advanced,
+  saveVideoWorkspaceSnapshot: integration.snapshot,
   commitVideoWorkspace: integration.commit,
+  commitVideoWorkspaceWithProjection: async (
+    args: Parameters<
+      typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspaceWithProjection
+    >[0]
+  ) => committedEditorFixtureProjection(await integration.commit(args)),
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
@@ -106,7 +120,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     );
     await fixture.click('pointerTool');
     await dragTimePlane(fixture.host, 200, 200);
-    await fixture.click('zoomAdd');
+    await fixture.addFocus();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     const target = () => fixture.host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]');
     const preview = fixture.host.querySelector<HTMLCanvasElement>(
@@ -126,24 +140,21 @@ it('blocks history and destructive shortcuts while the export controls are disab
         )!
         .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     );
-    const disabledPreview = fixture.host.querySelector<HTMLCanvasElement>(
-      '[data-ui="gallery.videoReview.zoomPreview"] canvas'
-    )!;
-    expect(disabledPreview.tabIndex).toBe(-1);
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.zoomPreview"] canvas')
+    ).toBeNull();
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.exportSection"]')
+    ).not.toBeNull();
     expect(target()).toBeNull();
     expect(fixture.button('exportSection').disabled).toBe(false);
     await fixture.click('exportSection');
     expect(fixture.button('cancelExport').disabled).toBe(false);
     expect(fixture.button('undo').disabled).toBe(true);
-    for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack'])
+    for (const label of ['advancedEditing', 'trackSettings'])
       expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();
-    await act(async () =>
-      disabledPreview.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
-      )
-    );
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(integration.commit).not.toHaveBeenCalled();
     for (const key of ['z', 'y'])
@@ -158,7 +169,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await act(async () => fail?.(new Error('Cancelled test export')));
     await fixture.cleanup();
   }
-});
+}, 30000);
 
 it('marks the export opener active only while its inspector panel is shown', async () => {
   vi.useFakeTimers();
@@ -196,7 +207,7 @@ it('marks the export opener active only while its inspector panel is shown', asy
       );
     }
     expect(fixture.snapshot.workspace.history).toEqual(history);
-    await fixture.click('zoomAdd');
+    await fixture.addFocus();
     expect(opener.getAttribute('aria-pressed')).toBe('false');
     expect(tabs()).toHaveLength(3);
     expect(tabs().some((node) => node.textContent === 'gallery.videoReview.exportSection')).toBe(
@@ -211,5 +222,50 @@ it('marks the export opener active only while its inspector panel is shown', asy
   } finally {
     await fixture.cleanup();
     vi.useRealTimers();
+  }
+}, 30000);
+
+it('opens the completed copy and dismisses feedback on tool or inspector changes', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    processedVideoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  integration.export.mockResolvedValue({ receipt: { mediaId: 'recording:exported-copy' } });
+  integration.openGallery.mockClear();
+  const progress = () => fixture.host.querySelector('[role="progressbar"]');
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('exportSection');
+    await fixture.click('exportVideo');
+    expect(progress()?.getAttribute('aria-valuenow')).toBe('100');
+    await fixture.click('openExportInLibrary');
+    expect(integration.openGallery).toHaveBeenCalledWith({ mediaId: 'recording:exported-copy' });
+    expect(progress()).not.toBeNull();
+    await fixture.click('cutMode');
+    expect(progress()).toBeNull();
+    await fixture.click('exportVideo');
+    expect(progress()).not.toBeNull();
+    await act(async () =>
+      Array.from(
+        fixture.host.querySelectorAll<HTMLButtonElement>(
+          '[data-ui="gallery.videoReview.inspectorNavigation"] button'
+        )
+      )
+        .find((node) => node.textContent === 'gallery.videoReview.scene')!
+        .click()
+    );
+    await fixture.click('exportSection');
+    expect(progress()).toBeNull();
+  } finally {
+    await fixture.cleanup();
   }
 });

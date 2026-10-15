@@ -1,5 +1,4 @@
 import { FabricImage, type Canvas } from 'fabric';
-import { BROWSER_HEADER_HEIGHT } from '../../document/model';
 import { getSourceObject } from '../document/layers';
 import { attachBrowserHeaderToImage } from '../../objects/image-frame';
 import { findBrowserFrameHeader } from '../tools/decorations';
@@ -22,7 +21,7 @@ export function ensureEditorBrowserFrameOnTop(canvas: Canvas | null): void {
   }
 
   const element = header instanceof FabricImage ? header.getElement() : null;
-  attachBrowserHeaderToImage(source, element, BROWSER_HEADER_HEIGHT);
+  attachBrowserHeaderToImage(source, element, header.getScaledHeight());
   header.set({ visible: false, selectable: false, evented: false });
   if (canvas.getActiveObjects().includes(header)) canvas.discardActiveObject();
   const sourceIndex = canvas.getObjects().indexOf(source);

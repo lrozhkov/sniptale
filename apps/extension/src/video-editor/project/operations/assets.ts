@@ -1,4 +1,8 @@
 import type { ProjectAssetPublicationOptions } from '../../../composition/persistence/projects/index';
+import {
+  readLibraryProjectBindingSource,
+  prepareLibraryProjectBinding,
+} from '../../../composition/persistence/projects/library-project-binding';
 import { getRecording } from '../../../composition/persistence/recordings/index';
 import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
@@ -138,6 +142,25 @@ export async function ensureLibraryMediaAssets(
   if (entry.source.kind === 'recording' && assetType !== VideoProjectAssetType.AUDIO) {
     return ensureRecordingAssets(project, entry.source.recordingId);
   }
+  if (entry.source.kind === 'recording' || entry.source.kind === 'project-export') {
+    const source = await readLibraryProjectBindingSource(mediaId);
+    await assertImportableProjectAssetFile(source.file, assetType);
+    const metadata =
+      assetType === VideoProjectAssetType.AUDIO
+        ? { ...(await loadAudioMetadata(source.file)), width: 0, height: 0, hasAudio: true }
+        : await loadVideoMetadata(source.file);
+    const projectAssetId = crypto.randomUUID();
+    const prepared = await prepareLibraryProjectBinding(source, projectAssetId);
+    await prepared.publish();
+    return [
+      createVideoProjectAsset(
+        source.filename,
+        assetType,
+        { kind: 'project-asset', projectAssetId, originMediaId: mediaId },
+        metadata
+      ),
+    ];
+  }
   if (
     (entry.source.kind === 'project-asset' || entry.source.kind === 'stored-asset') &&
     entry.imageContentState !== 'edited'
@@ -186,7 +209,8 @@ async function referenceLibraryAsset(
 
 function getLibraryImportType(entry: MediaLibraryEntry): ImportableProjectAssetType {
   if (entry.source.kind !== 'web-snapshot') {
-    if (entry.kind === 'audio') return VideoProjectAssetType.AUDIO;
+    if (entry.kind === 'audio' || (entry.kind === 'export' && entry.mimeType.startsWith('audio/')))
+      return VideoProjectAssetType.AUDIO;
     if (entry.kind === 'image' || entry.kind === 'screenshot') return VideoProjectAssetType.IMAGE;
     if (entry.kind === 'video' || entry.kind === 'recording' || entry.kind === 'export') {
       return VideoProjectAssetType.VIDEO;

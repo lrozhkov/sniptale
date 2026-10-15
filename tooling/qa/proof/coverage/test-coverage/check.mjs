@@ -203,6 +203,7 @@ export function collectCoverageViolations(
 export function runTestCoverageCheck({
   files = [],
   coverageReportPath = REPORT_PATH,
+  coverageReportText = null,
   baseline = loadBase(),
   mode = 'changed',
 } = {}) {
@@ -218,7 +219,7 @@ export function runTestCoverageCheck({
   }
 
   const reportFile = abs(coverageReportPath);
-  if (!fs.existsSync(reportFile)) {
+  if (coverageReportText === null && !fs.existsSync(reportFile)) {
     return {
       files: targetFiles,
       skipped: false,
@@ -227,7 +228,9 @@ export function runTestCoverageCheck({
     };
   }
 
-  const coverageMap = createCoverageMap(JSON.parse(fs.readFileSync(reportFile, 'utf8')));
+  const coverageMap = createCoverageMap(
+    JSON.parse(coverageReportText ?? fs.readFileSync(reportFile, 'utf8'))
+  );
   const summaries = new Map();
   const coverageDetails = new Map();
   for (const filePath of coverageMap.files()) {

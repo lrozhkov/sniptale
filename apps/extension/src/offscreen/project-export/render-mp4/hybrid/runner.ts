@@ -1,3 +1,9 @@
+import {
+  createExportTimeEstimator,
+  type ExportTimeWorkInterval,
+} from '../../../../features/video/project/export/time-estimate';
+import { planProjectExportTime } from '../../../../features/video/project/export/time-estimate-plan';
+import { getProjectExportFrameOptions } from '../../../../features/video/project/export/encoding-quality';
 import { translate } from '../../../../platform/i18n';
 import { VideoProjectExportPhase } from '../../../../features/video/project/types/export';
 import { runFrameDrivenCompositeRenderLoop } from '../../render-loop';
@@ -149,7 +155,24 @@ async function tryRenderCleanSourceSpan(
   span: Extract<Mp4VideoRenderSpan, { kind: 'clean-source' }>
 ): Promise<boolean> {
   try {
+    let lastProgress = performance.now();
+    args.job.timeEstimator?.resume();
     const encoded = await encodeCleanSourceMp4Span({
+      onFrame: (time) => {
+        const estimate = args.job.timeEstimator?.observe(time);
+        const now = performance.now();
+        if (now - lastProgress < 500) return;
+        lastProgress = now;
+        const range = args.job.renderProgressRange ?? { start: 0, end: 100 };
+        void sendProgress(
+          args.job.jobId,
+          VideoProjectExportPhase.RENDERING,
+          range.start + ((time - span.start) / (span.end - span.start)) * (range.end - range.start),
+          getSpanProgressDetail(span),
+          estimate
+        );
+      },
+      encodeOptions: getProjectExportFrameOptions(args.settings),
       span,
       throwIfPipelineFailed: args.throwIfPipelineFailed,
       videoEncoder: args.videoEncoder,
@@ -171,8 +194,12 @@ async function tryRenderAcceleratedCompositeSpan(
   args: Mp4HybridVideoPipelineArgs,
   span: Extract<Mp4VideoRenderSpan, { kind: 'accelerated-composite' }>
 ): Promise<boolean> {
+  let submitted = false;
   try {
     return await renderAcceleratedCompositeWebmSpan({
+      onFrameSubmitted: () => {
+        submitted = true;
+      },
       canvas: args.canvas,
       context: args.context,
       job: args.job,
@@ -185,7 +212,7 @@ async function tryRenderAcceleratedCompositeSpan(
       ...(args.signal === undefined ? {} : { signal: args.signal }),
     });
   } catch (error) {
-    if (isAbortError(error)) {
+    if (submitted || isAbortError(error)) {
       throw error;
     }
   }
@@ -195,6 +222,29 @@ async function tryRenderAcceleratedCompositeSpan(
 
 export async function runMp4HybridVideoPipeline(args: Mp4HybridVideoPipelineArgs): Promise<void> {
   const spans = planMp4VideoRenderSpans(args.project, args.settings);
+  const compositePlan = planProjectExportTime(
+    args.project,
+    args.settings,
+    spans.flatMap((span) => [span.start, span.end])
+  );
+  const workPlan: ExportTimeWorkInterval[] = compositePlan.map((item) => {
+    const span = spans.find(
+      (candidate) => candidate.start <= item.start && candidate.end > item.start
+    );
+    return span?.kind === 'clean-source'
+      ? { ...item, cost: 1, route: 'clean' }
+      : { ...item, route: span?.kind === 'accelerated-composite' ? 'accelerated' : 'composite' };
+  });
+  if (args.job.timeEstimator) args.job.timeEstimator.replacePlan(workPlan);
+  else args.job.timeEstimator = createExportTimeEstimator(workPlan);
+  args.job.timeEstimator.resume();
+  const applyCompositeFallback = (span: Mp4VideoRenderSpan) => {
+    for (const [index, item] of workPlan.entries()) {
+      if (item.start >= span.start && item.start < span.end)
+        workPlan[index] = { ...compositePlan[index]!, route: 'composite' };
+    }
+    args.job.timeEstimator?.replacePlan(workPlan);
+  };
   await sendHybridPlanProgress(args, spans);
   const duration = spans.reduce((sum, span) => sum + span.end - span.start, 0);
   let completed = 0;
@@ -213,6 +263,7 @@ export async function runMp4HybridVideoPipeline(args: Mp4HybridVideoPipelineArgs
       if (span.kind === 'clean-source') {
         const renderedCleanSource = await tryRenderCleanSourceSpan(args, span);
         if (!renderedCleanSource) {
+          applyCompositeFallback(span);
           const fallbackMessage = translate('offscreenExport.hybridCleanSpanFallback');
           await sendHybridFallbackProgress(args, index, spans.length, fallbackMessage);
           await renderCompositeSpan(
@@ -227,6 +278,7 @@ export async function runMp4HybridVideoPipeline(args: Mp4HybridVideoPipelineArgs
       if (span.kind === 'accelerated-composite') {
         const renderedAcceleratedComposite = await tryRenderAcceleratedCompositeSpan(args, span);
         if (!renderedAcceleratedComposite) {
+          applyCompositeFallback(span);
           const fallbackMessage = translate('offscreenExport.hybridAcceleratedCompositeFallback');
           await sendHybridFallbackProgress(args, index, spans.length, fallbackMessage);
           await renderCompositeSpan(args, span, fallbackMessage);

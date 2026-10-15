@@ -1,5 +1,6 @@
+import { reviewTrackGestureLocked } from './track-row';
 import type { ReviewBeforeAction } from './note-transitions';
-import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type PlaneDragProps = {
@@ -16,13 +17,18 @@ type PlaneDragProps = {
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
   onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
   originalRangeTool?: boolean;
+  sourceRangeTool?: boolean;
+  sourceRangeKind?: 'cut' | 'speed' | undefined;
 };
+
+type PlaneCapability = 'source' | 'cut' | 'speed' | 'focus' | 'original' | 'seek';
 
 interface PlaneDragState {
   lane: 'source' | 'focus' | 'seek';
+  capability: PlaneCapability;
   start: number;
   x: number;
-  range: ReviewAnchor | null;
+  range: Extract<ReviewAnchor, { kind: 'range' }> | null;
   selection: ReviewAnchor;
   time: number;
   pointerId: number;
@@ -37,11 +43,35 @@ type CapturedPointerDrag = {
   pointerId: number;
 };
 
+const cancelTimelineGesturesEvent = 'sniptale:cancel-review-timeline-gestures';
+
+/** Lane control transitions cancel transient gestures before draining accepted edits. */
+export function cancelReviewTimelineGestures() {
+  window.dispatchEvent(new Event(cancelTimelineGesturesEvent));
+}
+
+/** Uses the existing gesture owner's cancellation, including pointer release. */
+export function useReviewGestureCancellation(cancel: () => void) {
+  useEffect(() => {
+    window.addEventListener(cancelTimelineGesturesEvent, cancel);
+    return () => window.removeEventListener(cancelTimelineGesturesEvent, cancel);
+  });
+}
+
 /** Escape owns cancellation and pointer release for one active timeline-item drag. */
 export function useReviewDragEscape<T extends CapturedPointerDrag>(
   drag: MutableRefObject<T | null>,
   resetPreview: () => void
 ) {
+  useReviewGestureCancellation(() => {
+    const current = drag.current;
+    if (!current) return;
+    drag.current = null;
+    current.admission?.cancel();
+    resetPreview();
+    if (current.node.hasPointerCapture(current.pointerId))
+      current.node.releasePointerCapture(current.pointerId);
+  });
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       const current = drag.current;
@@ -78,25 +108,28 @@ export const planeTime = (
 export function reviewPlaneLane(
   target: EventTarget | null,
   focusEnabled: boolean,
-  originalEnabled: boolean
-): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' | 'gap' {
+  originalEnabled: boolean,
+  sourceEnabled = false,
+  annotationEnabled = false
+): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' | 'gap' | 'ruler' | 'annotation' {
   if (!(target instanceof Element)) return 'gap';
+  if (target.closest('[data-ui="gallery.videoReview.ruler"]')) return 'ruler';
   if (focusEnabled && target.closest('[data-ui="gallery.videoReview.editBlock"]')) return 'seek';
   if (target.closest('button,[data-ui="gallery.videoReview.trackHeader"]')) return 'control';
   if (target.closest('[data-ui="gallery.videoReview.editBlock"],[data-audio-id],[role="button"]'))
     return 'item';
   if (target.closest('[data-dragging="true"]')) return 'item';
+  if (reviewTrackGestureLocked(target)) return 'seek';
   const audio = target.closest('[data-ui="gallery.videoReview.audioLane"]');
   if (audio)
     return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';
   if (target.closest('[data-ui="gallery.videoReview.zoomLane"]'))
     return focusEnabled ? 'focus' : 'seek';
-  if (
-    target.closest(
-      '[data-ui="gallery.videoReview.sourceLane"],[data-ui="gallery.videoReview.ruler"]'
-    )
-  )
-    return focusEnabled || originalEnabled ? 'seek' : 'source';
+  if (target.closest('[data-ui="gallery.videoReview.annotationEffectsLane"]'))
+    return annotationEnabled ? 'annotation' : 'seek';
+  if (target.closest('[data-ui="gallery.videoReview.textTrack"]')) return 'seek';
+  if (target.closest('[data-ui="gallery.videoReview.sourceLane"]'))
+    return sourceEnabled && !focusEnabled && !originalEnabled ? 'source' : 'seek';
   return 'gap';
 }
 
@@ -104,6 +137,7 @@ export function reviewPlaneLane(
 export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
   const plane = useRef<HTMLDivElement>(null);
   const drag = useRef<PlaneDragState | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<PlaneDragState['range']>(null);
   const commitRange = (current: PlaneDragState) => {
     if (!current.range) return;
     if (current.lane === 'focus') {
@@ -113,23 +147,28 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
   };
   const restore = (current: PlaneDragState) => {
     current.cancelled = true;
+    setSourcePreview(null);
     if (current.lane === 'focus') props.onFocusRangePreview?.(null);
     if (!current.admitted) return;
     props.onSeek(current.time, false);
     props.onSelect(current.selection);
   };
+  const capability: PlaneCapability = props.onFocusRangeCommit
+    ? 'focus'
+    : props.originalRangeTool
+      ? 'original'
+      : props.sourceRangeTool
+        ? (props.sourceRangeKind ?? 'source')
+        : 'seek';
   const lifetime = useReviewPlaneDragLifetime({
     plane,
     drag,
     restore,
-    capability: props.onFocusRangeCommit
-      ? 'focus'
-      : props.originalRangeTool
-        ? 'original'
-        : 'source',
+    capability,
   });
   return {
     plane,
+    sourcePreview,
     activeLane: () => drag.current?.lane,
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
@@ -138,9 +177,18 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
       const hit = reviewPlaneLane(
         event.target,
         !!props.onFocusRangeCommit,
-        !!props.originalRangeTool
+        !!props.originalRangeTool,
+        !!props.sourceRangeTool
       );
-      if (hit === 'control' || hit === 'item' || hit === 'original' || hit === 'gap') return;
+      if (
+        hit === 'ruler' ||
+        hit === 'control' ||
+        hit === 'item' ||
+        hit === 'original' ||
+        hit === 'annotation' ||
+        hit === 'gap'
+      )
+        return;
       const time = planeTime(event, props.duration, gutter);
       if (props.busy) {
         (props.beforeAction ?? ((action) => action()))(() => props.onSeek(time, false));
@@ -149,6 +197,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
       const lane = hit;
       const current: PlaneDragState = {
         lane,
+        capability,
         start: time,
         x: event.clientX,
         range: null,
@@ -160,6 +209,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         cancelled: false,
       };
       drag.current = current;
+      setSourcePreview(null);
       event.currentTarget.setPointerCapture(event.pointerId);
       (props.beforeAction ?? ((action) => action()))(() => {
         if (!lifetime.canAdmit(current)) return;
@@ -168,7 +218,10 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         props.onSeek(time);
         if (current.range) {
           if (lane === 'focus') props.onFocusRangePreview?.(current.range);
-          else props.onSelect(current.range);
+          else {
+            if (!current.ended) setSourcePreview(current.range);
+            props.onSelect(current.range);
+          }
         } else if (
           lane !== 'source' ||
           props.selection.kind !== 'range' ||
@@ -196,13 +249,17 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
       };
       if (current.admitted) {
         if (current.lane === 'focus') props.onFocusRangePreview?.(current.range);
-        else props.onSelect(current.range);
+        else {
+          setSourcePreview(current.range);
+          props.onSelect(current.range);
+        }
       }
     },
     onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
       if (!current || event.pointerId !== current.pointerId) return;
       drag.current = null;
+      setSourcePreview(null);
       current.ended = true;
       if (event.currentTarget.hasPointerCapture(event.pointerId))
         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -223,7 +280,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
 function useReviewPlaneDragLifetime(props: {
   plane: MutableRefObject<HTMLDivElement | null>;
   drag: MutableRefObject<PlaneDragState | null>;
-  capability: 'source' | 'focus' | 'original';
+  capability: PlaneCapability;
   restore(current: PlaneDragState): void;
 }) {
   const { plane, drag, restore } = props;
@@ -234,7 +291,7 @@ function useReviewPlaneDragLifetime(props: {
     (current: PlaneDragState) =>
       mounted.current &&
       !current.cancelled &&
-      (current.lane === 'seek' || current.lane === capability.current),
+      (current.lane === 'seek' || current.capability === capability.current),
     []
   );
   const release = useCallback(
@@ -251,6 +308,7 @@ function useReviewPlaneDragLifetime(props: {
     release(current);
     restore(current);
   };
+  useReviewGestureCancellation(cancel);
   useEffect(() => {
     const current = drag.current;
     if (current && !canAdmit(current)) cancel();

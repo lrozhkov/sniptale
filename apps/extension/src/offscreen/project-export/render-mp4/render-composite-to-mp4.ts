@@ -22,11 +22,14 @@ export async function renderCompositeToMp4(
 ): Promise<Blob> {
   const signal = job.exportAbortController?.signal;
   const pipeline = await createMp4Pipeline(project, settings, signal);
-  await announceMp4PipelineStart(job.jobId, pipeline.fallbackNotes);
-  const encoderState = createMp4EncoderState(pipeline);
+  let encoderState: ReturnType<typeof createMp4EncoderState> | null = null;
+  let completed = false;
 
   try {
-    return await runMp4EncodingPipeline({
+    if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+    await announceMp4PipelineStart(job.jobId, pipeline.fallbackNotes);
+    encoderState = createMp4EncoderState(pipeline);
+    const blob = await runMp4EncodingPipeline({
       audioEncoder: encoderState.audioEncoder,
       canvas,
       context,
@@ -39,6 +42,9 @@ export async function renderCompositeToMp4(
       videoEncoder: encoderState.videoEncoder,
       ...(signal === undefined ? {} : { signal }),
     });
+    if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+    completed = true;
+    return blob;
   } catch (error) {
     const normalized = normalizeMp4ExportError(error, job.cancelled);
     if (normalized.kind === 'failure') {
@@ -46,7 +52,12 @@ export async function renderCompositeToMp4(
     }
     throw normalized.error;
   } finally {
-    closeEncoderQuietly(encoderState.videoEncoder);
-    closeEncoderQuietly(encoderState.audioEncoder);
+    closeEncoderQuietly(encoderState?.videoEncoder ?? null);
+    closeEncoderQuietly(encoderState?.audioEncoder ?? null);
+    if (!completed) {
+      await pipeline.muxer.cancel().catch((error: unknown) => {
+        logger.error('MP4 output cleanup failed', error);
+      });
+    }
   }
 }

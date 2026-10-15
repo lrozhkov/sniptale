@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   buildMedia: vi.fn(),
   buildScenarios: vi.fn(),
   buildVideoProjects: vi.fn(),
-  db: { getAll: vi.fn() },
+  db: { getAll: vi.fn(), transaction: vi.fn() },
   listGalleryViews: vi.fn(),
 }));
 
@@ -55,6 +55,10 @@ function options() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.db.transaction.mockImplementation(() => ({
+    objectStore: (name: string) => ({ getAll: () => mocks.db.getAll(name) }),
+    done: Promise.resolve(),
+  }));
   mocks.buildEffects.mockResolvedValue([]);
   mocks.buildMedia.mockResolvedValue([]);
   mocks.buildScenarios.mockResolvedValue([]);
@@ -156,3 +160,22 @@ describe('media backup v6 dependency admission', () => {
     );
   });
 });
+
+it.each(['mediaAssetIds', 'scenarioProjectIds', 'videoProjectIds'] as const)(
+  'refuses an absent explicit %s target instead of writing an empty shortcut archive',
+  async (kind) => {
+    mocks.db.getAll.mockResolvedValue([]);
+    const selected = {
+      mediaAssetIds: [],
+      scenarioProjectIds: [],
+      videoProjectIds: [],
+      [kind]: ['missing'],
+    };
+    await expect(
+      buildMediaHubBackupExportPlanFromLibraryV6(
+        createMediaHubBackupExportOptions({ scope: 'selected', selected }),
+        { requireSelected: true }
+      )
+    ).rejects.toThrow('selected backup item');
+  }
+);

@@ -1,3 +1,4 @@
+import { readReviewAudioClipRange, type ReviewAudioClipInput } from './audio-clip-source';
 import { createTempoProcessor } from '../../features/video/audio/tempo';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 
@@ -5,7 +6,7 @@ import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanc
 export interface ReviewAudioClipRenderer {
   render(
     entry: QuickEditAudioPlanEntry,
-    buffer: AudioBuffer,
+    buffer: ReviewAudioClipInput,
     from: number,
     to: number,
     signal: AbortSignal
@@ -40,7 +41,20 @@ export function createReviewAudioClipRenderer(): ReviewAudioClipRenderer {
       while (state.frame < limit) {
         signal.throwIfAborted();
         const count = Math.min(state.chunkSize, limit - state.frame);
-        const chunk = state.processor.render(state.read, count);
+        const range = state.processor.inputRange(count);
+        const read = await readReviewAudioClipRange(
+          buffer,
+          state.offset + range.start,
+          state.offset + range.end,
+          signal
+        );
+        const chunk = state.processor.render(
+          (channel, frame) =>
+            frame >= 0 && frame + state.offset >= 0 && frame + state.offset < state.end
+              ? read(channel, frame + state.offset)
+              : 0,
+          count
+        );
         copyClipRange(result, chunk, state.frame, start);
         retainClipTail(state, chunk);
         state.frame += count;
@@ -52,11 +66,12 @@ export function createReviewAudioClipRenderer(): ReviewAudioClipRenderer {
   };
 }
 
-function createClipTempo(entry: QuickEditAudioPlanEntry, buffer: AudioBuffer, padding: number) {
+function createClipTempo(
+  entry: QuickEditAudioPlanEntry,
+  buffer: ReviewAudioClipInput,
+  padding: number
+) {
   const rate = entry.playbackRate ?? 1;
-  const planes = Array.from({ length: buffer.numberOfChannels }, (_, c) =>
-    buffer.getChannelData(c)
-  );
   const offset = Math.round(entry.sourceOffset * buffer.sampleRate);
   const end = Math.min(
     buffer.length,
@@ -65,10 +80,8 @@ function createClipTempo(entry: QuickEditAudioPlanEntry, buffer: AudioBuffer, pa
   return {
     buffer,
     processor: createTempoProcessor(buffer.sampleRate, buffer.numberOfChannels, rate),
-    read: (channel: number, frame: number) =>
-      frame >= 0 && frame + offset >= 0 && frame + offset < end
-        ? planes[channel]![frame + offset]!
-        : 0,
+    offset,
+    end,
     chunkSize: Math.max(1, Math.min(buffer.sampleRate, Math.floor((4 * buffer.sampleRate) / rate))),
     frame: 0,
     padding,

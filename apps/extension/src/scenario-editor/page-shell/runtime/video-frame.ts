@@ -1,3 +1,4 @@
+import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
 import type { GuideVideoAction } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { projectGuideVideoActions } from './video-actions';
@@ -50,7 +51,9 @@ export async function loadGuideVideoSource(
     throw new Error('Video source changed.');
   signal.throwIfAborted();
   return {
-    actions: projectGuideVideoActions(telemetry?.actionEvents ?? []),
+    actions: projectGuideVideoActions(
+      telemetry ? projectRecordingObservationClock(telemetry).actionEvents : []
+    ),
     blob,
     filename: entry.filename,
     recordingId: entry.source.kind === 'recording' ? entry.source.recordingId : null,

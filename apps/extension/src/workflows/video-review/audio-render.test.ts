@@ -1,7 +1,10 @@
+import { quickEditAudioSourceKey } from '../../features/video/review/advanced/audio-plan';
 import { readFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { expect, it, vi } from 'vitest';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { resolveOriginalSourceAudio } from '../../features/video/review/advanced/original-audio-mutes';
 
 it('keeps unsupported audio processing separate from packet-copy support and honors cancellation', async () => {
   const input = new Input({
@@ -257,6 +260,35 @@ it('decodes discontinuous packet runs separately and leaves the missing source i
   }
 });
 
+it.each([false, true])(
+  'prerolls Opus without copying pre-cut samples or crossing a gap (%s)',
+  async (gap) => {
+    const fixture = await audioFixture();
+    audioMock.packets = Array.from({ length: 10 }, (_, index) => 0.92 + index * 0.02)
+      .filter((time) => !gap || time < 0.96 || time >= 1)
+      .map((timestamp) => ({ timestamp, duration: 0.02, data: new Uint8Array([0xf8, 0]) }));
+    audioMock.samples.mockImplementation((start: number, end: number) => [
+      decodedSample(start, end - start),
+    ]);
+    try {
+      for await (const sample of renderReviewAudio(
+        fixture.track,
+        { sourceStart: 1, sourceEnd: 1.1, resultStart: 0, resultEnd: 0.1, rate: 1, kind: 'keep' },
+        false,
+        new AbortController().signal
+      ))
+        expect(sample.timestamp).toBe(0);
+      expect(audioMock.samples).toHaveBeenCalledTimes(1);
+      expect(audioMock.samples.mock.calls[0]![0]).toBeCloseTo(gap ? 1 : 0.92);
+      const pcm = fixture.windows[0]!.input!.getChannelData(0);
+      expect(pcm.subarray(0, 960).every((value) => value === 0)).toBe(true);
+      expect(pcm[1000]).toBe(0.25);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+);
+
 it('bounds accelerated windows and emits a short final chunk without a whole-source buffer', async () => {
   const fixture = await audioFixture();
   try {
@@ -294,7 +326,7 @@ it('exports zero-fade external clips at constant gain through their end', async 
     const entry = {
       lane: 'music' as const,
       clipId: 'm',
-      assetId: 'project-asset:m',
+      source: { kind: 'project' as const, assetId: 'project-asset:m' },
       timelineStart: 0.5,
       duration: 0.5,
       sourceOffset: 0,
@@ -311,7 +343,10 @@ it('exports zero-fade external clips at constant gain through their end', async 
       {
         entries: [entry],
         buffers: new Map<string, AudioBuffer>([
-          ['project-asset:m', clipBuffer as unknown as AudioBuffer],
+          [
+            quickEditAudioSourceKey({ kind: 'project', assetId: 'project-asset:m' }),
+            clipBuffer as unknown as AudioBuffer,
+          ],
         ]),
         originalVolume: 2,
         originalMuted: false,
@@ -350,7 +385,7 @@ it('exports a voiceover slice with the same asset rate and fade phase as preview
           {
             lane: 'voiceover',
             clipId: 'v:slice',
-            assetId: 'voice',
+            source: { kind: 'project' as const, assetId: 'voice' },
             timelineStart: 0,
             duration: 1,
             sourceOffset: 1,
@@ -361,7 +396,12 @@ it('exports a voiceover slice with the same asset rate and fade phase as preview
             fadePhase: { offset: 1, duration: 4 },
           },
         ],
-        buffers: new Map([['voice', buffer as unknown as AudioBuffer]]),
+        buffers: new Map([
+          [
+            quickEditAudioSourceKey({ kind: 'project', assetId: 'voice' }),
+            buffer as unknown as AudioBuffer,
+          ],
+        ]),
         originalVolume: 1,
         originalMuted: false,
       }
@@ -387,7 +427,7 @@ it('keeps external speech PCM continuous across separate video-segment renders',
     const entry = {
       lane: 'voiceover' as const,
       clipId: 'voice',
-      assetId: 'voice',
+      source: { kind: 'project' as const, assetId: 'voice' },
       timelineStart: 0,
       sourceOffset: 0.37,
       duration: 1.75,
@@ -398,7 +438,7 @@ it('keeps external speech PCM continuous across separate video-segment renders',
     };
     const plan = {
       entries: [entry],
-      buffers: new Map([['voice', buffer]]),
+      buffers: new Map([[quickEditAudioSourceKey({ kind: 'project', assetId: 'voice' }), buffer]]),
       originalVolume: 1,
       originalMuted: true,
     };
@@ -603,45 +643,139 @@ it.each([48000, 44100])(
   }
 );
 
-it('applies source gain inside a fragment without scaling the added music buffer', async () => {
+it('retains native resampler context around streamed normal-speed clip windows', async () => {
   const fixture = await audioFixture();
-  audioMock.packets = Array.from({ length: 50 }, (_, i) => ({
-    timestamp: 2 + i * 0.02,
-    duration: 0.02,
-    data: new Uint8Array([0xf8, 0]),
+  const read = vi.fn(async (start: number, end: number) => ({
+    start,
+    planes: [new Float32Array(end - start).fill(0.5)],
   }));
-  audioMock.samples.mockImplementation((start: number, end: number) => [
-    decodedSample(start, end - start),
-  ]);
-  const music = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
-  music.getChannelData(0).fill(0.75);
   try {
     for await (const _sample of renderReviewAudio(
-      fixture.track,
-      { sourceStart: 2, sourceEnd: 3, resultStart: 0, resultEnd: 1, rate: 1, kind: 'keep' },
-      false,
+      null,
+      { sourceStart: 1, sourceEnd: 2, resultStart: 1, resultEnd: 2, rate: 1, kind: 'keep' },
+      true,
       new AbortController().signal,
       {
-        entries: [],
-        buffers: new Map([['music', music]]),
-        originalVolume: 1,
-        originalMuted: false,
-        originalRanges: [
-          { id: 'mute', start: 2.2, end: 2.4, volume: 0 },
-          { id: 'boost', start: 2.4, end: 2.6, volume: 2 },
+        entries: [
+          {
+            lane: 'music',
+            clipId: 'm',
+            source: { kind: 'project' as const, assetId: 'a' },
+            timelineStart: 0,
+            sourceOffset: 2,
+            duration: 5,
+            volume: 1,
+            fadeIn: 0,
+            fadeOut: 0,
+          },
         ],
+        buffers: new Map([
+          [
+            quickEditAudioSourceKey({ kind: 'project', assetId: 'a' }),
+            { sampleRate: 44100, numberOfChannels: 1, length: 44100 * 10, read, dispose() {} },
+          ],
+        ]),
+        originalVolume: 1,
+        originalMuted: true,
       }
     )) {
       /* drain */
     }
-    const pcm = fixture.windows[0]!.sources![0]!.buffer!.getChannelData(0);
-    const at = (time: number) => pcm[Math.round((time + 0.02) * 48_000)];
-    expect(at(0.1)).toBeCloseTo(0.25);
-    expect(at(0.3)).toBe(0);
-    expect(at(0.5)).toBeCloseTo(0.5);
-    expect(at(0.7)).toBeCloseTo(0.25);
-    expect(music.getChannelData(0)[0]).toBe(0.75);
+    expect(read).toHaveBeenCalledWith(
+      Math.floor(2.98 * 44100),
+      Math.ceil(4.02 * 44100),
+      expect.any(AbortSignal)
+    );
+    const source = fixture.windows[0]!.sources![0]!;
+    expect(source.started![0]).toBeCloseTo(0.02);
+    expect(source.started![1]).toBeCloseTo(0.02);
+    expect(source.started![2]).toBe(1);
   } finally {
     fixture.cleanup();
   }
 });
+
+it.each([...[0.5, 1, 2, 4].map((rate) => ({ rate, overlay: true })), { rate: 1, overlay: false }])(
+  'composes source gain and attenuation (rate=$rate, overlay=$overlay) without scaling external PCM',
+  async ({ rate, overlay }) => {
+    const fixture = await audioFixture();
+    audioMock.packets = Array.from({ length: 250 }, (_, i) => ({
+      timestamp: i * 0.02,
+      duration: 0.02,
+      data: new Uint8Array([0xf8, 0]),
+    }));
+    audioMock.samples.mockImplementation((start: number, end: number) => [
+      decodedSample(start, end - start),
+    ]);
+    const voiceover = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
+    voiceover.getChannelData(0).fill(0.75);
+    const audio = createQuickEditAdvancedState().audio;
+    audio.original.ranges = overlay
+      ? [{ id: 'manual', start: 2, end: 3, volume: 0.5 }]
+      : [
+          { id: 'mute', start: 2.2, end: 2.4, volume: 0 },
+          { id: 'boost', start: 2.4, end: 2.6, volume: 2 },
+        ];
+    audio.original.mutes = overlay
+      ? [
+          { id: 'one', kind: 'range', start: 2.2, end: 2.5, volume: 0 },
+          { id: 'two', kind: 'range', start: 2.4, end: 2.8, volume: 0.5 },
+        ]
+      : [];
+    try {
+      for await (const _sample of renderReviewAudio(
+        fixture.track,
+        {
+          sourceStart: 2,
+          sourceEnd: 3,
+          resultStart: 0,
+          resultEnd: 1 / rate,
+          rate,
+          kind: rate === 1 ? 'keep' : 'speed',
+        },
+        false,
+        new AbortController().signal,
+        {
+          entries: [
+            {
+              lane: 'voiceover',
+              clipId: 'accepted',
+              source: { kind: 'project' as const, assetId: 'accepted' },
+              timelineStart: 0,
+              duration: 0.4 / rate,
+              sourceOffset: 0,
+              volume: 1,
+              fadeIn: 0,
+              fadeOut: 0,
+              playbackRate: rate,
+            },
+          ],
+          buffers: new Map([
+            [quickEditAudioSourceKey({ kind: 'project', assetId: 'accepted' }), voiceover],
+            [quickEditAudioSourceKey({ kind: 'project', assetId: 'music' }), voiceover],
+          ]),
+          originalVolume: overlay ? 2 : 1,
+          originalMuted: false,
+          originalRanges: resolveOriginalSourceAudio(audio).ranges!,
+        }
+      )) {
+        /* drain bounded output */
+      }
+      const sampleAt = (sourceTime: number) => {
+        const outputTime = (sourceTime - 2) / rate;
+        const window = Math.floor(outputTime);
+        const pcm = fixture.windows[window]!.sources![0]!.buffer!.getChannelData(0);
+        return pcm[Math.round((outputTime - window + 0.02) * 48000)]!;
+      };
+      expect(sampleAt(2.1)).toBeCloseTo(overlay ? 0.125 : 0.25, 3);
+      expect(sampleAt(2.3)).toBeCloseTo(0, 3);
+      expect(sampleAt(2.5)).toBeCloseTo(overlay ? 0.0625 : 0.5, 3);
+      expect(sampleAt(2.7)).toBeCloseTo(overlay ? 0.0625 : 0.25, 3);
+      if (rate >= 1) expect(sampleAt(2.9)).toBeCloseTo(overlay ? 0.125 : 0.25, 3);
+      expect(voiceover.getChannelData(0)[0]).toBe(0.75);
+      expect(fixture.windows[0]!.gains![0]!.gain.value).toBe(overlay ? 2 : 1);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+);

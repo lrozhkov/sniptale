@@ -5,7 +5,7 @@ import { createVideoReviewReport } from '../../workflows/video-review/report';
 import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
 
-/** Copy and download share the exact committed revision and complete telemetry payload. */
+/** Copy and download share the exact committed revision and summary with exact non-cursor telemetry. */
 export async function exportReviewReport(
   resource: LoadedReview,
   action: 'copy' | 'download',
@@ -28,6 +28,8 @@ export async function exportReviewReport(
       telemetry: translate('gallery.videoReview.reportTelemetry'),
       excluded: translate('gallery.videoReview.reportExcluded'),
       empty: translate('gallery.videoReview.reportEmpty'),
+      cursorSummary: (count) =>
+        translate('gallery.videoReview.reportCursorSummary').replace('{count}', String(count)),
     },
   });
   if (action === 'copy') await navigator.clipboard.writeText(report);

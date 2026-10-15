@@ -17,7 +17,6 @@ for (const variant of [
     const button = (key: Parameters<typeof translate>[0]) =>
       dialog.getByRole('button', { name: label(key), exact: true });
     try {
-      await page.setViewportSize({ width: 1280, height: 720 });
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
         storage: {
@@ -36,12 +35,48 @@ for (const variant of [
       const solid = button('gallery.videoReview.backgroundSolid');
       await solid.click();
       await expect(solid).toHaveAttribute('aria-pressed', 'true');
-      await expect(solid).toHaveCSS('border-top-width', '1px');
+      await expect(solid).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
       await expect(solid).toHaveCSS('box-shadow', 'none');
+      const modes = dialog.locator('.review-background-kinds button');
+      const geometry = await modes.evaluateAll((nodes) =>
+        nodes.map((node) => ({
+          y: node.getBoundingClientRect().y,
+          fits: node.scrollWidth <= node.clientWidth,
+        }))
+      );
+      expect(geometry).toHaveLength(3);
+      expect(geometry.every((value) => value.y === geometry[0]!.y && value.fits)).toBe(true);
+      const paint = dialog.locator('.review-background-paint');
+      await expect(paint.locator('button > svg')).toBeHidden();
+      const fieldBox = (await paint.boundingBox())!;
+      const paintBox = (await paint.locator('button').boundingBox())!;
+      expect(paintBox.x + paintBox.width).toBeCloseTo(fieldBox.x + fieldBox.width, 0);
       await page.screenshot({ path: testInfo.outputPath('solid-selection.png') });
-      await button('gallery.videoReview.backgroundGradient').click();
-      const presets = dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button');
-      const selected = presets.first();
+
+      const more = dialog.getByRole('button', {
+        name: label('settings.editor.backgrounds.showMore'),
+        exact: true,
+      });
+      await more.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath('gradient-more.png'), fullPage: false });
+      await more.hover();
+      await page.screenshot({
+        path: testInfo.outputPath('gradient-more-hover.png'),
+        fullPage: false,
+      });
+      await more.focus();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Shift+Tab');
+      await expect(more).toBeFocused();
+      await expect(more).toHaveCSS('outline-width', '2px');
+      await more.click();
+      await expect(dialog.locator('[data-ui="shared.ui.backgroundThumbnails.group"]')).toHaveText([
+        label('gallery.videoReview.backgroundColors'),
+        label('gallery.videoReview.backgroundGradients'),
+      ]);
+      const selected = dialog
+        .locator('[data-ui="gallery.videoReview.gradientPresets"] button[style*="gradient"]')
+        .first();
       await selected.click();
       await page.mouse.move(10, 10);
       await expect(selected).toHaveAttribute('aria-pressed', 'true');
@@ -69,16 +104,18 @@ for (const variant of [
       await expect(selected).toHaveCSS('outline-color', colors.accent);
       await expect(dialog.locator('[data-ui="gallery.videoReview.inspector"]')).toBeInViewport();
       const presetName = await selected.getAttribute('aria-label');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
+      // The combined palette starts with colors; reveal the gradient page again on reopen.
+      await more.click();
       const restored = dialog.locator(
         '[data-ui="gallery.videoReview.gradientPresets"] button[aria-pressed="true"]'
       );
       await expect(restored).toHaveCount(1);
       await expect(restored).toHaveAttribute('aria-label', presetName!);
       await expect(restored).toHaveCSS('outline-width', '1px');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

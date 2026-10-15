@@ -130,7 +130,7 @@ function renderProductSelectMenuOption<T extends string = string>(
 
   return (
     <ProductSelectMenuOption
-      key={option.value}
+      key={`option:${option.value}`}
       className={getProductSelectOptionClassName({
         controlSize: props.controlSize,
         isDisabled: Boolean(option.disabled),
@@ -161,6 +161,34 @@ function renderProductSelectMenuOption<T extends string = string>(
   );
 }
 
+/** Group wrappers preserve the flat option indices used for focus and keyboard navigation. */
+function renderProductSelectMenuItems<T extends string>(props: ProductSelectMenuProps<T>) {
+  const items: ReactNode[] = [];
+  for (let index = 0; index < props.options.length;) {
+    const option = props.options[index]!;
+    if (!option.group) {
+      items.push(renderProductSelectMenuOption(props, option, index++));
+      continue;
+    }
+    const children: ReactNode[] = [];
+    const start = index;
+    while (index < props.options.length && props.options[index]!.group === option.group) {
+      children.push(renderProductSelectMenuOption(props, props.options[index]!, index++));
+    }
+    items.push(
+      <div
+        key={`group:${start}`}
+        role="group"
+        aria-label={option.group}
+        className="sniptale-select-option-group"
+      >
+        {children}
+      </div>
+    );
+  }
+  return items;
+}
+
 function ProductSelectMenu<T extends string = string>(props: ProductSelectMenuProps<T>) {
   const menuRef = useFloatingSurfaceWheelContainment(props.menuRef);
   return (
@@ -176,7 +204,7 @@ function ProductSelectMenu<T extends string = string>(props: ProductSelectMenuPr
         menuClassName: props.menuClassName,
       })}
     >
-      {props.options.map((option, index) => renderProductSelectMenuOption(props, option, index))}
+      {renderProductSelectMenuItems(props)}
     </div>
   );
 }

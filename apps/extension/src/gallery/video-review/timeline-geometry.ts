@@ -1,45 +1,46 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+  type HTMLAttributes,
+} from 'react';
+import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { reviewTimelineNavigationBounds } from './track-projection';
 
-/** The viewport owns the label gutter and usable ruler width at every resize. */
-export function useReviewTimelineGeometry(
-  audioVisible: boolean,
-  zoomVisible: boolean,
-  markersCount: number
+/** Slider and timeline gestures use the same bounded logarithmic zoom steps. */
+export function reviewWheelZoom(
+  value: number,
+  event: Pick<WheelEvent, 'deltaX' | 'deltaY' | 'deltaMode'>
 ) {
+  const delta = event.deltaY || event.deltaX;
+  if (!Number.isFinite(delta) || delta === 0) return null;
+  const pixels = delta * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 100 : 1);
+  const step = Math.sign(pixels) * Math.max(0.1, Math.min(5, Math.abs(pixels) / 20));
+  const current = Math.log2(value) * 25;
+  const next = Math.max(0, Math.min(100, Math.round((current - step) * 10) / 10));
+  return 2 ** (next / 25);
+}
+
+/** Time coordinates use only the independently clipped right viewport. */
+export function useReviewTimelineGeometry() {
   const viewport = useRef<HTMLDivElement>(null);
-  const [gutter, setGutter] = useState(192);
   const [width, setWidth] = useState(640);
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
-    const measure = () => {
-      const headers = node.querySelectorAll<HTMLElement>(
-        '[data-ui="gallery.videoReview.trackHeader"]'
-      );
-      const natural = Math.max(
-        120,
-        ...Array.from(headers, (header) => {
-          const label = header.querySelector<HTMLElement>('[data-track-label]');
-          const controls = header.querySelector<HTMLElement>('[data-track-controls]');
-          return (label?.scrollWidth ?? 0) + (controls?.scrollWidth ?? 0) + 44;
-        })
-      );
-      const next = Math.min(Math.round(node.clientWidth * 0.4) || 260, Math.ceil(natural));
-      setGutter(next);
-      setWidth(Math.max(1, node.clientWidth - next));
-    };
+    const measure = () => setWidth(Math.max(1, node.clientWidth));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
-    node
-      .querySelectorAll('[data-track-label], [data-track-controls]')
-      .forEach((item) => observer.observe(item));
     return () => observer.disconnect();
-  }, [audioVisible, zoomVisible, markersCount]);
-  return { viewport, gutter, width };
+  }, []);
+  return { viewport, gutter: 0, width };
 }
 
 /** Commits admitted zoom requests after the ruler has adopted its new scale. */
@@ -47,6 +48,10 @@ export function useReviewTimelineNavigation(
   props: {
     duration: number;
     time: number;
+    playing: boolean;
+    navigationRevision?: number | undefined;
+    sourceId?: string | undefined;
+    playbackRange?: ReviewPlaybackRange | null | undefined;
     edits?: readonly ReviewEdit[];
     zoomAnchor?: number | null | undefined;
     beforeAction?: ReviewBeforeAction | undefined;
@@ -55,12 +60,18 @@ export function useReviewTimelineNavigation(
   { viewport, gutter, width }: ReturnType<typeof useReviewTimelineGeometry>
 ) {
   const [zoom, setZoom] = useState(1);
+  const wheelTarget = useRef<HTMLElement>(null);
   const zoomTarget = useRef<number | null>(null);
+  const lastNavigationRevision = useRef(props.navigationRevision);
+  const follow = useReviewPlaybackFollow(props, viewport, width, zoom);
+  const { suspend } = follow;
   const navigation = useMemo(
     () => reviewTimelineNavigationBounds(props.duration, props.edits ?? []),
     [props.duration, props.edits]
   );
   useLayoutEffect(() => {
+    const requestedSeek = props.navigationRevision !== lastNavigationRevision.current;
+    lastNavigationRevision.current = props.navigationRevision;
     const target = zoomTarget.current;
     zoomTarget.current = null;
     if (target !== null && viewport.current && props.duration > 0) {
@@ -70,22 +81,162 @@ export function useReviewTimelineNavigation(
       );
       return;
     }
-    if (props.time === navigation.start || props.time === navigation.end)
+    if (
+      (requestedSeek || (!props.playing && !follow.suspended.current)) &&
+      (props.time === navigation.start || props.time === navigation.end)
+    )
       revealBoundary(viewport.current, props.time, navigation, props.duration, gutter, width, zoom);
-  }, [props.time, navigation, props.duration, zoom, gutter, width, viewport]);
+  }, [
+    props.time,
+    props.playing,
+    props.navigationRevision,
+    navigation,
+    props.duration,
+    zoom,
+    gutter,
+    width,
+    viewport,
+    follow.suspended,
+  ]);
   const navigate = (target: number) => {
     (props.beforeAction ?? ((action) => action()))(() => {
+      suspend();
       props.onSeek(target, false);
       revealBoundary(viewport.current, target, navigation, props.duration, gutter, width, zoom);
     });
   };
-  const onZoom = (value: number) =>
-    (props.beforeAction ?? ((action) => action()))(() => {
-      if (value === zoom) return;
-      zoomTarget.current = props.zoomAnchor ?? props.time;
-      setZoom(value);
-    });
-  return { zoom, navigation, navigate, onZoom };
+  const { beforeAction, zoomAnchor, time } = props;
+  const onZoom = useCallback(
+    (value: number) =>
+      (beforeAction ?? ((action) => action()))(() => {
+        if (value === zoom) return;
+        suspend();
+        zoomTarget.current = zoomAnchor ?? time;
+        setZoom(value);
+      }),
+    [beforeAction, zoomAnchor, time, zoom, suspend]
+  );
+  useEffect(() => {
+    const node = wheelTarget.current;
+    if (!node) return;
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || event.metaKey || event.defaultPrevented) return;
+      const next = reviewWheelZoom(zoom, event);
+      if (next === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (next !== zoom) onZoom(next);
+    };
+    node.addEventListener('wheel', wheel, { passive: false });
+    return () => node.removeEventListener('wheel', wheel);
+  }, [zoom, onZoom]);
+  return { zoom, navigation, navigate, onZoom, wheelTarget, follow };
+}
+
+/** Existing playback updates move the viewport; user navigation owns it until the next Play. */
+function useReviewPlaybackFollow(
+  props: {
+    playing: boolean;
+    time: number;
+    duration: number;
+    sourceId?: string | undefined;
+    navigationRevision?: number | undefined;
+    playbackRange?: ReviewPlaybackRange | null | undefined;
+  },
+  viewport: RefObject<HTMLDivElement | null>,
+  width: number,
+  zoom: number
+) {
+  const suspended = useRef(false);
+  const previous = useRef({
+    playing: false,
+    sourceId: props.sourceId,
+    navigationRevision: props.navigationRevision,
+  });
+  const position = useRef({ left: 0, anchor: 0 });
+  const suspend = useCallback(() => {
+    suspended.current = true;
+  }, []);
+  const onScroll = () => {
+    const left = viewport.current?.scrollLeft ?? 0;
+    if (Math.abs(left - position.current.left) > 1) suspend();
+    position.current.left = left;
+  };
+  useLayoutEffect(() => {
+    const start =
+      props.playing && (!previous.current.playing || previous.current.sourceId !== props.sourceId);
+    const navigated = props.navigationRevision !== previous.current.navigationRevision;
+    previous.current = {
+      playing: props.playing,
+      sourceId: props.sourceId,
+      navigationRevision: props.navigationRevision,
+    };
+    if (start) suspended.current = false;
+    if (navigated) suspended.current = true;
+    const node = viewport.current;
+    if (
+      !node ||
+      !props.playing ||
+      props.playbackRange ||
+      suspended.current ||
+      zoom <= 1 ||
+      node.clientWidth <= 0 ||
+      props.duration <= 0 ||
+      !Number.isFinite(props.duration) ||
+      !Number.isFinite(props.time) ||
+      document.visibilityState === 'hidden'
+    )
+      return;
+    const x = (props.time / props.duration) * width * zoom;
+    if (start) {
+      const visible = x - node.scrollLeft;
+      position.current.anchor =
+        visible >= 0 && visible <= width
+          ? Math.max(width / 2, Math.min(width - 1, visible))
+          : width / 2;
+    }
+    const anchor = Math.max(width / 2, Math.min(width - 1, position.current.anchor));
+    const target = x < node.scrollLeft ? x - anchor : Math.max(node.scrollLeft, x - anchor);
+    node.scrollLeft = Math.max(0, Math.min(width * (zoom - 1), target));
+    // Read back the browser-clamped value so our own asynchronous scroll event is not user input.
+    position.current.left = node.scrollLeft;
+  }, [
+    props.playing,
+    props.sourceId,
+    props.navigationRevision,
+    props.time,
+    props.duration,
+    props.playbackRange,
+    viewport,
+    width,
+    zoom,
+  ]);
+  const interaction: HTMLAttributes<HTMLDivElement> = {
+    onPointerDownCapture(event) {
+      if (
+        event.target instanceof Node &&
+        event.currentTarget.contains(event.target) &&
+        event.target !== event.currentTarget
+      )
+        suspend();
+    },
+    onWheelCapture(event) {
+      if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
+      if (!event.ctrlKey && (event.deltaX !== 0 || (event.shiftKey && event.deltaY !== 0)))
+        suspend();
+    },
+    onKeyDownCapture(event) {
+      if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
+      if (
+        !['Tab', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(event.key) &&
+        (event.target !== event.currentTarget ||
+          event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight')
+      )
+        suspend();
+    },
+  };
+  return { suspended, suspend, onScroll, interaction };
 }
 
 function revealBoundary(
@@ -101,4 +252,38 @@ function revealBoundary(
   const x = gutter + (target / duration) * width * zoom;
   if (x < node.scrollLeft + 16 || x > node.scrollLeft + node.clientWidth - 24)
     node.scrollLeft = target === navigation.start ? 0 : Math.max(0, x - node.clientWidth + 24);
+}
+
+/** Tool activation reveals its lane through the existing vertical viewport, preserving horizontal position. */
+export function useReviewToolLaneNavigation(
+  viewport: RefObject<HTMLDivElement | null>,
+  tools: { focus: boolean; original: boolean; source: boolean; annotation?: boolean }
+) {
+  const active = tools.focus
+    ? 'focus'
+    : tools.original
+      ? 'original'
+      : tools.source
+        ? 'source'
+        : tools.annotation
+          ? 'annotation'
+          : null;
+  useEffect(() => {
+    if (!active || !viewport.current) return;
+    const selectors = {
+      annotation: '[data-ui="gallery.videoReview.annotationEffectsLane"]',
+      focus: '[data-ui="gallery.videoReview.zoomLane"]',
+      original: '[data-original-audio-lane]',
+      source: '[data-ui="gallery.videoReview.sourceLane"]',
+    };
+    const lane = viewport.current.querySelector<HTMLElement>(selectors[active]);
+    if (!lane) return;
+    const bounds = viewport.current.getBoundingClientRect();
+    const rect = lane.getBoundingClientRect();
+    const ruler = viewport.current.querySelector('[data-ui="gallery.videoReview.rulerRow"]');
+    const visibleTop = bounds.top + (ruler?.getBoundingClientRect().height ?? 0);
+    if (rect.top < visibleTop || rect.bottom > bounds.bottom)
+      viewport.current.scrollTop += rect.top - visibleTop - 4;
+  }, [active, viewport]);
+  return active;
 }

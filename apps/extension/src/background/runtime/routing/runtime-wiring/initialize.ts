@@ -1,3 +1,7 @@
+import { createAudioJobService } from '../../../ai/audio/service';
+import { registerAudioJobPorts } from '../../../ai/audio/port';
+import { createReviewTextJobService } from '../../../ai/llm/review-text-job';
+import { registerReviewTextPorts } from '../../../ai/llm/review-text-port';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { initializeBackgroundContextMenus } from '../../context-menu/service';
 import {
@@ -10,6 +14,7 @@ import { getNativeAppRuntimeService } from '../../native-app/service-singleton';
 import { initializeNativeAppPermissionLifecycle } from '../../native-app/permission-lifecycle';
 import {
   configureNativeIngestionPrivacyErasureCleanupPort,
+  configureAudioJobPrivacyErasurePort,
   configureScreenshotPrivacyErasureCleanupPort,
 } from '../../../application/privacy-erasure/composition';
 import { configureDownloadPort } from '../../../routing-contracts/download-port';
@@ -35,6 +40,11 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
 
   // The service worker has no localStorage paint hint, so keep its translation state hydrated.
   subscribeToLocaleChanges(() => undefined);
+  const audioJobs = createAudioJobService();
+  const textJobs = createReviewTextJobService();
+  configureAudioJobPrivacyErasurePort(audioJobs, textJobs);
+  registerAudioJobPorts(audioJobs);
+  registerReviewTextPorts(textJobs);
   configureDownloadPort({ executeDownloadBlob });
   runStartupMaintenance(state, logger);
   registerInstallListener(logger);

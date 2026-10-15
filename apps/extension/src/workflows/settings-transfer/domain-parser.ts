@@ -1,3 +1,4 @@
+import { getAIModelOperation } from '../../contracts/settings/model-operation';
 import { z } from 'zod';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type {
@@ -237,6 +238,12 @@ function parseAiDomain(
         typeof value['defaultModelId'] !== 'string'
       )
         failSettingsTransferDomain(domainId);
+      if (
+        items.some(
+          (model) => model.id === value['defaultModelId'] && getAIModelOperation(model) !== 'text'
+        )
+      )
+        failSettingsTransferDomain(domainId);
       return json({ items, defaultModelId: value['defaultModelId'] ?? null });
     }
     case 'ai.chrome':
@@ -248,14 +255,19 @@ function parseAiDomain(
       return json({ enabled: value['enabled'] });
     case 'ai.prompts':
       if (
-        Object.keys(value).some((key) => key !== 'global' && key !== 'scenario') ||
+        Object.keys(value).some(
+          (key) => key !== 'global' && key !== 'scenario' && key !== 'recognition'
+        ) ||
         (value['global'] !== undefined && typeof value['global'] !== 'string') ||
-        (value['scenario'] !== undefined && typeof value['scenario'] !== 'string')
+        (value['scenario'] !== undefined && typeof value['scenario'] !== 'string') ||
+        (value['recognition'] !== undefined &&
+          (typeof value['recognition'] !== 'string' || value['recognition'].length > 10000))
       )
         failSettingsTransferDomain(domainId);
       return json({
         ...(value['global'] === undefined ? {} : { global: value['global'] }),
         ...(value['scenario'] === undefined ? {} : { scenario: value['scenario'] }),
+        ...(value['recognition'] === undefined ? {} : { recognition: value['recognition'] }),
       });
     case 'ai.prompt-templates': {
       const templates = parseStoredPromptTemplates(value['items']);

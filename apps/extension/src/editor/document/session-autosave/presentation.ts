@@ -24,6 +24,7 @@ function isCurrentPresentation(
   editRevision: number
 ): boolean {
   return (
+    !state.hydration &&
     state.contextGeneration === contextGeneration &&
     state.activeContext?.aggregateId === context.aggregateId &&
     state.activeContext.durableRevision === revision &&
@@ -121,6 +122,7 @@ export function scheduleImagePresentation(
   if (!context.renderPresentation) return;
   state.presentationPending = true;
   if (
+    state.hydration ||
     state.interactionActive ||
     state.hasUnsavedChanges ||
     state.pendingDocument ||

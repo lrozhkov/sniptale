@@ -1,9 +1,11 @@
 import type { BrowserFrameState } from '../../../../features/editor/document/types';
-import { composeExactBrowserFrameSvg } from './compositor';
+import { composeWindowHeaderSvg } from '../../../../features/browser-frame/appearance';
+import { resolveEditorWindowHeader } from '../../../../features/editor/document/constants';
 
 interface ExactBrowserFrameRenderOptions {
   browserFrame: BrowserFrameState;
   height: number;
+  sourceHeight: number;
   headerHeight: number;
   radius: number;
   width: number;
@@ -17,15 +19,9 @@ export async function renderExactBrowserFrameToDataUrl(
   options: ExactBrowserFrameRenderOptions
 ): Promise<string> {
   return createSvgDataUrl(
-    composeExactBrowserFrameSvg({
-      contentHeight: Math.max(0, options.height - options.headerHeight),
-      faviconDataUrl: options.browserFrame.faviconDataUrl ?? null,
-      headerHeight: options.headerHeight,
-      height: options.height,
-      radius: options.radius,
-      title: options.browserFrame.title,
-      url: options.browserFrame.url,
+    composeWindowHeaderSvg(resolveEditorWindowHeader(options.browserFrame), {
       width: options.width,
+      height: options.sourceHeight,
     })
   );
 }

@@ -1,3 +1,4 @@
+import { getScenarioStoredProject, readScenarioStorage, writeScenarioStorage } from './storage';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
@@ -13,13 +14,16 @@ import {
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STORE_NAME,
   initDB,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import type { ScenarioProjectEntry } from './contracts';
+import type { ScenarioProjectEntry, ScenarioProjectSnapshot } from './contracts';
 import { createScenarioProjectEntry } from './projects/entry';
+import { isScenarioHistoryActionId } from './history-model';
 import { parseScenarioProjectEntry } from './read-guards';
 import { parseScenarioAssetEntry } from './read-guards';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.guards';
@@ -75,7 +79,7 @@ const logger = createLogger({ namespace: 'ScenarioAggregatePublication' });
 
 function requireSupportedScenarioEntry(raw: unknown): ScenarioProjectEntry | undefined {
   if (raw === undefined) return undefined;
-  const entry = parseScenarioProjectEntry(raw);
+  const entry = parseScenarioProjectEntry(raw, 'exclusive');
   if (!entry) throw new Error('Scenario project content is unavailable.');
   return entry;
 }
@@ -94,6 +98,8 @@ interface CommitScenarioAggregateMutationOptions {
   expectedUpdatedAt?: number | null;
   storageClass?: LibraryStorageClass;
   publicationUpdatedAt?: number;
+  /** Page-only grouped metadata writes never cross a child-publication journal. */
+  historyActionId?: string;
 }
 
 interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
@@ -103,10 +109,7 @@ interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
   children?: PreparedScenarioAggregateChildMutation;
 }
 
-interface ScenarioAggregateMutationResult {
-  project: GuideProject;
-  workspaceRevision: number;
-}
+type ScenarioAggregateMutationResult = ScenarioProjectSnapshot;
 
 type ScenarioAggregateTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
 
@@ -160,6 +163,8 @@ function assertChildOwnership(
 function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation | undefined) {
   const storeNames: Array<
     | typeof SCENARIO_PROJECTS_STORE
+    | typeof SCENARIO_PROJECT_HISTORY_STORE
+    | typeof SCENARIO_PROJECT_UNITS_STORE
     | typeof SCENARIO_ASSETS_STORE
     | typeof SCENARIO_STEP_EDITOR_DOCUMENTS_STORE
     | typeof ASSET_REFS_STORE
@@ -169,7 +174,14 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
     | typeof PROJECT_ASSETS_STORE
     | typeof STORE_NAME
     | typeof VIDEO_PROJECTS_STORE
-  > = [SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE, MEDIA_LIBRARY_STORE, STORE_NAME];
+  > = [
+    SCENARIO_PROJECTS_STORE,
+    SCENARIO_PROJECT_HISTORY_STORE,
+    SCENARIO_PROJECT_UNITS_STORE,
+    SCENARIO_ASSETS_STORE,
+    MEDIA_LIBRARY_STORE,
+    STORE_NAME,
+  ];
   if ((children?.assetPuts?.length ?? 0) > 0 || (children?.assetDeletes?.length ?? 0) > 0) {
     storeNames.push(
       SCENARIO_ASSETS_STORE,
@@ -202,6 +214,18 @@ export async function commitScenarioAggregateMutation(
   project: GuideProject,
   options: CommitScenarioAggregateMutationOptions = {}
 ): Promise<ScenarioAggregateMutationResult> {
+  if (
+    options.historyActionId !== undefined &&
+    (!isScenarioHistoryActionId(options.historyActionId) ||
+      typeof options.expectedRevision !== 'number' ||
+      !Number.isSafeInteger(options.expectedRevision) ||
+      options.expectedRevision < 0 ||
+      options.children)
+  )
+    return rejectScenarioMutationBeforeHandoff(
+      options.children,
+      new Error('Invalid scenario history action admission.')
+    );
   const parsed = parseGuideProject(project);
   if (parsed.status !== 'ok') {
     return rejectScenarioMutationBeforeHandoff(
@@ -240,9 +264,7 @@ export async function commitScenarioAggregateMutation(
   try {
     assertChildOwnership(project.id, preparedChildren);
     const db = await initDB();
-    const existing = requireSupportedScenarioEntry(
-      await db.get(SCENARIO_PROJECTS_STORE, project.id)
-    );
+    const existing = requireSupportedScenarioEntry(await getScenarioStoredProject(db, project.id));
     assertExpectedScenarioRevision({
       existing: existing ?? undefined,
       expectedRevision: preparedOptions.expectedRevision,
@@ -322,17 +344,21 @@ async function commitScenarioAggregateInTransaction(
   const tx = db.transaction(getMutationStoreNames(options.children), 'readwrite');
   let entry: ScenarioProjectEntry;
   try {
-    const projectStore = tx.objectStore(SCENARIO_PROJECTS_STORE);
-    const existing = requireSupportedScenarioEntry(await projectStore.get(project.id));
+    const storage = await readScenarioStorage(tx, project.id);
+    const existing = requireSupportedScenarioEntry(storage.logical);
     if (
       existing &&
       !hasScenarioChildMutations(options.children) &&
       areScenarioProjectsEqual(existing.project, project)
     ) {
       if (existing.lifecycle?.storageClass === 'temporary') {
-        await projectStore.put({
-          ...existing,
-          lifecycle: promoteLibraryLifecycle(existing.lifecycle, Date.now()),
+        await writeScenarioStorage(tx, {
+          storage,
+          existing,
+          entry: {
+            ...existing,
+            lifecycle: promoteLibraryLifecycle(existing.lifecycle, Date.now()),
+          },
         });
       }
       await promoteScenarioSourceLifecycles(tx, existing, Date.now());
@@ -352,7 +378,7 @@ async function commitScenarioAggregateInTransaction(
     entry = createScenarioAggregateEntry({ existing, options, project });
     await applyScenarioAssetMutations(tx, project.id, options.children, physicalDelete);
     await promoteScenarioSourceLifecycles(tx, entry, entry.updatedAt);
-    await projectStore.put(entry);
+    await writeScenarioStorage(tx, { storage, existing, entry });
     await applyScenarioDocumentMutations({
       children: options.children,
       physicalDelete,
@@ -395,6 +421,11 @@ function createScenarioAggregateEntry(args: {
   return createScenarioProjectEntry({
     existing: args.existing,
     project: args.project,
+    // Both callers privately admit a fresh storage snapshot before constructing this entry.
+    historyOwnership: 'exclusive',
+    ...(args.options.historyActionId === undefined
+      ? {}
+      : { historyActionId: args.options.historyActionId }),
     ...(args.options.storageClass === undefined ? {} : { storageClass: args.options.storageClass }),
     ...(args.options.publicationUpdatedAt === undefined
       ? {}
@@ -517,9 +548,7 @@ export async function commitScenarioAggregateSnapshotMutation(args: {
   let existing: ScenarioProjectEntry | null;
   try {
     const db = await initDB();
-    existing = parseScenarioProjectEntry(
-      await db.get(SCENARIO_PROJECTS_STORE, args.baseProject.id)
-    );
+    existing = parseScenarioProjectEntry(await getScenarioStoredProject(db, args.baseProject.id));
   } catch (error) {
     return rejectScenarioMutationBeforeHandoff(args.children, error);
   }
@@ -580,7 +609,7 @@ async function publishScenarioAssetJournal(
   }
   const db = await initDB();
   const existing = requireSupportedScenarioEntry(
-    await db.get(SCENARIO_PROJECTS_STORE, payload.project.id)
+    await getScenarioStoredProject(db, payload.project.id)
   );
   if (existing && (await isScenarioPublicationAlreadyCommitted(db, existing, payload))) {
     return {

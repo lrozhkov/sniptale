@@ -4,6 +4,7 @@ import { updateScenarioProjectRecordMetadata } from '../../../composition/persis
 import type { GallerySelectionController } from './controller-types';
 import {
   isGalleryMediaItem,
+  isGalleryQuickEditProjectItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
   isGallerySelectableItem,
@@ -28,6 +29,7 @@ import { listMediaAssetProjectUsageBatch } from '../../../composition/persistenc
 function splitSelectableTargets(targets: GalleryItem[]) {
   return {
     media: targets.filter(isGalleryMediaItem),
+    quickEdits: targets.filter(isGalleryQuickEditProjectItem),
     scenarios: targets.filter(isGalleryScenarioItem),
     videoProjects: targets.filter(isGalleryVideoProjectItem),
     exports: targets.filter(isGalleryScenarioExportItem),
@@ -35,6 +37,12 @@ function splitSelectableTargets(targets: GalleryItem[]) {
 }
 
 function trashTarget(item: GalleryItem): LibraryTrashTarget {
+  if (item.type === 'quick-edit-project')
+    return {
+      kind: 'quick-edit-project',
+      id: item.entityId,
+      expectedRevision: item.project.revision,
+    };
   if (isGalleryScenarioExportItem(item)) return { kind: 'scenario-export', id: item.entityId };
   if (isGalleryScenarioItem(item)) return { kind: 'scenario-project', id: item.entityId };
   if (isGalleryVideoProjectItem(item)) return { kind: 'video-project', id: item.entityId };
@@ -76,10 +84,13 @@ async function preparePermanentDeletion(
   withBusy: GalleryBusyAction,
   isCurrent: () => boolean
 ): Promise<GalleryPreparedDeletion | null> {
-  const { media, scenarios, videoProjects, exports } = splitSelectableTargets([...targets]);
+  const { media, scenarios, videoProjects, exports, quickEdits } = splitSelectableTargets([
+    ...targets,
+  ]);
   const scenarioIds = new Set(scenarios.map((item) => item.entityId));
   const independentExports = exports.filter((item) => !scenarioIds.has(item.project.id));
   const removedProjectKeys = new Set([
+    ...quickEdits.map((item) => `review:${item.entityId}`),
     ...scenarios.map((item) => `scenario:${item.entityId}`),
     ...videoProjects.map((item) => `video:${item.entityId}`),
   ]);
@@ -134,6 +145,7 @@ async function preparePermanentDeletion(
                   ...independentExports,
                   ...scenarios,
                   ...videoProjects,
+                  ...quickEdits,
                   ...media,
                 ]) {
                   await permanentlyDeleteLibraryItem(

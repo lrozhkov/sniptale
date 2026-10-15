@@ -117,3 +117,52 @@ it.each(['recording', 'export'])('loads real %s library videos before playback',
     loadGuideVideoSource({ mediaId: 'media' }, new AbortController().signal)
   ).resolves.toMatchObject({ blob, recordingId: 'recording' });
 });
+
+it('projects original document observations before matching guide video playback', async () => {
+  io.entry.mockResolvedValue({
+    id: 'media',
+    kind: 'recording',
+    updatedAt: 1,
+    size: 5,
+    filename: 'source.webm',
+    source: { kind: 'recording', recordingId: 'recording' },
+  });
+  io.blob.mockResolvedValue(new Blob(['video'], { type: 'video/webm' }));
+  const raw = {
+    recordingId: 'recording',
+    cursorTrack: null,
+    signals: [],
+    observationClock: {
+      version: 1,
+      domain: 'observation',
+      segments: [
+        {
+          id: 'resume',
+          documentId: 'doc',
+          timeOriginMs: 100000,
+          startedAtTimestampMs: 5000,
+          observationStartSeconds: 5,
+          mediaStartEstimateSeconds: 0.4,
+          mapping: null,
+        },
+      ],
+    },
+    actionEvents: [
+      {
+        id: 'press',
+        kind: 'CLICK',
+        time: 5.2,
+        duration: 0.2,
+        point: { x: 40, y: 60 },
+        recordingPoint: { x: 0.4, y: 0.6 },
+        label: '',
+        preset: 'NONE',
+        data: { observationClockId: 'resume' },
+      },
+    ],
+  };
+  io.telemetry.mockResolvedValue(raw);
+  const source = await loadGuideVideoSource({ mediaId: 'media' }, new AbortController().signal);
+  expect(source.actions?.[0]).toMatchObject({ id: 'press', time: expect.closeTo(0.6, 6) });
+  expect(raw.actionEvents[0]?.time).toBe(5.2);
+});

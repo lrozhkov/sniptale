@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/foundation",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -18,11 +18,12 @@
     "./utils/filename": "./src/utils/filename.ts",
     "./utils/hotkey-key-maps": "./src/utils/hotkey-key-maps.ts",
     "./utils/preset-path": "./src/utils/preset-path.ts",
-    "./utils/screenshot-filename": "./src/utils/screenshot-filename.ts"
+    "./utils/screenshot-filename": "./src/utils/screenshot-filename.ts",
+    "./history/equal": "./src/history/equal.ts",
+    "./history/retention": "./src/history/retention.ts"
   },
-  "dependencies": {},
   "devDependencies": {
-    "vitest": "^4.1.10"
+    "vitest": "5.0.3"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/foundation/src",

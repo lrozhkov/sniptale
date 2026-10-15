@@ -1,3 +1,4 @@
+import { BackgroundPresetsSettings } from './backgrounds/view';
 import { translate } from '../../../../platform/i18n';
 import { SettingsSubpageTabs, settingsSectionClassName } from '../../../section-surface';
 import { ToolPresetsSettings } from './tools/view';
@@ -9,7 +10,7 @@ export function EditorResourcesContent(props: {
   onViewChange?: (view: string) => void;
   view?: string;
 }) {
-  const supportedViews = ['tools', 'palettes', 'surfaces', 'gradients'] as const;
+  const supportedViews = ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'] as const;
   const view = supportedViews.includes(props.view as (typeof supportedViews)[number])
     ? (props.view as (typeof supportedViews)[number])
     : 'tools';
@@ -23,10 +24,13 @@ export function EditorResourcesContent(props: {
           { id: 'palettes', label: translate('settings.navigation.views.palettes') },
           { id: 'surfaces', label: translate('settings.navigation.views.surfaces') },
           { id: 'gradients', label: translate('settings.navigation.views.gradients') },
+          { id: 'backgrounds', label: translate('settings.navigation.views.backgrounds') },
         ]}
         onChange={props.onViewChange}
       />
-      {view === 'palettes' ? (
+      {view === 'backgrounds' ? (
+        <BackgroundPresetsSettings />
+      ) : view === 'palettes' ? (
         <PalettesSettings />
       ) : view === 'surfaces' ? (
         <SurfaceStylePresetsSettings />

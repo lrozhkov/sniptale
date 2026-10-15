@@ -41,20 +41,20 @@ export const BrowserFrameBehaviorSections: React.FC<{
   </fieldset>
 );
 
-export const BrowserFrameInsertSection: React.FC<{
+export const BrowserFrameResetSection: React.FC<{
   disabled?: boolean;
-  insertOrUpdateBrowserFrame: () => Promise<void> | void;
-}> = ({ disabled = false, insertOrUpdateBrowserFrame }) => {
+  resetBrowserFrame: () => Promise<void> | void;
+}> = ({ disabled = false, resetBrowserFrame }) => {
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const handleApply = async () => {
+  const handleReset = async () => {
     if (disabled || pending) return;
 
     setPending(true);
     setActionError(null);
     try {
-      await runAndReportEditorAction('browser-frame-insert-update', insertOrUpdateBrowserFrame, {
+      await runAndReportEditorAction('browser-frame-reset', resetBrowserFrame, {
         fallbackKey: 'editor.compact.browserFrameApplyFailed',
         notify: false,
       });
@@ -83,9 +83,9 @@ export const BrowserFrameInsertSection: React.FC<{
         className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
         disabled={disabled || pending}
         aria-busy={pending}
-        onClick={() => void handleApply()}
+        onClick={() => void handleReset()}
       >
-        {pending ? translate('common.states.loading') : translate('editor.compact.apply')}
+        {pending ? translate('common.states.loading') : translate('windowHeader.reset')}
       </button>
     </div>
   );

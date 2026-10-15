@@ -2,7 +2,7 @@
 import { getCaptureSurfaceService, recoverCaptureSurfaces } from '../../../capture-surface';
 import {
   clearActiveVideoRecordingLease,
-  ensureActiveVideoRecordingLeaseHydrated,
+  ensureVideoRecordingLeaseCache,
 } from '../recording-control-lease';
 import {
   deleteVideoSurfaceSession,
@@ -42,7 +42,7 @@ async function reconcileRecoveredTabOutput(session: VideoSurfaceSession): Promis
 async function recoverVideoCaptureSurfaceInternal(
   pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier
 ): Promise<void> {
-  const activeLeasePromise = ensureActiveVideoRecordingLeaseHydrated();
+  const activeLeasePromise = ensureVideoRecordingLeaseCache();
   let abandonedRecordingStopped = false;
   const recoveryPromise = recoverCaptureSurfaces({
     beforeAbandonedRestore: (surface) =>
@@ -63,6 +63,22 @@ async function recoverVideoCaptureSurfaceInternal(
   if (!activeLease) return;
   const captureSurfaceService = getCaptureSurfaceService();
   const appliedBinding = captureSurfaceService.getAppliedBindingForSession(activeLease.recordingId);
+
+  if (activeLease.phase === 'terminal') {
+    if (!activeLease.surfaceBinding)
+      throw new Error('Terminal recording source binding is incomplete.');
+    storeVideoSurfaceSession({
+      applied: appliedBinding?.applied ?? null,
+      generation: activeLease.surfaceBinding.generation,
+      recordingId: activeLease.recordingId,
+      sourceReady: false,
+      sourceVideoHeight: null,
+      sourceVideoWidth: null,
+      streamInstanceId: activeLease.surfaceBinding.streamInstanceId,
+      tabId: appliedBinding?.tabId ?? activeLease.recordingTabId,
+    });
+    return;
+  }
 
   if (abandonedRecordingStopped) {
     if (captureSurfaceService.hasSessionLease(activeLease.recordingId)) {

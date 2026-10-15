@@ -1,6 +1,19 @@
 import {
+  readStoredVideoWorkspaceProject,
+  writeVideoWorkspaceProject,
+} from '../review-workspaces/project-commands';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
+import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
+import { readWorkspaceStorage } from '../review-workspaces/storage';
+import { createScenarioProjectStore, getScenarioStoredProject } from '../scenario/storage';
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
+import {
   MEDIA_LIBRARY_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_EXPORTS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
@@ -11,7 +24,10 @@ import { parseScenarioProjectEntry, parseScenarioExportEntry } from '../scenario
 import { createLibraryLifecycle, type LibraryLifecycle } from './contracts';
 import type { LibraryLifecycleTarget } from './promotion';
 
-export type LibraryTrashTarget = LibraryLifecycleTarget | { kind: 'scenario-export'; id: string };
+export type LibraryTrashTarget =
+  | LibraryLifecycleTarget
+  | { kind: 'scenario-export'; id: string }
+  | { kind: 'quick-edit-project'; id: string; expectedRevision: number };
 
 const TRASH_LOCK = 'sniptale:library-trash';
 let testQueue: Promise<unknown> = Promise.resolve();
@@ -24,7 +40,8 @@ export class StaleTrashItemError extends Error {
   }
 }
 
-function withTrashLock<T>(operation: () => Promise<T>): Promise<T> {
+/** Serialize lifecycle admission with existing Trash move, restore and purge operations. */
+export function runWithLibraryTrashMutation<T>(operation: () => Promise<T>): Promise<T> {
   if (typeof navigator !== 'undefined' && navigator.locks)
     return navigator.locks.request(TRASH_LOCK, { mode: 'exclusive' }, operation);
   if (typeof chrome !== 'undefined')
@@ -35,6 +52,7 @@ function withTrashLock<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 function targetStore(target: LibraryTrashTarget) {
+  if (target.kind === 'quick-edit-project') return VIDEO_WORKSPACES_STORE;
   return target.kind === 'media'
     ? MEDIA_LIBRARY_STORE
     : target.kind === 'scenario-project'
@@ -45,6 +63,13 @@ function targetStore(target: LibraryTrashTarget) {
 }
 
 function parseTarget(target: LibraryTrashTarget, value: unknown) {
+  if (target.kind === 'quick-edit-project') {
+    const parsed = parseVideoWorkspace(value);
+    if (!parsed || parsed.aggregateId !== target.id || parsed.revision !== target.expectedRevision)
+      return null;
+    const workspace = materializeVideoWorkspaceProject(parsed, target.id);
+    return { ...workspace, lifecycle: workspace.project.lifecycle };
+  }
   if (target.kind === 'media') return parseMediaLibraryEntry(value);
   if (target.kind === 'scenario-project') return parseScenarioProjectEntry(value);
   if (target.kind === 'video-project') return parseVideoProjectEntry(value);
@@ -68,6 +93,8 @@ function encodeTargetLifecycle(
   entry: NonNullable<ReturnType<typeof parseTarget>>,
   lifecycle: LibraryLifecycle
 ) {
+  if (target.kind === 'quick-edit-project') throw new StaleTrashItemError();
+  if (target.kind === 'video-project') return withVideoProjectUsage({ ...entry, lifecycle });
   if (target.kind !== 'scenario-export') return { ...entry, lifecycle };
   const catalogue = parseScenarioExportEntry(entry);
   if (!catalogue) throw new StaleTrashItemError();
@@ -87,12 +114,16 @@ async function mutateTrash(
 ): Promise<void> {
   if (!Number.isFinite(now) || now < 0) throw new Error('Invalid Trash mutation time.');
   if (targets.length === 0) return;
-  await withTrashLock(() =>
+  await runWithLibraryTrashMutation(() =>
     runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(
         [
           MEDIA_LIBRARY_STORE,
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
           SCENARIO_PROJECTS_STORE,
+          SCENARIO_PROJECT_HISTORY_STORE,
+          SCENARIO_PROJECT_UNITS_STORE,
           VIDEO_PROJECTS_STORE,
           SCENARIO_EXPORTS_STORE,
         ],
@@ -100,7 +131,31 @@ async function mutateTrash(
       );
       try {
         for (const target of targets) {
-          const store = tx.objectStore(targetStore(target));
+          if (target.kind === 'quick-edit-project') {
+            const { workspace } = await readStoredVideoWorkspaceProject(tx, target.id);
+            if (workspace.revision !== target.expectedRevision) throw new StaleTrashItemError();
+            const lifecycle = workspace.project.lifecycle;
+            if (restore ? lifecycle.trashedAt === undefined : lifecycle.trashedAt !== undefined)
+              continue;
+            const { trashedAt, ...active } = lifecycle;
+            await writeVideoWorkspaceProject(
+              tx,
+              target.id,
+              target.expectedRevision,
+              {
+                ...workspace.project,
+                lifecycle: restore
+                  ? { ...active, updatedAt: Math.max(now, trashedAt ?? 0, lifecycle.updatedAt + 1) }
+                  : { ...lifecycle, trashedAt: Math.max(now, lifecycle.updatedAt + 1) },
+              },
+              now
+            );
+            continue;
+          }
+          const store =
+            target.kind === 'scenario-project'
+              ? createScenarioProjectStore(tx)
+              : tx.objectStore(targetStore(target));
           const entry = parseTarget(target, await store.get(target.id));
           if (!entry) throw new StaleTrashItemError();
           const lifecycle = entry.lifecycle ?? createLibraryLifecycle('library', entry.updatedAt);
@@ -153,6 +208,18 @@ export function restoreStoredItemsFromTrash(
   return mutateTrash(targets, true, now);
 }
 
+async function readTrashTarget(
+  db: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
+  target: LibraryTrashTarget
+): Promise<unknown> {
+  if (target.kind === 'scenario-project') return getScenarioStoredProject(db, target.id);
+  if (target.kind !== 'quick-edit-project') return db.get(targetStore(target), target.id);
+  const tx = db.transaction([VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE], 'readonly');
+  const value = (await readWorkspaceStorage(tx, target.id)).logical;
+  await tx.done;
+  return value;
+}
+
 /**
  * Serialize a complete destructive workflow with Trash admission and restoration across pages.
  * The lock deliberately surrounds existing deletion owners, whose media branches can span
@@ -163,9 +230,9 @@ export function runWithTrashedStoredItem<T>(
   expectedTrashedAt: number,
   operation: () => Promise<T>
 ): Promise<T> {
-  return withTrashLock(async () => {
+  return runWithLibraryTrashMutation(async () => {
     await runWithIndexedDbMutation(async (db) => {
-      const entry = parseTarget(target, await db.get(targetStore(target), target.id));
+      const entry = parseTarget(target, await readTrashTarget(db, target));
       if (!entry || entry.lifecycle?.trashedAt !== expectedTrashedAt)
         throw new StaleTrashItemError();
     });
@@ -179,7 +246,7 @@ export function runWithStoredItemLifecycle<T>(
   expected: Pick<LibraryLifecycle, 'updatedAt' | 'trashedAt'>,
   operation: () => Promise<T>
 ): Promise<T> {
-  return withTrashLock(async () => {
+  return runWithLibraryTrashMutation(async () => {
     if (
       !Number.isFinite(expected.updatedAt) ||
       expected.updatedAt < 0 ||
@@ -188,7 +255,7 @@ export function runWithStoredItemLifecycle<T>(
     )
       throw new StaleTrashItemError();
     await runWithIndexedDbMutation(async (db) => {
-      const entry = parseTarget(target, await db.get(targetStore(target), target.id));
+      const entry = parseTarget(target, await readTrashTarget(db, target));
       if (!entry) throw new StaleTrashItemError();
       const lifecycle = entry.lifecycle ?? createLibraryLifecycle('library', entry.updatedAt);
       if (lifecycle.updatedAt !== expected.updatedAt || lifecycle.trashedAt !== expected.trashedAt)

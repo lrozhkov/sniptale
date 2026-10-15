@@ -58,7 +58,10 @@ beforeEach(async () => {
   io.read.mockResolvedValue(undefined);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
-  io.load.mockResolvedValue({ versions: [{ project: fixture(), revision: 1, savedAt: 1 }] });
+  io.load.mockResolvedValue({
+    currentRevision: 1,
+    versions: [{ project: fixture(), revision: 1, savedAt: 1 }],
+  });
   io.attach.mockImplementation(async ({ project }) => {
     const next = structuredClone(project);
     next.updatedAt = 2;
@@ -70,9 +73,12 @@ beforeEach(async () => {
       gain: 1,
       transcript: '',
     };
-    return next;
+    return { project: next, workspaceRevision: 2 };
   });
-  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 3 }));
+  io.save.mockImplementation(async (project) => ({
+    project: { ...project, updatedAt: 3 },
+    workspaceRevision: 2,
+  }));
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -181,7 +187,7 @@ it('deduplicates slide and object narration and leaves detached audio unloaded',
   io.read.mockResolvedValue(new Blob(['voice'], { type: 'audio/webm' }));
   const attach = io.attach.getMockImplementation()!;
   io.attach.mockImplementation(async (args) => {
-    const next = await attach(args);
+    const { project: next, workspaceRevision } = await attach(args);
     const slide = next.tour.slides[0];
     slide.annotations = [
       {
@@ -200,7 +206,7 @@ it('deduplicates slide and object narration and leaves detached audio unloaded',
       loop: true,
       ducking: { enabled: true, level: 0.25 },
     };
-    return next;
+    return { project: next, workspaceRevision };
   });
   await act(async () => {
     await state.commitChange(command());
@@ -235,11 +241,67 @@ it('releases and reacquires the same media IDs when opening another project', as
   const next = structuredClone(state.project!);
   next.id = 'other';
   io.list.mockResolvedValue([{ id: 'other', availability: 'available' }]);
-  io.load.mockResolvedValue({ versions: [{ project: next, revision: 1, savedAt: 1 }] });
+  io.load.mockResolvedValue({
+    currentRevision: 1,
+    versions: [{ project: next, revision: 1, savedAt: 1 }],
+  });
   await act(async () => state.openExisting('other'));
   expect(urls.revoke).toHaveBeenCalledWith('blob:voice-1');
   expect(io.read).toHaveBeenCalledTimes(2);
   expect(state.images['audio']).toBe('blob:voice-2');
+});
+
+it('refuses an old resource callback after a same-id A/B/A document round trip', async () => {
+  const oldCommit = state.commitChange;
+  const original = structuredClone(state.project!);
+  const other = { ...original, id: 'other' };
+  io.list.mockResolvedValue([
+    { id: 'other', availability: 'available' },
+    { id: original.id, availability: 'available' },
+  ]);
+  io.load
+    .mockResolvedValueOnce({
+      currentRevision: 17,
+      versions: [{ project: other, revision: 17, savedAt: 1 }],
+    })
+    .mockResolvedValueOnce({
+      currentRevision: 37,
+      versions: [{ project: { ...original, name: 'Reopened A' }, revision: 37, savedAt: 1 }],
+    });
+  await act(async () => state.openExisting('other'));
+  await act(async () => state.openExisting(original.id));
+  await act(async () => expect(await oldCommit(command())).toBe(false));
+  expect(io.attach).not.toHaveBeenCalled();
+  expect(state.project?.name).toBe('Reopened A');
+});
+
+it('discards a pending resource acknowledgement after opening another document', async () => {
+  const original = structuredClone(state.project!);
+  let finish!: (snapshot: { project: typeof original; workspaceRevision: number }) => void;
+  io.attach.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = state.commitChange(command());
+  });
+  const other = { ...original, id: 'other', name: 'Other document' };
+  io.list.mockResolvedValue([{ id: other.id, availability: 'available' }]);
+  io.load.mockResolvedValue({
+    currentRevision: 37,
+    versions: [{ project: other, revision: 37, savedAt: 1 }],
+  });
+  await act(async () => state.openExisting(other.id));
+  await act(async () => {
+    finish({ project: { ...original, name: 'Late old document' }, workspaceRevision: 59 });
+    expect(await pending).toBe(false);
+  });
+  expect(state.project?.id).toBe(other.id);
+  expect(state.project?.name).toBe(other.name);
+  expect(state.status).toBe('saved');
 });
 
 it('loads music-only URLs and releases them when the binding is undone', async () => {
@@ -255,7 +317,7 @@ it('loads music-only URLs and releases them when the binding is undone', async (
       loop: true,
       ducking: { enabled: true, level: 0.25 },
     };
-    return next;
+    return { project: next, workspaceRevision: 2 };
   });
   await act(async () => {
     await state.commitChange(command());
@@ -277,18 +339,21 @@ it('discards late music bytes after undo without creating a stale object URL', a
       })
   );
   io.attach.mockImplementation(async ({ project }) => ({
-    ...project,
-    updatedAt: 2,
-    tour: {
-      ...project.tour,
-      backgroundMusic: {
-        assetId: 'music',
-        duration: 2,
-        volume: 0.3,
-        loop: true,
-        ducking: { enabled: true, level: 0.25 },
+    project: {
+      ...project,
+      updatedAt: 2,
+      tour: {
+        ...project.tour,
+        backgroundMusic: {
+          assetId: 'music',
+          duration: 2,
+          volume: 0.3,
+          loop: true,
+          ducking: { enabled: true, level: 0.25 },
+        },
       },
     },
+    workspaceRevision: 2,
   }));
   await act(async () => {
     await state.commitChange(command());

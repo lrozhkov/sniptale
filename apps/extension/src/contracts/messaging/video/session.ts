@@ -1,3 +1,6 @@
+import type { RecordingObservationsMessage } from '../../video/types/messages';
+import type { GetRecordingStateMessage } from '@sniptale/runtime-contracts/video/types/messages.content';
+import type { RecordingFrameClockBinding } from '../../video/recording-frame-clock';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type {
   RuntimeAreaSelectedMessage,
@@ -32,6 +35,7 @@ import type {
 export type { RuntimeVideoSessionResponseByType } from './session-responses';
 
 export type RuntimeVideoSessionRequestByType = {
+  [VideoMessageType.RECORDING_OBSERVATIONS]: RecordingObservationsMessage;
   [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: ReleaseVideoRecordingSurfaceMessage;
   [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: VideoRecordingSurfaceCommandMessage;
   [VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER]: VideoRecordingCameraOfferMessage;
@@ -93,7 +97,11 @@ export type RuntimeVideoSessionRequestByType = {
     recordingId: string;
     settings: Partial<VideoRecordingSettings>;
   };
-  [VideoMessageType.GET_RECORDING_STATE]: { type: typeof VideoMessageType.GET_RECORDING_STATE };
+  [VideoMessageType.GET_RECORDING_STATE]: GetRecordingStateMessage;
+  [VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING]: RecordingFrameClockBinding & {
+    type: typeof VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING;
+    capabilityToken: string;
+  };
   [VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT]: {
     type: typeof VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT;
     recordingId: string;

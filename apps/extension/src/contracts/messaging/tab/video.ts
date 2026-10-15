@@ -1,3 +1,4 @@
+import type { RecordingFrameClockAnchor } from '../../video/recording-frame-clock';
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { RuntimeRequestByType } from '../contracts/runtime-message/index';
@@ -14,15 +15,18 @@ export type TabVideoRequestByType = {
     type: typeof VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE;
     recordingId: string;
     offsetSeconds?: number;
+    frameClock?: RecordingFrameClockAnchor | null;
   };
   [VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE]: {
     type: typeof VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE;
   };
   [VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE]: {
     type: typeof VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE;
+    frameClock?: RecordingFrameClockAnchor | null;
   };
   [VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE]: {
     type: typeof VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE;
+    frameClock?: RecordingFrameClockAnchor | null;
   };
   [VideoMessageType.SHOW_COUNTDOWN]: {
     type: typeof VideoMessageType.SHOW_COUNTDOWN;
