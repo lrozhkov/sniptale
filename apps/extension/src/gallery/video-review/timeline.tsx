@@ -1,3 +1,4 @@
+import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
@@ -96,13 +97,7 @@ type TimelineProps = {
 
 /** One source lane, with an independent ruler/playhead rather than browser slider chrome. */
 export function ReviewTimeline(props: TimelineProps) {
-  const audioVisible = !!props.audioTrack;
-  const zoomVisible = !!props.zoomTrack || !!props.textTrack || !!props.annotationEffectsTrack;
-  const { viewport, gutter, width } = useReviewTimelineGeometry(
-    audioVisible,
-    zoomVisible,
-    props.actionsTrackVisible === false ? 0 : props.markers.length
-  );
+  const { viewport, gutter, width } = useReviewTimelineGeometry();
   const { zoom, navigation, navigate, onZoom, wheelTarget, follow } = useReviewTimelineNavigation(
     props,
     {
@@ -142,6 +137,7 @@ export function ReviewTimeline(props: TimelineProps) {
     <section
       ref={wheelTarget}
       data-ui="gallery.videoReview.timeline"
+      data-active-tool-lane={activeLane ?? undefined}
       className={`@container flex min-h-0 ${reviewTimelineHeightClass(props)} min-w-0 max-w-full shrink-0 flex-col
         overflow-hidden border-t border-[var(--sniptale-color-border-soft)]`}
     >
@@ -156,102 +152,111 @@ export function ReviewTimeline(props: TimelineProps) {
         onPlay={() => (props.beforeAction ?? ((action) => action()))(props.onPlay)}
         onZoom={onZoom}
       />
-      <div
-        ref={viewport}
-        data-ui="gallery.videoReview.timelineViewport"
-        style={{ overflowX: zoom === 1 ? 'hidden' : 'auto' }}
-        onScroll={() => {
-          follow.onScroll();
-          hover.clear();
-        }}
-        {...follow.interaction}
-        className={`w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain
-          ${props.fillHeight ? 'flex-1' : ''}`}
-      >
+      <ReviewTimelinePanes viewport={viewport} busy={props.busy}>
         <div
-          ref={plane.plane}
-          data-ui="gallery.videoReview.timePlane"
-          data-active-tool-lane={activeLane ?? undefined}
-          title={hover.reason}
-          role="slider"
-          tabIndex={0}
-          aria-label={translate('gallery.videoReview.position')}
-          aria-valuemin={0}
-          aria-valuemax={props.duration}
-          aria-valuenow={props.time}
-          aria-valuetext={reviewTimeLabel(props.time)}
-          className="group/plane relative overflow-clip pb-2 outline-none focus-visible:ring-1
-            focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)]"
-          style={
-            {
-              // CSS follows the resized viewport before ResizeObserver can update ruler measurements.
-              width: zoom === 1 ? '100%' : `calc(${zoom * 100}% - ${gutter * (zoom - 1)}px)`,
-              '--review-track-gutter': `${gutter}px`,
-              cursor: hover.cursor,
-            } as CSSProperties
-          }
-          onPointerDownCapture={hover.clear}
-          onPointerDown={plane.onPointerDown}
-          onPointerMoveCapture={(event) => hover.move(event, plane.activeLane())}
-          onPointerMove={plane.onPointerMove}
-          onPointerUp={(event) => {
-            plane.onPointerUp(event);
+          ref={viewport}
+          data-ui="gallery.videoReview.timelineViewport"
+          style={{ overflowX: zoom === 1 ? 'hidden' : 'auto', scrollbarGutter: 'stable' }}
+          onScroll={() => {
+            follow.onScroll();
             hover.clear();
           }}
-          onPointerCancel={() => {
-            plane.onPointerCancel();
-            hover.clear();
-          }}
-          onPointerLeave={hover.clear}
+          {...follow.interaction}
+          className={`w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain
+          ${props.fillHeight ? 'flex-1' : ''}`}
         >
-          <ReviewPlaybackRangeOverlay
-            range={ruler.range}
-            duration={props.duration}
-            gutter={gutter}
-            width={Math.max(1, width * zoom)}
-          />
-          <ReviewTimelineResizeGuide
-            key={props.sourceId}
-            hover={hover.hover}
-            viewport={viewport}
-            gutter={gutter}
-            width={Math.max(1, width * zoom)}
-            duration={props.duration}
+          <div
+            ref={plane.plane}
+            data-ui="gallery.videoReview.timePlane"
+            data-active-tool-lane={activeLane ?? undefined}
+            title={hover.reason}
+            role="slider"
+            tabIndex={0}
+            aria-label={translate('gallery.videoReview.position')}
+            aria-valuemin={0}
+            aria-valuemax={props.duration}
+            aria-valuenow={props.time}
+            aria-valuetext={reviewTimeLabel(props.time)}
+            className="group/plane relative overflow-clip pb-2 outline-none focus-visible:ring-1
+            focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)]"
+            style={
+              {
+                // CSS follows the resized viewport before ResizeObserver can update ruler measurements.
+                width: zoom === 1 ? '100%' : `calc(${zoom * 100}% - ${gutter * (zoom - 1)}px)`,
+                '--review-track-gutter': `${gutter}px`,
+                cursor: hover.cursor,
+              } as CSSProperties
+            }
+            onPointerDownCapture={(event) => {
+              if (event.target instanceof Node && event.currentTarget.contains(event.target))
+                hover.clear();
+            }}
+            onPointerDown={plane.onPointerDown}
+            onPointerMoveCapture={(event) => {
+              if (event.target instanceof Node && event.currentTarget.contains(event.target))
+                hover.move(event, plane.activeLane());
+              else hover.clear();
+            }}
+            onPointerMove={plane.onPointerMove}
+            onPointerUp={(event) => {
+              plane.onPointerUp(event);
+              hover.clear();
+            }}
+            onPointerCancel={() => {
+              plane.onPointerCancel();
+              hover.clear();
+            }}
+            onPointerLeave={hover.clear}
           >
-            <ReviewRulerRow
-              controls={props.trackControls}
-              interaction={ruler.interaction}
-              time={props.time}
+            <ReviewPlaybackRangeOverlay
+              range={ruler.range}
               duration={props.duration}
               gutter={gutter}
               width={Math.max(1, width * zoom)}
             />
-            <div inert={props.busy}>
-              <ReviewTimelineEvents {...props} width={width} zoom={zoom} />
-              <ReviewSourceLane
-                {...props}
-                drawingRange={plane.sourcePreview}
-                drawingKind={props.sourceRangeKind}
-                rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
-                snapToKeyframes={!!props.boundaries}
+            <ReviewTimelineResizeGuide
+              key={props.sourceId}
+              hover={hover.hover}
+              viewport={viewport}
+              gutter={gutter}
+              width={Math.max(1, width * zoom)}
+              duration={props.duration}
+            >
+              <ReviewRulerRow
+                controls={props.trackControls}
+                interaction={ruler.interaction}
+                time={props.time}
+                duration={props.duration}
+                gutter={gutter}
+                width={Math.max(1, width * zoom)}
               />
-            </div>
-            <ReviewPlayhead
-              time={props.time}
-              duration={props.duration}
-              gutter={gutter}
-              width={Math.max(1, width * zoom)}
-            />
-            <div inert={props.busy}>
-              {props.zoomTrack}
-              {props.webcamTrack}
-              {props.textTrack}
-              {props.annotationEffectsTrack}
-              {props.audioTrack}
-            </div>
-          </ReviewTimelineResizeGuide>
+              <div inert={props.busy}>
+                <ReviewTimelineEvents {...props} width={width} zoom={zoom} />
+                <ReviewSourceLane
+                  {...props}
+                  drawingRange={plane.sourcePreview}
+                  drawingKind={props.sourceRangeKind}
+                  rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
+                  snapToKeyframes={!!props.boundaries}
+                />
+              </div>
+              <ReviewPlayhead
+                time={props.time}
+                duration={props.duration}
+                gutter={gutter}
+                width={Math.max(1, width * zoom)}
+              />
+              <div inert={props.busy}>
+                {props.zoomTrack}
+                {props.webcamTrack}
+                {props.textTrack}
+                {props.annotationEffectsTrack}
+                {props.audioTrack}
+              </div>
+            </ReviewTimelineResizeGuide>
+          </div>
         </div>
-      </div>
+      </ReviewTimelinePanes>
     </section>
   );
 }

@@ -27,43 +27,20 @@ export function reviewWheelZoom(
   return 2 ** (next / 25);
 }
 
-/** The viewport owns the label gutter and usable ruler width at every resize. */
-export function useReviewTimelineGeometry(
-  audioVisible: boolean,
-  zoomVisible: boolean,
-  markersCount: number
-) {
+/** Time coordinates use only the independently clipped right viewport. */
+export function useReviewTimelineGeometry() {
   const viewport = useRef<HTMLDivElement>(null);
-  const [gutter, setGutter] = useState(192);
   const [width, setWidth] = useState(640);
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
-    const measure = () => {
-      const headers = node.querySelectorAll<HTMLElement>(
-        '[data-ui="gallery.videoReview.trackHeader"]'
-      );
-      const natural = Math.max(
-        120,
-        ...Array.from(headers, (header) => {
-          const label = header.querySelector<HTMLElement>('[data-track-label]');
-          const controls = header.querySelector<HTMLElement>('[data-track-controls]');
-          return (label?.scrollWidth ?? 0) + (controls?.scrollWidth ?? 0) + 44;
-        })
-      );
-      const next = Math.min(Math.round(node.clientWidth * 0.4) || 260, Math.ceil(natural));
-      setGutter(next);
-      setWidth(Math.max(1, node.clientWidth - next));
-    };
+    const measure = () => setWidth(Math.max(1, node.clientWidth));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
-    node
-      .querySelectorAll('[data-track-label], [data-track-controls]')
-      .forEach((item) => observer.observe(item));
     return () => observer.disconnect();
-  }, [audioVisible, zoomVisible, markersCount]);
-  return { viewport, gutter, width };
+  }, []);
+  return { viewport, gutter: 0, width };
 }
 
 /** Commits admitted zoom requests after the ruler has adopted its new scale. */
@@ -236,13 +213,20 @@ function useReviewPlaybackFollow(
   ]);
   const interaction: HTMLAttributes<HTMLDivElement> = {
     onPointerDownCapture(event) {
-      if (event.target !== event.currentTarget) suspend();
+      if (
+        event.target instanceof Node &&
+        event.currentTarget.contains(event.target) &&
+        event.target !== event.currentTarget
+      )
+        suspend();
     },
     onWheelCapture(event) {
+      if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
       if (!event.ctrlKey && (event.deltaX !== 0 || (event.shiftKey && event.deltaY !== 0)))
         suspend();
     },
     onKeyDownCapture(event) {
+      if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return;
       if (
         !['Tab', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(event.key) &&
         (event.target !== event.currentTarget ||

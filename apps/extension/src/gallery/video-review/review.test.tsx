@@ -815,7 +815,7 @@ it.each(['basic', 'advanced'] as const)(
         if (mode === 'basic') return fixture.click('telemetry');
         await fixture.click('trackSettings');
         const toggle = fixture.host.querySelector<HTMLButtonElement>(
-          '[data-review-track="actions"] [role="switch"]'
+          '[data-review-header-track="actions"] [role="switch"]'
         );
         expect(toggle).not.toBeNull();
         await act(async () => toggle!.click());
@@ -852,7 +852,8 @@ it('lists every lane in settings, retains unavailable streams off, and preserves
     );
     await fixture.click('advancedEditing');
     await fixture.click('trackSettings');
-    const row = (track: string) => fixture.host.querySelector(`[data-review-track="${track}"]`);
+    const row = (track: string) =>
+      fixture.host.querySelector(`[data-review-header-track="${track}"]`);
     for (const track of [
       'source',
       'actions',

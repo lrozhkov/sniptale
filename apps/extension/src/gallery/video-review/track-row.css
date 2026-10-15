@@ -6,9 +6,11 @@
   }
 }
 
+[data-review-header-muted='true'],
 [data-review-track-muted='true'] [data-ui='gallery.videoReview.trackHeader'] {
   background-color: var(--sniptale-color-surface-input);
 }
+[data-review-header-muted='true'] [data-track-label],
 [data-review-track-muted='true'] [data-track-label] {
   color: var(--sniptale-color-text-secondary);
 }
@@ -35,7 +37,7 @@
   );
 }
 
-/* Mark the sticky lane header so tool guidance never covers authored items. */
+/* Tool guidance stays on the header in either presentation. */
 :is(
     [data-active-tool-lane='annotation']
       [data-review-track-muted]:has([data-ui='gallery.videoReview.annotationEffectsLane']),
@@ -45,7 +47,11 @@
       [data-review-track-muted]:has([data-ui='gallery.videoReview.zoomLane']),
     [data-active-tool-lane='original'] [data-review-track-muted]:has([data-original-audio-lane])
   )
-  > [data-ui='gallery.videoReview.trackHeader'] {
+  > [data-ui='gallery.videoReview.trackHeader'],
+[data-active-tool-lane='annotation'] [data-review-header-track='annotationEffects'],
+[data-active-tool-lane='source'] [data-review-header-track='source'],
+[data-active-tool-lane='focus'] [data-review-header-track='zoom'],
+[data-active-tool-lane='original'] [data-review-header-track='originalAudio'] {
   box-shadow: inset 2px 0 color-mix(in srgb, var(--sniptale-color-accent) 60%, transparent);
   background: color-mix(
     in srgb,

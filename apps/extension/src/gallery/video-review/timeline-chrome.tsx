@@ -99,7 +99,7 @@ export function ReviewRulerRow(props: {
       data-ui="gallery.videoReview.rulerRow"
       className="sticky top-0 z-40 bg-[var(--sniptale-color-surface-panel)]"
     >
-      <ReviewTrackRow label="" icon={props.controls}>
+      <ReviewTrackRow ruler label="" icon={props.controls}>
         <ReviewRuler
           duration={props.duration}
           width={props.width}

@@ -181,13 +181,13 @@ it('keeps a usable ruler width while track labels and viewport are temporarily u
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(0);
   act(() => measure());
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('120px');
+  expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('0px');
   expect(plane.querySelector('[data-ui="gallery.videoReview.ruler"]')).not.toBeNull();
 });
 
 it('does not observe geometry before the viewport mounts', () => {
   function DetachedGeometry() {
-    useReviewTimelineGeometry(false, false, 0);
+    useReviewTimelineGeometry();
     return null;
   }
   act(() => environment.root!.render(<DetachedGeometry />));
@@ -368,7 +368,7 @@ it('renders ruler labels at the unit chosen for the current scale', () => {
   }
 });
 
-it('sizes the fixed gutter from natural label and control widths without a resize handle', () => {
+it('sizes the separate label pane from natural label and control widths without a resize handle', () => {
   const metric = vi
     .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
     .mockImplementation(function (this: HTMLElement) {
@@ -380,8 +380,8 @@ it('sizes the fixed gutter from natural label and control widths without a resiz
     });
   try {
     const { host, props } = renderTimeline();
-    const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-    expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('238px');
+    const panes = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timelinePanes"]')!;
+    expect(panes.style.getPropertyValue('--review-label-width')).toBe('238px');
     expect(host.querySelector('[role="separator"]')).toBeNull();
     expect(props.onSeek).not.toHaveBeenCalled();
   } finally {

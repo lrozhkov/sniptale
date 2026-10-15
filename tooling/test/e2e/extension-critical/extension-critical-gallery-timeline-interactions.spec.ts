@@ -77,6 +77,78 @@ async function inspectResizeGuide(page: Page, dialog: Locator) {
   return guide;
 }
 
+async function inspectTimelinePanes(dialog: Locator, scroll = false) {
+  const panes = dialog.locator('[data-ui="gallery.videoReview.timelinePanes"]');
+  const aligned = async () => {
+    await expect
+      .poll(() =>
+        panes.evaluate((node) => {
+          const headers = [...node.querySelectorAll<HTMLElement>('[data-review-header-track]')];
+          return Math.max(
+            0,
+            ...headers.map((header) => {
+              const body = node.querySelector<HTMLElement>(
+                `[data-review-track="${header.dataset.reviewHeaderTrack}"]`
+              );
+              if (!body) return Infinity;
+              const a = header.getBoundingClientRect();
+              const b = body.getBoundingClientRect();
+              return Math.max(Math.abs(a.top - b.top), Math.abs(a.bottom - b.bottom));
+            })
+          );
+        })
+      )
+      .toBeLessThanOrEqual(1);
+  };
+  await aligned();
+  if (!scroll) return;
+  const left = dialog.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+  const right = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  await expect
+    .poll(() => left.evaluate((node) => node.scrollHeight - node.clientHeight))
+    .toBeGreaterThan(0);
+  for (const [surface, amount] of [
+    [left, 1],
+    [right, 0.5],
+    [left, 0],
+  ] as const) {
+    await surface.evaluate((node, fraction) => {
+      node.scrollTop = (node.scrollHeight - node.clientHeight) * fraction;
+    }, amount);
+    await expect
+      .poll(async () =>
+        Math.abs(
+          (await left.evaluate((node) => node.scrollTop)) -
+            (await right.evaluate((node) => node.scrollTop))
+        )
+      )
+      .toBeLessThanOrEqual(1);
+    await aligned();
+  }
+  const clipping = await panes.evaluate((node) => {
+    const left = node.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.trackListViewport"]'
+    )!;
+    const right = node.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.timelineViewport"]'
+    )!;
+    const header = left.querySelector<HTMLElement>('[data-ui="gallery.videoReview.trackHeader"]')!;
+    return {
+      separated: header.getBoundingClientRect().right <= right.getBoundingClientRect().left + 1,
+      labelOverflow: getComputedStyle(left).overflowX,
+      labelBar: left.offsetWidth - left.clientWidth,
+      timeBar: right.offsetWidth - right.clientWidth,
+      rangeDifference: Math.abs(
+        left.scrollHeight - left.clientHeight - (right.scrollHeight - right.clientHeight)
+      ),
+    };
+  });
+  expect(clipping).toMatchObject({ separated: true, labelOverflow: 'hidden' });
+  expect(clipping.rangeDifference).toBeLessThanOrEqual(1);
+  expect(clipping.labelBar).toBeGreaterThan(0);
+  expect(clipping.timeBar).toBeGreaterThan(0);
+}
+
 async function inspectTrackControls(
   page: Page,
   dialog: Locator,
@@ -102,16 +174,17 @@ async function inspectTrackControls(
   ]) {
     await expect(dialog.locator(`[data-review-track="${track}"]`)).toHaveCount(1);
   }
-  const camera = dialog.locator('[data-review-track="webcam"] [role="switch"]');
+  const camera = dialog.locator('[data-review-header-track="webcam"] [role="switch"]');
   await expect(camera).toBeDisabled();
   await expect(camera).not.toBeChecked();
-  const textToggle = dialog.locator('[data-review-track="text"] [role="switch"]');
+  await inspectTimelinePanes(dialog);
+  const textToggle = dialog.locator('[data-review-header-track="text"] [role="switch"]');
   await textToggle.uncheck();
   await settings.click();
   await expect(dialog.locator('[data-review-track="text"]')).toHaveCount(0);
   await settings.click();
-  await dialog.locator('[data-review-track="text"] [role="switch"]').check();
-  await expect(dialog.locator('[data-review-track="text"] [role="switch"]')).toBeChecked();
+  await dialog.locator('[data-review-header-track="text"] [role="switch"]').check();
+  await expect(dialog.locator('[data-review-header-track="text"] [role="switch"]')).toBeChecked();
   await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
   await dialog.locator('[data-review-track="music"]').scrollIntoViewIfNeeded();
   await page.screenshot({
@@ -121,7 +194,8 @@ async function inspectTrackControls(
   });
   await settings.click();
   const source = dialog.locator('[data-review-track="source"]');
-  const lock = source.getByRole('button', {
+  const sourceHeader = dialog.locator('[data-review-header-track="source"]');
+  const lock = sourceHeader.getByRole('button', {
     name: `${label('gallery.videoReview.trackLock')}: ${label('gallery.videoReview.sourceVideo')}`,
     exact: true,
   });
@@ -138,7 +212,7 @@ async function inspectTrackControls(
     (await readNativeReviewWorkspace(page, `recording:${betaV1Fixture.records.recordings[0]!.id}`))
       ?.history.length
   ).toBe(historyBefore);
-  await source
+  await sourceHeader
     .getByRole('button', {
       name: `${label('gallery.videoReview.trackUnlock')}: ${label('gallery.videoReview.sourceVideo')}`,
       exact: true,
@@ -151,7 +225,7 @@ async function inspectNotes(page: Page, dialog: Locator, locale: 'ru' | 'en', ba
   const button = (key: Parameters<typeof translate>[0]) =>
     dialog.getByRole('button', { name: translate(key, locale), exact: true }).first();
   await button('gallery.videoReview.trackSettings').click();
-  await dialog.locator('[data-review-track="actions"] [role="switch"]').uncheck();
+  await dialog.locator('[data-review-header-track="actions"] [role="switch"]').uncheck();
   await button('gallery.videoReview.trackSettings').click();
   if (basic) await button('gallery.videoReview.advancedEditing').click();
   await expect(dialog.locator('[data-ui="gallery.videoReview.historyTrack"]')).toHaveCount(0);
@@ -381,6 +455,7 @@ for (const variant of [
         path: info.outputPath('source-tools-and-ruler.png'),
         fullPage: false,
       });
+      await inspectTimelinePanes(dialog);
       await inspectTrackControls(
         page,
         dialog,
@@ -597,13 +672,13 @@ for (const variant of [
         exact: true,
       });
       await settings.click();
-      await dialog.locator('[data-review-track="webcam"] [role="switch"]').click();
+      await dialog.locator('[data-review-header-track="webcam"] [role="switch"]').click();
       await expect
         .poll(async () => (await persistedReviewContent(page))?.webcam?.assetId)
         .toMatch(/^project-asset:/);
       await settings.click();
       await dialog
-        .locator('[data-review-track="voiceover"]')
+        .locator('[data-review-header-track="voiceover"]')
         .getByRole('button', { name: label('gallery.videoReview.audioImport'), exact: true })
         .click();
       const drawer = page.locator('[data-ui="music.library.drawer"]');
@@ -683,6 +758,27 @@ for (const variant of [
                 fullPage: false,
               });
             }
+          }
+          await inspectTimelinePanes(dialog, count === 3 && !adjacent);
+          if (count === 3 && !adjacent) {
+            const zoom = dialog.getByRole('slider', {
+              name: label('videoEditor.timeline.zoom'),
+              exact: true,
+            });
+            await zoom.fill('50');
+            const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+            await viewport.evaluate((node) => {
+              node.scrollLeft = node.scrollWidth;
+            });
+            await expect
+              .poll(() => viewport.evaluate((node) => node.scrollLeft))
+              .toBeGreaterThan(0);
+            await inspectTimelinePanes(dialog, true);
+            await page.screenshot({
+              path: info.outputPath(`panes-${compact}.png`),
+              fullPage: false,
+            });
+            await zoom.fill('0');
           }
         }
       }
