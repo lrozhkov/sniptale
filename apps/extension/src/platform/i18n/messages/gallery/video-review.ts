@@ -653,6 +653,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
   downloadReport: { ru: 'Скачать отчёт', en: 'Download report' },
   reportCopied: { ru: 'Отчёт скопирован', en: 'Report copied' },
   reportReady: { ru: 'Скачивание отчёта начато', en: 'Report download started' },
+  backupFailed: {
+    ru: 'Не удалось создать резервную копию. Повторите попытку.',
+    en: 'Could not create the backup. Try again.',
+  },
   reportFailed: {
     ru: 'Не удалось экспортировать отчёт. Повторите попытку.',
     en: 'Could not export the report. Try again.',

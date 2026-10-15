@@ -104,6 +104,7 @@ describe('gallery selected export modes', () => {
         },
       }),
       expect.objectContaining({
+        requireSelected: true,
         filename: expect.stringMatching(/^Sniptale_media-hub-selection-backup_.*\.zip$/),
       })
     );
@@ -232,4 +233,19 @@ describe('gallery selected export modes', () => {
     );
     expect(createDirectFileSinkMock).not.toHaveBeenCalled();
   });
+});
+
+it('exports the explicit preview target without changing the library selection', async () => {
+  const selected = createMediaItem({ id: 'selected' });
+  const target = createMediaItem({ id: 'preview' });
+  const { controller } = createController({ selectedItems: [selected] });
+  await createSelectionBackupAction(controller)(runBusyAction, [target]);
+  expect(exportMediaHubBackupMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      scope: 'selected',
+      selected: { mediaAssetIds: ['preview'], scenarioProjectIds: [], videoProjectIds: [] },
+    }),
+    expect.objectContaining({ requireSelected: true })
+  );
+  expect(controller.state.selection.selectedItems).toEqual([selected]);
 });

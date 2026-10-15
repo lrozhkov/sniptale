@@ -47,7 +47,11 @@ import {
   createDeleteManyAction,
   createRestoreTrashAction,
 } from './selection';
-import { createSelectionBackupAction, createSelectionZipAction } from './selection-export';
+import {
+  exportGalleryItemsBackup,
+  createSelectionBackupAction,
+  createSelectionZipAction,
+} from './selection-export';
 import { createBusyActionRunner } from './shared';
 import { openSnapshotScreenshotInEditor } from './snapshot-screenshot';
 import type { UseGalleryAppActionsResult } from './useGalleryAppActions.types';
@@ -120,6 +124,16 @@ function buildGalleryAppActionsResult(args: {
       inspectWebSnapshot,
     },
     preview: {
+      backup: (item) =>
+        withBusy(async () => {
+          if (controller.state.preview.session.item?.id !== item.id) return;
+          const saved = await savePreviewDraftBeforeDownload(
+            controller,
+            args.navigationCoordinator,
+            args.readPreviewState
+          );
+          if (saved !== null) await exportGalleryItemsBackup([item]);
+        }),
       close: args.handlePreviewClose,
       copy: () => copyPreviewItem(controller, withBusy),
       download: () =>

@@ -102,6 +102,7 @@ function createLayoutProps() {
     onPreviewClose: vi.fn(),
     onPreviewInspectorToggle: vi.fn(),
     onPreviewCopy: vi.fn(),
+    onPreviewBackup: vi.fn(),
     onPreviewDelete: vi.fn(),
     onPreviewDownload: vi.fn(),
     onPreviewDownloadOriginal: vi.fn(),
@@ -175,6 +176,7 @@ function createOpenOverlayProps(onConfirm = vi.fn()) {
 }
 
 type PreviewOverlayProps = {
+  onBackup: () => Promise<void>;
   item: { id: string };
   navigation?: {
     current: number;
@@ -211,6 +213,7 @@ async function invokePreviewCallbacks(previewProps: PreviewOverlayProps) {
   previewProps.onRemoveTag('alpha');
   previewProps.onAddTag();
   previewProps.onResetChanges();
+  await previewProps.onBackup();
   await previewProps.onDownload();
   await previewProps.onCopy();
   previewProps.onEdit();
@@ -405,6 +408,7 @@ it('wires preview overlay callbacks to the parent app-shell actions', async () =
   expect(props.onRemoveTag).toHaveBeenCalledWith('alpha');
   expect(props.onAddTag).toHaveBeenCalledTimes(1);
   expect(props.onPreviewResetChanges).toHaveBeenCalledTimes(1);
+  expect(props.onPreviewBackup).toHaveBeenCalledWith(props.state.preview.session.item);
   expect(props.onPreviewDownload).toHaveBeenCalledTimes(1);
   expect(props.onPreviewCopy).toHaveBeenCalledTimes(1);
   expect(props.onPreviewEdit).toHaveBeenCalledWith(props.state.preview.session.item);

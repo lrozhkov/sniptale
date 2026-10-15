@@ -100,6 +100,8 @@ function buildGalleryPreviewHandlers(
     onPreviewResetChanges: () => {
       if (!isReadOnlyTrashPreview(controller)) actions.preview.resetChanges();
     },
+    onPreviewBackup: (item: GalleryItem) =>
+      isReadOnlyTrashPreview(controller) ? Promise.resolve() : actions.preview.backup(item),
     onPreviewDownload: () =>
       isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.download(),
     onPreviewDownloadOriginal: () =>

@@ -10,6 +10,7 @@ import {
   createController,
   createMediaItem,
   createScenarioItem,
+  createScenarioExportItem,
   createVideoProjectItem,
   runBusyAction,
 } from './test-support/index';
@@ -606,6 +607,22 @@ it('maps a selected quick-edit and its source to one media root without montage 
   expect(createSelectedBackupExportOptions([project, source])?.selected).toEqual({
     mediaAssetIds: ['source'],
     scenarioProjectIds: [],
+    videoProjectIds: [],
+  });
+});
+
+it('backs up a saved scenario export through its owning project and deduplicates targets', async () => {
+  const { createSelectedBackupExportOptions } = await import('./backup');
+  const artifact = createScenarioExportItem();
+  artifact.project.lifecycle = { storageClass: 'temporary', savedAt: null, updatedAt: 1 };
+  expect(createSelectedBackupExportOptions([artifact])?.includeDrafts).toBe(true);
+  const project = createScenarioItem({ entityId: artifact.project.id });
+  expect(createSelectedBackupExportOptions([artifact])?.selected?.scenarioProjectIds).toEqual([
+    artifact.project.id,
+  ]);
+  expect(createSelectedBackupExportOptions([artifact, project, artifact])?.selected).toEqual({
+    mediaAssetIds: [],
+    scenarioProjectIds: [artifact.project.id],
     videoProjectIds: [],
   });
 });

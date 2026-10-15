@@ -1,3 +1,4 @@
+import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import {
   initDB,
@@ -16,21 +17,12 @@ import { resolveBackupDependencySelection } from './scenario-dependencies';
 import { MEDIA_HUB_BACKUP_SHARED_LAYOUT } from '../layout';
 
 export async function buildMediaHubBackupExportPlanFromLibraryV6(
-  options: MediaHubBackupExportOptions
+  options: MediaHubBackupExportOptions,
+  admission: { expectedReview?: VideoWorkspaceSnapshot | undefined; requireSelected?: boolean } = {}
 ) {
   const db = await initDB();
   const dependencies = await resolveBackupDependencySelection(db, options);
-  const effectiveOptions: MediaHubBackupExportOptions =
-    options.scope === 'selected'
-      ? {
-          ...options,
-          selected: {
-            mediaAssetIds: dependencies.media.selected,
-            scenarioProjectIds: dependencies.scenarios.selected,
-            videoProjectIds: options.selected?.videoProjectIds ?? [],
-          },
-        }
-      : options;
+  const effectiveOptions = withRequiredBackupDependencies(options, dependencies);
   const items = (await db.getAll(MEDIA_LIBRARY_STORE))
     .map(parseMediaLibraryEntry)
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
@@ -44,6 +36,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
   const coveredProjectMediaIds = await coveredProjectMedia(videoProjects);
   const media = await buildMediaRootInventory({
     coveredProjectMediaIds,
+    expectedReview: admission.expectedReview,
     db,
     items,
     options: effectiveOptions,
@@ -77,6 +70,12 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
       `Selected video project requires an excluded scenario project: ${missingScenarioDependency}.`
     );
   }
+  if (admission.requireSelected)
+    assertExplicitBackupTargets(options, {
+      mediaAssetIds: new Set([...exportedMediaIds, ...coveredProjectMediaIds]),
+      scenarioProjectIds: exportedScenarioIds,
+      videoProjectIds: new Set(videoProjects.map((root) => root.descriptor.rootId)),
+    });
   return buildMediaHubBackupExportPlanV6({
     layout: MEDIA_HUB_BACKUP_SHARED_LAYOUT,
     ...(options.scope === 'all' ? { galleryViews: await listGallerySavedViews() } : {}),
@@ -105,4 +104,32 @@ async function coveredProjectMedia(
     }
   }
   return coveredProjectMediaIds;
+}
+
+/** Direct item commands must not silently omit requested roots; the full export modal retains its filters. */
+function assertExplicitBackupTargets(
+  options: MediaHubBackupExportOptions,
+  available: Record<keyof NonNullable<MediaHubBackupExportOptions['selected']>, ReadonlySet<string>>
+) {
+  if (options.scope !== 'selected' || !options.selected) return;
+  for (const kind of ['mediaAssetIds', 'scenarioProjectIds', 'videoProjectIds'] as const) {
+    if (options.selected[kind].some((id) => !available[kind].has(id)))
+      throw new Error('A selected backup item is missing or excluded.');
+  }
+}
+
+/** Preserve explicit roots and add only dependencies admitted by the existing resolver. */
+function withRequiredBackupDependencies(
+  options: MediaHubBackupExportOptions,
+  dependencies: Awaited<ReturnType<typeof resolveBackupDependencySelection>>
+): MediaHubBackupExportOptions {
+  if (options.scope !== 'selected') return options;
+  return {
+    ...options,
+    selected: {
+      mediaAssetIds: dependencies.media.selected,
+      scenarioProjectIds: dependencies.scenarios.selected,
+      videoProjectIds: options.selected?.videoProjectIds ?? [],
+    },
+  };
 }

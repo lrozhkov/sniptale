@@ -67,6 +67,7 @@ export interface GalleryAppLayoutProps {
   onAddTag: (tag?: string) => void;
   onPreviewResetChanges?: () => void;
   onSaveMetadata?: () => void;
+  onPreviewBackup: (item: GalleryItem) => Promise<void>;
   onPreviewDownload: () => Promise<boolean>;
   onPreviewDownloadOriginal: () => Promise<boolean>;
   onPreviewCopy: () => Promise<boolean>;

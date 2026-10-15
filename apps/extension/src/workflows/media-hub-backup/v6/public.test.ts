@@ -5,12 +5,13 @@ const io = vi.hoisted(() => ({
   write: vi.fn(),
   abort: vi.fn(),
   backfill: vi.fn(),
+  pick: vi.fn(),
 }));
 vi.mock('../../../composition/persistence/scenario/library-publication', () => ({
   backfillScenarioLibraryAssets: io.backfill,
 }));
 vi.mock('../../../composition/archive-transfer', () => ({
-  createDirectFileSink: async () => ({ abort: io.abort }),
+  createDirectFileSink: io.pick,
 }));
 vi.mock('./inventory', () => ({ buildMediaHubBackupExportPlanFromLibraryV6: io.inventory }));
 vi.mock('./export', () => ({ exportMediaHubBackupV6: io.write }));
@@ -28,6 +29,7 @@ import { exportMediaHubBackup } from './public';
 beforeEach(() => {
   vi.clearAllMocks();
   io.active = false;
+  io.pick.mockImplementation(async () => ({ abort: io.abort }));
   io.inventory.mockImplementation(async () => {
     expect(io.active).toBe(true);
     return {};
@@ -56,4 +58,31 @@ it('releases backup protection and aborts the sink on a failed writer', async ()
   await expect(exportMediaHubBackup()).rejects.toThrow('cancelled');
   expect(io.active).toBe(false);
   expect(io.abort).toHaveBeenCalledOnce();
+});
+
+it('aborts without writing when the agreed snapshot is refused, then permits a fresh retry', async () => {
+  io.inventory.mockRejectedValueOnce(new Error('Video review changed'));
+  io.abort.mockResolvedValue(undefined);
+  await expect(exportMediaHubBackup({}, { requireSelected: true })).rejects.toThrow('changed');
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.abort).toHaveBeenCalledOnce();
+  await exportMediaHubBackup({}, { requireSelected: true });
+  expect(io.write).toHaveBeenCalledOnce();
+});
+
+it('holds source protection while the file picker waits and through sink abort', async () => {
+  io.pick.mockImplementationOnce(async () => {
+    expect(io.active).toBe(true);
+    return {
+      abort: async () => {
+        expect(io.active).toBe(true);
+      },
+    };
+  });
+  io.write.mockRejectedValueOnce(new Error('write refused'));
+  await expect(exportMediaHubBackup()).rejects.toThrow('write refused');
+  expect(io.active).toBe(false);
+  io.pick.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'));
+  await expect(exportMediaHubBackup()).rejects.toMatchObject({ name: 'AbortError' });
+  expect(io.active).toBe(false);
 });

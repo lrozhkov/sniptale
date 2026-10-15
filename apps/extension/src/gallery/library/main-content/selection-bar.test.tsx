@@ -209,7 +209,7 @@ it('supports missing tag catalog while keeping selection actions available', () 
   expect(container?.querySelector('input')).not.toBeNull();
 });
 
-it('offers catalogue deletion without resource actions for export-only selection', () => {
+it('offers project backup and catalogue deletion for export-only selection', () => {
   const selectedItems = [createScenarioExportItem()];
   const props = createProps({ selectedItems });
   renderSelectionBar(props);
@@ -217,12 +217,15 @@ it('offers catalogue deletion without resource actions for export-only selection
   expect(deletion).toBeInstanceOf(HTMLButtonElement);
   for (const label of [
     'gallery.app.addTags',
-    'gallery.app.selectionBackup',
     'gallery.app.selectionZip',
     'gallery.preview.downloadOriginal',
   ]) {
     expect(container?.querySelector(`button[aria-label="${label}"]`)).toBeNull();
   }
+  const backup = container?.querySelector('button[aria-label="gallery.app.selectionBackup"]');
+  expect(backup).toBeInstanceOf(HTMLButtonElement);
+  act(() => backup?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(props.onSelectionBackup).toHaveBeenCalledOnce();
   act(() => deletion?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
   expect(props.onDeleteMany).toHaveBeenCalledWith(selectedItems, {
     anchor: deletion,

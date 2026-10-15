@@ -94,10 +94,10 @@
       "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:platform",
-      "reason": "tool-noise: Five static RU/EN message entries extend the existing typed catalog. There are no effects, state authorities, runtime branches or new message owner. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: One static RU/EN backup failure message extends the existing typed catalog. The file has no effects, state authorities or runtime branches; score 2, delta 0, cohesion 1. Main inspected this exact data-only change. Fresh independent architecture review must validate the classification.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess new behavior, state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Independent architecture review must validate this classification.",
       "reviewDate": "2026-10-15",
-      "astHash": "2ed8271f182577347bd7c9e3626ed8aee9659b14bfa5ec820dc31017d32e7382",
+      "astHash": "7ee7b27da682abbf08d881a26dcc0e93ac5f11b17514d29990020e6fda9ec6d1",
       "signatureHash": "8eadb2acc969b6433bcd1d7c34b623e67e962a2a739520d7c469a7dc86dd7989"
     },
     {

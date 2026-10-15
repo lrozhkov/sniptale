@@ -6,6 +6,7 @@ import {
   getControlSecondaryButtonClassName,
 } from '@sniptale/ui/control-language';
 import {
+  Archive,
   ArrowUpRight,
   Clapperboard,
   CopyPlus,
@@ -611,6 +612,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
   const hasEditedImageContent = canUseImageAggregateActions && item.imageContentState === 'edited';
   const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
   const hasFileActions =
+    Boolean(props.onBackup) ||
     canDownload ||
     canCopy ||
     canOpenWebSnapshot ||
@@ -639,6 +641,11 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
         <PreviewPrimaryActions {...props} />
         {hasFileActions ? (
           <PreviewActionGroup label={translate('gallery.preview.fileActions')}>
+            {props.onBackup ? (
+              <PreviewActionButton icon={Archive} onClick={props.onBackup}>
+                {translate('gallery.app.selectionBackup')}
+              </PreviewActionButton>
+            ) : null}
             {canOpenWebSnapshot && props.onOpenSnapshotScreenshot ? (
               <PreviewActionButton
                 icon={Images}

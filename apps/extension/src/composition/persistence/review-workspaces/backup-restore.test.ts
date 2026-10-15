@@ -656,3 +656,24 @@ it.each([3, 4] as const)(
     );
   }
 );
+
+it('admits the agreed backup snapshot and refuses a later writer, deletion or recreated identity', async () => {
+  const expectedSnapshot = { workspace, draft };
+  const read = (next: typeof workspace | undefined, nextDraft: typeof draft | undefined = draft) =>
+    readVideoReviewForBackup({
+      db: snapshotDatabase(next, nextDraft),
+      aggregateId: workspace.aggregateId,
+      sourceAssetId: workspace.sourceAssetId,
+      expectedSnapshot,
+    });
+  await expect(read(workspace)).resolves.toMatchObject({ draft });
+  await expect(read({ ...workspace, revision: workspace.revision + 1 })).rejects.toThrow('changed');
+  await expect(read(workspace, { ...draft, revision: draft.revision + 1 })).rejects.toThrow(
+    'changed'
+  );
+  await expect(read(undefined)).rejects.toThrow();
+  await expect(read({ ...workspace, createdAt: workspace.createdAt + 1 })).rejects.toThrow(
+    'changed'
+  );
+  await expect(read(workspace)).resolves.toMatchObject({ draft });
+});

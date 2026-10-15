@@ -71,6 +71,7 @@ export async function readVideoReviewForBackup(args: {
   db: VideoReviewBackupDatabase;
   aggregateId: string;
   sourceAssetId: string;
+  expectedSnapshot?: VideoWorkspaceSnapshot | undefined;
 }): Promise<PortableVideoReview | undefined> {
   const tx = args.db.transaction(
     [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
@@ -81,17 +82,32 @@ export async function readVideoReviewForBackup(args: {
     tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(args.aggregateId),
   ]);
   await tx.done;
-  if (raw === undefined && rawDraft === undefined) return undefined;
+  if (raw === undefined && rawDraft === undefined && !args.expectedSnapshot) return undefined;
   const workspace = parseVideoWorkspace(raw);
   if (!workspace || workspace.sourceAssetId !== args.sourceAssetId) {
     throw new Error('Video review source is missing or changed.');
   }
   const { sourceAssetId: _localId, typing: _typing, ...portable } = workspace;
-  return parsePortableVideoReviewShape(
+  const result = parsePortableVideoReviewShape(
     { workspace: portable, draft: rawDraft === undefined ? null : rawDraft },
     args.aggregateId,
     true
   );
+  if (args.expectedSnapshot) {
+    const {
+      sourceAssetId,
+      typing: _expectedTyping,
+      ...expectedWorkspace
+    } = args.expectedSnapshot.workspace;
+    const expected = parsePortableVideoReviewShape(
+      { workspace: expectedWorkspace, draft: args.expectedSnapshot.draft },
+      args.aggregateId,
+      true
+    );
+    if (sourceAssetId !== args.sourceAssetId || JSON.stringify(result) !== JSON.stringify(expected))
+      throw new Error('Video review changed before backup. Retry the backup.');
+  }
+  return result;
 }
 
 /** Rebinds a verified portable review to the restored video and its new local byte object. */

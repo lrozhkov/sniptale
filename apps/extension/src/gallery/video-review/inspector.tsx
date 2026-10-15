@@ -6,6 +6,7 @@ import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import './inspector-navigation.css';
 import {
+  Archive,
   List,
   PanelLeft,
   ChevronsDownUp,
@@ -96,6 +97,7 @@ export function ReviewInspector(props: {
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
+  onBackup?(): void;
   children: ReactNode;
   actions?: ReactNode;
   composer?: ReactNode;
@@ -291,6 +293,17 @@ function ReviewInspectorFooter(
 ) {
   return (
     <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pt-20 space-y-2 overflow-y-auto">
+      {props.onBackup ? (
+        <ReviewButton
+          label={translate('gallery.app.selectionBackup')}
+          disabled={props.busy}
+          className={`${reviewTextButtonClassName} justify-start`}
+          onClick={props.onBackup}
+        >
+          <Archive size={15} aria-hidden="true" />
+          <span>{translate('gallery.app.selectionBackup')}</span>
+        </ReviewButton>
+      ) : null}
       {props.showReports ? (
         <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
           <ReviewButton

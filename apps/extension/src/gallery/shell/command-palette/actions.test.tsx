@@ -38,6 +38,7 @@ function createActions(): UseGalleryAppActionsResult {
       inspectWebSnapshot: vi.fn(),
     },
     preview: {
+      backup: vi.fn(),
       close: vi.fn(),
       copy: vi.fn(),
       download: vi.fn(),

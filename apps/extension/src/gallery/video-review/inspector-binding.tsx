@@ -1,3 +1,7 @@
+import {
+  exportMediaHubBackup,
+  createMediaHubBackupExportOptions,
+} from '../../workflows/media-hub-backup';
 import { ReviewCursorPathEditor, ReviewCursorPathSettings } from './cursor-path-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-export';
@@ -235,13 +239,14 @@ export function ReviewInspectorBinding({
               : 'saved'
         }
         onRetry={() => void run(state.retryAdvanced)}
-        message={snapshot.error ? reviewErrorMessage(snapshot.error) : null}
+        message={snapshot.error ? reviewErrorMessage(snapshot.error) : state.message}
         onBack={() => leave(onBack)}
         onClose={() => leave(onClose)}
         rangeSelected={state.selection.kind === 'range'}
         onAdd={state.add}
         onSelect={state.selectComment}
         onHover={state.setHovered}
+        onBackup={() => void run(() => backupReview(state, canvasComments))}
         {...reviewInspectorNoteActions(state, resource)}
       >
         <ReviewSelectionBinding
@@ -371,6 +376,32 @@ function ReviewRecordedHistory({
   );
 }
 
+/** Backup joins accepted edits and recovery before reading the exact saved snapshot. */
+async function backupReview(
+  state: Pick<InspectorState, 'composer' | 'flushAdvanced' | 'session' | 'setMessage'>,
+  canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
+) {
+  await flushReviewTextVoiceBuffers(state, canvasComments);
+  const expectedReview = await state.session.saveBuffered();
+  try {
+    await exportMediaHubBackup(
+      createMediaHubBackupExportOptions({
+        includeDrafts: true,
+        scope: 'selected',
+        selected: {
+          mediaAssetIds: [expectedReview.workspace.aggregateId],
+          scenarioProjectIds: [],
+          videoProjectIds: [],
+        },
+      }),
+      { expectedReview, requireSelected: true }
+    );
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === 'AbortError'))
+      state.setMessage(translate('gallery.videoReview.backupFailed'));
+  }
+}
+
 /** Note mutations and report feedback share the existing editor action/session authority. */
 function reviewInspectorNoteActions(
   state: InspectorState,
@@ -460,7 +491,7 @@ function focusRecordedAction(
   if (!id) return;
   if (state.advanced.ui.mode !== 'advanced') state.setMode('advanced');
   state.zoom.setSelection(id);
-  state.setTrackVisibility('zoom', true);
+  void state.setTrackVisibility('zoom', true);
   state.video.current?.pause();
   const time = state.timeline.timeMap.timelineToSource((region.start + region.end) / 2);
   if (time !== null) state.seek(time, false);

@@ -12,18 +12,27 @@ import type { CursorFocusPath } from '../../features/video/project/cursor-focus-
 import { translate } from '../../platform/i18n';
 
 const sceneProbe = vi.hoisted(() => ({ enabled: false }));
+const backupExport = vi.hoisted(() => vi.fn());
+vi.mock('../../workflows/media-hub-backup', async (original) => ({
+  ...(await original<typeof import('../../workflows/media-hub-backup')>()),
+  exportMediaHubBackup: backupExport,
+}));
 vi.mock('./advanced-panels', () => ({
   ReviewSceneProperties: (props: { cursorPath: ReactNode }) => <div>{props.cursorPath}</div>,
   ReviewAdvancedPanels: () => null,
 }));
 vi.mock('./inspector', () => ({
   ReviewInspector: (props: {
+    onBackup(): void;
+    message: string | null;
     scene: ReactNode;
     speech: ReactNode;
     actionHistory: ReactNode;
     children: ReactNode;
   }) => (
     <div>
+      <button onClick={props.onBackup}>Backup current work</button>
+      <p role="status">{props.message}</p>
       {sceneProbe.enabled ? props.scene : null}
       {props.speech}
       {props.actionHistory}
@@ -80,6 +89,7 @@ it('joins every editor buffer for either recognition source and guards related-t
   const props = {
     resource: { filename: 'video', file: new Blob(), source: {}, session: {} },
     state: {
+      message: 'Backup refused',
       actionSoundPreview: { audition: vi.fn(), stopAudition: vi.fn() },
       advanced,
       activeSelection: { kind: 'audio', id: 'clip', lane: 'voiceover' },
@@ -138,9 +148,57 @@ it('joins every editor buffer for either recognition source and guards related-t
     });
   try {
     await act(async () => root.render(<ReviewInspectorBinding {...props} />));
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('Backup refused');
     await click('Flush source buffers');
     await click('Flush clip buffers');
     expect(order).toEqual(['notes', 'advanced', 'canvas', 'notes', 'advanced', 'canvas']);
+    const { workspace } =
+      await import('../../composition/persistence/review-workspaces/backup-restore.test-support');
+    const expectedReview = { workspace, draft: null };
+    const save = vi.fn(async () => {
+      order.push('save');
+      return expectedReview;
+    });
+    const failure = vi.fn();
+    const backupProps = {
+      ...props,
+      state: {
+        ...props.state,
+        session: { ...props.state.session, saveBuffered: save },
+        run: async (action: () => Promise<unknown>) => {
+          try {
+            await action();
+          } catch {
+            failure();
+          }
+        },
+      },
+    };
+    await act(async () => root.render(<ReviewInspectorBinding {...backupProps} />));
+    backupExport.mockImplementationOnce(async () => {
+      order.push('export');
+    });
+    await click('Backup current work');
+    expect(order.slice(-5)).toEqual(['notes', 'advanced', 'canvas', 'save', 'export']);
+    expect(backupExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: 'selected',
+        selected: {
+          mediaAssetIds: [workspace.aggregateId],
+          scenarioProjectIds: [],
+          videoProjectIds: [],
+        },
+      }),
+      { expectedReview, requireSelected: true }
+    );
+    save.mockRejectedValueOnce(new Error('Save refused'));
+    await click('Backup current work');
+    expect(failure).toHaveBeenCalledOnce();
+    expect(backupExport).toHaveBeenCalledOnce();
+    await click('Backup current work');
+    expect(backupExport).toHaveBeenCalledTimes(2);
+    await act(async () => root.render(<ReviewInspectorBinding {...props} />));
+
     await click('Open related text');
     expect(select).not.toHaveBeenCalled();
     allowed = true;

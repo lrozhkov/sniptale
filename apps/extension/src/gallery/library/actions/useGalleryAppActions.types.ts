@@ -29,6 +29,7 @@ export interface UseGalleryAppActionsResult {
     inspectWebSnapshot: (file: File | null) => Promise<void>;
   };
   preview: {
+    backup: (item: GalleryItem) => Promise<void>;
     close: () => Promise<void>;
     copy: () => Promise<boolean>;
     download: () => Promise<boolean>;

@@ -30,8 +30,20 @@ function buildSelectedBackupScope(
           .map((item) => item.entityId ?? item.id)
       ),
     ],
-    scenarioProjectIds: items.filter(isGalleryScenarioItem).map((item) => item.entityId),
-    videoProjectIds: items.filter(isGalleryVideoProjectItem).map((item) => item.entityId),
+    scenarioProjectIds: [
+      ...new Set(
+        items.flatMap((item) =>
+          item.type === 'scenario-export'
+            ? [item.project.id]
+            : isGalleryScenarioItem(item)
+              ? [item.entityId]
+              : []
+        )
+      ),
+    ],
+    videoProjectIds: [
+      ...new Set(items.filter(isGalleryVideoProjectItem).map((item) => item.entityId)),
+    ],
   };
 }
 
@@ -53,7 +65,11 @@ export function createSelectedBackupExportOptions(
   if (!hasSelectedBackupScope(selected)) return null;
 
   return createMediaHubBackupExportOptions({
-    includeDrafts: items.some((item) => item.lifecycle?.storageClass === 'temporary'),
+    includeDrafts: items.some(
+      (item) =>
+        item.lifecycle?.storageClass === 'temporary' ||
+        (item.type === 'scenario-export' && item.project.lifecycle?.storageClass === 'temporary')
+    ),
     scope: 'selected',
     selected,
   });

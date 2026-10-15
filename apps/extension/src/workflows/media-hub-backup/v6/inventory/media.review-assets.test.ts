@@ -249,3 +249,29 @@ it('exports selected project metadata and source bytes once through the media in
   });
   expect(payload.objects).toHaveLength(4);
 });
+
+it('uses the same recording identity for review admission and original bytes after replacement', async () => {
+  const entry = mediaEntry('recording');
+  const db = database(entry);
+  const get = db.get.getMockImplementation()!;
+  let recordingReads = 0;
+  db.get.mockImplementation(async (store, key) => {
+    if (store === 'recordings') {
+      recordingReads++;
+      return {
+        ...sourceRow('recording'),
+        assetId: recordingReads === 1 ? 'video-object' : 'replacement-object',
+      };
+    }
+    return get(store, key);
+  });
+  const { blob: _blob, ...metadata } = entry;
+  await buildMediaRootInventory({
+    db,
+    items: [{ ...metadata, hasThumbnail: false }],
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+  });
+  const videoReads = mocks.readFile.mock.calls.filter(([ref]) => ref.mimeType === 'video/webm');
+  expect(videoReads.at(-1)?.[0].assetId).toBe('video-object');
+});

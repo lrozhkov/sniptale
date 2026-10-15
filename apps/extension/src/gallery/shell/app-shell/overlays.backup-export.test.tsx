@@ -61,6 +61,7 @@ function createCallbackProps() {
     onMediaImportConfirm: vi.fn(),
     onPreviewClose: vi.fn(),
     onPreviewCopy: vi.fn(),
+    onPreviewBackup: vi.fn(),
     onPreviewDelete: vi.fn(),
     onPreviewDownload: vi.fn(),
     onPreviewDownloadOriginal: vi.fn(),

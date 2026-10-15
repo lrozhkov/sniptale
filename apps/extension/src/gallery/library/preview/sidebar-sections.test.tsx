@@ -627,3 +627,53 @@ it('resets unsaved quick-edit names without exposing media file commands', async
   expect(container.textContent).not.toContain('gallery.preview.fileActions');
   await act(async () => root.unmount());
 });
+
+it('keeps one backup command for each library item type and suppresses duplicate activation', async () => {
+  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
+  const items = [
+    createMediaItem(),
+    createScenarioItem(),
+    createVideoProjectItem(),
+    createScenarioExportItem(),
+    createQuickEditProjectGalleryItem({
+      aggregateId: 'quick',
+      name: 'Quick',
+      createdAt: 1,
+      updatedAt: 1,
+      revision: 1,
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+      source: null,
+      unavailableReason: null,
+    }),
+  ];
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    for (const item of items) {
+      let finish!: () => void;
+      const onBackup = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          })
+      );
+      await act(async () =>
+        root.render(<PreviewActions {...createProps()} item={item} onBackup={onBackup} />)
+      );
+      const buttons = host.querySelectorAll<HTMLButtonElement>(
+        '[aria-label="gallery.app.selectionBackup"]'
+      );
+      expect(buttons).toHaveLength(1);
+      await act(async () => {
+        buttons[0]!.click();
+        buttons[0]!.click();
+      });
+      expect(onBackup).toHaveBeenCalledOnce();
+      expect(buttons[0]!.disabled).toBe(true);
+      await act(async () => finish());
+      expect(buttons[0]!.disabled).toBe(false);
+    }
+  } finally {
+    await act(async () => root.unmount());
+  }
+});

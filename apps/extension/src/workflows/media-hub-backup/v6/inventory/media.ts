@@ -1,3 +1,4 @@
+import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 import { projectRecordingMetadataPrivacy } from '../privacy';
 import {
   readVideoReviewForBackup,
@@ -24,6 +25,7 @@ import type {
   MediaThumbnailEntry,
 } from '../../../../composition/persistence/media-library/contracts';
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
+import type { StoredRecordingEntry } from '../../../../composition/persistence/recordings/contracts';
 import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../../../../composition/persistence/recordings/telemetry.guards';
 import { parseStoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots';
@@ -170,12 +172,9 @@ async function buildRecordingSource(args: {
   db: MediaInventoryDatabase;
   entry: MediaLibraryEntry;
   options: MediaHubBackupExportOptions;
-  recordingId: string;
+  recording: StoredRecordingEntry;
 }) {
-  const stored = parseRecordingEntry(await args.db.get(STORE_NAME, args.recordingId));
-  if (!stored) {
-    throw new Error(`Recording backup metadata is missing: ${args.recordingId}.`);
-  }
+  const stored = args.recording;
   const file = await readRefFile(args.db, stored.assetId, stored.filename);
   const originalObjectId = args.collector.add(
     file,
@@ -255,6 +254,7 @@ async function buildWebSnapshotSource(args: {
 }
 
 async function buildMediaSource(args: {
+  expectedReview?: VideoWorkspaceSnapshot | undefined;
   collector: MediaObjectCollector;
   db: MediaInventoryDatabase;
   entry: MediaLibraryEntry;
@@ -293,10 +293,11 @@ async function buildMediaSource(args: {
       db: args.db,
       aggregateId: entry.id,
       sourceAssetId: recording.assetId,
+      expectedSnapshot: args.expectedReview,
     });
     const videoReview = encodePortableReviewAssetRefs(storedReview);
     return {
-      ...(await buildRecordingSource({ ...args, entry, recordingId: entry.source.recordingId })),
+      ...(await buildRecordingSource({ ...args, entry, recording })),
       ...(videoReview ? { videoReview } : {}),
       ...(storedReview
         ? { reviewAssets: await buildReviewAssets(args.db, args.collector, storedReview.workspace) }
@@ -328,6 +329,7 @@ async function buildMediaSource(args: {
     db: args.db,
     aggregateId: entry.id,
     sourceAssetId: child.assetId,
+    expectedSnapshot: args.expectedReview,
   });
   const videoReview = encodePortableReviewAssetRefs(storedReview);
   const reviewAssets = storedReview
@@ -453,6 +455,7 @@ function buildRootSummary(args: {
 }
 
 async function buildMediaRoot(args: {
+  expectedReview?: VideoWorkspaceSnapshot | undefined;
   db: MediaInventoryDatabase;
   item: MediaLibraryItem;
   options: MediaHubBackupExportOptions;
@@ -462,7 +465,14 @@ async function buildMediaRoot(args: {
   const entry = parseMediaLibraryEntry(await args.db.get(MEDIA_LIBRARY_STORE, args.item.id));
   if (!entry) throw new Error(`Media backup row is invalid: ${args.item.id}.`);
   const collector = createMediaObjectCollector(args.rootIndex, args.paths);
-  const source = await buildMediaSource({ collector, db: args.db, entry, options: args.options });
+  const source = await buildMediaSource({
+    collector,
+    db: args.db,
+    entry,
+    options: args.options,
+    expectedReview:
+      args.expectedReview?.workspace.aggregateId === entry.id ? args.expectedReview : undefined,
+  });
   const isImageAggregate =
     (entry.source.kind === 'screenshot' || entry.source.kind === 'stored-asset') &&
     (entry.kind === 'image' || entry.kind === 'screenshot');
@@ -525,6 +535,7 @@ async function buildMediaRoot(args: {
 }
 
 export async function buildMediaRootInventory(args: {
+  expectedReview?: VideoWorkspaceSnapshot | undefined;
   db: MediaInventoryDatabase;
   items: MediaLibraryItem[];
   coveredProjectMediaIds?: ReadonlySet<string>;

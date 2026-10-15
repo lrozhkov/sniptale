@@ -54,6 +54,7 @@ type TestLayoutProps = {
   onMediaImportConfirm: (strategy: 'skip' | 'duplicate') => void;
   onPreviewClose: () => void;
   onPreviewInspectorToggle: () => void;
+  onPreviewBackup: (item: unknown) => Promise<void>;
   onPreviewDelete: (item: unknown) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewOpen: (item: unknown, options?: { inspectorCollapsed?: boolean }) => void;
@@ -112,6 +113,7 @@ function createActions(): UseGalleryAppActionsResult {
       inspectWebSnapshot: vi.fn(async () => undefined),
     },
     preview: {
+      backup: vi.fn(),
       close: vi.fn(async () => undefined),
       copy: vi.fn(),
       download: vi.fn(),
@@ -206,6 +208,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
     layoutProps.onRemoveTag('alpha');
     layoutProps.onResetFilters();
     layoutProps.onPreviewResetChanges();
+    void layoutProps.onPreviewBackup({ id: 'asset-1' });
     layoutProps.onPreviewDelete({ id: 'asset-1' });
     layoutProps.onPreviewOpenSnapshotScreenshot();
     layoutProps.onExportBackup();
@@ -222,6 +225,7 @@ it('maps gallery actions into layout props and handles primary callbacks', () =>
     layoutProps.onViewModeChange('list');
   });
 
+  expect(actions.preview.backup).toHaveBeenCalledWith({ id: 'asset-1' });
   expect(layoutPropsMock).toHaveBeenCalled();
   expect(actions.preview.close).toHaveBeenCalledTimes(1);
   expect(actions.preview.openSnapshotScreenshotInEditor).toHaveBeenCalledTimes(1);
@@ -371,6 +375,7 @@ it('opens trashed material read-only, navigates without saving, and restores onl
     layoutProps.onApplySelectionTag('blocked');
   });
   await act(async () => {
+    await layoutProps.onPreviewBackup(next);
     await layoutProps.onPreviewPromote(next);
   });
   expect(getState().preview.session.item?.id).toBe('deleted-2');
@@ -378,6 +383,7 @@ it('opens trashed material read-only, navigates without saving, and restores onl
   expect(actions.selection.deleteMany).toHaveBeenCalledExactlyOnceWith([next], undefined);
   expect(actions.preview.openSnapshotScreenshotInEditor).not.toHaveBeenCalled();
   expect(actions.preview.resetChanges).not.toHaveBeenCalled();
+  expect(actions.preview.backup).not.toHaveBeenCalled();
   expect(actions.selection.downloadBackup).not.toHaveBeenCalled();
   expect(actions.selection.applyTag).not.toHaveBeenCalled();
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();

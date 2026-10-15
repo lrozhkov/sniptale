@@ -150,6 +150,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         onHover={vi.fn()}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
+        onBackup={vi.fn()}
         onReport={vi.fn()}
         settingsAvailable={advanced}
         selectionHasSections={advanced && contextKey.startsWith('settings:zoom:')}
@@ -170,6 +171,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
     expect(host.textContent).toContain('Selected controls');
     expect(host.textContent).not.toContain('gallery.videoReview.commentsEmpty');
+    expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).not.toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     const basicTabs = () =>
       Array.from(
@@ -191,6 +193,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     await act(async () => render(true, 'settings:none:'));
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
     expect(host.textContent).toContain('Scene controls');
+    expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).not.toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     const presentation = host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.inspectorPresentation"]'
@@ -208,6 +211,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
       host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
     ).not.toBeNull();
     expect(host.textContent).toContain('Selected controls');
+    expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).not.toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     const tabs = () =>
       Array.from(
@@ -221,6 +225,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         .click()
     );
     expect(host.textContent).toContain('Scene controls');
+    expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).not.toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     expect(tabs().some((button) => button.textContent === 'Zoom')).toBe(true);
     await act(async () =>
@@ -229,6 +234,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         .click()
     );
     expect(host.textContent).toContain('Selected controls');
+    expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).not.toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     await act(async () => render(false, 'comments'));
     expect(host.textContent).not.toContain('Selected controls');
