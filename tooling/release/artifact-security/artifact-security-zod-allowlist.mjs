@@ -179,6 +179,30 @@ function hasAllowedBundledZodCompiler(snippet, matchIndex, alias) {
   );
 }
 
+function hasAllowedClosedZodCompiler(snippet, matchIndex, alias) {
+  const prefix = `compile(){let${alias}=Function,`;
+  const start = snippet.text.indexOf(prefix);
+  if (start < 0) return false;
+  const content = readIdentifierAt(snippet.text, start + prefix.length);
+  if (!content) return false;
+  for (const newline of ['``', '`\\n`']) {
+    const beforeCall = `${prefix}${content.value}=this?.content??[""];returnnew`;
+    const compiler =
+      beforeCall +
+      `${alias}(...Object.keys(this.closed),` +
+      '`returnfunction(${this.args.join(",")}){${' +
+      `${content.value}.join(${newline})` +
+      '}};`)(...Object.values(this.closed))}';
+    if (
+      snippet.text.startsWith(compiler, start) &&
+      snippet.map[start + beforeCall.length] === matchIndex
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasAllowedZodCompiler(text, matchIndex, alias) {
   const start = Math.max(0, matchIndex - 180);
   const end = Math.min(text.length, matchIndex + 260);
@@ -186,7 +210,8 @@ function hasAllowedZodCompiler(text, matchIndex, alias) {
 
   return (
     hasAllowedSourceZodCompiler(snippet, matchIndex, alias) ||
-    hasAllowedBundledZodCompiler(snippet, matchIndex, alias)
+    hasAllowedBundledZodCompiler(snippet, matchIndex, alias) ||
+    hasAllowedClosedZodCompiler(snippet, matchIndex, alias)
   );
 }
 

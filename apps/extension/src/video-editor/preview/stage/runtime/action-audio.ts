@@ -117,7 +117,7 @@ class ProjectActionAudioRuntime {
       if (scope.revision === this.generation) this.failed.set(cue.id, error);
       throw error;
     } finally {
-      if (this.pending.get(cue.id) === loading) this.pending.delete(cue.id);
+      if (Object.is(this.pending.get(cue.id), loading)) this.pending.delete(cue.id);
     }
   };
   private scheduleDecodedCue = async (

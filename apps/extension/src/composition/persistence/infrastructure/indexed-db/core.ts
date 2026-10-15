@@ -345,7 +345,7 @@ async function prepareDatabase(allowAlphaReset = false): Promise<void> {
   try {
     await observed;
   } finally {
-    if (state.preparationPromise === observed) state.preparationPromise = null;
+    if (Object.is(state.preparationPromise, observed)) state.preparationPromise = null;
   }
 }
 

@@ -94,7 +94,11 @@ function sourceReadingReferences(sourceFile) {
     }
     if (ts.isCallExpression(node)) {
       const callName = node.expression.getText(sourceFile).split('.').at(-1);
-      if (SOURCE_READER_CALLS.has(callName) && ts.isStringLiteral(node.arguments[0])) {
+      if (
+        SOURCE_READER_CALLS.has(callName) &&
+        node.arguments.length > 0 &&
+        ts.isStringLiteral(node.arguments[0])
+      ) {
         references.push({ literal: node.arguments[0], node });
       }
     }

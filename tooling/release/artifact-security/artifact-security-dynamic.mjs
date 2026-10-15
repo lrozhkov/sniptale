@@ -9,7 +9,6 @@ import ts from 'typescript';
 import { getArtifactSourceSnapshot } from '../artifact-source/artifact-source-snapshot.mjs';
 
 const FUNCTION_ALIAS_SCAN_WINDOW_CHARS = 500;
-const FUNCTION_ALIAS_DECLARATION_KINDS = ['const', 'let', 'var'];
 
 function hasIdentifierBoundary(text, start, end) {
   const previous = start > 0 ? text[start - 1] : '';
@@ -25,52 +24,6 @@ function skipWhitespace(text, index) {
   }
 
   return cursor;
-}
-
-function findFunctionAliasDeclarations(text) {
-  const declarations = [];
-  for (const kind of FUNCTION_ALIAS_DECLARATION_KINDS) {
-    let offset = 0;
-    while (offset < text.length) {
-      const kindIndex = text.indexOf(kind, offset);
-      if (kindIndex === -1) {
-        break;
-      }
-
-      offset = kindIndex + kind.length;
-      if (!hasIdentifierBoundary(text, kindIndex, kindIndex + kind.length)) {
-        continue;
-      }
-
-      const aliasStart = skipWhitespace(text, kindIndex + kind.length);
-      const alias = readIdentifierAt(text, aliasStart);
-      if (!alias) {
-        continue;
-      }
-
-      const assignmentStart = skipWhitespace(text, alias.end);
-      if (text[assignmentStart] !== '=') {
-        continue;
-      }
-
-      const functionStart = skipWhitespace(text, assignmentStart + 1);
-      if (
-        text.slice(functionStart, functionStart + 'Function'.length) !== 'Function' ||
-        !hasIdentifierBoundary(text, functionStart, functionStart + 'Function'.length)
-      ) {
-        continue;
-      }
-
-      declarations.push({
-        alias: alias.value,
-        end: functionStart + 'Function'.length,
-        functionStart,
-        index: kindIndex,
-      });
-    }
-  }
-
-  return declarations.sort((left, right) => left.index - right.index);
 }
 
 function findBlockScopedEnd(node) {
@@ -105,16 +58,15 @@ function findFunctionScopedEnd(node) {
   return null;
 }
 
-function collectFunctionAliasScopeEnds(sourceFile) {
-  const scopeEnds = new Map();
+function collectFunctionAliasDeclarations(sourceFile) {
+  const declarations = [];
 
   function visit(node) {
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.initializer &&
-      ts.isIdentifier(node.initializer) &&
-      node.initializer.text === 'Function'
+      readIdentifierAt(node.initializer.getText(sourceFile), 0)?.value === 'Function'
     ) {
       const declarationList = node.parent;
       const isBlockScoped =
@@ -122,7 +74,11 @@ function collectFunctionAliasScopeEnds(sourceFile) {
         (declarationList.flags & ts.NodeFlags.BlockScoped) !== 0;
       const scopeEnd = isBlockScoped ? findBlockScopedEnd(node) : findFunctionScopedEnd(node);
       if (scopeEnd !== null) {
-        scopeEnds.set(node.initializer.getStart(sourceFile), scopeEnd);
+        declarations.push({
+          alias: node.name.text,
+          end: node.initializer.end,
+          scopeEnd,
+        });
       }
     }
 
@@ -130,7 +86,7 @@ function collectFunctionAliasScopeEnds(sourceFile) {
   }
 
   visit(sourceFile);
-  return scopeEnds;
+  return declarations;
 }
 
 function findAliasedFunctionCallIndexes(text, alias) {
@@ -181,13 +137,9 @@ function verifyDirectFunctionConstructors(relativePath, text) {
 
 function verifyAliasedFunctionConstructors(relativePath, snapshot) {
   const { sourceFile, text } = snapshot;
-  const scopeEnds = collectFunctionAliasScopeEnds(sourceFile);
-  for (const declaration of findFunctionAliasDeclarations(text)) {
+  for (const declaration of collectFunctionAliasDeclarations(sourceFile)) {
     const scanStart = declaration.end;
-    const scanEnd = Math.min(
-      scanStart + FUNCTION_ALIAS_SCAN_WINDOW_CHARS,
-      scopeEnds.get(declaration.functionStart) ?? text.length
-    );
+    const scanEnd = Math.min(scanStart + FUNCTION_ALIAS_SCAN_WINDOW_CHARS, declaration.scopeEnd);
     const scanWindow = text.slice(scanStart, scanEnd);
     for (const aliasCallIndex of findAliasedFunctionCallIndexes(scanWindow, declaration.alias)) {
       const callIndex = scanStart + aliasCallIndex;

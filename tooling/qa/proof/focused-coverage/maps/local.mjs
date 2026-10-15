@@ -1,5 +1,15 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-audio-runtime-consumers',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-audio-runtime.ts',
+    reason:
+      'Playback preparation and queued audio lifetime use both runtime and action-audio suites.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-review-audio-runtime.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-action-audio-runtime.test.tsx',
+    ],
+  },
+  {
     owner: 'project-cursor-focus-consumers',
     productionFile: 'apps/extension/src/features/video/project/cursor-focus-path/projection.ts',
     reason:
@@ -189,6 +199,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason: 'IndexedDB schema and upgrade authority are exercised by the owner-local core suite.',
     testFiles: [
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.lock.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.recovery.test.ts',
     ],
   },
   {

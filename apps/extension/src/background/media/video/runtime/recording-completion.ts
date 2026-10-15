@@ -384,7 +384,7 @@ export async function stopRecording(discard = false): Promise<RecordingStopResul
   try {
     return await work;
   } finally {
-    if (pendingStops.get(recordingId) === work) pendingStops.delete(recordingId);
+    if (Object.is(pendingStops.get(recordingId), work)) pendingStops.delete(recordingId);
   }
 }
 

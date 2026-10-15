@@ -632,9 +632,9 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     []
   );
   const stopAudition = useCallback(() => session.current?.cancelAudition(), []);
-  const preparePlayback = useCallback(
-    () => session.current?.preparePlayback() ?? Promise.resolve(false),
-    []
-  );
+  const preparePlayback = useCallback(() => {
+    const current = session.current;
+    return current ? current.preparePlayback() : Promise.resolve(false);
+  }, []);
   return { audition, stopAudition, preparePlayback };
 }

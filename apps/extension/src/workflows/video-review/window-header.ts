@@ -167,10 +167,8 @@ export function createReviewWindowRaster(args: {
     lease?.release();
     throw new Error('Window composition canvas is unavailable.');
   }
-  let saved = false;
   try {
     context.save();
-    saved = true;
     try {
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(0, 0, lease.canvas.width, lease.canvas.height);
@@ -201,7 +199,7 @@ export function createReviewWindowRaster(args: {
         args.videoRect.height * scaleY
       );
     } finally {
-      if (saved) context.restore();
+      context.restore();
     }
   } catch (error) {
     lease.release();

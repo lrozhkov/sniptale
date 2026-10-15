@@ -402,3 +402,13 @@ it('accepts canonical effect build imports but rejects a retired root import in 
     `stale module path: ${path}:1 -> ../../../src/features/video/project/effect-bundle/manifest`
   );
 });
+
+it('accepts argument-free file handle reads without treating them as path literals', () => {
+  const root = fixture();
+  write(
+    root,
+    'tooling/read-owned.mjs',
+    'export async function read(handle) { return handle.readFile(); }'
+  );
+  expect(targetOnlyPathErrors(root)).toEqual([]);
+});

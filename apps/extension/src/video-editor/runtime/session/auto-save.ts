@@ -262,7 +262,7 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
     async flushLatest(): Promise<void> {
       const turn = context;
       if (!turn || !input || disposed) throw new Error('The open video project changed.');
-      while (!disposed && context === turn) {
+      while (context === turn) {
         const project = getCurrentVideoEditorProjectSnapshot();
         if (!project || project.id !== turn.project.id)
           throw new Error('The open video project changed.');

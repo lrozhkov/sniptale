@@ -1,9 +1,40 @@
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 
 import tailwindcss from '@tailwindcss/postcss';
 import type { Plugin as EsbuildPlugin } from 'esbuild';
 import postcss from 'postcss';
+import type { Plugin } from 'vite';
+
+const ZOD_COMPILER_PATH = /\/node_modules\/zod\/v4\/core\/compile\.js$/;
+const ZOD_COMPILER_SHA256 = '53fcf24821f50ecf42492ab7101abe8a50ead8286a53567d71648fe5ca346b99';
+
+/** Keep Zod's typed runtime fallback without retaining an executable AOT constructor. */
+export function transformZodCompiler(source: string, id: string): string | null {
+  if (!ZOD_COMPILER_PATH.test(id.replaceAll('\\', '/'))) return null;
+  const declaration = 'const F = Function;';
+  if (
+    createHash('sha256').update(source).digest('hex') !== ZOD_COMPILER_SHA256 ||
+    source.split(declaration).length !== 2
+  ) {
+    throw new Error('Zod compiler source changed; review the extension runtime fallback.');
+  }
+  return source.replace(
+    declaration,
+    'const F = class { constructor() { ' +
+      'throw new ZodCompileUnsupportedError("dynamic compilation in the extension"); } };'
+  );
+}
+
+/** Apply the same dependency policy to main Vite modules and injected esbuild bundles. */
+export function createZodRuntimeFallbackPlugin(): Plugin {
+  return {
+    name: 'sniptale:zod-runtime-fallback',
+    enforce: 'pre',
+    transform: transformZodCompiler,
+  };
+}
 
 export function createReleaseSafeDependencyAliasPlugin(repositoryRoot: string): EsbuildPlugin {
   const aliases = new Map([
@@ -19,6 +50,10 @@ export function createReleaseSafeDependencyAliasPlugin(repositoryRoot: string): 
   return {
     name: 'sniptale:release-safe-dependency-aliases',
     setup(build) {
+      build.onLoad({ filter: /[\\/]zod[\\/]v4[\\/]core[\\/]compile\.js$/ }, async (args) => ({
+        contents: transformZodCompiler(await readFile(args.path, 'utf8'), args.path) ?? undefined,
+        loader: 'js',
+      }));
       build.onResolve({ filter: /^(jszip|readable-stream|setimmediate|zod)$/ }, (args) => ({
         path: aliases.get(args.path) ?? args.path,
       }));

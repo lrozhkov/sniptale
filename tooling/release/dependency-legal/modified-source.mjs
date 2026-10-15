@@ -10,13 +10,18 @@ async function readOwnedFile(root, relative) {
   const absolute = path.resolve(root, relative);
   const canonicalRoot = await fs.realpath(root);
   const canonicalFile = await fs.realpath(absolute);
-  if (
-    !canonicalFile.startsWith(`${canonicalRoot}${path.sep}`) ||
-    !(await fs.stat(canonicalFile)).isFile()
-  ) {
+  if (!canonicalFile.startsWith(`${canonicalRoot}${path.sep}`)) {
     throw new Error(`Modified dependency source escapes the repository: ${relative}`);
   }
-  return fs.readFile(canonicalFile);
+  const handle = await fs.open(canonicalFile, 'r');
+  try {
+    if (!(await handle.stat()).isFile()) {
+      throw new Error(`Modified dependency source is not a regular file: ${relative}`);
+    }
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
 }
 
 function instructions(record, manifest) {

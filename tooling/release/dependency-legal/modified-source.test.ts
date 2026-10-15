@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { generateDependencyLegalClosure } from './index.mjs';
 import { generateRepositoryDependencyLegal } from './generate-dependency-legal.mjs';
 import { validateDependencyLegalClosure } from './validation.mjs';
@@ -16,6 +16,7 @@ const roots: string[] = [];
 const owner = 'tooling/ci/mediabunny';
 const modifiedSources = [{ packageName: 'mediabunny', version: '1.61.3', owner }];
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
 });
 
@@ -125,3 +126,64 @@ it('requires every generated modified-source file at the release packaging bound
     )
   ).toThrow('digest drift');
 });
+
+it('reads the checked source object when its path is replaced after the file check', async () => {
+  const { repoRoot } = await fixture();
+  const target = path.join(repoRoot, owner, 'source.patch');
+  const stat = fs.stat.bind(fs);
+  const open = fs.open.bind(fs);
+  let replaced = false;
+  const replace = async () => {
+    if (replaced) return;
+    replaced = true;
+    await fs.rename(target, `${target}.old`);
+    await fs.writeFile(target, 'replacement');
+  };
+  vi.spyOn(fs, 'stat').mockImplementation(async (...args) => {
+    const result = await stat(...args);
+    if (args[0] === target) await replace();
+    return result;
+  });
+  vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args);
+    if (args[0] === target) {
+      const handleStat = handle.stat.bind(handle);
+      vi.spyOn(handle, 'stat').mockImplementation(async (...options) => {
+        const result = await handleStat(...options);
+        await replace();
+        return result;
+      });
+    }
+    return handle;
+  });
+  await expect(
+    generateDependencyLegalClosure({ repoRoot, modifiedSources })
+  ).resolves.toBeDefined();
+  expect(replaced).toBe(true);
+});
+
+it.each(['stat', 'readFile'] as const)(
+  'closes the owned source handle after %s failure',
+  async (operation) => {
+    const { repoRoot } = await fixture();
+    const target = path.join(repoRoot, owner, 'source.patch');
+    const open = fs.open.bind(fs);
+    const closed = vi.fn();
+    vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args);
+      if (args[0] === target) {
+        const close = handle.close.bind(handle);
+        vi.spyOn(handle, operation).mockRejectedValue(new Error('source read failed'));
+        vi.spyOn(handle, 'close').mockImplementation(async () => {
+          await close();
+          closed();
+        });
+      }
+      return handle;
+    });
+    await expect(generateDependencyLegalClosure({ repoRoot, modifiedSources })).rejects.toThrow(
+      'source read failed'
+    );
+    expect(closed).toHaveBeenCalledOnce();
+  }
+);

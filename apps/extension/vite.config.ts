@@ -1,4 +1,5 @@
 import { normalizeMediabunny } from '../../tooling/ci/mediabunny/normalize.mjs';
+import { createZodRuntimeFallbackPlugin } from './build/injected-build-support.ts';
 import { tourPlayerScript } from './build/tour-player-script.ts';
 import { videoEffectResources } from './build/video-effect-resources.ts';
 import { copyFile, mkdir } from 'node:fs/promises';
@@ -155,6 +156,7 @@ export default defineConfig(({ mode }) => ({
   publicDir: resolvePath(BUILD_LAYOUT.appRoot, 'public'),
   base: './',
   plugins: [
+    createZodRuntimeFallbackPlugin(),
     tourPlayerScript(),
     videoEffectResources(join(APP_ROOT, 'public/video-effects')),
     extensionHtmlInputs(BUILD_LAYOUT),

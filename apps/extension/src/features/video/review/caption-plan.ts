@@ -51,7 +51,7 @@ function captionBlocks(fragment: ReviewTextFragment, wrap: (text: string) => str
   if (located.some((word) => !word) || fragment.text.slice(position).trim()) return whole;
   const blocks: typeof whole = [];
   let first = 0;
-  for (let index = 1; index <= located.length; index++) {
+  for (let index = 1; index < located.length; index++) {
     const candidate = located[index];
     if (candidate && wrap(fragment.text.slice(located[first]!.from, candidate.to)).length <= 2)
       continue;
@@ -64,6 +64,13 @@ function captionBlocks(fragment: ReviewTextFragment, wrap: (text: string) => str
     });
     first = index;
   }
+  const start = located[first]!;
+  const end = located[located.length - 1]!;
+  blocks.push({
+    text: fragment.text.slice(start.from, end.to),
+    start: start.start,
+    end: end.end,
+  });
   return blocks;
 }
 

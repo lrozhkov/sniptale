@@ -70,7 +70,7 @@ export function configureAudioJobPrivacyErasurePort(
 
 const privacyErasureUseCase = new PrivacyErasureUseCase({
   audioJobs: {
-    cancelActiveJob: () => audioJobs?.cancelActiveJob() ?? Promise.resolve(),
+    cancelActiveJob: () => (audioJobs ? audioJobs.cancelActiveJob() : Promise.resolve()),
     reserveErasureExclusion: () =>
       audioJobs?.reserveErasureExclusion() ?? { release() {}, async waitForActiveMutations() {} },
   },
