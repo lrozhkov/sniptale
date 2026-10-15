@@ -343,3 +343,42 @@ it('keeps each cut transition through resize and refuses failed property commits
     vi.unstubAllGlobals();
   }
 });
+
+it.each(['cut', 'speed'] as const)(
+  'returns to pointer after accepted %s placement and retains the tool after refusal',
+  async (kind) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const root = createRoot(document.createElement('div'));
+    const commit = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const select = vi.fn();
+    let hook!: ReturnType<typeof useReviewEdits>;
+    function Harness() {
+      hook = useReviewEdits({
+        duration: 6,
+        boundaries: [0, 2, 4, 6],
+        edits: [],
+        pause: vi.fn(),
+        seek: vi.fn(),
+        setSelection: vi.fn(),
+        onSelectedEditIdChange: select,
+        commit,
+      });
+      return null;
+    }
+    try {
+      act(() => root.render(<Harness />));
+      await act(async () => hook.toggle(kind));
+      await act(async () => hook.commitRange({ kind: 'range', start: 2, end: 4 }));
+      expect(hook.mode).toBe(kind);
+      expect(select).not.toHaveBeenCalled();
+      await act(async () => hook.commitRange({ kind: 'range', start: 2, end: 4 }));
+      expect(hook.mode).toBeNull();
+      expect(hook.cutting).toBe(false);
+      expect(select).toHaveBeenCalledWith(expect.any(String));
+      expect(commit).toHaveBeenCalledTimes(2);
+    } finally {
+      act(() => root.unmount());
+      vi.unstubAllGlobals();
+    }
+  }
+);
