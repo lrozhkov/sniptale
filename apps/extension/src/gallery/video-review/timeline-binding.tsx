@@ -353,7 +353,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         {...(props.advanced.ui.mode !== 'advanced' && props.editing.exporter.index
           ? { boundaries: props.editing.exporter.index.boundaries }
           : {})}
-        {...reviewTimelineAudioTrack(props, features, projection)}
+        {...reviewTimelineAudioTrack(props, features, projection, compact)}
         onRangeCommit={(range) => {
           if (props.editing.mode) void props.editing.commitRange(range);
         }}
@@ -798,7 +798,8 @@ function ReviewTextLane(props: {
 function reviewTimelineAudioTrack(
   props: TimelineBindingProps,
   features: ReturnType<typeof resolveQuickEditEffectiveFeatures>,
-  projection: ReviewTrackProjection
+  projection: ReviewTrackProjection,
+  compact: boolean
 ) {
   return features.mode === 'advanced' ||
     features.audioTrackVisible ||
@@ -806,6 +807,7 @@ function reviewTimelineAudioTrack(
     ? {
         audioTrack: (
           <ReviewAudioLaneBinding
+            compact={compact}
             beforeAction={props.beforeAction}
             selectedEditId={props.editing.selected?.id}
             edits={props.edits}

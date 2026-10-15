@@ -189,17 +189,6 @@
       "signatureHash": "eb89f5599e8f3549069f4e9fd7c31dae6ed1f4e85908453bedd8ca34b5a8bcee"
     },
     {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
-      "symbol": "ReviewTimelineBinding",
-      "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "59731c9624bf88fe6d00c527c90e30bca72ab07735bc04c026a6df1359678153",
-      "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
-      "reason": "tool-noise: The provider connects existing placement tools, common row chrome and injected commands. Configuration and density are disposable presentation state. Cancellation clears existing gesture owners before the session command. No new writer or resource receiver appears. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-15"
-    },
-    {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/workflows/video-review/export-lifecycle.test.ts",
       "symbol": "<file>",
@@ -403,9 +392,9 @@
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "cd29a254926c929da3a7b35be86f729f7018f5611151356c0d282a9081e19360",
+      "astHash": "fb898949935ecae07908acff5899c067c8ea434abf9558ad04e03551614d4e94",
       "signatureHash": "418e85bf5dc567bc2a34e4a84bd51169a0d66dc2fffd55e97beb75697efecb0c",
-      "reason": "tool-noise: The provider connects existing placement tools, common row chrome and injected commands. Configuration and density are disposable presentation state. Cancellation clears existing gesture owners before the session command. No new writer or resource receiver appears. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: The existing timeline provider forwards the compact presentation flag to its audio lane adapter. File score remains 6, with no score increase, and cohesion is 0.97. The change adds no state writer, gesture receiver, resource lifetime or recovery authority. Main inspected the complete diff. Fresh complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {

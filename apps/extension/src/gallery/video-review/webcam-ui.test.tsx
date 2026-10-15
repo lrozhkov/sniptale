@@ -255,7 +255,7 @@ it('keeps camera markers on the source axis and creates hide intervals through a
     root.render(<ReviewWebcamTrack editor={editor} projection={createTrackProjection(12, [])} />);
   act(render);
   const track = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.webcamTrack"]')!;
-  expect(track.style.height).toBe('40px');
+  expect(track.style.height).toBe('36px');
   click('webcamSettings');
   expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' });
   const markers = track.querySelectorAll<HTMLButtonElement>('button');

@@ -1,4 +1,9 @@
-import { reviewTrackGestureLocked } from './track-row';
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+} from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import {
   packQuickEditFocusRows,
@@ -25,7 +30,6 @@ import {
 } from '../../features/video/review/snap';
 import { reviewTrackStatusButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewDragEscape } from './timeline-drag';
 
 type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor'>;
@@ -235,8 +239,8 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
     >
       <div
         data-ui="gallery.videoReview.zoomLane"
-        className="relative mt-1 rounded bg-[var(--sniptale-color-surface-hover)]"
-        style={{ height: rowCount * (props.compact ? 28 : 36) - 4 }}
+        className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: rowCount * reviewTrackMetrics(props.compact).step }}
       >
         {shownRegions
           .filter((region) => !region.dormant)
@@ -298,14 +302,6 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
             }}
           />
         ) : null}
-        {!props.regions.length ? (
-          <p
-            className="pointer-events-none absolute inset-0 flex items-center justify-center
-              text-[11px] text-[var(--sniptale-color-text-muted)]"
-          >
-            {translate('gallery.videoReview.zoomEmptyHint')}
-          </p>
-        ) : null}
       </div>
     </ReviewTrackRow>
   );
@@ -360,7 +356,10 @@ function ReviewZoomGapLink(props: {
       style={{
         left: `${left * 100}%`,
         width: `${(right - left) * 100}%`,
-        top: props.row * (props.compact ? 28 : 36) + (props.compact ? 2 : 4),
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset +
+          (props.compact ? 2 : 4),
         height: props.compact ? 20 : 24,
         bottom: 'auto',
       }}
@@ -558,8 +557,10 @@ function ReviewZoomRegionBlock(
           active:cursor-grabbing ${tone}`}
       style={{
         ...style,
-        top: props.row * (props.compact ? 28 : 36),
-        height: props.compact ? 24 : 32,
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset,
+        height: reviewTrackMetrics(props.compact).body,
         bottom: 'auto',
       }}
       onPointerDown={begin}

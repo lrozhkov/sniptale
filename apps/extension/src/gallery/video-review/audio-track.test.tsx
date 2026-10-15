@@ -135,8 +135,8 @@ it('stacks overlapping voiceovers without moving neighbors and retains rows duri
   });
   const lane = lanes[1]!;
   const blocks = [...lane.querySelectorAll<HTMLDivElement>('[role="button"]')];
-  expect(blocks.map((block) => block.style.top)).toEqual(['0px', '36px', '72px', '0px']);
-  expect((lane as HTMLElement).style.height).toBe('104px');
+  expect(blocks.map((block) => block.style.top)).toEqual(['2px', '38px', '74px', '2px']);
+  expect((lane as HTMLElement).style.height).toBe('108px');
   vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 104));
   const moving = blocks[1]!;
   Object.assign(moving, { setPointerCapture: vi.fn() });
@@ -148,7 +148,7 @@ it('stacks overlapping voiceovers without moving neighbors and retains rows duri
       new MouseEvent('pointermove', { bubbles: true, clientX: 300, shiftKey: true })
     )
   );
-  expect(moving.style.top).toBe('36px');
+  expect(moving.style.top).toBe('38px');
   expect(blocks[0]!.style.left).toBe('10%');
   await act(async () =>
     moving.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 300 }))

@@ -152,7 +152,7 @@ it('puts overlapping source gain on separate rows and detaches linked coverage o
     const items = f.lane.querySelectorAll<HTMLButtonElement>('button[data-audio-id]');
     expect(items).toHaveLength(3);
     expect(new Set([...items].map((item) => item.style.top)).size).toBe(3);
-    expect(f.lane.style.height).toBe('96px');
+    expect(f.lane.style.height).toBe('108px');
     const take = f.lane.querySelector<HTMLButtonElement>('button[data-audio-id="mute:binding:0"]')!;
     f.send('pointerdown', 250, take);
     f.send('pointerup', 250);

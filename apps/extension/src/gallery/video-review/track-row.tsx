@@ -7,6 +7,12 @@ import { translate } from '../../platform/i18n';
 import { ReviewButton, reviewCompactTrackButtonClassName } from './controls';
 import './track-row.css';
 
+/** Interval lanes share symmetric insets and row pitch in each density. */
+export function reviewTrackMetrics(compact = false) {
+  const body = compact ? 24 : 32;
+  return { body, step: body + 4, inset: 2 };
+}
+
 type ReviewTrackControlsState = {
   ui: QuickEditUiState;
   configuring: boolean;

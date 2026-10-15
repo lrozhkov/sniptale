@@ -1,4 +1,9 @@
-import { reviewTrackGestureLocked } from './track-row';
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+} from './track-row';
 import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
@@ -17,7 +22,6 @@ import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
 import type { useReviewAudio } from './use-review-audio';
 import { ReviewAudioWaveform } from './audio-waveform';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewButton, reviewTrackStatusButtonClassName } from './controls';
 
 type Drag = {
@@ -37,6 +41,7 @@ type Drag = {
 
 /** Source-time automation shares video coordinates and never affects added audio clips. */
 export function ReviewOriginalAudioTrack(props: {
+  compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   original: QuickEditOriginalAudio;
   waveform?: ReviewWaveform | undefined;
@@ -90,11 +95,11 @@ export function ReviewOriginalAudioTrack(props: {
           data-ui="gallery.videoReview.audioLane"
           data-original-audio-lane
           data-audio-muted={muted ? 'true' : 'false'}
-          className={`relative mt-1 h-8 rounded touch-none border-b border-dashed
+          className={`relative h-8 rounded touch-none border-b border-dashed
             bg-[var(--sniptale-color-surface-hover)]
             ${muted ? 'border-[var(--sniptale-color-text-secondary)]' : 'border-transparent'}`}
           style={{
-            height: rowCount * 32,
+            height: rowCount * reviewTrackMetrics(props.compact).step,
             ...(gesture.preview?.id
               ? { cursor: gesture.preview.edge === 'move' ? 'grabbing' : 'ew-resize' }
               : {}),
@@ -111,6 +116,7 @@ export function ReviewOriginalAudioTrack(props: {
           />
           {ranges.map((range) => (
             <ReviewOriginalGainBlock
+              compact={props.compact}
               key={range.id}
               range={range}
               row={rows.get(range.id) ?? 0}
@@ -212,6 +218,7 @@ function OriginalAudioControls(props: {
 
 /** One authored source-gain item keeps its selection and resize handles together. */
 function ReviewOriginalGainBlock(props: {
+  compact?: boolean | undefined;
   range: QuickEditOriginalAudioRange;
   row: number;
   duration: number;
@@ -235,8 +242,10 @@ function ReviewOriginalGainBlock(props: {
       className={`absolute z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
         rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
       style={{
-        top: props.row * 32,
-        height: 32,
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset,
+        height: reviewTrackMetrics(props.compact).body,
         left: `${(start / props.duration) * 100}%`,
         width: `${((end - start) / props.duration) * 100}%`,
       }}

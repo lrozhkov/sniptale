@@ -123,7 +123,7 @@ it.each([false, true])(
         root.render(<Fixture key={fragmentCount} compact={compact} fragmentCount={fragmentCount} />)
       );
       const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.textTrack"]')!;
-      expect(lane.style.height).toBe(`${Math.max(1, fragmentCount) * step - 4}px`);
+      expect(lane.style.height).toBe(`${Math.max(1, fragmentCount) * step}px`);
       expect(lane.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
       expect(lane.className).not.toContain('my-1');
       const blocks = lane.querySelectorAll<HTMLElement>('[data-text-id]');
@@ -131,7 +131,7 @@ it.each([false, true])(
       const tops = [...blocks].map((block) => parseFloat(block.style.top)).sort((a, b) => a - b);
       expect(tops).toEqual(Array.from({ length: fragmentCount }, (_, index) => index * step + 2));
       for (const block of blocks) {
-        expect(block.style.height).toBe(`${step - 8}px`);
+        expect(block.style.height).toBe(`${step - 4}px`);
       }
       const before = structuredClone(current);
       act(() =>

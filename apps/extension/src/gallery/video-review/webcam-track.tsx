@@ -1,9 +1,13 @@
-import { reviewTrackGestureLocked } from './track-row';
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackCuts,
+  ReviewTrackRow,
+} from './track-row';
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Camera, Eye, EyeOff, Settings2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import {
   ReviewButton,
   reviewCompactTrackButtonClassName,
@@ -107,7 +111,7 @@ export function ReviewWebcamTrack(props: {
       <div
         data-ui="gallery.videoReview.webcamTrack"
         className="relative border-b border-[var(--sniptale-color-border-soft)]"
-        style={{ height: compact ? 28 : 40, touchAction: 'none' }}
+        style={{ height: reviewTrackMetrics(compact).step, touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           if (
@@ -195,7 +199,7 @@ function ReviewWebcamTrackMarkers({
           title={translate('gallery.videoReview.webcamHidden')}
           aria-label={`${translate('gallery.videoReview.webcamHidden')} ${range.start}–${range.end}`}
           className={
-            'absolute inset-y-1 z-20 flex items-center justify-center overflow-hidden ' +
+            'absolute inset-y-0.5 z-20 flex items-center justify-center overflow-hidden ' +
             'border border-dashed rounded-sm ' +
             reviewTimelineItemTone(
               editor.selection.kind === 'webcam-hidden' && editor.selection.id === range.id

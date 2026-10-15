@@ -608,7 +608,7 @@ it('repacks transient overlapping overlay ranges and restores rows on Escape', a
   await track.event(first!, 'pointerdown', 0);
   await track.event(first!, 'pointermove', 300, true);
   expect(first!.style.top).not.toBe(second!.style.top);
-  expect(track.lane.style.height).toBe('68px');
+  expect(track.lane.style.height).toBe('72px');
   expect(commit).not.toHaveBeenCalled();
   await act(async () =>
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -686,7 +686,7 @@ it('uses one visible row for adjacent Zoom, Spotlight and Border intervals', asy
   );
   expect(track.blocks).toHaveLength(4);
   expect(new Set(track.blocks.map((block) => block.style.top)).size).toBe(1);
-  expect(track.lane.style.height).toBe('32px');
+  expect(track.lane.style.height).toBe('36px');
 });
 
 it.each(['zoom', 'spotlight'] as const)(

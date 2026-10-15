@@ -126,7 +126,11 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
             style={{ top: lane * ACTION_LANE_PITCH_PX, height: ACTION_MARKER_HEIGHT_PX }}
           />
           {!layout.items.some((item) => item.lane === lane) &&
-          (lane !== 2 || !props.cursorFocusKeys?.length) ? (
+          (lane !== 2 || !props.cursorFocusKeys?.length) &&
+          reviewHistoryCaptureStatus(
+            props.captureCapabilities,
+            lane === 0 ? 'keyboard' : lane === 1 ? 'mouse' : 'cursor'
+          ) !== 'available' ? (
             <span
               className={`pointer-events-none absolute inset-x-0 truncate px-1
                 text-[11px] leading-5 text-[var(--sniptale-color-text-secondary)]`}

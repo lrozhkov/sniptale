@@ -1,10 +1,26 @@
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { replaceNativeReviewWorkspace } from '../support/native-review-workspace';
+import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
+import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../../apps/extension/src/features/video/review/document';
+import {
+  addReviewTextFragment,
+  type ReviewTextDocument,
+} from '../../../../apps/extension/src/features/video/review/text-document';
+import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
+import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/review/advanced/focus';
+import { readReviewAnnotationEffectDocument } from '../../../../apps/extension/src/features/video/review/annotation-effects/validation';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
-import { persistedReviewContent } from '../support/voiceover-speech-fixture';
+import { persistedReviewContent, syntheticSpeechWav } from '../support/voiceover-speech-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 async function gesture(page: Page, lane: Locator, start: number, end?: number) {
@@ -21,7 +37,7 @@ async function gesture(page: Page, lane: Locator, start: number, end?: number) {
 async function inspectResizeGuide(page: Page, dialog: Locator) {
   const block = dialog.locator('[data-ui="gallery.videoReview.editBlock"]').first();
   const edge = block.locator('[data-edge="end"]');
-  await edge.scrollIntoViewIfNeeded();
+  await edge.hover();
   const box = await edge.boundingBox();
   if (!box) throw new Error('Source resize handle is absent');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -299,8 +315,8 @@ for (const variant of [
           if (((await density.getAttribute('aria-pressed')) === 'true') !== compact)
             await density.click();
           const step = compact ? 28 : 36;
-          await expect(text).toHaveCSS('height', `${Math.max(1, count) * step - 4}px`);
-          await expect(annotations).toHaveCSS('height', `${step - 4}px`);
+          await expect(text).toHaveCSS('height', `${Math.max(1, count) * step}px`);
+          await expect(annotations).toHaveCSS('height', `${step}px`);
           const textColor = await text.evaluate((node) => getComputedStyle(node).backgroundColor);
           await expect(annotations).toHaveCSS('background-color', textColor);
           expect(textColor).not.toBe('rgba(0, 0, 0, 0)');
@@ -422,6 +438,256 @@ for (const variant of [
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))
       );
+    }
+  });
+}
+
+async function seedDensityRows(page: Page, count: number, adjacent = false) {
+  const saved = await readNativeReviewWorkspace(page, 'recording:beta-v1-recording');
+  if (!saved) throw new Error('Density workspace is absent');
+  const before = replayReviewHistory(
+    saved.history,
+    saved.cursor,
+    saved.source,
+    reviewAdvancedContentBaseline(saved.advanced)
+  ).advancedContent;
+  const source = await readFile(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'utf8'
+  );
+  const document = readReviewAnnotationEffectDocument(source);
+  if (!document) throw new Error('Density effect is invalid');
+  const sha256 = createHash('sha256').update(source).digest('hex');
+  const snapshot = {
+    id: `effect:${sha256}`,
+    schemaVersion: 'sniptale.effect.v1' as const,
+    kind: 'standalone' as const,
+    documentId: document.id,
+    sha256,
+    source,
+    retainedByteLength: Buffer.byteLength(source),
+    assets: [],
+  };
+  const ranges = Array.from({ length: count }, (_, i) => ({
+    start: adjacent ? i + 1 : 1,
+    end: adjacent ? i + 2 : 4,
+  }));
+  let text: ReviewTextDocument = { version: 1, fragments: [] };
+  for (const [i, range] of ranges.entries()) {
+    const result = addReviewTextFragment(text, {
+      id: `density-text-${i}`,
+      ...range,
+      text: `Text ${i}`,
+      timeDomain: 'source',
+    });
+    if (!result.ok) throw new Error('Density text is invalid');
+    text = result.document;
+  }
+  const clips = ranges.map((range, i) => ({
+    id: `density-audio-${i}`,
+    assetId: before.audio.voiceover[0]!.assetId,
+    timelineStart: range.start,
+    duration: range.end - range.start,
+    sourceOffset: 0,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  }));
+  const after = {
+    ...before,
+    text,
+    zoom: {
+      ...before.zoom,
+      enabled: true,
+      regions: ranges.map((range, i) => ({
+        ...createQuickEditZoomRegion({
+          id: `density-focus-${i}`,
+          at: range.start,
+          duration: range.end - range.start,
+        }),
+        ...(i ? { spotlight: createQuickEditSpotlight() } : {}),
+      })),
+    },
+    annotationEffects: {
+      enabled: true,
+      instances: ranges.map((range, i) => ({
+        id: `density-effect-${i}`,
+        snapshotId: snapshot.id,
+        enabled: true,
+        ...range,
+        attachment: 'viewport' as const,
+        transform: { x: 0.1, y: 0.1, width: 0.3, height: 0.2, rotation: 0 },
+        controls: { accent: '#5f7cff' },
+        order: i,
+      })),
+    },
+    webcam: { ...before.webcam!, hiddenRanges: [{ id: 'density-hidden', start: 1, end: 4 }] },
+    audio: {
+      ...before.audio,
+      original: {
+        ...before.audio.original,
+        ranges: [],
+        mutes: ranges.map((range, i) => ({
+          id: `density-gain-${i}`,
+          kind: 'range' as const,
+          ...range,
+          volume: 0.5,
+        })),
+      },
+      voiceover: clips,
+      music: clips.map((clip) => ({ ...clip, id: `music-${clip.id}` })),
+    },
+  };
+  const history = [
+    ...saved.history.slice(0, saved.cursor),
+    { id: crypto.randomUUID(), at: Date.now(), target: 'advancedContent' as const, before, after },
+  ];
+  const inspected = inspectVideoWorkspace({
+    ...saved,
+    revision: saved.revision + 1,
+    updatedAt: Date.now(),
+    history,
+    cursor: history.length,
+    effectSnapshots: [snapshot],
+  });
+  const row = inspected.workspace;
+  if (!row)
+    throw new Error(`Density fixture failed workspace admission: ${JSON.stringify(inspected)}`);
+  await replaceNativeReviewWorkspace(page, row.aggregateId, row);
+}
+
+for (const variant of [
+  { width: 1280, height: 560, theme: 'light', locale: 'ru' },
+  { width: 1920, height: 900, theme: 'dark', locale: 'en' },
+] as const) {
+  test(`interval track density ${variant.width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: variant.width, height: variant.height });
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    const dialog = page.locator('dialog');
+    const open = async () => {
+      await page.reload();
+      await page.getByRole('button', { name: /: Screen$/ }).click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    };
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewWebcamBundle(page);
+      await open();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await expect
+        .poll(
+          async () =>
+            (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))?.advanced.ui.mode
+        )
+        .toBe('advanced');
+      const settings = dialog.getByRole('button', {
+        name: label('gallery.videoReview.trackSettings'),
+        exact: true,
+      });
+      await settings.click();
+      await dialog.locator('[data-review-track="webcam"] [role="switch"]').click();
+      await expect
+        .poll(async () => (await persistedReviewContent(page))?.webcam?.assetId)
+        .toMatch(/^project-asset:/);
+      await settings.click();
+      await dialog
+        .locator('[data-review-track="voiceover"]')
+        .getByRole('button', { name: label('gallery.videoReview.audioImport'), exact: true })
+        .click();
+      const drawer = page.locator('[data-ui="music.library.drawer"]');
+      await drawer.locator('input[type="file"]').setInputFiles({
+        name: 'density.wav',
+        mimeType: 'audio/wav',
+        buffer: syntheticSpeechWav(4),
+      });
+      await expect(drawer).toHaveCount(0);
+      await expect
+        .poll(async () => (await persistedReviewContent(page))?.audio.voiceover.length)
+        .toBe(1);
+      for (const [count, adjacent] of [
+        [1, false],
+        [2, false],
+        [3, false],
+        [3, true],
+      ] as const) {
+        await seedDensityRows(page, count, adjacent);
+        await open();
+        for (const compact of [false, true]) {
+          const density = dialog.getByRole('button', {
+            name: label('gallery.videoReview.compactTrackHeight'),
+            exact: true,
+          });
+          if (((await density.getAttribute('aria-pressed')) === 'true') !== compact)
+            await density.click();
+          const rows = adjacent ? 1 : count;
+          const step = compact ? 28 : 36;
+          for (const [laneSelector, bodySelector, rowCount] of [
+            ['[data-ui="gallery.videoReview.zoomLane"]', ':scope > [role="button"]', rows],
+            ['[data-ui="gallery.videoReview.textTrack"]', '[data-text-id]', rows],
+            [
+              '[data-ui="gallery.videoReview.annotationEffectsLane"]',
+              '[data-annotation-effect-id]',
+              rows,
+            ],
+            [
+              '[data-original-audio-lane]',
+              '[data-ui="gallery.videoReview.originalAudioRange"]',
+              rows,
+            ],
+            ['[data-audio-lane="voiceover"]', '[data-audio-id]', rows],
+            ['[data-audio-lane="music"]', '[data-audio-id]', rows],
+            ['[data-ui="gallery.videoReview.webcamTrack"]', ':scope > button', 1],
+          ] as const) {
+            const lane = dialog.locator(laneSelector);
+            await expect(lane).toBeAttached();
+            await expect(lane).toHaveCSS('height', `${rowCount * step}px`);
+            const bodies = lane.locator(bodySelector);
+            await expect(bodies).toHaveCount(
+              rowCount === 1 && laneSelector.includes('webcam') ? 1 : count
+            );
+            const rects = await bodies.evaluateAll((nodes) =>
+              nodes.map((node) => {
+                const box = node.getBoundingClientRect();
+                const lane = node.parentElement!.getBoundingClientRect();
+                return { top: box.top - lane.top, height: box.height };
+              })
+            );
+            for (const rect of rects)
+              expect(Math.abs(rect.height - (step - 4))).toBeLessThanOrEqual(1);
+            const tops = [...new Set(rects.map((rect) => rect.top))].sort((a, b) => a - b);
+            expect(tops).toHaveLength(rowCount);
+            for (const [i, top] of tops.entries())
+              expect(Math.abs(top - (2 + i * step))).toBeLessThanOrEqual(1);
+            if (
+              count === 3 &&
+              !adjacent &&
+              (laneSelector.includes('zoomLane') || laneSelector.includes('music'))
+            ) {
+              await lane.scrollIntoViewIfNeeded();
+              await page.screenshot({
+                path: info.outputPath(
+                  `density-${compact}-${laneSelector.includes('zoomLane') ? 'top' : 'bottom'}.png`
+                ),
+                fullPage: false,
+              });
+            }
+          }
+        }
+      }
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
   });
 }

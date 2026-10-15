@@ -1,4 +1,9 @@
-import { reviewTrackGestureLocked } from './track-row';
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+} from './track-row';
 import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
@@ -41,7 +46,6 @@ import {
   ReviewButton,
 } from './controls';
 import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
@@ -78,6 +82,7 @@ const LANES: Array<{
 ];
 
 type ReviewAudioTimelineProps = {
+  compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
@@ -219,7 +224,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
         data-ui="gallery.videoReview.audioLane"
         data-audio-lane={props.lane}
         {...dropTarget}
-        style={{ height: rowCount * 36 - 4 }}
+        style={{ height: rowCount * reviewTrackMetrics(props.compact).step }}
       >
         {props.clips.flatMap((stored) => {
           const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
@@ -230,6 +235,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
               : [undefined];
           return (
             <ReviewAudioClipBlock
+              compact={props.compact}
               key={clip.id}
               row={rows.get(clip.id) ?? 0}
               pieces={pieces}
@@ -259,7 +265,6 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
         })}
         <ReviewTrackCuts projection={props.cutsProjection ?? props.projection} />
         <ReviewAudioLaneStatus
-          empty={!props.clips.length}
           guide={
             preview?.guide == null
               ? null
@@ -274,6 +279,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
 
 /** One draggable clip block; edges trim, the body moves, and Escape cancels the preview. */
 type ReviewAudioClipBlockProps = {
+  compact?: boolean | undefined;
   row: number;
   pieces: readonly (ReturnType<ReviewTrackProjection['slices']>[number] | undefined)[];
   clip: QuickEditAudioClip;
@@ -329,8 +335,10 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
       style={{
         left: `${start * 100}%`,
         width: `${(end - start) * 100}%`,
-        top: props.row * 36,
-        height: 32,
+        top:
+          props.row * reviewTrackMetrics(props.compact).step +
+          reviewTrackMetrics(props.compact).inset,
+        height: reviewTrackMetrics(props.compact).body,
       }}
       {...reviewAudioClipGesture(props, assetDuration)}
     >
@@ -522,6 +530,7 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
       />
       {props.hasOriginalAudio !== false ? (
         <ReviewOriginalAudioTrack
+          compact={props.compact}
           beforeAction={props.beforeAction}
           onOpenSpeech={props.onOpenSpeech}
           duration={props.duration}
@@ -542,11 +551,12 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           track="originalAudio"
           label={translate('gallery.videoReview.audioOriginal')}
         >
-          <div className="h-8" />
+          <div style={{ height: reviewTrackMetrics(props.compact).step }} />
         </ReviewTrackRow>
       )}
       {props.showAddedAudio !== false ? (
         <ReviewClipLanes
+          compact={props.compact}
           beforeAction={props.beforeAction}
           audio={props.audio}
           assets={props.assets}
@@ -576,6 +586,7 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
     <>
       {LANES.map((lane) => (
         <ReviewAudioClipLane
+          compact={props.compact}
           key={lane.key}
           lane={lane.key}
           label={translate(lane.label)}
@@ -671,18 +682,10 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
   );
 }
 
-/** Empty-lane guidance and the current magnetic alignment share the lane coordinate scale. */
-function ReviewAudioLaneStatus(props: { empty: boolean; guide: number | null; duration: number }) {
+/** Magnetic alignment uses the lane coordinate scale. */
+function ReviewAudioLaneStatus(props: { guide: number | null; duration: number }) {
   return (
     <>
-      {props.empty ? (
-        <p
-          className="pointer-events-none absolute inset-0 flex items-center justify-center
-              text-[11px] text-[var(--sniptale-color-text-muted)]"
-        >
-          {translate('gallery.videoReview.audioEmpty')}
-        </p>
-      ) : null}
       {props.guide !== null ? (
         <div
           aria-hidden="true"
@@ -707,7 +710,7 @@ function useAudioLaneDrop(props: {
   return drop
     ? {
         'data-drop-active': dropHover ? 'true' : undefined,
-        className: `relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)] ${
+        className: `relative h-8 rounded bg-[var(--sniptale-color-surface-hover)] ${
           dropHover
             ? 'outline-2 outline-offset-[-1px] outline-[var(--sniptale-color-border-accent-strong)]'
             : ''
@@ -754,7 +757,7 @@ function useAudioLaneDrop(props: {
         },
       }
     : {
-        className: 'relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]',
+        className: 'relative h-8 rounded bg-[var(--sniptale-color-surface-hover)]',
       };
 }
 

@@ -1,4 +1,9 @@
-import { reviewTrackGestureLocked } from './track-row';
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+} from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { Captions, List, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -15,7 +20,6 @@ import {
   reviewTimelineResizeHandleClassName,
   reviewTextButtonClassName,
 } from './controls';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 
 /** Independent text shares track rows, source-axis gestures and the existing inspector. */
 type TextTrackProps = {
@@ -40,7 +44,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
   }));
   const rows = packReviewTextRows(ranges);
   const rowCount = Math.max(1, ...Array.from(rows.values(), (row) => row + 1));
-  const step = props.compact ? 28 : 36;
+  const metrics = reviewTrackMetrics(props.compact);
+  const step = metrics.step;
   const duration = Math.max(0.01, props.editor.projection.duration);
   return (
     <ReviewTrackRow
@@ -70,8 +75,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
     >
       <div
         data-ui="gallery.videoReview.textTrack"
-        className="relative mt-1 rounded bg-[var(--sniptale-color-surface-hover)]"
-        style={{ height: rowCount * step - 4 }}
+        className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: rowCount * step }}
       >
         {fragments.map((fragment) => {
           const range = props.editor.sourceInterval(fragment);
@@ -93,8 +98,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
                 reviewTimelineItemTone(props.selectedId === fragment.id),
               ].join(' ')}
               style={{
-                top: (rows.get(fragment.id) ?? 0) * step + 2,
-                height: step - 8,
+                top: (rows.get(fragment.id) ?? 0) * step + metrics.inset,
+                height: metrics.body,
                 left: `${(range.start / duration) * 100}%`,
                 width: `${(Math.max(0, range.end - range.start) / duration) * 100}%`,
               }}

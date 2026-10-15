@@ -77,9 +77,12 @@ it('distinguishes captured empty cursor observations from unavailable and unknow
     );
     const row = host.querySelector('[data-history-family="cursor"]')!;
     expect(row.getAttribute('data-history-coverage')).toBe(pointer);
-    const suffix =
-      pointer === 'available' ? 'Empty' : pointer === 'unavailable' ? 'Unavailable' : 'Unknown';
-    expect(row.textContent).toContain(`gallery.videoReview.historyCapture${suffix}`);
+    if (pointer === 'available') {
+      expect(row.textContent).toBe('');
+    } else {
+      const suffix = pointer === 'unavailable' ? 'Unavailable' : 'Unknown';
+      expect(row.textContent).toContain(`gallery.videoReview.historyCapture${suffix}`);
+    }
     expect(host.querySelectorAll('[data-history-family]')).toHaveLength(3);
     expect(
       host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')?.style.height

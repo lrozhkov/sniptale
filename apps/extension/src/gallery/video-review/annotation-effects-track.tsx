@@ -1,4 +1,9 @@
-import { reviewTrackGestureLocked } from './track-row';
+import {
+  reviewTrackMetrics,
+  reviewTrackGestureLocked,
+  ReviewTrackCuts,
+  ReviewTrackRow,
+} from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Sticker } from 'lucide-react';
@@ -18,7 +23,6 @@ import {
 } from './controls';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { useReviewDragEscape } from './timeline-drag';
-import { ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { ReviewTimelineLabel } from './timeline-label';
 import type { ReviewTrackProjection } from './track-projection';
 
@@ -153,7 +157,8 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
       ),
     [props.snapshots, props.instances, locale]
   );
-  const height = props.compact ? 28 : 36;
+  const metrics = reviewTrackMetrics(props.compact);
+  const height = metrics.step;
   const finish = (cancel: boolean) => {
     const current = drag.current;
     if (!current) return;
@@ -213,7 +218,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
           props.drawing ? translate('gallery.videoReview.annotationEffectsDraw') : undefined
         }
         className={[
-          'relative mt-1 rounded bg-[var(--sniptale-color-surface-hover)]',
+          'relative rounded bg-[var(--sniptale-color-surface-hover)]',
           props.drawing
             ? [
                 'cursor-inherit touch-none focus-visible:outline focus-visible:outline-2',
@@ -221,7 +226,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               ].join(' ')
             : '',
         ].join(' ')}
-        style={{ height: Math.max(1, ...Array.from(rows.values(), (row) => row + 1)) * height - 4 }}
+        style={{ height: Math.max(1, ...Array.from(rows.values(), (row) => row + 1)) * height }}
         onKeyDown={(event) => {
           if (
             !props.drawing ||
@@ -382,8 +387,8 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               style={{
                 left: `${(range.start / props.duration) * 100}%`,
                 width: `${((range.end - range.start) / props.duration) * 100}%`,
-                top: (rows.get(instance.id) ?? 0) * height + 2,
-                height: height - 8,
+                top: (rows.get(instance.id) ?? 0) * height + metrics.inset,
+                height: metrics.body,
               }}
               onKeyDown={(event) => {
                 if (props.busy) return;
@@ -547,16 +552,6 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
             className="pointer-events-none absolute inset-y-0 z-20 w-px bg-[var(--sniptale-color-accent-emphasis)]"
             style={{ left: `${(guide / props.duration) * 100}%` }}
           />
-        ) : null}
-        {!props.instances.length ? (
-          <p
-            className={[
-              'pointer-events-none absolute inset-0 flex items-center justify-center text-[11px]',
-              'text-[var(--sniptale-color-text-muted)]',
-            ].join(' ')}
-          >
-            {translate('gallery.videoReview.annotationEffectsEmpty')}
-          </p>
         ) : null}
       </div>
     </ReviewTrackRow>
