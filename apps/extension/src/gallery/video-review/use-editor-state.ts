@@ -364,6 +364,7 @@ function useReviewEditorTimeline(
     onMediaError,
     recovering,
     seekRevision,
+    navigationRevision,
     actionSoundPreview,
   } = useReviewTransport({
     resource,
@@ -423,6 +424,7 @@ function useReviewEditorTimeline(
     onMediaError,
     recovering,
     seekRevision,
+    navigationRevision,
     playing,
     setPlaying,
     seek,

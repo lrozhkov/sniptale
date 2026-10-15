@@ -50,10 +50,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline.tsx",
       "symbol": "ReviewTimeline",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One measured timeline composes ruler, lanes and playhead inside a source-qualified visual provider. The provider owns only the disposable guide; existing range gestures and commands retain their owners. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
+      "reason": "tool-noise: One measured timeline composes ruler, lanes and playhead. The new bindings route user input to playback follow in the existing navigation owner. Score remains 3 with delta 0, state authorities 0 and cohesion 0.80. Range gestures, media time and persistence keep their existing owners. Another JSX wrapper would only forward these bindings. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15",
-      "astHash": "ad58efc3f200017a53041e73ab7c340eda62f25cf90f715bbf98baca1f4e4302",
+      "astHash": "2ada74b03cf5d341ad376c914c29f3f154bae3b1296844518b281821dd3350c0",
       "signatureHash": "99bc8f53332cdb91cb2856b5f298ed8492021b86e698d8380c534924bc6d9bdc"
     },
     {
@@ -61,10 +61,10 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess if this owner acquires another state authority or independent operation. Remove when the analyzer recognizes this cohesive boundary.",
-      "astHash": "fc3aafa65e6f5bf014e9b621ff58957d375b92e27cf9629fae08c0c3ed23c10d",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, gesture, persistence writer, resource or recovery lifetime. Remove when the analyzer models this cohesive UI binding. Fresh independent architecture review must validate this classification.",
+      "astHash": "abc8c92d4f938e69c3c146d0905de6a779a9883a2f8bf9d352c4e55fcd380349",
       "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e",
-      "reason": "tool-noise: The editor adds only a setTrackLocked binding. Existing hooks retain persistence, navigation, waveform, import, panel and preview ownership. Another wrapper would forward the same bindings. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: The existing editor/timeline binding forwards only navigationRevision from the playback owner. Score 3 has no increase. This change adds no branch, state authority, gesture, resource or persistence owner. Extracting another JSX adapter would only forward the same transport values. Main inspected the exact diff. Fresh complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -369,10 +369,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "fb898949935ecae07908acff5899c067c8ea434abf9558ad04e03551614d4e94",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, gesture, persistence writer, resource or recovery lifetime. Remove when the analyzer models this cohesive UI binding. Fresh independent architecture review must validate this classification.",
+      "astHash": "74a084d42741cd7d8dfc58358f1eb0b4245777c1c6b710d5ad19354b9dbdac97",
       "signatureHash": "418e85bf5dc567bc2a34e4a84bd51169a0d66dc2fffd55e97beb75697efecb0c",
-      "reason": "tool-noise: The existing timeline provider forwards the compact presentation flag to its audio lane adapter. File score remains 6, with no score increase, and cohesion is 0.97. The change adds no state writer, gesture receiver, resource lifetime or recovery authority. Main inspected the complete diff. Fresh complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: The existing editor/timeline binding forwards only navigationRevision from the playback owner. Score 6 has no increase. This change adds no branch, state authority, gesture, resource or persistence owner. Extracting another JSX adapter would only forward the same transport values. Main inspected the exact diff. Fresh complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -770,6 +770,17 @@
       "reviewDate": "2026-10-15",
       "reason": "tool-noise: One mounted stage fixture checks native/manual visibility, layer ordering and feedback. Its mock presentation state drives the existing stage receiver; setup and teardown remain shared. File score remains 2 without an increase and cohesion is 1. Main inspected the complete fixture. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource or fixture lifetime. Remove when the analyzer models this cohesive stage fixture. Fresh complete-candidate architecture review must validate this classification."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
+      "symbol": "ReviewTimelineBinding",
+      "owner": "extension:gallery:video-review",
+      "astHash": "5a173f08eb78fbcaf2404862356da87819ff9ccda15e3d57c5c6027d36499117",
+      "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
+      "reviewDate": "2026-10-15",
+      "reason": "tool-noise: The existing editor/timeline binding forwards only navigationRevision from the playback owner. Score 5 has no increase. This change adds no branch, state authority, gesture, resource or persistence owner. Extracting another JSX adapter would only forward the same transport values. Main inspected the exact diff. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, gesture, persistence writer, resource or recovery lifetime. Remove when the analyzer models this cohesive UI binding. Fresh independent architecture review must validate this classification."
     }
   ]
 }

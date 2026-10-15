@@ -57,6 +57,7 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  navigationRevision?: number | undefined;
   annotationEffects?: ReturnType<typeof useReviewAnnotationEffects>;
   effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
   annotationSourceId?: string;
@@ -362,6 +363,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         }}
         time={props.time}
         playing={props.playing}
+        navigationRevision={props.navigationRevision}
         selection={reviewTimelineSourceSelection(props)}
         edits={props.edits}
         onEdit={props.editing.select}

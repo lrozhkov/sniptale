@@ -223,10 +223,13 @@ it('owns replaceable unsnapped loops, rejects cut-only ranges and clears only ex
     act(() => test.hook.setPlaybackRange({ start: 4.1, end: 4.2 }));
     expect(test.hook.playing).toBe(true);
     const revision = test.hook.seekRevision;
+    const navigationRevision = test.hook.navigationRevision;
     act(() => test.hook.onTime(4.2));
     expect(test.hook.time).toBeCloseTo(4.1, 5);
     expect(test.hook.seekRevision).toBeGreaterThan(revision);
+    expect(test.hook.navigationRevision).toBe(navigationRevision);
     act(() => test.hook.seek(4.15, false));
+    expect(test.hook.navigationRevision).toBe(navigationRevision + 1);
     expect(test.hook.playbackRange).not.toBeNull();
     act(() => test.hook.setPlaybackRange(null));
     expect(test.hook.time).toBe(4.15);

@@ -53,6 +53,7 @@ type TimelineProps = {
   duration: number;
   time: number;
   playing: boolean;
+  navigationRevision?: number | undefined;
   selection: ReviewAnchor;
   annotations: readonly ReviewAnnotation[];
   edits?: readonly ReviewEdit[];
@@ -102,11 +103,14 @@ export function ReviewTimeline(props: TimelineProps) {
     zoomVisible,
     props.actionsTrackVisible === false ? 0 : props.markers.length
   );
-  const { zoom, navigation, navigate, onZoom, wheelTarget } = useReviewTimelineNavigation(props, {
-    viewport,
-    gutter,
-    width,
-  });
+  const { zoom, navigation, navigate, onZoom, wheelTarget, follow } = useReviewTimelineNavigation(
+    props,
+    {
+      viewport,
+      gutter,
+      width,
+    }
+  );
   const ruler = useReviewRulerRange({
     ...props,
     range: props.playbackRange ?? null,
@@ -156,7 +160,11 @@ export function ReviewTimeline(props: TimelineProps) {
         ref={viewport}
         data-ui="gallery.videoReview.timelineViewport"
         style={{ overflowX: zoom === 1 ? 'hidden' : 'auto' }}
-        onScroll={hover.clear}
+        onScroll={() => {
+          follow.onScroll();
+          hover.clear();
+        }}
+        {...follow.interaction}
         className={`w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain
           ${props.fillHeight ? 'flex-1' : ''}`}
       >

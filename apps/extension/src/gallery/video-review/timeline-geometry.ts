@@ -6,7 +6,9 @@ import {
   useRef,
   useState,
   type RefObject,
+  type HTMLAttributes,
 } from 'react';
+import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { reviewTimelineNavigationBounds } from './track-projection';
@@ -69,6 +71,10 @@ export function useReviewTimelineNavigation(
   props: {
     duration: number;
     time: number;
+    playing: boolean;
+    navigationRevision?: number | undefined;
+    sourceId?: string | undefined;
+    playbackRange?: ReviewPlaybackRange | null | undefined;
     edits?: readonly ReviewEdit[];
     zoomAnchor?: number | null | undefined;
     beforeAction?: ReviewBeforeAction | undefined;
@@ -79,11 +85,16 @@ export function useReviewTimelineNavigation(
   const [zoom, setZoom] = useState(1);
   const wheelTarget = useRef<HTMLElement>(null);
   const zoomTarget = useRef<number | null>(null);
+  const lastNavigationRevision = useRef(props.navigationRevision);
+  const follow = useReviewPlaybackFollow(props, viewport, width, zoom);
+  const { suspend } = follow;
   const navigation = useMemo(
     () => reviewTimelineNavigationBounds(props.duration, props.edits ?? []),
     [props.duration, props.edits]
   );
   useLayoutEffect(() => {
+    const requestedSeek = props.navigationRevision !== lastNavigationRevision.current;
+    lastNavigationRevision.current = props.navigationRevision;
     const target = zoomTarget.current;
     zoomTarget.current = null;
     if (target !== null && viewport.current && props.duration > 0) {
@@ -93,11 +104,26 @@ export function useReviewTimelineNavigation(
       );
       return;
     }
-    if (props.time === navigation.start || props.time === navigation.end)
+    if (
+      (requestedSeek || (!props.playing && !follow.suspended.current)) &&
+      (props.time === navigation.start || props.time === navigation.end)
+    )
       revealBoundary(viewport.current, props.time, navigation, props.duration, gutter, width, zoom);
-  }, [props.time, navigation, props.duration, zoom, gutter, width, viewport]);
+  }, [
+    props.time,
+    props.playing,
+    props.navigationRevision,
+    navigation,
+    props.duration,
+    zoom,
+    gutter,
+    width,
+    viewport,
+    follow.suspended,
+  ]);
   const navigate = (target: number) => {
     (props.beforeAction ?? ((action) => action()))(() => {
+      suspend();
       props.onSeek(target, false);
       revealBoundary(viewport.current, target, navigation, props.duration, gutter, width, zoom);
     });
@@ -107,10 +133,11 @@ export function useReviewTimelineNavigation(
     (value: number) =>
       (beforeAction ?? ((action) => action()))(() => {
         if (value === zoom) return;
+        suspend();
         zoomTarget.current = zoomAnchor ?? time;
         setZoom(value);
       }),
-    [beforeAction, zoomAnchor, time, zoom]
+    [beforeAction, zoomAnchor, time, zoom, suspend]
   );
   useEffect(() => {
     const node = wheelTarget.current;
@@ -126,7 +153,106 @@ export function useReviewTimelineNavigation(
     node.addEventListener('wheel', wheel, { passive: false });
     return () => node.removeEventListener('wheel', wheel);
   }, [zoom, onZoom]);
-  return { zoom, navigation, navigate, onZoom, wheelTarget };
+  return { zoom, navigation, navigate, onZoom, wheelTarget, follow };
+}
+
+/** Existing playback updates move the viewport; user navigation owns it until the next Play. */
+function useReviewPlaybackFollow(
+  props: {
+    playing: boolean;
+    time: number;
+    duration: number;
+    sourceId?: string | undefined;
+    navigationRevision?: number | undefined;
+    playbackRange?: ReviewPlaybackRange | null | undefined;
+  },
+  viewport: RefObject<HTMLDivElement | null>,
+  width: number,
+  zoom: number
+) {
+  const suspended = useRef(false);
+  const previous = useRef({
+    playing: false,
+    sourceId: props.sourceId,
+    navigationRevision: props.navigationRevision,
+  });
+  const position = useRef({ left: 0, anchor: 0 });
+  const suspend = useCallback(() => {
+    suspended.current = true;
+  }, []);
+  const onScroll = () => {
+    const left = viewport.current?.scrollLeft ?? 0;
+    if (Math.abs(left - position.current.left) > 1) suspend();
+    position.current.left = left;
+  };
+  useLayoutEffect(() => {
+    const start =
+      props.playing && (!previous.current.playing || previous.current.sourceId !== props.sourceId);
+    const navigated = props.navigationRevision !== previous.current.navigationRevision;
+    previous.current = {
+      playing: props.playing,
+      sourceId: props.sourceId,
+      navigationRevision: props.navigationRevision,
+    };
+    if (start) suspended.current = false;
+    if (navigated) suspended.current = true;
+    const node = viewport.current;
+    if (
+      !node ||
+      !props.playing ||
+      props.playbackRange ||
+      suspended.current ||
+      zoom <= 1 ||
+      node.clientWidth <= 0 ||
+      props.duration <= 0 ||
+      !Number.isFinite(props.duration) ||
+      !Number.isFinite(props.time) ||
+      document.visibilityState === 'hidden'
+    )
+      return;
+    const x = (props.time / props.duration) * width * zoom;
+    if (start) {
+      const visible = x - node.scrollLeft;
+      position.current.anchor =
+        visible >= 0 && visible <= width
+          ? Math.max(width / 2, Math.min(width - 1, visible))
+          : width / 2;
+    }
+    const anchor = Math.max(width / 2, Math.min(width - 1, position.current.anchor));
+    const target = x < node.scrollLeft ? x - anchor : Math.max(node.scrollLeft, x - anchor);
+    node.scrollLeft = Math.max(0, Math.min(width * (zoom - 1), target));
+    // Read back the browser-clamped value so our own asynchronous scroll event is not user input.
+    position.current.left = node.scrollLeft;
+  }, [
+    props.playing,
+    props.sourceId,
+    props.navigationRevision,
+    props.time,
+    props.duration,
+    props.playbackRange,
+    viewport,
+    width,
+    zoom,
+  ]);
+  const interaction: HTMLAttributes<HTMLDivElement> = {
+    onPointerDownCapture(event) {
+      if (event.target !== event.currentTarget) suspend();
+    },
+    onWheelCapture(event) {
+      if (!event.ctrlKey && (event.deltaX !== 0 || (event.shiftKey && event.deltaY !== 0)))
+        suspend();
+    },
+    onKeyDownCapture(event) {
+      if (
+        !['Tab', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(event.key) &&
+        (event.target !== event.currentTarget ||
+          event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight')
+      )
+        suspend();
+    },
+  };
+  return { suspended, suspend, onScroll, interaction };
 }
 
 function revealBoundary(

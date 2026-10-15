@@ -306,3 +306,113 @@ test('manual camera offset pixels follow cut speed and loop transport', async ({
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+for (const width of [1280, 1920]) {
+  test(`timeline follows playback and respects manual navigation at ${width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
+    const host = await startHostServer();
+    const ui = previewPlaybackControls(page);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': width === 1280 ? 'dark' : 'light',
+        },
+      });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?theme=${width === 1280 ? 'dark' : 'light'}`
+      );
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await ui.open();
+      if (width === 1920) await ui.button('gallery.videoReview.advancedEditing').click();
+      const viewport = ui.review.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+      const zoom = ui.review.getByRole('slider', {
+        name: translate('videoEditor.timeline.zoom', 'en'),
+        exact: true,
+      });
+      await zoom.fill('75');
+      await ui.seek(2);
+      await ui.button('gallery.videoReview.play').click();
+      const samples = await viewport.evaluate(async (node) => {
+        const plane = node.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+        const playhead = node.querySelector<HTMLElement>(
+          '[data-ui="gallery.videoReview.playhead"]'
+        )!;
+        const samples: Array<{ time: number; left: number; x: number; width: number }> = [];
+        const start = performance.now();
+        while (performance.now() - start < 1400) {
+          await new Promise(requestAnimationFrame);
+          const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+          const bounds = node.getBoundingClientRect();
+          const cursor = playhead.getBoundingClientRect();
+          samples.push({
+            time: Number(plane.getAttribute('aria-valuenow')),
+            left: node.scrollLeft,
+            x: cursor.left + cursor.width / 2 - bounds.left - gutter,
+            width: node.clientWidth - gutter,
+          });
+        }
+        return samples;
+      });
+      expect(samples.length).toBeGreaterThan(2);
+      expect(samples.at(-1)!.time).toBeGreaterThan(samples[0]!.time + 0.5);
+      expect(samples.at(-1)!.left).toBeGreaterThan(samples[0]!.left);
+      expect(samples.every((sample) => sample.x >= -1 && sample.x <= sample.width + 1)).toBe(true);
+      await writeFile(info.outputPath('timeline-follow.json'), JSON.stringify(samples, null, 2));
+      await viewport.hover();
+      const beforeWheel = await viewport.evaluate((node) => node.scrollLeft);
+      await page.mouse.wheel(-500, 0);
+      await expect
+        .poll(() => viewport.evaluate((node) => node.scrollLeft))
+        .toBeLessThan(beforeWheel);
+      const manual = await viewport.evaluate((node) => node.scrollLeft);
+      const time = await ui.video.evaluate((node: HTMLVideoElement) => node.currentTime);
+      await expect
+        .poll(() => ui.video.evaluate((node: HTMLVideoElement) => node.currentTime))
+        .toBeGreaterThan(time + 0.5);
+      expect(await viewport.evaluate((node) => node.scrollLeft)).toBeCloseTo(manual, 0);
+      await ui.button('gallery.videoReview.pause').click();
+      await ui.button('gallery.videoReview.play').click();
+      await expect
+        .poll(() => viewport.evaluate((node) => node.scrollLeft))
+        .toBeGreaterThan(manual + 20);
+      await ui.button('gallery.videoReview.pause').click();
+      const timePlane = ui.review.locator('[data-ui="gallery.videoReview.timePlane"]');
+      await timePlane.focus();
+      await page.keyboard.press('End');
+      await expect
+        .poll(async () => Number(await timePlane.getAttribute('aria-valuenow')))
+        .toBeGreaterThan(11.9);
+      await expect
+        .poll(() => viewport.evaluate((node) => node.scrollLeft))
+        .toBeGreaterThan(manual + 1000);
+      await page.keyboard.press('Home');
+      await expect(timePlane).toHaveAttribute('aria-valuenow', '0');
+      await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBe(0);
+      await ui.button('gallery.videoReview.play').click();
+      await timePlane.focus();
+      await page.keyboard.press('End');
+      await expect
+        .poll(async () => Number(await timePlane.getAttribute('aria-valuenow')))
+        .toBeGreaterThan(11.9);
+      await expect
+        .poll(() => viewport.evaluate((node) => node.scrollLeft))
+        .toBeGreaterThan(manual + 1000);
+      await page.screenshot({
+        path: info.outputPath(`timeline-follow-${width}.png`),
+        fullPage: false,
+      });
+      if (width === 1280) {
+        await page.setViewportSize({ width: 1200, height: 560 });
+        await expect(viewport).toBeVisible();
+      }
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

@@ -32,6 +32,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   const [playbackRange, updateRange] = useState<ReviewPlaybackRange | null>(null);
   const rangeRef = useRef(playbackRange);
   const [seekRevision, reviseSeek] = useState(0);
+  const [navigationRevision, reviseNavigation] = useState(0);
   const setRange = (range: ReviewPlaybackRange | null) => {
     rangeRef.current = range;
     updateRange(range);
@@ -112,6 +113,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     setPlaying,
     playbackRange,
     seekRevision,
+    navigationRevision,
     setPlaybackRange: (requested: ReviewPlaybackRange | null) => {
       if (!requested) {
         setRange(null);
@@ -146,6 +148,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       const range = rangeRef.current;
       if (range && !props.retainCutTime && (next < range.start || next >= range.end))
         setRange(null);
+      reviseNavigation((revision) => revision + 1);
       seekSource(next);
     },
     play: () => {

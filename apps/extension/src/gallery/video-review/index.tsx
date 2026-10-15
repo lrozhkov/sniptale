@@ -253,6 +253,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
               telemetryAvailable={state.projected.markers.length > 0}
               time={state.time}
               playing={state.playing}
+              navigationRevision={state.navigationRevision}
               markers={state.projected.markers}
               captureCapabilities={state.projected.captureCapabilities}
               zoom={zoom}

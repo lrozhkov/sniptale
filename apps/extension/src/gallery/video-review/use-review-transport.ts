@@ -47,6 +47,7 @@ export function useReviewTransport(args: {
     onMediaError,
     recovering,
     seekRevision,
+    navigationRevision,
   } = useReviewPlayback({
     duration: source.duration,
     edits: args.edits,
@@ -113,5 +114,6 @@ export function useReviewTransport(args: {
     onMediaError,
     recovering,
     seekRevision,
+    navigationRevision,
   };
 }
