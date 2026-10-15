@@ -106,7 +106,7 @@ jobs:
           images=$(node tooling/ci/finalize-image-receipts.mjs build/image-use "$SOURCE_SHA" "$SOURCE_TREE" "$PROOF_RUN_ID" "$SOURCE_ATTEMPT")
           echo "qa=$(jq -er .qaDigest <<<"$images")" >> "$GITHUB_OUTPUT"
           echo "controller=$(jq -er .controllerDigest <<<"$images")" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
@@ -143,7 +143,7 @@ jobs:
           done
       - name: Attest release assets
         id: release-attestation
-        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           create-storage-record: false
           subject-path: |
@@ -153,7 +153,7 @@ jobs:
             build/release-proof/release-assets/sniptale_*.zip
       - name: Attest build image
         id: qa-attestation
-        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           create-storage-record: false
           subject-name: ghcr.io/lrozhkov/sniptale-qa
@@ -161,7 +161,7 @@ jobs:
           push-to-registry: true
       - name: Attest controller image
         id: controller-attestation
-        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           create-storage-record: false
           subject-name: ghcr.io/lrozhkov/sniptale-controller
@@ -194,7 +194,7 @@ jobs:
             '{schemaVersion:1,artifactKind:"sniptale-release-finalizer-admission",classification:$classification,repository:$repository,releaseCommit:$releaseCommit,controlCommit:$controlCommit,finalizerRunId:$finalizerRunId,sourceProofRunId:$sourceProofRunId,sourceProofRunAttempt:$sourceProofRunAttempt,images:{qa:$qa,controller:$controller}}' \
             > build/release-proof/finalizer-admission.json
           node tooling/ci/verify-finalizer-admission.mjs build/release-proof/finalizer-admission.json "$SOURCE_SHA" "$GITHUB_SHA" "$GITHUB_RUN_ID"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-finalized-assets-${{ steps.source.outputs.source-sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

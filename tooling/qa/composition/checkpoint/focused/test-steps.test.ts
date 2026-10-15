@@ -392,7 +392,9 @@ it.each([
       './test-steps.mjs',
       import.meta.url
     );
-    const stdout = ` FAIL  ${testFile} > deleted content must not return after recreation\nAssertionError: stale writer admitted`;
+    const stdout =
+      ` FAIL  ${testFile} > deleted content must not return after recreation\n` +
+      'AssertionError: stale writer admitted';
     const execute = vi.fn(async () => ({ status: 1, stdout, stderr: '' }));
     const steps = await module.runFocusedUnitTests(
       { codeFiles: [owner], targetFiles: [owner] },

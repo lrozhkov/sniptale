@@ -337,3 +337,12 @@ function appendAuthoredGapSegments(
     segments.push({ ...edit, ...gap, id, keys: gap.keys.toSorted(compareCursorFocusKeys) });
   }
 }
+
+/** Finish a nonempty captured run without changing its authored end or observed keys. */
+export function finishCapturedCursorSegment(segment: CursorFocusSegment): void {
+  segment.keys.sort(compareCursorFocusKeys);
+  const last = segment.keys.at(-1)!;
+  if (last.time < segment.end)
+    segment.keys.push({ ...last, id: `end:${segment.id}`, time: segment.end, anchor: 'boundary' });
+  else if (last.anchor === 'movement') last.anchor = 'boundary';
+}

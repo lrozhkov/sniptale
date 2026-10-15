@@ -6,7 +6,7 @@ import {
   SCENARIO_PROJECT_UNITS_STORE,
 } from '../core.stores';
 import { betaV17Fixture } from '../fixtures/beta-v17';
-import { DATABASE_MIGRATIONS } from '../schema-contracts';
+import { CURRENT_SCHEMA_CONTRACTS, DATABASE_MIGRATIONS } from '../schema-contracts';
 import { handleDatabaseUpgrade } from './core';
 
 it('adds only empty indexed history stores and publishes the current contracts after validation', () => {
@@ -37,8 +37,7 @@ it('adds only empty indexed history stores and publishes the current contracts a
     ['projectId', 'projectId'],
   ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
-  expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 22 });
-  expect(puts).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 7 });
+  expect(puts.mock.calls.map(([contract]) => contract)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });

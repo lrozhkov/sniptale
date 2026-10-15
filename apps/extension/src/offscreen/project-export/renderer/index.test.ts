@@ -147,6 +147,7 @@ it('renders composition layers and scales cursor and action overlays through the
 
   expect(resolveVideoCompositionRenderPassesMock).toHaveBeenCalledWith(project, 1.5, {
     includeSubtitles: false,
+    cameraViewport: { width: 200, height: 100 },
   });
   expect(context.clearRect).toHaveBeenCalledWith(0, 0, 200, 100);
   expect(context.fillRect).toHaveBeenCalledWith(0, 0, 200, 100);

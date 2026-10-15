@@ -1,5 +1,31 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'project-cursor-focus-consumers',
+    productionFile: 'apps/extension/src/features/video/project/cursor-focus-path/projection.ts',
+    reason:
+      'Existing handoff and editor suites prove source projection, anchors and retained edits.',
+    testFiles: [
+      'apps/extension/src/features/video/review/standalone-interactions.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.cursor.test.ts',
+    ],
+  },
+  {
+    owner: 'review-cursor-focus-consumers',
+    productionFile: 'apps/extension/src/features/video/review/advanced/cursor-focus-path.ts',
+    reason:
+      'Handoff and camera suites prove retained anchors, cropped observations and continuity.',
+    testFiles: [
+      'apps/extension/src/features/video/review/standalone-interactions.test.ts',
+      'apps/extension/src/features/video/review/advanced/scene-camera-plan.test.ts',
+    ],
+  },
+  {
+    owner: 'review-scene-camera-consumers',
+    productionFile: 'apps/extension/src/features/video/review/advanced/scene.ts',
+    reason: 'Camera-plan consumers prove output fitting and link-gap rejection.',
+    testFiles: ['apps/extension/src/features/video/review/advanced/scene-camera-plan.test.ts'],
+  },
+  {
     owner: 'review-project-concurrency',
     productionFile:
       'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
@@ -47,8 +73,8 @@ export const LOCAL_OWNER_MAPPINGS = [
   {
     owner: 'background-review-audio-authorization',
     productionFile: 'apps/extension/src/background/ai/audio/authorization.ts',
-    reason:
-      'Sender, durable source selection, native ranges and transcript scope are checked by the authorization and provider request consumer suites.',
+    reason: `Sender, durable source selection, native ranges and transcript scope are checked by
+      the authorization and provider request consumer suites.`,
     testFiles: [
       'apps/extension/src/background/ai/audio/authorization.test.ts',
       'apps/extension/src/background/ai/audio/authorization.source.test.ts',
@@ -60,8 +86,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'indexed-db-usage-index-estimation',
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/usage-index-migration.ts',
-    reason:
-      'The schema admission and usage-index upgrade suites execute estimation through the registered migration, including source failure and alias cursor validation.',
+    reason: `The schema admission and usage-index upgrade suites execute estimation through the
+      registered migration, including source failure and alias cursor validation.`,
     testFiles: [
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/usage-index.test.ts',
@@ -70,8 +96,8 @@ export const LOCAL_OWNER_MAPPINGS = [
   {
     owner: 'video-review-session-durable-access',
     productionFile: 'apps/extension/src/workflows/video-review/session-durable-access.ts',
-    reason:
-      'The session suites exercise source/revision CAS, autosave, reset, retained history, speech receipts and annotation acquisition through the owning session.',
+    reason: `The session suites exercise source/revision CAS, autosave, reset, retained history,
+      speech receipts and annotation acquisition through the owning session.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/workflows/video-review/session.test.ts',
@@ -87,8 +113,8 @@ export const LOCAL_OWNER_MAPPINGS = [
   {
     owner: 'video-review-session-private-contracts',
     productionFile: 'apps/extension/src/workflows/video-review/session-types.ts',
-    reason:
-      'Private session state and persistence contracts are consumed by the session and durable-access suites; this module has no independent runtime.',
+    reason: `Private session state and persistence contracts are consumed by the session and
+      durable-access suites; this module has no independent runtime.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/session.test.ts',
       'apps/extension/src/workflows/video-review/session.autosave.test.ts',

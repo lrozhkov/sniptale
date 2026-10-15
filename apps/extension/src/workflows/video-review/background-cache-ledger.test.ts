@@ -17,18 +17,18 @@ for (const size of [
   { width: 2560, height: 1280 },
 ])
   it(`rebuilds follow/fixed/follow at ${size.width}x${size.height} with real retained resources`, () => {
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
-      function (this: HTMLCanvasElement) {
-        return {
-          canvas: this,
-          fillRect: vi.fn(),
-          drawImage: vi.fn(),
-          clearRect: vi.fn(),
-          reset: vi.fn(),
-          filter: 'none',
-        } as unknown as CanvasRenderingContext2D;
-      }
-    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+      this: HTMLCanvasElement
+    ) {
+      return {
+        canvas: this,
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+        clearRect: vi.fn(),
+        reset: vi.fn(),
+        filter: 'none',
+      } as unknown as CanvasRenderingContext2D;
+    });
     const scale = Math.min(1, 2048 / Math.max(size.width, size.height));
     const cache = {
       width: Math.round(size.width * scale),

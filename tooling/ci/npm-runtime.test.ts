@@ -24,10 +24,12 @@ function runtimeFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-npm-runtime-'));
   roots.push(root);
   const dependencies = {
-    npm: '11.19.1',
+    npm: '12.2.0',
     'brace-expansion': '5.0.12',
-    undici: '6.28.1',
+    undici: '6.29.0',
     'http-cache-semantics': '4.3.0',
+    'ip-address': '10.7.3',
+    'postcss-selector-parser': '7.1.6',
   };
   const packages: Record<string, unknown> = { '': { dependencies } };
   for (const [name, version] of Object.entries(dependencies)) {
@@ -35,7 +37,14 @@ function runtimeFixture() {
     packages[`node_modules/${name}`] = { version };
   }
   const npmRoot = path.join(root, 'node_modules/npm');
-  for (const name of ['minimatch', 'node-gyp', 'make-fetch-happen', 'unrelated'])
+  for (const name of [
+    'minimatch',
+    'node-gyp',
+    'make-fetch-happen',
+    'socks',
+    '@npmcli/query',
+    'unrelated',
+  ])
     writePackage(path.join(npmRoot, 'node_modules', name), name, '1.0.0');
   writePackage(path.join(npmRoot, 'node_modules/brace-expansion'), 'brace-expansion', '5.0.9');
   writePackage(path.join(npmRoot, 'node_modules/undici'), 'undici', '6.28.0');
@@ -43,6 +52,12 @@ function runtimeFixture() {
     path.join(npmRoot, 'node_modules/http-cache-semantics'),
     'http-cache-semantics',
     '4.2.0'
+  );
+  writePackage(path.join(npmRoot, 'node_modules/ip-address'), 'ip-address', '10.5.0');
+  writePackage(
+    path.join(npmRoot, 'node_modules/postcss-selector-parser'),
+    'postcss-selector-parser',
+    '7.1.4'
   );
   fs.copyFileSync(
     'tooling/ci/fixtures/http-cache-semantics-4.3.0.fixture.txt',
@@ -53,7 +68,7 @@ function runtimeFixture() {
   fs.writeFileSync(path.join(root, 'package-lock.json'), bytes);
   const lock = {
     node: {
-      npmVersion: '11.19.1',
+      npmVersion: '12.2.0',
       npmLockSha256: crypto.createHash('sha256').update(bytes).digest('hex'),
     },
   };
@@ -69,6 +84,15 @@ it('normalizes only reviewed bundles and validates actual consumer resolution id
   expect(normalizeNpmRuntime(root, lock)).toBe(npmRoot);
   expect(normalizeNpmRuntime(root, lock)).toBe(npmRoot);
   expect(validateNpmRuntime(root, lock)).toBe(npmRoot);
+  for (const [consumer, name] of [
+    ['socks', 'ip-address'],
+    ['@npmcli/query', 'postcss-selector-parser'],
+  ] as const) {
+    const resolver = createRequire(path.join(npmRoot, 'node_modules', consumer, 'index.js'));
+    expect(resolver.resolve(`${name}/package.json`)).toBe(
+      path.join(root, 'node_modules', name, 'package.json')
+    );
+  }
   expect(fs.existsSync(path.join(npmRoot, 'node_modules/unrelated/index.js'))).toBe(true);
 });
 
@@ -97,7 +121,7 @@ it('rejects a symlink replacement and never removes an external package', () => 
   const { root, npmRoot, lock } = runtimeFixture();
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-npm-outside-'));
   roots.push(outside);
-  writePackage(outside, 'undici', '6.28.1');
+  writePackage(outside, 'undici', '6.29.0');
   const replacement = path.join(root, 'node_modules/undici');
   fs.rmSync(replacement, { recursive: true });
   fs.symlinkSync(outside, replacement);
@@ -110,7 +134,7 @@ it('rejects a manifest that disagrees with the locked dependency graph', () => {
   const { root, lock } = runtimeFixture();
   fs.writeFileSync(
     path.join(root, 'package.json'),
-    JSON.stringify({ dependencies: { npm: '11.19.1' } })
+    JSON.stringify({ dependencies: { npm: '12.2.0' } })
   );
   expect(() => validateNpmInputs(root, lock)).toThrow('input version drift');
 });

@@ -18,16 +18,16 @@ const background: QuickEditBackgroundSettings = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
-    function (this: HTMLCanvasElement) {
-      return {
-        canvas: this,
-        fillRect: vi.fn(),
-        drawImage: vi.fn(),
-        fillStyle: '',
-      } as unknown as CanvasRenderingContext2D;
-    }
-  );
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+    this: HTMLCanvasElement
+  ) {
+    return {
+      canvas: this,
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillStyle: '',
+    } as unknown as CanvasRenderingContext2D;
+  });
 });
 const context = () => document.createElement('canvas').getContext('2d')!;
 it('filters once per owner and invalidates paint/image/geometry without filtering content', () => {

@@ -54,62 +54,64 @@ test('native EffectV1 annotations match export painters in both attachment plane
 });
 
 for (const converted of [false, true]) {
-  test(`native MP4/WebM exports retain annotations through full, fragment and presentation clocks (converted=${converted})`, async ({
-    page,
-  }, info) => {
-    test.setTimeout(120_000);
-    const bundle = await build({
-      entryPoints: ['tooling/test/e2e/support/quick-review-annotation-render-probe.ts'],
-      bundle: true,
-      format: 'esm',
-      platform: 'browser',
-      write: false,
-      loader: { '.svg': 'text', '.woff2': 'dataurl' },
-      define: { 'process.env.NODE_ENV': '"production"' },
-    });
-    const host = await startHostServer();
-    try {
-      await applyHarnessBootstrap(page, {});
-      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
-      await page.locator('[data-ui="gallery.page.root"]').waitFor();
-      const results = await page.evaluate(
-        async ({ text, converted }) => {
-          const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
-          try {
-            const module: typeof import('../support/quick-review-annotation-render-probe') =
-              await import(url);
-            return await module.exportProbe(converted);
-          } finally {
-            URL.revokeObjectURL(url);
-          }
-        },
-        { text: bundle.outputFiles[0]!.text, converted }
-      );
-      await writeFile(
-        info.outputPath('annotation-native-exports.json'),
-        JSON.stringify(results, null, 2)
-      );
-      expect(results).toHaveLength(6);
-      for (const result of results) {
-        expect(result.bytes).toBeGreaterThan(1000);
-        expect(result.witnessPixels).toBeGreaterThan(100);
-        // Lossy 8-bit 4:2:0 encoding changes edges; average RGB error stays below 6/255.
-        expect(result.meanRgbDifference, JSON.stringify(result)).toBeLessThan(6);
-        expect(result.decodedTime).toBeCloseTo(result.capturedTime, 4);
-        const duration = result.fragment ? 0.5 : result.presentation ? 3 : 2;
-        expect(result.decodedFrames, JSON.stringify(result)).toBe(duration * 30);
-        expect(result.lastDecodedTime, JSON.stringify(result)).toBeCloseTo(duration - 1 / 30, 2);
-        if (result.format === 'webm' && result.presentation) {
-          // Preserved microsecond timing omits DefaultDuration; Matroska's final SimpleBlock
-          // has no duration. Check the muxed Segment duration and every decoded frame.
-          expect(result.metadataDuration).toBeCloseTo(duration, 2);
-          expect(result.duration).toBeCloseTo(result.lastDecodedTime, 2);
-        } else expect(result.duration).toBeCloseTo(duration, 2);
+  test(
+    `native MP4/WebM exports retain annotations through full, fragment and presentation clocks ` +
+      `(converted=${converted})`,
+    async ({ page }, info) => {
+      test.setTimeout(120_000);
+      const bundle = await build({
+        entryPoints: ['tooling/test/e2e/support/quick-review-annotation-render-probe.ts'],
+        bundle: true,
+        format: 'esm',
+        platform: 'browser',
+        write: false,
+        loader: { '.svg': 'text', '.woff2': 'dataurl' },
+        define: { 'process.env.NODE_ENV': '"production"' },
+      });
+      const host = await startHostServer();
+      try {
+        await applyHarnessBootstrap(page, {});
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        const results = await page.evaluate(
+          async ({ text, converted }) => {
+            const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+            try {
+              const module: typeof import('../support/quick-review-annotation-render-probe') =
+                await import(url);
+              return await module.exportProbe(converted);
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          },
+          { text: bundle.outputFiles[0]!.text, converted }
+        );
+        await writeFile(
+          info.outputPath('annotation-native-exports.json'),
+          JSON.stringify(results, null, 2)
+        );
+        expect(results).toHaveLength(6);
+        for (const result of results) {
+          expect(result.bytes).toBeGreaterThan(1000);
+          expect(result.witnessPixels).toBeGreaterThan(100);
+          // Lossy 8-bit 4:2:0 encoding changes edges; average RGB error stays below 6/255.
+          expect(result.meanRgbDifference, JSON.stringify(result)).toBeLessThan(6);
+          expect(result.decodedTime).toBeCloseTo(result.capturedTime, 4);
+          const duration = result.fragment ? 0.5 : result.presentation ? 3 : 2;
+          expect(result.decodedFrames, JSON.stringify(result)).toBe(duration * 30);
+          expect(result.lastDecodedTime, JSON.stringify(result)).toBeCloseTo(duration - 1 / 30, 2);
+          if (result.format === 'webm' && result.presentation) {
+            // Preserved microsecond timing omits DefaultDuration; Matroska's final SimpleBlock
+            // has no duration. Check the muxed Segment duration and every decoded frame.
+            expect(result.metadataDuration).toBeCloseTo(duration, 2);
+            expect(result.duration).toBeCloseTo(result.lastDecodedTime, 2);
+          } else expect(result.duration).toBeCloseTo(duration, 2);
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
       }
-    } finally {
-      await new Promise<void>((resolve, reject) =>
-        host.server.close((error) => (error ? reject(error) : resolve()))
-      );
     }
-  });
+  );
 }

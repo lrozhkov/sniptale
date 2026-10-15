@@ -1,3 +1,4 @@
+import { uncropQuickEditVideoRect } from './canvas';
 import {
   evaluateReviewFollowCursor,
   resolveReviewCursorCameraPlan,
@@ -338,15 +339,7 @@ function reviewCameraLinkConflict(
   if (endpointFailure) return conflict(endpointFailure.reason, endpointFailure.time);
   const from = evaluateReviewSceneFollow(regions, source, source.end, source.transform, input);
   const to = evaluateReviewSceneFollow(regions, target, target.start, target.transform, input);
-  const size = input.output ?? computeQuickEditSceneSize(input);
-  const output = { width: size.width, height: size.height };
-  const layout = computeQuickEditSceneLayout({
-    ...input,
-    output,
-    camera: QUICK_EDIT_IDENTITY_CAMERA,
-  });
-  const policy =
-    context.policy ?? resolveCameraFollowPolicy({ legacySensitivity: context.path.sensitivity });
+  const { output, layout, policy } = reviewCameraGeometryInputs(input, context);
   const key = reviewCameraGapSignature({ source, target, from, to, scene: input, policy });
   let cached = linkProofs.get(context);
   if (!cached) {
@@ -391,15 +384,7 @@ export function resolveReviewCameraGeometry(
   const context = region.cursorFocus;
   const input = scene ?? context?.scene;
   if (!context || !input) return undefined;
-  const size = input.output ?? computeQuickEditSceneSize(input);
-  const output = { width: size.width, height: size.height };
-  const layout = computeQuickEditSceneLayout({
-    ...input,
-    output,
-    camera: QUICK_EDIT_IDENTITY_CAMERA,
-  });
-  const policy =
-    context.policy ?? resolveCameraFollowPolicy({ legacySensitivity: context.path.sensitivity });
+  const { output, layout, policy } = reviewCameraGeometryInputs(input, context);
   const cornerRadius = input.background.enabled
     ? (input.background.layout.cornerRadius * output.width) /
       (input.canvas?.width ?? input.source.width)
@@ -440,15 +425,7 @@ export function resolveReviewCameraGeometry(
 export function computeQuickEditSceneSize(input: Omit<SceneInput, 'output' | 'camera'>) {
   const base = input.canvas ?? input.source;
   const content = computeQuickEditContentRect(base, input.background);
-  const crop = input.canvas?.crop
-    ? fitQuickEditSourceCrop(input.source, base, input.canvas.crop)
-    : undefined;
-  const fitted = fitVideoRect(
-    content,
-    crop
-      ? { width: input.source.width * crop.width, height: input.source.height * crop.height }
-      : input.source
-  );
+  const { fitted } = fitSceneSource(input, content);
   const headerHeight = input.windowHeader
     ? Math.ceil(
         (windowHeaderGeometry(input.windowHeader, input.source).height * fitted.width) /
@@ -479,29 +456,14 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     { width: input.output.width, height: input.output.height - headerHeight },
     background
   );
-  const crop = input.canvas?.crop
-    ? fitQuickEditSourceCrop(input.source, base, input.canvas.crop)
-    : undefined;
-  const fitted = fitVideoRect(
-    content,
-    crop
-      ? { width: input.source.width * crop.width, height: input.source.height * crop.height }
-      : input.source
-  );
+  const { crop, fitted } = fitSceneSource(input, content);
   const visibleVideoRect = {
     x: content.x + fitted.x,
     y: content.y + fitted.y + headerHeight,
     width: fitted.width,
     height: fitted.height,
   };
-  const videoRect = crop
-    ? {
-        x: visibleVideoRect.x - (crop.x * visibleVideoRect.width) / crop.width,
-        y: visibleVideoRect.y - (crop.y * visibleVideoRect.height) / crop.height,
-        width: visibleVideoRect.width / crop.width,
-        height: visibleVideoRect.height / crop.height,
-      }
-    : visibleVideoRect;
+  const videoRect = crop ? uncropQuickEditVideoRect(visibleVideoRect, crop) : visibleVideoRect;
   const windowRect = {
     ...visibleVideoRect,
     y: visibleVideoRect.y - headerHeight,
@@ -864,4 +826,34 @@ export function computeQuickEditSpatialRasterLayout(
       height: video.height / scale,
     },
   };
+}
+
+function reviewCameraGeometryInputs(
+  input: QuickEditCameraSceneInput,
+  context: NonNullable<QuickEditZoomRegion['cursorFocus']>
+) {
+  const size = input.output ?? computeQuickEditSceneSize(input);
+  const output = { width: size.width, height: size.height };
+  const layout = computeQuickEditSceneLayout({
+    ...input,
+    output,
+    camera: QUICK_EDIT_IDENTITY_CAMERA,
+  });
+  const policy =
+    context.policy ?? resolveCameraFollowPolicy({ legacySensitivity: context.path.sensitivity });
+  return { output, layout, policy };
+}
+
+function fitSceneSource(input: Omit<SceneInput, 'output' | 'camera'>, content: QuickEditRect) {
+  const base = input.canvas ?? input.source;
+  const crop = input.canvas?.crop
+    ? fitQuickEditSourceCrop(input.source, base, input.canvas.crop)
+    : undefined;
+  const fitted = fitVideoRect(
+    content,
+    crop
+      ? { width: input.source.width * crop.width, height: input.source.height * crop.height }
+      : input.source
+  );
+  return { crop, fitted };
 }

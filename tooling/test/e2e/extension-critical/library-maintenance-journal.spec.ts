@@ -259,7 +259,8 @@ test('controlled export summaries reach native extension Settings JSONL and ZIP 
       await zip.close();
     }
     expect(infoMessages.filter((message) => message.includes('ReviewExport'))).toEqual([
-      '[ReviewExport] export outcome=failed route=render destination=download stage=mux-finalize code=mux-finalize-failed',
+      '[ReviewExport] export outcome=failed route=render destination=download ' +
+        'stage=mux-finalize code=mux-finalize-failed',
     ]);
     expect(failures).toEqual([]);
   } finally {

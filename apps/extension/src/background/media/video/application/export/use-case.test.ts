@@ -1,4 +1,5 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import * as projectFollow from '../../../../../features/video/composition/motion/project-follow';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { cancelProjectExportUseCase, startProjectExportUseCase } from './use-case';
@@ -17,6 +18,8 @@ import {
   createProjectExportSettings as createSettings,
   PROJECT_EXPORT_OWNER as owner,
 } from './use-case.test-support';
+
+afterEach(() => vi.restoreAllMocks());
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -54,6 +57,9 @@ it('refuses a conflicting camera before offscreen, capabilities, or ledger write
     zoomOutDuration: 0,
   };
   project.motionRegions = [region];
+  vi.spyOn(projectFollow, 'resolveProjectCameraConflicts').mockReturnValueOnce([
+    { regionId: region.id, interval: { start: 0, end: 3 }, time: 0, reason: 'dynamics' },
+  ]);
   const before = structuredClone(project);
   const ports = createPorts();
   vi.mocked(ports.loadProjectExportInput).mockResolvedValue(project);

@@ -93,7 +93,7 @@ it('covers camera easing and viewport mapping helpers', () => {
   });
 });
 
-it('resolves cursor-focused camera regions while easing out near the region end', () => {
+it('keeps empty retained cursor coverage centered while easing out near the region end', () => {
   const project = createEmptyVideoProject('Camera cursor', 1000, 800);
   project.motionRegions = [
     {
@@ -119,7 +119,7 @@ it('resolves cursor-focused camera regions while easing out near the region end'
 
   expect(camera).toEqual(
     expect.objectContaining({
-      focusPoint: expect.objectContaining({ x: 120, y: 180 }),
+      focusPoint: { x: 500, y: 400 },
       regionId: 'motion-cursor',
     })
   );

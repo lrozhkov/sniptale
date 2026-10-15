@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { tabVideoControlledCursorContracts } from '../../../contracts/messaging/tab/contracts/controlled';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-// @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   type RecordingActionEvent,

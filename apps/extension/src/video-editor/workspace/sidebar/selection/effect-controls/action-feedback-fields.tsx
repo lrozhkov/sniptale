@@ -1,3 +1,4 @@
+import { reviewGestureAreaBounds } from '../../../../../features/video/project/action-feedback/validation';
 import { projectActionFeedbackMarkers } from '../../../../../features/video/review/project-action-audio';
 import { InspectorDetails } from '../shared/details';
 import { useState, useEffect } from 'react';
@@ -304,13 +305,7 @@ function FeedbackGestureFields({
         >
           {(['x', 'y', 'width', 'height'] as const).map((key) => {
             const area = gestureStyle.gestureArea!;
-            const min = key === 'width' || key === 'height' ? 0.1 : 0;
-            const max =
-              (1 -
-                area[
-                  key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y'
-                ]) *
-              100;
+            const { min, max } = reviewGestureAreaBounds(area, key);
             return (
               <FeedbackNumber
                 key={key}

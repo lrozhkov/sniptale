@@ -374,7 +374,7 @@ async function installNestedResourceGraph(failRelease = false) {
 }
 
 it.each(['save', 'delete', 'asset', 'asset-shared', 'asset-published-shared'] as const)(
-  'preserves live Undo or reclaims nested resources on confirmed parent %s',
+  'preserves independent quick-edit projects on parent %s',
   async (operation) => {
     const { saveVideoProject, deleteVideoProject, deleteProjectAsset } = await import('./index');
     const { parent, table } = await installNestedResourceGraph();
@@ -416,11 +416,10 @@ it.each(['save', 'delete', 'asset', 'asset-shared', 'asset-published-shared'] as
       expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
       return;
     }
-    expect(table('project_assets').size).toBe(0);
-    expect(table('video_workspaces').size).toBe(0);
-    expect(deleteMocks.completePhysicalDeleteOperationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ assetIds: expect.arrayContaining(['parent-bytes', 'child-bytes']) })
-    );
+    expect(table('project_assets').size).toBe(2);
+    expect(table('video_workspaces').size).toBe(1);
+    expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
+    if (operation === 'delete') expect(table('video_projects').has(parent.id)).toBe(false);
   }
 );
 
@@ -468,6 +467,8 @@ it.each(['save-failure', 'delete-failure'] as const)(
   async (operation) => {
     const { saveVideoProject, deleteVideoProject } = await import('./index');
     const { parent, table } = await installNestedResourceGraph(true);
+    // An independent quick-edit project retains its source; this case releases an unowned source.
+    if (operation === 'delete-failure') table('video_workspaces').clear();
     const names = ['video_projects', 'project_assets', 'video_workspaces'];
     const before = names.map((name) => structuredClone(table(name)));
     const run =

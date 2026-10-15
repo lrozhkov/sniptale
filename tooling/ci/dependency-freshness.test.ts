@@ -78,16 +78,18 @@ it('is a deterministic read-only operator plan with no mutation owner', () => {
 });
 
 it('classifies current, available, failed, and unverifiable upstream identities read-only', async () => {
-  const simulatedLatest = createDependencyRefreshPlan().npmLockRoots.flatMap(
-    (lock) => lock.dependencies
-  );
+  const plan = createDependencyRefreshPlan();
+  const simulatedLatest = plan.npmLockRoots.flatMap((lock) => lock.dependencies);
+  const currentSetupNode = plan.actionPins.find(
+    ({ action }) => action === 'actions/setup-node'
+  )!.declaredVersion;
   const fetchImpl = async (input: string | URL) => {
     const url = String(input);
     if (url.includes('actions/checkout')) {
       return new Response(JSON.stringify({ tag_name: 'v99.0.0' }), { status: 200 });
     }
     if (url.includes('actions/setup-node')) {
-      return new Response(JSON.stringify({ tag_name: 'v7.0.0' }), { status: 200 });
+      return new Response(JSON.stringify({ tag_name: currentSetupNode }), { status: 200 });
     }
     if (url.includes('coverallsapp/github-action')) {
       return new Response('unavailable', { status: 503 });

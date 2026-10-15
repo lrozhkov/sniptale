@@ -1,3 +1,4 @@
+import { resolveCursorFocusHandle } from '../../../../ui/cursor-focus-control-layout';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import { projectCursorFocusTimelineKeys } from '../../../../features/video/project/cursor-focus-path/timeline';
 import {
@@ -318,18 +319,14 @@ function createCursorGesture(context: {
           event.clientY - stageBounds.top - (position.y * stageBounds.height) / 100
         );
       };
-      const candidates = (['incoming', 'outgoing'] as const)
-        .filter((name) => controls[name] !== undefined)
-        .map((name) => ({ name, distance: distance(controls[name]!) }))
-        .filter((item) => item.distance <= 14)
-        .toSorted((a, b) => a.distance - b.distance);
-      const activated = candidates.find((item) => item.name === handle);
-      handle =
-        candidates[0] && candidates[0].distance < distance(selected)
-          ? activated && Math.abs(activated.distance - candidates[0].distance) < 0.01
-            ? handle
-            : candidates[0].name
-          : undefined;
+      handle = resolveCursorFocusHandle(
+        {
+          incoming: controls.incoming ? distance(controls.incoming) : undefined,
+          outgoing: controls.outgoing ? distance(controls.outgoing) : undefined,
+        },
+        distance(selected),
+        handle
+      );
     }
     if (!handle && key.id !== selected.id) {
       event.preventDefault();

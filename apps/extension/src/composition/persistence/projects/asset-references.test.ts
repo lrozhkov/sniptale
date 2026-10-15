@@ -90,7 +90,7 @@ it.each(['unknown-video', 'scenario', 'review'] as const)(
   }
 );
 
-it('reclaims private nested auxiliaries after their parent placement is removed', async () => {
+it('retains an independent quick-edit project and its nested auxiliaries after placement removal', async () => {
   const { createQuickEditAdvancedState } =
     await import('../../../features/video/review/advanced/defaults');
   const advanced = createQuickEditAdvancedState();
@@ -152,6 +152,7 @@ it('reclaims private nested auxiliaries after their parent placement is removed'
     operation: buildPhysicalDeleteOperation([]),
     projectAssetIds: ['parent'],
   });
-  expect(table('project_assets').has('parent')).toBe(false);
-  expect(table('project_assets').has('child')).toBe(false);
+  expect(table('project_assets').has('parent')).toBe(true);
+  expect(table('project_assets').has('child')).toBe(true);
+  expect(table('video_workspaces').has('project-asset:parent')).toBe(true);
 });

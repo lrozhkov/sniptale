@@ -1,4 +1,5 @@
 import { maintainLibraryAssets } from '../../workflows/media-hub/maintenance';
+import { subscribeToAssetResourceRelease } from '../../composition/persistence/assets/resource-sessions';
 import { getLibraryStorageUsage } from '../../composition/persistence/library-lifecycle';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
@@ -497,10 +498,38 @@ export function useGalleryLibraryState({
   useEffect(() => {
     if (!hasLoadedLibrarySnapshot) return;
     const controller = new AbortController();
-    void maintainLibraryAssets(controller.signal, () => {
-      if (!controller.signal.aborted) onBanner(translate('gallery.app.trashCleanupFailed'));
-    });
-    return () => controller.abort();
+    let running = false;
+    let pending = false;
+    const schedule = () => {
+      if (controller.signal.aborted || document.visibilityState === 'hidden') return;
+      pending = true;
+      if (running) return;
+      running = true;
+      void (async () => {
+        try {
+          while (pending && !controller.signal.aborted) {
+            pending = false;
+            await maintainLibraryAssets(controller.signal, () => {
+              if (!controller.signal.aborted) onBanner(translate('gallery.app.trashCleanupFailed'));
+            });
+          }
+        } catch {
+          logger.debug('Library maintenance deferred');
+        } finally {
+          running = false;
+        }
+      })();
+    };
+    const unsubscribe = subscribeToAssetResourceRelease(schedule);
+    window.addEventListener('focus', schedule);
+    document.addEventListener('visibilitychange', schedule);
+    schedule();
+    return () => {
+      controller.abort();
+      unsubscribe();
+      window.removeEventListener('focus', schedule);
+      document.removeEventListener('visibilitychange', schedule);
+    };
   }, [hasLoadedLibrarySnapshot, onBanner]);
 
   useGalleryLibrarySubscriptions({ onBanner, refresh, refreshEpochRef });

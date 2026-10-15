@@ -689,37 +689,37 @@ it('keeps Drawing options inside right and bottom viewport edges under page zoom
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('innerWidth', 600);
   vi.stubGlobal('innerHeight', 400);
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      const isTrigger = this.matches('[data-ui="content.toolbar.drawing.pencil"]');
-      const x = isTrigger ? 570 : 0;
-      const y = isTrigger ? 360 : 0;
-      const width = isTrigger ? 36 : 0;
-      const height = isTrigger ? 36 : 0;
-      return {
-        bottom: y + height,
-        height,
-        left: x,
-        right: x + width,
-        top: y,
-        width,
-        x,
-        y,
-        toJSON: () => ({}),
-      };
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    const isTrigger = this.matches('[data-ui="content.toolbar.drawing.pencil"]');
+    const x = isTrigger ? 570 : 0;
+    const y = isTrigger ? 360 : 0;
+    const width = isTrigger ? 36 : 0;
+    const height = isTrigger ? 36 : 0;
+    return {
+      bottom: y + height,
+      height,
+      left: x,
+      right: x + width,
+      top: y,
+      width,
+      x,
+      y,
+      toJSON: () => ({}),
+    };
+  });
   // jsdom has no layout; provide the dimensions read by the real menu measurement effect.
-  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(
-    function (this: HTMLElement) {
-      return this.classList.contains('sniptale-drawing-options-menu') ? 190 : 0;
-    }
-  );
-  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
-    function (this: HTMLElement) {
-      return this.classList.contains('sniptale-drawing-options-menu') ? 170 : 0;
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.classList.contains('sniptale-drawing-options-menu') ? 190 : 0;
+  });
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.classList.contains('sniptale-drawing-options-menu') ? 170 : 0;
+  });
   const session = createDrawingSession({ onDocumentCommit: () => true });
   const controller: ContentDrawingController = {
     session,

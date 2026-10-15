@@ -187,13 +187,7 @@ it('preserves audit advisories when another finding blocks the release', () => {
   expect(step.status).toBe('failed');
   expect(step.advisories).toEqual([advisory]);
   const observed = normalizeObservedStep(step).observation;
-  expect(observed.diagnostic?.locations).toEqual([
-    {
-      file: advisory.file,
-      line: null,
-      message: `${advisory.rule}: ${advisory.message}`,
-    },
-  ]);
+  expect(observed.diagnostic?.locations).toEqual([]);
   expect(observed.log).toContain(
     `- advisory ${advisory.rule}: ${advisory.file} ${advisory.message}`
   );

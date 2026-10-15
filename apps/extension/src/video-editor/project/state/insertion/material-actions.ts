@@ -1,3 +1,4 @@
+import { recordingIdForProjectAsset } from '../../../../features/video/project/source-interactions';
 import { projectRecordingObservationClock } from '../../../../features/video/project/observation-clock';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
@@ -51,12 +52,7 @@ export function addMaterialCapturedActions(
   const added = addedClips.flatMap((clip) => {
     if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) return [];
     const asset = project.assets.find((item) => item.id === clip.assetId);
-    const recordingId =
-      asset?.source.kind === 'recording'
-        ? asset.source.recordingId
-        : asset?.source.kind === 'project-asset'
-          ? asset.source.originRecordingId
-          : null;
+    const recordingId = recordingIdForProjectAsset(asset);
     if (recordingId !== telemetry.recordingId) return [];
     const sourceInstanceId = clip.sourceInstanceId;
     return events.flatMap<VideoProjectActionEvent>((event) => {
@@ -99,12 +95,7 @@ export function addMaterialCapturedActions(
   for (const clip of addedClips) {
     if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) continue;
     const asset = project.assets.find((item) => item.id === clip.assetId);
-    const recordingId =
-      asset?.source.kind === 'recording'
-        ? asset.source.recordingId
-        : asset?.source.kind === 'project-asset'
-          ? asset.source.originRecordingId
-          : null;
+    const recordingId = recordingIdForProjectAsset(asset);
     if (
       recordingId !== telemetry.recordingId ||
       feedback.some(

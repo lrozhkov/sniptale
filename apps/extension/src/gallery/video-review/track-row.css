@@ -14,6 +14,7 @@
 [data-review-track-muted='true'] [data-track-label] {
   color: var(--sniptale-color-text-secondary);
 }
+[data-review-track-muted='true'] [data-review-track-content] > :first-child,
 [data-review-track-muted='true']
   [data-review-track-content]
   :is(

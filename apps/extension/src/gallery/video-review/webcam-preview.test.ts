@@ -43,11 +43,11 @@ beforeEach(() => {
       static revokeObjectURL = mocks.revokeUrl;
     }
   );
-  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(
-    function (this: HTMLMediaElement) {
-      loaded.push(this);
-    }
-  );
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    loaded.push(this);
+  });
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
 });
 afterEach(() => {

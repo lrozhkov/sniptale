@@ -1,5 +1,5 @@
-import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
 // @vitest-environment jsdom
+import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

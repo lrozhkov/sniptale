@@ -43,19 +43,19 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c`
 - Repository/source: https://github.com/fontsource/font-files.git
 
-### `@iconify-icons/tabler` 2.0.0
+### `@iconify-icons/tabler` 2.0.4
 
 - Installed path: `node_modules/@iconify-icons/tabler`
 - Declared license expression: `MIT`
 - Selected license: `MIT`
 - License source class: `pinned-upstream`
-- License source: `tooling/release/dependency-legal/sources/tabler-icons-3.46.0.LICENSE`
+- License source: `tooling/release/dependency-legal/sources/tabler-icons-3.49.0.LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/@iconify-icons__tabler-2.0.0.txt`](LICENSES/dependencies/@iconify-icons__tabler-2.0.0.txt)
+- Redistributed license text: [`LICENSES/dependencies/@iconify-icons__tabler-2.0.4.txt`](LICENSES/dependencies/@iconify-icons__tabler-2.0.4.txt)
 - License text SHA-256: `b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db`
-- Repository/source: https://registry.npmjs.org/@iconify-icons/tabler/-/tabler-2.0.0.tgz
-- Immutable license origin: https://raw.githubusercontent.com/tabler/tabler-icons/v3.46.0/LICENSE
-- Upstream license version: `3.46.0`
+- Repository/source: https://registry.npmjs.org/@iconify-icons/tabler/-/tabler-2.0.4.tgz
+- Immutable license origin: https://raw.githubusercontent.com/tabler/tabler-icons/v3.49.0/LICENSE
+- Upstream license version: `3.49.0`
 - Pinned source SHA-256: `b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db`
 
 ### `@iconify/react` 6.0.2
@@ -178,7 +178,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `5e807b516a9be9229ed459880bf353a336e2d947867247290680d437017be391`
 - Repository/source: https://github.com/pshihn/hachure-fill.git
 
-### `idb` 8.0.3
+### `idb` 8.0.4
 
 - Installed path: `node_modules/idb`
 - Declared license expression: `ISC`
@@ -186,7 +186,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/idb/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/idb-8.0.3.txt`](LICENSES/dependencies/idb-8.0.3.txt)
+- Redistributed license text: [`LICENSES/dependencies/idb-8.0.4.txt`](LICENSES/dependencies/idb-8.0.4.txt)
 - License text SHA-256: `873a2f333fda393ec3464f4579209b019d98e97c3bf498b10e85f630162fd708`
 - Repository/source: https://github.com/jakearchibald/idb.git
 
@@ -250,7 +250,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `5c81b0caa98593408b03125efa25efe622341ed87ae55561968828cd887d64a4`
 - Repository/source: https://github.com/calvinmetcalf/lie.git
 
-### `lucide-react` 1.33.0
+### `lucide-react` 1.52.0
 
 - Installed path: `node_modules/lucide-react`
 - Declared license expression: `ISC`
@@ -258,7 +258,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/lucide-react/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/lucide-react-1.33.0.txt`](LICENSES/dependencies/lucide-react-1.33.0.txt)
+- Redistributed license text: [`LICENSES/dependencies/lucide-react-1.52.0.txt`](LICENSES/dependencies/lucide-react-1.52.0.txt)
 - License text SHA-256: `b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57`
 - Repository/source: https://github.com/lucide-icons/lucide.git
 

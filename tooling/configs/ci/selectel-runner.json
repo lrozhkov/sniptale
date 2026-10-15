@@ -43,10 +43,10 @@
     "expectedRegion": "ru-3"
   },
   "runner": {
-    "version": "2.336.0",
-    "archive": "actions-runner-linux-x64-2.336.0.tar.gz",
-    "url": "https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz",
-    "sha256": "04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d",
+    "version": "2.338.0",
+    "archive": "actions-runner-linux-x64-2.338.0.tar.gz",
+    "url": "https://github.com/actions/runner/releases/download/v2.338.0/actions-runner-linux-x64-2.338.0.tar.gz",
+    "sha256": "af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32",
     "labelPrefix": "sniptale-qa-",
     "workFolder": "_work",
     "maxJobs": 1,
@@ -75,7 +75,10 @@
   },
   "lifecycle": {
     "maxProfiles": 10,
-    "serverCreateReconciliation": { "attempts": 6, "intervalSeconds": 5 },
+    "serverCreateReconciliation": {
+      "attempts": 6,
+      "intervalSeconds": 5
+    },
     "ttlSeconds": 10800,
     "nameTemplate": "sniptale-<run-id>-<attempt>",
     "requiredMetadata": [

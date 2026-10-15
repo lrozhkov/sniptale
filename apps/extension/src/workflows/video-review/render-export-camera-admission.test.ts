@@ -1,8 +1,11 @@
-import { expect, it } from 'vitest';
+import * as sceneCamera from '../../features/video/review/advanced/scene';
+import { afterEach, expect, it, vi } from 'vitest';
 import { createCameraFollowSettings } from '../../features/video/project/camera/cursor-policy';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { state, argsFixture } from './render-export.test-support';
 import { writeReviewFrames } from './render-export';
+
+afterEach(() => vi.restoreAllMocks());
 
 it.each([false, true])(
   'rejects a direct follow export before decoder/writer effects when source geometry is known=%s',
@@ -28,6 +31,11 @@ it.each([false, true])(
         exit: { type: 'none', duration: 0 },
       },
     ];
+    if (known) {
+      vi.spyOn(sceneCamera, 'resolveReviewCameraConflicts').mockReturnValueOnce([
+        { regionId: 'conflict', interval: { start: 0, end: 2 }, time: 0, reason: 'dynamics' },
+      ]);
+    }
     const before = structuredClone(args.advanced);
     const drawn = state.drawn.length,
       encoded = state.encoded.length;

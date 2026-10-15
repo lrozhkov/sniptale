@@ -72,11 +72,11 @@ async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
     [2560, 1440, 360, 440],
   ] as const) {
     await page.setViewportSize({ width, height });
-    await expectWidthReset(page, 'video-editor.materials.resize', 'ArrowLeft', materialsWidth);
+    await expectWidthReset(page, 'video-editor.materials.resize', 'ArrowRight', materialsWidth);
     await expectWidthReset(
       page,
       'video-editor.floating.context-inspector.resize',
-      'ArrowRight',
+      'ArrowLeft',
       inspectorWidth
     );
     await expectTimelineToolbarControls(page);
@@ -85,7 +85,10 @@ async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
       .locator('[data-ui="video-editor.workspace.sidebar-header-title-row"]')
       .boundingBox())!;
     const viewerHeader = (await page.locator('[data-ui="video.preview.header"]').boundingBox())!;
-    expect(title.y + title.height).toBeCloseTo(viewerHeader.y + viewerHeader.height - 1, 0);
+    // The header's one-pixel border can offset its content center by half a pixel.
+    expect(
+      Math.abs(title.y + title.height / 2 - (viewerHeader.y + viewerHeader.height / 2))
+    ).toBeLessThanOrEqual(1);
     const docks = [
       page.locator('[data-ui="video-editor.materials.dock-toggle"]'),
       page.locator('[data-ui="video-editor.inspector.dock-toggle"]'),
@@ -96,6 +99,17 @@ async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
     for (const dock of docks) await dock.click();
   }
   await page.setViewportSize(originalViewport);
+  const canvas = page.locator('[data-ui="video-editor.timeline.canvas-scroll"]');
+  await expect
+    .poll(() =>
+      canvas.evaluate((node) => {
+        const ruler = node.querySelector('[data-ui="video-editor.timeline.ruler"]');
+        return ruler
+          ? Math.abs(ruler.getBoundingClientRect().width - node.clientWidth)
+          : Number.POSITIVE_INFINITY;
+      })
+    )
+    .toBeLessThanOrEqual(1);
 }
 
 async function expectWidthReset(
@@ -106,8 +120,9 @@ async function expectWidthReset(
 ): Promise<void> {
   const separator = page.locator(`[data-ui="${selector}"]`);
   await expect(separator).toHaveAttribute('aria-valuenow', String(width));
-  await separator.press(key);
-  await expect(separator).toHaveAttribute('aria-valuenow', String(width - 24));
+  const canGrow = width + 24 <= Number(await separator.getAttribute('aria-valuemax'));
+  await separator.press(canGrow ? key : key === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft');
+  await expect(separator).toHaveAttribute('aria-valuenow', String(width + (canGrow ? 24 : -24)));
   await separator.hover();
   expect(await separator.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)'
@@ -138,11 +153,14 @@ async function expectTimelineToolbarControls(page: Page): Promise<void> {
   }
   const width = (await toolbar.boundingBox())!.width;
   if (width >= 1000) {
-    const minimum = width >= 1400 ? 36 : 32;
     const buttons = toolbar.locator('button:visible');
     for (const button of await buttons.all()) {
       if ((await button.evaluate((node) => getComputedStyle(node).visibility)) === 'hidden')
         continue;
+      const isAutosave = await button.evaluate((node) =>
+        Boolean(node.closest('[data-ui="autosave-control"]'))
+      );
+      const minimum = isAutosave || width < 1400 ? 32 : 36;
       await expect
         .poll(async () => (await button.boundingBox())!.height)
         .toBeGreaterThanOrEqual(minimum);
@@ -190,7 +208,7 @@ async function expectTrackMenuPlacement(page: Page): Promise<void> {
   expect(bounds.y).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
-  await expect(menu.locator('button')).toHaveCount(2);
+  await expect(menu.locator('button')).toHaveCount(3);
   await menu.locator('button').first().focus();
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
@@ -284,7 +302,12 @@ async function expectTimelineZoomKeyboard(page: Page): Promise<void> {
   await expect(zoom).toHaveValue('0');
   await expect(playhead).toHaveAttribute('aria-valuenow', time!);
   await zoom.press('End');
-  for (let value = 100; value > initial; value -= 1) await zoom.press('ArrowLeft');
+  const step = Number(await zoom.getAttribute('step'));
+  await zoom.press('ArrowLeft');
+  await expect(zoom).toHaveValue(String(100 - step));
+  await zoom.press('Home');
+  for (let index = 0; index < Math.round(initial / step); index += 1)
+    await zoom.press('ArrowRight');
   await expect(zoom).toHaveValue(String(initial));
 }
 

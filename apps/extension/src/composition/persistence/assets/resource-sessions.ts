@@ -1,4 +1,16 @@
 const RESOURCE_GATE = 'sniptale:assets:resource-readers';
+const READER_RELEASED = 'sniptale:asset-resource-released';
+
+/** Local maintenance retries after disposal; other tabs retry when they become active. */
+export function subscribeToAssetResourceRelease(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => undefined;
+  window.addEventListener(READER_RELEASED, listener);
+  return () => window.removeEventListener(READER_RELEASED, listener);
+}
+
+function notifyReaderReleased(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(READER_RELEASED));
+}
 
 /** Disposable readers protect source bindings as well as bytes until their lifetime drains. */
 export interface AssetResourceSession {
@@ -36,14 +48,21 @@ export async function acquireAssetResourceSession(): Promise<AssetResourceSessio
     release: async () => {
       release();
       await lifetime;
+      notifyReaderReleased();
     },
   };
 }
 
 /** Export and backup hold a reader through their complete asynchronous write/abort. */
-export function runWithAssetResourceRead<T>(operation: () => Promise<T>): Promise<T> {
+export async function runWithAssetResourceRead<T>(operation: () => Promise<T>): Promise<T> {
   const locks = resourceLocks();
-  return locks ? locks.request(RESOURCE_GATE, { mode: 'shared' }, operation) : operation();
+  try {
+    return await (locks
+      ? locks.request(RESOURCE_GATE, { mode: 'shared' }, operation)
+      : operation());
+  } finally {
+    notifyReaderReleased();
+  }
 }
 
 /** Causal maintenance never waits for readers and fails closed without native coordination. */

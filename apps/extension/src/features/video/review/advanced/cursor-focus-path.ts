@@ -1,6 +1,6 @@
 import {
   simplifyCursorFocusPath,
-  compareCursorFocusKeys,
+  finishCapturedCursorSegment,
   resolveAuthoredCursorFocusPath,
 } from '../../project/cursor-focus-path/authoring';
 import type {
@@ -428,16 +428,7 @@ function appendReviewFocusAnchors(
     segment.keys.push(
       ...anchors.filter((key) => key.time >= segment.start && key.time <= segment.end)
     );
-    segment.keys.sort(compareCursorFocusKeys);
-    const last = segment.keys.at(-1)!;
-    if (last.time < segment.end)
-      segment.keys.push({
-        ...last,
-        id: `end:${segment.id}`,
-        time: segment.end,
-        anchor: 'boundary',
-      });
-    else if (last.anchor === 'movement') last.anchor = 'boundary';
+    finishCapturedCursorSegment(segment);
   }
 }
 

@@ -101,7 +101,14 @@ const label = ${JSON.stringify(label)};
 const slot = await acquireHostQaSlot('qa:checkpoint', { sharedRoot: root, pollIntervalMs: 25 });
 process.env[HOST_QUEUE_TICKET_ENV] = slot.ticketName;
 fs.appendFileSync(root + '/trace', label + ':start\\n');
-const orphan = ${orphan ? "spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { env: { ...process.env }, detached: true, stdio: 'ignore' })" : 'null'};
+const orphan = ${
+      orphan
+        ? [
+            "spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'],",
+            "{ env: { ...process.env }, detached: true, stdio: 'ignore' })",
+          ].join(' ')
+        : 'null'
+    };
 process.stdout.write('ready:' + (orphan?.pid ?? 0) + '\\n');
 process.stdin.resume();
 process.stdin.once('end', () => {
@@ -160,7 +167,8 @@ function stopOrphan(pid: number) {
   try {
     process.kill(pid, 'SIGKILL');
   } catch (error) {
-    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ESRCH') throw error;
+    if (typeof error !== 'object' || error === null || !('code' in error) || error.code !== 'ESRCH')
+      throw error;
   }
 }
 

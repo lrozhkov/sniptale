@@ -21,11 +21,11 @@ it('collapses captions in priority order and restores them after resize or tool 
   document.body.appendChild(host);
   const root = createRoot(host);
   let available = 550;
-  const width = vi
-    .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
-    .mockImplementation(function (this: HTMLElement) {
-      return available;
-    });
+  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return available;
+  });
   const content = vi
     .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
     .mockImplementation(function (this: HTMLElement) {

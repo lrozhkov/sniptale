@@ -126,7 +126,7 @@ export async function verifyGalleryCameraPolicy(page: Page, info: TestInfo, reco
     if ((await readReviewContent(page, recordingId))?.zoom.regions.length)
       await policyDialog
         .getByRole('button', {
-          name: new RegExp('^' + policyLabel('gallery.videoReview.zoomRegionLabel') + ' '),
+          name: policyLabel('gallery.videoReview.zoomRegionLabel') + ' ',
         })
         .last()
         .click();

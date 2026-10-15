@@ -233,11 +233,13 @@ it('resolves exact cut boundaries when timestamp seeks return the preceding key 
   const signal = new AbortController().signal;
   const index = await inspectReviewMedia(file, signal);
   const getKeyPacket = EncodedPacketSink.prototype.getKeyPacket;
-  const seek = vi
-    .spyOn(EncodedPacketSink.prototype, 'getKeyPacket')
-    .mockImplementation(function (this: EncodedPacketSink, timestamp, options) {
-      return getKeyPacket.call(this, timestamp - 0.001, options);
-    });
+  const seek = vi.spyOn(EncodedPacketSink.prototype, 'getKeyPacket').mockImplementation(function (
+    this: EncodedPacketSink,
+    timestamp,
+    options
+  ) {
+    return getKeyPacket.call(this, timestamp - 0.001, options);
+  });
   let bytes = new Uint8Array(0);
   try {
     const receipt = await writeReviewPackets({

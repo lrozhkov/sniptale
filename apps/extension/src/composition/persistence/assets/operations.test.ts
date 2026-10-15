@@ -411,6 +411,29 @@ it('keeps busy logical-only retirement without scanning Library during an editor
   }
 });
 
+it('retains physical-delete intent without scanning while an editor is open, then retries', async () => {
+  const { db } = installMutationHarness();
+  let readerOpen = true;
+  const request = vi.fn(
+    async (name: string, _options: unknown, action: (lock: unknown) => Promise<unknown>) =>
+      action(name === 'sniptale:assets:resource-readers' && readerOpen ? null : {})
+  );
+  vi.stubGlobal('navigator', { locks: { request } });
+  const intent = buildPhysicalDeleteOperation(['obsolete']);
+  try {
+    await completePhysicalDeleteOperation(intent);
+    expect(db.getAll).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+    readerOpen = false;
+    await completePhysicalDeleteOperation(intent);
+    expect(mocks.deleteObject).toHaveBeenCalledExactlyOnceWith('obsolete');
+    expect(db.delete).toHaveBeenCalledWith('asset_operations', intent.operationId);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it('keeps projected targets pending while completing unrelated intents in the same batch', async () => {
   const { db } = installMutationHarness();
   db.getAll.mockImplementation(async (store: string) =>

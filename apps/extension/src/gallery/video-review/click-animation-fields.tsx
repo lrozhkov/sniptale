@@ -1,3 +1,4 @@
+import { reviewGestureAreaBounds } from '../../features/video/project/action-feedback/validation';
 import { reviewInformationSections } from './inspector-sections';
 import { MousePointer2, Palette, Clock3, Move, RotateCcw } from 'lucide-react';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
@@ -405,13 +406,7 @@ function ClickAnimation({
             >
               {(['x', 'y', 'width', 'height'] as const).map((key) => {
                 const area = props.values[0]!.gestureArea!;
-                const min = key === 'width' || key === 'height' ? 0.1 : 0;
-                const max =
-                  (1 -
-                    area[
-                      key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y'
-                    ]) *
-                  100;
+                const { min, max } = reviewGestureAreaBounds(area, key);
                 return (
                   <ClickNumberRow
                     key={key}

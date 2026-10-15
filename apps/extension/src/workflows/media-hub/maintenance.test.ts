@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 const {
   usageIndex,
   publish,
@@ -10,7 +10,9 @@ const {
   recover,
   settings,
   log,
+  cleanupProbe,
 } = vi.hoisted(() => ({
+  cleanupProbe: vi.fn(),
   log: vi.fn(),
   usageIndex: vi.fn(),
   publish: vi.fn(),
@@ -21,6 +23,9 @@ const {
   trash: vi.fn(),
   recover: vi.fn(),
   settings: vi.fn(async () => ({ localStoragePolicy: {} })),
+}));
+vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
+  tryAssetResourceCleanup: cleanupProbe,
 }));
 vi.mock('../../composition/persistence/library-lifecycle/maintenance-log', () => ({
   createMaintenanceLog: () => ({ append: log }),
@@ -50,13 +55,72 @@ vi.mock('../../composition/persistence/asset-publication-recovery/audit', () => 
 }));
 vi.mock('../../features/media-hub/events', () => ({ publishMediaHubLibraryChanged: publish }));
 import { maintainLibraryAssets } from './maintenance';
+beforeAll(async () => {
+  await import('../../composition/persistence/library-lifecycle/cleanup');
+});
 beforeEach(() => {
+  cleanupProbe
+    .mockReset()
+    .mockImplementation(async (operation: () => Promise<unknown>) => operation());
   settings.mockResolvedValue({ localStoragePolicy: {} });
   trash.mockResolvedValue({ failedCount: 0 });
 });
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.clearAllMocks();
+});
+
+it('defers optional housekeeping for an open reader but still recovers publications', async () => {
+  cleanupProbe.mockResolvedValue(undefined);
+  await maintainLibraryAssets(new AbortController().signal);
+  expect(usageIndex).not.toHaveBeenCalled();
+  expect(provenance).not.toHaveBeenCalled();
+  expect(backfill).not.toHaveBeenCalled();
+  expect(drafts).not.toHaveBeenCalled();
+  expect(trash).not.toHaveBeenCalled();
+  expect(collect).not.toHaveBeenCalled();
+  expect(recover).toHaveBeenCalledOnce();
+});
+
+it('does not queue a second Gallery pass behind the active executor', async () => {
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let busy = false;
+  const request = vi.fn(
+    async (_name: string, _options: unknown, action: (lock: object | null) => Promise<void>) => {
+      if (busy) return action(null);
+      busy = true;
+      try {
+        return await action({});
+      } finally {
+        busy = false;
+      }
+    }
+  );
+  vi.stubGlobal('navigator', { locks: { request } });
+  usageIndex.mockImplementationOnce(async () => {
+    entered();
+    await held;
+  });
+  const first = maintainLibraryAssets(new AbortController().signal);
+  await started;
+  await maintainLibraryAssets(new AbortController().signal);
+  expect(usageIndex).toHaveBeenCalledOnce();
+  release();
+  await first;
+  expect(collect).toHaveBeenCalledOnce();
+  expect(request).toHaveBeenCalledWith(
+    'sniptale:library-maintenance',
+    { mode: 'exclusive', ifAvailable: true },
+    expect.any(Function)
+  );
 });
 it('yields before maintenance and cancels on unmount or superseding refresh', async () => {
   vi.useFakeTimers();

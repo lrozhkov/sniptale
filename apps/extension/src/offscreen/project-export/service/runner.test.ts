@@ -1,4 +1,5 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import * as projectFollow from '../../../features/video/composition/motion/project-follow';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cancelActiveProjectExportJob, releaseProjectExportJob, runProjectExport } from './runner';
 import { VideoExportFormat, VideoExportQualityPreset } from '../../../features/video/project/types';
 import { createVideoProjectFromRecording } from '../../../features/video/project/factories/creation';
@@ -33,6 +34,8 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+afterEach(() => vi.restoreAllMocks());
+
 beforeEach(() => {
   vi.clearAllMocks();
   loadImagesForProjectMock.mockResolvedValue(new Map());
@@ -60,6 +63,14 @@ it('refuses a conflicting follow camera before acquiring export resources', asyn
       zoomOutDuration: 0,
     },
   ];
+  vi.spyOn(projectFollow, 'resolveProjectCameraConflicts').mockReturnValueOnce([
+    {
+      regionId: project.motionRegions[0]!.id,
+      interval: { start: 0, end: 3 },
+      time: 0,
+      reason: 'dynamics',
+    },
+  ]);
   const job = { jobId: 'camera-job', cancelled: false };
   const settings = {
     downloadAfterExport: true,

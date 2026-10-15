@@ -80,7 +80,8 @@ test('native draft expiry preserves bytes for 7/30 days, independent switches an
   const visit = async (time: number, drafts = true, trash = true) => {
     await page.clock.setFixedTime(time);
     await page.goto(
-      `${host.origin}${GALLERY_HARNESS_PATH}?locale=en&draftCleanup=${drafts ? 'on' : 'off'}&trashCleanup=${trash ? 'on' : 'off'}`
+      `${host.origin}${GALLERY_HARNESS_PATH}?locale=en` +
+        `&draftCleanup=${drafts ? 'on' : 'off'}&trashCleanup=${trash ? 'on' : 'off'}`
     );
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await settled(page);
@@ -179,7 +180,8 @@ for (const variant of [
         },
       });
       await page.goto(
-        `${host.origin}${SETTINGS_HARNESS_PATH}?section=saving&view=drafts&locale=${variant.locale}&theme=${variant.theme}`
+        `${host.origin}${SETTINGS_HARNESS_PATH}?section=saving&view=drafts` +
+          `&locale=${variant.locale}&theme=${variant.theme}`
       );
       const action = page.getByRole('button', {
         name: label('settings.storageDrafts.deleteAll'),

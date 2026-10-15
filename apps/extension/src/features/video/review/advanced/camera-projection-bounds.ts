@@ -309,23 +309,30 @@ function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boo
   return { g, tx, ty, scale, weight, k, inverseK, translation };
 }
 
+function cameraSourceCoordinate(
+  input: QuickEditCameraProjectionInterval,
+  motion: boolean,
+  axis: 'x' | 'y'
+) {
+  const { window: windowRect, video } = input;
+  const size = axis === 'x' ? 'width' : 'height';
+  const actual = !motion ? input.actual : undefined;
+  const p: Range = actual
+    ? [Math.min(actual.from[axis], actual.to[axis]), Math.max(actual.from[axis], actual.to[axis])]
+    : [0, 1];
+  return add(constant(video[axis] - windowRect[axis]), multiply(boxed(p), constant(video[size])));
+}
+
 function cameraRasterCoordinate(
   input: QuickEditCameraProjectionInterval,
   motion: boolean,
   jets: NonNullable<ReturnType<typeof nominalCameraJets>>,
   axis: 'x' | 'y'
 ) {
-  const { window: windowRect, video } = input;
+  const { window: windowRect } = input;
   const size = axis === 'x' ? 'width' : 'height';
   const translation = axis === 'x' ? jets.tx : jets.ty;
-  const actual = !motion ? input.actual : undefined;
-  const p: Range = actual
-    ? [Math.min(actual.from[axis], actual.to[axis]), Math.max(actual.from[axis], actual.to[axis])]
-    : [0, 1];
-  const source = add(
-    constant(video[axis] - windowRect[axis]),
-    multiply(boxed(p), constant(video[size]))
-  );
+  const source = cameraSourceCoordinate(input, motion, axis);
   const q =
     input.windowWeight === 'window'
       ? source
@@ -348,16 +355,8 @@ function unrotatedOutputCoordinate(
   jets: NonNullable<ReturnType<typeof nominalCameraJets>>,
   axis: 'x' | 'y'
 ) {
-  const { window: windowRect, video } = input;
-  const size = axis === 'x' ? 'width' : 'height';
-  const actual = !motion ? input.actual : undefined;
-  const p: Range = actual
-    ? [Math.min(actual.from[axis], actual.to[axis]), Math.max(actual.from[axis], actual.to[axis])]
-    : [0, 1];
-  const source = add(
-    constant(video[axis] - windowRect[axis]),
-    multiply(boxed(p), constant(video[size]))
-  );
+  const { window: windowRect } = input;
+  const source = cameraSourceCoordinate(input, motion, axis);
   return add(
     constant(windowRect[axis]),
     subtract(multiply(jets.scale, source), axis === 'x' ? jets.tx : jets.ty)

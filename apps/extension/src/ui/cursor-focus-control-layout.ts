@@ -59,3 +59,22 @@ export function layoutCursorFocusControls(input: {
   }
   return result;
 }
+
+/** Prefer a reachable handle over its key, retaining the activated handle for an equal-distance tie. */
+export function resolveCursorFocusHandle(
+  distances: Record<Handle, number | undefined>,
+  keyDistance: number,
+  preferred?: Handle
+): Handle | undefined {
+  const candidates = (['incoming', 'outgoing'] as const)
+    .filter((name) => distances[name] !== undefined)
+    .map((name) => ({ name, distance: distances[name]! }))
+    .filter((item) => item.distance <= 14)
+    .toSorted((a, b) => a.distance - b.distance);
+  const activated = candidates.find((item) => item.name === preferred);
+  return candidates[0] && candidates[0].distance < keyDistance
+    ? activated && Math.abs(activated.distance - candidates[0].distance) < 0.01
+      ? preferred
+      : candidates[0].name
+    : undefined;
+}

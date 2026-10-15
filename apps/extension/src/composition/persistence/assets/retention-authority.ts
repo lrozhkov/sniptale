@@ -192,7 +192,11 @@ async function visitDurableRows(
   if (!Array.isArray(rows)) return false;
   let valid = true;
   for (let index = 0; index < rows.length; index++) {
-    if (index % 8 === 0) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (index % 8 === 0) {
+      // Supported Chrome provides scheduler.yield; background timers can stall the lifecycle hold.
+      if (typeof scheduler !== 'undefined') await scheduler.yield();
+      else await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
     signal?.throwIfAborted();
     const accepted = visit(rows[index], index);
     valid = valid && accepted;

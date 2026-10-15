@@ -24,17 +24,27 @@ const OPERATIONAL_ARGS = [
   '--no-error-on-unmatched-pattern',
 ];
 
-function assertFormatterMigrationAuthority() {
+function assertFormatterAuthority() {
   const evidence = JSON.parse(fs.readFileSync(fromRelativePath(FORMATTER_MIGRATION_PATH), 'utf8'));
   const installedVersion = JSON.parse(
     fs.readFileSync(fromRelativePath('node_modules/oxfmt/package.json'), 'utf8')
   ).version;
   if (
     evidence.schemaVersion !== 2 ||
-    evidence.targetFormatter !== `oxfmt@${installedVersion}` ||
+    evidence.targetFormatter !== 'oxfmt@0.64.0' ||
     evidence.canonicalAuthority !== '.oxfmtrc.json'
   ) {
-    throw new Error('Formatter migration authority drifted from the installed Oxfmt toolchain.');
+    throw new Error('Formatter migration evidence differs from its sealed authority.');
+  }
+  const toolchain = JSON.parse(
+    fs.readFileSync(fromRelativePath('tooling/configs/ci/toolchain.lock.json'), 'utf8')
+  );
+  const packageLock = JSON.parse(fs.readFileSync(fromRelativePath('package-lock.json'), 'utf8'));
+  if (
+    installedVersion !== toolchain.projectToolchain?.oxfmt?.version ||
+    installedVersion !== packageLock.packages?.['node_modules/oxfmt']?.version
+  ) {
+    throw new Error('Installed Oxfmt differs from the locked toolchain.');
   }
 }
 
@@ -107,7 +117,7 @@ function collectOxfmtResult(candidateFiles, commandRunner, { repositoryWide = fa
 }
 
 export function runFormatterCheck(candidateFiles, commandRunner = runRepoNodeEntry, options = {}) {
-  assertFormatterMigrationAuthority();
+  assertFormatterAuthority();
   const { candidateFiles: admittedCandidateFiles, changedFiles } = collectOxfmtResult(
     candidateFiles,
     commandRunner,
@@ -120,7 +130,7 @@ export function runFormatterCheck(candidateFiles, commandRunner = runRepoNodeEnt
 }
 
 export function runFormatterWrite(candidateFiles, commandRunner = runRepoNodeEntry, options = {}) {
-  assertFormatterMigrationAuthority();
+  assertFormatterAuthority();
   const { candidateFiles: admittedCandidateFiles, changedFiles } = collectOxfmtResult(
     candidateFiles,
     commandRunner,

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 315,
-  "findingDigest": "sha256:d2855731808e1cc9a6a5da05228a97695c5669ba9c66ab8e7f20b0f9bca4be95",
+  "findingCount": 317,
+  "findingDigest": "sha256:0e9bb68d2430aef669310e125066637c6bebbc5a3aec20931b7c3662d5e33d59",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -114,6 +114,27 @@
       "owner": "apps/extension/src/background/application/privacy-erasure/composition.ts",
       "reason": "Exact mutation-queue-name matches the forwarded waitForActiveMutations method on caller-held exclusion reservations. This composition creates no queue, token store or authorization decision: existing lifecycle owners issue reservations and PrivacyErasureUseCase owns execution ordering.",
       "removalCondition": "Remove this exact entry when forwarding method stops matching the signal or this composition starts owning a queue, lease, token or admission authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.lease",
+      "owner": "apps/extension/src/background/media/video/recording-control-lease/index.ts",
+      "reason": "The existing runtime descriptor registers this lease owner. The heuristic does not resolve ownerModule references.",
+      "removalCondition": "Remove when the guard resolves the existing descriptor, the signals disappear, or the descriptor no longer covers this owner.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.completion",
+      "owner": "apps/extension/src/background/media/video/runtime/recording-completion.ts",
+      "reason": "These maps join pending promises and delete completed entries. Durable lease and session state own completion decisions.",
+      "removalCondition": "Remove when these signals disappear or the collections acquire independent completion authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.speech-publication",
+      "owner": "apps/extension/src/workflows/video-review/speech-publication.ts",
+      "reason": "This WeakMap holds disposable attachment handles for retries. Session and persistence owners control publication acceptance and recovery.",
+      "removalCondition": "Remove when the signal disappears or this bookkeeping acquires publication authority.",
       "classification": "tool-noise"
     }
   ],
@@ -348,9 +369,9 @@
     },
     {
       "file": "apps/extension/src/background/media/video/recording-control-lease/index.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: reset-for-tests.",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name, reset-for-tests.",
       "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+      "noiseId": "noise.policy-state-descriptor.lease"
     },
     {
       "file": "apps/extension/src/background/media/video/runtime/export-capabilities.ts",
@@ -393,6 +414,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/recording-completion.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.completion"
     },
     {
       "file": "apps/extension/src/background/media/video/ui/region-selection.ts",
@@ -1785,6 +1812,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/workflows/video-review/speech-publication.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.speech-publication"
     },
     {
       "file": "packages/platform/src/data/zip-profile/entry-filenames.ts",

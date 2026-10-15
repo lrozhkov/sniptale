@@ -55,9 +55,11 @@ describe('visible Settings transfer coverage guard', () => {
       },
     });
     const policy = readFileSync(join(process.cwd(), 'docs/security/data-handling.md'), 'utf8');
-    expect(policy).toMatch(
-      /Background preset metadata[^\n]*sniptale_background_presets[^\n]*excluded from sync, settings transfer/u
-    );
+    const backgroundPolicy = policy
+      .split('\n\n')
+      .find((paragraph) => paragraph.startsWith('Background preset metadata'));
+    expect(backgroundPolicy).toContain('sniptale_background_presets');
+    expect(backgroundPolicy).toContain('Exclude it from sync, settings transfer');
   });
 
   it('classifies every Settings persistence mutation callsite exactly', () => {

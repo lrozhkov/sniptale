@@ -1,3 +1,4 @@
+import { recordingIdForProjectAsset } from './source-interactions';
 import type { VideoProject, VideoProjectActionEvent, VideoProjectVideoClip } from './types';
 
 /** One appearance of an authored fact on the current timeline. Never persisted. */
@@ -71,12 +72,7 @@ export function resolveVideoProjectActionOccurrences(
   for (const clip of project.clips) {
     if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) continue;
     const asset = project.assets.find((item) => item.id === clip.assetId);
-    const recordingId =
-      asset?.source.kind === 'recording'
-        ? asset.source.recordingId
-        : asset?.source.kind === 'project-asset'
-          ? asset.source.originRecordingId
-          : null;
+    const recordingId = recordingIdForProjectAsset(asset);
     if (!recordingId) continue;
     const key = JSON.stringify([recordingId, clip.sourceInstanceId]);
     const group = instances.get(key) ?? [];

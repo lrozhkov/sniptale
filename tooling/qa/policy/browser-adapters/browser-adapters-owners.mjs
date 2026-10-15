@@ -1,4 +1,6 @@
 export const LOCAL_STORAGE_OWNER_FILES = new Set([
+  // E2E locale bootstrap runs before page modules. Remove when that bootstrap no longer writes storage.
+  'tooling/test/e2e/support/cursor-camera-policy-proof.ts',
   'apps/extension/src/popup/diagnostics/performance/index.ts',
   'apps/extension/src/popup/diagnostics/tracing/index.ts',
   'apps/extension/src/platform/i18n/locale/state.ts',

@@ -67,26 +67,26 @@ function stubReviewDom() {
         value: () => undefined,
       });
   }
-  const show = vi
-    .spyOn(HTMLDialogElement.prototype, 'showModal')
-    .mockImplementation(function (this: HTMLDialogElement) {
-      this.open = true;
-    });
-  const close = vi
-    .spyOn(HTMLDialogElement.prototype, 'close')
-    .mockImplementation(function (this: HTMLDialogElement) {
-      this.open = false;
-    });
-  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(
-    function (this: HTMLMediaElement) {
-      this.dispatchEvent(new Event('pause'));
-    }
-  );
-  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
-    async function (this: HTMLMediaElement) {
-      this.dispatchEvent(new Event('play'));
-    }
-  );
+  const show = vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
+    this: HTMLDialogElement
+  ) {
+    this.open = true;
+  });
+  const close = vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(function (
+    this: HTMLDialogElement
+  ) {
+    this.open = false;
+  });
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    this.dispatchEvent(new Event('pause'));
+  });
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
+    this: HTMLMediaElement
+  ) {
+    this.dispatchEvent(new Event('play'));
+  });
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640);
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(360);
   const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:review');

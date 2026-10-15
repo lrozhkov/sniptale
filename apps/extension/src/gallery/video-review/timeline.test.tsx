@@ -369,15 +369,15 @@ it('renders ruler labels at the unit chosen for the current scale', () => {
 });
 
 it('sizes the separate label pane from natural label and control widths without a resize handle', () => {
-  const metric = vi
-    .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
-    .mockImplementation(function (this: HTMLElement) {
-      return this.hasAttribute('data-track-label')
-        ? 130
-        : this.hasAttribute('data-track-controls')
-          ? 64
-          : 0;
-    });
+  const metric = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.hasAttribute('data-track-label')
+      ? 130
+      : this.hasAttribute('data-track-controls')
+        ? 64
+        : 0;
+  });
   try {
     const { host, props } = renderTimeline();
     const panes = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timelinePanes"]')!;

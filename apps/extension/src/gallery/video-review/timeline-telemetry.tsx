@@ -328,33 +328,24 @@ function ReviewHistoryItem({
         animatedIds={props.animatedIds}
       />
     );
+  const description = [
+    reviewEventLabel(marker.eventType),
+    reviewMouseButtonLabel(marker.mouseButton),
+    item.lane === 0 ? translate('gallery.videoReview.historyKeyboardCoverage') : undefined,
+    marker.target,
+    animated ? translate('gallery.videoReview.clickAnimation') : undefined,
+    `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <button
       key={`${marker.ref.kind}:${marker.ref.id}`}
       type="button"
       aria-pressed={selected}
       data-animated={animated ? 'true' : 'false'}
-      aria-label={[
-        translate('gallery.videoReview.telemetry'),
-        reviewEventLabel(marker.eventType),
-        reviewMouseButtonLabel(marker.mouseButton),
-        item.lane === 0 ? translate('gallery.videoReview.historyKeyboardCoverage') : undefined,
-        marker.target,
-        animated ? translate('gallery.videoReview.clickAnimation') : undefined,
-        `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
-      ]
-        .filter(Boolean)
-        .join(' · ')}
-      title={[
-        reviewEventLabel(marker.eventType),
-        reviewMouseButtonLabel(marker.mouseButton),
-        item.lane === 0 ? translate('gallery.videoReview.historyKeyboardCoverage') : undefined,
-        marker.target,
-        animated ? translate('gallery.videoReview.clickAnimation') : undefined,
-        `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
-      ]
-        .filter(Boolean)
-        .join(' · ')}
+      aria-label={`${translate('gallery.videoReview.telemetry')} · ${description}`}
+      title={description}
       onClick={() => props.onMarker(marker)}
       className={[
         'absolute flex items-center justify-center gap-1 overflow-hidden',

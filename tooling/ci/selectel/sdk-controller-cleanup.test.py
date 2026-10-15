@@ -57,7 +57,7 @@ def runner_api_failure():
         def find_subnet(self, resource_id, ignore_missing=True):
             return None if self.subnet_deleted else types.SimpleNamespace(id=resource_id)
 
-        def remove_interface_from_router(self, router, subnet_id):
+        def remove_interface_from_router(self, router, subnet):
             events.append("router-interface-delete")
 
         def delete_router(self, resource, ignore_missing=True):
@@ -369,7 +369,7 @@ def identity_recovery():
                 else None
             )
 
-        def remove_interface_from_router(self, router, subnet_id):
+        def remove_interface_from_router(self, router, subnet):
             deleted.append(owned_router_port.id)
 
         def delete_router(self, resource, ignore_missing=True):

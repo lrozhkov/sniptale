@@ -17,6 +17,35 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
     operation(await mocks.db()),
 }));
 
+it('finishes retention validation without waiting for background-tab timers', async () => {
+  const yieldTask = vi.fn(async () => undefined);
+  vi.stubGlobal('scheduler', { yield: yieldTask });
+  const timer = vi.spyOn(globalThis, 'setTimeout');
+  mocks.db.mockResolvedValue({
+    getAll: async (store: string) =>
+      store === 'recordings'
+        ? Array.from({ length: 17 }, (_, index) => ({
+            id: `recording-${index}`,
+            assetId: `asset-${index}`,
+            createdAt: 1,
+            filename: 'recording.webm',
+            mimeType: 'video/webm',
+            size: 1,
+          }))
+        : [],
+  });
+  try {
+    const snapshot = await collectDurableAssetSnapshot();
+    expect(snapshot.authorityValid).toBe(true);
+    expect(snapshot.expectedOwners).toHaveLength(17);
+    expect(yieldTask).toHaveBeenCalled();
+    expect(timer).not.toHaveBeenCalled();
+  } finally {
+    timer.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
 it('yields while validating many rows and returns only their retention projection', async () => {
   const getAll = vi.fn(async (store: string) =>
     store === 'recordings'

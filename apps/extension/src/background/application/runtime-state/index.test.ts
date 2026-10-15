@@ -1,15 +1,13 @@
 import { expect, it, vi } from 'vitest';
 
 const { scenarioSessionServiceCtorMock } = vi.hoisted(() => ({
-  scenarioSessionServiceCtorMock: vi.fn(
-    function ScenarioSessionServiceMock(this: {
-      clearTab: ReturnType<typeof vi.fn>;
-      kind: string;
-    }) {
-      this.clearTab = vi.fn();
-      this.kind = 'scenario-session-service';
-    }
-  ),
+  scenarioSessionServiceCtorMock: vi.fn(function ScenarioSessionServiceMock(this: {
+    clearTab: ReturnType<typeof vi.fn>;
+    kind: string;
+  }) {
+    this.clearTab = vi.fn();
+    this.kind = 'scenario-session-service';
+  }),
 }));
 
 vi.mock('../../scenario/session-service', () => ({

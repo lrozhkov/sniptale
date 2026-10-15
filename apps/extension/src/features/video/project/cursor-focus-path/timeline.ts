@@ -1,6 +1,6 @@
 import type { VideoProject } from '../types';
 import type { CursorFocusBinding, CursorFocusKey, CursorFocusPath } from './types';
-import { resolveProjectCursorFocusPath } from './projection';
+import { resolveProjectCursorFocusPath, projectCursorFocusKeyOccurrences } from './projection';
 
 /** A disposable occurrence of one source key on the editor's existing time axis. */
 export interface CursorFocusTimelineKey extends CursorFocusKey {
@@ -38,24 +38,15 @@ export function projectCursorFocusTimelineKeys(project: VideoProject): CursorFoc
           sourceTime: key.time,
         }));
       const binding = segment.binding;
-      return project.clips.flatMap((clip) =>
-        clip.type === 'VIDEO' && (clip.sourceInstanceId ?? clip.id) === binding.sourceInstanceId
-          ? segment.keys
-              .filter(
-                (key) =>
-                  key.time >= clip.sourceStart && key.time <= clip.sourceStart + clip.sourceDuration
-              )
-              .map((key) => ({
-                ...key,
-                timelineId: `${clip.id}:${key.id}`,
-                segmentId: segment.id,
-                binding,
-                sourceTime: key.time,
-                time: clip.startTime + (key.time - clip.sourceStart) / (clip.playbackRate ?? 1),
-                sourceClipId: clip.id,
-              }))
-          : []
-      );
+      return projectCursorFocusKeyOccurrences(project, segment).map(({ key, clip, time }) => ({
+        ...key,
+        timelineId: `${clip.id}:${key.id}`,
+        segmentId: segment.id,
+        binding,
+        sourceTime: key.time,
+        time,
+        sourceClipId: clip.id,
+      }));
     })
     .sort(compareTimelineKeys);
   // A split boundary is one occurrence on a continuous output axis, not two independent facts.

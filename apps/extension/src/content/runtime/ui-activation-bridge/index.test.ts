@@ -87,17 +87,17 @@ function mountPointerSelectionTextarea(): HTMLTextAreaElement {
   vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(
     DOMRect.fromRect({ height: 40, width: 100 })
   );
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
-        return DOMRect.fromRect({
-          height: 20,
-          x: this.previousSibling.data.length * 10,
-        });
-      }
-      return DOMRect.fromRect();
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
+      return DOMRect.fromRect({
+        height: 20,
+        x: this.previousSibling.data.length * 10,
+      });
     }
-  );
+    return DOMRect.fromRect();
+  });
   return textarea;
 }
 
@@ -384,17 +384,17 @@ describe('content UI activation bridge focus ownership', () => {
     vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(
       DOMRect.fromRect({ height: 40, width: 100 })
     );
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-      function (this: HTMLElement) {
-        if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
-          return DOMRect.fromRect({
-            height: 20,
-            x: this.previousSibling.data.length * 10,
-          });
-        }
-        return DOMRect.fromRect();
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
+        return DOMRect.fromRect({
+          height: 20,
+          x: this.previousSibling.data.length * 10,
+        });
       }
-    );
+      return DOMRect.fromRect();
+    });
 
     try {
       textarea.dispatchEvent(
@@ -424,17 +424,17 @@ describe('content UI activation bridge focus ownership', () => {
     vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(
       DOMRect.fromRect({ height: 40, width: 140 })
     );
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-      function (this: HTMLElement) {
-        if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
-          return DOMRect.fromRect({
-            height: 20,
-            x: this.previousSibling.data.length * 10,
-          });
-        }
-        return DOMRect.fromRect();
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
+        return DOMRect.fromRect({
+          height: 20,
+          x: this.previousSibling.data.length * 10,
+        });
       }
-    );
+      return DOMRect.fromRect();
+    });
 
     for (let clickCount = 0; clickCount < 2; clickCount += 1) {
       textarea.dispatchEvent(
@@ -462,14 +462,14 @@ describe('content UI activation bridge focus ownership', () => {
     vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(
       DOMRect.fromRect({ height: 40, width: 140 })
     );
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-      function (this: HTMLElement) {
-        if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
-          return DOMRect.fromRect({ height: 20, x: this.previousSibling.data.length * 10 });
-        }
-        return DOMRect.fromRect();
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
+        return DOMRect.fromRect({ height: 20, x: this.previousSibling.data.length * 10 });
       }
-    );
+      return DOMRect.fromRect();
+    });
 
     textarea.dispatchEvent(
       new MouseEvent('pointerdown', {
@@ -494,12 +494,12 @@ describe('content UI activation bridge focus ownership', () => {
     root.append(textarea);
     vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect({ width: 80 }));
     let markerRoot: Node | null = null;
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-      function (this: HTMLElement) {
-        if (this.tagName === 'SPAN') markerRoot = this.getRootNode();
-        return DOMRect.fromRect();
-      }
-    );
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.tagName === 'SPAN') markerRoot = this.getRootNode();
+      return DOMRect.fromRect();
+    });
 
     dispatchPrimaryPointerDown(textarea);
 
@@ -671,19 +671,19 @@ describe('content UI activation bridge controlled text input', () => {
     vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(
       DOMRect.fromRect({ height: 60, width: 50 })
     );
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-      function (this: HTMLElement) {
-        if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
-          const offset = this.previousSibling.data.length;
-          return DOMRect.fromRect({
-            height: 20,
-            x: (offset % 5) * 10,
-            y: Math.floor(offset / 5) * 20,
-          });
-        }
-        return DOMRect.fromRect();
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
+        const offset = this.previousSibling.data.length;
+        return DOMRect.fromRect({
+          height: 20,
+          x: (offset % 5) * 10,
+          y: Math.floor(offset / 5) * 20,
+        });
       }
-    );
+      return DOMRect.fromRect();
+    });
 
     dispatchHostCancelledKeydown(textarea, { key: 'ArrowUp' });
 

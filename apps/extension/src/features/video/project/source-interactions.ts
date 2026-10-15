@@ -1,5 +1,15 @@
 import type { VideoProject } from './types';
 
+/** Recording ancestry is shared by source retention, authored actions and camera targets. */
+export function recordingIdForProjectAsset(asset: VideoProject['assets'][number] | undefined) {
+  const source = asset?.source;
+  return source?.kind === 'recording'
+    ? source.recordingId
+    : source?.kind === 'project-asset'
+      ? source.originRecordingId
+      : null;
+}
+
 function sourceInstances(project: VideoProject) {
   const assets = new Map(project.assets.map((asset) => [asset.id, asset]));
   const instances = new Map<string, Set<string>>();
@@ -7,24 +17,12 @@ function sourceInstances(project: VideoProject) {
   if (project.baseRecordingId) recordingIds.add(project.baseRecordingId);
   if (project.source.kind === 'recording') recordingIds.add(project.source.recordingId);
   for (const asset of project.assets) {
-    const source = asset.source;
-    const id =
-      source.kind === 'recording'
-        ? source.recordingId
-        : source.kind === 'project-asset'
-          ? source.originRecordingId
-          : null;
+    const id = recordingIdForProjectAsset(asset);
     if (id) recordingIds.add(id);
   }
   for (const clip of project.clips) {
     if (clip.type !== 'VIDEO') continue;
-    const source = assets.get(clip.assetId)?.source;
-    const recordingId =
-      source?.kind === 'recording'
-        ? source.recordingId
-        : source?.kind === 'project-asset'
-          ? source.originRecordingId
-          : null;
+    const recordingId = recordingIdForProjectAsset(assets.get(clip.assetId));
     if (!recordingId) continue;
     const id = clip.sourceInstanceId ?? clip.id;
     const recordings = instances.get(id) ?? new Set<string>();

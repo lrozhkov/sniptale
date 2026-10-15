@@ -392,7 +392,7 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
   const [selected, setSelected] = useState('');
   const anchor = useRef<HTMLElement | null>(null);
   const activation = useRef(0);
-  const advanced = props.advanced.ui.mode === 'advanced';
+  const advanced = resolveQuickEditEffectiveFeatures(props.advanced).annotationEffectsTrackVisible;
   const active =
     enabled && advanced && !props.editing.mode && !props.audio.originalTool && !props.zoom.drawing;
   const catalog = useReviewAnnotationCatalog(active);
@@ -566,10 +566,11 @@ function reviewTimelineSourceSelection(props: TimelineBindingProps): ReviewAncho
 /** Drawing availability follows detected source audio in either editing mode. */
 function useOriginalAudioPlacement(props: TimelineBindingProps) {
   const audioCodec = props.editing.exporter.index?.audioCodec;
+  const enabled = resolveQuickEditEffectiveFeatures(props.advanced).originalAudioTrackVisible;
   const { setOriginalTool } = props.audio;
   useEffect(() => {
-    if (audioCodec === null) setOriginalTool(false);
-  }, [audioCodec, setOriginalTool]);
+    if (audioCodec === null || !enabled) setOriginalTool(false);
+  }, [audioCodec, enabled, setOriginalTool]);
 }
 
 /** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */

@@ -1,4 +1,16 @@
+import { z } from 'zod';
 import { expect, type BrowserContext, type Page } from '@playwright/test';
+
+const runtimeReplySchema = z.object({
+  error: z.unknown().optional(),
+  id: z.number().optional(),
+  result: z
+    .object({
+      exceptionDetails: z.unknown().optional(),
+      result: z.object({ value: z.unknown().optional() }).optional(),
+    })
+    .optional(),
+});
 
 const POPUP_PATH = 'apps/extension/src/popup/index.html';
 
@@ -124,17 +136,19 @@ export async function evaluateInTarget(
     const evaluationResponse = new Promise<{
       error?: unknown;
       result?: { exceptionDetails?: unknown; result?: { value?: unknown } };
-    }>((resolve) => {
+    }>((resolve, reject) => {
       const onMessage = (event: { message: string; sessionId: string }) => {
         if (event.sessionId !== attached.sessionId) return;
-        const response = JSON.parse(event.message) as {
-          error?: unknown;
-          id?: number;
-          result?: { exceptionDetails?: unknown; result?: { value?: unknown } };
-        };
-        if (response.id !== 1) return;
-        session.off('Target.receivedMessageFromTarget', onMessage);
-        resolve(response);
+        try {
+          const raw: unknown = JSON.parse(event.message);
+          const response = runtimeReplySchema.parse(raw);
+          if (response.id !== 1) return;
+          session.off('Target.receivedMessageFromTarget', onMessage);
+          resolve(response);
+        } catch (error) {
+          session.off('Target.receivedMessageFromTarget', onMessage);
+          reject(error);
+        }
       };
       session.on('Target.receivedMessageFromTarget', onMessage);
     });

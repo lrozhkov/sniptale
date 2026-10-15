@@ -157,12 +157,16 @@ export function transformReviewAnnotationEffectAttachment(
   )
     return flattenMappedAnnotationBody(box, to, mapping);
   const center = { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 };
+  return normalizeMappedAnnotationBody(center, { width, height }, u, to);
+}
+
+function normalizeMappedAnnotationBody(center: Point, size: Size, axis: Point, plane: Size) {
   return admitMappedAnnotationBody({
-    x: (center.x - width / 2) / to.width,
-    y: (center.y - height / 2) / to.height,
-    width: width / to.width,
-    height: height / to.height,
-    rotation: Math.atan2(u.y, u.x),
+    x: (center.x - size.width / 2) / plane.width,
+    y: (center.y - size.height / 2) / plane.height,
+    width: size.width / plane.width,
+    height: size.height / plane.height,
+    rotation: Math.atan2(axis.y, axis.x),
   });
 }
 
@@ -202,11 +206,5 @@ function flattenMappedAnnotationBody(
     return null;
   const width = Math.hypot(u.x, u.y),
     height = Math.hypot(v.x, v.y);
-  return admitMappedAnnotationBody({
-    x: (center.x - width / 2) / to.width,
-    y: (center.y - height / 2) / to.height,
-    width: width / to.width,
-    height: height / to.height,
-    rotation: Math.atan2(u.y, u.x),
-  });
+  return normalizeMappedAnnotationBody(center, { width, height }, u, to);
 }

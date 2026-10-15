@@ -338,3 +338,13 @@ function parseGestureArea(raw: unknown): NonNullable<ReviewClickStyle['gestureAr
     return null;
   return { x, y, width, height };
 }
+
+/** Percentage controls retain a positive area and keep each edge inside the source plane. */
+export function reviewGestureAreaBounds(
+  area: NonNullable<ReviewClickStyle['gestureArea']>,
+  key: 'x' | 'y' | 'width' | 'height'
+) {
+  const min = key === 'width' || key === 'height' ? 0.1 : 0;
+  const opposite = key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y';
+  return { min, max: (1 - area[opposite]) * 100 };
+}

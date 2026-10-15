@@ -34,17 +34,17 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 };
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
-const REQUIRED_NODE_VERSION = '24.18.0';
-const REQUIRED_NODE_ENGINE = '>=24.18.0 <25';
-const REQUIRED_PACKAGE_MANAGER = 'npm@11.19.1';
+const REQUIRED_NODE_VERSION = '24.21.0';
+const REQUIRED_NODE_ENGINE = '>=24.21.0 <25';
+const REQUIRED_PACKAGE_MANAGER = 'npm@12.2.0';
 const REQUIRED_NPM_CONFIG = Object.freeze(['loglevel=error', 'min-release-age=7']);
 const REQUIRED_PACKAGE_DEPENDENCY_BASELINES = {
   react: /^\^19\.3\.\d+$/u,
   'react-dom': /^\^19\.3\.\d+$/u,
 };
 const REQUIRED_PACKAGE_DEV_DEPENDENCY_BASELINES = {
-  '@types/react': /^\^19\.2\.\d+$/u,
-  '@types/react-dom': /^\^19\.2\.\d+$/u,
+  '@types/react': /^\^19\.3\.\d+$/u,
+  '@types/react-dom': /^\^19\.3\.\d+$/u,
   '@vitejs/plugin-react': /^\^6\.1\.\d+$/u,
 };
 
@@ -182,11 +182,11 @@ function collectNpmPolicyViolations(packageJson, npmrcSource, nvmrcSource) {
   }
   if (
     packageJson.devEngines?.packageManager?.name !== 'npm' ||
-    packageJson.devEngines.packageManager.version !== '11.19.1' ||
+    packageJson.devEngines.packageManager.version !== '12.2.0' ||
     packageJson.devEngines.packageManager.onFail !== 'error'
   ) {
     violations.push(
-      createViolation(PACKAGE_JSON_PATH, 'devEngines.packageManager must enforce npm 11.19.1')
+      createViolation(PACKAGE_JSON_PATH, 'devEngines.packageManager must enforce npm 12.2.0')
     );
   }
   return violations;

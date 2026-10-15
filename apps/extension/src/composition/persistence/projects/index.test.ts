@@ -200,7 +200,7 @@ async function verifyProjectSaveRefreshesUpdatedAt() {
   await saveVideoProject(project);
 
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith({
-    usageReferenceKeys: ['indexed:v1'],
+    usageReferenceKeys: ['indexed:v2'],
     createdAt: 55,
     id: 'project-1',
     lifecycle: {

@@ -186,7 +186,7 @@ for (const viewport of [
       await expect(dialog.locator('[data-ui="cursorFocusPath.overlay"]')).toHaveCount(0);
       const dwell = dialog
         .locator('[data-history-family="cursor"]')
-        .getByRole('button', { name: new RegExp(label('gallery.videoReview.eventCursorIdle')) })
+        .getByRole('button', { name: label('gallery.videoReview.eventCursorIdle') })
         .first();
       await dwell.click();
       const focus = dialog
@@ -555,7 +555,7 @@ for (const viewport of [
         .click();
       await expect(
         page.getByRole('option', {
-          name: new RegExp(label('videoEditor.sidebar.cursorFocusManualKey')),
+          name: label('videoEditor.sidebar.cursorFocusManualKey'),
         })
       ).toBeVisible();
       await page.keyboard.press('Escape');
@@ -718,7 +718,7 @@ async function selectAuthoredKey(page: Page, row: Locator, id: string) {
     .click();
   await page
     .getByRole('option', {
-      name: new RegExp(translate('videoEditor.sidebar.cursorFocusManualKey', 'en')),
+      name: translate('videoEditor.sidebar.cursorFocusManualKey', 'en'),
     })
     .first()
     .click();

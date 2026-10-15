@@ -27,29 +27,27 @@ sudo apt-get update
 sudo apt-get install -y build-essential curl git python3 python3-pip xvfb
 ```
 
-Install the Node version from [`.nvmrc`](../../.nvmrc). Then install the package manager from [`package.json`](../../package.json):
+Install the Node version from [`.nvmrc`](../../.nvmrc). Install the locked npm package and normalize its reviewed dependency replacements:
 
 ```bash
 nvm install
 nvm use
-npm install --global "$(node -p 'require("./package.json").packageManager')" --ignore-scripts --min-release-age-exclude=npm
+npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+node tooling/ci/npm-runtime.mjs tooling/configs/ci/npm tooling/configs/ci/toolchain.lock.json
+mkdir -p ~/.local/bin
+SNIPTALE_NODE_BIN="$(dirname "$(nvm which)")"
+SNIPTALE_NPM_BIN="$PWD/tooling/configs/ci/npm/node_modules/.bin"
+ln -sf "$SNIPTALE_NODE_BIN/node" ~/.local/bin/node
+ln -sf "$SNIPTALE_NPM_BIN/npm" ~/.local/bin/npm
+ln -sf "$SNIPTALE_NPM_BIN/npx" ~/.local/bin/npx
+export PATH="$HOME/.local/bin:$PATH"
 hash -r
 node tooling/ci/runtime-parity.mjs
 ```
 
-The runtime-parity command checks Node, npm, npx, PATH resolution, real executable paths, and their shared npm package root against [`toolchain.lock.json`](../../tooling/configs/ci/toolchain.lock.json).
+The runtime-parity command checks Node, npm, npx, executable paths, and their shared npm root against [`toolchain.lock.json`](../../tooling/configs/ci/toolchain.lock.json).
 
-If non-interactive shells cannot find the pinned runtime, link all three executables together:
-
-```bash
-mkdir -p ~/.local/bin
-SNIPTALE_NODE_BIN="$(dirname "$(nvm which)")"
-ln -sf "$SNIPTALE_NODE_BIN/node" ~/.local/bin/node
-ln -sf "$SNIPTALE_NODE_BIN/npm" ~/.local/bin/npm
-ln -sf "$SNIPTALE_NODE_BIN/npx" ~/.local/bin/npx
-```
-
-Add `~/.local/bin` to the login-shell `PATH`. Do not update only one link.
+Add `~/.local/bin` to the login-shell `PATH`. Update all three links together when the runtime or repository path changes.
 
 Clone or copy the repository into the Linux filesystem. Preserve uncommitted work before migration. Do not copy `node_modules` between operating systems.
 
@@ -62,6 +60,8 @@ npm rebuild canvas
 node node_modules/@ast-grep/cli/postinstall.js
 npm run prepare
 ```
+
+The root manifest permits the install script for the exact locked canvas version. Other dependency scripts remain disabled.
 
 Do not remove or regenerate `package-lock.json` during setup. Install optional local agent files separately with `npm run agents:install`. Maintainers refresh their archive with `npm run agents:pack`.
 

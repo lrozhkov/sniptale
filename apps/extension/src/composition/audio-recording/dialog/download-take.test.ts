@@ -41,11 +41,11 @@ beforeEach(() => {
       static revokeObjectURL = revoke;
     }
   );
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
-    function (this: HTMLAnchorElement) {
-      filename = this.download;
-    }
-  );
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement
+  ) {
+    filename = this.download;
+  });
 });
 afterEach(() => {
   vi.clearAllTimers();

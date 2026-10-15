@@ -9,15 +9,15 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'gallery-review-inspector-binding',
     productionFile: 'apps/extension/src/gallery/video-review/inspector-binding.tsx',
-    reason:
-      'The modal integration suite exercises inspector composition, note/report actions, selection and ordered close/recovery through the real binding.',
+    reason: `The modal integration suite exercises inspector composition, note/report actions,
+      selection and ordered close/recovery through the real binding.`,
     testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
   },
   {
     owner: 'gallery-review-preview-presentation-session',
     productionFile: 'apps/extension/src/gallery/video-review/preview-presentation-session.ts',
-    reason:
-      'Mounted preview hooks exercise the session acquisition, source callbacks, stale results, publication, cancellation, failure diagnostics and retry lifecycle.',
+    reason: `Mounted preview hooks exercise the session acquisition, source callbacks, stale
+      results, publication, cancellation, failure diagnostics and retry lifecycle.`,
     testFiles: [
       'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
       'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
@@ -27,8 +27,8 @@ export const EDITOR_OWNER_MAPPINGS = [
     owner: 'video-review-export-diagnostics',
     productionFile: 'apps/extension/src/workflows/video-review/export-diagnostics.ts',
     allowCrossOwner: true,
-    reason:
-      'Actual exporters and mounted Gallery consumers prove terminal summaries, nested stages, cancellation, cleanup, privacy and advisory sink failures.',
+    reason: `Actual exporters and mounted Gallery consumers prove terminal summaries, nested
+      stages, cancellation, cleanup, privacy and advisory sink failures.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/export-diagnostics.test.ts',
       'apps/extension/src/workflows/video-review/export-lifecycle.diagnostics.test.ts',
@@ -47,8 +47,8 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'video-review-frame-export-setup',
     productionFile: 'apps/extension/src/workflows/video-review/render-export-setup.ts',
-    reason:
-      'The frame exporter executes decoration acquisition, partial failure compensation, codec configuration and unchanged caller-owned cleanup.',
+    reason: `The frame exporter executes decoration acquisition, partial failure compensation,
+      codec configuration and unchanged caller-owned cleanup.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/render-export.test.ts',
       'apps/extension/src/workflows/video-review/render-export.diagnostics.test.ts',
@@ -61,8 +61,8 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'gallery-review-native-stage',
     productionFile: 'apps/extension/src/gallery/video-review/stage-video.tsx',
-    reason:
-      'The stage consumer suites exercise native video, header, selection geometry and composition parity through the mounted stage.',
+    reason: `The stage consumer suites exercise native video, header, selection geometry and
+      composition parity through the mounted stage.`,
     testFiles: [
       'apps/extension/src/gallery/video-review/stage.test.tsx',
       'apps/extension/src/gallery/video-review/stage-geometry.test.tsx',
@@ -71,8 +71,8 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'video-review-export-scene',
     productionFile: 'apps/extension/src/workflows/video-review/render-export-scene.ts',
-    reason:
-      'Export frame and overlay consumer suites execute the extracted scene composition, borrowed raster lifetime and decorated lens sampling.',
+    reason: `Export frame and overlay consumer suites execute the extracted scene composition,
+      borrowed raster lifetime and decorated lens sampling.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/render-export.test.ts',
       'apps/extension/src/workflows/video-review/scene-frame.test.ts',
@@ -82,8 +82,8 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'gallery-review-annotation-numeric',
     productionFile: 'apps/extension/src/gallery/video-review/annotation-effects-numeric.tsx',
-    reason:
-      'Actual inspector scrub proposals, local anchor bounds and cancellation are proved through presentation and canonical annotation history.',
+    reason: `Actual inspector scrub proposals, local anchor bounds and cancellation are proved
+      through presentation and canonical annotation history.`,
     testFiles: [
       'apps/extension/src/gallery/video-review/annotation-effects-inspector.test.tsx',
       'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
@@ -92,8 +92,8 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'gallery-review-timeline-hover',
     productionFile: 'apps/extension/src/gallery/video-review/timeline-hover.tsx',
-    reason:
-      'Real timeline hit-target tests exercise seek/draw cursor admission, snapped guides, item/control guards and capture cleanup.',
+    reason: `Real timeline hit-target tests exercise seek/draw cursor admission, snapped guides,
+      item/control guards and capture cleanup.`,
     testFiles: ['apps/extension/src/gallery/video-review/timeline-hit-targets.test.tsx'],
   },
   {
@@ -111,8 +111,8 @@ export const EDITOR_OWNER_MAPPINGS = [
     owner: 'video-project-source-authoring-retention',
     productionFile: 'apps/extension/src/features/video/project/source-interactions.ts',
     allowCrossOwner: true,
-    reason:
-      'Real feature removal, editor Undo/Redo and selected portable backup/restore prove source-bound authoring retention.',
+    reason: `Real feature removal, editor Undo/Redo and selected portable backup/restore prove
+      source-bound authoring retention.`,
     testFiles: [
       'apps/extension/src/features/video/project/library-source-removal.test.ts',
       'apps/extension/src/video-editor/project/state/actions.test.ts',
@@ -140,15 +140,15 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'gallery-review-cursor-inspection',
     productionFile: 'apps/extension/src/gallery/video-review/cursor-path-editor.tsx',
-    reason:
-      'The adjacent overlay suite renders this actual inspector and exercises source-point edits, tangents and global policy.',
+    reason: `The adjacent overlay suite renders this actual inspector and exercises source-point
+      edits, tangents and global policy.`,
     testFiles: ['apps/extension/src/gallery/video-review/cursor-path-overlay.test.tsx'],
   },
   {
     owner: 'gallery-review-result-time-lane-adapters',
     productionFile: 'apps/extension/src/gallery/video-review/timeline-lane-bindings.tsx',
-    reason:
-      'Timeline binding and audio placement suites render these adapters with real source/result projection and command gates.',
+    reason: `Timeline binding and audio placement suites render these adapters with real
+      source/result projection and command gates.`,
     testFiles: [
       'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
       'apps/extension/src/gallery/video-review/audio-track-placement.test.tsx',
@@ -187,8 +187,8 @@ export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'video-annotation-builtins',
     productionPrefix: 'apps/extension/src/features/video/project/annotation-engine/builtins/',
-    reason:
-      'Built-in template factories, key mapping, and both shipped packs are covered by the focused built-in helper suite.',
+    reason: `Built-in template factories, key mapping, and both shipped packs are covered by the
+      focused built-in helper suite.`,
     testFiles: [
       'apps/extension/src/features/video/project/annotation-engine/builtins/helpers.test.ts',
     ],

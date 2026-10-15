@@ -638,3 +638,20 @@ it('does not restart or cancel maintenance when the mounted library refreshes', 
   expect(maintainLibraryAssetsMock).toHaveBeenCalledOnce();
   expect(signal.aborted).toBe(false);
 });
+
+it('retries maintenance after reader disposal and removes the retry listener on unmount', async () => {
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  renderConnectedProbe(values, {
+    onBanner: vi.fn(),
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  expect(maintainLibraryAssetsMock).toHaveBeenCalledOnce();
+  await act(async () => window.dispatchEvent(new Event('sniptale:asset-resource-released')));
+  expect(maintainLibraryAssetsMock).toHaveBeenCalledTimes(2);
+  act(() => root?.unmount());
+  root = null;
+  window.dispatchEvent(new Event('sniptale:asset-resource-released'));
+  expect(maintainLibraryAssetsMock).toHaveBeenCalledTimes(2);
+});

@@ -93,6 +93,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
   const busy = props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle';
   const admit = props.beforeAction ?? ((action: () => void) => action());
   const advanced = props.advanced;
+  const features = resolveQuickEditEffectiveFeatures(advanced);
   const sourceAudioReady = !!props.editing.exporter.index?.audioCodec;
   const volumeIssue =
     props.rulerRange && props.originalAudioEditor
@@ -172,13 +173,13 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           onRate={(rate) => admit(() => props.editing.changeRate(rate))}
           onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
         />
-        {advanced.ui.mode === 'advanced' && props.annotationTool ? (
+        {features.annotationEffectsTrackVisible && props.annotationTool ? (
           <ReviewAnnotationToolControl tool={props.annotationTool} busy={busy} admit={admit} />
         ) : null}
-        {advanced.ui.mode === 'advanced' && props.focusTool ? (
+        {features.zoomTrackVisible && props.focusTool ? (
           <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
         ) : null}
-        {props.originalAudioEditor ? (
+        {props.originalAudioEditor && features.originalAudioTrackVisible ? (
           <ReviewToolGroup
             active={props.originalAudioEditor.originalTool && sourceAudioReady}
             label={translate('gallery.videoReview.volume')}

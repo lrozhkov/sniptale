@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { fitVideoRect } from '../../features/video/review/geometry';
 import { act, useEffect, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -10,7 +11,11 @@ import {
   quickEditSpatialTargetCamera,
 } from '../../features/video/review/advanced/spatial';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
-import { computeQuickEditWindowTransform } from '../../features/video/review/advanced/scene';
+import {
+  computeQuickEditWindowTransform,
+  computeQuickEditSceneLayout,
+  computeQuickEditSceneSize,
+} from '../../features/video/review/advanced/scene';
 import {
   projectQuickEditPoint,
   quickEditPlaneProjection,
@@ -231,4 +236,31 @@ it('keeps annotation attachment planes canonical while CSS fit changes and consu
   expect(observed.size.width).toBeLessThanOrEqual(533);
   await render({ source, scene: { background: { enabled: false }, camera } });
   expect(observed.annotationGeometry?.contentToViewport).not.toEqual(before?.contentToViewport);
+});
+
+it('snaps fractional visible crop bounds before recovering the source rectangle', async () => {
+  const scene = {
+    background: { enabled: false as const },
+    camera,
+    canvas: { width: 1001, height: 777, crop: { x: 0.13, y: 0.17, width: 0.61, height: 0.57 } },
+  };
+  await render({ source, scene });
+  const output = fitVideoRect(viewport, computeQuickEditSceneSize({ ...scene, source }));
+  const canonical = computeQuickEditSceneLayout({ ...scene, source, output });
+  const raw = canonical.visibleVideoRect!;
+  expect(Object.values(raw).some((value) => value !== Math.round(value))).toBe(true);
+  const visible = {
+    x: Math.round(raw.x),
+    y: Math.round(raw.y),
+    width: Math.max(1, Math.round(raw.width)),
+    height: Math.max(1, Math.round(raw.height)),
+  };
+  const crop = canonical.sourceCrop!;
+  expect(observed.sceneLayout!.visibleVideoRect).toEqual(visible);
+  expect(observed.sceneLayout!.videoRect).toEqual({
+    x: visible.x - (crop.x * visible.width) / crop.width,
+    y: visible.y - (crop.y * visible.height) / crop.height,
+    width: visible.width / crop.width,
+    height: visible.height / crop.height,
+  });
 });

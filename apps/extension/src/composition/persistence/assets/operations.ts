@@ -63,10 +63,13 @@ export async function completePhysicalDeleteOperations(
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<void> {
   if (!operations.length) return;
+  if (!(await tryAssetResourceCleanup(async () => true))) return;
   await initDB();
   await runWithDurableAssetLifecycleLock(async () => {
     let authority: Awaited<ReturnType<typeof readPhysicalDeleteAuthority>> | undefined;
     for (const operation of operations) {
+      // Probe only: never hold the reader gate across nested retirement or metadata mutation.
+      if (!(await tryAssetResourceCleanup(async () => true))) return;
       let admitted = operation;
       if (operation.privateSources?.length) {
         admitted =

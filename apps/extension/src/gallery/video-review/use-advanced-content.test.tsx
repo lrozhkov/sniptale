@@ -1,5 +1,5 @@
-import { createCameraFollowSettings } from '../../features/video/project/camera/cursor-policy';
 // @vitest-environment jsdom
+import { createCameraFollowSettings } from '../../features/video/project/camera/cursor-policy';
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

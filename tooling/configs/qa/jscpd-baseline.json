@@ -76,6 +76,42 @@
       }
     },
     {
+      "id": "0e607213033818c341e74099474f57300b778e53aae97e25d184a331f06fd096",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+      "reason": "Gallery commits through onChange and optional selection; the editor commits through guarded project history and can refuse. Listener bindings belong to those host closures.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+        "start": 334,
+        "end": 351
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
+        "start": 375,
+        "end": 392
+      }
+    },
+    {
+      "id": "0ee787452cafd25b1768cd6d08393163fe6d43b630e2002ccc6dc3e948ab68d0",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+      "reason": "These bindings use the existing shared GalleryGridCard. Virtualized groups and flat units retain different DOM containment and scrolling ownership.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 584,
+        "end": 589
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 666,
+        "end": 671
+      }
+    },
+    {
       "id": "0f555468acf5ac5645a587f9637483ed52affca248d9136b312da961f77368f9",
       "classification": "tool-noise",
       "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
@@ -382,24 +418,6 @@
       }
     },
     {
-      "id": "36c7858be6ac7dc0c11d6c598beec291af45b3da136dabad62847d481873202b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/project/history/index.ts",
-      "reason": "Undo and redo are inverse state transitions with different past/future mutation; mirrored terminal projection keeps direction visible.",
-      "removalCondition": "Remove when a shared transition model represents both directions without branching configuration or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/project/history/index.ts",
-        "start": 168,
-        "end": 178
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/project/history/index.ts",
-        "start": 210,
-        "end": 220
-      }
-    },
-    {
       "id": "376caab089c049d01cd9be443e86ca38549110d467213adca90c0c54a842ce5a",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/annotations",
@@ -433,6 +451,42 @@
         "path": "apps/extension/src/video-editor/project/state/track/groups.ts",
         "start": 41,
         "end": 46
+      }
+    },
+    {
+      "id": "3985fcd9d694d035e3346748ad013532d742c398ac517fba9782fa694a5c0a2b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+      "reason": "Camera policy already belongs to cursor-policy. Gallery binds ReviewNumberRow, precision and explicit reset; the editor binds NumberInput, SliderField and undefined reset. This fragment binds those distinct host controls.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 381,
+        "end": 440
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 438,
+        "end": 497
+      }
+    },
+    {
+      "id": "39a83f53f975bfd1cba16fff050bd7a0984c3391c599dfc229e1beb19a51cdd9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 483,
+        "end": 497
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 506,
+        "end": 520
       }
     },
     {
@@ -724,6 +778,24 @@
       }
     },
     {
+      "id": "4ba6aad3f05cfd41cd57c6c35349236633062eaa31cf32492e6ad87eaa36c6be",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+      "reason": "Camera preset policy is shared. The gallery and editor bind different control components and reset contracts; this JSX does not own the preset algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 355,
+        "end": 374
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 413,
+        "end": 432
+      }
+    },
+    {
       "id": "4d2d7eef8351fb744546d5951873ef99e6aea43c24af883e7e7fce390b87a111",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/annotations",
@@ -904,24 +976,6 @@
       }
     },
     {
-      "id": "5e56d60f0e0fa14aa7bbc0abcda19a7ffc56df4c303494a20388caf41cb6f055",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/project/validation/interaction.ts",
-      "reason": "Complete action presentation and sparse override validation intentionally share optional style fields but enforce different required-field contracts.",
-      "removalCondition": "Remove when the full and override wire contracts converge or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 148,
-        "end": 153
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 163,
-        "end": 168
-      }
-    },
-    {
       "id": "5f3fe67731e0552eb97792d333e109cecbeb4a3624b654ab05b3b48aa6d076e3",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/inspector/grouped/inspector.css <-> apps/extension/src/video-editor/workspace/sidebar/selection/grouped-inspector/panel.css",
@@ -991,6 +1045,24 @@
         "path": "packages/ui/src/styles/toolbar/transient/feedback.css",
         "start": 58,
         "end": 63
+      }
+    },
+    {
+      "id": "64e940029f4d7a36a8c7184b4d6a6af3e9607995edd1cfcdd4dc57eae02dc130",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/speech-profile.tsx",
+      "reason": "Three response-format options bind a profile patch and a full model-parameter update. The matching JSX contains no provider or audio-processing decision.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/speech-profile.tsx",
+        "start": 92,
+        "end": 100
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/ai/connections/forms/model-audio-fields.tsx",
+        "start": 213,
+        "end": 221
       }
     },
     {
@@ -1228,6 +1300,24 @@
       }
     },
     {
+      "id": "6e1384ef94b9fc327263ed7a99568290be8c66bbdbacb0c09ab042527b75d23b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/factories/project-recording.ts",
+      "reason": "The recording factory validates normalized points. Insertion receives normalized telemetry and deduplicates additional clip facts. The matching event-field projection does not own those distinct receiving contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/factories/project-recording.ts",
+        "start": 55,
+        "end": 64
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/project/state/insertion/material-actions.ts",
+        "start": 75,
+        "end": 85
+      }
+    },
+    {
       "id": "71d4f4ea17a7e8018661bbb0fff278c730b76c03aa99609ab9cfbb43651df225",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/popover-controls.css",
@@ -1261,6 +1351,24 @@
         "path": "tooling/qa/composition/repository/full-verification/scheduler.mjs",
         "start": 11,
         "end": 27
+      }
+    },
+    {
+      "id": "7276c3d5bb19d0b41fb2bb23aa290a90a066e5c98fccbd0547bc8b94bb24c530",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 483,
+        "end": 497
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 735,
+        "end": 749
       }
     },
     {
@@ -1318,6 +1426,24 @@
       }
     },
     {
+      "id": "02148ac7b09762f19e9f9f74869f8e4d007e24685cf15a1ba5eaa9cf2e6b8df8",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/assets/resource-sessions.ts",
+      "reason": "The matched promises adapt Web Locks to a held lease. Scenario also acquires an asset lease and compensates failed acquisition; the asset owner controls only its own reader gate. Shared promise setup would not unify resource authority.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/assets/resource-sessions.ts",
+        "start": 30,
+        "end": 41
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/scenario/resource-sessions.ts",
+        "start": 20,
+        "end": 31
+      }
+    },
+    {
       "id": "76d71fdadf0aa201bbe0f61b636b341bd84fc75e31976c1f26c396d94b8f7602",
       "classification": "tool-noise",
       "owner": "tooling/web-snapshot-smoke/runtime",
@@ -1333,42 +1459,6 @@
         "path": "tooling/web-snapshot-smoke/runtime/runner.mjs",
         "start": 189,
         "end": 202
-      }
-    },
-    {
-      "id": "77029748781459a10ed6a912c7f4fefaae5f5d96a33e73d3ac5e6775fce0a42c",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding",
-      "reason": "Exact local finalization adapters set each session phase and settle its terminal through the existing common writer-finalization operation. Live output completion and failure cleanup remain distinct producer authorities; forwarding phase/fail callbacks would split that authority.",
-      "removalCondition": "Remove when the exact pair disappears or both producers acquire one accepted state-machine and failure-cleanup owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 156,
-        "end": 170
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 421,
-        "end": 435
-      }
-    },
-    {
-      "id": "77ad7ce7f092f49efbafa5350798d6974d9de9c7058defa567877203a0144e58",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding",
-      "reason": "Exact stop-admission adapters belong to different state machines: recorder inactivity and live starting admission differ, as do producer stop and drain transitions. Shared terminal mechanics are already extracted.",
-      "removalCondition": "Remove when the exact pair disappears or both producers acquire one accepted state-machine and failure-cleanup owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 92,
-        "end": 97
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 338,
-        "end": 343
       }
     },
     {
@@ -1405,6 +1495,24 @@
         "path": "packages/ui/src/styles/ai-modal-content/fields.css",
         "start": 45,
         "end": 52
+      }
+    },
+    {
+      "id": "7d7aea9a9ea2eb4d928a59b6c17e327aecfde9e7e39666c13553a84cd54b3412",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+      "reason": "Both layouts use the existing GalleryGridCardMedia component. List and grid bindings preserve separate DOM containment and layout ownership.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 266,
+        "end": 276
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 289,
+        "end": 299
       }
     },
     {
@@ -1786,6 +1894,42 @@
       }
     },
     {
+      "id": "981a4c545d670a7e4d7ea6b60f7d5a1bb0970f1c8cbe02af9020b3f2d066f5b8",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
+      "reason": "These frame diagnostic projections have different payload contracts: the encoder includes color space and the stream does not. They contain no frame transformation algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
+        "start": 44,
+        "end": 57
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
+        "start": 8,
+        "end": 21
+      }
+    },
+    {
+      "id": "98269b392bf54bb6a42f31456fb6eea1e9479a9aea0380b7343c04900f3b4b72",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/project/history/index.ts",
+      "reason": "Undo and redo change opposite history collections. Their terminal result projection surrounds separate inverse transitions.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/project/history/index.ts",
+        "start": 192,
+        "end": 204
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/project/history/index.ts",
+        "start": 237,
+        "end": 249
+      }
+    },
+    {
       "id": "98d8d4e01939e28b2590fd3e2203c317e1a3787ed43ed4b37efa9df2c488646d",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal-content/preview-actions.css",
@@ -1819,6 +1963,24 @@
         "path": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
         "start": 44,
         "end": 49
+      }
+    },
+    {
+      "id": "99a1891cf1217943e4e596140f9d9fbbf1db590a249478ed3b4b60a70e32a385",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+      "reason": "Common camera policy is already shared. Gallery uses ReviewDetails and an explicit reset callback; editor uses InspectorDetails and undefined reset. The matching fragment binds host-specific controls.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 450,
+        "end": 472
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 506,
+        "end": 528
       }
     },
     {
@@ -1912,21 +2074,21 @@
       }
     },
     {
-      "id": "9e2d73dafeb68f7eb61b52d01bcf85c9b09cc19c1081141135073f3e15c24799",
+      "id": "9d1b78634a7028e290fc4f2657217025beed2590c39b970591717d98956056c6",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
+      "owner": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+      "reason": "Common artifact finalization is already shared. Recorder and live producers retain distinct stop, drain and failure-cleanup state machines.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
-        "start": 43,
-        "end": 56
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 156,
+        "end": 170
       },
       "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
-        "start": 8,
-        "end": 21
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 433,
+        "end": 447
       }
     },
     {
@@ -2092,6 +2254,24 @@
       }
     },
     {
+      "id": "ab691fb281a7e0cbca92d8c557925c8cd1551462a9fbff8f33693eba88d63a23",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 483,
+        "end": 497
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 712,
+        "end": 726
+      }
+    },
+    {
       "id": "ab929064d0c19b824e82011414d8085348a065334762166ed1f9690bfa961f89",
       "classification": "tool-noise",
       "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
@@ -2254,6 +2434,78 @@
       }
     },
     {
+      "id": "b6fd0cb0921a9a204ae41df02c8e2f4d650ae5c52702a60f3b6f07ede18f8fb7",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+      "reason": "Accessible bindings surround circle and ellipse handles. Hosts retain distinct coordinate conversion and keyboard operations; this fragment has no movement algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+        "start": 173,
+        "end": 186
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
+        "start": 436,
+        "end": 449
+      }
+    },
+    {
+      "id": "b88fd738889e0922ada54808460d21f8073ea0d4989a0b108e6c9bc5aaab006c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/sidebar/types.ts",
+      "reason": "Sidebar and shell callback ports differ in required and optional facets and surrounding responsibilities. The narrow matching declarations do not establish a shared state owner.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/sidebar/types.ts",
+        "start": 51,
+        "end": 56
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/shell/app-shell/types.ts",
+        "start": 84,
+        "end": 89
+      }
+    },
+    {
+      "id": "b9b39856be7aa29f1b9fb2311db9b7ecd581ddae0046513be454f20e9083f355",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 483,
+        "end": 497
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 689,
+        "end": 703
+      }
+    },
+    {
+      "id": "bab4a2a1382227067a36ad0e3e3397c7eb98535361cb16de0203c5b4705df974",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+      "reason": "Recorder inactivity and live starting admission belong to different producer state machines. Existing shared finalization does not own those stop gates.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 92,
+        "end": 97
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 348,
+        "end": 353
+      }
+    },
+    {
       "id": "bc509d9619d4ba60da4e2db80cf3b276b225bf85fd6c3ae069d9acf201770b20",
       "classification": "tool-noise",
       "owner": "apps/extension/src/video-editor/library/effects-dock/catalog-section.tsx",
@@ -2362,6 +2614,24 @@
       }
     },
     {
+      "id": "c16a116e98e421c0dec52dcc49a73f4ac20e861edb1d97e076e9997d127c3177",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+      "reason": "Pointer cleanup removes callbacks from different host-owned edit sessions. Gallery publication and guarded editor history commits retain separate failure and cancellation contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+        "start": 315,
+        "end": 329
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
+        "start": 357,
+        "end": 371
+      }
+    },
+    {
       "id": "c1c080519524ad7325d7da4a168eebbe2d8398b2fca2f5e9de04b26fd083e0da",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
@@ -2377,24 +2647,6 @@
         "path": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
         "start": 61,
         "end": 66
-      }
-    },
-    {
-      "id": "c352e5b293e66d55e7d3a60b23bf523f5ca22c5277add7c4575cdddcaec2deae",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-      "reason": "List and grid already reuse GalleryGridCardMedia; kind/details cells and grid project controls have distinct DOM layouts. Matching props bind the shared media primitive.",
-      "removalCondition": "Remove when the exact pair disappears or both layouts intentionally share one complete card body.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 263,
-        "end": 273
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 286,
-        "end": 296
       }
     },
     {
@@ -2560,24 +2812,6 @@
       }
     },
     {
-      "id": "cb783e4848d1d578bf9a628cb93d078365fef0b3b8b01df2ccd11997a923a820",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/sidebar/types.ts <-> apps/extension/src/gallery/shell/app-shell/types.ts",
-      "reason": "Gallery sidebar requires facet/scope callbacks while app-shell allows them and owns backup actions. Overlapping saved-view signatures are narrow UI port declarations, not independent saved-view state machines.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/sidebar/types.ts",
-        "start": 51,
-        "end": 56
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/shell/app-shell/types.ts",
-        "start": 83,
-        "end": 88
-      }
-    },
-    {
       "id": "cbb432ee90c3089981315db2502f0dbabb3caedf53cbbd1e5e94503191c03d32",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/annotations",
@@ -2611,6 +2845,24 @@
         "path": "apps/extension/src/composition/persistence/highlighter/mutation-write.ts",
         "start": 37,
         "end": 51
+      }
+    },
+    {
+      "id": "ce263d140f40b5a3eab03876f5c834ab1351b702f2a7d898ef24e58ab98eff6e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/media/video/runtime/handlers/state/recording-state.ts",
+      "reason": "Pause and resume surround the existing shared history synchronization operation with separate admission and lifecycle transitions. The guard prefix does not own a shared transition.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/background/media/video/runtime/handlers/state/recording-state.ts",
+        "start": 192,
+        "end": 200
+      },
+      "secondFile": {
+        "path": "apps/extension/src/background/media/video/runtime/handlers/state/recording-state.ts",
+        "start": 218,
+        "end": 226
       }
     },
     {
@@ -2758,6 +3010,24 @@
       }
     },
     {
+      "id": "de67006c0e9365fbe0c3c8ab6712c88b086658ccb2dab3379dc0659b2ebade2d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/action-feedback/validation.ts",
+      "reason": "Gesture area bounds now belong to the shared reviewGestureAreaBounds operation. The remaining fragment binds ReviewDetails and ClickNumberRow in Gallery versus InspectorDetails and FeedbackNumber in the editor; host commits remain separate.",
+      "removalCondition": "Remove when this exact pair disappears or the host controls and commit contracts acquire an accepted shared presentation owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/click-animation-fields.tsx",
+        "start": 412,
+        "end": 424
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-fields.tsx",
+        "start": 311,
+        "end": 323
+      }
+    },
+    {
       "id": "ded8371510692f38e45a5d93e074d1862ba1e3fcf4d8c401b360bed23c7a694c",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/editor-resources",
@@ -2791,6 +3061,24 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 58,
         "end": 69
+      }
+    },
+    {
+      "id": "dfa144ecc4fa1b8d8f8dbe032f01c6b4feb34ba62386bbc633a52e2087df262c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/validation/interaction.ts",
+      "reason": "Complete presentation and sparse override parsers share optional leaf checks but enforce different required fields and receiving contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 168,
+        "end": 173
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 183,
+        "end": 188
       }
     },
     {
@@ -2863,6 +3151,24 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
         "start": 51,
         "end": 65
+      }
+    },
+    {
+      "id": "ea5e32fdd67cb0e59adf490dbcc6154a256b2ccf2a48a1e517a223ac3f4e003f",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 483,
+        "end": 497
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 666,
+        "end": 680
       }
     },
     {
@@ -3025,42 +3331,6 @@
         "path": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
         "start": 79,
         "end": 87
-      }
-    },
-    {
-      "id": "fa396eea4c889d5204d9cecd362bd58b46827d0434de2749e25e7a0b8c6f73a6",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor project operations",
-      "reason": "Auto-transform analysis and material insertion independently derive recording lineage for different operations; a shared helper would expose caller-specific asset policy.",
-      "removalCondition": "Remove when recording lineage becomes one domain-owned query contract or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/project/operations/auto-transform.ts",
-        "start": 77,
-        "end": 85
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/project/state/insertion/material-actions.ts",
-        "start": 50,
-        "end": 57
-      }
-    },
-    {
-      "id": "fb45eb5243b04375873c2cab1f2fe59d229c7f9477578953545abe2e509c5807",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-      "reason": "Flat virtualized units and expanded recording-group members already reuse GalleryGridCard; keys, offsets, group controls and containment differ. Another wrapper would merely forward the same card props.",
-      "removalCondition": "Remove when the exact pair disappears or one rendering authority replaces both virtualized insertion contexts.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 579,
-        "end": 584
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 661,
-        "end": 666
       }
     },
     {

@@ -89,3 +89,16 @@ export function quickEditCanvasPreset(
     height: Math.max(2, Math.round((y * unit) / 2) * 2),
   };
 }
+
+/** Recover source bounds from a visible crop; callers own any raster snapping before this operation. */
+export function uncropQuickEditVideoRect(
+  visible: QuickEditRect,
+  crop: QuickEditRect
+): QuickEditRect {
+  return {
+    x: visible.x - (crop.x * visible.width) / crop.width,
+    y: visible.y - (crop.y * visible.height) / crop.height,
+    width: visible.width / crop.width,
+    height: visible.height / crop.height,
+  };
+}

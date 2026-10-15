@@ -24,11 +24,7 @@ it('admits Trash without mutating existing aggregates or their durable object gr
   expect(db.createObjectStore).not.toHaveBeenCalled();
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls.every(([name]) => name === 'schema_contracts')).toBe(true);
-  expect(put).toHaveBeenCalledWith(
-    CURRENT_SCHEMA_CONTRACTS.find((contract) => contract.domainId === 'mediaLibrary')
-  );
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 7 });
-  expect(put).toHaveBeenCalledWith({ domainId: 'videoProjects', schemaVersion: 4 });
+  expect(put.mock.calls.map(([contract]) => contract)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   const migration = DATABASE_MIGRATIONS.find((entry) => entry.fromDatabaseVersion === 3)!;
   expect(await migration.estimateAdditionalBytes()).toBe(64 * 1024);
   expect(migration.risk).toBe('additive');

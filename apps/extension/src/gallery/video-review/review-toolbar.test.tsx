@@ -291,6 +291,7 @@ it('shows the Focus type only while Focus is active and retains the insertion ch
   const root = createRoot(host);
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
   let kind: 'zoom' | 'spotlight' | 'border' | undefined;
   let admitted = true;
   const onToggle = vi.fn();

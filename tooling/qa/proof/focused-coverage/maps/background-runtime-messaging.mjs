@@ -17,6 +17,18 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/background/page-access/readiness.test.ts'],
   },
   {
+    owner: 'background-context-menu-service',
+    productionFile: 'apps/extension/src/background/runtime/context-menu/service.ts',
+    exclusive: true,
+    reason:
+      'Service suites prove menu creation, serialized rebuilds, visibility and listener ownership.',
+    testFiles: [
+      'apps/extension/src/background/runtime/context-menu/service.rebuild.test.ts',
+      'apps/extension/src/background/runtime/context-menu/service.listeners.test.ts',
+      'apps/extension/src/background/runtime/context-menu/service.no-tab.test.ts',
+    ],
+  },
+  {
     owner: 'background-context-menu-messaging',
     productionPrefix: 'apps/extension/src/background/runtime/context-menu/',
     exclusive: true,

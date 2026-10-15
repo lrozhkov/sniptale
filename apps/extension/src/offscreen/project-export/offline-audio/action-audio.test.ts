@@ -115,7 +115,9 @@ it('mixes a surviving release at Speed with native duration and bounded preparat
     .map(([index]) => index);
   expect(nonzero[0]).toBeGreaterThanOrEqual(9600);
   expect(nonzero[0]).toBeLessThanOrEqual(9602);
-  expect(nonzero.at(-1)).toBeLessThan(12000);
+  // Allow sub-millisecond silence and resampling at the native sample boundary.
+  expect((nonzero.at(-1)! - nonzero[0]!) / 48000).toBeCloseTo(7995 / 44100, 3);
+  expect(nonzero.at(-1)).toBeLessThan(Math.ceil((0.2 + 7995 / 44100) * 48000));
   expect(Math.max(...plane.map(Math.abs))).toBeGreaterThan(0);
   expect(Math.max(...plane.map(Math.abs))).toBeLessThanOrEqual(0.0625);
   expect(output.getChannelData(1)).toEqual(plane);

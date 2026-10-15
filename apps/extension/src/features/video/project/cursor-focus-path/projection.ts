@@ -1,5 +1,6 @@
 import {
   simplifyCursorFocusPath,
+  finishCapturedCursorSegment,
   compareCursorFocusKeys,
   insertCursorFocusKey,
   resolveAuthoredCursorFocusPath,
@@ -32,7 +33,7 @@ export function deriveProjectCursorFocusPath(
   appendProjectClickAnchors(segments, occurrences, project);
   appendProjectDwellAnchors(segments, project);
   appendProjectReleaseAnchors(segments, occurrences);
-  finishCapturedCursorSegments(segments);
+  segments.forEach(finishCapturedCursorSegment);
   return simplifyCursorFocusPath(
     {
       version: 1,
@@ -108,29 +109,20 @@ export function resolveProjectCursorFocusSamples(
           visible: true,
         }));
       const binding = segment.binding;
-      return project.clips.flatMap((clip) =>
-        clip.type === 'VIDEO' && (clip.sourceInstanceId ?? clip.id) === binding.sourceInstanceId
-          ? segment.keys
-              .filter(
-                (key) =>
-                  key.time >= clip.sourceStart && key.time <= clip.sourceStart + clip.sourceDuration
-              )
-              .map((key) => ({
-                ...project.cursorTrack?.samples.find((sample) => sample.id === key.id),
-                id: key.id,
-                time: clip.startTime + (key.time - clip.sourceStart) / (clip.playbackRate ?? 1),
-                x: key.x * project.width,
-                y: key.y * project.height,
-                visible: true,
-                sourceAnchor: {
-                  kind: 'recording-source' as const,
-                  recordingId: binding.recordingId,
-                  sourceClipId: clip.id,
-                  sourceTime: key.time,
-                },
-              }))
-          : []
-      );
+      return projectCursorFocusKeyOccurrences(project, segment).map(({ key, clip, time }) => ({
+        ...project.cursorTrack?.samples.find((sample) => sample.id === key.id),
+        id: key.id,
+        time,
+        x: key.x * project.width,
+        y: key.y * project.height,
+        visible: true,
+        sourceAnchor: {
+          kind: 'recording-source' as const,
+          recordingId: binding.recordingId,
+          sourceClipId: clip.id,
+          sourceTime: key.time,
+        },
+      }));
     })
     .sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
 }
@@ -411,17 +403,24 @@ function appendProjectReleaseAnchors(
   }
 }
 
-function finishCapturedCursorSegments(segments: CursorFocusSegment[]): void {
-  for (const segment of segments) {
-    segment.keys.sort(compareCursorFocusKeys);
-    const last = segment.keys.at(-1)!;
-    if (last.time < segment.end)
-      segment.keys.push({
-        ...last,
-        id: `end:${segment.id}`,
-        time: segment.end,
-        anchor: 'boundary',
-      });
-    else if (last.anchor === 'movement') last.anchor = 'boundary';
-  }
+/** Project source keys through matching retained clips, including both source endpoints. */
+export function projectCursorFocusKeyOccurrences(
+  project: VideoProject,
+  segment: CursorFocusSegment
+) {
+  const binding = segment.binding;
+  if (binding.kind !== 'recording-source') return [];
+  return project.clips.flatMap((clip) => {
+    if (clip.type !== 'VIDEO' || (clip.sourceInstanceId ?? clip.id) !== binding.sourceInstanceId)
+      return [];
+    return segment.keys
+      .filter(
+        (key) => key.time >= clip.sourceStart && key.time <= clip.sourceStart + clip.sourceDuration
+      )
+      .map((key) => ({
+        key,
+        clip,
+        time: clip.startTime + (key.time - clip.sourceStart) / (clip.playbackRate ?? 1),
+      }));
+  });
 }

@@ -180,7 +180,7 @@ it('handles recording state and tab routes through the state owner', async () =>
   expect(sendResponse).toHaveBeenCalledWith({
     recordingHealth: 'healthy',
     success: true,
-    state: { status: VideoRecordingStatus.IDLE, duration: 0 },
+    state: { status: VideoRecordingStatus.IDLE, duration: 0, completion: null },
   });
 
   expect(handleRecordingTabId(sendResponse, 17)).toEqual({

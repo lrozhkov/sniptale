@@ -41,14 +41,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       - name: Authenticate image cleanup
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: echo "$GH_TOKEN" | docker login ghcr.io --username '${{ github.actor }}' --password-stdin
       - name: Delete expired images
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: node tooling/ci/candidate-image-maintenance.mjs apply
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: candidate-image-sweep-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -94,7 +94,7 @@ jobs:
             }' > build/selectel-controller/sweep.json
           fi
           exit "$status"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: selectel-sweep-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -135,7 +135,7 @@ jobs:
             --env RUNNER_CONTROLLER_TOKEN \
             --env GITHUB_RUN_ID="$RECOVERY_RUN_ID" --env GITHUB_RUN_ATTEMPT="$RECOVERY_RUN_ATTEMPT" \
             "$CONTROLLER_IMAGE" recover-cleanup /workspace/build/selectel-controller/recovery.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: selectel-recovery-${{ inputs.recovery_run_id }}-${{ inputs.recovery_run_attempt }}-${{ github.run_id }}
@@ -156,7 +156,7 @@ jobs:
       - uses: ./.github/actions/setup-locked-node
       - name: Report dependency updates
         run: node tooling/ci/dependency-freshness.mjs > build/dependency-freshness.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-freshness-${{ github.sha }}-${{ github.run_id }}
           path: build/dependency-freshness.json

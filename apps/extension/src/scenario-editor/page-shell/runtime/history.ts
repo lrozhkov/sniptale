@@ -4,8 +4,10 @@ import {
   type GuideStructureOperation,
 } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
-import { selectHistoryRetentionWindow } from '@sniptale/foundation/history/retention';
+import {
+  EDITOR_HISTORY_LIMITS,
+  selectEditorSnapshotWindow,
+} from '../../../features/editor-history/policy';
 
 const HISTORY_LIMIT = EDITOR_HISTORY_LIMITS.maxActions;
 /** Page-local disposable undo state; persisted revisions remain owned by scenario persistence. */
@@ -47,16 +49,7 @@ function guideActionIdentity(state: GuideHistory, actionId?: string): GuideHisto
 function retainGuideHistory(state: GuideHistory): GuideHistory {
   if (!state.present) return state;
   const snapshots = [...state.past, state.present, ...state.future];
-  let bytes = 0;
-  const cumulative = snapshots.map(
-    (snapshot) => (bytes += new TextEncoder().encode(JSON.stringify(snapshot)).byteLength)
-  );
-  const window = selectHistoryRetentionWindow(
-    snapshots.slice(0, -1).map(() => ({ actions: 1, bytes: 0 })),
-    state.past.length,
-    EDITOR_HISTORY_LIMITS,
-    (start, end) => cumulative[end]! - (cumulative[start - 1] ?? 0)
-  );
+  const window = selectEditorSnapshotWindow(snapshots, state.past.length);
   const past = window.start === 0 ? state.past : snapshots.slice(window.start, state.past.length);
   const future =
     window.end === snapshots.length - 1

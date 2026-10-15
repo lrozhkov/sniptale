@@ -137,8 +137,8 @@ it.each(['same', 'advance-failure', 'advance-success', 'advance-two-failures'] a
     );
     await started;
     const advanced = mode !== 'same';
-    if (advanced) graphs[0]!.currentTime = 0.2;
-    const nextArgs = { ...args, currentTime: advanced ? 1.1 : 0.9 };
+    if (advanced) graphs[0]!.currentTime = 0.3;
+    const nextArgs = { ...args, currentTime: advanced ? 1.2 : 0.9 };
     let completed = false;
     const second = runtime.sync(nextArgs).then(
       () => {
@@ -157,10 +157,7 @@ it.each(['same', 'advance-failure', 'advance-success', 'advance-two-failures'] a
       successful
         ? new Response(
             await readFile(
-              new URL(
-                '../../../../../public/action-sounds/v2/mouse-classic-down.wav',
-                import.meta.url
-              )
+              new URL('../../../../../public/action-sounds/v1/mouse-click.wav', import.meta.url)
             )
           )
         : new Response('', { status: 503 })
@@ -168,17 +165,17 @@ it.each(['same', 'advance-failure', 'advance-success', 'advance-two-failures'] a
     const failures = await Promise.all([first, second]);
     if (advanced) {
       expect(nodes).toHaveLength(0);
-      graphs[0]!.currentTime = 0.21;
-      const following = runtime.sync({ ...nextArgs, currentTime: 1.11 });
+      graphs[0]!.currentTime = 0.31;
+      const following = runtime.sync({ ...nextArgs, currentTime: 1.21 });
       if (successful) await following;
       else await expect(following).rejects.toThrow();
       expect(fetchSample).toHaveBeenCalledTimes(multiple ? 2 : 1);
       if (multiple) {
-        graphs[0]!.currentTime = 0.22;
-        await expect(runtime.sync({ ...nextArgs, currentTime: 1.12 })).rejects.toThrow();
+        graphs[0]!.currentTime = 0.32;
+        await expect(runtime.sync({ ...nextArgs, currentTime: 1.22 })).rejects.toThrow();
         expect(nodes).toHaveLength(1);
-        graphs[0]!.currentTime = 0.23;
-        await expect(runtime.sync({ ...nextArgs, currentTime: 1.13 })).rejects.toThrow();
+        graphs[0]!.currentTime = 0.33;
+        await expect(runtime.sync({ ...nextArgs, currentTime: 1.23 })).rejects.toThrow();
         expect(fetchSample).toHaveBeenCalledTimes(3);
       }
       runtime.reset();
@@ -237,7 +234,8 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
   expect(nodes).toHaveLength(1);
   expect(nodes[0]!.playbackRate.value).toBe(1);
   expect(nodes[0]!.start.mock.calls[0]![0]).toBeCloseTo(0.1, 12);
-  expect(nodes[0]!.start.mock.calls[0]!.slice(1)).toEqual([0, 0.07000000000000006]);
+  expect(nodes[0]!.start.mock.calls[0]![1]).toBe(0);
+  expect(nodes[0]!.start.mock.calls[0]![2]).toBeCloseTo(7995 / 44100, 12);
   graphs.at(-1)!.currentTime = 0.11;
   await sync({ plan: structuredClone(plan), currentTime: 1.01, isPlaying: true });
   expect(graphs.at(-1)!.close).not.toHaveBeenCalled();
@@ -246,7 +244,7 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
   await sync({ plan, currentTime: 3.9, isPlaying: true });
   expect(nodes).toHaveLength(2);
   expect(nodes[1]!.start.mock.calls[0]![1]).toBe(0);
-  expect(nodes[1]!.start.mock.calls[0]![2]).toBeCloseTo(0.05, 12);
+  expect(nodes[1]!.start.mock.calls[0]![2]).toBeCloseTo(7995 / 44100, 12);
   await sync({ plan, currentTime: 3.9, isPlaying: false });
   expect(nodes[1]!.stop).toHaveBeenCalledTimes(2);
   await close();

@@ -524,12 +524,12 @@ it('toggles the same Gallery video once per press, consumes holds and keeps reje
       this.dispatchEvent(new Event('play'));
       return Promise.resolve();
     });
-  const pause = vi
-    .mocked(HTMLMediaElement.prototype.pause)
-    .mockImplementation(function (this: HTMLMediaElement) {
-      Object.defineProperty(this, 'paused', { configurable: true, value: true });
-      this.dispatchEvent(new Event('pause'));
-    });
+  const pause = vi.mocked(HTMLMediaElement.prototype.pause).mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: true });
+    this.dispatchEvent(new Event('pause'));
+  });
   act(() => root.render(<PreviewVideo src="blob:clip" spacePlayback="enabled" />));
   const action = document.createElement('input');
   action.type = 'checkbox';

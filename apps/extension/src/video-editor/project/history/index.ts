@@ -5,8 +5,10 @@ import type {
   VideoEditorProjectHistoryError,
   VideoEditorProjectHistoryTransactionLease,
 } from '../../contracts/commands/history';
-import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
-import { selectHistoryRetentionWindow } from '@sniptale/foundation/history/retention';
+import {
+  EDITOR_HISTORY_LIMITS,
+  selectEditorSnapshotWindow,
+} from '../../../features/editor-history/policy';
 
 /** Maximum number of project-edit actions retained for undo in the active editor session. */
 export const VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT = EDITOR_HISTORY_LIMITS.maxActions;
@@ -16,16 +18,7 @@ function retainProjectHistory(
   current: VideoEditorHistorySnapshot
 ) {
   const snapshots = [...history.past, current, ...history.future];
-  let bytes = 0;
-  const cumulative = snapshots.map(
-    (snapshot) => (bytes += new TextEncoder().encode(JSON.stringify(snapshot)).byteLength)
-  );
-  const window = selectHistoryRetentionWindow(
-    snapshots.slice(0, -1).map(() => ({ actions: 1, bytes: 0 })),
-    history.past.length,
-    EDITOR_HISTORY_LIMITS,
-    (start, end) => cumulative[end]! - (cumulative[start - 1] ?? 0)
-  );
+  const window = selectEditorSnapshotWindow(snapshots, history.past.length);
   return {
     ...history,
     past: snapshots.slice(window.start, history.past.length),

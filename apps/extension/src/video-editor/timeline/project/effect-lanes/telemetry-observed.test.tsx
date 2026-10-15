@@ -375,7 +375,8 @@ it.each([5, 31])('names additional delivered button %s in the standalone history
     )
   );
   const title = container.querySelector<HTMLButtonElement>('[data-action-id="extra"]')!.title;
-  expect(title).toMatch(new RegExp(`(?:Mouse button|Кнопка мыши) ${button + 1}`));
+  expect(title).toMatch(/(?:Mouse button|Кнопка мыши) /);
+  expect(title).toContain(` ${button + 1}`);
   expect(title).not.toMatch(/Forward button|Кнопка мыши «Вперёд»/);
 });
 

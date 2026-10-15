@@ -55,6 +55,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
     !unavailable &&
     !props.placeholder;
   const locked = !!(track && controls?.ui.lockedTracks?.[track]);
+  const muted = !!props.muted || !!(track && controls && !enabled);
   const visible =
     !(props.placeholder && !controls?.configuring) &&
     !(track && controls && !controls.configuring && !enabled);
@@ -62,7 +63,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
   if (!visible) return null;
   const header = (
     <ReviewTrackHeader
-      row={props}
+      row={{ ...props, muted }}
       controls={controls}
       enabled={enabled}
       locked={locked}
@@ -74,12 +75,13 @@ export function ReviewTrackRow(props: TrackRowProps) {
       ref={placement.body}
       data-review-track={track}
       data-review-track-locked={locked}
-      data-review-track-muted={props.muted ? 'true' : 'false'}
-      className={
+      data-review-track-muted={muted ? 'true' : 'false'}
+      className={[
         placement.header
           ? 'grid grid-cols-1'
-          : 'grid grid-cols-[var(--review-track-gutter,192px)_minmax(0,1fr)]'
-      }
+          : 'grid grid-cols-[var(--review-track-gutter,192px)_minmax(0,1fr)]',
+        track && track !== 'source' ? 'mt-1' : '',
+      ].join(' ')}
     >
       {placement.header ? createPortal(header, placement.header) : header}
       <div data-review-track-content className="relative min-w-0">

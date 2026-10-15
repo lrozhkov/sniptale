@@ -751,17 +751,17 @@ it('shows navigation primary text directly in a compact centered composition', a
 
 it('keeps every navigation link reachable across unequal text page heights', async () => {
   const { player, root } = await mount();
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      const text = this.querySelector<HTMLElement>('.tour-navigation-text');
-      const textHeight = text?.style.height
-        ? parseFloat(text.style.height)
-        : (text?.textContent?.length ?? 0) > 80
-          ? 96
-          : 20;
-      return new DOMRect(0, 0, 400, this.matches('.tour-navigation-content') ? 40 + textHeight : 0);
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    const text = this.querySelector<HTMLElement>('.tour-navigation-text');
+    const textHeight = text?.style.height
+      ? parseFloat(text.style.height)
+      : (text?.textContent?.length ?? 0) > 80
+        ? 96
+        : 20;
+    return new DOMRect(0, 0, 400, this.matches('.tour-navigation-content') ? 40 + textHeight : 0);
+  });
   const tour = createTourDocument('tour');
   tour.slides = [
     {

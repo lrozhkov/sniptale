@@ -215,7 +215,8 @@ export async function probe(source: string, historyLength = 1190) {
         : null,
       longTasks,
       limitation:
-        'Native IndexedDB and actual storage owner; synthetic source metadata. No editor UI/input, playback or OPFS availability assertion.',
+        'Native IndexedDB and actual storage owner; synthetic source metadata. No editor ' +
+        'UI/input, playback or OPFS availability assertion.',
     };
   } finally {
     observer.disconnect();

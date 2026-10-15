@@ -263,7 +263,7 @@ beforeEach(() => {
   mocks.failWrite.mockReset();
 });
 
-it('removes the obsolete exclusive review graph and journals its bytes on replace', async () => {
+it('retains independent quick-edit projects and their bytes on root replacement', async () => {
   const metadata = portableMetadata(true);
   const tables = installDatabase(metadata, false, true);
   await mediaLibraryRootPublisher.publish({
@@ -286,31 +286,18 @@ it('removes the obsolete exclusive review graph and journals its bytes on replac
 
   for (const entry of oldReviewAssets) {
     const aggregateId = `project-asset:${entry.id}`;
-    expect(tables.get('project_assets')?.has(entry.id)).toBe(false);
-    expect(tables.get('media_library')?.has(aggregateId)).toBe(false);
-    expect(tables.get('video_workspaces')?.has(aggregateId)).toBe(false);
-    expect(
-      [...tables.get('video_workspace_history')!.values()]
-        .filter(isRecord)
-        .some((row) => row['aggregateId'] === aggregateId)
-    ).toBe(false);
-    expect(tables.get('video_workspace_drafts')?.has(aggregateId)).toBe(false);
-    expect(
-      [...(tables.get('asset_owners')?.values() ?? [])].some(
-        (value) =>
-          typeof value === 'object' &&
-          value !== null &&
-          (value as Record<string, unknown>)['ownerId'] === entry.id
-      )
-    ).toBe(false);
-    expect(tables.get('asset_refs')?.has(entry.assetId)).toBe(false);
+    expect(tables.get('project_assets')?.get(entry.id)).toEqual(entry);
+    expect(tables.get('video_workspaces')?.has(aggregateId)).toBe(true);
+    expect(tables.get('video_workspace_drafts')?.has(aggregateId)).toBe(true);
+    expect(tables.get('asset_refs')?.has(entry.assetId)).toBe(true);
+    expect(tables.get('asset_owners')?.has(String(['project-asset', entry.id, 'body']))).toBe(true);
   }
-  expect(mocks.completeDelete).toHaveBeenCalledWith(
-    expect.objectContaining({
-      assetIds: expect.arrayContaining(oldReviewAssets.map((entry) => entry.assetId)),
-    }),
-    undefined
-  );
+  for (const entry of oldReviewAssets) {
+    expect(mocks.completeDelete).not.toHaveBeenCalledWith(
+      expect.objectContaining({ assetIds: expect.arrayContaining([entry.assetId]) }),
+      undefined
+    );
+  }
 });
 
 it('preserves independently published auxiliary materials when replacing their former review root', async () => {
@@ -409,7 +396,7 @@ it('retains the auxiliaries of an independently retained review source', async (
   expect(tables.get('asset_refs')?.has('old-music-bytes')).toBe(true);
 });
 
-it('reclaims nested private resources before replacing their source workspace', async () => {
+it('retains an independent quick-edit project and its nested resources on replacement', async () => {
   const metadata = portableMetadata(true);
   const tables = installDatabase(metadata);
   for (const entry of oldReviewAssets)
@@ -452,8 +439,9 @@ it('reclaims nested private resources before replacing their source workspace', 
     session: session('replace'),
     staged: stagedObjects(),
   });
-  expect(tables.get('project_assets')?.has('nested')).toBe(false);
-  expect(tables.get('asset_refs')?.has('nested-bytes')).toBe(false);
+  expect(tables.get('project_assets')?.has('nested')).toBe(true);
+  expect(tables.get('asset_refs')?.has('nested-bytes')).toBe(true);
+  expect(tables.get('video_workspaces')?.has(workspace.aggregateId)).toBe(true);
 });
 
 it('aborts replacement after a failed publication write and preserves the original graph', async () => {

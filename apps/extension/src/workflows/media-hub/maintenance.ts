@@ -3,11 +3,30 @@ import type { MaintenanceLogOperation } from '../../composition/persistence/libr
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
+import { tryAssetResourceCleanup } from '../../composition/persistence/assets/resource-sessions';
 
 const maintenanceLog = createMaintenanceLog();
 const logger = createLogger({ namespace: 'LibraryAssetMaintenance' });
 /** Cancellable housekeeping runs after rendering; never join it from capture or snapshot reads. */
 export async function maintainLibraryAssets(
+  signal: AbortSignal,
+  onTrashCleanupFailure?: () => void
+): Promise<void> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  if (!locks) {
+    if (typeof chrome === 'undefined') await runLibraryMaintenance(signal, onTrashCleanupFailure);
+    return;
+  }
+  await locks.request(
+    'sniptale:library-maintenance',
+    { mode: 'exclusive', ifAvailable: true },
+    async (lock) => {
+      if (lock) await runLibraryMaintenance(signal, onTrashCleanupFailure);
+    }
+  );
+}
+
+async function runLibraryMaintenance(
   signal: AbortSignal,
   onTrashCleanupFailure?: () => void
 ): Promise<void> {
@@ -122,6 +141,8 @@ export async function maintainLibraryAssets(
   for (const [operation, step] of steps) {
     await new Promise<void>((resolve) => setTimeout(resolve, 16));
     if (signal.aborted) return;
+    if (operation !== 'publication-recovery' && !(await tryAssetResourceCleanup(async () => true)))
+      continue;
     const started = performance.now();
     void maintenanceLog.append({ operation, code: 'started' });
     try {

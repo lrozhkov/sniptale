@@ -229,9 +229,8 @@ for (const [width, height, locale, theme] of [
           await key.click();
           await expect(key).toHaveAttribute('aria-pressed', 'true');
           await expect(click).toBeVisible();
-          await expect(row.locator('[data-action-id=hold]')).toHaveAttribute(
-            'title',
-            new RegExp(translate('videoEditor.timeline.historyHold', locale))
+          expect(await row.locator('[data-action-id=hold]').getAttribute('title')).toContain(
+            translate('videoEditor.timeline.historyHold', locale)
           );
           expect((await click.boundingBox())!.y - (await key.boundingBox())!.y).toBe(28);
           await key.focus();

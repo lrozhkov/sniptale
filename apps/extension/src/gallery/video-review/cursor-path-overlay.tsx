@@ -1,3 +1,4 @@
+import { resolveCursorFocusHandle } from '../../ui/cursor-focus-control-layout';
 import { useState, useEffect, useRef } from 'react';
 import { translate } from '../../platform/i18n';
 import { layoutCursorFocusControls } from '../../ui/cursor-focus-control-layout';
@@ -283,18 +284,14 @@ function beginReviewCursorGesture(
         event.clientX - rect.left - position.x * rect.width,
         event.clientY - rect.top - position.y * rect.height
       );
-    const candidates = (['incoming', 'outgoing'] as const)
-      .filter((name) => controls[name] !== undefined)
-      .map((name) => ({ name, distance: distance(controls[name]!) }))
-      .filter((item) => item.distance <= 14)
-      .toSorted((a, b) => a.distance - b.distance);
-    const activated = candidates.find((item) => item.name === handle);
-    handle =
-      candidates[0] && candidates[0].distance < distance(selected)
-        ? activated && Math.abs(activated.distance - candidates[0].distance) < 0.01
-          ? handle
-          : candidates[0].name
-        : undefined;
+    handle = resolveCursorFocusHandle(
+      {
+        incoming: controls.incoming ? distance(controls.incoming) : undefined,
+        outgoing: controls.outgoing ? distance(controls.outgoing) : undefined,
+      },
+      distance(selected),
+      handle
+    );
   }
   if (!handle && props.onSelect && props.selectedKeyId !== key.id) {
     event.preventDefault();

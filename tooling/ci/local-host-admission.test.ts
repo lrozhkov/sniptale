@@ -40,9 +40,11 @@ export function resolveLocalExecutionEnvironmentIdentity() { return { kind: 'hos
     'tooling/ci/seal-lane-artifacts.mjs',
     `${mark}
 export function sealLaneArtifacts() {
-  const ticket = JSON.parse(fs.readFileSync(${JSON.stringify(queueRoot)} + '/' + process.env.SNIPTALE_QA_HOST_QUEUE_TICKET, 'utf8'));
+  const ticketPath = ${JSON.stringify(queueRoot)} + '/' + process.env.SNIPTALE_QA_HOST_QUEUE_TICKET;
+  const ticket = JSON.parse(fs.readFileSync(ticketPath, 'utf8'));
   const lock = JSON.parse(fs.readFileSync('.tmp/qa/locks/blocking-wrapper.lock.json', 'utf8'));
-  if (ticket.pid !== process.pid || !ticket.admitted || ticket.released || lock.pid !== process.pid) throw new Error('CI released its slots before sealing.');
+  if (ticket.pid !== process.pid || !ticket.admitted || ticket.released || lock.pid !== process.pid)
+    throw new Error('CI released its slots before sealing.');
   mark('seal'); return true;
 }`
   );
@@ -65,7 +67,10 @@ export function sealLaneArtifacts() {
     root,
     'tooling/ci/qa-composition.mjs',
     `${mark}
-const collect = ({ session }) => { mark('gate:' + fs.readFileSync('candidate.txt', 'utf8')); return { steps: [], context: { scope: 'workspace' } }; };
+const collect = ({ session }) => {
+  mark('gate:' + fs.readFileSync('candidate.txt', 'utf8'));
+  return { steps: [], context: { scope: 'workspace' } };
+};
 export const collectCiProofResults = collect;
 export const collectCiReleaseResults = collect;
 `
@@ -91,7 +96,9 @@ export const collectCiReleaseResults = collect;
     `
 import { acquireHostQaSlot as acquire } from ${JSON.stringify(queueUrl)};
 export { HOST_QUEUE_TICKET_ENV } from ${JSON.stringify(queueUrl)};
-export function acquireHostQaSlot(id, options) { return acquire(id, { ...options, sharedRoot: ${JSON.stringify(queueRoot)} }); }
+export function acquireHostQaSlot(id, options) {
+  return acquire(id, { ...options, sharedRoot: ${JSON.stringify(queueRoot)} });
+}
 `
   );
   writeFile(
@@ -100,7 +107,15 @@ export function acquireHostQaSlot(id, options) { return acquire(id, { ...options
     `
 import { runObservedWrapper as run } from ${JSON.stringify(runnerUrl)};
 import { acquireHostQaSlot } from ${JSON.stringify(queueUrl)};
-export function runObservedWrapper(options) { return run({ contractValidator: () => {}, hostSlotFactory: (id, options) => acquireHostQaSlot(id, { ...options, sharedRoot: ${JSON.stringify(queueRoot)} }), ...options }); }
+export function runObservedWrapper(options) {
+  return run({
+    contractValidator: () => {},
+    hostSlotFactory: (id, options) => acquireHostQaSlot(id, {
+      ...options, sharedRoot: ${JSON.stringify(queueRoot)}
+    }),
+    ...options
+  });
+}
 `
   );
   writeFile(
@@ -110,10 +125,25 @@ export function runObservedWrapper(options) { return run({ contractValidator: ()
 export function prepareLocalFastProofAdmission() {
   mark('admission');
   const proofRoot = process.cwd() + '/.tmp/inherited';
-  const admission = { artifactKind: 'sniptale-fast-proof-admission', outcome: 'admitted', candidateTree: process.env.SNIPTALE_CANDIDATE_TREE, commit: process.env.SNIPTALE_CANDIDATE_SHA, executionEnvironment: { kind: 'host-wsl', digest: 'sha256:' + 'a'.repeat(64) }, workspaceMode: 'local-workspace', proofRoot };
-  for (const file of ['unit-proof.json', 'coverage-proof.json']) { const dest = proofRoot + '/.tmp/qa/' + file; fs.mkdirSync(dest.slice(0, dest.lastIndexOf('/')), { recursive: true }); fs.writeFileSync(dest, '{}'); }
-  for (const file of ['coverage-final.json', 'coverage-summary.json', 'lcov.info', 'html/index.html']) { const dest = proofRoot + '/.tmp/coverage/canonical/' + file; fs.mkdirSync(dest.slice(0, dest.lastIndexOf('/')), { recursive: true }); fs.writeFileSync(dest, '{}'); }
-  const admissionPath = process.cwd() + '/.tmp/admission.json'; fs.writeFileSync(admissionPath, JSON.stringify(admission)); return { admission, admissionPath };
+  const admission = {
+    artifactKind: 'sniptale-fast-proof-admission', outcome: 'admitted',
+    candidateTree: process.env.SNIPTALE_CANDIDATE_TREE, commit: process.env.SNIPTALE_CANDIDATE_SHA,
+    executionEnvironment: { kind: 'host-wsl', digest: 'sha256:' + 'a'.repeat(64) },
+    workspaceMode: 'local-workspace', proofRoot
+  };
+  for (const file of ['unit-proof.json', 'coverage-proof.json']) {
+    const dest = proofRoot + '/.tmp/qa/' + file;
+    fs.mkdirSync(dest.slice(0, dest.lastIndexOf('/')), { recursive: true });
+    fs.writeFileSync(dest, '{}');
+  }
+  for (const file of ['coverage-final.json', 'coverage-summary.json', 'lcov.info', 'html/index.html']) {
+    const dest = proofRoot + '/.tmp/coverage/canonical/' + file;
+    fs.mkdirSync(dest.slice(0, dest.lastIndexOf('/')), { recursive: true });
+    fs.writeFileSync(dest, '{}');
+  }
+  const admissionPath = process.cwd() + '/.tmp/admission.json';
+  fs.writeFileSync(admissionPath, JSON.stringify(admission));
+  return { admission, admissionPath };
 }
 `
   );
