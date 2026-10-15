@@ -240,9 +240,7 @@ it('projects visible keys and authors absolute times once in a scrolled timeline
   );
   expect(host.querySelector('[data-cursor-focus-key="before"]')).toBeNull();
   expect(host.querySelector('[data-cursor-focus-key="after"]')).toBeNull();
-  expect(host.querySelector<HTMLElement>('[data-cursor-focus-key="visible"]')!.style.left).toBe(
-    '196px'
-  );
+  expect(host.querySelector('[data-cursor-focus-key="visible"]')).toBeNull();
   vi.spyOn(
     host.querySelector('[data-ui="cursorFocusPath.timelineKeys"]')!,
     'getBoundingClientRect'
@@ -260,6 +258,11 @@ it('projects visible keys and authors absolute times once in a scrolled timeline
   const row = host.querySelector<HTMLButtonElement>(
     'button[title="videoEditor.sidebar.cursorFocusRowHint"]'
   )!;
+  act(() => row.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 300 })));
+  expect(useVideoEditorStore.getState().currentTime).toBe(6);
+  expect(host.querySelector<HTMLElement>('[data-cursor-focus-key="visible"]')!.style.left).toBe(
+    '194px'
+  );
   act(() =>
     row.dispatchEvent(
       new MouseEvent('dblclick', {

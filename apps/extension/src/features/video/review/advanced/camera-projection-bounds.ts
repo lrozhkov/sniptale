@@ -197,22 +197,20 @@ function reciprocal(a: ProjectionJet) {
   return unary(a, value, [negative(square), times([2, 2], cube), times([-6, -6], fourth)]);
 }
 
+function trajectoryIntervalBounds(trajectory: CameraTrajectory, start: number, end: number) {
+  return ([0, 1, 2, 3] as const).map((order) =>
+    cameraTrajectoryBounds(trajectory, start, end, order)
+  );
+}
+
 function trajectoryJet(
-  trajectory: CameraTrajectory,
+  bounds: readonly CameraPanBounds[],
   axis: 'x' | 'y',
-  start: number,
-  end: number,
   follow = false
 ): ProjectionJet {
-  const values = [0, 1, 2, 3].map((order) => {
-    const bounds = cameraTrajectoryBounds(
-      trajectory,
-      start,
-      end,
-      order === 0 ? 0 : order === 1 ? 1 : order === 2 ? 2 : 3
-    );
-    return axis === 'x' ? range(bounds.minX, bounds.maxX) : range(bounds.minY, bounds.maxY);
-  });
+  const values = bounds.map((value) =>
+    axis === 'x' ? range(value.minX, value.maxX) : range(value.minY, value.maxY)
+  );
   const derivatives: Derivatives = [values[1]!, values[2]!, values[3]!];
   return {
     value: values[0]!,
@@ -268,22 +266,22 @@ function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boo
   const phaseBounds =
     typeof input.phase === 'number'
       ? null
-      : cameraTrajectoryBounds(input.phase, input.start, input.end);
+      : motion
+        ? trajectoryIntervalBounds(input.phase, input.start, input.end)
+        : [cameraTrajectoryBounds(input.phase, input.start, input.end)];
   const g =
     typeof input.phase === 'number'
       ? constant(input.phase)
       : motion
-        ? trajectoryJet(input.phase, 'x', input.start, input.end)
-        : boxed([phaseBounds!.minX, phaseBounds!.maxX]);
-  const pan = (axis: 'x' | 'y') =>
+        ? trajectoryJet(phaseBounds!, 'x')
+        : boxed([phaseBounds![0]!.minX, phaseBounds![0]!.maxX]);
+  const panBounds =
     motion && input.trajectory
-      ? trajectoryJet(
-          input.trajectory,
-          axis,
-          input.start,
-          input.end,
-          typeof input.phase !== 'number'
-        )
+      ? trajectoryIntervalBounds(input.trajectory, input.start, input.end)
+      : null;
+  const pan = (axis: 'x' | 'y') =>
+    panBounds
+      ? trajectoryJet(panBounds, axis, typeof input.phase !== 'number')
       : boxed(axis === 'x' ? [input.pan.minX, input.pan.maxX] : [input.pan.minY, input.pan.maxY]);
   const startScale = input.from?.scale ?? 1;
   const translation = (axis: 'x' | 'y') => {
@@ -371,6 +369,23 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
   const qx = cameraRasterCoordinate(input, motion, jets, 'x'),
     qy = cameraRasterCoordinate(input, motion, jets, 'y');
   if (qx.value[0] > qx.value[1] || qy.value[0] > qy.value[1]) return null;
+  if (
+    input.perspective.rotateX === 0 &&
+    input.perspective.rotateY === 0 &&
+    input.perspective.rotateZ === 0 &&
+    (!input.from ||
+      (input.from.perspective.rotateX === 0 &&
+        input.from.perspective.rotateY === 0 &&
+        input.from.perspective.rotateZ === 0))
+  ) {
+    return {
+      qx,
+      qy,
+      denominator: constant(1),
+      outX: unrotatedOutputCoordinate(input, motion, jets, 'x'),
+      outY: unrotatedOutputCoordinate(input, motion, jets, 'y'),
+    };
+  }
   const angle = (axis: 'rotateX' | 'rotateY' | 'rotateZ') => {
     const start = input.from?.perspective[axis] ?? 0;
     const delta = input.perspective[axis] - start;
@@ -405,23 +420,6 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
   );
   const inverseDenominator = reciprocal(denominator);
   if (!inverseDenominator) return null;
-  if (
-    input.perspective.rotateX === 0 &&
-    input.perspective.rotateY === 0 &&
-    input.perspective.rotateZ === 0 &&
-    (!input.from ||
-      (input.from.perspective.rotateX === 0 &&
-        input.from.perspective.rotateY === 0 &&
-        input.from.perspective.rotateZ === 0))
-  ) {
-    return {
-      qx,
-      qy,
-      denominator,
-      outX: unrotatedOutputCoordinate(input, motion, jets, 'x'),
-      outY: unrotatedOutputCoordinate(input, motion, jets, 'y'),
-    };
-  }
   const center = (origin: number, size: number, translation: ProjectionJet) =>
     add(subtract(constant(origin), multiply(weight, translation)), multiply(k, constant(size / 2)));
   const outX = add(

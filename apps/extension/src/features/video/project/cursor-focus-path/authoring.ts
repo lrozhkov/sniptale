@@ -266,6 +266,14 @@ export function addReviewCursorFocusKey(
     duration,
     ...path.segments.filter((item) => item.start >= bounded).map((item) => item.start)
   );
+  const before = path.segments
+    .filter((item) => item.end <= bounded)
+    .sort((a, b) => b.end - a.end)[0];
+  const after = path.segments
+    .filter((item) => item.start >= bounded)
+    .sort((a, b) => a.start - b.start)[0];
+  const point = (before && evaluateCursorFocusSegment(before, before.end, path.smoothing)) ||
+    (after && evaluateCursorFocusSegment(after, after.start, path.smoothing)) || { x: 0.5, y: 0.5 };
   return {
     ...path,
     segments: [
@@ -275,7 +283,9 @@ export function addReviewCursorFocusKey(
         binding: { kind: 'project' },
         start,
         end,
-        keys: [{ id, time: bounded, x: 0.5, y: 0.5, anchor: 'manual', interpolation: 'smooth' }],
+        keys: [
+          { id, time: bounded, x: point.x, y: point.y, anchor: 'manual', interpolation: 'smooth' },
+        ],
       },
     ],
   };
@@ -345,4 +355,30 @@ export function finishCapturedCursorSegment(segment: CursorFocusSegment): void {
   if (last.time < segment.end)
     segment.keys.push({ ...last, id: `end:${segment.id}`, time: segment.end, anchor: 'boundary' });
   else if (last.anchor === 'movement') last.anchor = 'boundary';
+}
+
+/** Moving a recorded occurrence creates a sparse manual correction and retains the recording. */
+export function moveCursorFocusTimelineKey(
+  path: CursorFocusPath,
+  key: CursorFocusKey & { segmentId: string },
+  time: number
+): { path: CursorFocusPath; id: string; time: number } {
+  const segment = path.segments.find((item) => item.id === key.segmentId);
+  if (!segment) return { path, id: key.id, time: key.time };
+  const bounded = Math.max(segment.start, Math.min(segment.end, time));
+  if (key.anchor === 'manual' || (key.anchor === 'movement' && key.authored))
+    return {
+      path: updateCursorFocusKey(path, key.id, { time: bounded }),
+      id: key.id,
+      time: bounded,
+    };
+  const id = cursorFocusOverrideId(key.id);
+  const existing = segment.keys.find((item) => item.id === id);
+  return {
+    path: existing
+      ? updateCursorFocusKey(path, id, { time: bounded })
+      : insertCursorFocusKey(path, segment.id, { id, time: bounded, x: key.x, y: key.y }),
+    id,
+    time: bounded,
+  };
 }

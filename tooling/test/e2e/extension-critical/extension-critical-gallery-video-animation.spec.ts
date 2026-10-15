@@ -120,14 +120,14 @@ for (const variant of [
         .first();
       const end = (await block.locator('[data-zoom-edge="end"]').boundingBox())!;
       const blockBox = (await block.boundingBox())!;
-      await page.keyboard.down('Shift');
+      await page.keyboard.down('Alt');
       await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2);
       await page.mouse.down();
       await page.mouse.move(blockBox.x + blockBox.width * 0.63, end.y + end.height / 2, {
         steps: 8,
       });
       await page.mouse.up();
-      await page.keyboard.up('Shift');
+      await page.keyboard.up('Alt');
       await expect
         .poll(async () => (await persistedFocus(page))?.enter.duration)
         .toBeLessThan(before.enter.duration);

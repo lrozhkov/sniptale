@@ -655,7 +655,7 @@ it.each([true, false])(
   }
 );
 
-it('changes a master and its legacy flag atomically while retaining locked content and Undo', async () => {
+it('changes a master atomically while content Undo preserves lane membership', async () => {
   const snapshot = initial();
   snapshot.workspace.advanced.ui.mode = 'advanced';
   const write = vi.fn(async () => snapshot);
@@ -679,7 +679,7 @@ it('changes a master and its legacy flag atomically while retaining locked conte
   expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(true);
   await session.history('undo');
   expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(false);
-  expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.actions).toBe(false);
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.actions).toBe(true);
   await session.history('redo');
   expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.actions).toBe(true);
   expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(true);

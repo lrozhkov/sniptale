@@ -260,6 +260,7 @@ it('joins every editor buffer for either recognition source and guards related-t
         busy: false,
         playing: false,
         cursorFocusPath: path,
+        cursorFocusKeys: [],
         setCursorFocusPath: changePath,
         selectCursorFocusKey: selectKey,
       },

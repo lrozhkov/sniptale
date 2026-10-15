@@ -44,6 +44,7 @@ type PreviewState = Pick<
   setCursorFocusPath?: EditorState['setCursorFocusPath'];
   selectCursorFocusKey?: EditorState['selectCursorFocusKey'];
   cursorFocusPath?: EditorState['cursorFocusPath'];
+  cursorFocusKeys?: EditorState['cursorFocusKeys'];
   annotationEffects?: EditorState['annotationEffects'];
   activeSelection?: EditorState['activeSelection'];
   text: Pick<EditorState['text'], 'jump'>;
@@ -405,6 +406,10 @@ function reviewCursorPathOverlayBinding(
             state.advanced.cursorFocusPath
           ),
         time: state.time,
+        recordedKey: state.cursorFocusKeys?.find(
+          (key) =>
+            state.activeSelection?.kind === 'cursor-focus' && key.id === state.activeSelection.id
+        ),
         ...(state.activeSelection?.kind === 'cursor-focus'
           ? { selectedKeyId: state.activeSelection.id }
           : {}),

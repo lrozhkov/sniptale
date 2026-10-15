@@ -153,7 +153,7 @@ function useReviewPlaybackFollow(
     sourceId: props.sourceId,
     navigationRevision: props.navigationRevision,
   });
-  const position = useRef({ left: 0, anchor: 0 });
+  const position = useRef({ left: 0 });
   const suspend = useCallback(() => {
     suspended.current = true;
   }, []);
@@ -174,6 +174,8 @@ function useReviewPlaybackFollow(
     if (start) suspended.current = false;
     if (navigated) suspended.current = true;
     const node = viewport.current;
+    // Play accepts the current viewport, including a paused zoom's deferred scroll event.
+    if (start && node) position.current.left = node.scrollLeft;
     if (
       !node ||
       !props.playing ||
@@ -188,15 +190,9 @@ function useReviewPlaybackFollow(
     )
       return;
     const x = (props.time / props.duration) * width * zoom;
-    if (start) {
-      const visible = x - node.scrollLeft;
-      position.current.anchor =
-        visible >= 0 && visible <= width
-          ? Math.max(width / 2, Math.min(width - 1, visible))
-          : width / 2;
-    }
-    const anchor = Math.max(width / 2, Math.min(width - 1, position.current.anchor));
-    const target = x < node.scrollLeft ? x - anchor : Math.max(node.scrollLeft, x - anchor);
+    // Keep the page still until its trailing edge; retain context at the next page's start.
+    if (x >= node.scrollLeft && x < node.scrollLeft + width * 0.95) return;
+    const target = x - width * 0.1;
     node.scrollLeft = Math.max(0, Math.min(width * (zoom - 1), target));
     // Read back the browser-clamped value so our own asynchronous scroll event is not user input.
     position.current.left = node.scrollLeft;

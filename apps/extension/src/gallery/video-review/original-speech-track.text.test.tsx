@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { translate, formatNumber } from '../../platform/i18n';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -141,9 +142,9 @@ it.each([false, true])(
     }
   }
 );
-async function pointer(target: Element, type: string, x: number) {
+async function pointer(target: Element, type: string, x: number, altKey = false) {
   await act(async () => {
-    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0, altKey });
     Object.defineProperty(event, 'pointerId', { value: 1 });
     target.dispatchEvent(event);
   });
@@ -242,3 +243,64 @@ it('refuses stale or out-of-project edits and supports manual split/merge/remova
   });
   expect(current.fragments).toHaveLength(0);
 });
+
+it.each(['source', 'result'] as const)(
+  'shows accepted %s text duration at both resize limits and clears on capture loss',
+  async (domain) => {
+    act(() => root.render(<Fixture domain={domain} />));
+    const block = prepare();
+    const readout = () =>
+      host.querySelector('[data-ui="gallery.videoReview.resizeDuration"]')?.textContent;
+    const duration = (value: number) =>
+      translate('gallery.videoReview.resizeDuration').replace(
+        '{duration}',
+        translate('gallery.videoReview.resizeSeconds').replace(
+          '{value}',
+          formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }, 'ru')
+        )
+      );
+    await pointer(
+      block.querySelector('[data-text-edge="end"]')!,
+      'pointerdown',
+      domain === 'source' ? 200 : 400
+    );
+    await pointer(block, 'pointermove', 2000);
+    expect(readout()).toContain(duration(domain === 'source' ? 9 : 4));
+    expect(current.fragments[0]).toMatchObject({ start: 1, end: 2 });
+    await pointer(block, 'lostpointercapture', 2000);
+    expect(readout()).toBeUndefined();
+    await pointer(
+      block.querySelector('[data-text-edge="start"]')!,
+      'pointerdown',
+      domain === 'source' ? 100 : 200
+    );
+    await pointer(block, 'pointermove', 2000);
+    expect(readout()).toContain(duration(0.01));
+    await pointer(block, 'pointerup', 2000);
+    expect(readout()).toBeUndefined();
+    expect(current.fragments[0]).toMatchObject({ start: 1.99, end: 2 });
+  }
+);
+
+it.each(['source', 'result'] as const)(
+  'snaps %s text resize in source pixels and releases with Alt',
+  async (domain) => {
+    act(() => root.render(<Fixture domain={domain} fragmentCount={2} />));
+    act(() => {
+      editor.change('overlap', { start: 3, end: 4 });
+    });
+    const block = prepare();
+    const initial = domain === 'source' ? 200 : 400;
+    const near = domain === 'source' ? 295 : 595;
+    await pointer(block.querySelector('[data-text-edge="end"]')!, 'pointerdown', initial);
+    await pointer(block, 'pointermove', near);
+    expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe(`${near + 5}px`);
+    await pointer(block, 'pointermove', near, true);
+    expect(
+      Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+    ).toBeCloseTo(near, 3);
+    await pointer(block, 'pointermove', near);
+    await pointer(block, 'pointerup', near);
+    expect(current.fragments[0]?.end).toBe(3);
+  }
+);

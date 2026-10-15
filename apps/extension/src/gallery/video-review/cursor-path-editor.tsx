@@ -39,25 +39,27 @@ interface CursorPathEditorProps {
   duration?: number;
   onSeek?(time: number): void;
   selectedKeyId?: string;
+  recordedKey?:
+    | import('../../features/video/project/cursor-focus-path/timeline').CursorFocusTimelineKey
+    | undefined;
   onSelect?(id: string, time: number): void;
   disabled: boolean;
   onChange(path: CursorFocusPath | undefined): void;
 }
 
 function cursorEditorState(props: CursorPathEditorProps) {
-  const keys = reviewCursorFocusTimelineKeys(props.path);
+  const keys = reviewCursorFocusTimelineKeys(props.path).filter(
+    (key) => key.anchor === 'manual' || key.authored || key.id === props.selectedKeyId
+  );
+  if (props.recordedKey && !keys.some((key) => key.id === props.recordedKey!.id))
+    keys.push(props.recordedKey);
   const select = (id: string, time: number) =>
     props.onSelect ? props.onSelect(id, time) : props.onSeek?.(time);
   const segment =
     props.path.segments.find((item) => item.keys.some((key) => key.id === props.selectedKeyId)) ??
     props.path.segments.find((item) => props.time >= item.start && props.time <= item.end);
   const selected =
-    segment?.keys.find((key) => key.id === props.selectedKeyId) ??
-    segment?.keys.toSorted(
-      (a, b) =>
-        Math.abs(a.time - props.time) - Math.abs(b.time - props.time) ||
-        compareCursorFocusKeys(b, a)
-    )[0];
+    props.recordedKey ?? segment?.keys.find((key) => key.id === props.selectedKeyId) ?? undefined;
   const constrained = evaluateReviewCursorFocus(props.path, props.time)?.constrained;
   const controls =
     selected && segment
@@ -66,7 +68,18 @@ function cursorEditorState(props: CursorPathEditorProps) {
   const editable = selected !== undefined;
   const change = (patch: Parameters<typeof updateCursorFocusKey>[2]) => {
     if (!selected) return;
-    const next = updateCursorFocusKey(props.path, selected.id, patch);
+    const base =
+      segment && !segment.keys.some((key) => key.id === selected.id)
+        ? {
+            ...props.path,
+            segments: props.path.segments.map((item) =>
+              item.id === segment.id
+                ? { ...item, keys: [...item.keys, selected].sort(compareCursorFocusKeys) }
+                : item
+            ),
+          }
+        : props.path;
+    const next = updateCursorFocusKey(base, selected.id, patch);
     props.onChange(next);
     if (patch.time !== undefined || patch.x !== undefined || patch.y !== undefined) {
       const key =
@@ -150,7 +163,12 @@ function CursorKeyActions({
   return (
     <>
       {([-1, 1] as const).map((direction) => {
-        const next = adjacentCursorFocusKey(keys, selected?.id, props.time, direction);
+        const next = adjacentCursorFocusKey(
+          keys.filter((key) => key.anchor === 'manual' || key.authored),
+          selected?.id,
+          props.time,
+          direction
+        );
         return (
           <ReviewButton
             key={direction}
@@ -196,7 +214,7 @@ function CursorPositionFields({ state }: { state: CursorEditorState }) {
         value={selected.id}
         options={keys.map((key) => {
           const kind = translate(
-            key.anchor === 'manual'
+            key.anchor === 'manual' || key.authored
               ? 'videoEditor.sidebar.cursorFocusManualKey'
               : 'videoEditor.sidebar.cursorFocusRecordedKey'
           );

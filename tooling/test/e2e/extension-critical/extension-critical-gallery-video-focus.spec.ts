@@ -250,7 +250,7 @@ for (const variant of [
       const end = block.locator('[data-zoom-edge="end"]');
       const initial = (await start.boundingBox())!;
       const other = (await end.boundingBox())!;
-      await page.keyboard.down('Shift');
+      await page.keyboard.down('Alt');
       await page.mouse.move(initial.x + initial.width / 2, initial.y + initial.height / 2);
       await page.mouse.down();
       await page.mouse.move(other.x + 150, other.y + other.height / 2);
@@ -262,7 +262,7 @@ for (const variant of [
       expect(edges.first).toBeLessThan(edges.last);
       const preview = (await block.boundingBox())!;
       await page.mouse.up();
-      await page.keyboard.up('Shift');
+      await page.keyboard.up('Alt');
       await expect.poll(async () => (await persistedFocus(page))?.start).toBeGreaterThan(0);
       const saved = (await persistedFocus(page))!;
       expect(saved.end).toBeCloseTo(2);
@@ -298,7 +298,7 @@ for (const variant of [
         .toBeCloseTo(originalWidth);
       const endInitial = (await end.boundingBox())!;
       const fixedStart = (await start.boundingBox())!;
-      await page.keyboard.down('Shift');
+      await page.keyboard.down('Alt');
       await page.mouse.move(
         endInitial.x + endInitial.width / 2,
         endInitial.y + endInitial.height / 2
@@ -312,7 +312,7 @@ for (const variant of [
       });
       expect(reverse.first).toBeLessThan(reverse.last);
       await page.mouse.up();
-      await page.keyboard.up('Shift');
+      await page.keyboard.up('Alt');
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -536,7 +536,7 @@ for (const variant of [
         translate('gallery.videoReview.cutGesture', variant.locale)
       );
       await button('gallery.videoReview.advancedEditing').click();
-      await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute('title', /Shift/);
+      await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute('title', /Alt/);
       await addReviewFocus(page);
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const block = lane.locator('[role="button"]').first();
@@ -544,12 +544,12 @@ for (const variant of [
       const pixelsPerSecond = bounds.width / 12;
       const move = async (delta: number, shift = false) => {
         const box = (await block.boundingBox())!;
-        if (shift) await page.keyboard.down('Shift');
+        if (shift) await page.keyboard.down('Alt');
         await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         await page.mouse.down();
         await page.mouse.move(box.x + box.width / 2 + delta, box.y + box.height / 2, { steps: 4 });
         await page.mouse.up();
-        if (shift) await page.keyboard.up('Shift');
+        if (shift) await page.keyboard.up('Alt');
       };
       // The fixture has codec keyframes at 0,2,4,...; no timeline object occupies 2s.
       const freeStart = 2 - 4 / pixelsPerSecond;
@@ -624,12 +624,12 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       const draw = async (lane: string, start: number, end: number) => {
         const box = (await dialog.locator(lane).boundingBox())!;
-        await page.keyboard.down('Shift');
+        await page.keyboard.down('Alt');
         await page.mouse.move(box.x + (box.width * start) / 12, box.y + box.height / 2);
         await page.mouse.down();
         await page.mouse.move(box.x + (box.width * end) / 12, box.y + box.height / 2, { steps: 8 });
         await page.mouse.up();
-        await page.keyboard.up('Shift');
+        await page.keyboard.up('Alt');
       };
       if (variant.speed) {
         await button('gallery.videoReview.speedMode').click();
@@ -679,12 +679,12 @@ for (const variant of [
       for (const edge of ['start', 'end'] as const) {
         const grip = (await block.locator(`[data-zoom-edge="${edge}"]`).boundingBox())!;
         const box = (await block.boundingBox())!;
-        await page.keyboard.down('Shift');
+        await page.keyboard.down('Alt');
         await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
         await page.mouse.down();
         await page.mouse.move(box.x + box.width / 2, grip.y + grip.height / 2, { steps: 8 });
         await page.mouse.up();
-        await page.keyboard.up('Shift');
+        await page.keyboard.up('Alt');
         await expect.poll(async () => (await persistedFocus(page))?.enter.duration).toBeLessThan(5);
         const shortened = await check();
         await page.screenshot({

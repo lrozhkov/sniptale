@@ -18,7 +18,7 @@ import { translate } from '../../platform/i18n';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { reviewHistoryCaptureStatus, reviewHistoryCaptureLabel } from './action-history-coverage';
+import { reviewHistoryCaptureStatus } from './action-history-coverage';
 import {
   layoutReviewActionLanes,
   reviewActionLane,
@@ -32,8 +32,6 @@ const HISTORY_EVENT_BACKGROUND = [
   'linear-gradient(var(--sniptale-color-surface-hover),var(--sniptale-color-surface-hover))',
   'var(--sniptale-color-surface-canvas)',
 ].join(',');
-/** Dense history never adds a fourth row. */
-const ACTION_LANE_MAX_VISIBLE = 3;
 
 type TelemetryStripProps = {
   captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
@@ -41,17 +39,20 @@ type TelemetryStripProps = {
   markers: readonly ReviewTelemetryMarker[];
   duration: number;
   time: number;
+  playing?: boolean | undefined;
   width: number;
   zoom: number;
   selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
   cursorFocusKeys?: readonly CursorFocusTimelineKey[];
   selectedCursorFocusId?: string;
   onCursorFocusKey?(key: CursorFocusTimelineKey): void;
+  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
+  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
   onAddCursorFocusKey?(time: number): void;
   onMarker(marker: ReviewTelemetryMarker): void;
 };
 
-/** Stable strip height with bounded groups repacked only after zoom settles. */
+/** Populated semantic rows stay stable while groups repack after zoom settles. */
 export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   const coverageId = useId();
   const [settled, setSettled] = useState({ width: props.width, zoom: props.zoom });
@@ -70,17 +71,24 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   );
   const ratio =
     (Math.max(1, props.width) * props.zoom) / (Math.max(1, settled.width) * settled.zoom);
-  const height =
-    ACTION_LANE_MAX_VISIBLE * ACTION_MARKER_HEIGHT_PX +
-    (ACTION_LANE_MAX_VISIBLE - 1) * ACTION_LANE_GAP_PX;
+  const lanes = [0, 1, 2].filter(
+    (lane) =>
+      layout.items.some((item) => item.lane === lane) ||
+      (lane === 2 && !!props.cursorFocusKeys?.length)
+  );
+  const cursorRow = lanes.indexOf(2);
+  const cursorTop = Math.max(0, cursorRow) * ACTION_LANE_PITCH_PX;
+  const height = Math.max(1, lanes.length) * ACTION_LANE_PITCH_PX - ACTION_LANE_GAP_PX;
   return (
     <div
       data-ui="gallery.videoReview.historyStrip"
       className="relative overflow-hidden"
       style={{ height }}
       onDoubleClick={(event) => {
+        if (cursorRow < 0 && lanes.length > 0 && event.target !== event.currentTarget) return;
         const rect = event.currentTarget.getBoundingClientRect();
-        if (event.clientY - rect.top < 48 || !props.onAddCursorFocusKey) return;
+        if ((cursorRow >= 0 && event.clientY - rect.top < cursorTop) || !props.onAddCursorFocusKey)
+          return;
         event.preventDefault();
         event.stopPropagation();
         props.onAddCursorFocusKey(
@@ -94,8 +102,10 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
         );
       }}
     >
-      <ReviewCursorKeyRow props={props} />
-      {[0, 1, 2].map((lane) => (
+      {cursorRow >= 0 || lanes.length === 0 ? (
+        <ReviewCursorKeyRow props={props} top={cursorTop} />
+      ) : null}
+      {lanes.map((lane, row) => (
         <div
           key={lane}
           role="group"
@@ -123,29 +133,8 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
           <span
             aria-hidden="true"
             className={['pointer-events-none absolute inset-x-0', ''].join(' ')}
-            style={{ top: lane * ACTION_LANE_PITCH_PX, height: ACTION_MARKER_HEIGHT_PX }}
+            style={{ top: row * ACTION_LANE_PITCH_PX, height: ACTION_MARKER_HEIGHT_PX }}
           />
-          {!layout.items.some((item) => item.lane === lane) &&
-          (lane !== 2 || !props.cursorFocusKeys?.length) &&
-          reviewHistoryCaptureStatus(
-            props.captureCapabilities,
-            lane === 0 ? 'keyboard' : lane === 1 ? 'mouse' : 'cursor'
-          ) !== 'available' ? (
-            <span
-              className={`pointer-events-none absolute inset-x-0 truncate px-1
-                text-[11px] leading-5 text-[var(--sniptale-color-text-secondary)]`}
-              style={{ top: lane * ACTION_LANE_PITCH_PX }}
-            >
-              {translate(
-                reviewHistoryCaptureLabel(
-                  reviewHistoryCaptureStatus(
-                    props.captureCapabilities,
-                    lane === 0 ? 'keyboard' : lane === 1 ? 'mouse' : 'cursor'
-                  )
-                )
-              )}
-            </span>
-          ) : null}
           {layout.items
             .filter((item) => item.lane === lane)
             .map((item) => {
@@ -155,6 +144,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
                   item={item}
                   props={props}
                   ratio={ratio}
+                  top={row * ACTION_LANE_PITCH_PX}
                 />
               );
             })}
@@ -278,19 +268,38 @@ function ReviewHistoryCluster(props: {
   );
 }
 
-function ReviewCursorKeyRow({ props }: { props: TelemetryStripProps }) {
+function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: number }) {
+  const coverage = new Map(
+    (props.cursorFocusKeys ?? [])
+      .filter((key) => (key.anchor === 'manual' || key.authored) && key.sourceCoverage)
+      .map((key) => [key.segmentId, key.sourceCoverage!])
+  );
+  const ratio = Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration);
   return props.onCursorFocusKey && props.onAddCursorFocusKey ? (
     <CursorFocusTimelineKeys
-      top={48}
+      top={top}
       height={20}
       keys={props.cursorFocusKeys ?? []}
       {...(props.selectedCursorFocusId ? { selectedId: props.selectedCursorFocusId } : {})}
       time={props.time}
       duration={props.duration}
-      pixelsPerSecond={Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration)}
+      pixelsPerSecond={ratio}
       onSelect={props.onCursorFocusKey}
+      playing={props.playing}
+      {...(props.onNavigateCursorFocus ? { onNavigate: props.onNavigateCursorFocus } : {})}
+      {...(props.onMoveCursorFocus ? { onMove: props.onMoveCursorFocus } : {})}
       onAdd={props.onAddCursorFocusKey}
-    />
+    >
+      {[...coverage].map(([id, span]) => (
+        <span
+          key={id}
+          aria-hidden="true"
+          data-ui="cursorFocusPath.authoredCoverage"
+          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-[var(--sniptale-color-border-soft)]"
+          style={{ left: span.start * ratio, width: Math.max(0, span.end - span.start) * ratio }}
+        />
+      ))}
+    </CursorFocusTimelineKeys>
   ) : null;
 }
 
@@ -301,10 +310,12 @@ function ReviewHistoryItem({
   item,
   props,
   ratio,
+  top,
 }: {
   item: ReturnType<typeof layoutReviewActionLanes>['items'][number];
   props: TelemetryStripProps;
   ratio: number;
+  top: number;
 }) {
   const marker = item.marker;
   const selected =
@@ -313,7 +324,7 @@ function ReviewHistoryItem({
     marker.ref.id === props.selectedTelemetryRef.id;
   const animated = marker.ref.kind === 'action' && props.animatedIds?.has(marker.ref.id);
   const tone = reviewTimelineItemTone(selected);
-  const cursorLine = item.lane === 2 && marker.eventType !== 'cursor-idle' && !selected;
+  const cursorLine = item.lane === 2;
   if (item.members.length > 1)
     return (
       <ReviewHistoryCluster
@@ -321,7 +332,7 @@ function ReviewHistoryItem({
         members={item.members}
         left={item.left * ratio}
         width={item.width * ratio}
-        top={item.lane * ACTION_LANE_PITCH_PX}
+        top={top}
         height={ACTION_MARKER_HEIGHT_PX}
         onMarker={props.onMarker}
         selectedRef={props.selectedTelemetryRef}
@@ -361,7 +372,7 @@ function ReviewHistoryItem({
       style={{
         left: item.left * ratio,
         width: item.width * ratio,
-        top: item.lane * ACTION_LANE_PITCH_PX,
+        top,
         height: ACTION_MARKER_HEIGHT_PX,
         background: cursorLine
           ? marker.eventType === 'cursor-gap'
@@ -373,8 +384,7 @@ function ReviewHistoryItem({
         opacity: cursorLine && marker.eventType === 'cursor-gap' ? 0.4 : 1,
       }}
     >
-      {item.lane !== 2 ||
-      ((marker.eventType === 'cursor-idle' || selected) && item.width * ratio >= 100) ? (
+      {item.lane !== 2 ? (
         <ReviewTimelineLabel
           icon={<ReviewEventIcon kind={marker.eventType} />}
           name={reviewEventLabel(marker.eventType)}

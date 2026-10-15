@@ -1,3 +1,4 @@
+import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { useEffect, useState, type RefObject, type PointerEvent } from 'react';
 import { sameQuickEditCamera } from '../../features/video/review/advanced/motion-blur';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
@@ -180,13 +181,6 @@ export function ReviewStagePresentationFeedback({
   const manual = presentation.active;
   const replacing =
     manual && presentation.status.phase === 'pending' && presentation.status.actualRaster !== null;
-  const [slowReplacement, setSlowReplacement] = useState(false);
-  useEffect(() => {
-    setSlowReplacement(false);
-    if (!replacing) return;
-    const timer = setTimeout(() => setSlowReplacement(true), 500);
-    return () => clearTimeout(timer);
-  }, [replacing]);
   return (
     <>
       {manual &&
@@ -229,30 +223,36 @@ export function ReviewStagePresentationFeedback({
               })}
           </div>
         )}
-      {manual && presentation.status.phase !== 'ready' && (!replacing || slowReplacement) ? (
-        <div
-          role={presentation.status.phase === 'failed' ? 'alert' : 'status'}
-          className={[
-            'absolute inset-x-0 top-0 z-40 flex items-center gap-2',
-            'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
-          ].join(' ')}
-        >
-          <span>
-            {translate(
-              presentation.status.phase === 'failed'
-                ? 'gallery.videoReview.previewFailed'
-                : replacing
-                  ? 'gallery.videoReview.previewUpdating'
-                  : 'gallery.videoReview.previewLoading'
-            )}
-          </span>
-          {presentation.status.phase === 'failed' ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.retry')}
-              onClick={presentation.retry}
-            />
-          ) : null}
-        </div>
+      {manual && presentation.status.phase !== 'ready' ? (
+        <DelayedLoadingFallback
+          key={presentation.status.phase}
+          delayMs={presentation.status.phase === 'failed' ? 0 : 1000}
+          fallback={
+            <div
+              role={presentation.status.phase === 'failed' ? 'alert' : 'status'}
+              className={[
+                'absolute inset-x-0 top-0 z-40 flex items-center gap-2',
+                'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
+              ].join(' ')}
+            >
+              <span>
+                {translate(
+                  presentation.status.phase === 'failed'
+                    ? 'gallery.videoReview.previewFailed'
+                    : replacing
+                      ? 'gallery.videoReview.previewUpdating'
+                      : 'gallery.videoReview.previewLoading'
+                )}
+              </span>
+              {presentation.status.phase === 'failed' ? (
+                <ReviewButton
+                  label={translate('gallery.videoReview.retry')}
+                  onClick={presentation.retry}
+                />
+              ) : null}
+            </div>
+          }
+        />
       ) : null}
       {showFrameRate ? (
         <output

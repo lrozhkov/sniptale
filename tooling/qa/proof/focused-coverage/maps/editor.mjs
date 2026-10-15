@@ -1,5 +1,17 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-review-opening-and-feedback',
+    productionFile: 'apps/extension/src/gallery/video-review/index.tsx',
+    reason: 'The modal integration suite exercises opening, retry, feedback and editor navigation.',
+    testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
+  },
+  {
+    owner: 'gallery-review-opening-and-feedback',
+    productionFile: 'apps/extension/src/gallery/video-review/feedback.tsx',
+    reason: 'The modal integration suite exercises opening, retry, feedback and editor navigation.',
+    testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
+  },
+  {
     owner: 'gallery-review-timeline-binding',
     productionFile: 'apps/extension/src/gallery/video-review/timeline-binding.tsx',
     reason:

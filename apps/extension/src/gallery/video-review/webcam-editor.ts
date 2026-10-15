@@ -74,7 +74,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
   const toggle = async () => {
     if (!latest.current.allowed() || acquisition.busy()) return;
     if (!camera) return acquisition.attach();
-    await latest.current.advanced.setTrackVisibility('webcam', !camera.enabled);
+    mutate((current) => ({ ...current, enabled: !current.enabled }));
     if (!camera.enabled) choose({ kind: 'webcam' });
   };
   const selectedPosition = camera?.positions.find(

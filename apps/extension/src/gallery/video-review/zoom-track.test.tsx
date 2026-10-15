@@ -10,10 +10,20 @@ import { createTrackProjection } from './track-projection';
 import { reconcileReviewFocus } from '../../features/video/review/focus-edits';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
-vi.mock('../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../platform/i18n')>()),
-  translate: (key: string) => key,
-}));
+vi.mock('../../platform/i18n', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../platform/i18n')>();
+  return {
+    ...actual,
+    translate: (...args: Parameters<typeof actual.translate>) =>
+      [
+        'gallery.videoReview.resizeDuration',
+        'gallery.videoReview.resizeBefore',
+        'gallery.videoReview.resizeSeconds',
+      ].includes(args[0])
+        ? actual.translate(...args)
+        : args[0],
+  };
+});
 
 let root: Root;
 let host: HTMLDivElement;
@@ -106,7 +116,7 @@ function renderTrack(
     event: async (target: Element, kind: string, x: number, shift = false) =>
       act(async () => {
         target.dispatchEvent(
-          new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, shiftKey: shift })
+          new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, altKey: shift })
         );
       }),
   };
@@ -291,11 +301,11 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   await track.event(second, 'pointerup', 195);
   expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
   expect(document.querySelector('[data-zoom-guide]')).toBeNull();
-  // The shift bypass releases the magnet; the clamp still keeps the window open.
+  // The Alt bypass releases the magnet; the clamp still keeps the window open.
   await track.event(startEdge, 'pointerdown', 400);
-  await track.event(second, 'pointermove', 195, true);
-  await track.event(second, 'pointerup', 195);
-  expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
+  await track.event(second, 'pointermove', 205, true);
+  await track.event(second, 'pointerup', 205);
+  expect(commit).toHaveBeenLastCalledWith('b', { start: 2.05, end: 6 }, 'start');
   expect(commit).toHaveBeenCalledTimes(3);
   // Escape cancels the transient drag without committing.
   await track.event(startEdge, 'pointerdown', 400);
@@ -566,7 +576,7 @@ it('retains a visible playhead target coinciding with the moving focus old edge'
 });
 
 it.each([false, true])(
-  'preserves visible timeline-end snapping with Shift bypass %s',
+  'preserves visible timeline-end snapping with Alt bypass %s',
   async (shift) => {
     const commit = vi.fn();
     const track = renderTrack([zoom('a', 1, 2)], commit, 9);
@@ -718,5 +728,37 @@ it.each(['zoom', 'spotlight'] as const)(
         expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
       }
     }
+  }
+);
+
+it.each(['start', 'end'] as const)(
+  'shows unchanged source duration on initial %s capture of legacy focus across Speed',
+  async (edge) => {
+    const projection = createTrackProjection(10, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 2,
+        end: 6,
+        requestedStart: 2,
+        requestedEnd: 6,
+        rate: 2,
+        audio: 'speed',
+      },
+    ]);
+    const track = renderTrack([zoom('legacy', 2.5, 3.5)], vi.fn(), null, { projection });
+    const block = track.blocks[0]!;
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    await track.event(
+      block.querySelector(`[data-zoom-edge="${edge}"]`)!,
+      'pointerdown',
+      edge === 'start' ? 300 : 500
+    );
+    const readout = host.querySelector('[data-ui="gallery.videoReview.resizeDuration"]');
+    expect(readout?.textContent).toBe('Duration 2.00 sWas 2.00 s · 0.00 s');
   }
 );

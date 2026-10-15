@@ -113,6 +113,8 @@ type TimelineBindingProps = {
   cursorFocusKeys?: readonly CursorFocusTimelineKey[];
   selectedCursorFocusId?: string | undefined;
   onCursorFocusKey?(key: CursorFocusTimelineKey): void;
+  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
+  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
   onAddCursorFocusKey?(time: number): void;
   onMarker(marker: ReviewTelemetryMarker): void;
   onClearSelection(): void;
@@ -855,6 +857,8 @@ function reviewTimelineHistoryBinding(props: TimelineBindingProps) {
     ...(props.cursorFocusKeys ? { cursorFocusKeys: props.cursorFocusKeys } : {}),
     ...(props.selectedCursorFocusId ? { selectedCursorFocusId: props.selectedCursorFocusId } : {}),
     ...(props.onCursorFocusKey ? { onCursorFocusKey: props.onCursorFocusKey } : {}),
+    ...(props.onNavigateCursorFocus ? { onNavigateCursorFocus: props.onNavigateCursorFocus } : {}),
+    ...(props.onMoveCursorFocus ? { onMoveCursorFocus: props.onMoveCursorFocus } : {}),
     ...(props.onAddCursorFocusKey ? { onAddCursorFocusKey: props.onAddCursorFocusKey } : {}),
     ...(props.selectedTelemetryRef ? { selectedTelemetryRef: props.selectedTelemetryRef } : {}),
     onMarker: (marker: ReviewTelemetryMarker) =>

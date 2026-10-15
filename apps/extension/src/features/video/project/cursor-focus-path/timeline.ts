@@ -9,6 +9,8 @@ export interface CursorFocusTimelineKey extends CursorFocusKey {
   binding: CursorFocusBinding;
   sourceTime: number;
   sourceClipId?: string;
+  /** Source-clock coverage for the quick editor, including deliberately authored gaps. */
+  sourceCoverage?: { start: number; end: number };
 }
 
 export function reviewCursorFocusTimelineKeys(path: CursorFocusPath): CursorFocusTimelineKey[] {
@@ -20,6 +22,7 @@ export function reviewCursorFocusTimelineKeys(path: CursorFocusPath): CursorFocu
         segmentId: segment.id,
         binding: segment.binding,
         sourceTime: key.time,
+        sourceCoverage: { start: segment.start, end: segment.end },
       }))
     )
     .sort(compareTimelineKeys);
@@ -92,4 +95,28 @@ export function adjacentCursorFocusKey(
   return direction === 1
     ? (ordered.find((key) => key.time > time) ?? null)
     : (ordered.findLast((key) => key.time < time) ?? null);
+}
+
+/** Screen-space proximity reveals one recorded fact without snapping the selected time. */
+export function nearestRecordedCursorKey(
+  keys: readonly CursorFocusTimelineKey[],
+  time: number,
+  pixelsPerSecond: number,
+  toX?: ((time: number) => number | null) | undefined
+) {
+  const x = toX ? toX(time) : time * pixelsPerSecond;
+  if (x === null) return undefined;
+  let nearest: CursorFocusTimelineKey | undefined;
+  let distance = 8;
+  for (const key of keys) {
+    if (key.anchor === 'manual' || key.authored) continue;
+    const point = toX ? toX(key.time) : key.time * pixelsPerSecond;
+    if (point === null) continue;
+    const delta = Math.abs(point - x);
+    if (delta <= distance) {
+      nearest = key;
+      distance = delta;
+    }
+  }
+  return nearest;
 }

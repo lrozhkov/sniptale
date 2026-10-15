@@ -193,7 +193,7 @@ function configureGalleryOwnerMocks(
   });
 }
 
-it('hands a one-shot quick-edit intent to the resolved recording and clears the route', () => {
+it('retains the quick-edit route while resolving its recording', () => {
   window.history.replaceState(null, '', '/gallery.html?recordingId=rec-7&mode=edit');
   const item = createItem({
     id: 'recording:rec-7',
@@ -208,5 +208,5 @@ it('hands a one-shot quick-edit intent to the resolved recording and clears the 
     item,
     url: null,
   });
-  expect(window.location.search).toBe('');
+  expect(window.location.search).toBe('?recordingId=rec-7&mode=edit');
 });

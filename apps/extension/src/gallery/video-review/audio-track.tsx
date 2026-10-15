@@ -61,9 +61,9 @@ function dragHasFiles(event: DragEvent<HTMLElement>) {
 }
 
 interface AudioDragState {
+  original: QuickEditAudioClip;
   admission: ReturnType<typeof deferReviewGesture>;
   lane: ReviewAudioLane;
-  id: string;
   edge: 'start' | 'end' | 'move';
   x: number;
   sourceAtPointer: number;
@@ -154,10 +154,12 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     boundary &&
       boundary.edge !== 'move' &&
       boundaryRange &&
-      props.clips.some((clip) => clip.id === boundary.id)
+      props.clips.some((clip) => clip.id === boundary.original.id)
       ? (props.projection?.source(boundaryRange[boundary.edge], boundary.edge) ??
           boundaryRange[boundary.edge])
-      : null
+      : null,
+    boundary ? reviewVoiceoverRange(boundary.original) : null,
+    boundaryRange
   );
   const cancelDrag = useCallback(() => {
     const current = drag.current;
@@ -187,16 +189,16 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     if (current?.node.hasPointerCapture(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
     if (!current || !shown || !current.moved) return;
-    const assetId = props.clips.find((clip) => clip.id === current.id)?.assetId ?? '';
+    const assetId = props.clips.find((clip) => clip.id === current.original.id)?.assetId ?? '';
     const assetDuration =
       props.assets?.get(assetId)?.duration ?? props.waveforms?.get(assetId)?.duration;
     const range = reviewVoiceoverRange(shown.clip);
     current.admission.commit(() => {
       if (current.edge === 'start')
-        props.onTrimClip(current.lane, current.id, 'start', range.start, assetDuration);
+        props.onTrimClip(current.lane, current.original.id, 'start', range.start, assetDuration);
       else if (current.edge === 'end')
-        props.onTrimClip(current.lane, current.id, 'end', range.end, assetDuration);
-      else props.onMoveClip(current.lane, current.id, range.start);
+        props.onTrimClip(current.lane, current.original.id, 'end', range.end, assetDuration);
+      else props.onMoveClip(current.lane, current.original.id, range.start);
     });
   };
   const rows = reviewAudioClipRows(
@@ -321,6 +323,7 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
     <div
       role="button"
       data-audio-id={clip.id}
+      data-review-removal-key={`audio:${clip.id}`}
       tabIndex={0}
       aria-label={accessibleLabel}
       data-cut-suppressed={props.cutSuppressed ? 'true' : 'false'}
@@ -405,9 +408,9 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
           ? event.target.closest('[data-audio-edge]')?.getAttribute('data-audio-edge')
           : null;
       props.drag.current = {
+        original: props.shown,
         admission,
         lane: props.lane,
-        id: clip.id,
         edge: edge === 'start' || edge === 'end' ? edge : 'move',
         x: event.clientX,
         sourceAtPointer:
@@ -432,12 +435,12 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
           event.clientX - current.x,
           current.width
         ) ?? ((event.clientX - current.x) / current.width) * props.duration;
-      const stored = props.clips.find((item) => item.id === current.id);
+      const stored = props.clips.find((item) => item.id === current.original.id);
       if (!stored) return;
       const original = retimeReviewVoiceover(stored, props.voiceoverSegments);
       const range = reviewVoiceoverRange(original);
       const base = { ...original, timelineStart: range.start, duration: range.end - range.start };
-      const threshold = event.shiftKey ? -1 : (SNAP_THRESHOLD_PX * props.duration) / current.width;
+      const threshold = event.altKey ? -1 : (SNAP_THRESHOLD_PX * props.duration) / current.width;
       const candidates = [
         ...(props.snapTimes ?? []),
         ...props.clips

@@ -1,7 +1,13 @@
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import type { VideoProject } from '../../../../features/video/project/types';
-import { addProjectCursorFocusKey } from '../../../../features/video/project/cursor-focus-path/projection';
-import { authoredCursorFocusPath } from '../../../../features/video/project/cursor-focus-path/authoring';
+import {
+  addProjectCursorFocusKey,
+  resolveProjectCursorFocusPath,
+} from '../../../../features/video/project/cursor-focus-path/projection';
+import {
+  authoredCursorFocusPath,
+  moveCursorFocusTimelineKey,
+} from '../../../../features/video/project/cursor-focus-path/authoring';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import {
   useVideoEditorClipSelectionPort,
@@ -30,6 +36,8 @@ export function ProjectCursorFocusKeys(params: {
   const select = useVideoEditorClipSelectionPort((port) => port.selectCursorSegment);
   const playback = useVideoEditorPlaybackPort((port) => ({
     time: port.currentTime,
+    playing: port.isPlaying,
+    setPlaying: port.setPlaying,
     seek: port.setCurrentTime,
   }));
   const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
@@ -38,6 +46,33 @@ export function ProjectCursorFocusKeys(params: {
     keys,
     selectedId: selection.kind === 'cursor-segment' ? selection.sampleId : undefined,
     time: playback.time,
+    playing: playback.playing,
+    onNavigate: (time: number, key?: CursorFocusTimelineKey) => {
+      playback.setPlaying(false);
+      if (key) select(key.id);
+      playback.seek(time);
+    },
+    onMove: (key: CursorFocusTimelineKey, time: number) => {
+      let result: { id: string; time: number } | undefined;
+      updateProject((project) => {
+        if (getVideoProjectUtilityLanes(project).actions.locked) return project;
+        const clip = project.clips.find((item) => item.id === key.sourceClipId);
+        const rate = clip?.type === 'VIDEO' ? (clip.playbackRate ?? 1) : 1;
+        const moved = moveCursorFocusTimelineKey(
+          resolveProjectCursorFocusPath(project),
+          { ...key, time: key.sourceTime },
+          key.sourceTime + (time - key.time) * rate
+        );
+        result = { id: moved.id, time: key.time + (moved.time - key.sourceTime) / rate };
+        return applyVideoProjectMutationPatch(project, {
+          cursorFocusPath: authoredCursorFocusPath(moved.path),
+        });
+      });
+      if (result) {
+        select(result.id);
+        playback.seek(result.time);
+      }
+    },
     duration: params.project.duration,
     pixelsPerSecond: params.pixelsPerSecond,
     disabled: getVideoProjectUtilityLanes(params.project).actions.locked,

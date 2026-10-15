@@ -99,7 +99,11 @@ for (const viewport of [
           { fixture: betaV1Fixture, pointer }
         );
         await page.reload();
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page
+          .locator(`[data-gallery-keyboard-id="${betaV1Fixture.records.media_library[0]!.id}"]`)
+          .getByRole('button', { name: 'beta-v1.webm', exact: true })
+          .first()
+          .click();
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
         const dialog = page.locator('dialog');
         const advanced = dialog.getByRole('button', {
@@ -110,21 +114,17 @@ for (const viewport of [
         const rows = dialog.locator(
           '[data-ui="gallery.videoReview.historyStrip"] [data-history-family]'
         );
-        await expect(rows).toHaveCount(3);
-        const cursorRow = dialog.locator('[data-history-family="cursor"]');
-        await expect(cursorRow).toHaveAttribute('data-history-coverage', pointer);
-        const cursorLabel = cursorRow.locator('span').last();
-        await cursorLabel.scrollIntoViewIfNeeded();
-        const cursorBounds = await cursorLabel.boundingBox();
-        expect(cursorBounds).not.toBeNull();
-        expect(cursorBounds!.y + cursorBounds!.height).toBeLessThanOrEqual(viewport.height);
+        await expect(rows).toHaveCount(0);
+        await expect(dialog.locator('[data-ui="gallery.videoReview.historyStrip"]')).toHaveCSS(
+          'height',
+          '20px'
+        );
         const key =
           pointer === 'available'
             ? 'gallery.videoReview.historyCaptureEmpty'
             : pointer === 'unavailable'
               ? 'gallery.videoReview.historyCaptureUnavailable'
               : 'gallery.videoReview.historyCaptureUnknown';
-        await expect(cursorRow).toContainText(translate(key, 'en'));
         await dialog
           .getByRole('button', {
             name: translate('gallery.videoReview.historyOpen', 'en'),

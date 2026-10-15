@@ -1,7 +1,8 @@
+import { ReviewButton } from './controls';
 import type { useReviewEditorState } from './use-editor-state';
 import type { useLoadedReview } from './use-session';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { CircleAlert, X } from 'lucide-react';
+import { ArrowLeft, CircleAlert, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { translate } from '../../platform/i18n';
 import { reviewOriginalAudioFeedbackMessage } from './original-audio-feedback';
@@ -82,16 +83,58 @@ export function reviewErrorMessage(
 /** Load feedback distinguishes saved editing state from source acquisition. */
 export function ReviewLoadStatus({
   failure,
+  onBack,
+  onRetry,
 }: {
   failure: ReturnType<typeof useLoadedReview>['failed'];
+  onBack(): void;
+  onRetry(): void;
 }) {
-  if (!failure) return <p role="status">{translate('gallery.videoReview.loading')}</p>;
-  const workspace = failure.stage === 'workspace' || failure.stage === 'session';
+  const workspace = failure?.stage === 'workspace' || failure?.stage === 'session';
   return (
-    <p role="alert">
-      {translate(
-        workspace ? 'gallery.videoReview.workspaceLoadFailed' : 'gallery.videoReview.loadFailed'
-      )}
-    </p>
+    <div
+      data-ui="gallery.videoReview.opening"
+      className="flex h-full min-h-0 items-center justify-center overflow-y-auto p-6"
+    >
+      <div className="my-auto flex w-full max-w-md flex-col items-center gap-5 text-center">
+        {failure ? (
+          <CircleAlert
+            size={32}
+            aria-hidden="true"
+            className="text-[var(--sniptale-color-danger)]"
+          />
+        ) : (
+          <LoaderCircle
+            size={32}
+            aria-hidden="true"
+            className="motion-safe:animate-spin text-[var(--sniptale-color-text-muted)]"
+          />
+        )}
+        <div className="space-y-2">
+          <h1 className="text-lg font-semibold">{translate('gallery.videoReview.editorTitle')}</h1>
+          <p
+            role={failure ? 'alert' : 'status'}
+            className="text-sm text-[var(--sniptale-color-text-secondary)]"
+          >
+            {translate(
+              !failure
+                ? 'gallery.videoReview.loading'
+                : workspace
+                  ? 'gallery.videoReview.workspaceLoadFailed'
+                  : 'gallery.videoReview.loadFailed'
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <ReviewButton label={translate('gallery.videoReview.back')} onClick={onBack}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            {translate('gallery.videoReview.back')}
+          </ReviewButton>
+          {failure ? (
+            <ReviewButton label={translate('gallery.videoReview.retry')} onClick={onRetry} />
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }

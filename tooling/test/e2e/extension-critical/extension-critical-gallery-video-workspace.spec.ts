@@ -352,7 +352,7 @@ async function exerciseWorkspaceAudio(
   expect(voicePeakStart).toBeGreaterThan(45);
   expect(voicePeakStart).toBeLessThan(55);
   await page.mouse.move(voiceBox.x + voiceBox.width / 2, voiceBox.y + voiceBox.height / 2);
-  await page.keyboard.down('Shift');
+  await page.keyboard.down('Alt');
   await page.mouse.down();
   await page.mouse.move(voiceBox.x + voiceBox.width / 2 + 25, voiceBox.y + voiceBox.height / 2, {
     steps: 3,
@@ -361,7 +361,7 @@ async function exerciseWorkspaceAudio(
   expect(Math.abs((await loudStart()) - voicePeakStart)).toBeLessThan(1);
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  await page.keyboard.up('Shift');
+  await page.keyboard.up('Alt');
   expect((await voice.boundingBox())!.x).toBeCloseTo(voiceBox.x, 0);
   await page.screenshot({ path: outputPath('voiceover-speed-preview.png') });
 }

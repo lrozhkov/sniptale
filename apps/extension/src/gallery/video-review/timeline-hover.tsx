@@ -1,4 +1,12 @@
-import { useEffect, useState, type PointerEvent, type RefObject } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type PointerEvent,
+  type RefObject,
+} from 'react';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { reviewTimeLabel } from './controls';
 import { planeTime, reviewPlaneLane } from './timeline-drag';
@@ -117,17 +125,32 @@ export function useReviewTimelineHover(options: HoverOptions) {
 export function ReviewTimelineHoverGuide(props: {
   hover: Hover | null;
   resizing?: boolean;
+  label?: ReactNode;
   viewport: RefObject<HTMLDivElement | null>;
   gutter: number;
   width: number;
 }) {
   const { hover } = props;
+  const active = hover !== null;
+  const label = useRef<HTMLSpanElement>(null);
+  const [labelWidth, setLabelWidth] = useState(70);
+  useLayoutEffect(() => {
+    const node = label.current;
+    if (!node) return;
+    const measure = () => setLabelWidth(node.getBoundingClientRect().width);
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(node);
+    return () => observer?.disconnect();
+  }, [props.label, active]);
   if (!hover) return null;
   const viewportRight =
     (props.viewport.current?.scrollLeft ?? 0) +
     (props.viewport.current?.clientWidth ?? props.gutter + props.width);
   if (hover.x < (props.viewport.current?.scrollLeft ?? 0) + props.gutter || hover.x > viewportRight)
     return null;
+  const leftLimit = (props.viewport.current?.scrollLeft ?? 0) + props.gutter - hover.x;
+  const labelOffset = Math.max(leftLimit, Math.min(4, viewportRight - hover.x - labelWidth));
   return (
     <div
       data-ui="gallery.videoReview.hoverTime"
@@ -139,14 +162,14 @@ export function ReviewTimelineHoverGuide(props: {
       style={{ left: hover.x }}
     >
       <span
+        ref={label}
         className="sticky top-0 block w-max whitespace-nowrap rounded bg-[var(--sniptale-color-surface-panel)]
           px-1 text-[11px] text-[var(--sniptale-color-text-primary)] shadow-sm"
         style={{
-          transform:
-            hover.x > viewportRight - 70 ? 'translateX(calc(-100% - 4px))' : 'translateX(4px)',
+          transform: `translateX(${labelOffset}px)`,
         }}
       >
-        {reviewTimeLabel(hover.time)}
+        {props.label ?? reviewTimeLabel(hover.time)}
       </span>
     </div>
   );

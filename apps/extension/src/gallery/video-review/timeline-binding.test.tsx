@@ -709,6 +709,16 @@ it('mounted result-time lanes keep zoom changes behind the existing action admis
     allowed = true;
     await act(async () => toggle().click());
     expect(current!.advanced.zoom.enabled).toBe(!original);
+    expect(current!.advanced.ui.tracks.zoom).toBe(true);
+    expect(host.querySelector('[data-review-track="zoom"]')).not.toBeNull();
+    expect(
+      host.querySelector('[data-review-track="zoom"]')?.getAttribute('data-review-track-muted')
+    ).toBe(String(original));
+    await act(async () => current!.flushAdvanced());
+    await act(async () => loaded.session.history('undo'));
+    await act(async () => loaded.session.history('redo'));
+    expect(current!.advanced.ui.tracks.zoom).toBe(true);
+    expect(host.querySelector('[data-review-track="zoom"]')).not.toBeNull();
     await act(async () => current!.addCursorFocusKey(1));
     expect(current!.activeSelection).toMatchObject({ kind: 'cursor-focus', time: 1 });
     const key = current!.cursorFocusKeys[0]!;

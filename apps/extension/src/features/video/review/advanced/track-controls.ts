@@ -78,27 +78,6 @@ export function assertReviewTracksEditable(
   if (locked.length) throw new ReviewTrackLockedError(locked);
 }
 
-/** History restores a legacy-backed master together with its authored enable flag. */
-export function reviewHistoryTrackControls(
-  ui: QuickEditUiState,
-  before: QuickEditAdvancedContent,
-  after: QuickEditAdvancedContent
-): QuickEditUiState {
-  const flags = (content: QuickEditAdvancedContent) => ({
-    actions: content.actionsEnabled !== false,
-    zoom: content.zoom.enabled,
-    webcam: content.webcam?.enabled !== false,
-    annotationEffects: content.annotationEffects?.enabled !== false,
-  });
-  const previous = flags(before);
-  const next = flags(after);
-  const tracks = { ...ui.tracks };
-  for (const track of ['actions', 'zoom', 'webcam', 'annotationEffects'] as const) {
-    if (previous[track] !== next[track]) tracks[track] = next[track];
-  }
-  return { ...ui, tracks };
-}
-
 /** Keeps legacy lane-level enable flags and the master in one persisted candidate. */
 export function withReviewTrackEnabled(
   state: QuickEditAdvancedState,

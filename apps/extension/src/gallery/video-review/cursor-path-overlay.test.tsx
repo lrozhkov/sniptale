@@ -99,7 +99,13 @@ it('inspector adds a manual key and reset uses the existing content writer witho
   const onPolicyChange = vi.fn();
   act(() =>
     root.render(
-      <ReviewCursorPathEditor path={path} time={1} disabled={false} onChange={onChange} />
+      <ReviewCursorPathEditor
+        path={path}
+        selectedKeyId="manual"
+        time={1}
+        disabled={false}
+        onChange={onChange}
+      />
     )
   );
   act(() =>
@@ -145,7 +151,13 @@ it('numeric tangent fields display the same automatic controls as canvas handles
   const onChange = vi.fn();
   act(() =>
     root.render(
-      <ReviewCursorPathEditor path={automatic} time={1} disabled={false} onChange={onChange} />
+      <ReviewCursorPathEditor
+        path={automatic}
+        selectedKeyId="manual"
+        time={1}
+        disabled={false}
+        onChange={onChange}
+      />
     )
   );
   expect(
@@ -327,7 +339,13 @@ it('tangent and policy numeric commits retain endpoints and use their independen
   const onPolicyChange = vi.fn();
   act(() =>
     root.render(
-      <ReviewCursorPathEditor path={path} time={1} disabled={false} onChange={onChange} />
+      <ReviewCursorPathEditor
+        path={path}
+        selectedKeyId="manual"
+        time={1}
+        disabled={false}
+        onChange={onChange}
+      />
     )
   );
   commitCursorNumber('videoEditor.sidebar.cursorFocusIncoming X', '-0.5');
@@ -380,6 +398,7 @@ it('key navigation and deletion keep empty-path authoring available within a kno
     root.render(
       <ReviewCursorPathEditor
         path={two}
+        selectedKeyId="manual"
         time={1}
         disabled={false}
         onChange={onChange}
@@ -691,4 +710,123 @@ it('offers three movement presets, keeps custom edits unselected and shares one 
   renderSettings(onPolicyChange.mock.lastCall![0]);
   expect(movement().querySelector('[aria-pressed="true"]')).toBeNull();
   expect(onChange).not.toHaveBeenCalled();
+});
+
+it('reveals a selected raw sample omitted by simplification and authors its canvas drag once', () => {
+  const recordedKey = {
+    id: 'raw',
+    segmentId: 'segment',
+    time: 1,
+    x: 0.7,
+    y: 0.4,
+    anchor: 'movement' as const,
+    interpolation: 'linear' as const,
+  };
+  const onChange = vi.fn<(value: CursorFocusPath) => void>();
+  const onSelect = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewCursorPathOverlay
+        path={path}
+        time={1}
+        width={100}
+        height={100}
+        selectedKeyId="raw"
+        recordedKey={recordedKey}
+        onChange={onChange}
+        onSeek={vi.fn()}
+        onSelect={onSelect}
+      />
+    )
+  );
+  const point = host.querySelector('[data-cursor-focus-key="raw"]')!;
+  expect(point).not.toBeNull();
+  expect(point.getAttribute('cx')).toBe('70');
+  expect(point.getAttribute('aria-pressed')).toBe('true');
+  expect(onChange).not.toHaveBeenCalled();
+  vi.spyOn(host.querySelector('svg')!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 100, 100)
+  );
+  act(() =>
+    point.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 70, clientY: 40 }))
+  );
+  act(() => window.dispatchEvent(new MouseEvent('pointermove', { clientX: 80, clientY: 60 })));
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  expect(onChange).toHaveBeenCalledOnce();
+  const result = onChange.mock.lastCall![0];
+  expect(result.segments[0]!.keys.find((key) => key.id === 'focus-override:raw')).toMatchObject({
+    anchor: 'manual',
+    time: 1,
+    x: 0.8,
+    y: 0.6,
+  });
+  expect(onSelect).toHaveBeenLastCalledWith('focus-override:raw', 1);
+  expect(recordedKey).toMatchObject({ x: 0.7, y: 0.4, anchor: 'movement' });
+  expect(path.segments[0]!.keys).toHaveLength(1);
+});
+
+it('keeps the original selected during a tangent drag when an override exists', () => {
+  const original = {
+    outgoing: { x: 0.4, y: 0.2 },
+    id: 'raw',
+    time: 1,
+    x: 0.25,
+    y: 0.25,
+    anchor: 'movement' as const,
+    interpolation: 'smooth' as const,
+  };
+  const candidate: CursorFocusPath = {
+    ...path,
+    segments: [
+      {
+        ...path.segments[0]!,
+        keys: [
+          original,
+          { ...original, id: 'focus-override:raw', anchor: 'manual', x: 0.5, y: 0.5 },
+          { ...original, id: 'end', time: 2, x: 0.9, y: 0.9 },
+        ],
+      },
+    ],
+  };
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewCursorPathOverlay
+        path={candidate}
+        selectedKeyId="raw"
+        time={1}
+        width={100}
+        height={100}
+        onChange={onChange}
+        onSeek={vi.fn()}
+      />
+    )
+  );
+  vi.spyOn(host.querySelector('svg')!, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 100,
+    height: 100,
+  } as DOMRect);
+  const tangent = host.querySelector('[aria-label="videoEditor.sidebar.cursorFocusOutgoing"]')!;
+  act(() =>
+    tangent.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        bubbles: true,
+        clientX: Number(tangent.getAttribute('cx')),
+        clientY: Number(tangent.getAttribute('cy')),
+      })
+    )
+  );
+  act(() => window.dispatchEvent(new MouseEvent('pointermove', { clientX: 70, clientY: 35 })));
+  expect(host.querySelector('[data-cursor-focus-key="raw"]')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  expect(
+    onChange.mock.lastCall![0].segments[0].keys.find((key: { id: string }) => key.id === 'raw')
+      .outgoing
+  ).toEqual({ x: 0.7, y: 0.35 });
 });

@@ -42,14 +42,17 @@ export function reviewSelectionExists(
   document: ReviewDocument,
   advanced: QuickEditAdvancedState,
   markers: readonly ReviewTelemetryMarker[] = [],
-  cursorFocusPath?: CursorFocusPath
+  cursorFocusPath?: CursorFocusPath,
+  cursorFocusKeys: readonly { id: string }[] = []
 ): boolean {
   if (selection.kind === 'none') return false;
   if (selection.kind === 'cursor-focus')
     return (
-      (cursorFocusPath ?? advanced.cursorFocusPath)?.segments.some((segment) =>
+      cursorFocusKeys.some((key) => key.id === selection.id) ||
+      ((cursorFocusPath ?? advanced.cursorFocusPath)?.segments.some((segment) =>
         segment.keys.some((key) => key.id === selection.id)
-      ) ?? false
+      ) ??
+        false)
     );
   if (selection.kind === 'webcam') return !!advanced.webcam?.enabled;
   if (selection.kind === 'webcam-position')
@@ -107,6 +110,7 @@ export function useReviewSelectionLifecycle(args: {
   advanced: QuickEditAdvancedState;
   markers?: readonly ReviewTelemetryMarker[];
   cursorFocusPath?: CursorFocusPath;
+  cursorFocusKeys?: readonly { id: string }[];
   deleteCursorFocus?(id: string): void;
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
@@ -162,7 +166,8 @@ export function useReviewSelectionLifecycle(args: {
         args.document,
         args.advanced,
         args.markers,
-        args.cursorFocusPath
+        args.cursorFocusPath,
+        args.cursorFocusKeys
       )
     )
       args.setSelection({ kind: 'none' });

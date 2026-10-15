@@ -291,7 +291,7 @@ export function ReviewTrackControls(props: {
     <fieldset
       disabled={props.busy}
       data-ui="gallery.videoReview.trackControls"
-      className="flex w-full items-center justify-end gap-1"
+      className="flex w-full items-center gap-1"
     >
       {features.mode === 'advanced' ? (
         <>
@@ -311,7 +311,11 @@ export function ReviewTrackControls(props: {
           </ReviewButton>
         </>
       ) : null}
-      {props.density ? <ReviewTrackHeightButton {...props.density} /> : null}
+      {props.density ? (
+        <div className="flex shrink-0 items-center">
+          <ReviewTrackHeightButton {...props.density} />
+        </div>
+      ) : null}
     </fieldset>
   );
 }

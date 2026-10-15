@@ -1,5 +1,15 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'cursor-timeline-consumers',
+    productionFile: 'apps/extension/src/features/video/project/cursor-focus-path/timeline.ts',
+    reason:
+      'Shared cursor controls and the standalone timeline prove picking and projected navigation.',
+    testFiles: [
+      'apps/extension/src/ui/cursor-focus-timeline-keys.test.tsx',
+      'apps/extension/src/video-editor/timeline/project/effect-lanes/cursor-focus-keys.test.tsx',
+    ],
+  },
+  {
     owner: 'review-audio-runtime-consumers',
     productionFile: 'apps/extension/src/gallery/video-review/use-review-audio-runtime.ts',
     reason:

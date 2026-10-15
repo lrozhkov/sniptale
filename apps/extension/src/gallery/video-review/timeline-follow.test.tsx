@@ -74,9 +74,6 @@ it('keeps source-time playback visible through cuts and clamps without seeking',
     const x = (time / 10) * width * 4 - viewport.scrollLeft;
     expect(x).toBeGreaterThanOrEqual(-1);
     expect(x).toBeLessThanOrEqual(width + 1);
-    expect(viewport.scrollLeft).toBeCloseTo(
-      Math.max(0, Math.min(width * 3, (time / 10) * width * 4 - width / 2))
-    );
     act(() => viewport.dispatchEvent(new Event('scroll')));
   }
   expect(props.onSeek).not.toHaveBeenCalled();
@@ -189,5 +186,43 @@ it('yields to accepted navigation outside viewport capture until the next Play',
   expect(viewport.scrollLeft).toBe(left);
   renderTimeline({ ...props, playing: false, time: 8, navigationRevision: 1 });
   renderTimeline({ ...props, playing: true, time: 8, navigationRevision: 1 });
+  expect(viewport.scrollLeft).toBeGreaterThan(left);
+});
+
+it('holds each playback page until the edge and advances by most of a viewport', () => {
+  const { host, props } = renderTimeline({ duration: 10, time: 0 });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  changeZoom(host, '50');
+  for (const [time, left] of [
+    [0, 0],
+    [1.5, 0],
+    [2.3, 0],
+    [2.375, 680],
+    [2.5, 680],
+    [3.5, 680],
+    [4.4, 680],
+    [4.5, 1360],
+    [10, 2400],
+    [0, 0],
+  ] as const) {
+    renderTimeline({ ...props, playing: true, time });
+    expect(viewport.scrollLeft).toBe(left);
+    act(() => viewport.dispatchEvent(new Event('scroll')));
+  }
+  expect(props.onSeek).not.toHaveBeenCalled();
+});
+
+it('keeps paging when a paused zoom scroll arrives after Play', () => {
+  const { host, props } = renderTimeline({ duration: 10, time: 5 });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  changeZoom(host, '50');
+  const left = viewport.scrollLeft;
+  renderTimeline({ ...props, playing: true });
+  act(() => viewport.dispatchEvent(new Event('scroll')));
+  renderTimeline({ ...props, playing: true, time: 8 });
   expect(viewport.scrollLeft).toBeGreaterThan(left);
 });

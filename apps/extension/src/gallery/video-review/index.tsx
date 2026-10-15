@@ -1,3 +1,4 @@
+import { setGalleryQuickEditUrl, clearGalleryQuickEditUrl } from '../platform/browser-driver';
 import { useReviewWorkspaceColor } from './workspace-color';
 import {
   useReviewInspectorNavigation,
@@ -19,9 +20,8 @@ import { ReviewLoadStatus, reviewErrorMessage } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { reviewSelectionLabel } from './selected-properties';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
-import { ReviewButton } from './controls';
 import { useReviewWaveforms } from './audio-waveform';
 import { ReviewTimelineBinding } from './timeline-binding';
 import { useLoadedReview, type LoadedReview } from './use-session';
@@ -294,6 +294,10 @@ export function VideoReview({
 }) {
   useAppLocale();
   const { resource, failed, retry } = useLoadedReview(aggregateId);
+  useEffect(() => {
+    setGalleryQuickEditUrl(aggregateId);
+    return () => clearGalleryQuickEditUrl(aggregateId);
+  }, [aggregateId]);
   return (
     <ReviewDialog>
       {resource ? (
@@ -304,13 +308,7 @@ export function VideoReview({
           onJoinPreview={onJoinPreview}
         />
       ) : (
-        <div className="space-y-4 p-4">
-          <ReviewButton label={translate('gallery.videoReview.back')} onClick={onBack} />
-          <ReviewLoadStatus failure={failed} />
-          {failed ? (
-            <ReviewButton label={translate('gallery.videoReview.retry')} onClick={retry} />
-          ) : null}
-        </div>
+        <ReviewLoadStatus failure={failed} onBack={onBack} onRetry={retry} />
       )}
     </ReviewDialog>
   );
@@ -334,6 +332,11 @@ function useReviewEditorNavigation(state: ReturnType<typeof useReviewEditorState
     exportRequest,
   });
   const historyCommands = {
+    onNavigateCursorFocus: (time: number, key?: (typeof state.cursorFocusKeys)[number]) => {
+      state.selectCursorFocusKey(key?.id, time);
+      navigation.setSection('selected');
+    },
+    onMoveCursorFocus: state.moveCursorFocusKey,
     onCursorFocusKey: (
       key: Parameters<
         NonNullable<Parameters<typeof ReviewTimelineBinding>[0]['onCursorFocusKey']>

@@ -308,7 +308,7 @@ test('manual camera offset pixels follow cut speed and loop transport', async ({
 });
 
 for (const width of [1280, 1920]) {
-  test(`timeline follows playback and respects manual navigation at ${width}`, async ({
+  test(`timeline pages playback and respects manual navigation at ${width}`, async ({
     page,
   }, info) => {
     await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
@@ -363,6 +363,14 @@ for (const width of [1280, 1920]) {
       expect(samples.at(-1)!.time).toBeGreaterThan(samples[0]!.time + 0.5);
       expect(samples.at(-1)!.left).toBeGreaterThan(samples[0]!.left);
       expect(samples.every((sample) => sample.x >= -1 && sample.x <= sample.width + 1)).toBe(true);
+      const advances = samples.slice(1).map((sample, index) => sample.left - samples[index]!.left);
+      expect(advances.filter((advance) => advance > 1).length).toBeGreaterThan(0);
+      expect(
+        advances.every((advance) => Math.abs(advance) <= 1 || advance >= samples[0]!.width * 0.8)
+      ).toBe(true);
+      expect(advances.filter((advance) => Math.abs(advance) <= 1).length).toBeGreaterThan(
+        samples.length / 2
+      );
       await writeFile(info.outputPath('timeline-follow.json'), JSON.stringify(samples, null, 2));
       await viewport.hover();
       const beforeWheel = await viewport.evaluate((node) => node.scrollLeft);
@@ -410,6 +418,85 @@ for (const width of [1280, 1920]) {
       if (width === 1280) {
         await page.setViewportSize({ width: 1200, height: 560 });
         await expect(viewport).toBeVisible();
+      }
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const width of [1280, 1920]) {
+  test(`quick project link restores editor and keeps opening navigation usable at ${width}`, async ({
+    page,
+    context,
+  }, info) => {
+    await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
+    const host = await startHostServer();
+    const ui = previewPlaybackControls(page);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': width === 1280 ? 'dark' : 'light',
+        },
+      });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?theme=${width === 1280 ? 'dark' : 'light'}`
+      );
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      // Hold source admission to inspect the actual opening surface without timing races.
+      await page.evaluate(
+        () =>
+          new Promise<void>((entered) => {
+            void navigator.locks.request(
+              'sniptale:assets:resource-readers',
+              { mode: 'exclusive' },
+              () => {
+                entered();
+                return new Promise<void>((release) =>
+                  document.addEventListener('release-opening-proof', () => release(), {
+                    once: true,
+                  })
+                );
+              }
+            );
+          })
+      );
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const opening = ui.review.locator('[data-ui="gallery.videoReview.opening"]');
+      await expect(opening.getByRole('status')).toBeVisible();
+      const address = page.url();
+      expect(new URL(address).searchParams.get('mode')).toBe('edit');
+      expect(new URL(address).searchParams.get('mediaId')).toBeTruthy();
+      await expect(opening.getByRole('button', { name: 'Back to viewer' })).toBeInViewport();
+      await page.screenshot({ path: info.outputPath('opening.png'), fullPage: false });
+      await opening.getByRole('button', { name: 'Back to viewer' }).click();
+      expect(new URL(page.url()).searchParams.has('mode')).toBe(false);
+      await page.evaluate(() => document.dispatchEvent(new Event('release-opening-proof')));
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(ui.review.locator('[data-ui="gallery.videoReview.stage"]')).toBeVisible();
+      expect(page.url()).toBe(address);
+      await page.reload();
+      await expect(ui.review.locator('[data-ui="gallery.videoReview.stage"]')).toBeVisible();
+      expect(page.url()).toBe(address);
+      const restored = await context.newPage();
+      try {
+        await restored.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
+        await applyHarnessBootstrap(restored, {
+          preserveMediaLibrary: true,
+          storage: { 'sniptale-locale-preference': 'en' },
+        });
+        await restored.goto(address);
+        await expect(restored.locator('[data-ui="gallery.videoReview.stage"]')).toBeVisible();
+        expect(restored.url()).toBe(address);
+        await previewPlaybackControls(restored).button('common.actions.close').click();
+        expect(new URL(restored.url()).searchParams.has('mode')).toBe(false);
+      } finally {
+        await restored.close();
       }
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));

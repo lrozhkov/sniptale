@@ -59,6 +59,9 @@ it('clips labels outside the time plane with a separate vertical scroll surface'
   );
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   expect(labels).not.toBeNull();
+  expect(labels!.style.scrollbarWidth).toBe('');
+  expect(labels!.firstElementChild?.className).toContain('sticky');
+  expect(labels!.style.scrollbarGutter).toBe('stable');
   const header = labels!.querySelector<HTMLElement>('[data-ui="gallery.videoReview.trackHeader"]')!;
   expect(header).not.toBeNull();
   expect(plane.contains(header)).toBe(false);

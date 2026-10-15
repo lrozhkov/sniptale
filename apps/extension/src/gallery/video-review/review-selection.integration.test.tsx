@@ -242,6 +242,8 @@ it('edits a selected speed range from its inspector through the same reversible 
         '[data-ui="gallery.videoReview.editingTools"] [aria-label="gallery.videoReview.removeEdit"]'
       )
     ).toBeNull();
+    expect(fixture.button('speedMode').getAttribute('aria-pressed')).toBe('false');
+    await fixture.click('speedMode');
     const toolbarRate = fixture.host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.editingTools"] [aria-label="gallery.videoReview.speedRate"]'
     )!;

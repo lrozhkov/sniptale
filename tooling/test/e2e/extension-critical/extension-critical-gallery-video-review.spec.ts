@@ -2625,14 +2625,14 @@ for (const variant of [
       const dragBy = async (seconds: number) => {
         const box = (await focus.boundingBox())!;
         const start = box.x + box.width / 2;
-        await page.keyboard.down('Shift');
+        await page.keyboard.down('Alt');
         await page.mouse.move(start, box.y + box.height / 2);
         await page.mouse.down();
         await page.mouse.move(start + (lane.width * seconds) / 12, box.y + box.height / 2, {
           steps: 10,
         });
         await page.mouse.up();
-        await page.keyboard.up('Shift');
+        await page.keyboard.up('Alt');
         await expect
           .poll(async () => (await focus.boundingBox())!.width)
           .toBeCloseTo(authored!.width, 0);

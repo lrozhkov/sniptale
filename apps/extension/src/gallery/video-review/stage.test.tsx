@@ -788,20 +788,59 @@ it('places native outer fade over the complete scene after blackout and disables
   expect(host.querySelector('[data-ui="gallery.videoReview.outerFade"]')).toBeNull();
 });
 
-it('keeps replacement feedback quiet until prolonged pending and exposes actual failure immediately', () => {
+it.each([false, true])(
+  'delays pending preview feedback with existing raster=%s and shows errors immediately',
+  (ready) => {
+    vi.useFakeTimers();
+    try {
+      presentation.active = true;
+      presentation.ready = ready;
+      presentation.phase = 'pending';
+      renderStage({});
+      const message = ready
+        ? 'gallery.videoReview.previewUpdating'
+        : 'gallery.videoReview.previewLoading';
+      expect(host.textContent).not.toContain(message);
+      act(() => vi.advanceTimersByTime(999));
+      expect(host.textContent).not.toContain(message);
+      act(() => vi.advanceTimersByTime(1));
+      expect(host.textContent).toContain(message);
+      presentation.phase = 'ready';
+      renderStage({});
+      expect(host.textContent).not.toContain(message);
+      presentation.phase = 'pending';
+      renderStage({});
+      expect(host.textContent).not.toContain(message);
+      presentation.phase = 'failed';
+      renderStage({});
+      expect(host.textContent).toContain('gallery.videoReview.previewFailed');
+      expect(host.querySelector('button[title="gallery.videoReview.retry"]')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);
+
+it('cancels brief preview preparation and restarts the delay for the next operation', () => {
   vi.useFakeTimers();
   try {
     presentation.active = true;
+    presentation.ready = false;
     presentation.phase = 'pending';
     renderStage({});
-    expect(host.textContent).not.toContain('gallery.videoReview.previewLoading');
-    expect(host.textContent).not.toContain('gallery.videoReview.previewUpdating');
-    act(() => vi.advanceTimersByTime(500));
-    expect(host.textContent).toContain('gallery.videoReview.previewUpdating');
-    presentation.phase = 'failed';
+    act(() => vi.advanceTimersByTime(600));
+    presentation.phase = 'ready';
     renderStage({});
-    expect(host.textContent).toContain('gallery.videoReview.previewFailed');
-    expect(host.querySelector('button[title="gallery.videoReview.retry"]')).not.toBeNull();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(host.textContent).not.toContain('gallery.videoReview.previewLoading');
+    presentation.phase = 'pending';
+    renderStage({});
+    act(() => vi.advanceTimersByTime(600));
+    expect(host.textContent).not.toContain('gallery.videoReview.previewLoading');
+    presentation.active = false;
+    renderStage({});
+    act(() => vi.advanceTimersByTime(1000));
+    expect(host.textContent).not.toContain('gallery.videoReview.previewLoading');
   } finally {
     vi.useRealTimers();
   }

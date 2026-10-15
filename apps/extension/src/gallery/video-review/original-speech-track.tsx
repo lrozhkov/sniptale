@@ -1,3 +1,4 @@
+import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
 import {
   reviewTrackMetrics,
   reviewTrackGestureLocked,
@@ -92,6 +93,7 @@ export function ReviewTextTrack(props: TextTrackProps) {
               aria-pressed={props.selectedId === fragment.id}
               aria-disabled={props.busy}
               data-text-id={fragment.id}
+              data-review-removal-key={`text:${fragment.id}`}
               data-dragging={gesture.draggingId === fragment.id ? 'true' : undefined}
               className={[
                 'absolute min-w-px touch-none select-none overflow-hidden rounded border px-3 text-left text-[11px]',
@@ -160,7 +162,9 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
       boundaryRange &&
       props.editor.document.fragments.some((fragment) => fragment.id === boundary.base.id)
       ? boundaryRange[boundary.edge]
-      : null
+      : null,
+    boundary?.base,
+    preview
   );
   const clearPreview = () => {
     previewRef.current = null;
@@ -208,10 +212,11 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     if (!current) return;
     const base = current.base;
     const limit = base.timeDomain === 'source' ? duration : props.editor.projection.resultDuration;
-    const delta =
+    const freeDelta =
       base.timeDomain === 'source'
         ? ((event.clientX - current.x) / current.width) * duration
         : props.editor.projection.delta(current.sourceAt, event.clientX - current.x, current.width);
+    const delta = textResizeDelta(props.editor, current, freeDelta, event.altKey);
     const shift = Math.max(-base.start, Math.min(limit - base.end, delta));
     const start =
       current.edge === 'move'
@@ -247,4 +252,37 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
       );
   };
   return { preview, draggingId: drag.current?.base.id, start, move, finish, cancel };
+}
+
+/** Snap in visible source pixels, then return a delta in the fragment's own clock. */
+function textResizeDelta(
+  editor: TextTrackProps['editor'],
+  gesture: { base: ReviewTextFragment; edge: 'start' | 'end' | 'move'; width: number },
+  delta: number,
+  bypass: boolean
+) {
+  if (bypass || gesture.edge === 'move') return delta;
+  const { base, edge, width } = gesture;
+  const sourceClock = base.timeDomain === 'source';
+  const requested = base[edge] + delta;
+  const time = sourceClock ? requested : editor.projection.source(requested, edge);
+  const playhead = editor.playhead(base);
+  const candidates = [
+    0,
+    editor.projection.duration,
+    sourceClock ? playhead : editor.projection.source(playhead),
+    ...editor.document.fragments
+      .filter((fragment) => fragment.id !== base.id)
+      .flatMap((fragment) => {
+        const span = editor.sourceInterval(fragment);
+        return [span.start, span.end];
+      }),
+  ];
+  const snap = snapTimelineTime(
+    time,
+    candidates,
+    (SNAP_THRESHOLD_PX * editor.projection.duration) / Math.max(1, width)
+  );
+  if (snap.candidate === null) return delta;
+  return (sourceClock ? snap.time : editor.projection.output(snap.time)) - base[edge];
 }

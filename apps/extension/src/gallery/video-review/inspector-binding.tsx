@@ -49,6 +49,7 @@ type InspectorState = Pick<
   | 'retryAdvanced'
   | 'setCursorFocusPath'
   | 'cursorFocusPath'
+  | 'cursorFocusKeys'
   | 'selectCursorFocusKey'
   | 'setMode'
   | 'setTrackVisibility'
@@ -600,6 +601,10 @@ function ReviewSelectionBinding({
         duration={resource.source.duration}
         onSelect={state.selectCursorFocusKey}
         selectedKeyId={state.activeSelection.id}
+        recordedKey={state.cursorFocusKeys.find(
+          (key) =>
+            state.activeSelection.kind === 'cursor-focus' && key.id === state.activeSelection.id
+        )}
         disabled={state.busy || state.playing || state.editing.exporter.phase !== 'idle'}
         onChange={state.setCursorFocusPath}
       />

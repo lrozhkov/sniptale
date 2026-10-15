@@ -89,6 +89,8 @@ type TimelineProps = {
   cursorFocusKeys?: readonly CursorFocusTimelineKey[];
   selectedCursorFocusId?: string;
   onCursorFocusKey?(key: CursorFocusTimelineKey): void;
+  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
+  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
   onAddCursorFocusKey?(time: number): void;
   actionsTrackVisible?: boolean;
   onMarker(marker: ReviewTelemetryMarker): void;
@@ -284,6 +286,9 @@ function ReviewTimelineEvents(
     | 'cursorFocusKeys'
     | 'selectedCursorFocusId'
     | 'onCursorFocusKey'
+    | 'onNavigateCursorFocus'
+    | 'onMoveCursorFocus'
+    | 'playing'
     | 'onAddCursorFocusKey'
     | 'duration'
     | 'time'
@@ -359,6 +364,11 @@ function ReviewTimelineEvents(
             ? { selectedCursorFocusId: props.selectedCursorFocusId }
             : {})}
           {...(props.onCursorFocusKey ? { onCursorFocusKey: props.onCursorFocusKey } : {})}
+          playing={props.playing}
+          {...(props.onNavigateCursorFocus
+            ? { onNavigateCursorFocus: props.onNavigateCursorFocus }
+            : {})}
+          {...(props.onMoveCursorFocus ? { onMoveCursorFocus: props.onMoveCursorFocus } : {})}
           {...(props.onAddCursorFocusKey ? { onAddCursorFocusKey: props.onAddCursorFocusKey } : {})}
         />
       </div>

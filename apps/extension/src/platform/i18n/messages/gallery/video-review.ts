@@ -1,3 +1,4 @@
+import { galleryVideoReviewTimelineMessages } from './video-review-timeline';
 import { galleryVideoReviewHistoryMessages } from './video-review-history';
 import { galleryVideoReviewAnimationMessages } from './video-review-animation';
 import { galleryVideoReviewActionAudioMessages } from './video-review-action-audio';
@@ -13,6 +14,7 @@ import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewTimelineMessages,
   trackSettings: { ru: 'Настройка дорожек', en: 'Track settings' },
   trackEnabled: { ru: 'Включено', en: 'Enabled' },
   trackLock: { ru: 'Заблокировать', en: 'Lock' },
@@ -148,7 +150,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
   webcamLoading: { ru: 'Загрузка камеры…', en: 'Loading camera…' },
   webcamSettings: { ru: 'Настройки камеры', en: 'Camera settings' },
   webcamHidden: { ru: 'Камера скрыта', en: 'Camera hidden' },
-  resizeTimeline: { ru: 'Изменить высоту таймлайна', en: 'Resize timeline' },
   resizePanelHint: {
     ru: 'Перетащите границу. Двойной щелчок или Enter — сбросить размер.',
     en: 'Drag to resize. Double-click or Enter to reset.',
@@ -290,8 +291,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
   toolbarUndo: { ru: 'Отменить', en: 'Undo' },
   toolbarRedo: { ru: 'Повторить', en: 'Redo' },
   toolbarNote: { ru: 'Заметка', en: 'Note' },
-  timelineStart: { ru: 'В начало (Home)', en: 'Go to start (Home)' },
-  timelineEnd: { ru: 'В конец (End)', en: 'Go to end (End)' },
   toolbarFragment: { ru: 'Фрагмент', en: 'Fragment' },
   precisePosition: { ru: 'Точное положение', en: 'Precise position' },
   preciseArea: { ru: 'Положение и размер', en: 'Position and size' },
@@ -301,8 +300,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Вырезать выделенный интервал или выбрать участок на таймлайне (C). В базовом режиме границы привязываются к ключевым кадрам видео.',
     en: 'Cut the selected interval or drag a range on the timeline (C). In basic mode, boundaries align to video keyframes.',
   },
-  resizeStart: { ru: 'Изменить начало участка', en: 'Resize interval start' },
-  resizeEnd: { ru: 'Изменить конец участка', en: 'Resize interval end' },
   cutMode: { ru: 'Вырезание', en: 'Cut mode' },
   applyCut: { ru: 'Вырезать диапазон', en: 'Cut range' },
   applyRange: { ru: 'Применить интервал', en: 'Apply range' },
@@ -410,7 +407,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
   normalTrackHeight: { ru: 'Обычная высота дорожки', en: 'Normal track height' },
   selectionStart: { ru: 'Начало выделения', en: 'Selection start' },
   selectionEnd: { ru: 'Конец выделения', en: 'Selection end' },
-  timelineZoom: { ru: 'Масштаб таймлайна', en: 'Timeline zoom' },
   enter: { ru: 'Быстрое редактирование', en: 'Quick edit' },
   openVideoEditor: { ru: 'Открыть в видеоредакторе', en: 'Open in video editor' },
   title: { ru: 'Разметка видео', en: 'Video review' },
@@ -509,8 +505,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   zoomAdd: { ru: 'Добавить фокусировку', en: 'Add focus' },
   focusRangeTool: { ru: 'Фокусировка на интервале', en: 'Focus on a range' },
   focusRangeHint: {
-    ru: 'Выделите интервал на дорожке фокусировки или примените к выбранному интервалу. При перемещении и изменении границ магнит притягивает к бегунку, краям видео и видимых участков. Shift временно отключает магнит.',
-    en: 'Draw a range on the focus track or apply to the selected range. Moving and resizing snap to the playhead, video ends and visible interval edges. Hold Shift to bypass snapping.',
+    ru: 'Выделите интервал на дорожке фокусировки или примените к выбранному интервалу. При перемещении и изменении границ магнит притягивает к бегунку, краям видео и видимых участков. Alt временно отключает магнит.',
+    en: 'Draw a range on the focus track or apply to the selected range. Moving and resizing snap to the playhead, video ends and visible interval edges. Hold Alt to bypass snapping.',
   },
   zoomRegionLabel: { ru: 'Приближение', en: 'Zoom' },
   zoomEmptyHint: {

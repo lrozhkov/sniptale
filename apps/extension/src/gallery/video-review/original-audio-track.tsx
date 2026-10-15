@@ -1,3 +1,4 @@
+import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
 import {
   reviewTrackMetrics,
   reviewTrackGestureLocked,
@@ -239,6 +240,7 @@ function ReviewOriginalGainBlock(props: {
       title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
       data-ui="gallery.videoReview.originalAudioRange"
       data-audio-id={range.id}
+      data-review-removal-key={`original-audio:${range.id}`}
       className={`absolute z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
         rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
       style={{
@@ -274,6 +276,34 @@ function ReviewOriginalGainBlock(props: {
   );
 }
 
+/** Resolve optional edge magnets on the same source axis as the audio lane. */
+function originalAudioPointerTime(
+  event: PointerEvent<HTMLDivElement>,
+  duration: number,
+  props: Parameters<typeof ReviewOriginalAudioTrack>[0],
+  drag: Drag | null
+) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const time = Math.max(
+    0,
+    Math.min(duration, ((event.clientX - rect.left) / Math.max(1, rect.width)) * duration)
+  );
+  if (event.altKey || !drag?.edge || drag.edge === 'move') return time;
+  const candidates = [
+    0,
+    duration,
+    ...(props.edits ?? []).flatMap((edit) => [edit.start, edit.end]),
+    ...(props.editor?.originalRanges ?? props.original.ranges ?? [])
+      .filter((range) => range.id !== drag.id)
+      .flatMap((range) => [range.start, range.end]),
+  ];
+  return snapTimelineTime(
+    time,
+    candidates,
+    (SNAP_THRESHOLD_PX * duration) / Math.max(1, rect.width)
+  ).time;
+}
+
 /** One pointer transaction for range drawing/resize, with Escape and capture-loss cancellation. */
 function useOriginalAudioGesture(
   props: Parameters<typeof ReviewOriginalAudioTrack>[0],
@@ -292,20 +322,15 @@ function useOriginalAudioGesture(
       ? boundary.edge === 'start'
         ? boundary.from
         : boundary.to
-      : null
+      : null,
+    boundary,
+    boundary ? { start: boundary.from, end: boundary.to } : null
   );
   const lifetime = useOriginalAudioGestureLifetime({
     drag,
     drawing: !!props.editor?.originalTool,
     resetPreview: () => setPreview(null),
   });
-  const position = (event: PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return Math.max(
-      0,
-      Math.min(duration, ((event.clientX - rect.left) / Math.max(1, rect.width)) * duration)
-    );
-  };
   return {
     preview,
     handlers: {
@@ -317,7 +342,7 @@ function useOriginalAudioGesture(
         if (!item && !props.editor.originalTool) return;
         event.stopPropagation();
         event.preventDefault();
-        const at = position(event);
+        const at = originalAudioPointerTime(event, duration, props, drag.current);
         const id = item?.dataset['audioId'];
         if (reviewTrackGestureLocked(event.currentTarget)) {
           if (id) props.editor.selectOriginal(id);
@@ -362,7 +387,7 @@ function useOriginalAudioGesture(
       },
       onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
         if (!drag.current || event.pointerId !== drag.current.pointerId) return;
-        const at = position(event);
+        const at = originalAudioPointerTime(event, duration, props, drag.current);
         const current = drag.current;
         const length = current.end - current.start;
         if (current.edge === 'move') {

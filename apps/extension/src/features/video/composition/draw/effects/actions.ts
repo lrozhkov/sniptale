@@ -25,11 +25,12 @@ export function drawActionCompositionState(
     context.fillStyle = frame.color;
     context.lineWidth = frame.stroke * Math.max(0.2, sizeScale);
     if (frame.path?.length) {
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
       context.beginPath();
-      frame.path.forEach((item, index) => {
-        if (index === 0) context.moveTo(item.x, item.y);
-        else context.lineTo(item.x, item.y);
-      });
+      const scale = Math.max(0.2, sizeScale);
+      const path = simplifyGesturePath(frame.path, Math.max(4, frame.stroke * 3) * scale);
+      traceGesturePath(context, path, Math.max(12, frame.stroke * 6) * scale);
       context.stroke();
     }
     if (frame.area)
@@ -83,6 +84,74 @@ export function drawActionCompositionState(
       break;
   }
   context.restore();
+}
+
+/** Display-only geometric tolerance removes capture jitter; telemetry and endpoints stay exact. */
+function simplifyGesturePath(points: readonly { x: number; y: number }[], tolerance: number) {
+  if (points.length < 3) return points;
+  const kept = new Set([0, points.length - 1]);
+  const pending: [number, number][] = [[0, points.length - 1]];
+  while (pending.length) {
+    const [start, end] = pending.pop()!;
+    const first = points[start]!;
+    const last = points[end]!;
+    const dx = last.x - first.x,
+      dy = last.y - first.y;
+    const length = dx * dx + dy * dy;
+    let worst = tolerance * tolerance;
+    let selected = -1;
+    for (let index = start + 1; index < end; index++) {
+      const point = points[index]!;
+      const along = length
+        ? Math.max(0, Math.min(1, ((point.x - first.x) * dx + (point.y - first.y) * dy) / length))
+        : 0;
+      const distance =
+        (point.x - first.x - along * dx) ** 2 + (point.y - first.y - along * dy) ** 2;
+      if (distance > worst) {
+        worst = distance;
+        selected = index;
+      }
+    }
+    if (selected >= 0) {
+      kept.add(selected);
+      pending.push([start, selected], [selected, end]);
+    }
+  }
+  return [...kept].sort((a, b) => a - b).map((index) => points[index]!);
+}
+
+/** Round only local corners; recorded endpoints and the current pointer stay exact. */
+function traceGesturePath(
+  context: CanvasRenderingContext2D,
+  points: readonly { x: number; y: number }[],
+  radius: number
+) {
+  const first = points[0]!;
+  context.moveTo(first.x, first.y);
+  for (let index = 1; index < points.length - 1; index++) {
+    const before = points[index - 1]!;
+    const point = points[index]!;
+    const after = points[index + 1]!;
+    const incoming = Math.hypot(point.x - before.x, point.y - before.y);
+    const outgoing = Math.hypot(after.x - point.x, after.y - point.y);
+    const distance = Math.min(radius, incoming / 2, outgoing / 2);
+    if (distance <= 0) {
+      context.lineTo(point.x, point.y);
+      continue;
+    }
+    context.lineTo(
+      point.x + ((before.x - point.x) * distance) / incoming,
+      point.y + ((before.y - point.y) * distance) / incoming
+    );
+    context.quadraticCurveTo(
+      point.x,
+      point.y,
+      point.x + ((after.x - point.x) * distance) / outgoing,
+      point.y + ((after.y - point.y) * distance) / outgoing
+    );
+  }
+  const last = points.at(-1)!;
+  if (points.length > 1) context.lineTo(last.x, last.y);
 }
 
 /** Shared manual-action overlay mapping for preview and exported output. */

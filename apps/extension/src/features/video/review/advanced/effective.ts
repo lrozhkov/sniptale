@@ -123,7 +123,10 @@ interface CursorRegionCache {
   facts: ReviewCursorFacts | null | undefined;
   regions: readonly QuickEditZoomRegion[];
 }
-const cursorRegions = new WeakMap<QuickEditAdvancedState, CursorRegionCache[]>();
+const cursorRegions = new WeakMap<
+  QuickEditAdvancedState | ReviewCursorFacts,
+  CursorRegionCache[]
+>();
 
 /** Derives the applied configuration without mutating the stored document. */
 export function resolveQuickEditEffectiveState(
@@ -187,7 +190,9 @@ function resolveCursorRegions(
     canvas: advanced ? state.canvas : undefined,
     header: advanced ? state.windowHeader : undefined,
   });
-  const cached = cursorRegions.get(state) ?? [];
+  // Immutable source facts survive unrelated settings snapshots; the signature owns invalidation.
+  const owner = cursorFacts?.facts ?? state;
+  const cached = cursorRegions.get(owner) ?? [];
   const previous = cached.find((entry) => entry.key === key && entry.facts === cursorFacts?.facts);
   if (previous) return previous.regions;
   const needsCursor =
@@ -249,7 +254,7 @@ function resolveCursorRegions(
   );
   cached.push({ key, facts: cursorFacts?.facts, regions });
   if (cached.length > 4) cached.shift();
-  cursorRegions.set(state, cached);
+  cursorRegions.set(owner, cached);
   return regions;
 }
 

@@ -101,7 +101,7 @@ export function useReviewEdits(props: {
     pending.current = true;
     try {
       if (await props.commit(before, after)) {
-        if (!before) setMode(kind);
+        if (!before) setMode(null);
         setSelectedEditId(after.id);
         props.setSelection({ kind: 'point', time: after.start });
         if (!before) props.seek(after.start);
