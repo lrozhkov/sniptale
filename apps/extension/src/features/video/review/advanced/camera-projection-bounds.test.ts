@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as trajectoryBounds from '../../composition/motion/camera-trajectory';
 import {
   boundQuickEditCameraMotion,
   boundQuickEditCameraProjection,
@@ -289,4 +290,34 @@ describe('real camera projection interval bounds', () => {
       expect(evaluateCameraTrajectory(phase, time).x).toBeCloseTo(time);
     }
   );
+});
+
+it('bounds each trajectory derivative once for both axes of a motion interval', () => {
+  const trajectory = createCameraTrajectory({
+    start: 0,
+    end: 1,
+    from: { x: 200, y: 100 },
+    to: { x: 600, y: 200 },
+  });
+  const phase = createCameraTrajectory({
+    start: 0,
+    end: 1,
+    from: { x: 0, y: 0 },
+    to: { x: 1, y: 0 },
+  });
+  const bound = vi.spyOn(trajectoryBounds, 'cameraTrajectoryBounds');
+  try {
+    const result = boundQuickEditCameraMotion({
+      ...base,
+      trajectory,
+      phase,
+      start: 0.4,
+      end: 0.41,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.speed).toBeGreaterThan(0);
+    expect(bound).toHaveBeenCalledTimes(8);
+  } finally {
+    bound.mockRestore();
+  }
 });

@@ -301,7 +301,9 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
         scrubStep={0.05}
         value={region.transform.scale}
         previewValue={props.previewRegion?.transform.scale}
-        onPreview={(scale) => props.onPreview?.(scale === null ? null : { scale })}
+        onPreview={(scale) => {
+          if (!props.followCursor) props.onPreview?.(scale === null ? null : { scale });
+        }}
         onChange={(scale) => onChange({ scale })}
       />
       <ReviewDetails

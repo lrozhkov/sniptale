@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { evaluateQuickEditCameraAtTime } from './scene';
+import { evaluateQuickEditCameraAtTime, resolveReviewSceneCameraPlan } from './scene';
 import { createQuickEditZoomRegion } from './zoom';
 import { createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedContentState } from './validation';
@@ -92,4 +92,34 @@ it('retains local follow and fixed policies through receiving admission and reje
       },
     })
   ).toBeNull();
+});
+
+it('reuses camera plans after unrelated settings snapshots and invalidates changed inputs', () => {
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.zoom.enabled = true;
+  state.ui.tracks.zoom = true;
+  state.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'camera', at: 0, duration: 2, endMax: 4 }),
+      followCursor: true,
+    },
+  ];
+  const input = {
+    facts: { cursorTrack: null, actionEvents: [], signals: [] },
+    source: { width: 1000, height: 600, duration: 4 },
+  };
+  const original = resolveQuickEditEffectiveState(state, input);
+  const plan = resolveReviewSceneCameraPlan(original.zoomRegions, original.zoomRegions[0]!);
+  expect(plan).not.toBeNull();
+  const changed = structuredClone(state);
+  changed.audio.original.volume = 0.5;
+  const repeated = resolveQuickEditEffectiveState(changed, input);
+  expect(repeated.zoomRegions).toBe(original.zoomRegions);
+  expect(resolveReviewSceneCameraPlan(repeated.zoomRegions, repeated.zoomRegions[0]!)).toBe(plan);
+  changed.zoom.regions[0]!.transform.scale += 0.5;
+  expect(resolveQuickEditEffectiveState(changed, input).zoomRegions).not.toBe(original.zoomRegions);
+  expect(
+    resolveQuickEditEffectiveState(state, { ...input, facts: { ...input.facts } }).zoomRegions
+  ).not.toBe(original.zoomRegions);
 });
