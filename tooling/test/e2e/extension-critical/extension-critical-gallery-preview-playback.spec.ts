@@ -424,3 +424,82 @@ for (const width of [1280, 1920]) {
     }
   });
 }
+
+for (const width of [1280, 1920]) {
+  test(`quick project link restores editor and keeps opening navigation usable at ${width}`, async ({
+    page,
+    context,
+  }, info) => {
+    await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
+    const host = await startHostServer();
+    const ui = previewPlaybackControls(page);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': width === 1280 ? 'dark' : 'light',
+        },
+      });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?theme=${width === 1280 ? 'dark' : 'light'}`
+      );
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      // Hold source admission to inspect the actual opening surface without timing races.
+      await page.evaluate(
+        () =>
+          new Promise<void>((entered) => {
+            void navigator.locks.request(
+              'sniptale:assets:resource-readers',
+              { mode: 'exclusive' },
+              () => {
+                entered();
+                return new Promise<void>((release) =>
+                  document.addEventListener('release-opening-proof', () => release(), {
+                    once: true,
+                  })
+                );
+              }
+            );
+          })
+      );
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const opening = ui.review.locator('[data-ui="gallery.videoReview.opening"]');
+      await expect(opening.getByRole('status')).toBeVisible();
+      const address = page.url();
+      expect(new URL(address).searchParams.get('mode')).toBe('edit');
+      expect(new URL(address).searchParams.get('mediaId')).toBeTruthy();
+      await expect(opening.getByRole('button', { name: 'Back to viewer' })).toBeInViewport();
+      await page.screenshot({ path: info.outputPath('opening.png'), fullPage: false });
+      await opening.getByRole('button', { name: 'Back to viewer' }).click();
+      expect(new URL(page.url()).searchParams.has('mode')).toBe(false);
+      await page.evaluate(() => document.dispatchEvent(new Event('release-opening-proof')));
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(ui.review.locator('[data-ui="gallery.videoReview.stage"]')).toBeVisible();
+      expect(page.url()).toBe(address);
+      await page.reload();
+      await expect(ui.review.locator('[data-ui="gallery.videoReview.stage"]')).toBeVisible();
+      expect(page.url()).toBe(address);
+      const restored = await context.newPage();
+      try {
+        await restored.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
+        await applyHarnessBootstrap(restored, {
+          preserveMediaLibrary: true,
+          storage: { 'sniptale-locale-preference': 'en' },
+        });
+        await restored.goto(address);
+        await expect(restored.locator('[data-ui="gallery.videoReview.stage"]')).toBeVisible();
+        expect(restored.url()).toBe(address);
+        await previewPlaybackControls(restored).button('common.actions.close').click();
+        expect(new URL(restored.url()).searchParams.has('mode')).toBe(false);
+      } finally {
+        await restored.close();
+      }
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

@@ -258,7 +258,7 @@ function useInitialRecordingPreview({
     }
 
     appliedRef.current = true;
-    clearGalleryRecordingPreviewUrlParams();
+    if (!quickEditRef.current) clearGalleryRecordingPreviewUrlParams();
     setPreview({
       ...(quickEditRef.current ? { initialMode: 'edit' as const } : {}),
       inspectorCollapsed: false,
