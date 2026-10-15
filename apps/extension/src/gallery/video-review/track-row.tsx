@@ -118,6 +118,7 @@ function ReviewTrackHeader({
       {track && track !== 'source' && controls?.configuring ? (
         <ProductToggle
           size="sm"
+          className="scale-75"
           checked={enabled}
           disabled={unavailable || controls.busy}
           aria-label={`${translate('gallery.videoReview.trackEnabled')}: ${props.label}`}

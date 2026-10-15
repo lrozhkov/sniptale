@@ -113,15 +113,18 @@ export function ReviewTimelinePanes(props: {
             [&_[data-ui="gallery.videoReview.trackHeader"]]:border-r-0`}
           style={{ paddingBottom: 'var(--review-scrollbar-height,0px)' }}
         >
-          <div ref={controls} className="relative shrink-0 overflow-hidden" />
           <div
             ref={labels}
             data-ui="gallery.videoReview.trackListViewport"
             onScroll={() => sync('labels')}
             inert={props.busy}
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
-            style={{ scrollbarWidth: 'auto', scrollbarGutter: 'stable' }}
+            style={{ scrollbarGutter: 'stable' }}
           >
+            <div
+              ref={controls}
+              className="sticky top-0 z-40 overflow-hidden bg-[var(--sniptale-color-surface-panel)]"
+            />
             <div ref={content} className="relative" />
           </div>
         </div>
@@ -170,7 +173,14 @@ function observeReviewPaneLayout(
       row.header.style.height = `${rect.height}px`;
       const label = row.header.querySelector<HTMLElement>('[data-track-label]');
       const actions = row.header.querySelector<HTMLElement>('[data-track-controls]');
-      natural = Math.max(natural, (label?.scrollWidth ?? 0) + (actions?.scrollWidth ?? 0) + 44);
+      const toggle = row.header.querySelector<HTMLElement>('[role="switch"]');
+      natural = Math.max(
+        natural,
+        (label?.scrollWidth ?? 0) +
+          (actions?.scrollWidth ?? 0) +
+          (toggle ? toggle.offsetWidth + 4 : 0) +
+          44
+      );
     }
     const scrollbar = Math.max(0, left.offsetWidth - left.clientWidth);
     const width = Math.min(root.clientWidth * 0.4 || 260, Math.ceil(natural + scrollbar));
