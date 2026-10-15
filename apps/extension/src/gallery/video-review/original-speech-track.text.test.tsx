@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { translate, formatNumber } from '../../platform/i18n';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -242,3 +243,41 @@ it('refuses stale or out-of-project edits and supports manual split/merge/remova
   });
   expect(current.fragments).toHaveLength(0);
 });
+
+it.each(['source', 'result'] as const)(
+  'shows accepted %s text duration at both resize limits and clears on capture loss',
+  async (domain) => {
+    act(() => root.render(<Fixture domain={domain} />));
+    const block = prepare();
+    const readout = () =>
+      host.querySelector('[data-ui="gallery.videoReview.resizeDuration"]')?.textContent;
+    const duration = (value: number) =>
+      translate('gallery.videoReview.resizeDuration').replace(
+        '{duration}',
+        translate('gallery.videoReview.resizeSeconds').replace(
+          '{value}',
+          formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }, 'ru')
+        )
+      );
+    await pointer(
+      block.querySelector('[data-text-edge="end"]')!,
+      'pointerdown',
+      domain === 'source' ? 200 : 400
+    );
+    await pointer(block, 'pointermove', 2000);
+    expect(readout()).toContain(duration(domain === 'source' ? 9 : 4));
+    expect(current.fragments[0]).toMatchObject({ start: 1, end: 2 });
+    await pointer(block, 'lostpointercapture', 2000);
+    expect(readout()).toBeUndefined();
+    await pointer(
+      block.querySelector('[data-text-edge="start"]')!,
+      'pointerdown',
+      domain === 'source' ? 100 : 200
+    );
+    await pointer(block, 'pointermove', 2000);
+    expect(readout()).toContain(duration(0.01));
+    await pointer(block, 'pointerup', 2000);
+    expect(readout()).toBeUndefined();
+    expect(current.fragments[0]).toMatchObject({ start: 1.99, end: 2 });
+  }
+);

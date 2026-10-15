@@ -35,6 +35,20 @@ import { useReviewDragEscape } from './timeline-drag';
 type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor'>;
 type FocusAxis = Pick<ReviewTrackProjection, 'duration' | 'source' | 'output'>;
 
+/** Focus feedback uses source seconds, including legacy ranges without a source anchor. */
+function focusSourceSpan(
+  range: FocusRange | undefined,
+  projection: ReviewTrackProjection | undefined
+) {
+  if (!range) return undefined;
+  return (
+    range.sourceAnchor ?? {
+      start: projection?.source(range.start) ?? range.start,
+      end: projection?.source(range.end, 'end') ?? range.end,
+    }
+  );
+}
+
 type ZoomTrackProps = {
   compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
@@ -190,6 +204,9 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
     setGuide(null);
   });
   const boundary = drag.current;
+  const originalRegion = props.regions.find((region) => region.id === boundary?.id);
+  const originalSpan = focusSourceSpan(originalRegion, props.projection);
+  const resizedSpan = focusSourceSpan(boundary?.range, props.projection);
   useReviewResizeBoundary(
     boundary,
     boundary &&
@@ -198,7 +215,9 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       ? (boundary.range.sourceAnchor?.[boundary.edge] ??
           props.projection?.source(boundary.range[boundary.edge], boundary.edge) ??
           boundary.range[boundary.edge])
-      : null
+      : null,
+    originalSpan,
+    resizedSpan
   );
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : region;

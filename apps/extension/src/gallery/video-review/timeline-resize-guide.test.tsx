@@ -4,8 +4,15 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewTimelineResizeGuide, useReviewResizeBoundary } from './timeline-resize-guide';
 
-function Boundary(props: { gesture: object; time: number }) {
-  useReviewResizeBoundary(props.gesture, props.time);
+vi.mock('../../platform/i18n/locale/hook', () => ({ useAppLocale: () => 'en' }));
+
+function Boundary(props: { gesture: object; time: number; before?: number; after?: number }) {
+  useReviewResizeBoundary(
+    props.gesture,
+    props.time,
+    props.before === undefined ? null : { start: 0, end: props.before },
+    props.after === undefined ? null : { start: 0, end: props.after }
+  );
   return null;
 }
 
@@ -92,6 +99,45 @@ it('updates the overlay without rendering unrelated track children', () => {
     act(() => host.querySelector('button')!.click());
     expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe('200px');
     expect(renders).toBe(1);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('shows accepted duration and signed change, including shortening and rounded zero', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const gesture = {};
+  const render = (after: number | null) =>
+    act(() =>
+      root.render(
+        <ReviewTimelineResizeGuide
+          hover={null}
+          viewport={{ current: null }}
+          gutter={0}
+          width={1000}
+          duration={10}
+        >
+          {after === null ? null : <Boundary gesture={gesture} time={4} before={2} after={after} />}
+        </ReviewTimelineResizeGuide>
+      )
+    );
+  const text = () =>
+    host.querySelector('[data-ui="gallery.videoReview.resizeDuration"]')?.textContent;
+  try {
+    render(3.25);
+    expect(text()).toContain('3.25');
+    expect(text()).toContain('2.00');
+    expect(text()).toContain('+1.25');
+    render(1.5);
+    expect(text()).toContain('−0.50');
+    render(1.999);
+    expect(text()).not.toContain('−');
+    expect(text()).toContain('0.00');
+    render(null);
+    expect(text()).toBeUndefined();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

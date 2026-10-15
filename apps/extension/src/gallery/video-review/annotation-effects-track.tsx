@@ -96,16 +96,16 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
   latest.current = props;
   const [preview, setPreview] = useState<(Range & { id: string | null }) | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
-  const boundary = drag.current;
+  const boundary = drag.current?.ready && !drag.current.ended ? drag.current : null;
   useReviewResizeBoundary(
     boundary,
     boundary &&
-      boundary.ready &&
-      !boundary.ended &&
       (boundary.edge === 'start' || boundary.edge === 'end') &&
       props.instances.some((instance) => instance.id === boundary.id)
       ? boundary.after[boundary.edge]
-      : null
+      : null,
+    boundary?.before,
+    boundary?.after
   );
   const reset = () => {
     setPreview(null);

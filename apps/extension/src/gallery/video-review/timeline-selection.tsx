@@ -82,22 +82,24 @@ export function ReviewSourceLane(props: SelectionProps) {
   );
 }
 
+type EditDrag = {
+  admission: ReturnType<typeof deferReviewGesture>;
+  x: number;
+  width: number;
+  edge: 'start' | 'end' | 'move';
+  range: { start: number; end: number };
+  moved: boolean;
+  node: HTMLDivElement;
+  pointerId: number;
+};
+
 function ReviewEditBlock(
   props: SelectionProps & { edit: ReviewEdit; onSnap(guide: number | null): void }
 ) {
   const { edit, duration, onSnap } = props;
   const [preview, setPreview] = useState<{ start: number; end: number } | null>(null);
   const [dragEdge, setDragEdge] = useState<'start' | 'end' | 'move' | null>(null);
-  const drag = useRef<{
-    admission: ReturnType<typeof deferReviewGesture>;
-    x: number;
-    width: number;
-    edge: 'start' | 'end' | 'move';
-    range: { start: number; end: number };
-    moved: boolean;
-    node: HTMLDivElement;
-    pointerId: number;
-  } | null>(null);
+  const drag = useRef<EditDrag | null>(null);
   useReviewDragEscape(drag, () => {
     setPreview(null);
     setDragEdge(null);
@@ -106,7 +108,9 @@ function ReviewEditBlock(
   const boundary = drag.current;
   useReviewResizeBoundary(
     boundary,
-    boundary && boundary.edge !== 'move' ? boundary.range[boundary.edge] : null
+    boundary && boundary.edge !== 'move' ? boundary.range[boundary.edge] : null,
+    edit,
+    boundary?.range
   );
   const committing = useRef(false);
   const cancel = () => {

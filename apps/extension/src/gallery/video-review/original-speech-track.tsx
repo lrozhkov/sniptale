@@ -160,7 +160,9 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
       boundaryRange &&
       props.editor.document.fragments.some((fragment) => fragment.id === boundary.base.id)
       ? boundaryRange[boundary.edge]
-      : null
+      : null,
+    boundary?.base,
+    preview
   );
   const clearPreview = () => {
     previewRef.current = null;

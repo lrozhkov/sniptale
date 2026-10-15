@@ -10,10 +10,20 @@ import { createTrackProjection } from './track-projection';
 import { reconcileReviewFocus } from '../../features/video/review/focus-edits';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
-vi.mock('../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../platform/i18n')>()),
-  translate: (key: string) => key,
-}));
+vi.mock('../../platform/i18n', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../platform/i18n')>();
+  return {
+    ...actual,
+    translate: (...args: Parameters<typeof actual.translate>) =>
+      [
+        'gallery.videoReview.resizeDuration',
+        'gallery.videoReview.resizeBefore',
+        'gallery.videoReview.resizeSeconds',
+      ].includes(args[0])
+        ? actual.translate(...args)
+        : args[0],
+  };
+});
 
 let root: Root;
 let host: HTMLDivElement;
@@ -718,5 +728,37 @@ it.each(['zoom', 'spotlight'] as const)(
         expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
       }
     }
+  }
+);
+
+it.each(['start', 'end'] as const)(
+  'shows unchanged source duration on initial %s capture of legacy focus across Speed',
+  async (edge) => {
+    const projection = createTrackProjection(10, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 2,
+        end: 6,
+        requestedStart: 2,
+        requestedEnd: 6,
+        rate: 2,
+        audio: 'speed',
+      },
+    ]);
+    const track = renderTrack([zoom('legacy', 2.5, 3.5)], vi.fn(), null, { projection });
+    const block = track.blocks[0]!;
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    await track.event(
+      block.querySelector(`[data-zoom-edge="${edge}"]`)!,
+      'pointerdown',
+      edge === 'start' ? 300 : 500
+    );
+    const readout = host.querySelector('[data-ui="gallery.videoReview.resizeDuration"]');
+    expect(readout?.textContent).toBe('Duration 2.00 sWas 2.00 s · 0.00 s');
   }
 );

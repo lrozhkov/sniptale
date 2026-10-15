@@ -292,7 +292,9 @@ function useOriginalAudioGesture(
       ? boundary.edge === 'start'
         ? boundary.from
         : boundary.to
-      : null
+      : null,
+    boundary,
+    boundary ? { start: boundary.from, end: boundary.to } : null
   );
   const lifetime = useOriginalAudioGestureLifetime({
     drag,
