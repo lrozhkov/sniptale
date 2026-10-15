@@ -108,7 +108,9 @@ export function ReviewTimelinePanes(props: {
           grid-cols-[var(--review-label-width,192px)_minmax(0,1fr)] overflow-hidden"
       >
         <div
-          className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--sniptale-color-surface-panel)]"
+          className={`flex min-h-0 min-w-0 flex-col overflow-hidden border-r
+            border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
+            [&_[data-ui="gallery.videoReview.trackHeader"]]:border-r-0`}
           style={{ paddingBottom: 'var(--review-scrollbar-height,0px)' }}
         >
           <div ref={controls} className="relative shrink-0 overflow-hidden" />
@@ -118,7 +120,7 @@ export function ReviewTimelinePanes(props: {
             onScroll={() => sync('labels')}
             inert={props.busy}
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
-            style={{ scrollbarGutter: 'stable' }}
+            style={{ scrollbarWidth: 'none' }}
           >
             <div ref={content} className="relative" />
           </div>

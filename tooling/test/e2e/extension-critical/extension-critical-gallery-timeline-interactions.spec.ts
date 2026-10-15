@@ -93,7 +93,11 @@ async function inspectTimelinePanes(dialog: Locator, scroll = false) {
               if (!body) return Infinity;
               const a = header.getBoundingClientRect();
               const b = body.getBoundingClientRect();
-              return Math.max(Math.abs(a.top - b.top), Math.abs(a.bottom - b.bottom));
+              return Math.max(
+                Math.abs(a.top - b.top),
+                Math.abs(a.bottom - b.bottom),
+                Math.abs(a.right - b.left)
+              );
             })
           );
         })
@@ -145,7 +149,7 @@ async function inspectTimelinePanes(dialog: Locator, scroll = false) {
   });
   expect(clipping).toMatchObject({ separated: true, labelOverflow: 'hidden' });
   expect(clipping.rangeDifference).toBeLessThanOrEqual(1);
-  expect(clipping.labelBar).toBeGreaterThan(0);
+  expect(clipping.labelBar).toBe(0);
   expect(clipping.timeBar).toBeGreaterThan(0);
 }
 

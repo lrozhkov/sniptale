@@ -87,7 +87,7 @@ it('groups cursor telemetry without losing captured sample identities', async ()
   expect(props.onMarker).toHaveBeenCalledWith(action);
 });
 
-it('groups colliding actions into three lanes without losing dense tail selection', async () => {
+it('groups colliding actions within its populated lane without losing dense tail selection', async () => {
   const markers = [0, 1, 2, 3, 4].map((index) => ({
     ref: { kind: 'action' as const, id: `click${index}` },
     eventType: 'CLICK',
@@ -96,8 +96,8 @@ it('groups colliding actions into three lanes without losing dense tail selectio
   }));
   const { host, props } = renderTimeline({ markers });
   const strip = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!;
-  // The lane stack stays at three visible rows; overflow remains selectable in the group.
-  expect(strip.style.height).toBe('68px');
+  // Dense events share one row; every group member remains selectable.
+  expect(strip.style.height).toBe('20px');
   expect(strip.className).toContain('overflow-hidden');
   const markerButtons = [
     ...strip.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventClick"]'),

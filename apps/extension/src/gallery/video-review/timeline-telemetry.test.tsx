@@ -54,40 +54,25 @@ const render = (markers: ReviewTelemetryMarker[]) =>
     );
   });
 
-it('distinguishes captured empty cursor observations from unavailable and unknown without adding rows', () => {
-  for (const pointer of ['available', 'unavailable', 'unknown'] as const) {
-    act(() =>
-      root.render(
-        <ReviewTelemetryStrip
-          markers={[]}
-          duration={10}
-          time={0}
-          width={1000}
-          zoom={1}
-          onMarker={vi.fn()}
-          captureCapabilities={{
-            version: 1,
-            pointer,
-            keyboard: 'available',
-            wheel: 'available',
-            coverage: 'document',
-          }}
-        />
-      )
-    );
-    const row = host.querySelector('[data-history-family="cursor"]')!;
-    expect(row.getAttribute('data-history-coverage')).toBe(pointer);
-    if (pointer === 'available') {
-      expect(row.textContent).toBe('');
-    } else {
-      const suffix = pointer === 'unavailable' ? 'Unavailable' : 'Unknown';
-      expect(row.textContent).toContain(`gallery.videoReview.historyCapture${suffix}`);
-    }
-    expect(host.querySelectorAll('[data-history-family]')).toHaveLength(3);
-    expect(
-      host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')?.style.height
-    ).toBe('68px');
-  }
+it('keeps one empty row without showing absent event families', () => {
+  render([]);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(0);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
+});
+
+it('packs populated families in semantic order without empty rows', () => {
+  render([
+    { ...marker('action', 'mouse', 1), eventType: 'CLICK' },
+    { ref: { kind: 'cursor', id: 'cursor' }, eventType: 'cursor', start: 2, end: 3 },
+  ]);
+  expect(host.querySelector('[data-history-family="keyboard"]')).toBeNull();
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  expect(host.querySelector<HTMLElement>('[data-history-family="mouse"] button')!.style.top).toBe(
+    '0px'
+  );
+  expect(host.querySelector<HTMLElement>('[data-history-family="cursor"] button')!.style.top).toBe(
+    '24px'
+  );
 });
 
 it('reserves semantic row pitch and groups collisions within the mouse row', () => {
@@ -99,7 +84,7 @@ it('reserves semantic row pitch and groups collisions within the mouse row', () 
   expect(host.querySelectorAll('[data-ui="gallery.videoReview.historyCluster"]')).toHaveLength(1);
   expect(
     host.querySelector('[data-ui="gallery.videoReview.historyCluster"]')?.parentElement?.style.top
-  ).toBe('24px');
+  ).toBe('0px');
 });
 
 it('groups overflow within three rows and exposes every member for selection', async () => {
@@ -123,7 +108,7 @@ it('groups overflow within three rows and exposes every member for selection', a
     )
   );
   const strip = host.firstElementChild as HTMLDivElement;
-  expect(strip.style.height).toBe('68px');
+  expect(strip.style.height).toBe('20px');
   expect(strip.className).not.toContain('overflow-y-auto');
   const cluster = host.querySelector<HTMLButtonElement>(
     '[data-ui="gallery.videoReview.historyCluster"] button'
@@ -137,20 +122,6 @@ it('groups overflow within three rows and exposes every member for selection', a
   expect(options[8]!.textContent).toContain('gallery.videoReview.clickAnimation');
   await act(async () => options[8]!.click());
   expect(onMarker).toHaveBeenCalledWith(markers[8]);
-});
-
-it('reserves all three semantic rows for an empty history', () => {
-  render([]);
-  const strip = host.firstElementChild as HTMLDivElement;
-  expect(strip.style.height).toBe('68px');
-  const frames = [...strip.querySelectorAll('[data-history-family] > span[aria-hidden=true]')];
-  expect(frames.slice(0, 2).every((frame) => !frame.classList.contains('border-b'))).toBe(true);
-  expect(frames[2]!.classList.contains('border-b')).toBe(false);
-  const keyboard = strip.querySelector('[data-history-family=keyboard]')!;
-  expect(keyboard.getAttribute('title')).toBe('gallery.videoReview.historyKeyboardCoverage');
-  expect(document.getElementById(keyboard.getAttribute('aria-describedby')!)?.textContent).toBe(
-    keyboard.getAttribute('title')
-  );
 });
 
 it('exposes readable event text for a history interval with available space', () => {
@@ -186,7 +157,7 @@ it('holds groups during zoom then repacks without changing height or selected id
     );
   show(1);
   const strip = host.firstElementChild as HTMLDivElement;
-  expect(strip.style.height).toBe('68px');
+  expect(strip.style.height).toBe('20px');
   expect(host.querySelectorAll('button')).toHaveLength(1);
   show(50);
   expect(host.querySelectorAll('button')).toHaveLength(1);
@@ -197,14 +168,14 @@ it('holds groups during zoom then repacks without changing height or selected id
   await act(async () => vi.advanceTimersByTime(150));
   expect(host.querySelectorAll('button')).toHaveLength(10);
   expect(new Set([...host.querySelectorAll('button')].map((button) => button.style.top))).toEqual(
-    new Set(['24px'])
+    new Set(['0px'])
   );
-  expect(strip.style.height).toBe('68px');
+  expect(strip.style.height).toBe('20px');
   expect(host.querySelectorAll('[aria-pressed=true]')).toHaveLength(1);
   show(1);
   await act(async () => vi.advanceTimersByTime(250));
   expect(host.querySelectorAll('button')).toHaveLength(1);
-  expect(strip.style.height).toBe('68px');
+  expect(strip.style.height).toBe('20px');
 });
 
 it('tints an authored keyboard event without tinting a signal with the same local id', () => {
@@ -291,4 +262,72 @@ it('shows a brief cursor gap without a competing text label', () => {
   const gap = host.querySelector('[data-history-family="cursor"] button')!;
   expect(gap.textContent).toBe('');
   expect(gap.getAttribute('aria-label')).toContain('1');
+});
+
+it('keeps focus keys on the packed cursor row and adds keys from an empty history', () => {
+  const onAdd = vi.fn();
+  const onSelect = vi.fn();
+  const key = {
+    id: 'focus',
+    timelineId: 'segment:focus',
+    segmentId: 'segment',
+    binding: { kind: 'project' as const },
+    sourceTime: 2,
+    time: 2,
+    x: 0.5,
+    y: 0.5,
+    anchor: 'manual' as const,
+    interpolation: 'linear' as const,
+  };
+  const show = (keys: (typeof key)[]) =>
+    act(() =>
+      root.render(
+        <ReviewTelemetryStrip
+          markers={[]}
+          cursorFocusKeys={keys}
+          duration={10}
+          time={0}
+          width={1000}
+          zoom={1}
+          onMarker={vi.fn()}
+          onCursorFocusKey={onSelect}
+          onAddCursorFocusKey={onAdd}
+        />
+      )
+    );
+  show([key]);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.timelineKeys"]')!.style.top
+  ).toBe('0px');
+  show([]);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(0);
+  act(() =>
+    host.firstElementChild!.dispatchEvent(
+      new MouseEvent('dblclick', { bubbles: true, clientX: 500, clientY: 10 })
+    )
+  );
+  expect(onAdd).toHaveBeenCalledWith(5);
+});
+
+it('does not add a focus key when a packed mouse event receives a double click', () => {
+  const onAdd = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewTelemetryStrip
+        markers={[{ ...marker('action', 'click', 1), eventType: 'CLICK' }]}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={vi.fn()}
+        onAddCursorFocusKey={onAdd}
+        onCursorFocusKey={vi.fn()}
+      />
+    )
+  );
+  act(() =>
+    host.querySelector('button')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+  );
+  expect(onAdd).not.toHaveBeenCalled();
 });
