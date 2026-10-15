@@ -102,12 +102,17 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
         <ContentToolbarButton
           tone="utility"
           size="compact"
-          active={filtered}
+          active={showFilters}
+          className="review-history-filter-toggle"
+          aria-description={
+            filtered ? translate('gallery.videoReview.historyFiltersActive') : undefined
+          }
           aria-expanded={showFilters}
           aria-label={translate('gallery.videoReview.textFragmentFilters')}
           onClick={() => setShowFilters((value) => !value)}
         >
-          <SlidersHorizontal size={16} />
+          <SlidersHorizontal size={16} aria-hidden="true" />
+          {filtered ? <span className="review-history-filter-dot" aria-hidden="true" /> : null}
         </ContentToolbarButton>
       </div>
       {showFilters && <TextDocumentFilters filters={filters} onChange={setFilters} />}

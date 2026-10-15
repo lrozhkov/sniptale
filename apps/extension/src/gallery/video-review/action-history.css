@@ -13,7 +13,10 @@
   border-color: var(--sniptale-color-border-accent-strong);
 }
 [data-ui='gallery.videoReview.inspector']
-  fieldset[data-ui='gallery.videoReview.actionHistory']
+  :is(
+    fieldset[data-ui='gallery.videoReview.actionHistory'],
+    [data-ui='gallery.videoReview.textDocument']
+  )
   .review-history-search
   > input[type='search'] {
   flex: 1;
@@ -106,7 +109,10 @@
 }
 
 [data-ui='gallery.videoReview.inspector']
-  fieldset[data-ui='gallery.videoReview.actionHistory']
+  :is(
+    fieldset[data-ui='gallery.videoReview.actionHistory'],
+    [data-ui='gallery.videoReview.textDocument']
+  )
   .review-history-search
   > input[type='search']:focus-visible {
   outline: none;
@@ -138,6 +144,9 @@
 }
 .review-history-filter-toggle {
   position: relative;
+}
+.sniptale-btn.review-history-filter-toggle[data-active='true'] {
+  color: var(--sniptale-color-text-primary);
 }
 .review-history-filter-dot {
   position: absolute;

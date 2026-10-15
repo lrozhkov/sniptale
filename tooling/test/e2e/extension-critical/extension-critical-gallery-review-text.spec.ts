@@ -625,6 +625,115 @@ async function resizeInspectorContent(page: Page, dialog: Locator, width: number
   await expect.poll(readWidth).toBe(width);
 }
 
+async function inspectTextSearch(
+  document: Locator,
+  page: Page,
+  locale: 'ru' | 'en',
+  screenshot: string
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const search = document.getByRole('searchbox');
+  await expect(search).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(search).toHaveCSS('border-top-width', '0px');
+  const geometry = await search.evaluate((node) => {
+    const parent = node.parentElement!;
+    const style = getComputedStyle(parent);
+    const icon = parent.querySelector('svg')!;
+    return {
+      width: node.getBoundingClientRect().width,
+      available:
+        parent.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight) -
+        icon.getBoundingClientRect().width -
+        parseFloat(style.columnGap),
+    };
+  });
+  expect(Math.abs(geometry.width - geometry.available)).toBeLessThanOrEqual(1);
+  const toggle = document.getByRole('button', {
+    name: label('gallery.videoReview.textFragmentFilters'),
+    exact: true,
+  });
+  const dot = toggle.locator('.review-history-filter-dot');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).not.toHaveAttribute('data-active', 'true');
+  await expect(dot).toHaveCount(0);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('data-active', 'true');
+  await expect(dot).toHaveCount(0);
+  await search.fill('Длинный поисковый запрос для проверки ширины');
+  await expect(dot).toBeVisible();
+  await expect(toggle).toHaveAttribute(
+    'aria-description',
+    label('gallery.videoReview.historyFiltersActive')
+  );
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).not.toHaveAttribute('data-active', 'true');
+  await expect(dot).toBeVisible();
+  await expect(search).toHaveValue('Длинный поисковый запрос для проверки ширины');
+  await document
+    .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
+    .click();
+  await expect(search).toBeFocused();
+  await expect(dot).toHaveCount(0);
+  await toggle.click();
+  await search.focus();
+  const activeColor = await toggle.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-text-primary)';
+    node.append(probe);
+    const expected = getComputedStyle(probe).color;
+    probe.remove();
+    return expected;
+  });
+  await expect(toggle).toHaveCSS('color', activeColor);
+  await expect(search).toHaveCSS('outline-style', 'none');
+  await page.screenshot({ path: screenshot, fullPage: false });
+  await toggle.click();
+}
+
+for (const variant of [
+  { width: 1280, height: 560, locale: 'ru', theme: 'light' },
+  { width: 1920, height: 900, locale: 'en', theme: 'dark' },
+] as const) {
+  test(`text search filters ${variant.width} ${variant.locale}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: variant.width, height: variant.height });
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.textTrackOpen'), exact: true })
+        .click();
+      await inspectTextSearch(
+        dialog.locator('[data-ui="gallery.videoReview.textDocument"]'),
+        page,
+        variant.locale,
+        info.outputPath('text-search-filters.png')
+      );
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
 for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'light' },
   { width: 1920, height: 900, locale: 'en', theme: 'dark' },

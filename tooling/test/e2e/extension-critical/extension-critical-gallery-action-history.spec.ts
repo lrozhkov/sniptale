@@ -478,7 +478,11 @@ async function verifyHistorySearchSelection(
     name: label('gallery.videoReview.historyFilters'),
     exact: true,
   });
+  await expect(filterToggle).not.toHaveAttribute('data-active', 'true');
+  await expect(filterToggle.locator('.review-history-filter-dot')).toHaveCount(0);
   await filterToggle.click();
+  await expect(filterToggle).toHaveAttribute('data-active', 'true');
+  await expect(filterToggle.locator('.review-history-filter-dot')).toHaveCount(0);
   await history
     .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
     .click();
@@ -490,6 +494,11 @@ async function verifyHistorySearchSelection(
     .click();
   await expect(history.locator('li')).toHaveCount(0);
   await expect(filterToggle).toHaveAttribute('data-active', 'true');
+  await expect(filterToggle.locator('.review-history-filter-dot')).toBeVisible();
+  await filterToggle.click();
+  await expect(filterToggle).not.toHaveAttribute('data-active', 'true');
+  await expect(filterToggle.locator('.review-history-filter-dot')).toBeVisible();
+  await filterToggle.click();
   await expect(search).toBeVisible();
   await history
     .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
@@ -498,6 +507,8 @@ async function verifyHistorySearchSelection(
     .getByRole('option', { name: label('gallery.videoReview.historyAll'), exact: true })
     .click();
   await expect(history.locator('li')).toHaveCount(9);
+  await expect(filterToggle).toHaveAttribute('data-active', 'true');
+  await expect(filterToggle.locator('.review-history-filter-dot')).toHaveCount(0);
   await filterToggle.click();
   await history.locator('li input[type="checkbox"]').first().check();
   const master = history.getByRole('checkbox', {
@@ -506,6 +517,8 @@ async function verifyHistorySearchSelection(
   });
   await expect(master).toBeChecked({ indeterminate: true });
   await search.fill(label('gallery.videoReview.eventCursorIdle'));
+  await expect(filterToggle.locator('.review-history-filter-dot')).toBeVisible();
+  await expect(filterToggle).not.toHaveAttribute('data-active', 'true');
   await expect(history.locator('li')).toHaveCount(2);
   await expect(history).toContainText(label('gallery.videoReview.historyHiddenSelected'));
   await configure.click();

@@ -107,6 +107,7 @@ export function HistoryFilters({
   const normalized = historyFilterState(markers, value).value;
   const { query, type, status, longer, targetType, element } = normalized;
   const active =
+    !!query.trim() ||
     !!element ||
     targetType !== 'all' ||
     type !== 'all' ||
@@ -124,7 +125,7 @@ export function HistoryFilters({
           aria-label={translate('gallery.videoReview.historyFilters')}
           title={translate('gallery.videoReview.historyFilters')}
           aria-expanded={expanded}
-          active={active}
+          active={expanded}
           aria-description={
             active ? translate('gallery.videoReview.historyFiltersActive') : undefined
           }
