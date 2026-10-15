@@ -1,3 +1,4 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import type { PreviewPanelProps } from './types';
@@ -12,6 +13,14 @@ export function PreviewNavigationZone({
   const previous = direction === 'previous';
   const disabled = previous ? !navigation.hasPrevious : !navigation.hasNext;
 
+  const press = useCommandPress({
+    disabled,
+    onClick: (event) => {
+      if (event.detail > 0) event.currentTarget.blur();
+      (previous ? navigation.onPrevious : navigation.onNext)();
+    },
+  });
+
   return (
     <button
       type="button"
@@ -19,11 +28,9 @@ export function PreviewNavigationZone({
       aria-label={translate(previous ? 'gallery.preview.previous' : 'gallery.preview.next')}
       title={translate(previous ? 'gallery.preview.previous' : 'gallery.preview.next')}
       disabled={disabled}
-      onClick={(event) => {
-        // Arrow navigation belongs to the preview; pointer clicks must not retain a zone ring.
-        if (event.detail > 0) event.currentTarget.blur();
-        (previous ? navigation.onPrevious : navigation.onNext)();
-      }}
+      {...press.props}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
       className={`gallery-preview-navigation-${direction} group relative flex h-full w-6 shrink-0
         cursor-pointer items-center justify-center
         bg-transparent text-[var(--sniptale-color-text-secondary)] transition-colors
@@ -33,21 +40,23 @@ export function PreviewNavigationZone({
         disabled:cursor-default disabled:hover:bg-transparent
         disabled:hover:text-[var(--sniptale-color-text-secondary)]`}
     >
-      {previous ? (
-        <ChevronLeft
-          aria-hidden="true"
-          className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100
+      <span className="sniptale-command-content">
+        {previous ? (
+          <ChevronLeft
+            aria-hidden="true"
+            className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100
             group-focus-visible:opacity-100 group-disabled:opacity-0
             [@media(hover:none)]:opacity-60"
-        />
-      ) : (
-        <ChevronRight
-          aria-hidden="true"
-          className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100
+          />
+        ) : (
+          <ChevronRight
+            aria-hidden="true"
+            className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100
             group-focus-visible:opacity-100 group-disabled:opacity-0
             [@media(hover:none)]:opacity-60"
-        />
-      )}
+          />
+        )}
+      </span>
     </button>
   );
 }

@@ -1,4 +1,5 @@
-import { forwardRef, useRef, useState } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
+import { forwardRef, useContext, useRef, useState } from 'react';
 import type React from 'react';
 import type { ProductInputProps } from '@sniptale/ui/product-form-controls';
 import { focusNextCompactInput } from '@sniptale/ui/compact-inspector-controls/focus';
@@ -99,26 +100,35 @@ export function InspectorFieldClear(props: {
   target: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
 }) {
   const label = translate('shared.ui.clearField').replace('{field}', props.label);
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({
+    enabled: scoped,
+    onPointerDown: (event) => event.preventDefault(),
+    onClick: () => {
+      const input = props.target.current;
+      if (!input || input.matches(':disabled') || input.readOnly) return;
+      const prototype =
+        input instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(input, '');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+    },
+  });
+  const icon = <X size={14} aria-hidden="true" />;
   return (
     <button
+      {...press.props}
       type="button"
       className="sniptale-field-clear"
       aria-label={label}
       title={label}
-      onPointerDown={(event) => event.preventDefault()}
-      onClick={() => {
-        const input = props.target.current;
-        if (!input || input.matches(':disabled') || input.readOnly) return;
-        const prototype =
-          input instanceof HTMLTextAreaElement
-            ? HTMLTextAreaElement.prototype
-            : HTMLInputElement.prototype;
-        Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(input, '');
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.focus();
-      }}
+      data-command-press={scoped ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
+      data-command-chrome={scoped ? 'true' : undefined}
     >
-      <X size={14} aria-hidden="true" />
+      {scoped ? <span className="sniptale-command-content">{icon}</span> : icon}
     </button>
   );
 }

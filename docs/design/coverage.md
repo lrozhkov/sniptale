@@ -2,10 +2,13 @@
 
 [Design index](index.md)
 
-[Surface-specific patterns](surfaces.md) limit generic rules for popup, timeline, canvas, and embedded UI. This bounded inventory examines the quick video inspector and recording setup. It is not a whole-application coverage claim. Existing product source remains authoritative for specialized mechanics and state ownership.
+[Surface-specific patterns](surfaces.md) limit generic rules for popup, timeline, canvas, and embedded UI. This bounded inventory examines the quick video inspector, library, and recording setup. It is not a whole-application coverage claim. Existing product source remains authoritative for specialized mechanics and state ownership.
 
 | Reachable flow | Rule owners | Reference requirement |
 | --- | --- | --- |
+| Library cards, rows, filters and batch actions | Collections, Selection, Buttons | Preserve virtual geometry, hidden selection and separate open targets |
+| Library preview properties and related projects | Properties, Fields, Collections | Plain name/value rows, complete values, native Clear and navigation |
+| Library backup, import, recovery and deletion | Layers, Fields, Buttons | Visible warnings, retry, cancellation and reachable short-height actions |
 | Scene proportions, resolution, Fit/Crop | Choices, Compositions | Full-column menu and source/custom values |
 | Inspector All/category presentation | Navigation, Compositions | [Combined presentation](../../tooling/design-reference/examples/compositions/index.html), retained values |
 | Browser header style, address, icon import | Fields, Buttons, Compositions | [URL and asynchronous icon actions](../../tooling/design-reference/examples/compositions/index.html) |
@@ -33,6 +36,12 @@
 - apps/extension/src/popup/recording/video/setup/body.tsx
 - apps/extension/src/popup/recording/video/settings/layout.tsx
 - apps/extension/src/ui/popup-shell/inline-curtain/select.tsx
+
+## Library integration
+
+The library uses the existing shared command press owner and canonical interface family. Its visual scope includes admission, loading, navigation, filters, collections, preview, menus, and dialogs. Shared preview controls retain their pending-editor contract outside the migrated command scope.
+
+The actual-product composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-gallery-library-design.spec.ts`. It checks both reference languages, themes, primary viewports, header breakpoint neighbors, and below-minimum scrolling. Component tests retain failure, pending, recovery, keyboard, and draft coverage. Screenshots and run results belong to the migration record, not this document.
 
 ## Integration exclusions
 

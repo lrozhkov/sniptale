@@ -72,7 +72,7 @@ export function GalleryImportDropTarget(props: GalleryImportDropTargetProps) {
           role="status"
           aria-live="polite"
           className={
-            'pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-2xl ' +
+            'pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-[4px] ' +
             'border-2 border-dashed border-[var(--sniptale-color-border-accent-strong)] ' +
             'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)] ' +
             'shadow-[0_18px_48px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_22%,transparent)] ' +
@@ -84,10 +84,10 @@ export function GalleryImportDropTarget(props: GalleryImportDropTargetProps) {
               className="h-9 w-9 text-[var(--sniptale-color-accent)]"
               aria-hidden="true"
             />
-            <strong className="text-base font-semibold">
+            <strong className="text-sm leading-5 font-semibold">
               {translate('gallery.importModal.libraryDropTitle')}
             </strong>
-            <span className="text-sm text-[var(--sniptale-color-text-secondary)]">
+            <span className="text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
               {translate('gallery.importModal.libraryDropDescription')}
             </span>
           </div>

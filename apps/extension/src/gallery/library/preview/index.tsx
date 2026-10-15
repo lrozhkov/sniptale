@@ -1,3 +1,6 @@
+import './preview.css';
+import { toggleInspectorFieldEditing } from '../../../ui/compact-inspector-controls/layout';
+import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { hasGalleryKeyboardLayer } from '../keyboard/context';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { VideoReview } from '../../video-review';
@@ -62,7 +65,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
   return (
     <div className="shrink-0" data-ui="gallery.preview.inspectorHeader">
       <div className="min-w-0">
-        <h2 className="flex min-h-9 items-center gap-2 pr-20 text-base font-semibold">
+        <h2 className="flex min-h-9 items-center gap-2 pr-20 text-[14px] leading-5 font-semibold">
           <CategoryIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
           {FOLDER_LABELS[folder]}
         </h2>
@@ -74,7 +77,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
             className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2
               text-xs font-medium text-[var(--sniptale-color-warning)]"
           >
-            <span className="whitespace-nowrap">
+            <span className="min-w-0 break-words">
               {props.item.expiresAt
                 ? `${translate('gallery.app.draftExpires')} ${formatDate(props.item.expiresAt)}`
                 : translate('gallery.app.draftNoExpiration')}
@@ -96,33 +99,49 @@ function PreviewFilenameField(
 ) {
   const editable = !props.trashMode && isMetadataEditable(props.item);
   const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div>
+    <div className="gallery-preview-filename">
       <label
-        htmlFor={inputId}
-        className="mb-2 block text-xs font-semibold uppercase
-          tracking-[0.12em] text-[var(--sniptale-color-text-muted-strong)]"
+        htmlFor={editable ? inputId : undefined}
+        onClick={(event) => {
+          if (!editable) return;
+          event.preventDefault();
+          toggleInspectorFieldEditing(inputRef.current);
+        }}
+        className="gallery-preview-section-label"
       >
         {isGalleryScenarioItem(props.item)
           ? translate('gallery.preview.scenarioName')
           : translate('gallery.preview.filename')}
       </label>
-      {props.trashMode ? (
-        <p className="break-words text-sm text-[var(--sniptale-color-text-primary)]">
+      {!editable ? (
+        <p className="break-words text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-primary)]">
           {props.filenameDraft}
         </p>
       ) : (
-        <input
-          id={inputId}
-          value={props.filenameDraft}
-          onChange={(event) => props.onFilenameChange(event.target.value)}
-          readOnly={!editable}
-          className="w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-          bg-[var(--sniptale-color-surface-panel)] px-3 py-2.5 text-sm
-          text-[var(--sniptale-color-text-primary)] outline-none transition
-          focus:border-[var(--sniptale-color-border-accent-strong)] read-only:cursor-default"
-        />
+        <div className="gallery-preview-filename-input">
+          <input
+            ref={inputRef}
+            id={inputId}
+            value={props.filenameDraft}
+            onChange={(event) => props.onFilenameChange(event.target.value)}
+            readOnly={!editable}
+            className="w-full min-w-0 bg-transparent text-[13px] font-medium leading-[18px]
+              text-[var(--sniptale-color-text-primary)] outline-none"
+          />
+          {props.filenameDraft ? (
+            <InspectorFieldClear
+              target={inputRef}
+              label={translate(
+                isGalleryScenarioItem(props.item)
+                  ? 'gallery.preview.scenarioName'
+                  : 'gallery.preview.filename'
+              )}
+            />
+          ) : null}
+        </div>
       )}
     </div>
   );
@@ -376,7 +395,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
           first.focus();
         }
       }}
-      className="fixed inset-0 z-40 flex
+      className="gallery-preview-panel fixed inset-0 z-40 flex
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_72%,black_20%)]
       "
     >
@@ -384,7 +403,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
         <div
           data-ui="gallery.preview.surface"
           className={`relative grid h-full w-full min-w-0 overflow-hidden
-            rounded-[var(--sniptale-radius-lg)]
+            rounded-[8px]
             border border-[var(--sniptale-color-border-soft)]
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)]
             text-[var(--sniptale-color-text-primary)] shadow-sm

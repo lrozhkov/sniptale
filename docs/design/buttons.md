@@ -25,7 +25,7 @@ Use 16px icons, 6px icon/text gaps, 10px compact horizontal padding, and the sha
 
 ## Toolbar and disclosure
 
-Inactive icon-only tools brighten their icon and show a faint neutral hover boundary, mixed at 28% secondary foreground. Selected tools retain no fill, an orange icon, and a 1px accent boundary mixed at 35%, rising to 55% on hover. Labeled choices retain neutral surfaces and normal text weight. Do not add checks merely to indicate toolbar selection. Use radio for exclusive tools and aria-pressed for independent modes. Programmatic state needs a visible non-hue alternative.
+Inactive icon-only tools brighten their icon and show a faint neutral hover boundary, mixed at 28% secondary foreground. Selected tools retain no fill, an orange icon, and a 1px accent boundary mixed at 35%, rising to 55% on hover. Labeled choices retain neutral surfaces and normal text weight. An icon row that selects a presentation remains a property choice. Its accepted value uses neutral selection, even when it resembles a toolbar. Do not add checks merely to indicate toolbar selection. Use radio for exclusive tools and aria-pressed for independent modes. Programmatic state needs a visible non-hue alternative.
 
 Physical pressure, selection, expansion, and focus remain independent. Use one toolbar Tab stop with arrow/Home/End focus movement. Moving focus does not activate a mode.
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -226,4 +226,39 @@ it('keeps suggestion selection as a draft until the explicit apply action', () =
   act(() => applyButton.click());
 
   expect(onSubmit).toHaveBeenCalledWith('alpha');
+});
+
+it('clears the tag draft without applying it and restores combobox focus', () => {
+  const onSubmit = vi.fn();
+  function Draft() {
+    const [value, setValue] = useState('alpha');
+    return (
+      <GalleryTagInput
+        allTags={['alpha', 'beta']}
+        explicitSubmit
+        onChange={setValue}
+        onSubmit={onSubmit}
+        placeholder="Enter tag"
+        value={value}
+      />
+    );
+  }
+  act(() => root?.render(<Draft />));
+  const input = container?.querySelector('input');
+  const clear = container?.querySelector('.sniptale-field-clear');
+  expect(clear).toBeInstanceOf(HTMLButtonElement);
+  act(() => (clear as HTMLButtonElement).click());
+  expect(input?.value).toBe('');
+  expect(input?.getAttribute('aria-label')).toBe('Enter tag');
+  expect(document.activeElement).toBe(input);
+  expect(onSubmit).not.toHaveBeenCalled();
+  expect(container?.querySelector('.sniptale-field-clear')).toBeNull();
+  expect(container?.querySelector('[role="listbox"]')).not.toBeNull();
+  expect(container?.textContent).not.toContain('gallery.app.apply');
+  setInputValue(input!, 'beta');
+  const apply = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === 'gallery.app.apply'
+  );
+  act(() => apply?.click());
+  expect(onSubmit).toHaveBeenCalledWith('beta');
 });

@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { Download, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -14,16 +15,16 @@ const statClassName =
   'border-r border-[var(--sniptale-color-border-soft)] px-3 py-1 last:border-r-0';
 
 const toggleClassName =
-  'flex cursor-pointer items-start gap-3 rounded-[8px] border border-[var(--sniptale-color-border-soft)] ' +
-  'bg-[var(--sniptale-color-surface-input)] px-3 py-2.5 text-left text-sm';
+  'flex cursor-pointer items-start gap-3 rounded-[4px] border border-[var(--sniptale-color-border-soft)] ' +
+  'bg-[var(--sniptale-color-surface-input)] px-3 py-2.5 text-left text-[13px] leading-[18px] font-medium';
 
 function SummaryStat(props: { label: string; value: string | number }) {
   return (
     <div className={statClassName}>
-      <div className="text-xs uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]">
+      <div className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]">
         {props.label}
       </div>
-      <div className="mt-1 text-lg font-semibold text-[var(--sniptale-color-text-primary)]">
+      <div className="mt-1 text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]">
         {props.value}
       </div>
     </div>
@@ -34,7 +35,7 @@ function DataClassRow(props: { count: number; label: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span>{props.label}</span>
-      <span className="font-mono text-xs text-[var(--sniptale-color-text-muted)]">
+      <span className="tabular-nums text-[13px] leading-[18px] text-[var(--sniptale-color-text-primary)]">
         {props.count}
       </span>
     </div>
@@ -56,10 +57,10 @@ function PrivacyToggle(props: {
         className="sniptale-checkbox mt-0.5"
       />
       <span>
-        <span className="block font-semibold text-[var(--sniptale-color-text-primary)]">
+        <span className="block font-medium text-[var(--sniptale-color-text-primary)]">
           {props.label}
         </span>
-        <span className="mt-1 block text-xs text-[var(--sniptale-color-text-secondary)]">
+        <span className="mt-1 block text-sm leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
           {props.description}
         </span>
       </span>
@@ -84,7 +85,7 @@ function BackupExportSummaryGrid(props: {
       : translate('gallery.backupExportModal.scopeAll');
 
   return (
-    <div className="mt-4 grid rounded-[8px] border border-[var(--sniptale-color-border-soft)] py-2 md:grid-cols-5">
+    <div className="mt-4 grid rounded-[4px] border border-[var(--sniptale-color-border-soft)] py-2 md:grid-cols-5">
       <SummaryStat
         label={translate('gallery.backupExportModal.assets')}
         value={props.summary.assetCount}
@@ -109,11 +110,17 @@ function BackupExportSummaryGrid(props: {
 function BackupDataClassesPanel({ summary }: Pick<BackupExportModalProps, 'summary'>) {
   return (
     <section className="mt-4 border-t border-[var(--sniptale-color-border-soft)] pt-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+      <div
+        className="flex items-center gap-2 text-[13px] leading-[18px] font-semibold
+        text-[var(--sniptale-color-text-primary)]"
+      >
         <ShieldCheck className="h-4 w-4 text-[var(--sniptale-color-success)]" />
         {translate('gallery.backupExportModal.dataClassesTitle')}
       </div>
-      <div className="mt-3 grid gap-2 text-sm text-[var(--sniptale-color-text-secondary)] md:grid-cols-2">
+      <div
+        className="mt-3 grid gap-2 text-[13px] leading-[18px] font-medium
+        text-[var(--sniptale-color-text-secondary)] md:grid-cols-2"
+      >
         <DataClassRow
           count={summary.assetCount}
           label={translate('gallery.backupExportModal.classMedia')}
@@ -194,9 +201,10 @@ function BackupExportActions(props: {
     props.options.includeWebSnapshots;
 
   return (
-    <div className="mt-5 flex flex-wrap justify-end gap-2">
+    <div className="mt-4 flex flex-wrap justify-end gap-2">
       {hasOptionalData ? (
-        <button
+        <ProductActionButton
+          compact
           type="button"
           onClick={() =>
             props.onOptionsChange(
@@ -209,30 +217,18 @@ function BackupExportActions(props: {
               })
             )
           }
-          className="rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-4 py-2 text-sm
-            text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]"
+          tone="secondary"
         >
           {translate('gallery.backupExportModal.supportBundle')}
-        </button>
+        </ProductActionButton>
       ) : null}
-      <button
-        type="button"
-        onClick={props.onClose}
-        className="rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-4 py-2 text-sm
-          text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]"
-      >
+      <ProductActionButton compact type="button" onClick={props.onClose} tone="secondary">
         {translate('common.actions.cancel')}
-      </button>
-      <button
-        type="button"
-        onClick={() => props.onExport(props.options)}
-        className="inline-flex items-center gap-2 rounded-[8px] border border-[var(--sniptale-color-accent)]
-          bg-[var(--sniptale-color-accent-soft)] px-4 py-2 text-sm font-semibold
-          text-[var(--sniptale-color-text-primary)]"
-      >
+      </ProductActionButton>
+      <ProductActionButton compact type="button" onClick={() => props.onExport(props.options)}>
         <Download className="h-4 w-4" />
         {translate('gallery.backupExportModal.export')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

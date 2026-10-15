@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { RotateCw } from 'lucide-react';
 import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -7,9 +8,9 @@ import { getPreviewOrigin, usePreviewSourceMetadata } from './source-metadata';
 
 function SourceRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-wrap justify-between gap-x-3 gap-y-1">
+    <div className="gallery-preview-property">
       <dt className="text-[var(--sniptale-color-text-secondary)]">{label}</dt>
-      <dd className="min-w-0 break-words font-medium">{value}</dd>
+      <dd className="min-w-0 break-words">{value}</dd>
     </div>
   );
 }
@@ -28,17 +29,9 @@ export function PreviewSourceField({
     item.sourceTitle?.trim() || (isGalleryScenarioExportItem(item) ? item.project.name : null);
   return (
     <section aria-label={translate('gallery.preview.source')}>
-      <h3
-        className="mb-2 text-xs font-semibold uppercase tracking-[0.12em]
-        text-[var(--sniptale-color-text-muted-strong)]"
-      >
-        {translate('gallery.preview.source')}
-      </h3>
-      <div
-        className="space-y-2 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-        bg-[var(--sniptale-color-surface-panel)] px-3 py-2.5 text-xs"
-      >
-        <dl className="space-y-2">
+      <h3 className="gallery-preview-section-label">{translate('gallery.preview.source')}</h3>
+      <div className="space-y-2 text-[13px] font-medium leading-[18px]">
+        <dl className="gallery-preview-properties">
           <SourceRow
             label={translate('gallery.preview.origin')}
             value={translate(getPreviewOrigin(item))}
@@ -103,14 +96,16 @@ export function PreviewSourceField({
         {metadata.status === 'unavailable' ? (
           <div>
             <p>{translate('gallery.preview.sourceUnavailable')}</p>
-            <button
+            <ProductActionButton
+              compact
+              tone="secondary"
               type="button"
               className={getControlSecondaryButtonClassName({ density: 'compact' })}
               onClick={metadata.retry}
             >
               <RotateCw className="h-4 w-4 shrink-0" aria-hidden="true" />
               {translate('gallery.preview.retrySource')}
-            </button>
+            </ProductActionButton>
           </div>
         ) : null}
       </div>

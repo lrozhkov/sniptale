@@ -352,11 +352,7 @@ it('wires import and confirm overlays to parent callbacks', async () => {
   confirmModalProps.onConfirm();
 
   expect(importModalProps.summary).toEqual(props.state.storage.pendingImport?.summary);
-  expect(confirmModalProps.dialogClassName).toContain('!p-0');
-  expect(confirmModalProps.dialogClassName).toContain('[&_.sniptale-modal-footer-sm]:!border-t-0');
-  expect(confirmModalProps.dialogClassName).toContain(
-    '[&_.sniptale-modal-footer-sm_button]:!rounded-[8px]'
-  );
+  expect(confirmModalProps.dialogClassName).toBe('sniptale-compact-workspace');
   expect(props.onImport).toHaveBeenCalledWith('replace');
   expect(props.onPendingImportClose).toHaveBeenCalledTimes(1);
   expect(props.onConfirmDialogClose).toHaveBeenCalledTimes(1);

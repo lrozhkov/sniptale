@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { Search } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { CommandPaletteAction, LocalizedCommandPaletteGroup } from './types';
@@ -42,14 +44,22 @@ function CommandPaletteResultRow(props: {
   onSelect: () => void;
   onHover: () => void;
 }) {
+  const compact = useContext(CommandPressScope);
+  const press = useCommandPress({
+    enabled: compact,
+    disabled: props.action.disabled,
+    onClick: props.onSelect,
+  });
   return (
     <button
+      {...press.props}
+      data-command-press={compact ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
       type="button"
       role="option"
       aria-selected={props.selected}
       data-selected={props.selected ? 'true' : 'false'}
       disabled={props.action.disabled}
-      onClick={props.onSelect}
       onMouseMove={props.onHover}
       className={buildResultRowClassName(props.selected, props.action.disabled)}
     >

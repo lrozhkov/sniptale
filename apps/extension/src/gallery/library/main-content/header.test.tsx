@@ -149,9 +149,7 @@ it('wires compact search, sort, and centered view-mode controls without manual r
 
   expect(container?.querySelector('header')?.className).toContain('min-h-12');
   expect(container?.querySelector('header')?.className).toContain('h-12');
-  expect(container?.querySelector('header')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
-  );
+  expect(container?.querySelector('header')?.className).toContain('rounded-[4px]');
   expect(container?.querySelector('header')?.className).toContain('z-30');
   expect(container?.querySelector('header')?.className).not.toContain('px-3');
   expect(segment?.className).toContain('lg:w-[19rem]');

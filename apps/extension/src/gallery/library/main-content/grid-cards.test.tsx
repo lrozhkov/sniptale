@@ -117,9 +117,7 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
   expect(onToggleSelection).toHaveBeenCalledWith('asset-1', { shiftKey: false });
   expect(onPreviewOpen).toHaveBeenCalledWith(firstItem);
   expectCompactGridPointerCursors(previewButton, selectionButtons[0]);
-  expect(previewButton.closest('article')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
-  );
+  expect(previewButton.closest('article')?.className).toContain('rounded-[4px]');
   expect(previewButton.closest('article')?.textContent).not.toContain('capture.png');
   expect(previewButton.getAttribute('title')).toBe('capture.png');
   const compactMetadata = previewButton

@@ -278,7 +278,7 @@ function MediaThumbFallback(props: { item: GalleryItem; showProjectHint: boolean
               {item.filename}
             </p>
             {duration !== null ? (
-              <p className="text-[10px] tabular-nums">{formatDurationLabel(duration)}</p>
+              <p className="text-[12px] tabular-nums">{formatDurationLabel(duration)}</p>
             ) : null}
           </div>
         ) : null}

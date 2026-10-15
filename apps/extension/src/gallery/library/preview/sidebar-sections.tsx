@@ -1,10 +1,8 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { canOpenGalleryProject } from '../items/types';
 import { getGalleryProjectSummary } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
-import {
-  getControlIconButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
+import { getControlIconButtonClassName } from '@sniptale/ui/control-language';
 import {
   Archive,
   ArrowUpRight,
@@ -47,49 +45,19 @@ import {
   openVideoEditorPage,
 } from '../../../platform/navigation/extension-pages';
 
-const previewMetadataCardClassName =
-  'flex items-center justify-between gap-3 border-b border-[var(--sniptale-color-border-soft)] ' +
-  'px-3 py-2 last:border-b-0';
-
-const previewMetadataGroupClassName =
-  'rounded-[8px] border border-[var(--sniptale-color-border-soft)] ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_56%,transparent)] ' +
-  'text-xs text-[var(--sniptale-color-text-secondary)]';
-
-const PREVIEW_TAG_CLASS_NAME = [
-  'inline-flex items-center gap-1 rounded-full border',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-info)_30%,var(--sniptale-color-border-soft)_70%)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-info)_10%,transparent)]',
-  'px-2.5 py-1 text-xs font-medium text-[var(--sniptale-color-info)] transition',
-  'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-info)_48%,var(--sniptale-color-border-soft)_52%)]',
-  'disabled:cursor-default',
-].join(' ');
-
-const previewActionButtonClassName = [
-  'w-full !justify-start !rounded-[8px] !px-3 text-left',
-  getControlSecondaryButtonClassName({ density: 'compact' }),
-].join(' ');
-
-const previewDangerActionButtonClassName = [
-  'w-full !justify-start !rounded-[8px] !px-3 text-left',
-  getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' }),
-].join(' ');
-
-const previewSectionLabelClassName =
-  'mb-2 text-xs font-semibold uppercase tracking-[0.12em] ' +
-  'text-[var(--sniptale-color-text-muted-strong)]';
-
-const previewActionGroupLabelClassName =
-  'mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.1em] ' +
-  'text-[var(--sniptale-color-text-muted-strong)]';
+const previewMetadataCardClassName = 'gallery-preview-property';
+const previewMetadataGroupClassName = 'gallery-preview-properties';
+const PREVIEW_TAG_CLASS_NAME = 'gallery-preview-tag';
+const previewActionButtonClassName = 'gallery-preview-action';
+const previewDangerActionButtonClassName = 'gallery-preview-action gallery-preview-action-danger';
+const previewSectionLabelClassName = 'gallery-preview-section-label';
+const previewActionGroupLabelClassName = 'gallery-preview-section-label';
 
 function PreviewMetadataCard(props: { label: string; value: string }) {
   return (
     <div className={previewMetadataCardClassName}>
-      <div className="text-[var(--sniptale-color-text-muted)]">{props.label}</div>
-      <div className="truncate text-right font-medium text-[var(--sniptale-color-text-primary)]">
-        {props.value}
-      </div>
+      <dt>{props.label}</dt>
+      <dd>{props.value}</dd>
     </div>
   );
 }
@@ -118,7 +86,9 @@ function PreviewActionButton(props: {
   const Icon = status === 'success' ? Check : props.icon;
   return (
     <div>
-      <button
+      <ProductActionButton
+        compact
+        tone="secondary"
         type="button"
         disabled={props.disabled || status === 'pending'}
         aria-label={props.children}
@@ -141,7 +111,7 @@ function PreviewActionButton(props: {
       >
         <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span role="status">{status === 'success' ? props.success : props.children}</span>
-      </button>
+      </ProductActionButton>
       {status === 'error' ? (
         <p role="alert" className="px-3 text-xs">
           {translate('gallery.preview.actionRetry')}
@@ -169,7 +139,9 @@ function PreviewTagList(props: { onRemoveTag?: (tag: string) => void; tagDrafts:
     <div className="flex flex-wrap gap-1.5" data-ui="gallery.preview.tags-list">
       {props.tagDrafts.map((tag) =>
         props.onRemoveTag ? (
-          <button
+          <ProductActionButton
+            compact
+            tone="secondary"
             key={tag}
             type="button"
             onClick={() => props.onRemoveTag?.(tag)}
@@ -178,7 +150,7 @@ function PreviewTagList(props: { onRemoveTag?: (tag: string) => void; tagDrafts:
           >
             <span className="max-w-40 truncate">{tag}</span>
             <X className="h-3 w-3 shrink-0" aria-hidden="true" />
-          </button>
+          </ProductActionButton>
         ) : (
           <span key={tag} className={PREVIEW_TAG_CLASS_NAME} title={tag}>
             <span className="max-w-40 truncate">{tag}</span>
@@ -201,7 +173,7 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
   if (isGalleryMediaItem(item)) {
     const recordingSource = item.recordingGroupView?.sourceLabel ?? item.sourceTitle;
     return (
-      <div className={previewMetadataGroupClassName}>
+      <dl className={previewMetadataGroupClassName}>
         <PreviewMetadataCard
           label={translate('gallery.preview.size')}
           value={formatBytes(item.size, 2)}
@@ -240,12 +212,12 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
             value={String(item.recordingGroupView.memberCount)}
           />
         ) : null}
-      </div>
+      </dl>
     );
   }
 
   return (
-    <div className={previewMetadataGroupClassName}>
+    <dl className={previewMetadataGroupClassName}>
       <PreviewMetadataCard
         label={translate('gallery.preview.type')}
         value={getGalleryItemKindLabel(item.kind)}
@@ -253,7 +225,10 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
       {isGalleryScenarioItem(item) &&
       item.project.availability === 'available' &&
       item.lifecycle?.trashedAt === undefined ? null : getGalleryProjectSummary(item) ? (
-        <p className="px-3 py-2">{getGalleryProjectSummary(item)}</p>
+        <div className={previewMetadataCardClassName}>
+          <dt>{translate('gallery.preview.projectMedia')}</dt>
+          <dd>{getGalleryProjectSummary(item)}</dd>
+        </div>
       ) : (
         <PreviewMetadataCard
           label={translate('gallery.preview.size')}
@@ -268,7 +243,7 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
         label={translate('gallery.app.updatedLabel')}
         value={formatDate(item.updatedAt)}
       />
-    </div>
+    </dl>
   );
 }
 
@@ -347,10 +322,13 @@ export function PreviewProjectUsage({
                 {project.name}
               </p>
             ) : (
-              <button
+              <ProductActionButton
+                compact
+                tone="secondary"
                 key={`${project.kind}:${project.id}`}
                 type="button"
-                className={previewActionButtonClassName}
+                className="gallery-preview-related"
+                title={project.name}
                 onClick={() => {
                   if (project.kind === 'video') void openVideoEditorPage(project.id, null);
                   if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
@@ -359,8 +337,8 @@ export function PreviewProjectUsage({
                 }}
               >
                 <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{project.name}</span>
-              </button>
+                <span className="min-w-0 break-words">{project.name}</span>
+              </ProductActionButton>
             )
           )}
         </div>
@@ -384,26 +362,14 @@ export function PreviewTagEditor(props: {
   const hasTags = props.tagDrafts.length > 0;
 
   const addButton = (
-    <button
+    <ProductActionButton
+      compact
+      tone="secondary"
       type="button"
       aria-label={translate('gallery.app.addTags')}
       title={hasTags ? translate('gallery.app.addTags') : undefined}
       onClick={() => setExpanded(true)}
-      className={
-        hasTags
-          ? `inline-flex h-7 w-7 items-center justify-center rounded-[6px]
-            text-[var(--sniptale-color-text-muted)] transition-colors
-            hover:bg-[var(--sniptale-color-surface-canvas)]
-            hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
-            focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]`
-          : `flex h-9 w-full items-center justify-start gap-2 rounded-[8px] border border-dashed
-            border-[var(--sniptale-color-border-soft)] px-3 text-xs font-medium
-            text-[var(--sniptale-color-text-secondary)] transition-colors
-            hover:border-[var(--sniptale-color-border-strong)]
-            hover:bg-[var(--sniptale-color-surface-canvas)]
-            hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
-            focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]`
-      }
+      className={hasTags ? 'gallery-preview-tag-add' : 'gallery-preview-action'}
     >
       {hasTags ? (
         <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -413,32 +379,30 @@ export function PreviewTagEditor(props: {
           {translate('gallery.app.addTags')}
         </>
       )}
-    </button>
+    </ProductActionButton>
   );
 
   return (
     <div>
       <div className="mb-2 flex min-h-7 items-center justify-between gap-2">
-        <div
-          className="text-xs font-semibold uppercase tracking-[0.12em]
-            text-[var(--sniptale-color-text-muted-strong)]"
-        >
-          {translate('gallery.preview.tags')}
-        </div>
+        <div className={previewSectionLabelClassName}>{translate('gallery.preview.tags')}</div>
         {editable && hasTags && !expanded ? addButton : null}
         {editable && expanded ? (
-          <button
+          <ProductActionButton
+            compact
+            tone="secondary"
             type="button"
             aria-label={translate('gallery.app.closeTagEditor')}
             title={translate('gallery.app.closeTagEditor')}
             onClick={() => setExpanded(false)}
-            className="sniptale-dismiss-button inline-flex h-7 w-7 items-center justify-center rounded-[6px]
+            data-command-chrome="true"
+            className="sniptale-dismiss-button inline-flex h-7 w-7 items-center justify-center rounded-[4px]
                transition-colors
                focus-visible:outline-none
               focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
+          </ProductActionButton>
         ) : null}
       </div>
       <div className="space-y-2">
@@ -494,7 +458,9 @@ function PreviewRestoreAction(
         {translate('gallery.preview.actions')}
       </div>
       <div className="space-y-2">
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           data-ui="gallery.preview.restore"
           disabled={pending.current || props.restoreBusy || !props.onRestoreTrash}
@@ -518,7 +484,7 @@ function PreviewRestoreAction(
           {translate(
             status === 'pending' ? 'gallery.app.restoringItem' : 'gallery.app.restoreItem'
           )}
-        </button>
+        </ProductActionButton>
         {status === 'failed' ? (
           <p role="alert" className="px-3 text-xs text-[var(--sniptale-color-danger)]">
             {translate('gallery.app.restoreItemFailed')}
@@ -552,7 +518,9 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
       {onReview || primaryLabel ? (
         <div className="space-y-1">
           {onReview ? (
-            <button
+            <ProductActionButton
+              compact
+              tone="secondary"
               type="button"
               data-ui="gallery.videoReview.enter"
               onClick={onReview}
@@ -560,13 +528,19 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
             >
               <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
               {translate('gallery.videoReview.enter')}
-            </button>
+            </ProductActionButton>
           ) : null}
           {primaryLabel ? (
-            <button type="button" onClick={onEdit} className={previewActionButtonClassName}>
+            <ProductActionButton
+              compact
+              tone="secondary"
+              type="button"
+              onClick={onEdit}
+              className={previewActionButtonClassName}
+            >
               <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               {translate(primaryLabel)}
-            </button>
+            </ProductActionButton>
           ) : null}
         </div>
       ) : null}
@@ -588,7 +562,9 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
     return (
       <>
         <PreviewRestoreAction {...props} />
-        <button
+        <ProductActionButton
+          compact
+          tone="danger"
           type="button"
           className={previewActionButtonClassName}
           onClick={(event) =>
@@ -597,7 +573,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           {translate('gallery.app.permanentDelete')}
-        </button>
+        </ProductActionButton>
       </>
     );
   const { item, onCopy, onDelete, onDownload, onResetChanges } = props;
@@ -711,18 +687,18 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
           data-ui="gallery.preview.lifecycle-actions"
           className="border-t border-[var(--sniptale-color-border-soft)] pt-2"
         >
-          <button
+          <ProductActionButton
+            compact
+            tone="danger"
             type="button"
             onClick={(event) =>
               void onDelete({ anchor: event.currentTarget, keyboard: event.detail === 0 })
             }
-            className={`${previewDangerActionButtonClassName}
-              min-w-0 !h-auto !min-h-9 !whitespace-normal !py-2
-              active:!translate-y-0 active:!bg-[var(--sniptale-color-surface-input)]`}
+            className={previewDangerActionButtonClassName}
           >
             <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             {translate('common.actions.delete')}
-          </button>
+          </ProductActionButton>
         </div>
       </div>
     </section>
@@ -739,7 +715,7 @@ export function PreviewPromotionAction(
   return (
     <PromotionAction
       key={props.item.id}
-      className={`${getControlIconButtonClassName()} !h-7 !w-7 !rounded-[6px]`}
+      className={`${getControlIconButtonClassName()} !h-8 !w-8 !rounded-[4px]`}
       onPromote={props.onPromote}
       visible
     />

@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { formatDate } from './date';
 import type { GalleryViewMode } from '../types';
 import type { GalleryItem } from '../items';
@@ -5,14 +6,8 @@ import { canOpenGalleryProject } from '../items/types';
 import { translate } from '../../../platform/i18n';
 import { ArrowUpRight } from 'lucide-react';
 
-const PROJECT_ACTION_CLASS_NAME = [
-  'inline-flex min-h-9 items-center justify-center rounded-[var(--sniptale-radius-md)] border',
-  'border-[var(--sniptale-color-border-strong)] bg-[var(--sniptale-color-surface-panel)]',
-  'px-3 text-xs font-semibold text-[var(--sniptale-color-text-primary)] transition',
-  'hover:border-[var(--sniptale-color-border-accent-strong)] hover:bg-[var(--sniptale-color-surface-hover)]',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
-  'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-[var(--sniptale-color-border-strong)]',
-].join(' ');
+const PROJECT_ACTION_CLASS_NAME =
+  'gallery-project-open inline-flex items-center justify-start gap-1.5 text-left';
 
 /** Concise project content and availability, without treating projects as encoded files. */
 export function getGalleryProjectSummary(item: GalleryItem): string | null {
@@ -49,7 +44,10 @@ export function GalleryProjectOpenAction(props: {
   const available = canOpenGalleryProject(props.item);
   const iconOnly = props.layout === 'grid';
   return (
-    <button
+    <ProductActionButton
+      tone="secondary"
+      compact
+      data-command-chrome={iconOnly ? 'true' : undefined}
       type="button"
       disabled={!available}
       aria-label={iconOnly ? translate('gallery.preview.openInEditor') : undefined}
@@ -76,7 +74,7 @@ export function GalleryProjectOpenAction(props: {
       ) : (
         translate('gallery.preview.openInEditor')
       )}
-    </button>
+    </ProductActionButton>
   );
 }
 
@@ -111,15 +109,15 @@ export function GalleryProjectDetails(props: {
           <button
             type="button"
             onClick={() => props.onPreviewOpen(props.item)}
-            className={`${isCompact ? 'text-xs leading-4' : 'text-sm leading-5'}
-              min-w-0 truncate text-left font-semibold text-[var(--sniptale-color-text-primary)]
+            className={`text-[13px] leading-[18px]
+              min-w-0 truncate text-left font-medium text-[var(--sniptale-color-text-primary)]
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]`}
             title={props.item.filename}
           >
             {props.item.filename}
           </button>
           <div
-            className={`${isCompact ? 'text-[10px] leading-3' : 'text-xs leading-4'}
+            className={`${isCompact ? 'text-[12px] leading-3' : 'text-[13px] leading-[18px]'}
               truncate text-[var(--sniptale-color-text-secondary)]`}
             title={gridSummary}
           >

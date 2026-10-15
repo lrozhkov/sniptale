@@ -1,8 +1,8 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { isGalleryScenarioExportItem } from '../items';
 import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { Archive, Download, FolderArchive, Trash2, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { GalleryTagInputDisclosure } from '../tags/disclosure';
 import type { GalleryMainContentProps } from './types';
@@ -22,18 +22,11 @@ type GallerySelectionBarProps = Pick<
   | 'selectionTagDraft'
 >;
 
-const galleryDangerSelectionActionClassName = [
-  getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' }),
-  '!h-8 !min-h-8 !rounded-[8px] !px-2.5 !text-xs',
-].join(' ');
-
-const gallerySelectionActionClassName = [
-  getControlSecondaryButtonClassName({ density: 'compact' }),
-  '!h-8 !min-h-8 !rounded-[8px] !px-2.5 !text-xs',
-].join(' ');
+const galleryDangerSelectionActionClassName = '!h-8 !min-h-8 !rounded-[4px] !px-2.5 !text-xs';
+const gallerySelectionActionClassName = '!h-8 !min-h-8 !rounded-[4px] !px-2.5 !text-xs';
 
 const galleryClearSelectionClassName = [
-  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]',
+  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
   'text-[var(--sniptale-color-text-muted)] transition-colors',
   'hover:bg-[var(--sniptale-color-surface-canvas)]',
   'hover:text-[var(--sniptale-color-text-primary)]',
@@ -66,7 +59,9 @@ function GallerySelectionActions(
 ) {
   return (
     <>
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         aria-label={translate('gallery.app.selectionBackup')}
         title={translate('gallery.app.selectionBackup')}
@@ -75,8 +70,10 @@ function GallerySelectionActions(
       >
         <Archive className="h-4 w-4" aria-hidden="true" />
         <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
-      </button>
-      <button
+      </ProductActionButton>
+      <ProductActionButton
+        tone="danger"
+        compact
         type="button"
         aria-label={translate('common.actions.delete')}
         title={getGalleryShortcutTitle(translate('common.actions.delete'), 'Del')}
@@ -90,7 +87,7 @@ function GallerySelectionActions(
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
         <span className="hidden 2xl:inline">{translate('common.actions.delete')}</span>
-      </button>
+      </ProductActionButton>
     </>
   );
 }
@@ -123,14 +120,14 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
     <div
       role="toolbar"
       aria-label={translate('gallery.app.selectionActions')}
-      className="flex h-8 min-w-0 flex-nowrap items-center justify-start gap-1.5"
+      className="flex h-8 min-w-0 flex-nowrap items-center justify-start gap-2"
       data-ui="gallery.selection.toolbar"
     >
       <div
         className="flex h-8 shrink-0 items-center gap-2 whitespace-nowrap px-1 text-xs"
         data-ui="gallery.selection.summary"
       >
-        <span className="font-semibold text-[var(--sniptale-color-text-primary)]">
+        <span className="font-medium text-[var(--sniptale-color-text-primary)]">
           {translate('gallery.app.selectedPrefix')} {selectedItems.length}
         </span>
         <span aria-hidden="true" className="text-[var(--sniptale-color-text-muted)]">
@@ -140,7 +137,10 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
           {formatBytes(selectedSize, 2)}
         </span>
       </div>
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
+        data-command-chrome="true"
         type="button"
         aria-label={translate('gallery.app.clearSelection')}
         title={getGalleryShortcutTitle(translate('gallery.app.clearSelection'), 'Escape')}
@@ -148,7 +148,7 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
         className={['sniptale-dismiss-button', galleryClearSelectionClassName].join(' ')}
       >
         <X className="h-4 w-4" aria-hidden="true" />
-      </button>
+      </ProductActionButton>
       <span
         aria-hidden="true"
         className="mx-0.5 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
@@ -161,7 +161,9 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
             onSelectionTagDraftChange={onSelectionTagDraftChange}
             selectionTagDraft={selectionTagDraft}
           />
-          <button
+          <ProductActionButton
+            tone="secondary"
+            compact
             type="button"
             aria-label={downloadLabel}
             title={downloadLabel}
@@ -174,7 +176,7 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
               <FolderArchive className="h-4 w-4" aria-hidden="true" />
             )}
             <span className="hidden 2xl:inline">{downloadLabel}</span>
-          </button>
+          </ProductActionButton>
         </>
       ) : null}
       <GallerySelectionActions
@@ -203,11 +205,13 @@ export function GalleryFoundResultsBar(props: GalleryFoundResultsProps) {
     >
       <span className="whitespace-nowrap px-1 text-xs text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.app.facetResults')}:{' '}
-        <span className="font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
+        <span className="font-medium tabular-nums text-[var(--sniptale-color-text-primary)]">
           {props.count}
         </span>
       </span>
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         disabled={props.disabled || props.count === 0}
         className={gallerySelectionActionClassName}
@@ -218,7 +222,7 @@ export function GalleryFoundResultsBar(props: GalleryFoundResultsProps) {
         onClick={props.onSelectAll}
       >
         {translate('gallery.app.selectAllResults')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

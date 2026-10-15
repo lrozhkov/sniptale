@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, type GalleryItem } from '../items';
 import { formatDate, getRecordingGroupRoleLabel } from '../ui';
@@ -37,7 +38,9 @@ export function GalleryPreviewRecovery(props: { onOpen?: () => void }) {
         {translate('gallery.app.previewUnavailable')}
       </span>
       {props.onOpen ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           className="rounded-[var(--sniptale-radius-sm)] border
           border-[var(--sniptale-color-border-strong)]
@@ -48,7 +51,7 @@ export function GalleryPreviewRecovery(props: { onOpen?: () => void }) {
           onClick={props.onOpen}
         >
           {translate('gallery.app.openEditorToRetryPreview')}
-        </button>
+        </ProductActionButton>
       ) : null}
     </div>
   );
@@ -104,8 +107,8 @@ function GalleryRecordingGroupLabel({ item }: Pick<GalleryCardDetailsProps, 'ite
   const group = `${translate('gallery.preview.recordingGroup')} ${item.recordingGroupView.memberCount}`;
   return (
     <div
-      className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px]
-        text-[var(--sniptale-color-accent-emphasis)]"
+      className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px]
+        text-[var(--sniptale-color-text-secondary)]"
       title={item.recordingGroupView.sourceLabel ?? `${role} · ${group}`}
     >
       <span className="truncate font-medium">{role}</span>
@@ -163,7 +166,7 @@ export function GalleryListDetails(
       >
         <div className="truncate font-medium">{source.label || '—'}</div>
         {source.detail ? (
-          <div className="mt-0.5 truncate text-[11px] text-[var(--sniptale-color-text-muted)]">
+          <div className="mt-0.5 truncate text-[12px] text-[var(--sniptale-color-text-muted)]">
             {source.detail}
           </div>
         ) : null}
@@ -183,7 +186,7 @@ export function GalleryListDetails(
           title={props.item.filename}
           aria-label={props.item.filename}
         >
-          <div className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+          <div className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]">
             <GalleryFilenameLabel filename={props.item.filename} />
           </div>
           <GalleryRecordingGroupLabel item={props.item} />
@@ -209,14 +212,16 @@ export function GalleryListDetails(
           <div className="flex items-center gap-2 text-xs">
             <span role="status">{translate('gallery.app.previewUnavailable')}</span>
             {props.onRetryPreview ? (
-              <button
+              <ProductActionButton
+                tone="secondary"
+                compact
                 type="button"
                 onClick={props.onRetryPreview}
-                className="font-semibold text-[var(--sniptale-color-accent-emphasis)] underline
+                className="font-semibold text-[var(--sniptale-color-text-secondary)] underline
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]"
               >
                 {translate('gallery.app.openEditorToRetryPreview')}
-              </button>
+              </ProductActionButton>
             ) : null}
           </div>
         ) : null}
@@ -243,7 +248,7 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
       className={
         props.compact
           ? `h-10 w-full shrink-0 border-t border-[var(--sniptale-color-border-soft)]
-            px-3 py-3 text-left`
+            flex items-center px-3 py-2 text-left`
           : `grid h-[72px] w-full shrink-0 grid-rows-[20px_16px] gap-2
             border-t border-[var(--sniptale-color-border-soft)] px-4 py-3.5 text-left`
       }
@@ -254,7 +259,7 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
       {props.compact ? null : (
         <div className="min-w-0">
           <div
-            className="flex h-5 min-w-0 items-center text-sm font-semibold
+            className="flex h-5 min-w-0 items-center text-[13px] leading-[18px] font-medium
               text-[var(--sniptale-color-text-primary)]"
           >
             <GalleryFilenameLabel filename={props.item.filename} />

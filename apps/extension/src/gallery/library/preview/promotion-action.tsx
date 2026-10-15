@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { Save } from 'lucide-react';
 import { useState } from 'react';
 import { translate } from '../../../platform/i18n';
@@ -17,7 +18,10 @@ export function PromotionAction({ className, onPromote, visible }: PromotionActi
 
   return (
     <>
-      <button
+      <ProductActionButton
+        compact
+        tone="secondary"
+        data-command-chrome="true"
         type="button"
         title={translate('gallery.preview.saveToLibrary')}
         aria-label={translate('gallery.preview.saveToLibrary')}
@@ -39,7 +43,7 @@ export function PromotionAction({ className, onPromote, visible }: PromotionActi
       >
         <Save className="h-4 w-4" aria-hidden="true" />
         <span className="sr-only">{translate('gallery.preview.saveToLibrary')}</span>
-      </button>
+      </ProductActionButton>
       {state === 'error' ? (
         <p role="alert" className="col-span-full text-xs text-[var(--sniptale-color-danger)]">
           {translate('gallery.preview.saveToLibraryError')}

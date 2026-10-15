@@ -276,18 +276,18 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   const initialSummaries = Array.from(container?.querySelectorAll('summary') ?? []);
   expect(container?.firstElementChild?.className).toContain('shrink-0');
   for (const summary of initialSummaries) {
-    expect(summary.className).toContain('h-7');
-    expect(summary.className).toContain('mx-1.5');
-    expect(summary.className).toContain('rounded-[var(--sniptale-radius-sm)]');
-    expect(summary.className).toContain('hover:shadow-[6px_0_0_var(');
+    expect(summary.className).toContain('min-h-8');
+    expect(summary.className).toContain('px-2');
+    expect(summary.className).toContain('rounded-[4px]');
+    expect(summary.className).toContain('[&::-webkit-details-marker]:hidden');
     expect(summary.className).toContain('focus-visible:outline-[var(--sniptale-color-accent)]');
     const chevron = summary.querySelector(':scope > svg:last-child');
-    expect(chevron?.getAttribute('class')).toContain('-rotate-90');
-    expect(chevron?.getAttribute('class')).toContain('group-open:rotate-0');
+    expect(chevron?.getAttribute('class')).toContain('h-3.5 w-3.5');
+    expect(chevron?.getAttribute('class')).toContain('group-open/facet:rotate-180');
     expect(chevron?.getAttribute('class')).toContain('motion-reduce:transition-none');
   }
   for (const section of Array.from(container?.querySelectorAll('details') ?? [])) {
-    expect(section.className).toContain('py-1');
+    expect(section.className).toContain('py-0.5');
   }
   expect(initialSummaries[0]?.textContent).toContain(`${translate('gallery.app.facetSelected')} 2`);
   expect(initialSummaries[1]?.textContent).toContain('beta');
@@ -397,6 +397,19 @@ it('opens a compact saved-view name field, reports a conflict, and confirms crea
     `[aria-label="${translate('gallery.app.savedViewName')}"]`
   );
   expect(input).not.toBeNull();
+  act(() => updateInputValue(input!, 'Discard draft'));
+  const clear = input?.parentElement?.querySelector('.sniptale-field-clear');
+  expect(clear).toBeInstanceOf(HTMLButtonElement);
+  click(clear);
+  expect(input?.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(input?.parentElement?.querySelector('.sniptale-field-clear')).toBeNull();
+  expect(onCreateSavedView).not.toHaveBeenCalled();
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.app.savedViewConfirm')}"]`
+    )?.disabled
+  ).toBe(true);
   act(() => updateInputValue(input!, 'Review PNG'));
   click(container?.querySelector(`[aria-label="${translate('gallery.app.savedViewConfirm')}"]`));
 

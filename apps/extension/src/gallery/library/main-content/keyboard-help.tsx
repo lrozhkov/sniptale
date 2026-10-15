@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { Keyboard, X } from 'lucide-react';
 import { ProductModal, ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { translate } from '../../../platform/i18n';
@@ -6,11 +7,11 @@ import { getGalleryPrimaryShortcut } from '../keyboard/shortcut-labels';
 
 function CommandList(props: { commands: Array<[string, string]> }) {
   return (
-    <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
+    <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-[13px] leading-[18px] font-medium">
       {props.commands.map(([label, keys]) => (
         <div key={label} className="contents">
-          <dt>{label}</dt>
-          <dd className="text-right font-mono text-[var(--sniptale-color-text-secondary)]">
+          <dt className="text-[var(--sniptale-color-text-secondary)]">{label}</dt>
+          <dd className="text-right tabular-nums text-[var(--sniptale-color-text-primary)]">
             {keys}
           </dd>
         </div>
@@ -21,6 +22,7 @@ function CommandList(props: { commands: Array<[string, string]> }) {
 
 function GalleryKeyboardHelpDialog(props: { onClose(): void }) {
   const titleId = useId();
+  const closePress = useCommandPress({ onClick: props.onClose });
   const contentRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -29,6 +31,7 @@ function GalleryKeyboardHelpDialog(props: { onClose(): void }) {
   const closeLabel = translate('common.actions.close');
   return (
     <ProductModal
+      dialogClassName="sniptale-compact-workspace"
       onClose={props.onClose}
       labelledBy={titleId}
       width="min(560px, calc(100vw - 40px))"
@@ -67,10 +70,15 @@ function GalleryKeyboardHelpDialog(props: { onClose(): void }) {
             type="button"
             aria-label={closeLabel}
             title={closeLabel}
-            onClick={props.onClose}
-            className="sniptale-dismiss-button flex h-8 w-8 items-center justify-center rounded-[8px]"
+            data-command-press=""
+            data-command-chrome="true"
+            data-pressing={closePress.pressed ? 'true' : undefined}
+            {...closePress.props}
+            className="sniptale-dismiss-button flex h-8 w-8 items-center justify-center rounded-[4px]"
           >
-            <X aria-hidden="true" className="h-4 w-4" />
+            <span className="sniptale-command-content">
+              <X aria-hidden="true" className="h-4 w-4" />
+            </span>
           </button>
         }
       />
@@ -104,7 +112,7 @@ function GalleryKeyboardHelpDialog(props: { onClose(): void }) {
           </section>
           <section className="space-y-2">
             <h3 className="font-semibold">{translate('gallery.keyboard.text')}</h3>
-            <p className="text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
+            <p className="text-sm leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
               {translate('gallery.keyboard.textBody')}
             </p>
           </section>
@@ -122,6 +130,7 @@ export function GalleryKeyboardHelp() {
     triggerRef.current?.focus({ preventScroll: true });
   };
   const label = translate('gallery.keyboard.title');
+  const triggerPress = useCommandPress({ onClick: () => setOpen(true) });
   return (
     <>
       <button
@@ -131,13 +140,18 @@ export function GalleryKeyboardHelp() {
         title={label}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen(true)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]
-          text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-hover)]
+        data-command-press=""
+        data-command-chrome="true"
+        data-pressing={triggerPress.pressed ? 'true' : undefined}
+        {...triggerPress.props}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]
+          text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]
           focus-visible:outline-none focus-visible:ring-2
           focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
       >
-        <Keyboard aria-hidden="true" className="h-4 w-4" />
+        <span className="sniptale-command-content">
+          <Keyboard aria-hidden="true" className="h-4 w-4" />
+        </span>
       </button>
       {open ? <GalleryKeyboardHelpDialog onClose={close} /> : null}
     </>

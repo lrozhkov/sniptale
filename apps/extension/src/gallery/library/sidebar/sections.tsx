@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { useState } from 'react';
 import { Check, ChevronDown, RotateCcw, Search, X } from 'lucide-react';
@@ -15,26 +16,25 @@ function cx(...values: Array<string | false | null | undefined>): string {
 }
 
 const facetOptionRowClassName = [
-  'relative flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border border-transparent px-1.5',
+  'relative flex h-8 cursor-pointer items-center gap-2 rounded-[4px] border border-transparent px-1.5',
   'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset',
   'has-[:focus-visible]:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 
 const facetSummaryClassName = [
-  'mx-1.5 flex h-7 cursor-pointer list-none items-center gap-2 rounded-[var(--sniptale-radius-sm)]',
+  'flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[4px] px-2 [&::-webkit-details-marker]:hidden',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
-  'hover:shadow-[6px_0_0_var(--sniptale-color-surface-hover),-6px_0_0_var(--sniptale-color-surface-hover)]',
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
   'focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 
 const facetSearchClassName = [
-  'mb-1.5 flex h-7 items-center gap-1.5 rounded-[7px] border px-2',
+  'mb-1.5 flex h-8 items-center gap-1.5 rounded-[4px] border px-2',
   'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)]',
 ].join(' ');
 
 const facetSearchInputClassName = [
-  'min-w-0 flex-1 bg-transparent text-xs outline-none',
+  'min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] outline-none',
   'placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent',
 ].join(' ');
 
@@ -107,16 +107,19 @@ function GalleryFacetOptionRow(props: {
       </span>
       <span
         className={cx(
-          'min-w-0 flex-1 truncate text-xs transition-colors',
+          'min-w-0 flex-1 truncate text-[13px] leading-[18px] transition-colors',
           'group-hover/facet-row:text-[var(--sniptale-color-text-primary-strong)]',
           props.checked
             ? 'font-semibold text-[var(--sniptale-color-text-primary-strong)]'
-            : 'text-[var(--sniptale-color-text-secondary)]'
+            : 'font-medium text-[var(--sniptale-color-text-secondary)]'
         )}
       >
         {props.label}
       </span>
-      <span className="text-[11px] tabular-nums text-[var(--sniptale-color-text-muted)]">
+      <span
+        className="w-7 shrink-0 text-right text-xs leading-4 font-normal tabular-nums
+        text-[var(--sniptale-color-text-muted)]"
+      >
         {props.count}
       </span>
     </label>
@@ -145,12 +148,15 @@ function GalleryFacetSection(props: {
 
   return (
     <details
-      className="group border-b border-[var(--sniptale-color-border-soft)] py-1 last:border-b-0"
+      className="group/facet py-0.5"
       open={props.isOpen}
       onToggle={(event) => props.onOpenChange(event.currentTarget.open)}
     >
       <summary className={facetSummaryClassName}>
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
+        <span
+          className="min-w-0 flex-1 truncate text-[13px] leading-[18px] font-medium
+          text-[var(--sniptale-color-text-primary)]"
+        >
           {getFacetTitle(props.facet.id)}
         </span>
         {props.selected.length > 0 ? (
@@ -158,14 +164,17 @@ function GalleryFacetSection(props: {
             <span
               title={singleSelectedLabel}
               className={cx(
-                'text-[10px] font-semibold text-[var(--sniptale-color-text-primary)]',
+                'text-xs leading-4 font-normal text-[var(--sniptale-color-text-primary)]',
                 singleSelectedLabel && 'max-w-28 truncate'
               )}
             >
               {selectionSummary}
             </span>
             {props.onClear ? (
-              <button
+              <ProductActionButton
+                tone="secondary"
+                compact
+                data-command-chrome="true"
                 type="button"
                 aria-label={`${translate('gallery.app.facetClear')} ${getFacetTitle(props.facet.id)}`}
                 title={translate('gallery.app.facetClear')}
@@ -174,24 +183,21 @@ function GalleryFacetSection(props: {
                   event.stopPropagation();
                   props.onClear?.();
                 }}
-                className="sniptale-dismiss-button inline-flex h-5 w-5 items-center justify-center rounded-[5px]
-                   transition-colors
-                   focus-visible:outline-none
-                  focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]"
+                className="sniptale-dismiss-button h-8 w-8 shrink-0"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
-              </button>
+              </ProductActionButton>
             ) : null}
           </span>
         ) : null}
         <ChevronDown
           className="h-3.5 w-3.5 text-[var(--sniptale-color-text-muted)]
-            -rotate-90 transition-transform duration-[120ms] group-open:rotate-0
+            transition-transform duration-[120ms] group-open/facet:rotate-180
             motion-reduce:transition-none"
           aria-hidden="true"
         />
       </summary>
-      <div className="mt-1 pb-2">
+      <div className="px-2 pt-2 pb-2">
         {props.facet.searchable ? (
           <div className={facetSearchClassName}>
             <Search className="h-3.5 w-3.5 text-[var(--sniptale-color-text-muted)]" />
@@ -203,19 +209,18 @@ function GalleryFacetSection(props: {
               className={facetSearchInputClassName}
             />
             {search ? (
-              <button
+              <ProductActionButton
+                tone="secondary"
+                compact
+                data-command-chrome="true"
                 type="button"
                 onClick={() => setSearch('')}
                 aria-label={translate('gallery.app.facetClearSearch')}
                 title={translate('gallery.app.facetClearSearch')}
-                className="sniptale-dismiss-button inline-flex h-5 w-5 shrink-0
-                  items-center justify-center rounded-[5px]
-                   transition-colors
-                   focus-visible:outline-none
-                  focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]"
+                className="sniptale-dismiss-button h-8 w-8 shrink-0"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
-              </button>
+              </ProductActionButton>
             ) : null}
           </div>
         ) : null}
@@ -232,7 +237,7 @@ function GalleryFacetSection(props: {
               />
             ))
           ) : (
-            <div className="px-1.5 py-2 text-xs text-[var(--sniptale-color-text-muted)]">
+            <div className="px-1.5 py-2 text-[13px] leading-[18px] text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.app.facetNoMatches')}
             </div>
           )}
@@ -318,13 +323,15 @@ export function GalleryFacetFilters(props: GallerySidebarProps) {
       {hasCustomResult ? (
         <div className="space-y-2 pt-2">
           <div className="flex items-center justify-between gap-2 px-1">
-            <span className="min-w-0 truncate text-xs text-[var(--sniptale-color-text-muted)]">
+            <span className="min-w-0 truncate text-[13px] leading-[18px] text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.app.facetResults')}:{' '}
               <span className="font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
                 {props.filteredItemCount}
               </span>
             </span>
-            <button
+            <ProductActionButton
+              tone="secondary"
+              compact
               type="button"
               disabled={props.filteredItemCount === 0}
               title={getGalleryShortcutTitle(
@@ -332,32 +339,24 @@ export function GalleryFacetFilters(props: GallerySidebarProps) {
                 getGalleryPrimaryShortcut('A')
               )}
               onClick={props.onSelectAll}
-              className="shrink-0 rounded-[7px] px-2 py-1 text-xs font-semibold
-                text-[var(--sniptale-color-text-primary)] transition-colors
-                hover:bg-[var(--sniptale-color-surface-hover)] disabled:cursor-default
-                disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2
-                focus-visible:ring-[var(--sniptale-color-text-primary)]"
+              className="shrink-0"
             >
               {translate('gallery.app.selectAllResults')}
-            </button>
+            </ProductActionButton>
           </div>
           {showFilterActions ? (
             <div className="flex flex-wrap gap-1.5">
               <GallerySavedViewActions {...props} hasFacetedFilters={hasFacetedFilters} />
-              <button
+              <ProductActionButton
+                tone="secondary"
+                compact
                 type="button"
                 onClick={props.onResetFilters}
-                className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] border
-                border-[var(--sniptale-color-border-soft)] px-2.5 text-xs font-medium
-                text-[var(--sniptale-color-text-secondary)] transition-colors
-                hover:border-[var(--sniptale-color-border-strong)]
-                hover:bg-[var(--sniptale-color-surface-canvas)]
-                hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
-                focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]"
+                className="min-w-0 flex-1 gap-1.5"
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="truncate">{translate('gallery.app.facetResetAll')}</span>
-              </button>
+              </ProductActionButton>
             </div>
           ) : null}
         </div>

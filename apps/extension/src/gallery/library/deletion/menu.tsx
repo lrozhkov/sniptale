@@ -1,5 +1,5 @@
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { useId } from 'react';
 import { Trash2 } from 'lucide-react';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
@@ -18,6 +18,18 @@ export function GalleryDeletionMenu({
 }) {
   const warningId = useId();
   const menu = useDeletionMenu(request, contextKey, onClose);
+  const trashPress = useCommandPress({
+    disabled: menu.pending,
+    onClick: () => {
+      if (request.moveToTrash) void menu.run(request.moveToTrash);
+    },
+  });
+  const permanentPress = useCommandPress({
+    disabled: menu.pending,
+    onClick: (event) => {
+      if (event.detail <= 1) void menu.activatePermanent();
+    },
+  });
   if (!request.moveToTrash) {
     return (
       <div
@@ -26,6 +38,7 @@ export function GalleryDeletionMenu({
         }}
       >
         <ProductConfirmDialog
+          dialogClassName="sniptale-compact-workspace"
           title={translate('gallery.app.permanentDelete')}
           message={menu.prepared?.warning ?? translate('gallery.app.deleteChecking')}
           confirmText={translate('gallery.app.permanentDelete')}
@@ -38,7 +51,9 @@ export function GalleryDeletionMenu({
       </div>
     );
   }
-  const itemLayout = 'w-full !justify-start gap-2 !whitespace-normal !min-h-9 text-left';
+  const itemLayout =
+    'flex min-h-9 w-full items-center gap-1.5 rounded-[4px] px-2 py-2 text-left text-[13px] ' +
+    'leading-[18px] font-medium hover:bg-[var(--sniptale-color-surface-hover)] aria-disabled:opacity-50';
   return (
     <ContentPopoverAdapter
       isOpen
@@ -46,22 +61,23 @@ export function GalleryDeletionMenu({
       popoverRef={menu.surfaceRef}
       style={menu.style}
       dataUi="gallery.deletion.menu"
-      className="!rounded-[10px] !bg-[var(--sniptale-color-surface-canvas)]
-        !bg-[linear-gradient(var(--sniptale-color-surface-panel),var(--sniptale-color-surface-panel))]"
+      className="sniptale-compact-workspace sniptale-parameter-menu"
     >
-      <div role="menu" className="space-y-1 p-1" aria-label={translate('common.actions.delete')}>
-        {request.moveToTrash ? (
-          <button
-            type="button"
-            role="menuitem"
-            className={`${getControlSecondaryButtonClassName({ density: 'compact' })} ${itemLayout}`}
-            aria-disabled={menu.pending}
-            onClick={() => void menu.run(request.moveToTrash!)}
-          >
+      <div role="menu" aria-label={translate('common.actions.delete')}>
+        <button
+          type="button"
+          role="menuitem"
+          className={itemLayout}
+          aria-disabled={menu.pending}
+          data-command-press=""
+          data-pressing={trashPress.pressed ? 'true' : undefined}
+          {...trashPress.props}
+        >
+          <span className="sniptale-command-content">
             <Trash2 aria-hidden="true" className="h-4 w-4" />
             {translate('gallery.app.moveToTrash')}
-          </button>
-        ) : null}
+          </span>
+        </button>
         <div
           role="separator"
           className="my-1 border-t border-[var(--sniptale-color-border-soft)]"
@@ -69,24 +85,26 @@ export function GalleryDeletionMenu({
         <button
           type="button"
           role="menuitem"
-          className={`${getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })} ${itemLayout}`}
+          className={`${itemLayout} text-[var(--sniptale-color-danger)]`}
           aria-disabled={menu.pending}
           aria-describedby={menu.prepared || menu.pending ? warningId : undefined}
-          onClick={(event) => {
-            if (event.detail <= 1) void menu.activatePermanent();
-          }}
+          data-command-press=""
+          data-pressing={permanentPress.pressed ? 'true' : undefined}
+          {...permanentPress.props}
         >
-          <Trash2 aria-hidden="true" className="h-4 w-4" />
-          {translate(
-            menu.prepared ? 'gallery.app.confirmPermanentDelete' : 'gallery.app.permanentDelete'
-          )}
+          <span className="sniptale-command-content">
+            <Trash2 aria-hidden="true" className="h-4 w-4" />
+            {translate(
+              menu.prepared ? 'gallery.app.confirmPermanentDelete' : 'gallery.app.permanentDelete'
+            )}
+          </span>
         </button>
       </div>
       {menu.prepared || menu.pending ? (
         <p
           id={warningId}
           role="status"
-          className="px-3 py-2 text-xs text-[var(--sniptale-color-text-secondary)]"
+          className="select-text px-3 py-2 text-sm leading-5 text-[var(--sniptale-color-text-secondary)]"
         >
           {menu.prepared?.warning ?? translate('gallery.app.deleteChecking')}
         </p>

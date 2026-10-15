@@ -27,7 +27,7 @@ async function createDraft(
   locale: 'ru' | 'en',
   theme: 'light' | 'dark'
 ) {
-  await page.goto(`chrome-extension://${extensionId}/apps/extension/src/editor/index.html`);
+  await page.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
   await page.evaluate(
     ({ locale, theme }) =>
       chrome.storage.local.set({
@@ -37,77 +37,74 @@ async function createDraft(
     { locale, theme }
   );
   await page.reload();
-  const start = page.locator('[data-ui="editor.page.start"]');
-  await expect(start).toBeVisible();
-  const image = await page.evaluate(() => {
+  await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+  // A native capture starts temporary. Opening a local file in the editor admits a retained project.
+  const assetId = await page.evaluate(async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 160;
     canvas.height = 90;
-    const context = canvas.getContext('2d')!;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Screenshot fixture canvas unavailable');
     context.fillStyle = '#2864c8';
     context.fillRect(0, 0, 160, 90);
-    return canvas.toDataURL('image/png').split(',')[1]!;
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (result) =>
+          result ? resolve(result) : reject(new Error('Screenshot fixture PNG unavailable')),
+        'image/png'
+      )
+    );
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const tx = db.transaction(['media_library', 'aggregate_presentations'], 'readwrite');
+      const done = new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(tx.error);
+        tx.onerror = () => reject(tx.error);
+      });
+      tx.objectStore('media_library').put({
+        id,
+        kind: 'screenshot',
+        source: { kind: 'screenshot' },
+        filename: 'deletion-draft.png',
+        originalFilename: 'deletion-draft.png',
+        createdAt: now,
+        updatedAt: now,
+        size: blob.size,
+        mimeType: 'image/png',
+        width: 160,
+        height: 90,
+        duration: null,
+        imageContentState: 'original',
+        workspaceRevision: 0,
+        sourceUrl: null,
+        sourceTitle: null,
+        sourceFavicon: null,
+        tags: [],
+        lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: now },
+        blob,
+      });
+      tx.objectStore('aggregate_presentations').put({
+        aggregateId: id,
+        aggregateKind: 'image',
+        presentationRevision: 0,
+        previewBlob: blob,
+        thumbnailBlob: blob,
+        updatedAt: now,
+      });
+      await done;
+    } finally {
+      db.close();
+    }
+    return id;
   });
-  await start.locator('input[type="file"]').setInputFiles({
-    name: 'deletion-draft.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(image, 'base64'),
-  });
-  await expect(start).toBeHidden();
-  await expect(page.locator('[data-ui="editor.page.open-loading"]')).toBeHidden();
-  await expect(page).toHaveURL(/assetId=/);
-  await expect(page.locator('[data-ui="autosave-control"] button')).toHaveAttribute(
-    'aria-label',
-    /Saved|Сохранено/
-  );
-  const assetId = new URL(page.url()).searchParams.get('assetId');
-  if (!assetId) throw new Error('Editor draft identity missing');
   await expect.poll(() => countMediaLibraryEntries(page, assetId)).toBe(1);
-  // Durable autosave precedes the deferred presentation; keep the editor alive until both agree.
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async (id) => {
-          const db = await new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open('sniptale-db');
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
-          try {
-            const tx = db.transaction(['media_library', 'aggregate_presentations']);
-            const read = (store: string, key: IDBValidKey) =>
-              new Promise<
-                | {
-                    workspaceRevision?: number;
-                    presentationRevision?: number;
-                    previewBlob?: Blob;
-                    thumbnailBlob?: Blob;
-                  }
-                | undefined
-              >((resolve, reject) => {
-                const request = tx.objectStore(store).get(key);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-              });
-            const [media, presentation] = await Promise.all([
-              read('media_library', id),
-              read('aggregate_presentations', ['image', id]),
-            ]);
-            return Boolean(
-              media &&
-              presentation &&
-              presentation.presentationRevision === (media.workspaceRevision ?? 0) &&
-              presentation.previewBlob instanceof Blob &&
-              presentation.thumbnailBlob instanceof Blob
-            );
-          } finally {
-            db.close();
-          }
-        }, assetId),
-      { timeout: 10000 }
-    )
-    .toBe(true);
-
   await page.evaluate(
     ({ locale, theme }) =>
       chrome.storage.local.set({
@@ -161,7 +158,7 @@ async function verifyCompactSidebar(page: Page, locale: 'ru' | 'en') {
   for (const box of boxes) {
     expect(box.x).toBe(boxes[0]!.x);
     expect(box.width).toBeGreaterThanOrEqual(36);
-    expect(box.height).toBe(40);
+    expect(box.height).toBe(32);
     expect(box.name).toBeTruthy();
     expect(box.title).toBe(box.name);
   }
@@ -219,7 +216,7 @@ for (const [locale, theme] of [
     });
     await expect(save).toBeVisible();
     const saveBox = (await save.boundingBox())!;
-    const expiry = header.locator('.whitespace-nowrap');
+    const expiry = header.getByText(label('gallery.app.draftExpires'), { exact: false });
     const expiryBox = (await expiry.boundingBox())!;
     expect(saveBox.width).toBeLessThanOrEqual(36);
     expect(

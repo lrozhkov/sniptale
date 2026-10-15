@@ -6,12 +6,14 @@ import type { ScenarioPreviewStep } from '../../../features/scenario/contracts/t
 export function ScenarioPreviewStepCard({ step }: { step: ScenarioPreviewStep }) {
   return (
     <article
-      className="overflow-hidden rounded-[18px] border border-[var(--sniptale-color-border-soft)]
+      className="overflow-hidden rounded-[4px] border border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] shadow-sm"
     >
       {(step.title || step.numberLabel !== null) && (
         <header className="px-4 py-3">
-          {step.title && <h3 className="break-words text-sm font-semibold">{step.title}</h3>}
+          {step.title && (
+            <h3 className="break-words text-[14px] leading-5 font-semibold">{step.title}</h3>
+          )}
           {step.numberLabel !== null && (
             <div className="mt-2 break-words text-xs text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.app.scenarioStepLabel')} {step.numberLabel}

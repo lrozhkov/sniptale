@@ -9,7 +9,13 @@ import {
 } from 'react';
 import { Plus, Tag } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
+
+const tagOptionActiveClassName =
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-text-secondary)_18%,var(--sniptale-color-surface-panel))]';
+const tagOptionHoverClassName =
+  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-secondary)_12%,var(--sniptale-color-surface-panel))]';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -29,7 +35,6 @@ interface GalleryTagInputProps {
 
 function GalleryTagInputField(props: {
   autoFocus: boolean;
-  compact: boolean;
   inputRef: RefObject<HTMLInputElement | null>;
   listId: string;
   onBlur: () => void;
@@ -45,49 +50,50 @@ function GalleryTagInputField(props: {
   return (
     <div
       className={cx(
-        'flex min-w-0 items-center gap-2 rounded-[8px] border border-[var(--sniptale-color-border-soft)]',
+        'flex min-w-0 items-center gap-2 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] transition-colors',
         'focus-within:border-[var(--sniptale-color-border-accent-strong)]',
-        props.compact ? 'h-8 px-2.5' : 'min-h-10 px-3 py-2'
+        'h-8 px-2.5'
       )}
     >
       <Tag
         aria-hidden="true"
-        className={cx(
-          'shrink-0 text-[var(--sniptale-color-text-muted)]',
-          props.compact ? 'h-3.5 w-3.5' : 'h-4 w-4'
-        )}
+        className={cx('shrink-0 text-[var(--sniptale-color-text-muted)]', 'h-4 w-4')}
       />
-      <input
-        autoFocus={props.autoFocus}
-        ref={props.inputRef}
-        aria-autocomplete="list"
-        aria-controls={props.listId}
-        aria-expanded={props.showOptions}
-        role="combobox"
-        value={props.value}
-        onBlur={props.onBlur}
-        onChange={(event) => props.onChange(event.target.value)}
-        onFocus={props.onFocus}
-        onKeyDown={props.onKeyDown}
-        placeholder={props.placeholder}
-        className={cx(
-          'min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--sniptale-color-text-muted)]',
-          props.compact ? 'text-xs' : 'text-sm'
-        )}
-      />
+      <div className="relative flex h-8 min-w-0 flex-1 items-center">
+        <input
+          aria-label={props.placeholder}
+          autoFocus={props.autoFocus}
+          ref={props.inputRef}
+          aria-autocomplete="list"
+          aria-controls={props.listId}
+          aria-expanded={props.showOptions}
+          role="combobox"
+          value={props.value}
+          onBlur={props.onBlur}
+          onChange={(event) => props.onChange(event.target.value)}
+          onFocus={props.onFocus}
+          onKeyDown={props.onKeyDown}
+          placeholder={props.placeholder}
+          className={cx(
+            'min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--sniptale-color-text-muted)]',
+            'h-full w-full pr-8 text-[13px] leading-[18px] font-medium'
+          )}
+        />
+        {props.value.length > 0 ? (
+          <InspectorFieldClear label={props.placeholder} target={props.inputRef} />
+        ) : null}
+      </div>
       {props.showSubmit ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           onMouseDown={(event) => event.preventDefault()}
           onClick={props.onSubmit}
-          className={cx(
-            getControlPrimaryButtonClassName({ density: 'compact' }),
-            '!h-6 !min-h-6 !rounded-[6px] !px-2 text-xs'
-          )}
         >
           {translate('gallery.app.apply')}
-        </button>
+        </ProductActionButton>
       ) : null}
     </div>
   );
@@ -105,7 +111,7 @@ function GalleryTagOptions(props: {
     <div
       aria-label={translate('gallery.app.tagOptionsLabel')}
       className="absolute left-0 top-[calc(100%+6px)] z-50 w-max min-w-full
-        max-w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-[8px]
+        max-w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-[4px]
         border border-[var(--sniptale-color-border-soft)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]
         shadow-lg backdrop-blur-sm"
@@ -124,11 +130,10 @@ function GalleryTagOptions(props: {
               props.onSelect(tag);
             }}
             className={cx(
-              'flex w-full cursor-pointer items-center rounded-[6px] px-2.5 py-2 text-left text-sm',
+              `flex w-full cursor-pointer items-center rounded-[4px] min-h-8 px-2.5 py-1 text-left
+                text-[13px] leading-[18px] font-medium`,
               'text-[var(--sniptale-color-text-primary)] transition-colors',
-              props.activeIndex === index
-                ? 'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_54%,transparent)]'
-                : 'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_42%,transparent)]'
+              props.activeIndex === index ? tagOptionActiveClassName : tagOptionHoverClassName
             )}
           >
             <span className="truncate">{tag}</span>
@@ -145,14 +150,15 @@ function GalleryTagOptions(props: {
             props.onSelect(props.value);
           }}
           className={cx(
-            'flex w-full cursor-pointer items-center gap-2 border-t px-3 py-2.5 text-left text-sm',
+            `flex w-full cursor-pointer items-center gap-2 border-t min-h-8 px-2.5 py-1 text-left text-[13px]
+              leading-[18px] font-medium`,
             'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-primary)]',
             props.activeIndex === props.suggestions.length
-              ? 'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_54%,transparent)]'
-              : 'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_42%,transparent)]'
+              ? tagOptionActiveClassName
+              : tagOptionHoverClassName
           )}
         >
-          <Plus className="h-4 w-4 shrink-0 text-[var(--sniptale-color-accent-emphasis)]" />
+          <Plus className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-secondary)]" />
           <span className="truncate">
             {translate('gallery.app.createTag')} “{props.value.trim()}”
           </span>
@@ -165,7 +171,6 @@ function GalleryTagOptions(props: {
 export function GalleryTagInput({
   allTags,
   autoFocus = false,
-  compact = false,
   excludeTags = [],
   explicitSubmit = false,
   onChange,
@@ -234,7 +239,6 @@ export function GalleryTagInput({
     <div className="relative min-w-0">
       <GalleryTagInputField
         autoFocus={autoFocus}
-        compact={compact}
         inputRef={inputRef}
         listId={listId}
         onBlur={() => {

@@ -78,7 +78,8 @@ for (const variant of [
       await review
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
-      await review.locator('[data-ui="gallery.videoReview.previewSettings"]').click();
+      await review.locator('[data-ui="gallery.videoReview.openExport"]').click();
+      await expect(review.locator('[data-ui="gallery.videoReview.exportSection"]')).toBeVisible();
       await backup().scrollIntoViewIfNeeded();
       await expect(backup()).toBeInViewport();
       await page.screenshot({ path: info.outputPath('backup-footer.png'), fullPage: false });

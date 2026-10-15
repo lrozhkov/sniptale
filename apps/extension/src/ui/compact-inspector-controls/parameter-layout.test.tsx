@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -321,4 +322,28 @@ it('activates an adaptive dropdown through its parameter name and padding', () =
   expect(activate).toHaveBeenCalledTimes(2);
   act(() => host.querySelector('button')!.click());
   expect(activate).toHaveBeenCalledTimes(3);
+});
+
+it('cancels a held clear command without changing or accepting its draft', () => {
+  const change = vi.fn();
+  const commit = vi.fn();
+  act(() =>
+    root.render(
+      <CommandPressScope.Provider value={true}>
+        <InspectorLayout>
+          <TextField label="Title" value="Scene" onChange={change} onValueCommit={commit} />
+        </InspectorLayout>
+      </CommandPressScope.Provider>
+    )
+  );
+  const clear = host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+  act(() => clear.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
+  expect(clear.dataset['pressing']).toBe('true');
+  expect(change).not.toHaveBeenCalled();
+  act(() => clear.dispatchEvent(new Event('pointercancel', { bubbles: true })));
+  expect(clear.dataset['pressing']).toBeUndefined();
+  act(() => clear.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+  expect(change).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('Scene');
 });

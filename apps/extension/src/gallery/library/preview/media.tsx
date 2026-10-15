@@ -225,7 +225,7 @@ function PreviewMediaLoadFeedback(props: {
       data-ui="gallery.preview.mediaStatus"
       role={props.status === 'loading' ? 'status' : 'alert'}
       aria-live={props.status === 'loading' ? 'polite' : 'assertive'}
-      className="max-w-md rounded-[8px] border border-[var(--sniptale-color-border-soft)]
+      className="max-w-md rounded-[4px] border border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] px-4 py-3 text-center text-sm
         text-[var(--sniptale-color-text-primary)]"
     >

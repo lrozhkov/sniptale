@@ -1,9 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ArchiveRestore } from 'lucide-react';
 import { useState } from 'react';
-import {
-  getControlPrimaryButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { MediaHubImportConflictStrategy } from '../../../workflows/media-hub-backup/index';
 import { formatDateTime, getCurrentLocale, translate } from '../../../platform/i18n';
@@ -11,14 +8,11 @@ import { GalleryModalFrame } from './frame';
 import type { ImportConflictModalProps } from './types';
 
 const importSummaryClassName =
-  'mt-4 divide-y divide-[var(--sniptale-color-border-soft)] rounded-[8px] border ' +
+  'mt-4 divide-y divide-[var(--sniptale-color-border-soft)] rounded-[4px] border ' +
   'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] px-3';
 
-const importSummaryRowClassName = 'flex min-h-10 items-center justify-between gap-4 py-2 text-sm';
-
-const importSecondaryButtonClassName = getControlSecondaryButtonClassName({ density: 'compact' });
-
-const importPrimaryButtonClassName = getControlPrimaryButtonClassName({ density: 'compact' });
+const importSummaryRowClassName =
+  'flex min-h-8 items-center justify-between gap-4 py-2 text-[13px] leading-[18px] font-medium';
 
 const STRATEGIES: MediaHubImportConflictStrategy[] = ['skip', 'duplicate', 'replace'];
 
@@ -97,7 +91,7 @@ function ImportStrategySelect(props: {
     <div className="mt-4">
       <label
         htmlFor="gallery-import-conflict-strategy"
-        className="mb-1.5 block text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
+        className="mb-1 block text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]"
       >
         {translate('gallery.importModal.conflictActionLabel')}
       </label>
@@ -115,7 +109,7 @@ function ImportStrategySelect(props: {
         }))}
         onChange={props.onChange}
       />
-      <p className="mt-1.5 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
+      <p className="mt-1.5 text-sm leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
         {getStrategyDescription(props.strategy)}
       </p>
     </div>
@@ -153,18 +147,14 @@ export function ImportConflictModalContent({
           onChange={setSelectedStrategy}
         />
       ) : null}
-      <div className="mt-5 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className={importSecondaryButtonClassName}>
+      <div className="mt-4 flex justify-end gap-2">
+        <ProductActionButton compact type="button" onClick={onClose} tone="secondary">
           {translate('common.actions.cancel')}
-        </button>
-        <button
-          type="button"
-          onClick={() => void onImport(strategy)}
-          className={importPrimaryButtonClassName}
-        >
+        </ProductActionButton>
+        <ProductActionButton compact type="button" onClick={() => void onImport(strategy)}>
           <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
           {translate('gallery.importModal.restore')}
-        </button>
+        </ProductActionButton>
       </div>
     </GalleryModalFrame>
   );

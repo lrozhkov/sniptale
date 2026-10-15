@@ -12,12 +12,12 @@ function ScenarioPreviewSurface(props: { children: ReactNode }) {
 function ScenarioPreviewEmptyState(props: { exportMode: boolean }) {
   return (
     <div
-      className="flex h-[240px] w-full max-w-xl flex-col items-center justify-center rounded-[20px]
+      className="flex h-[240px] w-full max-w-xl flex-col items-center justify-center rounded-[4px]
         border border-dashed border-[var(--sniptale-color-border-soft)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,transparent)]
         px-6 text-center text-[var(--sniptale-color-text-secondary)]"
     >
-      <div className="text-lg font-semibold text-[var(--sniptale-color-text-primary)]">
+      <div className="text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]">
         {props.exportMode
           ? translate('gallery.preview.kindScenarioExport')
           : translate('gallery.app.scenarioProjectsTitle')}
@@ -37,12 +37,12 @@ function ScenarioPreviewStepsGrid(props: {
   return (
     <ScenarioPreviewSurface>
       <div className="mb-2">
-        <div className="text-xs uppercase tracking-[0.16em] text-[var(--sniptale-color-text-muted-strong)]">
+        <div className="text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-muted-strong)]">
           {props.exportMode
             ? translate('gallery.preview.kindScenarioExport')
             : translate('gallery.preview.folderScenario')}
         </div>
-        <div className="mt-2 text-2xl font-semibold text-[var(--sniptale-color-text-primary)]">
+        <div className="mt-2 break-words text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]">
           {props.title}
         </div>
       </div>

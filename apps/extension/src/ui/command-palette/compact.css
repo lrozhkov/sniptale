@@ -1,0 +1,40 @@
+.sniptale-compact-palette {
+  color: var(--sniptale-color-text-primary);
+}
+.sniptale-compact-palette input {
+  min-height: 32px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-compact-palette [role='option'] {
+  min-height: 48px;
+  margin-block: 1px;
+  padding: 8px;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+}
+.sniptale-compact-palette [role='option']:is(:hover, [aria-selected='true']) {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-compact-palette [role='option'] > span:first-child {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--sniptale-color-text-secondary);
+}
+.sniptale-compact-palette [role='option'] > span:nth-child(2) > span {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.sniptale-compact-palette [role='option'] .text-sm {
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-compact-palette [role='option'] .text-xs {
+  font: 400 12px / 16px var(--sniptale-font-interface);
+}
+.sniptale-compact-palette [role='option'][data-pressing='true'] > span {
+  opacity: 0.72;
+}

@@ -76,6 +76,7 @@ it('forwards modal sizing to the canonical product modal', () => {
 
   const panel = container?.querySelector('.max-w-md');
   expect(panel?.className).toContain('sniptale-modal');
+  expect(panel?.className).toContain('sniptale-compact-workspace');
   expect(panel?.className).not.toContain('rounded-[16px]');
   expect(container?.querySelector('.sniptale-modal-title-sm')?.textContent).toBe('Default title');
 });

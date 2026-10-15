@@ -20,8 +20,8 @@ export function GalleryEmptyState(props: {
 
   return (
     <div
-      className="flex h-full min-h-[420px] flex-col items-center justify-center
-        rounded-[var(--sniptale-radius-lg)]
+      className="flex h-full min-h-32 flex-col items-center justify-center p-4
+        rounded-[4px]
         border border-dashed border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] text-center text-[var(--sniptale-color-text-muted)]"
     >
@@ -36,8 +36,10 @@ export function GalleryEmptyState(props: {
           aria-hidden="true"
         />
       )}
-      <div className="text-lg font-semibold text-[var(--sniptale-color-text-primary)]">{title}</div>
-      <div className="mt-2 max-w-md text-sm leading-6">{description}</div>
+      <div className="text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]">
+        {title}
+      </div>
+      <div className="mt-2 max-w-md text-[14px] leading-5">{description}</div>
     </div>
   );
 }

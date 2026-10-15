@@ -99,7 +99,7 @@ it('composes folder and tag sections inside the shared shell', () => {
     INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS
   );
   expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
+    'rounded-[4px]'
   );
   expect(container?.querySelector('[data-ui="gallery.sidebar.shell"]')?.className).toContain(
     'overflow-hidden'
@@ -151,9 +151,8 @@ it('offers trash navigation and replaces library filters with recoverable action
   expect(props.onTrashModeChange).toHaveBeenCalledWith(true);
   act(() => root?.render(<GallerySidebar {...props} trashMode />));
   const returnButton = button('gallery.app.returnToLibrary');
-  expect(returnButton.className).toContain('rounded-[var(--sniptale-radius-sm)]');
-  expect(returnButton.className).toContain('hover:border-');
-  expect(returnButton.className).toContain('focus-visible:ring-2');
+  expect(returnButton.className).toContain('w-full');
+  expect(returnButton.type).toBe('button');
   expect(container?.querySelector('[data-ui="test.folder-list"]')).toBeNull();
   expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
   expect(container?.querySelector('[data-ui="gallery.trash.summary"]')?.textContent).toContain(

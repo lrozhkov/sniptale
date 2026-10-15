@@ -116,11 +116,11 @@ function render(props: PreviewPanelProps) {
   });
 }
 
-it('uses the shared large-surface radius for the preview workspace', () => {
+it('uses the compact dialog radius for the preview workspace', () => {
   render(createProps());
 
   expect(container?.querySelector('[data-ui="gallery.preview.surface"]')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
+    'rounded-[8px]'
   );
 });
 
@@ -157,7 +157,7 @@ afterEach(() => {
 });
 
 it('renders preview shell, updates the filename, and forwards close actions', () => {
-  const props = createProps();
+  const props = createProps({ item: createMediaItem() });
 
   render(props);
 
@@ -180,6 +180,34 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
 
   expect(props.onFilenameChange).toHaveBeenCalledWith('renamed.png');
   expect(props.onClose).toHaveBeenCalledTimes(1);
+});
+
+it('clears the filename draft through input and restores focus without accepting it', () => {
+  const props = createProps({ item: createMediaItem() });
+  render(props);
+  const input = container?.querySelector('input');
+  const clear = container?.querySelector<HTMLButtonElement>('.sniptale-field-clear');
+  if (!input || !clear) throw new Error('Missing filename editor');
+  act(() => clear.click());
+  expect(props.onFilenameChange).toHaveBeenCalledWith('');
+  expect(document.activeElement).toBe(input);
+  expect(props.onSave).not.toHaveBeenCalled();
+  render({ ...props, filenameDraft: '' });
+  expect(container?.querySelector('.sniptale-field-clear')).toBeNull();
+});
+
+it('toggles filename editing from its label without changing the draft', () => {
+  const props = createProps({ item: createMediaItem() });
+  render(props);
+  const input = container?.querySelector('input');
+  const label = container?.querySelector('label');
+  act(() => label?.click());
+  expect(document.activeElement).toBe(input);
+  act(() => label?.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => label?.click());
+  expect(document.activeElement).toBe(input);
+  expect(props.onFilenameChange).not.toHaveBeenCalled();
 });
 
 it('renders source link when available and fallback copy when missing', () => {
@@ -286,15 +314,10 @@ it('uses project name as the source fallback and keeps non-HTML exports read-onl
     })
   );
 
-  const input = container?.querySelector('input');
-
-  if (!(input instanceof HTMLInputElement)) {
-    throw new Error('Expected preview filename input');
-  }
-
+  expect(container?.querySelector('input')).toBeNull();
+  expect(container?.querySelector('.gallery-preview-filename p')?.textContent).toBe('preview.png');
   expect(container?.textContent).toContain('Quarterly Demo');
   expect(container?.textContent).toContain('gallery.preview.filename');
-  expect(input.readOnly).toBe(true);
 });
 
 it('surfaces unavailable project recovery state and keeps its identity read-only', () => {
@@ -311,7 +334,8 @@ it('surfaces unavailable project recovery state and keeps its identity read-only
     'gallery.preview.unavailableInvalidProject'
   );
   expect(container?.textContent).toContain('gallery.preview.unavailableProjectRecovery');
-  expect(container?.querySelector('input')?.readOnly).toBe(true);
+  expect(container?.querySelector('input')).toBeNull();
+  expect(container?.querySelector('.gallery-preview-filename p')?.textContent).toBe('preview.png');
 });
 
 it('hides the inspector sidebar when collapsed and closes on Escape', () => {

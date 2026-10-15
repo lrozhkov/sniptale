@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { CheckCircle2, CircleX, LoaderCircle, XCircle } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { formatBytes } from '../../platform/i18n/format-bytes';
@@ -59,8 +60,8 @@ export function GalleryImportProgressCard(props: {
       aria-live="polite"
       className={
         props.inline
-          ? 'mt-2 rounded-[14px] border border-[var(--sniptale-color-border-soft)] p-3'
-          : 'fixed bottom-5 right-5 z-40 w-[min(420px,calc(100vw-2.5rem))] rounded-[16px] ' +
+          ? 'mt-2 rounded-[4px] border border-[var(--sniptale-color-border-soft)] p-3'
+          : 'fixed bottom-5 right-5 z-40 w-[min(420px,calc(100vw-2.5rem))] rounded-[4px] ' +
             'border border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] ' +
             'p-4 text-[var(--sniptale-color-text-primary)] shadow-lg'
       }
@@ -68,11 +69,11 @@ export function GalleryImportProgressCard(props: {
       <div className="flex items-start gap-3">
         <Icon
           aria-hidden="true"
-          className={`mt-0.5 h-5 w-5 shrink-0 ${active ? 'animate-spin' : ''}`}
+          className={`mt-0.5 h-4 w-4 shrink-0 ${active ? 'animate-spin' : ''}`}
         />
         <div className="min-w-0 flex-1">
           <div className="font-semibold">{title}</div>
-          <div className="mt-1 truncate text-xs text-[var(--sniptale-color-text-secondary)]">
+          <div className="mt-1 break-words text-xs text-[var(--sniptale-color-text-secondary)]">
             {props.state.file.name}
           </div>
         </div>
@@ -100,7 +101,7 @@ export function GalleryImportProgressCard(props: {
         </span>
       </div>
       {props.state.progress.currentFilename ? (
-        <div className="mt-2 truncate text-xs text-[var(--sniptale-color-text-muted)]">
+        <div className="mt-2 break-words text-xs text-[var(--sniptale-color-text-muted)]">
           {props.state.progress.currentFilename}
         </div>
       ) : null}
@@ -111,11 +112,11 @@ export function GalleryImportProgressCard(props: {
         </div>
       ) : null}
       {props.state.failedFilenames?.length ? (
-        <div className="mt-2 text-xs text-[var(--sniptale-color-danger)]">
+        <div className="mt-2 select-text text-sm leading-5 font-normal text-[var(--sniptale-color-danger)]">
           <div>{translate('gallery.importModal.mediaFilesSkipped')}:</div>
           <ul className="mt-1 max-h-24 space-y-0.5 overflow-y-auto" role="list">
             {props.state.failedFilenames.map((filename, index) => (
-              <li key={`${filename}-${index}`} className="truncate" title={filename}>
+              <li key={`${filename}-${index}`} className="break-words" title={filename}>
                 {filename}
               </li>
             ))}
@@ -124,23 +125,19 @@ export function GalleryImportProgressCard(props: {
       ) : null}
       <div className="mt-4 flex justify-end">
         {active ? (
-          <button
+          <ProductActionButton
+            compact
             type="button"
             disabled={props.state.status === 'cancelling'}
             onClick={props.onCancel}
-            className="rounded-[12px] border border-[var(--sniptale-color-border-soft)] px-3 py-2 text-sm
-              disabled:cursor-not-allowed disabled:opacity-50"
+            tone="secondary"
           >
             {translate('common.actions.cancel')}
-          </button>
+          </ProductActionButton>
         ) : (
-          <button
-            type="button"
-            onClick={props.onDismiss}
-            className="rounded-[12px] border border-[var(--sniptale-color-border-soft)] px-3 py-2 text-sm"
-          >
+          <ProductActionButton compact type="button" onClick={props.onDismiss} tone="secondary">
             {translate('common.actions.close')}
-          </button>
+          </ProductActionButton>
         )}
       </div>
     </aside>

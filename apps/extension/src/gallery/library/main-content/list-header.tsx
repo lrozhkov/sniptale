@@ -16,7 +16,7 @@ export function GalleryListHeader() {
         'sticky top-0 z-10 grid h-12 items-center gap-3 px-3',
         'border-b border-[var(--sniptale-color-border-strong)]',
         'bg-[var(--sniptale-color-surface-muted)]',
-        'text-[11px] font-semibold uppercase tracking-[0.06em]',
+        'text-[12px] leading-4 font-medium',
         'text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       role="row"

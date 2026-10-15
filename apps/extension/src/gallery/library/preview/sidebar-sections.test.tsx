@@ -117,8 +117,8 @@ it('uses compact tag layouts for empty, populated, and editing states', async ()
       element.className.includes('min-h-[40px]')
     )
   ).toBe(false);
-  expect(emptyAction?.className).toContain('w-full');
-  expect(emptyAction?.className).toContain('border-dashed');
+  expect(emptyAction?.className).toContain('gallery-preview-action');
+  expect(emptyAction?.className).not.toContain('border-dashed');
 
   await act(async () => root.render(<PreviewTagEditor {...commonProps} tagDrafts={['alpha']} />));
   const populatedAction = container.querySelector<HTMLButtonElement>(
@@ -128,7 +128,7 @@ it('uses compact tag layouts for empty, populated, and editing states', async ()
     'alpha'
   );
   expect(populatedAction?.className).not.toContain('w-full');
-  expect(populatedAction?.className).toContain('text-[var(--sniptale-color-text-muted)]');
+  expect(populatedAction?.className).toContain('gallery-preview-tag-add');
   expect(populatedAction?.className).not.toContain('text-[var(--sniptale-color-accent-emphasis)]');
   expect(populatedAction?.textContent).toBe('');
   expect(populatedAction?.getAttribute('title')).toBe('gallery.app.addTags');
@@ -150,6 +150,9 @@ it('renders media and project metadata through their canonical layouts', async (
       <PreviewMetadataCards item={createMediaItem({ duration: 2.5, height: 720, width: 1280 })} />
     )
   );
+  expect(container.querySelector('dl')).not.toBeNull();
+  expect(container.querySelector('dt')?.textContent).toBe('gallery.preview.size');
+  expect(container.querySelector('dd')?.textContent).not.toBe('');
   expect(container.textContent).toContain('1280×720');
   expect(container.textContent).toContain('2.5 gallery.preview.durationSuffix');
 
@@ -381,7 +384,7 @@ it('keeps navigation and file commands neutral with matching geometry', async ()
   expect(commands.length).toBeGreaterThan(1);
   for (const command of commands) {
     expect(command.className).not.toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
-    expect(command.className).toContain('!px-3');
+    expect(command.className).toContain('gallery-preview-action');
   }
   await act(async () => root.unmount());
 });
@@ -565,7 +568,9 @@ it('omits redundant headings for one file action and distinguishes save-copy fro
   expect(container.textContent).toContain('gallery.preview.download');
   expect(container.textContent).toContain('common.actions.delete');
   await act(async () => root.render(<PreviewActions {...props} onSaveCopy={vi.fn()} />));
-  expect(container.querySelector('#preview-actions-heading')?.className).toContain('text-xs');
+  expect(container.querySelector('#preview-actions-heading')?.className).toContain(
+    'gallery-preview-section-label'
+  );
   const copy = [...container.querySelectorAll('button')].find(
     (button) => button.textContent === 'gallery.preview.saveCopy'
   );

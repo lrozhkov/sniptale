@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { useRef, useState } from 'react';
+import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { ArrowDown, ArrowUp, Check, Save, Trash2, X } from 'lucide-react';
 import {
   GallerySavedViewError,
@@ -22,14 +24,14 @@ export function GallerySavedViewRows(
   const views = (props.savedViews ?? []).filter((view) => view.folderFilter === props.folder);
   if (views.length === 0) return null;
   return (
-    <div className="space-y-0.5 pl-7">
+    <div className="space-y-1 pl-7">
       {views.slice(0, visibleCount).map((view, index) => {
         const active = props.activeSavedView?.id === view.id;
         return (
           <div
             key={view.id}
             className={cx(
-              'group relative h-8 rounded-[7px] border text-xs transition-colors',
+              'group relative h-8 rounded-[4px] border text-[13px] leading-[18px] transition-colors',
               active
                 ? [
                     'border-transparent',
@@ -48,8 +50,8 @@ export function GallerySavedViewRows(
               type="button"
               aria-pressed={active}
               onClick={() => props.onSavedViewSelect?.(view.id)}
-              className="flex h-full w-full min-w-0 items-center truncate rounded-[7px] px-2
-                pr-[78px] text-left font-medium outline-none
+              className="flex h-full w-full min-w-0 items-center truncate rounded-[4px] px-2
+                pr-[100px] text-left font-medium outline-none
                 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-text-primary)]"
               title={view.name}
             >
@@ -86,16 +88,15 @@ export function GallerySavedViewRows(
         );
       })}
       {visibleCount < views.length ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           onClick={() => setVisibleCount((current) => current + 5)}
-          className="flex h-8 w-full items-center rounded-[7px] px-2 text-left text-xs font-medium
-            text-[var(--sniptale-color-text-primary)] transition-colors
-            hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none
-            focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]"
+          className="w-full !justify-start"
         >
           {translate('gallery.app.savedViewShowMore')}
-        </button>
+        </ProductActionButton>
       ) : null}
     </div>
   );
@@ -111,7 +112,9 @@ function SavedViewRowAction(props: {
 }) {
   const Icon = props.icon;
   return (
-    <button
+    <ProductActionButton
+      tone={props.danger ? 'danger' : 'secondary'}
+      compact
       type="button"
       disabled={props.disabled}
       onClick={(event) => {
@@ -120,18 +123,10 @@ function SavedViewRowAction(props: {
       }}
       aria-label={`${props.label} ${props.viewName}`}
       title={props.label}
-      className={cx(
-        'inline-flex h-6 w-6 items-center justify-center rounded-[6px]',
-        'text-[var(--sniptale-color-text-muted)] transition-colors',
-        'hover:bg-[var(--sniptale-color-surface-panel)] hover:text-[var(--sniptale-color-text-primary)]',
-        'focus-visible:outline-none focus-visible:ring-2',
-        'focus-visible:ring-[var(--sniptale-color-text-primary)] disabled:opacity-35',
-        props.danger &&
-          'hover:bg-[var(--sniptale-color-danger-soft)] hover:text-[var(--sniptale-color-danger)]'
-      )}
+      className="h-8 w-8 shrink-0"
     >
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-    </button>
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </ProductActionButton>
   );
 }
 
@@ -147,6 +142,7 @@ function errorMessage(error: unknown): string {
 export function GallerySavedViewActions(
   props: GallerySidebarProps & { hasFacetedFilters: boolean }
 ) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
@@ -173,41 +169,54 @@ export function GallerySavedViewActions(
     <>
       {isCreating && canCreate ? (
         <div
-          className="order-last w-full basis-full space-y-1.5 rounded-[8px] border
+          className="order-last w-full basis-full space-y-1.5 rounded-[4px] border
           border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)] p-1.5"
         >
           <div className="flex h-8 items-center gap-1.5">
-            <input
-              autoFocus
-              value={name}
-              maxLength={MAX_GALLERY_SAVED_VIEW_NAME_LENGTH}
-              onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') void save();
-                if (event.key === 'Escape') {
-                  setIsCreating(false);
-                  setError(null);
-                }
-              }}
-              aria-label={translate('gallery.app.savedViewName')}
-              placeholder={translate('gallery.app.savedViewName')}
-              className="h-full min-w-0 flex-1 rounded-[7px] border
+            <div className="relative h-8 min-w-0 flex-1">
+              <input
+                ref={inputRef}
+                autoFocus
+                value={name}
+                maxLength={MAX_GALLERY_SAVED_VIEW_NAME_LENGTH}
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void save();
+                  if (event.key === 'Escape') {
+                    setIsCreating(false);
+                    setError(null);
+                  }
+                }}
+                aria-label={translate('gallery.app.savedViewName')}
+                placeholder={translate('gallery.app.savedViewName')}
+                className="h-full w-full min-w-0 rounded-[4px] border
                 border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
-                px-2 text-xs outline-none focus:border-[var(--sniptale-color-border-accent-strong)]"
-            />
-            <button
+                pl-2 pr-8 text-[13px] leading-[18px] outline-none
+                focus:border-[var(--sniptale-color-border-accent-strong)]"
+              />
+              {name.length > 0 ? (
+                <InspectorFieldClear
+                  label={translate('gallery.app.savedViewName')}
+                  target={inputRef}
+                />
+              ) : null}
+            </div>
+            <ProductActionButton
+              tone="secondary"
+              compact
               type="button"
               disabled={!name.trim() || isSaving}
               onClick={() => void save()}
               aria-label={translate('gallery.app.savedViewConfirm')}
               title={translate('gallery.app.savedViewConfirm')}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[7px]
-                bg-[var(--sniptale-color-accent)] text-white transition-colors
-                hover:bg-[var(--sniptale-color-accent-emphasis)] disabled:opacity-50"
+              className="h-8 w-8 shrink-0"
             >
               <Check className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
+            </ProductActionButton>
+            <ProductActionButton
+              tone="secondary"
+              compact
+              data-command-chrome="true"
               type="button"
               onClick={() => {
                 setIsCreating(false);
@@ -215,18 +224,20 @@ export function GallerySavedViewActions(
               }}
               aria-label={translate('common.actions.cancel')}
               title={translate('common.actions.cancel')}
-              className="sniptale-dismiss-button inline-flex h-8 w-8 items-center justify-center rounded-[7px]"
+              className="sniptale-dismiss-button h-8 w-8 shrink-0"
             >
               <X className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </ProductActionButton>
           </div>
           {error ? (
-            <p className="px-1 text-[11px] text-[var(--sniptale-color-danger)]">{error}</p>
+            <p className="px-1 text-sm leading-5 text-[var(--sniptale-color-danger)]">{error}</p>
           ) : null}
         </div>
       ) : null}
       {canCreate || canUpdate ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           onClick={() => {
             if (canUpdate) {
@@ -239,22 +250,20 @@ export function GallerySavedViewActions(
               setError(null);
             }
           }}
-          className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px]
-            border border-[var(--sniptale-color-border-soft)] px-2 text-xs font-medium
-            text-[var(--sniptale-color-text-secondary)] transition-colors
-            hover:border-[var(--sniptale-color-border-strong)]
-            hover:bg-[var(--sniptale-color-surface-canvas)]"
+          className="min-w-0 flex-1 gap-1.5"
         >
-          <Save className="h-3.5 w-3.5" aria-hidden="true" />
+          <Save className="h-4 w-4" aria-hidden="true" />
           <span className="truncate">
             {canUpdate
               ? translate('gallery.app.savedViewUpdate')
               : translate('gallery.app.savedViewSave')}
           </span>
-        </button>
+        </ProductActionButton>
       ) : null}
       {!isCreating && error ? (
-        <p className="basis-full px-1 text-[11px] text-[var(--sniptale-color-danger)]">{error}</p>
+        <p className="basis-full px-1 text-sm leading-5 text-[var(--sniptale-color-danger)]">
+          {error}
+        </p>
       ) : null}
     </>
   );
