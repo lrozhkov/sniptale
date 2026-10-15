@@ -1,0 +1,36 @@
+# Specialized mechanics
+
+[Working example](../../tooling/design-reference/examples/specialized/index.html) · [Foundations](foundations.md)
+
+[Surface-specific patterns](surfaces.md) limit generic rules for popup, timeline, canvas, and embedded UI.
+## Preserve the useful interaction
+
+Standardize surrounding labels, values, icons, focus, surfaces, and feedback. Do not replace a timeline, canvas gesture, color plane, scrub control, or docking interaction with a generic field for visual consistency. The examples provide bounded probes. They do not implement media decoding, real playback, production history, capture permissions, or native eyedropper parity.
+
+| Mechanic | Preserve |
+| --- | --- |
+| Timeline seek and playhead | Time mapping, playback state, selection, scroll ownership |
+| Clip trim/resize | Valid boundaries, snapping, preview, commit, cancellation, capture |
+| Lane selection | Selection meaning, modifiers, context commands, focus |
+| Canvas pan/zoom/crop/resize | Coordinate mapping, zoom context, tool, bounds, recovery |
+| Numeric scrub and stepper | Units, precision, domain limits, repeat and acceptance |
+| Color plane and eyedropper | Color model, alpha, format, draft and browser-session ownership |
+| Inspector docking/resize | Scroll owners, category rail, intermediate layouts, reachability |
+
+Before implementation, record the trigger, state owner, preview, acceptance, cancellation, failure, and supported limits for the affected mechanic. Map a real consumer and evidence to each claimed invariant. Preserve supported keyboard alternatives and pointer capture. Do not invent shortcuts or change domain mappings during styling.
+
+## Shared gesture contract
+
+Keep accepted state separate from a live preview. A valid release commits once. Cancel, Escape, lost capture, window blur, and supported operating-system interruption clear active feedback and preserve accepted data. Keep handles recognizable at supported zoom. Active dragging remains visible after the pointer leaves the original hit region. Do not apply command-button displacement to drag handles.
+
+Preserve independent gesture surfaces and actual scroll owners. Avoid changes that swallow page scrolling. Physical touch and operating-system interruption require integration proof beyond synthetic events.
+
+## Numeric variants
+
+Some properties allow a wider typed domain than their contextual scrub range. Declare typed bounds and scrub bounds separately. A valid typed value outside scrub bounds remains accepted. Show an explicit out-of-range indication instead of silently clamping the typed value or implying an exact thumb position. The next deliberate range edit can choose a value within the scrub domain.
+
+Some device settings expose a slider and read-only value. Preserve that range-only contract rather than adding direct numeric editing during visual alignment. The shared [Numbers](numbers.md) owner defines the actual variants.
+
+## Product references
+
+Preserve existing crop, timeline, media, and inspector owners rather than copying the probes into product state. The complete color/paint selector remains authoritative in apps/extension/src/ui/color-selector/index.tsx and its existing shared packages. Read about the sample color transaction in [Layers](layers.md). Review [Coverage](coverage.md) before using these examples as a complete screen implementation reference.

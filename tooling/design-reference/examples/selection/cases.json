@@ -1,0 +1,71 @@
+{
+  "group": "selection",
+  "version": "package-5",
+  "rules": "selection.md",
+  "component": "Switch / Checkbox / RadioGroup",
+  "excludes": ["numeric editing", "dropdown catalogs", "collection row layout", "navigation tabs"],
+  "cases": [
+    {
+      "id": "selection.switch-independent",
+      "title": "Независимая функция",
+      "states": ["off", "on"],
+      "proof": "The switch accepts a persistent independent setting without a separate confirmation."
+    },
+    {
+      "id": "selection.checkbox-independent",
+      "title": "Состав операции",
+      "states": ["unchecked", "checked"],
+      "proof": "Checkboxes select independent conditions without implying a running source."
+    },
+    {
+      "id": "selection.radio-exclusive",
+      "title": "Один режим из группы",
+      "states": ["none-option", "selected", "disabled-option"],
+      "proof": "Native radio selection replaces the previous value and retains its selection on repeated clicks."
+    },
+    {
+      "id": "selection.mixed-parent",
+      "title": "Смешанное состояние родителя",
+      "states": ["none", "some", "all"],
+      "proof": "The parent reflects the children. Individual checkboxes reflect only their own item."
+    },
+    {
+      "id": "selection.disabled",
+      "title": "Недоступные состояния",
+      "states": ["off-disabled", "on-disabled"],
+      "proof": "Disabled controls retain their value and ignore pointer/keyboard activation."
+    },
+    {
+      "id": "selection.async",
+      "title": "Ожидание, ошибка и повтор",
+      "states": ["pending", "error", "retry", "accepted"],
+      "proof": "Reject duplicate activation, preserve accepted state on failure, and preserve focus through recovery."
+    },
+    {
+      "id": "selection.densities",
+      "title": "Модификации плотности",
+      "states": ["compact", "standard", "spacious"],
+      "proof": "One component owns each control across the trial 16/18/20 px drawing sizes."
+    },
+    {
+      "id": "selection.multiline",
+      "title": "Многострочная подпись",
+      "states": ["long-label", "description"],
+      "proof": "The circle stays aligned with the first label line, independently of description height."
+    },
+    {
+      "id": "selection.live-test",
+      "title": "Настройка с тестовым потоком",
+      "states": ["pending", "rejected", "retry", "unsupported"],
+      "proof": "Persistent settings remain distinct from future-operation inclusion and retain their accepted state after rejected live-test application."
+    },
+    {
+      "id": "selection.neutral-filters",
+      "title": "Нейтральные фильтры библиотеки",
+      "states": ["unchecked-neutral", "hover", "checked-inverse", "stable-width"],
+      "proof": "A scoped proposed filter tone uses theme-inverted selection without orange and retains stable layout when its label becomes semibold."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

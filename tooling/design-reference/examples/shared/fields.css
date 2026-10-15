@@ -1,0 +1,207 @@
+.text-field {
+  min-width: 0;
+  margin-bottom: var(--space-related);
+}
+.text-label {
+  display: block;
+  color: var(--secondary);
+  font-size: var(--font-control-size);
+  margin: 0 0 var(--space-related);
+  overflow-wrap: anywhere;
+}
+.text-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: var(--control-padding-block) var(--control-padding-inline);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  background: var(--sniptale-color-surface-input);
+  color: var(--text);
+  line-height: var(--font-control-line);
+  caret-color: var(--text);
+}
+textarea.text-input {
+  min-height: 100px;
+  resize: vertical;
+  overflow-wrap: anywhere;
+}
+.text-input::placeholder {
+  color: var(--secondary);
+  opacity: 1;
+}
+.text-field[data-context='inspector'] .text-input {
+  border-color: transparent;
+  background: transparent;
+}
+.text-field:hover > .text-input:not(:disabled):not(:read-only),
+.text-field:focus-within > .text-input:not(:disabled):not(:read-only) {
+  background: var(--surface-hover);
+  border-color: var(--field-border, var(--divider));
+}
+.text-input:focus {
+  outline: none;
+}
+html[data-input-mode='keyboard'] .text-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.text-input[aria-invalid='true'] {
+  border-color: var(--sniptale-color-danger);
+}
+.text-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.text-field[data-readonly='true'] .text-input {
+  background: transparent;
+}
+.reference-case .field-description,
+.reference-case .field-error {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+.reference-case .field-description {
+  color: var(--secondary);
+}
+.reference-case .field-error {
+  color: #be123c;
+}
+.theme[data-theme='dark'] .reference-case .field-error {
+  color: #fda4af;
+}
+.field-description:empty,
+.field-error:empty {
+  display: none;
+}
+.form-summary {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-groups);
+}
+.form-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: start;
+}
+.form-actions .action-status {
+  max-width: 60ch;
+}
+@media (max-width: 900px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (forced-colors: active) {
+  .text-input {
+    background: Canvas;
+    color: CanvasText;
+    border-color: ButtonText;
+  }
+  .theme[data-theme] .reference-case .field-error {
+    color: CanvasText;
+  }
+}
+.field-status {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.text-field .text-input[aria-invalid='true'] {
+  --field-border: var(--sniptale-color-danger);
+  border-color: var(--field-border);
+}
+
+.text-field:last-child {
+  margin-bottom: 0;
+}
+
+/* Keep input as a direct child so the whole label-to-field hover owner remains intact. */
+.text-field--clearable {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.text-field--clearable > .text-label {
+  grid-column: 1;
+  grid-row: 1;
+}
+.text-field.text-field--clearable > .text-input {
+  grid-column: 1;
+  grid-row: 2;
+  padding-inline-end: 36px;
+}
+.text-field.text-field--clearable > .text-clear {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: end;
+  align-self: center;
+  z-index: 1;
+  margin-inline-end: 4px;
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  height: 24px;
+  padding: 0;
+}
+.text-field.text-field--clearable:has(> textarea) > .text-clear {
+  align-self: start;
+  margin-top: 4px;
+}
+.text-field--clearable > .text-clear svg {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+}
+.text-field--clearable > .field-description,
+.text-field--clearable > .field-error {
+  grid-column: 1/-1;
+}
+.text-field--clearable:has(> .text-input:disabled) > .text-clear,
+.text-field--clearable:has(> .text-input:read-only) > .text-clear {
+  display: none;
+}
+
+.reference-case .field-description {
+  font: 400 12px/16px var(--font-ui);
+}
+.reference-case .field-error {
+  font: 400 14px/20px var(--font-ui);
+}
+/* Authored multiline content retains a full-width editor in compact inspectors. */
+.inspector-controls .text-field[data-context='inspector']:has(> textarea) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  align-items: start;
+}
+.inspector-controls .text-field[data-context='inspector']:has(> textarea) > .text-label {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+}
+.inspector-controls
+  .text-field.text-field--clearable[data-context='inspector']:has(> textarea)
+  > .text-input,
+.inspector-controls
+  .text-field.text-field--clearable[data-context='inspector']:has(> textarea)
+  > .text-clear {
+  grid-column: 1;
+  grid-row: 2;
+}
+.inspector-controls .text-field[data-context='inspector']:has(> textarea) > .text-input {
+  min-height: 80px;
+  width: 100%;
+  padding: 6px 36px 6px 6px;
+  text-align: start;
+  resize: vertical;
+}
+.inspector-controls .text-field[data-context='inspector']:has(> textarea) > .text-clear {
+  align-self: start;
+  margin-top: 4px;
+}

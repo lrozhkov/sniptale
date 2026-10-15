@@ -1,0 +1,41 @@
+@font-face {
+  font-family: Inter;
+  src: url('./inter-variable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  --font-ui: Inter, 'Segoe UI', sans-serif;
+  --font-control-size: 13px;
+  --font-control-line: 18px;
+  --font-control-weight: 500;
+  --font-caption-size: 12px;
+  --font-caption-line: 16px;
+  --font-copy-size: 14px;
+  --font-copy-line: 20px;
+}
+
+:root,
+[data-theme] {
+  --sniptale-font-sans: var(--font-ui);
+}
+
+/* Parameter names have one owner across ordinary control constructions. */
+.theme
+  :is(
+    .param-name,
+    .parameter-name,
+    .number-label,
+    .field-label,
+    .text-label,
+    .color-name,
+    .resource-label,
+    .selection-setting > span,
+    .selection-option[data-layout='parameter'] .option-label,
+    .selection-group legend,
+    .property-group legend
+  ) {
+  font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
+  color: var(--secondary);
+}

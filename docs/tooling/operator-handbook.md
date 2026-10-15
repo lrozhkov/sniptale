@@ -18,6 +18,7 @@ This document owns public operator commands and external run procedures. Wrapper
 | Run the project build without QA proof | `npm run build` or `npm run ci:build` |
 | Build unpacked release output without admission | `npm run build:release` |
 | Debug typecheck, build, and packaging | `npm run release:package-only` |
+| Open the local design reference | `npm run design:reference -- [--port number]` |
 | Run extension smoke | `npm run qa:e2e` |
 | Write a non-blocking topology report | `npm run qa:structural-audit` |
 | Inspect wrapper records | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` |

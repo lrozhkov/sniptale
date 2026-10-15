@@ -1,0 +1,37 @@
+# Reference verification
+
+[Design index](index.md)
+
+## Per-group acceptance
+
+Inspect one group at a time. Operate every declared case before advancing to the next group. Use both themes at 1280×560 and 1920×900 CSS viewports with DPR 1. Set viewport before navigation. Inspect settled, visible-area screenshots of each case, not only the page top. Check relevant breakpoint neighbors and a width below 1280 for horizontal scroll.
+
+Check long names, unbroken values, local clipping, real overflow, short-height actions, and meaningful empty/error states. Keep desktop density distinct from touch-target requirements for supported touch surfaces.
+
+## Required interactions
+
+- Traverse label, padding, gap, and field with pointer and clicks. Hot regions must not contain dead activation strips.
+- Traverse available and unavailable menu rows. Keep hover independent of the committed check.
+- Use real Tab navigation to check focus. Pointer interaction must not show keyboard-only frames.
+- Exercise press, hold, release outside, interruption, and release once for commands.
+- Check editing, valid acceptance, invalid draft retention, Escape, Save/Cancel, pending, failure, and retry.
+- Drag ranges and scrollbars. Check hidden ranges during typing and no layout movement during hover.
+- Check disappearing anchors, nested Escape, modal clipping, and focus after removal.
+- Inspect contrast against actual themed and patterned backdrops, including reduced transparency and forced colors.
+- Check reduced motion without hiding state feedback.
+
+## Mixed-row rhythm
+
+Check every inspector category at regular and narrow widths, in both themes and languages. Compare visible label baselines across numbers, colors, switches, choices, and text fields. Include transitions between inline and stacked layouts and compound-resource rows. Check the actual text inset within each row. Do not restrict coverage to numeric, color, and boolean controls. For adjacent compact one-line rows, expect a 36px pitch: 32px row plus 4px gap. Allow 0.5px rounding tolerance. Check an 8px gap below the complete disclosure header target.
+
+Check conditional controls and expanded nested groups. Hidden content must reserve no space. Record multiline labels, editors, errors, and explicit group boundaries as expansion reasons. Do not flatten those cases to satisfy a uniform-height assertion. Check hover and editing without row movement. Inspect the mixed composition after measurements.
+
+## Review and evidence
+
+Record source files, rule changes, proof commands, screenshots, review findings, and unresolved limitations outside the portable reference package. Expert review and successful checks do not imply user acceptance. Keep the exact user-reviewed version explicit. Preserve historical decisions outside the active catalog. Do not reintroduce rejected treatments through an old sample. Structural English lint does not establish dictionary compliance or compare requirements.
+
+## Product implementation boundary
+
+Reference examples do not authorize product changes by themselves. Product implementation follows repository planning, affected-consumer mapping, preflight, QA, and required reviews. Product portals, theme inheritance, assistive technology, physical touch, native permissions, and operating-system interruption require integration proof. A local HTML specimen does not establish complete WCAG compliance or production behavior.
+
+Preserve accepted data and completed work after failure.

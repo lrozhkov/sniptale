@@ -36,7 +36,7 @@ This index lists current active documents and their authority.
 - [Persistence contracts](architecture/persistence-contracts.md) owns IndexedDB admission, domain versions, migration, and recovery policy.
 - [Parser architecture](architecture/parser-architecture.md), [i18n architecture](architecture/i18n-architecture.md), and [platform tradeoffs](architecture/platform-patterns-and-tradeoffs.md) own their domain contracts.
 - [Video editor layering](architecture/video-editor-layering.md) and [EffectV1 bundles](architecture/video-effect-bundles.md) own their domain contracts.
-- Repository-local `DESIGN.md` owns UX, accessibility, theme, restrained accent use, screen composition, and interaction requirements.
+- [Design reference](design/index.md) owns product UX, accessibility, theme, control semantics, screen composition, and interaction requirements. Local `DESIGN.md` routes to these documents.
 
 ## Implementation, operation, and release
 
@@ -53,3 +53,25 @@ This index lists current active documents and their authority.
 - [Data handling](security/data-handling.md), [manifest permissions](security/manifest-permissions.md), and [threat model](security/threat-model.md) own security policy.
 - [Provenance](oss/provenance.md) and [release](oss/release.md) own redistribution evidence and local release procedure.
 - [CONTRIBUTING.md](../CONTRIBUTING.md) owns issue and proposal guidance. It records the current external code-contribution policy. [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) governs participation.
+
+## Product design rules
+
+- [Buttons](design/buttons.md)
+- [Choices and surfaces](design/choices-and-surfaces.md)
+- [Collections](design/collections.md)
+- [Command content](design/command-content.md)
+- [Compositions](design/compositions.md)
+- [Coverage](design/coverage.md)
+- [Fields](design/fields.md)
+- [Foundations](design/foundations.md)
+- [Layers](design/layers.md)
+- [Localization](design/localization.md)
+- [Navigation](design/navigation.md)
+- [Numbers](design/numbers.md)
+- [Properties](design/properties.md)
+- [Responsive](design/responsive.md)
+- [Runtime](design/runtime.md)
+- [Selection](design/selection.md)
+- [Specialized](design/specialized.md)
+- [Surfaces](design/surfaces.md)
+- [Verification](design/verification.md)

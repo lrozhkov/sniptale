@@ -1,0 +1,137 @@
+@import url('assets/geometry.css');
+@import url('assets/typography.css');
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--sniptale-color-surface-canvas);
+  color: var(--sniptale-color-text-primary);
+  font: 500 13px/18px var(--font-ui);
+  user-select: none;
+}
+header,
+main,
+footer {
+  max-width: 1200px;
+  margin: auto;
+  padding-inline: 24px;
+}
+header {
+  padding-block: 24px 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: start;
+}
+h1 {
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+p {
+  margin: 4px 0;
+  color: var(--sniptale-color-text-secondary);
+  font: 400 12px/16px var(--font-ui);
+}
+nav {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+a:hover {
+  color: var(--sniptale-color-text-primary);
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  min-height: 32px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--sniptale-color-border-soft);
+}
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+main {
+  padding-bottom: 20px;
+}
+.catalog-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+th {
+  font: 400 12px/16px var(--font-ui);
+  color: var(--sniptale-color-text-secondary);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+td {
+  padding: 12px;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+  vertical-align: middle;
+}
+td:first-child,
+th:first-child {
+  padding-left: 0;
+}
+td:first-child {
+  width: 62%;
+}
+td a {
+  white-space: nowrap;
+}
+td strong {
+  font-weight: 500;
+}
+footer {
+  padding-block: 16px 24px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+  color: var(--sniptale-color-text-secondary);
+  font: 400 12px/16px var(--font-ui);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+@media (max-width: 700px) {
+  header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  header,
+  main,
+  footer {
+    padding-inline: 16px;
+  }
+  td {
+    padding: 10px 6px;
+  }
+  td:first-child {
+    width: 52%;
+  }
+}
+html[data-theme='dark'] {
+  color-scheme: dark;
+}

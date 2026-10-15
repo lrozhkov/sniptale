@@ -1,0 +1,59 @@
+{
+  "group": "layers",
+  "version": "package-5",
+  "rules": "layers.md",
+  "component": "AnchoredLayer / CommandMenu / ModalDialog / ColorEditor / NativeHint",
+  "excludes": ["full production portals", "full color-space parser", "physical eyedropper proof"],
+  "cases": [
+    {
+      "id": "layers.commands",
+      "title": "Меню команд",
+      "states": ["open", "disabled", "keyboard", "dismissed"],
+      "proof": "Commands differ from selecting a stored value."
+    },
+    {
+      "id": "layers.popover",
+      "title": "Привязанное редактирование",
+      "states": ["draft", "accepted", "cancelled", "outside"],
+      "proof": "Nonmodal editing preserves an explicit draft contract."
+    },
+    {
+      "id": "layers.modal",
+      "title": "Диалог и прокручиваемое содержимое",
+      "states": ["modal", "invalid", "nested-menu", "content-scroll", "footer"],
+      "proof": "Native modal focus and inner scrolling retain accessible actions."
+    },
+    {
+      "id": "layers.inner-escape",
+      "title": "Внутренний Escape",
+      "states": ["inner-cancel", "outer-dismiss"],
+      "proof": "Inner editing handles its cancellation before the outer dialog."
+    },
+    {
+      "id": "layers.color",
+      "title": "Цвет, alpha и палитра",
+      "states": ["direct", "invalid", "palette", "alpha", "apply", "cancel", "eyedropper"],
+      "proof": "Valid color data survives invalid drafts. Browser eyedropper lifecycle remains browser-owned."
+    },
+    {
+      "id": "layers.tooltip",
+      "title": "Необязательная подсказка",
+      "states": ["hover", "focus", "escape"],
+      "proof": "Native browser title supplements an accessible command name. No custom tooltip node is created."
+    },
+    {
+      "id": "layers.anchor",
+      "title": "Положение и исчезающий якорь",
+      "states": ["position", "clipped-anchor", "cancel"],
+      "proof": "A layer dismisses when its anchor leaves its visible scroll area."
+    },
+    {
+      "id": "layers.feedback",
+      "title": "Результат и восстановление",
+      "states": ["status", "error", "recovery"],
+      "proof": "Feedback names the result and an available recovery action."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

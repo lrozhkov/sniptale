@@ -100,7 +100,8 @@
     "build:release": "vite build --config apps/extension/vite.config.ts --mode release",
     "release:legal": "node tooling/release/dependency-legal/generate-dependency-legal.mjs",
     "release:package-only": "node tooling/qa/proof/typecheck/execution/check.mjs && npm run build:release && node tooling/release/package/package-dist.mjs",
-    "preview": "vite preview --config apps/extension/vite.config.ts"
+    "preview": "vite preview --config apps/extension/vite.config.ts",
+    "design:reference": "node tooling/design-reference/server.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

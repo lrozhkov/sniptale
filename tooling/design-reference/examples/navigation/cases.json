@@ -1,0 +1,47 @@
+{
+  "group": "navigation",
+  "version": "package-5",
+  "rules": "navigation.md",
+  "component": "Tabs / CategoryNavigation / Disclosure",
+  "excludes": ["property segments", "feature toggles", "numeric editing"],
+  "cases": [
+    {
+      "id": "navigation.automatic",
+      "title": "Tabs с быстрым содержимым",
+      "states": ["selected", "focus", "draft-preserved"],
+      "proof": "Arrow activation changes the associated panel and preserves drafts."
+    },
+    {
+      "id": "navigation.manual",
+      "title": "Отдельное перемещение фокуса",
+      "states": ["focused", "selected", "disabled"],
+      "proof": "Vertical arrows move focus while Enter or Space activates the panel."
+    },
+    {
+      "id": "navigation.categories",
+      "title": "Категории инспектора",
+      "states": ["current", "hover"],
+      "proof": "Category navigation is not a property radio group."
+    },
+    {
+      "id": "navigation.disclosure",
+      "title": "Разделы и вложенные группы",
+      "states": ["open", "closed", "remembered"],
+      "proof": "Native disclosure keeps a stable preference outside content state."
+    },
+    {
+      "id": "navigation.destinations",
+      "title": "Переход к разделам",
+      "states": ["links", "destination"],
+      "proof": "Links retain native destination behavior."
+    },
+    {
+      "id": "navigation.scroll",
+      "title": "Группы при малой высоте",
+      "states": ["internal-scroll", "focus"],
+      "proof": "The actual scroll owner reaches the final group."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

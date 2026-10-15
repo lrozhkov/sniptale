@@ -1,0 +1,44 @@
+.action-button > svg,
+.action-button > span,
+.number-stepper button > svg {
+  transition: transform 110ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.theme .action-button[data-down='true']:not(:disabled):not([aria-disabled='true']),
+.theme .number-stepper button[data-down='true']:not(:disabled) {
+  background: color-mix(in srgb, var(--surface-hover), var(--text) 9%);
+  transition-duration: 55ms;
+}
+.action-button[data-down='true'] > svg,
+.action-button[data-down='true'] > span,
+.number-stepper button[data-down='true'] > svg {
+  transform: translateY(1px);
+  transition-duration: 55ms;
+}
+.theme[data-theme='light'] .action-button[data-kind='danger'][data-down='true'] {
+  color: #9f1239;
+}
+.theme[data-theme='dark'] .action-button[data-kind='danger'][data-down='true'] {
+  color: #fecdd3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .action-button > svg,
+  .action-button > span,
+  .number-stepper button > svg {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .theme .action-button[data-down='true']:not(:disabled):not([aria-disabled='true']),
+  .theme .number-stepper button[data-down='true']:not(:disabled) {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  .theme[data-theme] .action-button[data-kind='danger'][data-down='true'] {
+    color: HighlightText;
+  }
+  .action-button[data-surface='outlined'] {
+    box-shadow: none;
+  }
+}

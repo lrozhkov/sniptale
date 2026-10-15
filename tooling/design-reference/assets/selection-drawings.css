@@ -1,0 +1,217 @@
+/* Exact geometry and animation from the previous controls study. */
+.check-hit {
+  --d: 18px;
+  --check-mark: 12px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.check-hit.sm {
+  --d: 16px;
+  --check-mark: 10px;
+}
+.check-hit.lg {
+  --d: 20px;
+  --check-mark: 14px;
+}
+.check-hit input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.check-disc {
+  box-sizing: border-box;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  width: var(--d);
+  height: var(--d);
+  border: 1px solid var(--thumb-border);
+  border-radius: 50%;
+  background: var(--thumb);
+  box-shadow: var(--thumb-shadow);
+  transition: box-shadow 150ms ease;
+}
+.check-disc svg {
+  width: var(--check-mark);
+  height: var(--check-mark);
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+.check-disc path {
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  opacity: 0;
+  transition:
+    stroke-dashoffset 120ms ease-in,
+    opacity 120ms ease-in;
+}
+.check-hit input:checked + .check-disc path {
+  stroke-dashoffset: 0;
+  opacity: 1;
+  transition:
+    stroke-dashoffset 160ms ease-out,
+    opacity 80ms ease-out;
+}
+.check-hit:hover input:not(:disabled) + .check-disc {
+  box-shadow:
+    var(--thumb-shadow),
+    0 0 6px 1px var(--control-glow);
+}
+.check-hit input:focus-visible + .check-disc,
+.check-focus-demo .check-disc {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.check-hit input:disabled + .check-disc {
+  opacity: 0.4;
+}
+.check-hit:has(input:disabled),
+.check-row:has(input:disabled) {
+  cursor: not-allowed;
+}
+.check-row {
+  cursor: pointer;
+}
+.switch {
+  --switch-accent: var(--sniptale-color-accent);
+  --w: 44px;
+  --h: 26px;
+  --d: 18px;
+  appearance: none;
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  flex: 0 0 auto;
+  width: var(--w);
+  height: var(--h);
+  padding: 0;
+  cursor: pointer;
+  border-radius: 20px;
+  isolation: isolate;
+}
+.switch:before {
+  content: '';
+  position: absolute;
+  height: 4px;
+  left: 2px;
+  right: 2px;
+  top: calc(50% - 2px);
+  background: var(--track);
+  border-radius: 5px;
+  transition: background 0.18s;
+}
+.switch:after {
+  content: '';
+  box-sizing: border-box;
+  position: absolute;
+  width: var(--d);
+  height: var(--d);
+  top: 50%;
+  transform: translateY(-50%);
+  left: 1px;
+  border-radius: 50%;
+  background: var(--thumb);
+  border: 1px solid var(--thumb-border);
+  box-shadow: var(--thumb-shadow);
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.15s;
+}
+.switch[aria-checked='true']:before {
+  background: var(--switch-accent);
+}
+.switch[aria-checked='true']:after {
+  transform: translate(calc(var(--w) - var(--d) - 2px), -50%);
+}
+.switch:hover:not(:disabled):after {
+  box-shadow:
+    var(--thumb-shadow),
+    0 0 6px 1px var(--control-glow);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.switch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.switch.sm {
+  --w: 34px;
+  --h: 24px;
+  --d: 16px;
+}
+.switch.lg {
+  --w: 54px;
+  --h: 32px;
+  --d: 20px;
+}
+.switch.lg:before {
+  height: 5px;
+  top: calc(50% - 2.5px);
+}
+.theme[data-theme='light'] {
+  --thumb: #fff;
+  --thumb-border: #747987;
+  --thumb-shadow: 0 0 3px #52658530;
+  --control-glow: rgba(39, 39, 42, 0.2);
+  --control-mark: #c2410c;
+}
+.theme[data-theme='dark'] {
+  --thumb: #ededf1;
+  --thumb-border: #bdbdc8;
+  --thumb-shadow: 0 0 4px #0006;
+  --control-glow: rgba(244, 244, 245, 0.25);
+  --control-mark: #c2410c;
+}
+.check-disc svg {
+  stroke: var(--control-mark);
+}
+@media (prefers-reduced-motion: reduce) {
+  .check-disc,
+  .check-disc path,
+  .switch:after,
+  .switch:before {
+    transition: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .check-disc {
+    background: Canvas;
+    border-color: ButtonText;
+    box-shadow: none;
+    forced-color-adjust: none;
+  }
+  .check-disc svg {
+    stroke: Highlight;
+  }
+  .switch:before {
+    background: ButtonText;
+    forced-color-adjust: none;
+  }
+  .switch[aria-checked='true']:before {
+    background: Highlight;
+  }
+  .switch:after {
+    background: Canvas;
+    border-color: ButtonText;
+    box-shadow: none;
+    forced-color-adjust: none;
+  }
+}

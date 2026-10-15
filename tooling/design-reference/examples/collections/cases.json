@@ -1,0 +1,63 @@
+{
+  "group": "collections",
+  "version": "package-5",
+  "rules": "collections.md",
+  "component": "ObjectCollection / Checkbox / Disclosure",
+  "excludes": [
+    "single property catalogs",
+    "new selection gestures",
+    "production grid virtualization"
+  ],
+  "cases": [
+    {
+      "id": "collections.rows",
+      "title": "Выбор, фильтр и массовые действия",
+      "states": ["none", "some", "all", "filtered", "hidden-selection", "delete", "undo"],
+      "proof": "Visible Select all scope differs from total batch scope. Opening is separate from selection."
+    },
+    {
+      "id": "collections.cards",
+      "title": "Карточки объектов",
+      "states": ["selected", "focus", "open"],
+      "proof": "The same collection owner changes layout without changing selection semantics."
+    },
+    {
+      "id": "collections.hierarchy",
+      "title": "Групповой выбор и раскрытие",
+      "states": ["mixed", "collapsed", "expanded"],
+      "proof": "Expansion does not change selection. Parent reflects only its children."
+    },
+    {
+      "id": "collections.long",
+      "title": "Длинные имена",
+      "states": ["unbroken-name", "metadata"],
+      "proof": "Full names wrap inside the row without displacing actions."
+    },
+    {
+      "id": "collections.empty",
+      "title": "Пустая библиотека",
+      "states": ["empty", "acquired"],
+      "proof": "Acquisition differs from no filter results."
+    },
+    {
+      "id": "collections.recovery",
+      "title": "Ошибка загрузки",
+      "states": ["loading", "failed", "retry"],
+      "proof": "Failure stays distinct from successful empty data. Recovery preserves logical focus."
+    },
+    {
+      "id": "collections.inline-notes",
+      "title": "Один комментарий и встроенное редактирование",
+      "states": ["single-selection", "hover-preview", "inline-edit", "cancel", "delete"],
+      "proof": "Single-selection comments preserve their own row/inline-composer pattern without introducing batch checkboxes."
+    },
+    {
+      "id": "collections.resource",
+      "title": "Один медиаресурс: источник и замена",
+      "states": ["accepted-preview", "library", "native-file", "pending", "error", "cancel"],
+      "proof": "Acquisition, replacement, and failure retain the accepted resource; this does not replace product import or media lifetime owners."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

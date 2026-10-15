@@ -1,0 +1,296 @@
+.content-tabs {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: stretch;
+  border-bottom: 1px solid var(--divider);
+}
+.content-tabs > [role='tab'] {
+  position: relative;
+  min-height: 40px;
+  min-width: 72px;
+  max-width: 100%;
+  padding: 8px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+.content-tabs > [role='tab']:hover:not(:disabled) {
+  color: var(--text);
+}
+.content-tabs > [role='tab'][aria-selected='true'] {
+  color: var(--text);
+  font-weight: 500;
+}
+.content-tabs > [role='tab'][aria-selected='true']:after {
+  content: '';
+  position: absolute;
+  height: 2px;
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  border-radius: 1px;
+  background: var(--sniptale-color-accent);
+}
+.content-tabs > [role='tab']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.content-tabs > [role='tab']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tab-content {
+  min-width: 0;
+  padding: 16px 0;
+}
+.tab-content > [role='tabpanel'] {
+  min-height: 80px;
+  overflow-wrap: anywhere;
+}
+.tab-content > [role='tabpanel']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.tab-layout[data-orientation='vertical'] {
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) minmax(0, 3fr);
+  gap: 16px;
+}
+.tab-layout[data-orientation='vertical'] .content-tabs {
+  flex-direction: column;
+  gap: 4px;
+  border: 0;
+}
+.tab-layout[data-orientation='vertical'] [role='tab'] {
+  text-align: left;
+}
+.tab-layout[data-orientation='vertical'] [role='tab'][aria-selected='true'] {
+  background: var(--surface-hover);
+  border-radius: var(--radius);
+}
+.tab-layout[data-orientation='vertical'] [role='tab'][aria-selected='true']:after {
+  display: none;
+}
+.reference-disclosure {
+  --disclosure-inset: 8px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+.reference-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px var(--disclosure-inset);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+.reference-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.reference-disclosure > summary:hover {
+  background: var(--surface-hover);
+}
+.reference-disclosure > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.reference-disclosure > summary > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.reference-disclosure > summary > svg path {
+  d: path('M5 9 L12 15 L19 9');
+  transition: d 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reference-disclosure[open] > summary > svg path {
+  d: path('M5 15 L12 9 L19 15');
+}
+.disclosure-body {
+  padding: 4px var(--disclosure-inset) 12px;
+}
+.reference-disclosure[data-level='section'] > summary {
+  font-size: 14px;
+}
+.reference-disclosure[data-level='group'] > summary {
+  color: var(--secondary);
+  font-size: 12px;
+}
+.category-layout {
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) minmax(0, 3fr);
+  gap: 16px;
+}
+.category-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.category-rail button {
+  min-height: 40px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--secondary);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.category-rail button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.category-rail [aria-current] {
+  background: var(--surface-hover);
+  color: var(--text);
+  font-weight: 500;
+}
+.category-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.nav-scroll-owner {
+  height: 240px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary) transparent;
+  padding: 4px 10px 4px 4px;
+}
+.destination-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.destination-section {
+  scroll-margin-top: 12px;
+  min-height: 110px;
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reference-disclosure > summary > svg path {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .content-tabs > [role='tab'][aria-selected='true'],
+  .category-rail [aria-current] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  .content-tabs > [role='tab'][aria-selected='true']:after {
+    background: HighlightText;
+  }
+}
+
+.reference-disclosure[data-level='group'] > summary {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+/* Optional information shares disclosure mechanics, without a command surface. */
+.reference-disclosure[data-kind='information'] > summary {
+  min-height: 32px;
+  padding: 4px var(--disclosure-inset);
+  color: var(--secondary);
+  font: 500 var(--font-control-size)/var(--font-control-line) var(--font-ui);
+}
+.reference-disclosure[data-kind='information'] > summary:hover {
+  background: transparent;
+  color: var(--text);
+}
+.reference-disclosure[data-kind='information'] .disclosure-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.reference-disclosure[data-kind='information'] .disclosure-label > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.reference-disclosure[data-kind='information'] > .disclosure-body {
+  padding: 0 var(--disclosure-inset) 4px calc(var(--disclosure-inset) + 22px);
+  color: var(--secondary);
+}
+
+/* Nested hierarchy is smaller visually while retaining a usable target. */
+.reference-disclosure .reference-disclosure > summary {
+  min-height: 32px;
+  padding: 4px var(--disclosure-inset);
+  font: 500 13px/18px var(--font-ui);
+  color: var(--secondary);
+}
+.reference-disclosure .reference-disclosure > summary > svg {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+}
+.reference-disclosure .reference-disclosure {
+  margin-bottom: 4px;
+}
+
+/* Navigation stays one line; it does not wrap into parameter segments. */
+.content-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  min-width: 0;
+  gap: 12px;
+}
+.content-tabs > [role='tab'] {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font: 500 13px/18px var(--font-ui);
+}
+.tab-layout[data-orientation='vertical'] .content-tabs {
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.tab-layout[data-orientation='vertical'] .content-tabs > [role='tab'] {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: start;
+  white-space: nowrap;
+}
+.category-rail {
+  min-width: 0;
+}
+.category-rail button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 13px/18px var(--font-ui);
+}
+
+/* Separate the complete header target from its first editable control. */
+.reference-disclosure[data-kind='group'] > .disclosure-body {
+  padding-top: 8px;
+}

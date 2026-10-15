@@ -1,0 +1,65 @@
+{
+  "group": "choices",
+  "version": "package-5",
+  "rules": "choices-and-surfaces.md",
+  "component": "createDropdown / PropertyChoice",
+  "excludes": ["navigation tabs", "independent pressed buttons", "numeric parser"],
+  "cases": [
+    {
+      "id": "choices.segments",
+      "title": "Короткие значения параметра",
+      "states": ["selected", "disabled", "keyboard"],
+      "proof": "Exclusive values use native radio semantics, not navigation tabs."
+    },
+    {
+      "id": "choices.tiles",
+      "title": "Стиль с визуальным сравнением",
+      "states": ["selected", "keyboard"],
+      "proof": "Labeled previews use the shared check glyph and one accepted value."
+    },
+    {
+      "id": "choices.sizes",
+      "title": "Пропорции и разрешение",
+      "states": ["source", "custom", "long-value"],
+      "proof": "Equivalent fields use one value-column width and preserve complete values."
+    },
+    {
+      "id": "choices.column",
+      "title": "Узкий инспектор",
+      "states": ["column-width", "wrapping"],
+      "proof": "The menu uses the explicit section bounds."
+    },
+    {
+      "id": "choices.catalog",
+      "title": "Каталог с поиском",
+      "states": ["filtered", "empty-search", "disabled", "scroll"],
+      "proof": "Search accepts existing values only and keeps active separate from selected."
+    },
+    {
+      "id": "choices.material",
+      "title": "Glass на фоне сцены",
+      "states": ["glass", "fallback"],
+      "proof": "Light glass blurs the background while content remains opaque."
+    },
+    {
+      "id": "choices.states",
+      "title": "Смешанное и отсутствующее значение",
+      "states": ["mixed", "unavailable", "empty"],
+      "proof": "No first-option replacement is invented."
+    },
+    {
+      "id": "choices.recovery",
+      "title": "Загрузка и повтор",
+      "states": ["pending", "error", "retry"],
+      "proof": "A failure preserves the accepted value and recovery keeps focus."
+    },
+    {
+      "id": "choices.edge",
+      "title": "Меню у края окна",
+      "states": ["flipped", "scrolling"],
+      "proof": "Placement stays in the visible viewport."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

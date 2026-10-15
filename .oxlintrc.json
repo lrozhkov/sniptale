@@ -2,8 +2,14 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["eslint", "typescript", "react", "vitest", "jsx-a11y"],
   "jsPlugins": [
-    { "name": "security", "specifier": "eslint-plugin-security" },
-    { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }
+    {
+      "name": "security",
+      "specifier": "eslint-plugin-security"
+    },
+    {
+      "name": "sonarjs",
+      "specifier": "eslint-plugin-sonarjs"
+    }
   ],
   "categories": {
     "correctness": "off"
@@ -343,6 +349,13 @@
       "files": ["apps/extension/public/**/*.js"],
       "env": {
         "browser": true
+      }
+    },
+    {
+      "files": ["tooling/design-reference/catalog.js", "tooling/design-reference/examples/**/*.js"],
+      "env": {
+        "browser": true,
+        "es2026": true
       }
     }
   ]

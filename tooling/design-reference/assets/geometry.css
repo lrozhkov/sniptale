@@ -1,0 +1,8 @@
+/* Sandbox proposal. The product token snapshot remains unchanged. */
+:root {
+  --radius-structure: 4px;
+  --radius-content: 4px;
+  --radius-control: 4px;
+  --radius-dialog: 8px;
+  --radius-segment-inner: var(--radius-control);
+}

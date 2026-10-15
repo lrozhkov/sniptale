@@ -1,0 +1,11 @@
+:root {
+  --control-height: 32px;
+  --control-line-height: 18px;
+  --control-padding-block: 6px;
+  --control-padding-inline: 10px;
+  --space-related: 4px;
+  --space-actions: 8px;
+  --space-groups: 12px;
+  --space-sections: 16px;
+  --menu-row-height: 36px;
+}

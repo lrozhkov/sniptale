@@ -1,0 +1,84 @@
+{
+  "group": "compositions",
+  "version": "package-5",
+  "rules": "compositions.md",
+  "component": "Shared reviewed control owners",
+  "excludes": ["full product simulation", "production persistence", "media playback"],
+  "cases": [
+    {
+      "id": "compositions.scene",
+      "title": "Быстрый редактор · сцена",
+      "states": ["column-menu", "custom", "crop-draft"],
+      "proof": "Representative composition reuses the canonical owners and preserves its declared transaction boundary."
+    },
+    {
+      "id": "compositions.appearance",
+      "title": "Оформление · соседство контролов",
+      "states": ["segments", "color", "contextual-number", "numeric-shadow"],
+      "proof": "Representative composition reuses the canonical owners and preserves its declared transaction boundary."
+    },
+    {
+      "id": "compositions.presentation",
+      "title": "Начало и конец · вложенные группы",
+      "states": ["conditional", "retained-values", "disclosure"],
+      "proof": "Representative composition reuses the canonical owners and preserves its declared transaction boundary."
+    },
+    {
+      "id": "compositions.gallery",
+      "title": "Галерея · выбор и открытие",
+      "states": ["selection", "filter", "batch", "undo"],
+      "proof": "Representative composition reuses the canonical owners and preserves its declared transaction boundary."
+    },
+    {
+      "id": "compositions.settings",
+      "title": "Настройки · немедленное и отложенное",
+      "states": ["immediate", "draft", "failure", "retry", "cancel"],
+      "proof": "Representative composition reuses the canonical owners and preserves its declared transaction boundary."
+    },
+    {
+      "id": "compositions.capture",
+      "title": "Захват · конфигурация и команда",
+      "states": ["configuration", "recording", "disabled", "recovery"],
+      "proof": "Representative composition reuses the canonical owners and preserves its declared transaction boundary."
+    },
+    {
+      "id": "compositions.inspector-presentation",
+      "title": "Инспектор: все разделы и категории",
+      "states": ["all", "categories", "two-columns", "retained-values"],
+      "proof": "Shared controls preserve accepted values and context-specific state ownership in this bounded screen branch."
+    },
+    {
+      "id": "compositions.resource",
+      "title": "Медиа и зависимые параметры",
+      "states": ["acquisition", "replace", "hidden-retention"],
+      "proof": "Shared controls preserve accepted values and context-specific state ownership in this bounded screen branch."
+    },
+    {
+      "id": "compositions.browser-header",
+      "title": "Браузерная шапка: адрес и действия",
+      "states": ["type-switch", "address", "async-icon", "remove-icon"],
+      "proof": "Shared controls preserve accepted values and context-specific state ownership in this bounded screen branch."
+    },
+    {
+      "id": "compositions.recording-settings",
+      "title": "Запись: зависимости и шторка",
+      "states": [
+        "tab",
+        "screen",
+        "camera",
+        "source-lock",
+        "output-dependencies",
+        "unavailable-selection"
+      ],
+      "proof": "Shared controls preserve accepted values and context-specific state ownership in this bounded screen branch."
+    },
+    {
+      "id": "compositions.nested-media",
+      "title": "Медиа в начале: вложенный переход",
+      "states": ["nested-disclosure", "media", "fade", "hidden-retention"],
+      "proof": "Shared controls preserve accepted values and context-specific state ownership in this bounded screen branch."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

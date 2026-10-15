@@ -1,0 +1,171 @@
+/* Shared compact inspector context. Component owners retain input and state logic. */
+.inspector-controls {
+  --inspector-row: 32px;
+  --inspector-gap: 4px;
+  --inspector-group-gap: 8px;
+  font-size: var(--font-control-size);
+  line-height: var(--font-control-line);
+}
+.inspector-controls .ref-number,
+.inspector-controls .text-field {
+  margin-bottom: 0;
+}
+.inspector-controls .number-row {
+  min-height: var(--inspector-row);
+  gap: 8px;
+}
+.inspector-controls .number-value-shell {
+  width: 104px;
+  min-height: 32px;
+  padding-inline: 6px;
+}
+.inspector-controls .number-value-shell input {
+  height: 24px;
+}
+.inspector-controls .ref-number[data-variant='contextual'] .number-row {
+  min-height: 32px;
+  padding-bottom: 0;
+}
+.inspector-controls .context-range-shell {
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+}
+.inspector-controls .selection-setting {
+  min-height: var(--inspector-row);
+  gap: 8px;
+}
+.inspector-controls .selection-option {
+  font-size: var(--font-control-size);
+  min-height: 32px;
+  padding-block: 2px;
+  gap: 6px;
+}
+.inspector-controls .property-group legend {
+  margin-bottom: 4px;
+}
+.inspector-controls .property-face {
+  font-size: var(--font-control-size);
+  min-height: 26px;
+  padding: 4px 6px;
+}
+.inspector-controls .control,
+.inspector-controls .search {
+  font-size: var(--font-control-size);
+  min-height: 32px;
+  padding: 4px 6px;
+}
+.inspector-controls .field-label {
+  margin: 0;
+}
+.inspector-controls .reference-disclosure > summary {
+  min-height: 32px;
+  padding: 4px var(--disclosure-inset);
+}
+.inspector-controls .disclosure-body {
+  padding: 0 var(--disclosure-inset) 4px;
+}
+.inspector-controls .param-row {
+  min-height: 32px;
+}
+.inspector-controls .text-field[data-context='inspector'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 8px;
+  align-items: center;
+}
+.inspector-controls .text-label {
+  margin: 0;
+}
+.inspector-controls .text-input {
+  min-height: 32px;
+  padding: 6px;
+  text-align: start;
+}
+.inspector-controls .field-description,
+.inspector-controls .field-error {
+  grid-column: 1/-1;
+}
+/* The contextual track occupies a dedicated lower strip, below text editing targets. */
+.inspector-controls .ref-number[data-variant='contextual'] .number-row {
+  min-height: 32px;
+  padding-bottom: 0;
+}
+.inspector-controls .ref-number[data-variant='contextual'] .number-value-shell {
+  min-height: 24px;
+}
+.inspector-controls .ref-number[data-variant='contextual'] .number-value-shell input {
+  height: 22px;
+}
+.inspector-controls .number-label,
+.inspector-controls .number-value-shell {
+  position: relative;
+  z-index: 1;
+}
+.inspector-controls .context-range-shell {
+  bottom: 0;
+}
+.inspector-controls .context-range-shell input.number-range {
+  --sniptale-range-shell-height: 8px;
+  top: -4px;
+}
+
+.inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-input,
+.inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-clear {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.inspector-controls .color-entry > .text-field[data-context='inspector'] {
+  display: contents;
+}
+/* Move range decoration below the text without moving rows or editing targets. */
+.inspector-controls {
+  --context-range-visual-offset: 3px;
+}
+.inspector-controls .context-track {
+  transform: translateY(var(--context-range-visual-offset));
+}
+.inspector-controls .context-range-shell input.number-range::-webkit-slider-runnable-track {
+  transform: translateY(var(--context-range-visual-offset));
+}
+.inspector-controls .context-range-shell input.number-range::-moz-range-track,
+.inspector-controls .context-range-shell input.number-range::-moz-range-progress,
+.inspector-controls .context-range-shell input.number-range::-moz-range-thumb {
+  transform: translateY(var(--context-range-visual-offset));
+}
+
+/* Text editing moves below its label when the local inspector cannot provide a useful value column. */
+@container (max-width:360px) {
+  .inspector-controls .text-field[data-context='inspector'] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .inspector-controls .text-field[data-context='inspector'] > .text-label {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-input,
+  .inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-clear {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+
+.inspector-controls .reference-disclosure[data-kind='group'] > .disclosure-body {
+  padding-top: 8px;
+}
+.inspector-controls .color-swatch.action-button {
+  width: var(--inspector-row);
+  min-height: var(--inspector-row);
+  height: var(--inspector-row);
+}
+
+@container (max-width:360px) {
+  .inspector-controls .text-field[data-context='inspector'] > .text-label {
+    padding-block-start: calc((var(--inspector-row) - var(--font-control-line))/2);
+  }
+}
+.inspector-controls .text-field[data-context='inspector']:has(> textarea) > .text-label {
+  padding-block-start: calc((var(--inspector-row) - var(--font-control-line))/2);
+}

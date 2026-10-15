@@ -1,0 +1,31 @@
+{
+  "group": "properties",
+  "version": "package-5",
+  "rules": "properties.md",
+  "cases": [
+    {
+      "id": "properties.metadata",
+      "title": "Свойства файла",
+      "states": ["light", "dark", "narrow", "long-text"],
+      "proof": "Static values remain readable. Only explicit copy and navigation targets activate."
+    },
+    {
+      "id": "properties.copy",
+      "title": "Копируемое значение и длинное имя",
+      "states": ["light", "dark", "narrow", "long-text"],
+      "proof": "Static values remain readable. Only explicit copy and navigation targets activate."
+    },
+    {
+      "id": "properties.related",
+      "title": "Связанные проекты",
+      "states": ["light", "dark", "narrow", "long-text"],
+      "proof": "Static values remain readable. Only explicit copy and navigation targets activate."
+    },
+    {
+      "id": "properties.absence",
+      "title": "Отсутствующие данные",
+      "states": ["light", "dark", "narrow", "long-text"],
+      "proof": "Static values remain readable. Only explicit copy and navigation targets activate."
+    }
+  ]
+}

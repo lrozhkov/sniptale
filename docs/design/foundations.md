@@ -1,0 +1,52 @@
+# Foundations
+
+[Working example](../../tooling/design-reference/examples/foundations/index.html) · [Design index](index.md) These shared rules apply to all groups. Group documents define only semantic and interaction differences. [Surface-specific patterns](surfaces.md) limit generic rules for popup, timeline, canvas, and embedded UI.
+
+## Typography and hierarchy
+
+| Role | Family | Size / line height | Weight |
+| --- | --- | --- | --- |
+| Parameter name, value, command, option | Inter | 13px / 18px | 500 |
+| Caption, auxiliary metadata, secondary hint | Inter | 12px / 16px | 400 |
+| Explanatory prose and errors | Inter | 14px / 20px | 400 |
+| Structural group heading | Inter | 14px / 20px | 600 |
+
+Use the bundled Inter font with Cyrillic, Latin, and numeric coverage. Keep its license with the asset. Names use secondary foreground. Values use primary foreground. Selection does not increase font weight. Use tabular digits where values change in place. Do not change typography between light and dark themes. Long names and values can wrap. Preserve complete dimensions and readable errors rather than hiding overflow.
+
+Keep prose within 45–75 characters where practical. Control labels can use the compact roles above.
+
+## Geometry and density
+
+| Element | Default geometry |
+| --- | --- |
+| Button, input, closed dropdown, parameter row | 32px minimum height |
+| Explicit larger density | 40px or 48px, same text role |
+| Related inspector rows | 4px gap, without extra component margins |
+| Related commands | 8px gap |
+| Compact inspector groups / form groups / sections | 8px / 12px / 16px gap |
+| Name above field / adjacent stacked fields | 4px internal / 8px inter-field gap |
+| Typical icon | 16px, 6px gap beside text |
+| Panel, preview, swatch, button, input, menu | 4px radius |
+| Modal dialog | 8px radius |
+
+Radii do not grow with the viewport. Functional circles remain circles. Long labels and visible errors can increase row height. Do not reserve space for absent errors or scrollbars. Provide targets of at least 24×24 CSS px unless a justified WCAG exception applies. Check target spacing separately from drawing size. Use internal padding for target size. Do not create inactive gaps inside a visually interactive region.
+
+The contextual numeric slider fits inside its row. It does not add spacing when hidden or revealed.
+
+## Interaction hierarchy
+
+Treat hover, keyboard focus, accepted selection, expanded state, pending work, and physical pressure as separate states. Pointer interaction must not show a keyboard-only focus frame. Real Tab navigation retains a visible focus indicator. Keep names, labels, hints, and interface text unselectable with the mouse. Editable values and useful diagnostic/error text retain text selection and copying.
+
+Do not use a text cursor on noneditable labels. Disabled controls do not react as available controls. Keep visible targets stable during hover and press. Animate decoration or content inside the target. Reduced motion removes optional displacement and interpolation without hiding state or feedback.
+
+## Surfaces and contrast
+
+Use semantic foreground, surface, boundary, focus, and accent roles for both themes. Quiet inspector controls reveal neutral surfaces and boundaries on hover. Do not add persistent borders without a task reason. Dropdowns use light glass. Apply transparency to the surface only, with opaque text and state marks. Provide a solid fallback without blur, under reduced transparency, and in forced colors.
+
+Check text against the rendered backdrop: ordinary text needs 4.5:1, large text 3:1. Essential control boundaries, state indicators, and focus markers need the applicable 3:1 contrast. Do not rely on hue alone. Keep a visible structural or textual state indication. The rejected heavy slider track is not a contrast fix. Record unresolved contrast decisions explicitly.
+
+## Sources
+
+[WCAG contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html), [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html), [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html), [Inter](https://rsms.me/inter/).
+
+Inspector content uses the panel surface. The canvas surface belongs to the underlying workspace. Do not substitute canvas material for a panel because both are dark.

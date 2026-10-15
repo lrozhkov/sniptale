@@ -1,0 +1,390 @@
+@import url('./button-press.css');
+.action-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  max-width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  line-height: var(--font-control-line);
+  overflow-wrap: anywhere;
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+.action-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.action-button[data-kind='primary'] {
+  color: var(--text);
+  background: var(--surface-hover);
+  font-weight: 500;
+}
+.action-button[data-kind='primary']:hover {
+  background: color-mix(in srgb, var(--surface-hover), var(--text) 6%);
+}
+.action-button[data-kind='danger'] {
+  color: var(--sniptale-color-danger);
+}
+.action-button[data-kind='utility'] {
+  color: var(--secondary);
+  padding-inline: 8px;
+}
+.action-button[data-kind='utility']:hover {
+  color: var(--text);
+}
+.action-button[data-density='compact'] {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: var(--font-control-size);
+}
+.action-button[data-density='spacious'] {
+  min-height: 48px;
+  padding: 10px 16px;
+  font-size: var(--font-control-size);
+}
+.action-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.action-button[aria-busy='true'] {
+  cursor: progress;
+}
+.action-button svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-action {
+  width: 40px;
+  padding: 0;
+}
+.icon-action[data-density='compact'] {
+  width: 32px;
+}
+.pressed-action[aria-pressed='true'] {
+  background: var(--surface-hover);
+  font-weight: 500;
+}
+.button-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  visibility: hidden;
+  color: #c2410c;
+}
+.button-check svg {
+  width: 12px;
+  height: 12px;
+}
+.theme[data-theme='dark'] .button-check {
+  color: #fdba74;
+}
+.pressed-action[aria-pressed='true'] .button-check {
+  visibility: visible;
+}
+.action-status {
+  font-size: var(--font-control-size);
+  min-height: 18px;
+}
+.reference-case p.action-status {
+  margin: 8px 0;
+}
+.action-row-label {
+  color: var(--secondary);
+  margin-right: auto;
+  min-width: 100px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .action-button {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .action-button {
+    color: ButtonText;
+    border: 1px solid ButtonText;
+  }
+  .action-button[data-kind='primary'],
+  .pressed-action[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  .button-check {
+    color: inherit;
+  }
+}
+.theme[data-theme='light'] .action-button[data-kind='danger'] {
+  color: #be123c;
+}
+.theme[data-theme='dark'] .action-button[data-kind='danger'] {
+  color: #fda4af;
+}
+@media (forced-colors: active) {
+  .theme[data-theme] .action-button[data-kind='danger'] {
+    color: ButtonText;
+  }
+  .theme[data-theme] .action-button[data-kind='primary'] {
+    color: HighlightText;
+  }
+}
+/* Surface, priority, persistent mode, and physical press are separate dimensions. */
+.action-button {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: var(--font-control-size);
+  user-select: none;
+  touch-action: manipulation;
+}
+.action-button[data-surface='filled'] {
+  background: var(--surface-hover);
+}
+.action-button[data-surface='outlined'] {
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--focus);
+}
+.action-button[data-surface='outlined']:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.pressed-action[aria-pressed='true'] {
+  color: var(--text);
+}
+.action-button[aria-disabled='true'] {
+  cursor: wait;
+  opacity: 0.65;
+}
+.button-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.button-backdrop {
+  padding: 16px;
+  border-radius: var(--radius-control);
+  background: linear-gradient(35deg, #bc856c 0 30%, #678598 30% 60%, #d0ad70 60%);
+}
+.button-specimen {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.button-specimen:last-child {
+  margin: 0;
+}
+.button-specimen > .sample-label {
+  margin: 0;
+}
+.button-cycle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.button-cycle-phase {
+  font-size: var(--font-control-size);
+  color: var(--secondary);
+}
+.button-compound {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.button-compound .field {
+  width: 200px;
+  max-width: 100%;
+}
+.button-form {
+  display: grid;
+  gap: 8px;
+  max-width: 360px;
+}
+.button-form .text-field {
+  margin: 0;
+}
+.button-caption {
+  font-size: var(--font-control-size);
+  color: var(--secondary);
+  margin-top: 8px;
+}
+
+.action-button[aria-expanded='true'] {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Local chrome and toolbar modes have different emphasis contracts. */
+.theme .action-button[data-appearance='chrome'] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--secondary);
+}
+.theme .action-button[data-appearance='chrome']:hover:not(:disabled),
+.theme
+  .action-button[data-appearance='chrome'][data-down='true']:not(:disabled):not(
+    [aria-disabled='true']
+  ) {
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+.theme .action-button[data-appearance='tool'] {
+  position: relative;
+  background: transparent;
+  color: var(--secondary);
+  box-shadow: inset 0 0 0 1px transparent;
+  --tool-accent: #b54708;
+  transition:
+    color 120ms,
+    box-shadow 120ms;
+}
+.theme[data-theme='dark'] .action-button[data-appearance='tool'] {
+  --tool-accent: #fb923c;
+}
+.theme .action-button[data-appearance='tool'][aria-pressed='true'] {
+  color: var(--tool-accent);
+  background: transparent;
+}
+.theme .action-button[data-appearance='tool']:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--secondary) 28%, transparent);
+}
+.theme .action-button[data-appearance='tool'][aria-pressed='true']:hover:not(:disabled) {
+  color: var(--tool-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tool-accent) 55%, transparent);
+}
+.theme
+  .action-button[data-appearance='tool'][data-down='true']:not(:disabled):not(
+    [aria-disabled='true']
+  ) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.button-density-list {
+  display: grid;
+  gap: 16px;
+}
+.button-density-row {
+  display: grid;
+  gap: 6px;
+}
+.button-density-row > .sample-label {
+  margin: 0;
+}
+.button-chrome-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+}
+.action-button .menu-indicator {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  transform: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.menu-indicator[data-axis='down'] path {
+  d: path('M4 6 L8 10 L12 6');
+  transition: d 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+[aria-expanded='true'] > .menu-indicator[data-axis='down'] path {
+  d: path('M4 10 L8 6 L12 10');
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-indicator path,
+  .theme .action-button[data-appearance='tool'] {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .theme .action-button[data-appearance='tool'] {
+    color: ButtonText;
+  }
+  .theme .action-button[data-appearance='tool'][aria-pressed='true'] {
+    color: Highlight;
+  }
+  .theme .action-button[data-appearance='tool']:hover:not(:disabled) {
+    box-shadow: inset 0 0 0 1px ButtonText;
+  }
+}
+
+.command-list > .action-button > .menu-indicator {
+  margin-left: auto;
+}
+/* Existing product toolbar disclosure: a down triangle, independent of selection. */
+.action-button[data-menu-indicator='true'] {
+  position: relative;
+}
+.action-button[data-menu-indicator='true']::before {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 0;
+  height: 0;
+  border-inline: 3px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.42;
+  pointer-events: none;
+}
+.action-button[data-menu-indicator='true'][aria-expanded='true']::before {
+  border-top-color: var(--tool-accent, #b54708);
+  opacity: 1;
+}
+.theme .action-button[data-appearance='tool'][aria-expanded='true'] {
+  background: transparent;
+  box-shadow: none;
+}
+.theme .action-button[data-appearance='tool'][aria-expanded='true']:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--secondary) 28%, transparent);
+}
+@media (forced-colors: active) {
+  .action-button[data-menu-indicator='true'][aria-expanded='true']::before {
+    border-top-color: ButtonText;
+  }
+}
+
+/* Icon-only toolbar selection keeps a restrained persistent boundary. */
+.theme .action-button.icon-action[data-appearance='tool'][aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tool-accent) 35%, transparent);
+}
+.theme
+  .action-button.icon-action[data-appearance='tool'][aria-pressed='true']:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tool-accent) 55%, transparent);
+}
+
+.action-status,
+.button-cycle-phase,
+.button-caption {
+  font-weight: 400;
+}

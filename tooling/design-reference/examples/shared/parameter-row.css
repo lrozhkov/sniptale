@@ -1,0 +1,100 @@
+.parameter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  align-items: center;
+  column-gap: 8px;
+  min-height: 32px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.parameter-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
+  padding: 0;
+}
+.parameter-value {
+  min-width: 0;
+}
+.parameter-value > :is(.property-group, .text-field, .choice-field, .ref-number) {
+  margin: 0;
+}
+.parameter-row[data-layout='stacked'] {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+}
+.parameter-row[data-label='inherited'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.parameter-row[data-activates='true'] {
+  cursor: pointer;
+}
+.parameter-value > .choice-field,
+.parameter-value .property-fallback {
+  display: block;
+  min-height: 32px;
+}
+.parameter-value > .choice-field > .field-label,
+.parameter-value .property-fallback > .field-label {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.parameter-value .property-group > legend {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.parameter-value .control {
+  width: 100%;
+  min-height: 32px;
+}
+.parameter-row:hover .control:not(:disabled) {
+  background: var(--hover, var(--surface-hover));
+  border-color: var(--hover-border, var(--divider));
+}
+.parameter-row .property-group {
+  padding: 0;
+  margin: 0;
+}
+.parameter-row .property-options[data-presentation='segments'] {
+  padding: 3px;
+}
+.parameter-row .property-options[data-presentation='segments'] .property-face {
+  min-height: 26px;
+  padding: 4px 6px;
+}
+.property-group legend {
+  padding: 0;
+}
+.parameter-value > .text-field {
+  display: block;
+}
+.parameter-value > .text-field > .text-label {
+  display: none;
+}
+
+.parameter-row[data-fit='stacked'] {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+}
+
+.parameter-row[data-label-fit='stacked'] {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 4px;
+}
+.parameter-row:is([data-layout='stacked'], [data-fit='stacked'], [data-label-fit='stacked'])
+  > .parameter-name:not([hidden]) {
+  padding-block-start: calc((var(--inspector-row, 32px) - var(--font-control-line))/2);
+}
