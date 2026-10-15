@@ -332,6 +332,11 @@ function useReviewEditorNavigation(state: ReturnType<typeof useReviewEditorState
     exportRequest,
   });
   const historyCommands = {
+    onNavigateCursorFocus: (time: number, key?: (typeof state.cursorFocusKeys)[number]) => {
+      state.selectCursorFocusKey(key?.id, time);
+      navigation.setSection('selected');
+    },
+    onMoveCursorFocus: state.moveCursorFocusKey,
     onCursorFocusKey: (
       key: Parameters<
         NonNullable<Parameters<typeof ReviewTimelineBinding>[0]['onCursorFocusKey']>

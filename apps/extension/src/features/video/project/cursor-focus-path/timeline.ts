@@ -93,3 +93,27 @@ export function adjacentCursorFocusKey(
     ? (ordered.find((key) => key.time > time) ?? null)
     : (ordered.findLast((key) => key.time < time) ?? null);
 }
+
+/** Screen-space proximity reveals one recorded fact without snapping the selected time. */
+export function nearestRecordedCursorKey(
+  keys: readonly CursorFocusTimelineKey[],
+  time: number,
+  pixelsPerSecond: number,
+  toX?: ((time: number) => number | null) | undefined
+) {
+  const x = toX ? toX(time) : time * pixelsPerSecond;
+  if (x === null) return undefined;
+  let nearest: CursorFocusTimelineKey | undefined;
+  let distance = 8;
+  for (const key of keys) {
+    if (key.anchor === 'manual' || key.authored) continue;
+    const point = toX ? toX(key.time) : key.time * pixelsPerSecond;
+    if (point === null) continue;
+    const delta = Math.abs(point - x);
+    if (delta <= distance) {
+      nearest = key;
+      distance = delta;
+    }
+  }
+  return nearest;
+}

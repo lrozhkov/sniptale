@@ -2,6 +2,44 @@ import type { VideoCompositionActionState } from '../../types';
 import { expect, it, vi } from 'vitest';
 import { drawActionCompositionState, drawSceneActionCompositionStates } from './actions';
 
+it('rounds gesture corners within the stroke width while preserving factual endpoints', () => {
+  const context = createContext();
+  const path = [
+    { x: 0, y: 0 },
+    { x: 20, y: 0 },
+    { x: 20, y: 20 },
+  ];
+  drawActionCompositionState(
+    context,
+    {
+      ...createActionState(),
+      preset: 'CLICK_PRESS',
+      renderKind: 'accent',
+      point: path[2]!,
+      gestureFeedback: {
+        effect: 'press',
+        point: path[2]!,
+        radius: 8,
+        stroke: 4,
+        color: '#ffffffff',
+        opacity: 1,
+        path,
+      },
+    },
+    null
+  );
+  expect(context.moveTo).toHaveBeenCalledWith(0, 0);
+  expect(context.lineTo).toHaveBeenCalledWith(16, 0);
+  expect(context.quadraticCurveTo).toHaveBeenCalledWith(20, 0, 20, 4);
+  expect(context.lineTo).toHaveBeenLastCalledWith(20, 20);
+  expect(context.lineJoin).toBe('round');
+  expect(path).toEqual([
+    { x: 0, y: 0 },
+    { x: 20, y: 0 },
+    { x: 20, y: 20 },
+  ]);
+});
+
 it('draws held feedback as a stable halo with the mapped factual path and authored frame', () => {
   const context = createContext();
   context.strokeRect = vi.fn();

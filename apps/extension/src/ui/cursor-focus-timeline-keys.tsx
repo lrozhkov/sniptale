@@ -7,14 +7,14 @@ import {
   type ReactNode,
   type MouseEvent,
   type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ProductDropdownMenu, ProductDropdownItem } from '@sniptale/ui/product-menus/dropdown';
 import { resolveThemeSafePortalTarget } from '@sniptale/ui/theme/safe-portal';
 import { translate, formatNumber } from '../platform/i18n';
 import {
-  layoutCursorFocusKeyGroups,
+  nearestRecordedCursorKey,
   adjacentCursorFocusKey,
   type CursorFocusTimelineKey,
 } from '../features/video/project/cursor-focus-path/timeline';
@@ -31,6 +31,9 @@ interface CursorFocusTimelineProps {
   children?: ReactNode;
   toX?: ((time: number) => number | null) | undefined;
   toTime?: ((offset: number) => number) | undefined;
+  playing?: boolean | undefined;
+  onNavigate?(time: number, key?: CursorFocusTimelineKey): void;
+  onMove?(key: CursorFocusTimelineKey, time: number): void;
   onSelect(key: CursorFocusTimelineKey): void;
   onAdd(time: number): void;
 }
@@ -44,20 +47,24 @@ export function CursorFocusTimelineKeys(props: CursorFocusTimelineProps) {
     setContext(null);
     if (restoreFocus) host.current?.querySelector<HTMLButtonElement>('button')?.focus();
   }, []);
-  const interaction = useCursorRowInteraction(props, host, setContext);
-  const [settled, setSettled] = useState(props.pixelsPerSecond);
+  const [inspection, setInspection] = useState<number | null>(null);
   useEffect(() => {
-    const timer = setTimeout(() => setSettled(props.pixelsPerSecond), 250);
-    return () => clearTimeout(timer);
-  }, [props.pixelsPerSecond]);
-  const groups = useMemo(
-    () => layoutCursorFocusKeyGroups(props.keys, settled),
-    [props.keys, settled]
-  );
+    if (props.playing) setInspection(null);
+    else setInspection((current) => (current === null ? null : props.time));
+  }, [props.time, props.playing]);
+  const interaction = useCursorRowInteraction(props, host, setContext, setInspection);
+  const drag = useCursorKeyDrag(props, host);
+  const visible = useMemo(() => {
+    const recorded =
+      !props.playing && inspection !== null
+        ? nearestRecordedCursorKey(props.keys, inspection, props.pixelsPerSecond, props.toX)
+        : undefined;
+    return props.keys.filter((key) => key.anchor === 'manual' || key.authored || key === recorded);
+  }, [props.keys, props.playing, props.pixelsPerSecond, props.toX, inspection]);
   return (
     <div
       ref={host}
-      className="pointer-events-none absolute inset-x-0 h-6"
+      className="pointer-events-none absolute inset-x-0 z-20 h-6"
       style={{ top: props.top ?? 0, height: props.height ?? 24 }}
       data-ui="cursorFocusPath.timelineKeys"
       onDoubleClick={interaction.onDoubleClick}
@@ -73,14 +80,48 @@ export function CursorFocusTimelineKeys(props: CursorFocusTimelineProps) {
         onPointerDown={(event) => event.stopPropagation()}
         {...interaction}
       />
-      {groups.map((group) => (
-        <CursorKeyGroup
-          key={group.members[0]!.timelineId}
-          group={group}
-          props={props}
-          settled={settled}
-        />
-      ))}
+      {visible.map((key) => {
+        const time = drag.preview?.key.timelineId === key.timelineId ? drag.preview.time : key.time;
+        const left = props.toX ? props.toX(time) : time * props.pixelsPerSecond;
+        if (left === null) return null;
+        const authored =
+          key.anchor === 'manual' ||
+          key.authored ||
+          drag.preview?.key.timelineId === key.timelineId;
+        return (
+          <button
+            key={key.timelineId}
+            type="button"
+            data-cursor-focus-key={key.id}
+            data-authored={authored ? 'true' : 'false'}
+            aria-label={cursorKeyLabel(key)}
+            aria-pressed={key.id === props.selectedId}
+            disabled={props.disabled || props.playing}
+            className="pointer-events-auto absolute z-30 flex w-3 items-center justify-center touch-none"
+            style={{ left: left - 6, height: props.height ?? 24 }}
+            onPointerDown={(event) => drag.start(event, key)}
+            onDoubleClick={(event) => {
+              if (key.anchor !== 'manual' && !key.authored) interaction.onDoubleClick(event);
+              else event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!drag.consumeClick()) props.onSelect(key);
+            }}
+          >
+            <span
+              className={[
+                authored ? 'h-2 w-2 rotate-45' : 'h-1.5 w-1.5 rounded-full',
+                'border border-[var(--sniptale-color-text-secondary)]',
+                authored
+                  ? 'bg-[var(--sniptale-color-text-secondary)]'
+                  : 'bg-[var(--sniptale-color-surface-panel)]',
+                key.id === props.selectedId ? '!border-[var(--sniptale-color-accent)]' : '',
+              ].join(' ')}
+            />
+          </button>
+        );
+      })}
       {context && host.current && (
         <CursorKeyContextMenu
           props={props}
@@ -96,15 +137,9 @@ export function CursorFocusTimelineKeys(props: CursorFocusTimelineProps) {
 function useCursorRowInteraction(
   props: CursorFocusTimelineProps,
   host: React.RefObject<HTMLDivElement | null>,
-  onContext: (context: CursorKeyContext) => void
+  onContext: (context: CursorKeyContext) => void,
+  inspect: (time: number) => void
 ) {
-  const click = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (click.current) clearTimeout(click.current);
-    },
-    []
-  );
   const timeAt = (event: MouseEvent) => {
     const offset = event.clientX - host.current!.getBoundingClientRect().left;
     const time = props.toTime ? props.toTime(offset) : offset / props.pixelsPerSecond;
@@ -115,18 +150,14 @@ function useCursorRowInteraction(
       event.stopPropagation();
       if (event.detail > 1) return;
       const time = timeAt(event);
-      if (click.current) clearTimeout(click.current);
-      click.current = setTimeout(() => {
-        const nearest = props.keys.toSorted(
-          (a, b) => Math.abs(a.time - time) - Math.abs(b.time - time)
-        )[0];
-        if (nearest) props.onSelect(nearest);
-      }, 220);
+      if (props.disabled) return;
+      inspect(time);
+      const nearest = nearestRecordedCursorKey(props.keys, time, props.pixelsPerSecond, props.toX);
+      props.onNavigate?.(time, nearest);
     },
     onDoubleClick: (event: MouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      if (click.current) clearTimeout(click.current);
       if (!props.disabled) props.onAdd(timeAt(event));
     },
     onContextMenu: (event: MouseEvent) => {
@@ -139,7 +170,7 @@ function useCursorRowInteraction(
       event.preventDefault();
       event.stopPropagation();
       const next = adjacentCursorFocusKey(
-        props.keys,
+        props.keys.filter((key) => key.anchor === 'manual' || key.authored),
         props.selectedId,
         props.time,
         event.key === 'ArrowLeft' ? -1 : 1
@@ -151,101 +182,92 @@ function useCursorRowInteraction(
 
 function cursorKeyLabel(key: CursorFocusTimelineKey): string {
   const kind = translate(
-    key.anchor === 'manual'
+    key.anchor === 'manual' || key.authored
       ? 'videoEditor.sidebar.cursorFocusManualKey'
       : 'videoEditor.sidebar.cursorFocusRecordedKey'
   );
   return `${kind} · ${formatNumber(key.time, { maximumFractionDigits: 3 })}`;
 }
 
-function CursorKeyGroup({
-  group,
-  props,
-  settled,
-}: {
-  group: ReturnType<typeof layoutCursorFocusKeyGroups>[number];
-  props: CursorFocusTimelineProps;
-  settled: number;
-}) {
-  const label = cursorKeyLabel;
-  const selected = group.members.some((key) => key.id === props.selectedId);
-  const authored = group.members.some((key) => key.anchor === 'manual' || key.authored);
-  const time = group.left / settled;
-  const projected = props.toX ? props.toX(time) : time * props.pixelsPerSecond;
-  if (projected === null) return null;
-  const left = projected - 4;
-  return group.members.length === 1 ? (
-    <button
-      key={group.members[0]!.timelineId}
-      type="button"
-      data-cursor-focus-key={group.members[0]!.id}
-      data-authored={authored ? 'true' : 'false'}
-      aria-label={label(group.members[0]!)}
-      aria-pressed={selected}
-      disabled={props.disabled}
-      className="pointer-events-auto absolute z-20 flex w-2 items-center justify-center"
-      style={{ left, height: props.height ?? 24 }}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => {
-        event.stopPropagation();
-        props.onSelect(group.members[0]!);
-      }}
-    >
-      <span
-        className={[
-          authored ? 'h-2 w-2 rotate-45' : 'h-1.5 w-1.5 rounded-full',
-          'border',
-          selected
-            ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent)]'
-            : 'border-[var(--sniptale-color-text-secondary)] bg-[var(--sniptale-color-surface-panel)]',
-        ].join(' ')}
-      />
-    </button>
-  ) : (
-    <div
-      key={group.members[0]!.timelineId}
-      className="pointer-events-auto absolute z-20"
-      style={{ left: left - 6, width: 20 }}
-      data-cursor-focus-group="true"
-      data-authored={authored ? 'true' : 'false'}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      <ProductSelect
-        value=""
-        placeholder=""
-        aria-label={`${translate('videoEditor.sidebar.cursorFocusKey')} · ${group.members.length}`}
-        aria-pressed={selected}
-        controlSize="sm"
-        menuWidth={320}
-        style={{
-          height: props.height ?? 24,
-          minHeight: props.height ?? 24,
-          width: 20,
-          minWidth: 20,
-          background: 'transparent',
-          borderColor: 'transparent',
-          boxShadow: 'none',
-        }}
-        className="!px-1 !text-[10px] [&_.sniptale-select-chevron]:!hidden"
-        options={group.members.map((key) => ({ value: key.timelineId, label: label(key) }))}
-        onChange={(id) => {
-          const key = group.members.find((item) => item.timelineId === id);
-          if (key) props.onSelect(key);
-        }}
-      />
-      <span
-        aria-hidden="true"
-        className={[
-          'pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 border',
-          authored ? 'rotate-45' : 'rounded-full',
-          selected
-            ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent)]'
-            : 'border-[var(--sniptale-color-text-secondary)] bg-[var(--sniptale-color-surface-panel)]',
-          'shadow-[2px_2px_0_var(--sniptale-color-border-soft)]',
-        ].join(' ')}
-      />
-    </div>
+/** Pointer preview is disposable; only a completed drag calls the existing authoring owner. */
+function useCursorKeyDrag(
+  props: CursorFocusTimelineProps,
+  host: React.RefObject<HTMLDivElement | null>
+) {
+  const [preview, setPreview] = useState<{ key: CursorFocusTimelineKey; time: number } | null>(
+    null
   );
+  const cleanup = useRef(() => {});
+  const suppress = useRef(false);
+  useEffect(() => () => cleanup.current(), []);
+  useEffect(() => {
+    if (props.disabled || props.playing) {
+      cleanup.current();
+      setPreview(null);
+    }
+  }, [props.disabled, props.playing]);
+  return {
+    preview,
+    consumeClick: () => {
+      const value = suppress.current;
+      suppress.current = false;
+      return value;
+    },
+    start: (event: ReactPointerEvent<HTMLButtonElement>, key: CursorFocusTimelineKey) => {
+      event.stopPropagation();
+      if (event.button !== 0 || props.disabled || props.playing || !props.onMove) return;
+      cleanup.current();
+      const node = event.currentTarget;
+      const pointerId = event.pointerId;
+      const startX = event.clientX;
+      const origin = host.current!.getBoundingClientRect().left;
+      const at = (x: number) =>
+        props.toTime ? props.toTime(x - origin) : (x - origin) / props.pixelsPerSecond;
+      const startTime = at(startX);
+      let time = key.time;
+      let moved = false;
+      const move = (next: globalThis.PointerEvent) => {
+        if (next.pointerId !== pointerId) return;
+        if (Math.abs(next.clientX - startX) >= 3) moved = true;
+        if (!moved) return;
+        time = Math.max(0, Math.min(props.duration, key.time + at(next.clientX) - startTime));
+        setPreview({ key, time });
+      };
+      const stop = (commit: boolean) => {
+        cleanup.current();
+        setPreview(null);
+        suppress.current = moved;
+        if (commit && moved && time !== key.time) props.onMove?.(key, time);
+      };
+      const up = (next: globalThis.PointerEvent) => {
+        if (next.pointerId === pointerId) {
+          move(next);
+          stop(true);
+        }
+      };
+      const cancel = () => stop(false);
+      const escape = (next: globalThis.KeyboardEvent) => {
+        if (next.key === 'Escape') {
+          next.preventDefault();
+          next.stopPropagation();
+          cancel();
+        }
+      };
+      cleanup.current = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', cancel);
+        window.removeEventListener('keydown', escape, true);
+        if (node.hasPointerCapture?.(pointerId)) node.releasePointerCapture(pointerId);
+        cleanup.current = () => {};
+      };
+      node.setPointerCapture?.(pointerId);
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', cancel);
+      window.addEventListener('keydown', escape, true);
+    },
+  };
 }
 
 function CursorKeyContextMenu({

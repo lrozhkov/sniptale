@@ -99,7 +99,13 @@ it('inspector adds a manual key and reset uses the existing content writer witho
   const onPolicyChange = vi.fn();
   act(() =>
     root.render(
-      <ReviewCursorPathEditor path={path} time={1} disabled={false} onChange={onChange} />
+      <ReviewCursorPathEditor
+        path={path}
+        selectedKeyId="manual"
+        time={1}
+        disabled={false}
+        onChange={onChange}
+      />
     )
   );
   act(() =>
@@ -145,7 +151,13 @@ it('numeric tangent fields display the same automatic controls as canvas handles
   const onChange = vi.fn();
   act(() =>
     root.render(
-      <ReviewCursorPathEditor path={automatic} time={1} disabled={false} onChange={onChange} />
+      <ReviewCursorPathEditor
+        path={automatic}
+        selectedKeyId="manual"
+        time={1}
+        disabled={false}
+        onChange={onChange}
+      />
     )
   );
   expect(
@@ -327,7 +339,13 @@ it('tangent and policy numeric commits retain endpoints and use their independen
   const onPolicyChange = vi.fn();
   act(() =>
     root.render(
-      <ReviewCursorPathEditor path={path} time={1} disabled={false} onChange={onChange} />
+      <ReviewCursorPathEditor
+        path={path}
+        selectedKeyId="manual"
+        time={1}
+        disabled={false}
+        onChange={onChange}
+      />
     )
   );
   commitCursorNumber('videoEditor.sidebar.cursorFocusIncoming X', '-0.5');
@@ -380,6 +398,7 @@ it('key navigation and deletion keep empty-path authoring available within a kno
     root.render(
       <ReviewCursorPathEditor
         path={two}
+        selectedKeyId="manual"
         time={1}
         disabled={false}
         onChange={onChange}

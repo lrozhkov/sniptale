@@ -370,9 +370,9 @@
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, gesture, persistence writer, resource or recovery lifetime. Remove when the analyzer models this cohesive UI binding. Fresh independent architecture review must validate this classification.",
-      "astHash": "37035920c191142433a1f8e82bc87c33c6d55421588e8a41f948a8e081a14055",
+      "astHash": "dfd41102b017da7bfc721a3cb4b600f17147f8b75da991b64a60e570499318f5",
       "signatureHash": "418e85bf5dc567bc2a34e4a84bd51169a0d66dc2fffd55e97beb75697efecb0c",
-      "reason": "tool-noise: Existing annotation and audio tool cancellation now follows the existing effective-feature policy. The audio condition uses its existing transient setter; annotation retains its existing activation and cleanup lifetime. Focus already uses this pattern. No state, ref, effect, queue, export or resource lifetime is added. File score6 has delta0 and cohesion0.96. Independent read-only track_controls_structural_check confirmed this boundary. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: This diff adds two typed cursor navigation and commit callbacks to the existing timeline binding and forwards them to its history receiver. It adds no state, effect, writer, resource or recovery authority. File score 6 has delta 0 and cohesion 0.96. Main inspected the exact diff. Extracting another adapter would add a forwarding layer. Fresh complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {

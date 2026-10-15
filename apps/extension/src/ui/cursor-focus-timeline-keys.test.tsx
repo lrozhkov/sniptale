@@ -63,50 +63,42 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-it('retains grouped keys and doubleclick adds once without a deferred seek', async () => {
-  const onSelect = vi.fn();
+it('seeks immediately and exposes only one nearby recorded key beside authored keys', () => {
+  const onNavigate = vi.fn();
   const onAdd = vi.fn();
   act(() =>
     root.render(
       <CursorFocusTimelineKeys
         keys={keys}
-        selectedId="auto"
         time={0}
         duration={4}
         pixelsPerSecond={100}
-        onSelect={onSelect}
+        onNavigate={onNavigate}
+        onSelect={vi.fn()}
         onAdd={onAdd}
       />
     )
   );
-  expect(host.querySelector('[data-cursor-focus-group] button')!.textContent).toBe('');
-  act(() => host.querySelector<HTMLButtonElement>('[data-cursor-focus-group] button')!.click());
-  const options = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
-  expect(options).toHaveLength(2);
-  await act(async () => options[1]!.click());
-  expect(onSelect).toHaveBeenCalledWith(keys[1]);
-  onSelect.mockClear();
-  const row = host.querySelector<HTMLButtonElement>(
-    'button[title="videoEditor.sidebar.cursorFocusRowHint"]'
-  )!;
-  vi.spyOn(host.firstElementChild!, 'getBoundingClientRect').mockReturnValue({
-    x: 0,
-    y: 0,
-    left: 0,
-    top: 0,
-    right: 400,
-    bottom: 24,
-    width: 400,
-    height: 24,
-    toJSON: () => ({}),
-  });
-  act(() => {
-    row.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 200 }));
-    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2, clientX: 200 }));
-  });
-  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(host.querySelectorAll('[data-cursor-focus-key]')).toHaveLength(1);
+  const row = host.querySelector('button')!;
+  act(() => row.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 4 })));
+  expect(onNavigate).toHaveBeenCalledExactlyOnceWith(0.04, keys[0]);
+  expect(host.querySelectorAll('[data-cursor-focus-key]')).toHaveLength(2);
+  expect(host.querySelector('[data-cursor-focus-group]')).toBeNull();
+  act(() =>
+    host
+      .querySelector('[data-cursor-focus-key="auto"]')!
+      .dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2, clientX: 4 }))
+  );
+  expect(onAdd).toHaveBeenCalledExactlyOnceWith(0.04);
+  onAdd.mockClear();
+  act(() => row.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 200 })));
+  expect(onNavigate).toHaveBeenLastCalledWith(2, undefined);
+  expect(host.querySelectorAll('[data-cursor-focus-key]')).toHaveLength(1);
+  act(() =>
+    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2, clientX: 200 }))
+  );
   expect(onAdd).toHaveBeenCalledExactlyOnceWith(2);
-  expect(onSelect).not.toHaveBeenCalled();
 });
 it('empty row supports context Add and keyboard navigation never creates captured facts', () => {
   const onAdd = vi.fn();
@@ -219,5 +211,48 @@ it.each(['command', 'escape', 'outside'] as const)(
     } finally {
       outside.remove();
     }
+  }
+);
+
+it.each(['commit', 'escape', 'cancel'] as const)(
+  'recorded marker drag has one %s outcome',
+  (outcome) => {
+    const onMove = vi.fn();
+    act(() =>
+      root.render(
+        <CursorFocusTimelineKeys
+          keys={keys}
+          time={0}
+          duration={4}
+          pixelsPerSecond={100}
+          onSelect={vi.fn()}
+          onAdd={vi.fn()}
+          onNavigate={vi.fn()}
+          onMove={onMove}
+        />
+      )
+    );
+    const pointer = (type: string, x: number) => {
+      const event = new MouseEvent(type, { bubbles: true, button: 0, clientX: x });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      return event;
+    };
+    act(() =>
+      host
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 4 }))
+    );
+    const marker = host.querySelector('[data-cursor-focus-key="auto"]')!;
+    act(() => marker.dispatchEvent(pointer('pointerdown', 0)));
+    act(() => window.dispatchEvent(pointer('pointermove', 50)));
+    expect(marker.getAttribute('data-authored')).toBe('true');
+    expect(onMove).not.toHaveBeenCalled();
+    act(() => {
+      if (outcome === 'escape')
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      else window.dispatchEvent(pointer(outcome === 'cancel' ? 'pointercancel' : 'pointerup', 50));
+    });
+    expect(onMove).toHaveBeenCalledTimes(outcome === 'commit' ? 1 : 0);
+    if (outcome === 'commit') expect(onMove).toHaveBeenCalledWith(keys[0], 0.5);
   }
 );

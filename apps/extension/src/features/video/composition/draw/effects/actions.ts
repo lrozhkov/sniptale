@@ -25,11 +25,10 @@ export function drawActionCompositionState(
     context.fillStyle = frame.color;
     context.lineWidth = frame.stroke * Math.max(0.2, sizeScale);
     if (frame.path?.length) {
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
       context.beginPath();
-      frame.path.forEach((item, index) => {
-        if (index === 0) context.moveTo(item.x, item.y);
-        else context.lineTo(item.x, item.y);
-      });
+      traceGesturePath(context, frame.path, context.lineWidth);
       context.stroke();
     }
     if (frame.area)
@@ -83,6 +82,40 @@ export function drawActionCompositionState(
       break;
   }
   context.restore();
+}
+
+/** Round only local corners; recorded endpoints and the current pointer stay exact. */
+function traceGesturePath(
+  context: CanvasRenderingContext2D,
+  points: readonly { x: number; y: number }[],
+  radius: number
+) {
+  const first = points[0]!;
+  context.moveTo(first.x, first.y);
+  for (let index = 1; index < points.length - 1; index++) {
+    const before = points[index - 1]!;
+    const point = points[index]!;
+    const after = points[index + 1]!;
+    const incoming = Math.hypot(point.x - before.x, point.y - before.y);
+    const outgoing = Math.hypot(after.x - point.x, after.y - point.y);
+    const distance = Math.min(radius, incoming / 2, outgoing / 2);
+    if (distance <= 0) {
+      context.lineTo(point.x, point.y);
+      continue;
+    }
+    context.lineTo(
+      point.x + ((before.x - point.x) * distance) / incoming,
+      point.y + ((before.y - point.y) * distance) / incoming
+    );
+    context.quadraticCurveTo(
+      point.x,
+      point.y,
+      point.x + ((after.x - point.x) * distance) / outgoing,
+      point.y + ((after.y - point.y) * distance) / outgoing
+    );
+  }
+  const last = points.at(-1)!;
+  if (points.length > 1) context.lineTo(last.x, last.y);
 }
 
 /** Shared manual-action overlay mapping for preview and exported output. */

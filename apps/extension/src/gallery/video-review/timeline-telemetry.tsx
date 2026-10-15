@@ -39,12 +39,15 @@ type TelemetryStripProps = {
   markers: readonly ReviewTelemetryMarker[];
   duration: number;
   time: number;
+  playing?: boolean | undefined;
   width: number;
   zoom: number;
   selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
   cursorFocusKeys?: readonly CursorFocusTimelineKey[];
   selectedCursorFocusId?: string;
   onCursorFocusKey?(key: CursorFocusTimelineKey): void;
+  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
+  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
   onAddCursorFocusKey?(time: number): void;
   onMarker(marker: ReviewTelemetryMarker): void;
 };
@@ -276,6 +279,9 @@ function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: n
       duration={props.duration}
       pixelsPerSecond={Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration)}
       onSelect={props.onCursorFocusKey}
+      playing={props.playing}
+      {...(props.onNavigateCursorFocus ? { onNavigate: props.onNavigateCursorFocus } : {})}
+      {...(props.onMoveCursorFocus ? { onMove: props.onMoveCursorFocus } : {})}
       onAdd={props.onAddCursorFocusKey}
     />
   ) : null;
@@ -302,7 +308,7 @@ function ReviewHistoryItem({
     marker.ref.id === props.selectedTelemetryRef.id;
   const animated = marker.ref.kind === 'action' && props.animatedIds?.has(marker.ref.id);
   const tone = reviewTimelineItemTone(selected);
-  const cursorLine = item.lane === 2 && marker.eventType !== 'cursor-idle' && !selected;
+  const cursorLine = item.lane === 2;
   if (item.members.length > 1)
     return (
       <ReviewHistoryCluster
@@ -362,8 +368,7 @@ function ReviewHistoryItem({
         opacity: cursorLine && marker.eventType === 'cursor-gap' ? 0.4 : 1,
       }}
     >
-      {item.lane !== 2 ||
-      ((marker.eventType === 'cursor-idle' || selected) && item.width * ratio >= 100) ? (
+      {item.lane !== 2 ? (
         <ReviewTimelineLabel
           icon={<ReviewEventIcon kind={marker.eventType} />}
           name={reviewEventLabel(marker.eventType)}

@@ -1,4 +1,7 @@
-import { addReviewCursorFocusKey } from '../../features/video/project/cursor-focus-path/authoring';
+import {
+  addReviewCursorFocusKey,
+  moveCursorFocusTimelineKey,
+} from '../../features/video/project/cursor-focus-path/authoring';
 import { useReviewAnnotationEffects } from './annotation-effects-editor';
 import { useReviewPresentation } from './use-review-presentation';
 import { useReviewWatermark } from './use-review-watermark';
@@ -464,14 +467,29 @@ function assembleReviewEditorState(
     projected,
     cursorFocusPath: wiring.cursorFocusPath,
     cursorFocusKeys: wiring.cursorFocusKeys,
-    selectCursorFocusKey: (id: string, time: number) =>
+    selectCursorFocusKey: (id: string | undefined, time: number) =>
       core.beforeAction(() => {
         core.setSelection({ kind: 'point', time });
-        setActiveSelection({ kind: 'cursor-focus', id, time });
+        setActiveSelection({ kind: 'cursor-focus', id: id ?? '', time });
         core.seek(time, false);
+      }),
+    moveCursorFocusKey: (key: (typeof wiring.cursorFocusKeys)[number], time: number) =>
+      core.beforeAction(() => {
+        const moved = moveCursorFocusTimelineKey(wiring.cursorFocusPath, key, time);
+        advancedState.setCursorFocusPath(moved.path);
+        core.setSelection({ kind: 'point', time: moved.time });
+        setActiveSelection({ kind: 'cursor-focus', id: moved.id, time: moved.time });
+        core.seek(moved.time, false);
       }),
     addCursorFocusKey: (time: number) =>
       core.beforeAction(() => {
+        if (
+          wiring.cursorFocusPath.segments.length &&
+          !wiring.cursorFocusPath.segments.some(
+            (segment) => time >= segment.start && time <= segment.end
+          )
+        )
+          return;
         const id = crypto.randomUUID();
         advancedState.setCursorFocusPath(
           addReviewCursorFocusKey(wiring.cursorFocusPath, time, core.source.duration, id)

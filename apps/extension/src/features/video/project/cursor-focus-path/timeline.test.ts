@@ -1,3 +1,4 @@
+import { moveCursorFocusTimelineKey, updateCursorFocusKey } from './authoring';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import { resolveProjectCursorFocusSamples } from './projection';
 import { expect, it } from 'vitest';
@@ -108,4 +109,42 @@ it('projects matching source endpoints at playback rate and deduplicates a conti
     'second',
     'second',
   ]);
+});
+
+it('moves a recorded point as a manual correction without changing the captured path', () => {
+  const original = structuredClone(path);
+  const recorded = reviewCursorFocusTimelineKeys(path).find((key) => key.id === 'end')!;
+  const moved = moveCursorFocusTimelineKey(path, recorded, 1.5);
+  expect(path).toEqual(original);
+  expect(moved.path.segments[0]!.keys.find((key) => key.id === 'end')).toEqual(
+    original.segments[0]!.keys[2]
+  );
+  expect(moved.path.segments[0]!.keys.find((key) => key.id === moved.id)).toMatchObject({
+    anchor: 'manual',
+    time: 1.5,
+    x: 0.8,
+    y: 0.8,
+  });
+  const again = moveCursorFocusTimelineKey(
+    moved.path,
+    { ...recorded, id: moved.id, anchor: 'manual', time: 1.5 },
+    1
+  );
+  expect(again.path.segments[0]!.keys.filter((key) => key.id === moved.id)).toHaveLength(1);
+  expect(again.time).toBe(1);
+});
+
+it('selects the manual correction when dragging a captured anchor with authored controls', () => {
+  const edited = updateCursorFocusKey(path, 'end', { interpolation: 'linear' });
+  const captured = reviewCursorFocusTimelineKeys(edited).find((key) => key.id === 'end')!;
+  expect(captured.authored).toBe(true);
+  const moved = moveCursorFocusTimelineKey(edited, captured, 1.5);
+  expect(moved.id).toBe('focus-override:end');
+  expect(moved.path.segments[0]!.keys.find((key) => key.id === moved.id)).toMatchObject({
+    anchor: 'manual',
+    time: moved.time,
+  });
+  expect(moved.path.segments[0]!.keys.find((key) => key.id === 'end')).toEqual(
+    edited.segments[0]!.keys.find((key) => key.id === 'end')
+  );
 });

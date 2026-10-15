@@ -1,6 +1,9 @@
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { reviewCursorFocusTimelineKeys } from '../../features/video/project/cursor-focus-path/timeline';
-import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
+import {
+  deriveReviewCursorFocusPath,
+  resolveReviewCursorFocusPath,
+} from '../../features/video/review/advanced/cursor-focus-path';
 import { deleteCursorFocusKey } from '../../features/video/project/cursor-focus-path/authoring';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -313,9 +316,27 @@ function useReviewCursorFocus(args: Parameters<typeof useReviewEditorWiring>[0])
       args.session,
     ]
   );
-  const cursorFocusKeys = useMemo(
-    () => reviewCursorFocusTimelineKeys(cursorFocusPath),
-    [cursorFocusPath]
-  );
+  const cursorFocusKeys = useMemo(() => {
+    const recorded = reviewCursorFocusTimelineKeys(
+      deriveReviewCursorFocusPath(
+        args.telemetry,
+        {
+          width:
+            args.sourceGeometry?.width ??
+            args.session.getSnapshot().snapshot.workspace.source.width,
+          height:
+            args.sourceGeometry?.height ??
+            args.session.getSnapshot().snapshot.workspace.source.height,
+          duration: args.sourceDuration,
+        },
+        true
+      )
+    );
+    const authored = reviewCursorFocusTimelineKeys(cursorFocusPath).filter(
+      (key) => key.anchor === 'manual' || key.authored
+    );
+    const authoredIds = new Set(authored.map((key) => key.timelineId));
+    return [...recorded.filter((key) => !authoredIds.has(key.timelineId)), ...authored];
+  }, [cursorFocusPath, args.telemetry, args.sourceGeometry, args.sourceDuration, args.session]);
   return { cursorFocusPath, cursorFocusKeys };
 }

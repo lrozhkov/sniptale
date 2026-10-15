@@ -346,3 +346,29 @@ export function finishCapturedCursorSegment(segment: CursorFocusSegment): void {
     segment.keys.push({ ...last, id: `end:${segment.id}`, time: segment.end, anchor: 'boundary' });
   else if (last.anchor === 'movement') last.anchor = 'boundary';
 }
+
+/** Moving a recorded occurrence creates a sparse manual correction and retains the recording. */
+export function moveCursorFocusTimelineKey(
+  path: CursorFocusPath,
+  key: CursorFocusKey & { segmentId: string },
+  time: number
+): { path: CursorFocusPath; id: string; time: number } {
+  const segment = path.segments.find((item) => item.id === key.segmentId);
+  if (!segment) return { path, id: key.id, time: key.time };
+  const bounded = Math.max(segment.start, Math.min(segment.end, time));
+  if (key.anchor === 'manual' || (key.anchor === 'movement' && key.authored))
+    return {
+      path: updateCursorFocusKey(path, key.id, { time: bounded }),
+      id: key.id,
+      time: bounded,
+    };
+  const id = cursorFocusOverrideId(key.id);
+  const existing = segment.keys.find((item) => item.id === id);
+  return {
+    path: existing
+      ? updateCursorFocusKey(path, id, { time: bounded })
+      : insertCursorFocusKey(path, segment.id, { id, time: bounded, x: key.x, y: key.y }),
+    id,
+    time: bounded,
+  };
+}
