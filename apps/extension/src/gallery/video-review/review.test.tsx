@@ -832,7 +832,12 @@ it.each(['basic', 'advanced'] as const)(
             ...committedEditorFixtureProjection(fixture.snapshot).document.advancedContent,
           }).actionsApplied;
         await fixture.click('undo');
-        expect(lane()).toBeNull();
+        expect(lane()).not.toBeNull();
+        expect(
+          fixture.host
+            .querySelector('[data-review-track="actions"]')
+            ?.getAttribute('data-review-track-muted')
+        ).toBe('true');
         expect(applied()).toBe(false);
         await fixture.click('redo');
         expect(lane()).not.toBeNull();

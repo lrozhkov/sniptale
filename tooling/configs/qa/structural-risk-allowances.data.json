@@ -127,10 +127,10 @@
       "file": "apps/extension/src/gallery/video-review/review.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The diff only changes two control selectors from body rows to portaled headers. Existing integration fixtures, settings and Notes assertions, cleanup, state and effects are unchanged; score remains 4 with delta 0 and cohesion 1.00. No new fixture lifetime is introduced. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: The existing history integration test now expects the lane to remain visible and muted after content Undo. The candidate changes assertions only in this file. Imports, fixtures, cleanup, state and effects are unchanged; score4 delta0, cohesion1.00. Main inspected the exact diff. Fresh complete-candidate architecture review must validate this binding.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess a new fixture lifecycle, independent authority or mixed recovery. Remove when the analyzer recognizes cohesive tests sharing one integration fixture. Independent architecture review must inspect the classification.",
       "reviewDate": "2026-10-15",
-      "astHash": "d04f5821ef3b2bd916645a16b28a2786cff9899593fb2afa932cb483850629bf",
+      "astHash": "1a5e57e174b7480b46a5d7bb93c817ba5c1db5e8bcb05b685450f82e54d60c32",
       "signatureHash": "a411df1f8a4dd05950d634461348210539321a3a0a91a54138e7774cc24654d9"
     },
     {

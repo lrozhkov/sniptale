@@ -62,7 +62,7 @@ beforeEach(() => {
   harness.database.mockResolvedValue(fixture.database);
 });
 
-it('moves masters with durable Undo, Redo and start while retaining locks and retrying refusal', async () => {
+it('preserves lane membership and locks through durable history and retry', async () => {
   const opened = await openVideoWorkspace(id, source);
   const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const disabled = { ...before, actionsEnabled: false };
@@ -96,7 +96,7 @@ it('moves masters with durable Undo, Redo and start while retaining locks and re
   expect(await readVideoWorkspace(id)).toEqual(saved);
   harness.failure = false;
   const undone = await moveVideoWorkspaceHistory(request);
-  expect(undone.workspace.advanced.ui.tracks.actions).toBe(false);
+  expect(undone.workspace.advanced.ui.tracks.actions).toBe(true);
   const redone = await moveVideoWorkspaceHistory({
     ...request,
     expectedRevision: undone.workspace.revision,

@@ -440,6 +440,7 @@ it('keeps one global density control available in both editing modes without tog
           `[aria-label="${translate('gallery.videoReview.compactTrackHeight')}"]`
         );
         expect(buttons).toHaveLength(1);
+        expect(buttons[0]!.parentElement!.className).not.toContain('ml-auto');
         expect(buttons[0]!.getAttribute('aria-pressed')).toBe(String(compact));
         await act(async () => buttons[0]!.click());
       }

@@ -517,7 +517,7 @@ function reviewAdvancedControls(
     setWorkspaceColor: advancedState.setWorkspaceColor,
     setKeyAnimations: advancedState.setKeyAnimations,
     setActionAudio: advancedState.setActionAudio,
-    setActionsEnabled: (enabled: boolean) => advancedState.setTrackVisibility('actions', enabled),
+    setActionsEnabled: advancedState.setActionsEnabled,
     setClickAnimations: advancedState.setClickAnimations,
     setBackground: advancedState.setBackground,
     backgroundPreview: advancedState.backgroundPreview,
