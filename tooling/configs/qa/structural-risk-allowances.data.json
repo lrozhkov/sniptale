@@ -589,10 +589,10 @@
       "file": "apps/extension/src/gallery/video-review/cursor-path-overlay.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One DOM/root/path fixture serves cursor overlay and inspector assertions. afterEach unmounts and removes it. The unchanged score counts test setup as effects. New assertions use the same fixture lifetime. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
+      "reason": "tool-noise: One DOM/root/path fixture serves cursor overlay and inspector assertions. afterEach unmounts and removes it. Recorded-point and tangent regression tests use this same fixture lifetime. Score remains 2, cohesion is 1, with no new state authority or effect family. Final architecture review must validate this exact candidate.",
       "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
-      "reviewDate": "2026-10-14",
-      "astHash": "a68b66171796a8d3642313b30a5a3c9c2dfa75667dfd8184417f736cf037e88e",
+      "reviewDate": "2026-10-15",
+      "astHash": "3ecbd80b23241b125e497f923e8a7c70477cf4074938a7613b511ef125bf9925",
       "signatureHash": "60a99b2d8b656cad91602100ee09a62a9465199b7a43beb5ad81395f80735993"
     },
     {
@@ -754,10 +754,10 @@
       "file": "apps/extension/src/gallery/video-review/use-review-wiring.ts",
       "symbol": "useReviewEditorWiring",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The existing editor wiring hook adds source time and playback range to its existing comment owner. It retains one annotation-tool cancellation ref and delegates comment, audio, text, history, and export operations to their existing owners. The changed code introduces no writer, resource lifetime or recovery authority. Splitting this binding would forward the same dependencies. Main inspected the exact diff and owner calls; final independent architecture review must validate this classification.",
+      "reason": "tool-noise: This diff forwards the existing cursor occurrence list to the existing selection lifecycle so recorded selections survive focus-path simplification. The wiring adds no state, effect, writer, resource or recovery authority. Function score 1 has delta 0 and cohesion 0.79. Main inspected the exact one-line diff. Splitting this binding would add a forwarding layer. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove on exact AST or signature change. Reassess a new writer, state receiver, effect or recovery lifetime. Remove when the analyzer distinguishes this composition boundary.",
       "reviewDate": "2026-10-15",
-      "astHash": "ce52107deb52ae2ef5d4bb5e7316262c2af317392b31149c297d584118c7e44a",
+      "astHash": "041bfd7f8c191a5f95b53d1f16e24841652646bf3d3a5681a15b33c21ab2e2c6",
       "signatureHash": "38263a7aced3b88e90affb445767a21322348102623dac291a84ea9ed94cb28c"
     },
     {

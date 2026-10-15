@@ -2,7 +2,7 @@ import type { VideoCompositionActionState } from '../../types';
 import { expect, it, vi } from 'vitest';
 import { drawActionCompositionState, drawSceneActionCompositionStates } from './actions';
 
-it('rounds gesture corners within the stroke width while preserving factual endpoints', () => {
+it('smooths retained gesture corners while preserving factual endpoints', () => {
   const context = createContext();
   const path = [
     { x: 0, y: 0 },
@@ -29,8 +29,8 @@ it('rounds gesture corners within the stroke width while preserving factual endp
     null
   );
   expect(context.moveTo).toHaveBeenCalledWith(0, 0);
-  expect(context.lineTo).toHaveBeenCalledWith(16, 0);
-  expect(context.quadraticCurveTo).toHaveBeenCalledWith(20, 0, 20, 4);
+  expect(context.lineTo).toHaveBeenCalledWith(10, 0);
+  expect(context.quadraticCurveTo).toHaveBeenCalledWith(20, 0, 20, 10);
   expect(context.lineTo).toHaveBeenLastCalledWith(20, 20);
   expect(context.lineJoin).toBe('round');
   expect(path).toEqual([
@@ -320,4 +320,40 @@ it('uses the authored click color, opacity and thickness with a deterministic en
   expect(context.lineWidth).toBe(12);
   expect(context.globalAlpha).toBe(0.25);
   expect(context.arc).toHaveBeenCalledWith(40, 50, expect.closeTo(78, 8), 0, Math.PI * 2);
+});
+
+it('removes small alternating capture jitter without shifting the start or current pointer', () => {
+  const context = createContext();
+  const path = [
+    { x: 0, y: 0 },
+    { x: 10, y: 2 },
+    { x: 20, y: -2 },
+    { x: 30, y: 2 },
+    { x: 40, y: -2 },
+    { x: 50, y: 0 },
+  ];
+  const original = structuredClone(path);
+  drawActionCompositionState(
+    context,
+    {
+      ...createActionState(),
+      preset: 'CLICK_PRESS',
+      renderKind: 'accent',
+      point: path.at(-1)!,
+      gestureFeedback: {
+        effect: 'press',
+        point: path.at(-1)!,
+        radius: 8,
+        stroke: 2,
+        color: '#fff',
+        opacity: 1,
+        path,
+      },
+    },
+    null
+  );
+  expect(context.moveTo).toHaveBeenCalledWith(0, 0);
+  expect(context.lineTo).toHaveBeenCalledExactlyOnceWith(50, 0);
+  expect(context.quadraticCurveTo).not.toHaveBeenCalled();
+  expect(path).toEqual(original);
 });

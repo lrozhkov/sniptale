@@ -269,6 +269,12 @@ function ReviewHistoryCluster(props: {
 }
 
 function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: number }) {
+  const coverage = new Map(
+    (props.cursorFocusKeys ?? [])
+      .filter((key) => (key.anchor === 'manual' || key.authored) && key.sourceCoverage)
+      .map((key) => [key.segmentId, key.sourceCoverage!])
+  );
+  const ratio = Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration);
   return props.onCursorFocusKey && props.onAddCursorFocusKey ? (
     <CursorFocusTimelineKeys
       top={top}
@@ -277,13 +283,23 @@ function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: n
       {...(props.selectedCursorFocusId ? { selectedId: props.selectedCursorFocusId } : {})}
       time={props.time}
       duration={props.duration}
-      pixelsPerSecond={Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration)}
+      pixelsPerSecond={ratio}
       onSelect={props.onCursorFocusKey}
       playing={props.playing}
       {...(props.onNavigateCursorFocus ? { onNavigate: props.onNavigateCursorFocus } : {})}
       {...(props.onMoveCursorFocus ? { onMove: props.onMoveCursorFocus } : {})}
       onAdd={props.onAddCursorFocusKey}
-    />
+    >
+      {[...coverage].map(([id, span]) => (
+        <span
+          key={id}
+          aria-hidden="true"
+          data-ui="cursorFocusPath.authoredCoverage"
+          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-[var(--sniptale-color-border-soft)]"
+          style={{ left: span.start * ratio, width: Math.max(0, span.end - span.start) * ratio }}
+        />
+      ))}
+    </CursorFocusTimelineKeys>
   ) : null;
 }
 

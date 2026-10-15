@@ -9,6 +9,8 @@ export interface CursorFocusTimelineKey extends CursorFocusKey {
   binding: CursorFocusBinding;
   sourceTime: number;
   sourceClipId?: string;
+  /** Source-clock coverage for the quick editor, including deliberately authored gaps. */
+  sourceCoverage?: { start: number; end: number };
 }
 
 export function reviewCursorFocusTimelineKeys(path: CursorFocusPath): CursorFocusTimelineKey[] {
@@ -20,6 +22,7 @@ export function reviewCursorFocusTimelineKeys(path: CursorFocusPath): CursorFocu
         segmentId: segment.id,
         binding: segment.binding,
         sourceTime: key.time,
+        sourceCoverage: { start: segment.start, end: segment.end },
       }))
     )
     .sort(compareTimelineKeys);

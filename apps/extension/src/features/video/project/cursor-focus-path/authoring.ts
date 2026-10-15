@@ -266,6 +266,14 @@ export function addReviewCursorFocusKey(
     duration,
     ...path.segments.filter((item) => item.start >= bounded).map((item) => item.start)
   );
+  const before = path.segments
+    .filter((item) => item.end <= bounded)
+    .sort((a, b) => b.end - a.end)[0];
+  const after = path.segments
+    .filter((item) => item.start >= bounded)
+    .sort((a, b) => a.start - b.start)[0];
+  const point = (before && evaluateCursorFocusSegment(before, before.end, path.smoothing)) ||
+    (after && evaluateCursorFocusSegment(after, after.start, path.smoothing)) || { x: 0.5, y: 0.5 };
   return {
     ...path,
     segments: [
@@ -275,7 +283,9 @@ export function addReviewCursorFocusKey(
         binding: { kind: 'project' },
         start,
         end,
-        keys: [{ id, time: bounded, x: 0.5, y: 0.5, anchor: 'manual', interpolation: 'smooth' }],
+        keys: [
+          { id, time: bounded, x: point.x, y: point.y, anchor: 'manual', interpolation: 'smooth' },
+        ],
       },
     ],
   };

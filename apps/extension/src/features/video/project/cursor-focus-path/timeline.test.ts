@@ -1,4 +1,10 @@
-import { moveCursorFocusTimelineKey, updateCursorFocusKey } from './authoring';
+import {
+  moveCursorFocusTimelineKey,
+  updateCursorFocusKey,
+  addReviewCursorFocusKey,
+  authoredCursorFocusPath,
+  resolveAuthoredCursorFocusPath,
+} from './authoring';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import { resolveProjectCursorFocusSamples } from './projection';
 import { expect, it } from 'vitest';
@@ -147,4 +153,50 @@ it('selects the manual correction when dragging a captured anchor with authored 
   expect(moved.path.segments[0]!.keys.find((key) => key.id === 'end')).toEqual(
     edited.segments[0]!.keys.find((key) => key.id === 'end')
   );
+});
+
+it('continues empty coverage with explicit manual keys and preserves them after resolving facts again', () => {
+  const observed: CursorFocusPath = {
+    ...path,
+    segments: [
+      {
+        ...path.segments[0]!,
+        id: 'left',
+        start: 0,
+        end: 1,
+        keys: [
+          { id: 'left-end', time: 1, x: 0.2, y: 0.3, anchor: 'boundary', interpolation: 'linear' },
+        ],
+      },
+      {
+        ...path.segments[0]!,
+        id: 'right',
+        start: 4,
+        end: 5,
+        keys: [
+          {
+            id: 'right-start',
+            time: 4,
+            x: 0.8,
+            y: 0.7,
+            anchor: 'boundary',
+            interpolation: 'linear',
+          },
+        ],
+      },
+    ],
+  };
+  const original = structuredClone(observed);
+  const first = addReviewCursorFocusKey(observed, 2, 5, 'gap-one');
+  expect(
+    first.segments.find((segment) => segment.id === 'manual-segment:gap-one')?.keys[0]
+  ).toMatchObject({ anchor: 'manual', time: 2, x: 0.2, y: 0.3 });
+  const next = updateCursorFocusKey(addReviewCursorFocusKey(first, 3, 5, 'gap-two'), 'gap-two', {
+    x: 0.6,
+    y: 0.5,
+  });
+  const restored = resolveAuthoredCursorFocusPath(observed, authoredCursorFocusPath(next));
+  const gap = restored.segments.find((segment) => segment.start === 1 && segment.end === 4)!;
+  expect(gap.keys.map((key) => key.id)).toEqual(['gap-one', 'gap-two']);
+  expect(observed).toEqual(original);
 });

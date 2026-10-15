@@ -28,7 +28,9 @@ export function drawActionCompositionState(
       context.lineCap = 'round';
       context.lineJoin = 'round';
       context.beginPath();
-      traceGesturePath(context, frame.path, context.lineWidth);
+      const scale = Math.max(0.2, sizeScale);
+      const path = simplifyGesturePath(frame.path, Math.max(4, frame.stroke * 3) * scale);
+      traceGesturePath(context, path, Math.max(12, frame.stroke * 6) * scale);
       context.stroke();
     }
     if (frame.area)
@@ -82,6 +84,40 @@ export function drawActionCompositionState(
       break;
   }
   context.restore();
+}
+
+/** Display-only geometric tolerance removes capture jitter; telemetry and endpoints stay exact. */
+function simplifyGesturePath(points: readonly { x: number; y: number }[], tolerance: number) {
+  if (points.length < 3) return points;
+  const kept = new Set([0, points.length - 1]);
+  const pending: [number, number][] = [[0, points.length - 1]];
+  while (pending.length) {
+    const [start, end] = pending.pop()!;
+    const first = points[start]!;
+    const last = points[end]!;
+    const dx = last.x - first.x,
+      dy = last.y - first.y;
+    const length = dx * dx + dy * dy;
+    let worst = tolerance * tolerance;
+    let selected = -1;
+    for (let index = start + 1; index < end; index++) {
+      const point = points[index]!;
+      const along = length
+        ? Math.max(0, Math.min(1, ((point.x - first.x) * dx + (point.y - first.y) * dy) / length))
+        : 0;
+      const distance =
+        (point.x - first.x - along * dx) ** 2 + (point.y - first.y - along * dy) ** 2;
+      if (distance > worst) {
+        worst = distance;
+        selected = index;
+      }
+    }
+    if (selected >= 0) {
+      kept.add(selected);
+      pending.push([start, selected], [selected, end]);
+    }
+  }
+  return [...kept].sort((a, b) => a - b).map((index) => points[index]!);
 }
 
 /** Round only local corners; recorded endpoints and the current pointer stay exact. */

@@ -331,3 +331,39 @@ it('does not add a focus key when a packed mouse event receives a double click',
   );
   expect(onAdd).not.toHaveBeenCalled();
 });
+
+it('continues the cursor line through deliberately authored empty coverage', () => {
+  act(() =>
+    root.render(
+      <ReviewTelemetryStrip
+        markers={[]}
+        duration={10}
+        time={5}
+        width={1000}
+        zoom={1}
+        onMarker={vi.fn()}
+        onCursorFocusKey={vi.fn()}
+        onAddCursorFocusKey={vi.fn()}
+        cursorFocusKeys={[
+          {
+            id: 'manual',
+            timelineId: 'gap:manual',
+            segmentId: 'gap',
+            binding: { kind: 'project' },
+            time: 5,
+            sourceTime: 5,
+            x: 0.2,
+            y: 0.3,
+            anchor: 'manual',
+            interpolation: 'smooth',
+            sourceCoverage: { start: 3, end: 7 },
+          },
+        ]}
+      />
+    )
+  );
+  const line = host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!;
+  expect(line.style.left).toBe('300px');
+  expect(line.style.width).toBe('400px');
+  expect(host.querySelector('[data-cursor-focus-key="manual"]')).not.toBeNull();
+});

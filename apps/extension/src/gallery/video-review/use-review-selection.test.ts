@@ -396,3 +396,12 @@ it('retains disabled effect selection and source timing, but stops navigation in
   advanced.annotationEffects.instances = [];
   expect(reviewSelectionExists(selected, document, advanced)).toBe(false);
 });
+
+it('retains a selected raw cursor sample even when the simplified path omits it', () => {
+  const advanced = createQuickEditAdvancedState();
+  const selection: ReviewSelection = { kind: 'cursor-focus', id: 'raw', time: 1 };
+  expect(reviewSelectionExists(selection, document, advanced, [], undefined, [{ id: 'raw' }])).toBe(
+    true
+  );
+  expect(reviewSelectionExists(selection, document, advanced, [], undefined, [])).toBe(false);
+});

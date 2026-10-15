@@ -483,13 +483,6 @@ function assembleReviewEditorState(
       }),
     addCursorFocusKey: (time: number) =>
       core.beforeAction(() => {
-        if (
-          wiring.cursorFocusPath.segments.length &&
-          !wiring.cursorFocusPath.segments.some(
-            (segment) => time >= segment.start && time <= segment.end
-          )
-        )
-          return;
         const id = crypto.randomUUID();
         advancedState.setCursorFocusPath(
           addReviewCursorFocusKey(wiring.cursorFocusPath, time, core.source.duration, id)

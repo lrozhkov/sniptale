@@ -556,8 +556,22 @@ it('shows the cursor authoring overlay only for an explicitly selected key', asy
   await render(true);
   expect(stage().cursorPath).toBeUndefined();
   state.activeSelection = { kind: 'cursor-focus', id: 'key', time: 1 };
+  const recorded = {
+    id: 'key',
+    timelineId: 'key',
+    segmentId: 'segment',
+    sourceTime: 1,
+    time: 1,
+    x: 0.7,
+    y: 0.4,
+    anchor: 'movement' as const,
+    interpolation: 'linear' as const,
+    binding: { kind: 'project' as const },
+  };
+  state.cursorFocusKeys = [recorded];
   await render(false);
   expect(stage().cursorPath?.selectedKeyId).toBe('key');
+  expect(stage().cursorPath?.recordedKey).toBe(recorded);
   state.playing = true;
   await render(false);
   expect(stage().cursorPath).toBeUndefined();

@@ -1,5 +1,5 @@
 import { resolveCursorFocusHandle } from '../../ui/cursor-focus-control-layout';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { translate } from '../../platform/i18n';
 import { layoutCursorFocusControls } from '../../ui/cursor-focus-control-layout';
 import type {
@@ -9,6 +9,7 @@ import type {
 } from '../../features/video/project/cursor-focus-path/types';
 import {
   updateCursorFocusKey,
+  insertCursorFocusKey,
   cursorFocusOverrideId,
   compareCursorFocusKeys,
 } from '../../features/video/project/cursor-focus-path/authoring';
@@ -28,19 +29,38 @@ interface ReviewCursorOverlayProps {
   onChange(path: CursorFocusPath): void;
   onSeek(time: number): void;
   selectedKeyId?: string;
+  recordedKey?: (CursorFocusKey & { segmentId: string }) | undefined;
   onSelect?(id: string, time: number): void;
 }
 
-export function ReviewCursorPathOverlay(props: ReviewCursorOverlayProps) {
-  const [draft, setDraft] = useState<CursorFocusPath | null>(null);
+export function ReviewCursorPathOverlay(input: ReviewCursorOverlayProps) {
+  const base = useMemo(() => {
+    const key = input.recordedKey;
+    if (
+      !key ||
+      input.path.segments.some((segment) => segment.keys.some((item) => item.id === key.id))
+    )
+      return input.path;
+    return {
+      ...input.path,
+      segments: input.path.segments.map((segment) =>
+        segment.id === key.segmentId
+          ? { ...segment, keys: [...segment.keys, key].sort(compareCursorFocusKeys) }
+          : segment
+      ),
+    };
+  }, [input.path, input.recordedKey]);
+  const props = { ...input, path: base };
+  const [draft, setDraft] = useState<{ path: CursorFocusPath; selectedId: string } | null>(null);
   const cancel = useRef<(() => void) | null>(null);
   useEffect(() => () => cancel.current?.(), []);
-  const path = draft ?? props.path;
+  const path = draft?.path ?? props.path;
   const segment =
     path.segments.find((item) => item.keys.some((key) => key.id === props.selectedKeyId)) ??
     path.segments.find((item) => props.time >= item.start && props.time <= item.end);
   if (!segment) return null;
-  const selectedIndex = segment.keys.findIndex((key) => key.id === props.selectedKeyId);
+  const selectedId = draft?.selectedId ?? props.selectedKeyId;
+  const selectedIndex = segment.keys.findIndex((key) => key.id === selectedId);
   const index =
     selectedIndex >= 0
       ? selectedIndex
@@ -267,7 +287,7 @@ function beginReviewCursorGesture(
     props: ReviewCursorOverlayProps;
     selected: CursorFocusKey;
     controls: ReturnType<typeof cursorFocusKeyControls>;
-    setDraft(path: CursorFocusPath | null): void;
+    setDraft(draft: { path: CursorFocusPath; selectedId: string } | null): void;
     cancel: { current: (() => void) | null };
   },
   event: React.PointerEvent<SVGCircleElement>,
@@ -308,12 +328,18 @@ function beginReviewCursorGesture(
       x: (pointer.clientX - rect.left) / rect.width,
       y: (pointer.clientY - rect.top) / rect.height,
     };
-    next = updateCursorFocusKey(
+    next = updateReviewCursorPoint(
       base,
-      key.id,
+      key,
       handle ? { [handle]: boundReviewCursorControl(props, position) } : position
     );
-    setDraft(next);
+    const overrideId = cursorFocusOverrideId(key.id);
+    const selectedId =
+      !handle &&
+      next.segments.some((segment) => segment.keys.some((item) => item.id === overrideId))
+        ? overrideId
+        : key.id;
+    setDraft({ path: next, selectedId });
   };
   const cleanup = () => {
     window.removeEventListener('pointermove', move);
@@ -366,11 +392,29 @@ function navigateReviewCursorPoint(
     event.preventDefault();
     event.stopPropagation();
     commitGeometry(
-      updateCursorFocusKey(props.path, key.id, {
+      updateReviewCursorPoint(props.path, key, {
         x: key.x + (event.key === 'ArrowRight' ? 0.01 : event.key === 'ArrowLeft' ? -0.01 : 0),
         y: key.y + (event.key === 'ArrowDown' ? 0.01 : event.key === 'ArrowUp' ? -0.01 : 0),
       }),
       key.id
     );
   }
+}
+
+/** A raw movement handle creates authored content only when its geometry changes. */
+function updateReviewCursorPoint(
+  path: CursorFocusPath,
+  key: CursorFocusKey,
+  patch: Parameters<typeof updateCursorFocusKey>[2]
+): CursorFocusPath {
+  if (key.anchor !== 'movement' || key.authored || (patch.x === undefined && patch.y === undefined))
+    return updateCursorFocusKey(path, key.id, patch);
+  if ((patch.x ?? key.x) === key.x && (patch.y ?? key.y) === key.y) return path;
+  const segment = path.segments.find((item) => item.keys.some((item) => item.id === key.id));
+  if (!segment) return path;
+  const id = cursorFocusOverrideId(key.id);
+  const base = segment.keys.some((item) => item.id === id)
+    ? path
+    : insertCursorFocusKey(path, segment.id, { id, time: key.time, x: key.x, y: key.y });
+  return updateCursorFocusKey(base, id, patch);
 }
