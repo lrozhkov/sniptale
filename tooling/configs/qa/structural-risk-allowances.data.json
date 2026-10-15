@@ -765,7 +765,7 @@
       "file": "apps/extension/src/gallery/video-review/stage.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "astHash": "cb0350c7db2ac783fb774bfa525dd24767b62e22470608f43917f1018f5ea371",
+      "astHash": "6bbd93bee1406da6982f4deba35dc7f9d624403bc2c6e7ddfd7704a750e5201b",
       "signatureHash": "fa9a1eb2ee8933c59a173a489946fabc2ccb58ed9a34265eea2092d931366c44",
       "reviewDate": "2026-10-15",
       "reason": "tool-noise: One mounted stage fixture checks native/manual visibility, layer ordering and feedback. Its mock presentation state drives the existing stage receiver; setup and teardown remain shared. File score remains 2 without an increase and cohesion is 1. Main inspected the complete fixture. Fresh complete-candidate architecture review must validate this classification.",
