@@ -106,6 +106,7 @@ type ReviewStageProps = {
   clickCues?: readonly ReviewClickCue[] | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
   backgroundImageUrl?: string | undefined;
+  backgroundPending?: boolean | undefined;
   cutPreview?: ReviewCutPreviewBinding | undefined;
   onCutRaster?: ((raster: ReviewCutPreviewRaster) => void) | undefined;
   url: string;
@@ -207,7 +208,7 @@ export function ReviewStage(props: ReviewStageProps) {
     watermarkOutput,
     size
   );
-  const manual = presentation.active;
+  const manual = presentation.active && presentation.status.actualRaster !== null;
   const { header, motion, projection, plane, projected } = useStageInteractionGeometry(
     props,
     { sceneLayout, content },

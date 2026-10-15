@@ -170,6 +170,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         focusPicker={props.focusPicker}
         cursorPath={props.cursorPath}
         backgroundImageUrl={image.url}
+        backgroundPending={props.backgroundPending}
         cutPreview={props.cutPreview}
         url={props.url}
         source={props.source}

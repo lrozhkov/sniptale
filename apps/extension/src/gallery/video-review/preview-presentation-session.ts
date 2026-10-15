@@ -51,6 +51,7 @@ class ManualPresentationSession {
   private diagnosed = false;
   private disposed = false;
   private waiting = false;
+  private playing = false;
   private sequence = 0;
   private current: Description | null = null;
   private resultTime = 0;
@@ -113,7 +114,7 @@ class ManualPresentationSession {
         ? { width: this.front.canvas.width, height: this.front.canvas.height }
         : null,
       presentedFPS:
-        last !== undefined && first !== undefined && last > first
+        this.playing && last !== undefined && first !== undefined && last > first
           ? ((this.publications.length - 1) * 1000) / (last - first)
           : null,
     });
@@ -145,6 +146,7 @@ class ManualPresentationSession {
 
   private prepare = async (request: { scene: Description; time: number }, signal: AbortSignal) => {
     if (this.contextLost) throw new Error('Preview context lost');
+    if (this.latest().input.backgroundPending) throw new PendingPresentation();
     this.current = request.scene;
     this.resultTime =
       this.latest().input.playing && this.video
@@ -262,7 +264,7 @@ class ManualPresentationSession {
       this.diagnostics = createReviewExportDiagnostics({ destination: 'preview', route: 'render' });
       this.diagnosed = false;
     }
-    this.publications.push(performance.now());
+    if (this.playing) this.publications.push(performance.now());
     while (this.publications.length > 2 && this.publications[0]! < performance.now() - 1000)
       this.publications.shift();
     this.reportBounds(value.prepared.watermarkBounds);
@@ -286,7 +288,7 @@ class ManualPresentationSession {
   };
 
   private seeking = () => {
-    this.clearFront();
+    this.publications.length = 0;
     this.waiting = true;
     this.scheduler.invalidate();
     this.status('pending');
@@ -296,6 +298,10 @@ class ManualPresentationSession {
     for (const event of ['loadeddata', 'seeked', 'timeupdate'])
       this.video?.addEventListener(event, this.ready);
     this.video?.addEventListener('seeking', this.seeking);
+    this.connectCamera();
+  }
+
+  private connectCamera() {
     const webcam = this.latest().input.webcam;
     if (!this.video || !webcam) return;
     this.cameraSource = createReviewWebcamPreviewSource(
@@ -331,15 +337,16 @@ class ManualPresentationSession {
     return this.admission.retainEndpoints(bytes);
   }
 
-  update(description: Description, generation: number, interacting: boolean) {
+  update(description: Description, generation: number, interacting: boolean, active = true) {
     this.current = description;
     this.sequence = generation;
     const input = this.latest().input;
-    this.status('pending');
+    if (this.playing !== input.playing || !active) this.publications.length = 0;
+    this.playing = active && input.playing;
     this.scheduler.update({
       scene: description,
       generation: String(generation),
-      visible: true,
+      visible: active,
       playing: input.playing,
       interacting,
       frameRate:
@@ -347,6 +354,16 @@ class ManualPresentationSession {
       detailedPaused: input.preferences.pausedQuality === 'detailed',
       pausedTime: input.pausedResultTime,
     });
+    if (!active) {
+      this.clearFront();
+      this.cancelSourceFrameCallback();
+      this.cameraSource?.dispose();
+      this.cameraSource = null;
+      this.cameraState = { phase: 'loading', duration: 0, ready: false };
+    } else if (!this.cameraSource) {
+      this.connectCamera();
+    }
+    this.status(active ? 'pending' : 'inactive');
   }
 
   retry() {

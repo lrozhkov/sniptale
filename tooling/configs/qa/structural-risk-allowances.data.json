@@ -36,17 +36,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/gallery/video-review/stage.tsx",
-      "symbol": "ReviewStage",
-      "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when measured stage geometry and final-layer ordering cease to delegate object capture and prepared effect pixels. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "18f18ccd6fa4458a36f14e7fafff778b8499882e394f5229f5b4070c3036010b",
-      "signatureHash": "25f6a795e84bbf4f2ecc983277ca56be3560a879b56918727aa5e0f29e19f3ca",
-      "reason": "tool-noise: This view composes the measured stage, native/manual publication plane and interactive overlays in explicit order. AnnotationGeometry publication is one callback and the editing SVG uses that canonical geometry; effect pixels still come from the existing manual owner. Native/manual, optional layer and feedback guards are JSX, not parallel state authority. Capture remains in named plane/overlay owners. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/packet-export.ts",
       "symbol": "writeReviewPackets",
       "owner": "extension:workflows:video-review",
@@ -366,17 +355,6 @@
     },
     {
       "rule": "structural-file-risk",
-      "file": "apps/extension/src/gallery/video-review/stage.tsx",
-      "symbol": "<file>",
-      "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when stage paint/interaction ordering or native/manual geometry/publication contract introduces another writer or lifecycle. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "1462ccdd615a9848186b47352df1b8044ebe52034591a70ce4769574f252e882",
-      "signatureHash": "a6d3082aeecde0d87f52ec1167b159a966f9609f15e0a035659b2477026261c5",
-      "reason": "tool-noise: The stage owns explicit native/manual paint ordering and interaction composition. Prepared presentation, object geometry, resource rendering and annotation gesture math are already separate owners; the addition publishes canonical geometry and places the SVG editing layer above final painted effects. No persistence or privileged writer was introduced. The file remains one stage contract and its private view helpers; an additional forwarding layer would obscure paint order. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
-    },
-    {
-      "rule": "structural-file-risk",
       "file": "apps/extension/src/gallery/video-review/timeline-binding.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
@@ -403,10 +381,10 @@
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes; reassess when mounted manual-preview scheduler/publication/disposal test fixture gains independently managed render lifetimes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "04669b915c27a972a2fd488c50b9ac8513ee49c7d349d1d77f827b8bc64d2fab",
+      "astHash": "f28b3142fd0757ed6810841d409e575ce73b34dbfd6fd065dc12c9d38aba80c2",
       "signatureHash": "be757cb3047b9229806d267e986f4b3c24aceb428f1e7a77aa44ec3feae9dea8",
-      "reason": "tool-noise: One mounted hook fixture tracks scheduler ticks, prepared frame leases, publication and disposal; beforeEach resets IO, afterEach unmounts and restores mocks/globals. Annotation cases use the same manual renderer lifecycle at source cadence and disabled release. These are resource/publication states of the existing hook contract, not independent feature transactions requiring another fixture authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: The existing mounted presentation fixture now checks retained front replacement, background readiness, playback cadence and native/manual handoff. These are states of the same stage or presentation lifetime, with shared setup and teardown. File score remains 2 without an increase and cohesion is 1. Main inspected the complete fixture; it adds no independent persistence, transport or resource owner. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-15"
     },
     {
       "rule": "structural-function-risk",
@@ -781,6 +759,17 @@
       "reviewDate": "2026-10-15",
       "astHash": "ce52107deb52ae2ef5d4bb5e7316262c2af317392b31149c297d584118c7e44a",
       "signatureHash": "38263a7aced3b88e90affb445767a21322348102623dac291a84ea9ed94cb28c"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/stage.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "astHash": "cb0350c7db2ac783fb774bfa525dd24767b62e22470608f43917f1018f5ea371",
+      "signatureHash": "fa9a1eb2ee8933c59a173a489946fabc2ccb58ed9a34265eea2092d931366c44",
+      "reviewDate": "2026-10-15",
+      "reason": "tool-noise: One mounted stage fixture checks native/manual visibility, layer ordering and feedback. Its mock presentation state drives the existing stage receiver; setup and teardown remain shared. File score remains 2 without an increase and cohesion is 1. Main inspected the complete fixture. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource or fixture lifetime. Remove when the analyzer models this cohesive stage fixture. Fresh complete-candidate architecture review must validate this classification."
     }
   ]
 }

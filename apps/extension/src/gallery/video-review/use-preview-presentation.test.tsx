@@ -250,6 +250,7 @@ it('publishes a complete manual frame at exact paused clocks and retains only it
   await step(50);
   expect(releases[0]).toHaveBeenCalledOnce();
   expect(releases[1]).not.toHaveBeenCalled();
+  expect(result.status.presentedFPS).toBeNull();
 });
 
 it('does not capture stale source pixels after asynchronous preparation finishes for a replaced source', async () => {
@@ -280,13 +281,14 @@ it('does not capture stale source pixels after asynchronous preparation finishes
   expect(io.render).toHaveBeenCalledOnce();
 });
 
-it('invalidates visible pixels on seek and waits for readiness without changing transport time', async () => {
+it('retains visible pixels on seek until atomic replacement without changing transport time', async () => {
   await render();
   await step(0);
+  const front = props.host.current!.querySelector('canvas');
   Object.defineProperty(props.video.current, 'seeking', { configurable: true, value: true });
   act(() => props.video.current!.dispatchEvent(new Event('seeking')));
-  expect(props.host.current!.querySelector('canvas')).toBeNull();
-  expect(releases[0]).toHaveBeenCalledOnce();
+  expect(props.host.current!.querySelector('canvas')).toBe(front);
+  expect(releases[0]).not.toHaveBeenCalled();
   await step(50);
   expect(io.render).toHaveBeenCalledOnce();
   expect(result.status.phase).toBe('pending');
@@ -294,6 +296,8 @@ it('invalidates visible pixels on seek and waits for readiness without changing 
   act(() => props.video.current!.dispatchEvent(new Event('seeked')));
   await step(100);
   expect(io.render).toHaveBeenCalledTimes(2);
+  expect(props.host.current!.querySelector('canvas')).not.toBe(front);
+  expect(releases[0]).toHaveBeenCalledOnce();
   expect(props.video.current!.currentTime).toBe(1.234567);
 });
 
@@ -336,6 +340,9 @@ it('reports native video cadence separately without a compositor when only the r
   });
   props.video.current!.cancelVideoFrameCallback = vi.fn();
   await render();
+  expect(callbacks).toHaveLength(0);
+  props = { ...props, playing: true };
+  await render();
   act(() =>
     callbacks.at(-1)!(0, {
       expectedDisplayTime: 0,
@@ -349,6 +356,13 @@ it('reports native video cadence separately without a compositor when only the r
     } as VideoFrameCallbackMetadata)
   );
   expect(result.status.nativeVideoFPS).toBe(30);
+  const late = callbacks.at(-1)!;
+  props = { ...props, playing: false };
+  await render();
+  act(() =>
+    late(1000, { expectedDisplayTime: 1000, presentedFrames: 31 } as VideoFrameCallbackMetadata)
+  );
+  expect(result.status.nativeVideoFPS).toBeNull();
   expect(result.status.presentedFPS).toBeNull();
   expect(io.factory).not.toHaveBeenCalled();
 });
@@ -388,7 +402,7 @@ it.each(['external', 'comment', 'webcam'] as const)(
     props = { ...props, playing: true };
     await render();
     expect(result.active).toBe(false);
-    expect(io.dispose).toHaveBeenCalledOnce();
+    expect(io.dispose).not.toHaveBeenCalled();
   }
 );
 
@@ -805,4 +819,66 @@ it('keeps the composed owner for dissolve projects even at Current quality outsi
   expect(result.active).toBe(true);
   expect(io.factory).toHaveBeenCalledOnce();
   expect(io.dispose).not.toHaveBeenCalled();
+});
+
+it('waits for attached background publication and resumes the same paused frame automatically', async () => {
+  await render();
+  await step(0);
+  const front = props.host.current!.firstElementChild;
+  props = {
+    ...props,
+    backgroundPending: true,
+    scene: {
+      ...props.scene,
+      background: {
+        enabled: true,
+        type: 'image',
+        assetId: 'project-asset:attached',
+        imageFit: 'cover',
+        layout: { padding: 8, cornerRadius: 4 },
+      },
+    },
+  };
+  await render();
+  await step(50);
+  expect(io.prepare).toHaveBeenCalledOnce();
+  expect(result.status.phase).toBe('pending');
+  expect(props.host.current!.firstElementChild).toBe(front);
+  props = { ...props, backgroundPending: false };
+  await render();
+  await step(100);
+  expect(io.prepare).toHaveBeenCalledTimes(2);
+  expect(result.status.phase).toBe('ready');
+  expect(props.video.current!.currentTime).toBe(1.234567);
+});
+
+it('retains one detailed renderer across native playback and waits for the new paused publication', async () => {
+  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, pausedQuality: 'detailed' };
+  const camera = cameraBinding();
+  await render();
+  act(() => {
+    camera.events().loaded(20);
+    camera.events().ready(true);
+  });
+  await step(0);
+  expect(result.status.actualRaster).not.toBeNull();
+  props = { ...props, playing: true };
+  await render();
+  await step(50);
+  expect(result.active).toBe(false);
+  expect(io.dispose).not.toHaveBeenCalled();
+  expect(camera.dispose).toHaveBeenCalledOnce();
+  expect(io.render).toHaveBeenCalledOnce();
+  props = { ...props, playing: false, pausedSourceTime: 2, pausedResultTime: 1.75 };
+  await render();
+  expect(result.status.actualRaster).toBeNull();
+  expect(io.camera).toHaveBeenCalledTimes(2);
+  act(() => {
+    camera.events().loaded(20);
+    camera.events().ready(true);
+  });
+  await step(100);
+  expect(result.status.actualRaster).not.toBeNull();
+  expect(io.factory).toHaveBeenCalledOnce();
+  expect(io.render.mock.lastCall![1].sourceTime).toBe(2);
 });

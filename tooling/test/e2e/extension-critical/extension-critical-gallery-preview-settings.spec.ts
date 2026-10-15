@@ -100,6 +100,31 @@ async function proveInspectorBreakpoints(page: Page, info: TestInfo) {
   );
 }
 
+async function proveDetailedHandoff(
+  review: import('@playwright/test').Locator,
+  canvas: import('@playwright/test').Locator,
+  manual: import('@playwright/test').Locator,
+  label: (key: Message) => string,
+  choose: (key: Message, option: string) => Promise<void>,
+  field: (key: Message) => import('@playwright/test').Locator
+) {
+  await choose(
+    'gallery.videoReview.previewPaused',
+    label('gallery.videoReview.previewPausedDetailed')
+  );
+  await expect(canvas).toBeVisible();
+  await review
+    .getByRole('button', { name: label('gallery.videoReview.play'), exact: true })
+    .click();
+  await expect(manual).toBeHidden();
+  await review
+    .getByRole('button', { name: label('gallery.videoReview.pause'), exact: true })
+    .click();
+  await expect(canvas).toBeVisible();
+  await field('gallery.videoReview.previewReset').click();
+  await expect(manual).toBeHidden();
+}
+
 for (const variant of variants) {
   test(`connected preview preferences preserve the scene ${variant.width}`, async ({
     page,
@@ -126,8 +151,12 @@ for (const variant of variants) {
       await page.getByRole('option', { name: option, exact: true }).click();
       await expect(field(key)).toHaveText(option);
     };
-    const open = async () => {
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    const open = async (recordingCardId: string) => {
+      await page
+        .locator(`[data-gallery-keyboard-id=${JSON.stringify(recordingCardId)}]`)
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect
         .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
@@ -156,7 +185,14 @@ for (const variant of variants) {
         mimeType: 'video/webm',
       });
       await page.reload();
-      await open();
+      const recordingCardId = await page
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .evaluate((node) =>
+          node.closest('[data-gallery-keyboard-id]')?.getAttribute('data-gallery-keyboard-id')
+        );
+      if (!recordingCardId) throw new Error('Missing recording card identity');
+      await open(recordingCardId);
       await gear.click();
       await expect(field('gallery.videoReview.previewResolution')).toHaveText(
         label('gallery.videoReview.previewCurrent')
@@ -179,6 +215,15 @@ for (const variant of variants) {
       await expect
         .poll(async () => (await readWebcamWorkspace(page))?.advanced.ui.mode)
         .toBe('advanced');
+      // New projects fade in from black; sample preview pixels after that authored edge.
+      await video.evaluate((node: HTMLVideoElement) => {
+        node.currentTime = 1;
+      });
+      await expect
+        .poll(() =>
+          video.evaluate((node: HTMLVideoElement) => !node.seeking && node.currentTime === 1)
+        )
+        .toBe(true);
       const baseline = await readWebcamWorkspace(page);
       const pausedTime = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
       await gear.click();
@@ -218,6 +263,7 @@ for (const variant of variants) {
         label('gallery.videoReview.previewOn')
       );
       const fps = review.locator('[data-ui="gallery.videoReview.previewFPS"]');
+      await expect(fps).toHaveText('— FPS');
       await expect(fps).toHaveAttribute(
         'title',
         label('gallery.videoReview.previewPresentedFrameRate')
@@ -234,6 +280,7 @@ for (const variant of variants) {
         .getByRole('button', { name: label('gallery.videoReview.pause'), exact: true })
         .click();
       await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
+      await expect(fps).toHaveText('— FPS');
       const stoppedAt = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
       await choose(
         'gallery.videoReview.previewPaused',
@@ -278,7 +325,7 @@ for (const variant of variants) {
       await page.evaluate(async (stored) => {
         await chrome.storage.local.set(stored);
       }, savedStorage);
-      await open();
+      await open(recordingCardId);
       await gear.click();
       await expect(field('gallery.videoReview.previewResolution')).toHaveText('360p');
       await expect(field('gallery.videoReview.previewFrameRate')).toHaveText('≤ 15 FPS');
@@ -297,6 +344,7 @@ for (const variant of variants) {
       );
       await expect(manual).toBeHidden();
       await expect(fps).toBeHidden();
+      await proveDetailedHandoff(review, canvas, manual, label, choose, field);
       await panel.press('Escape');
       await expect(gear).toBeFocused();
       await review.locator('[data-ui="gallery.videoReview.fullscreen"]').click();

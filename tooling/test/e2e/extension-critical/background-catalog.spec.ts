@@ -150,6 +150,16 @@ for (const viewport of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
+      await page.evaluate(async () => {
+        await chrome.storage.local.set({
+          sniptale_quick_preview_preferences: {
+            rasterPreset: '360p',
+            frameRate: 'current',
+            pausedQuality: 'same',
+            showFrameRate: true,
+          },
+        });
+      });
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await page
@@ -159,6 +169,7 @@ for (const viewport of [
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
       await page
+        .getByRole('group', { name: label('gallery.videoReview.background'), exact: true })
         .getByRole('button', { name: label('gallery.videoReview.backgroundImage'), exact: true })
         .click();
       const picker = page.locator('[data-ui="background.image.picker"]');
@@ -174,6 +185,24 @@ for (const viewport of [
         const response = await route.fetch();
         await route.fulfill({ response, contentType: 'image/svg+xml' });
       });
+
+      const canvas = page.locator('[data-ui="gallery.videoReview.manualPreview"] canvas');
+      const video = page.locator('[data-ui="gallery.videoReview.stage"] video').first();
+      await expect(canvas).toBeVisible();
+      await video.evaluate((node: HTMLVideoElement) => {
+        node.currentTime = 1;
+      });
+      await expect
+        .poll(() =>
+          video.evaluate((node: HTMLVideoElement) => !node.seeking && node.currentTime === 1)
+        )
+        .toBe(true);
+      const pausedTime = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
+      const edgePixel = () =>
+        canvas.evaluate((node: HTMLCanvasElement) => [
+          ...node.getContext('2d')!.getImageData(1, Math.floor(node.height / 2), 1, 1).data,
+        ]);
+      const previousPixel = await edgePixel();
       const chosen = picker.getByRole('button', { name: 'Blue Hour', exact: true });
       await chosen.scrollIntoViewIfNeeded();
       const beforeLoading = await picker.boundingBox();
@@ -190,6 +219,12 @@ for (const viewport of [
       });
       release();
       await expect(chosen).toHaveAttribute('aria-busy', 'false');
+      await expect(
+        page.getByText(label('gallery.videoReview.previewFailed'), { exact: true })
+      ).toHaveCount(0);
+      await expect.poll(edgePixel).not.toEqual(previousPixel);
+      expect(await video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBe(pausedTime);
+      await expect(page.locator('[data-ui="gallery.videoReview.previewFPS"]')).toHaveText('— FPS');
 
       await expect(
         page.getByText(label('gallery.videoReview.backgroundImportFailed'), { exact: true })

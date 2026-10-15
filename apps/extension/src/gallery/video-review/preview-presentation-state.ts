@@ -20,6 +20,7 @@ export interface PresentationInput {
   /** Originating session resources are read within the existing prepare transaction. */
   readAsset?: (reference: string, signal: AbortSignal) => Promise<Blob | null>;
   sourceFrameRate?: number | undefined;
+  backgroundPending?: boolean | undefined;
   scene: Scene;
   canonical: Size;
   css: Size;
@@ -86,6 +87,7 @@ export function resolvePresentationDescription(
     input.preferences,
     input.sourceFrameRate,
     input.seekRevision,
+    input.backgroundPending,
     input.playing,
     interacting,
     !input.playing && input.cameraTransform,

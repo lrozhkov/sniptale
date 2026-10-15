@@ -16,6 +16,8 @@ import type {
 
 const presentation = vi.hoisted(() => ({
   active: false,
+  ready: true,
+  phase: 'ready' as 'ready' | 'pending' | 'failed',
   input: vi.fn(),
   retry: vi.fn(),
   draft: vi.fn(),
@@ -27,8 +29,9 @@ vi.mock('./use-preview-presentation', () => ({
     return {
       active: presentation.active,
       status: {
-        phase: presentation.active ? 'ready' : 'inactive',
-        actualRaster: null,
+        phase: presentation.active ? presentation.phase : 'inactive',
+        actualRaster:
+          presentation.active && presentation.ready ? { width: 800, height: 450 } : null,
         presentedFPS: null,
         nativeVideoFPS: null,
         captionConflicts: presentation.conflicts,
@@ -75,6 +78,8 @@ let host: HTMLDivElement;
 
 beforeEach(() => {
   presentation.active = false;
+  presentation.ready = true;
+  presentation.phase = 'ready';
   presentation.conflicts = [];
   presentation.input.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -110,6 +115,7 @@ const renderStage = (
       | 'scene'
       | 'zoom'
       | 'backgroundImageUrl'
+      | 'backgroundPending'
       | 'drawing'
       | 'region'
       | 'comments'
@@ -134,6 +140,7 @@ const renderStage = (
         region={props.region}
         {...(props.comments ? { comments: props.comments } : {})}
         backgroundImageUrl={props.backgroundImageUrl}
+        backgroundPending={props.backgroundPending}
         {...(props.scene ? { scene: props.scene } : {})}
         {...(props.zoom ? { zoom: props.zoom } : {})}
         onRegion={vi.fn()}
@@ -712,11 +719,17 @@ it('places watermark after keys and before blackout at full scene resolution ind
 });
 
 it('keeps the native video node mounted while switching all scene pixels to managed presentation', () => {
-  const props = { scene: { background: disabled, camera: identity } };
+  const props = { scene: { background: disabled, camera: identity }, backgroundPending: true };
   const original = renderStage(props).video;
   expect(host.querySelector('[data-ui="blackout-proof"]')).not.toBeNull();
   presentation.active = true;
+  presentation.ready = false;
+  const waiting = renderStage(props).video;
+  expect(waiting).toBe(original);
+  expect(waiting.parentElement!.style.opacity).toBe('');
+  presentation.ready = true;
   const managed = renderStage(props).video;
+  expect(presentation.input.mock.lastCall?.[0].backgroundPending).toBe(true);
   expect(managed).toBe(original);
   expect(managed.parentElement!.style.opacity).toBe('0');
   expect(host.querySelector('[data-ui="blackout-proof"]')).toBeNull();
@@ -773,4 +786,23 @@ it('places native outer fade over the complete scene after blackout and disables
   presentation.active = true;
   renderStage({ outerFadePlan: result.plan });
   expect(host.querySelector('[data-ui="gallery.videoReview.outerFade"]')).toBeNull();
+});
+
+it('keeps replacement feedback quiet until prolonged pending and exposes actual failure immediately', () => {
+  vi.useFakeTimers();
+  try {
+    presentation.active = true;
+    presentation.phase = 'pending';
+    renderStage({});
+    expect(host.textContent).not.toContain('gallery.videoReview.previewLoading');
+    expect(host.textContent).not.toContain('gallery.videoReview.previewUpdating');
+    act(() => vi.advanceTimersByTime(500));
+    expect(host.textContent).toContain('gallery.videoReview.previewUpdating');
+    presentation.phase = 'failed';
+    renderStage({});
+    expect(host.textContent).toContain('gallery.videoReview.previewFailed');
+    expect(host.querySelector('button[title="gallery.videoReview.retry"]')).not.toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
 });

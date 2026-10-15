@@ -14,6 +14,12 @@ import {
 
 export type ReviewPreviewPresentationInput = PresentationInput;
 type Owner = ReturnType<typeof createManualPresentationOwner>;
+const inactiveStatus: ReviewPreviewPresentationStatus = {
+  phase: 'inactive',
+  actualRaster: null,
+  presentedFPS: null,
+  nativeVideoFPS: null,
+};
 
 /** Current stays hybrid; detailed pause retains one manual owner throughout a gesture. */
 export function isReviewPreviewManual(preferences: QuickPreviewPreferences, playing: boolean) {
@@ -29,12 +35,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const [pageVisible, setPageVisible] = useState(() => document.visibilityState !== 'hidden');
   const [comments, setComments] = useState<Record<string, { x: number; y: number }>>({});
   const [placement, setPlacement] = useState<QuickEditWebcamPlacement | null>(null);
-  const [status, setStatus] = useState<ReviewPreviewPresentationStatus>({
-    phase: 'inactive',
-    actualRaster: null,
-    presentedFPS: null,
-    nativeVideoFPS: null,
-  });
+  const [reported, setReported] = useState({ key: '', status: inactiveStatus });
   const [bounds, setBounds] = useState<Prepared['watermarkBounds'] | null>(null);
   const [camera, setCamera] = useState<PresentationCameraState>({
     phase: 'loading',
@@ -50,8 +51,12 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     !!input.scene.captions?.settings?.enabled ||
     !!input.cut?.edits.some((edit) => edit.kind === 'cut' && edit.transition?.type === 'dissolve');
   const active = manual && input.visible !== false && pageVisible;
+  const retained =
+    (manual || input.preferences.pausedQuality === 'detailed') &&
+    input.visible !== false &&
+    pageVisible;
   const lifetimeKey = JSON.stringify([
-    active,
+    retained,
     input.sourceIdentity,
     input.webcam?.settings.assetId,
     input.webcam?.editor.resourceAttempt,
@@ -59,6 +64,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const lifetime = useRef<ReturnType<typeof createPresentationSlot> | null>(null);
   if (lifetime.current?.key !== lifetimeKey) lifetime.current = createPresentationSlot(lifetimeKey);
   const owner = lifetime.current;
+  const status = reported.key === lifetimeKey ? reported.status : inactiveStatus;
   const cut = useReviewCutTransitionProvider(active ? input.cut : undefined, true, owner.admit);
   const latest = useRef({ input, cut, placement });
   latest.current = { input, cut, placement };
@@ -80,46 +86,30 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     return () => document.removeEventListener('visibilitychange', change);
   }, []);
   useLayoutEffect(() => {
-    if (!active) {
-      setStatus({
-        phase: 'inactive',
-        actualRaster: null,
-        presentedFPS: null,
-        nativeVideoFPS: null,
-      });
-      setBounds(null);
-      latest.current.input.onStatistics?.({
-        phase: 'inactive',
-        actualRaster: null,
-        presentedFPS: null,
-        nativeVideoFPS: null,
-      });
-      return;
-    }
     setCamera({ phase: 'loading', duration: 0, ready: false });
-    const value = createManualPresentationOwner(
-      () => latest.current,
-      (value) => {
-        setStatus(value);
-        latest.current.input.onStatistics?.(value);
-      },
-      setBounds,
-      setCamera
-    );
-    owner.current = value;
+    setBounds(null);
+    setReported({ key: owner.key, status: inactiveStatus });
+    latest.current.input.onStatistics?.(inactiveStatus);
     return () => {
+      owner.current?.dispose();
       owner.current = null;
-      value.dispose();
     };
-  }, [active, owner]);
-  const reportNative = useCallback((value: ReviewPreviewPresentationStatus) => {
-    setStatus(value);
-    latest.current.input.onStatistics?.(value);
-  }, []);
+  }, [owner]);
+  const reportNative = useCallback(
+    (value: ReviewPreviewPresentationStatus) => {
+      setReported({ key: owner.key, status: value });
+      latest.current.input.onStatistics?.(value);
+    },
+    [owner]
+  );
   useNativePreviewCadence(
     input.video,
     input.sourceIdentity,
-    !manual && pageVisible && input.preferences.showFrameRate,
+    !manual &&
+      input.visible !== false &&
+      pageVisible &&
+      input.playing &&
+      input.preferences.showFrameRate,
     reportNative
   );
   const stable = useRef<ReturnType<typeof resolvePresentationDescription> | null>(null);
@@ -133,7 +123,18 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const key = stable.current.key;
   useLayoutEffect(() => {
     const current = stable.current!;
-    owner.current?.update(current.description, current.generation, !!interacting);
+    if (active && !owner.current) {
+      owner.current = createManualPresentationOwner(
+        () => latest.current,
+        (value) => {
+          setReported({ key: owner.key, status: value });
+          latest.current.input.onStatistics?.(value);
+        },
+        setBounds,
+        setCamera
+      );
+    }
+    owner.current?.update(current.description, current.generation, !!interacting, active);
   }, [active, owner, key, interacting]);
   useEffect(() => {
     owner.current?.ready();
@@ -182,9 +183,22 @@ function useNativePreviewCadence(
   useEffect(() => {
     const node = video.current;
     if (!enabled || !node?.requestVideoFrameCallback) return;
+    let disposed = false;
     let callback = 0;
     let start: { time: number; frames: number } | null = null;
+    const reset = () => {
+      start = null;
+      report(inactiveStatus);
+    };
+    reset();
+    node.addEventListener('seeking', reset);
     const observe: VideoFrameRequestCallback = (_now, metadata) => {
+      if (disposed) return;
+      if (node.seeking) {
+        reset();
+        callback = node.requestVideoFrameCallback(observe);
+        return;
+      }
       if (!start) start = { time: metadata.expectedDisplayTime, frames: metadata.presentedFrames };
       const elapsed = metadata.expectedDisplayTime - start.time;
       if (elapsed >= 500) {
@@ -201,6 +215,11 @@ function useNativePreviewCadence(
       callback = node.requestVideoFrameCallback(observe);
     };
     callback = node.requestVideoFrameCallback(observe);
-    return () => node.cancelVideoFrameCallback(callback);
+    return () => {
+      disposed = true;
+      node.cancelVideoFrameCallback(callback);
+      node.removeEventListener('seeking', reset);
+      report(inactiveStatus);
+    };
   }, [enabled, video, sourceIdentity, report]);
 }

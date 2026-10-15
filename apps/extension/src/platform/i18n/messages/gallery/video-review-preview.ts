@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewPreviewMessages = defineMessageSource({
+  previewUpdating: { ru: 'Обновление превью', en: 'Updating preview' },
   previewLoading: { ru: 'Подготовка превью', en: 'Preparing preview' },
   previewFailed: { ru: 'Не удалось отобразить превью', en: 'Could not render preview' },
   previewNativeFrameRate: { ru: 'Частота кадров видео', en: 'Video frame rate' },

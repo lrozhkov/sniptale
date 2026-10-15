@@ -23,7 +23,9 @@ async function observePublications(page: Page) {
     const samples: Array<{ now: number; width: number; height: number; pixels: number[] }> = [];
     let started = performance.now();
     let overflow = false;
+    let emptySurfaces = 0;
     const observer = new MutationObserver((records) => {
+      if (!(host.firstElementChild instanceof HTMLCanvasElement)) emptySurfaces++;
       if (
         !records.some((record) =>
           [...record.addedNodes].some((node) => node instanceof HTMLCanvasElement)
@@ -51,10 +53,11 @@ async function observePublications(page: Page) {
     return {
       start() {
         samples.length = 0;
+        emptySurfaces = 0;
         started = performance.now();
       },
       read() {
-        return { started, samples, overflow };
+        return { started, samples, overflow, emptySurfaces };
       },
       stop() {
         observer.disconnect();
@@ -248,6 +251,7 @@ for (let repetition = 1; repetition <= 3; repetition++) {
         expect(first).toBeDefined();
         expect(refined).toBeDefined();
         expect(trace.overflow).toBe(false);
+        expect(trace.emptySurfaces).toBe(0);
         expect(await ui.video.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeCloseTo(
           target,
           4

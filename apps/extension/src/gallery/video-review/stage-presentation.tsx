@@ -19,6 +19,7 @@ type PresentationProps = {
   captions?: PreviewInput['scene']['captions'];
   annotationEffects?: PreviewInput['scene']['annotationEffects'];
   readAsset?: PreviewInput['readAsset'];
+  backgroundPending?: boolean | undefined;
   onCaptionSelect?: ((id: string) => void) | undefined;
   video: PreviewInput['video'];
   url: string;
@@ -127,6 +128,7 @@ export function useStagePresentation(
     sourceIdentity: props.url,
     ...(props.readAsset ? { readAsset: props.readAsset } : {}),
     sourceFrameRate: props.preview?.sourceFrameRate,
+    backgroundPending: props.backgroundPending,
     scene: stagePresentationScene(props),
     canonical: watermarkOutput,
     css: size,
@@ -176,6 +178,15 @@ export function ReviewStagePresentationFeedback({
   onCaptionSelect?: PresentationProps['onCaptionSelect'];
 }) {
   const manual = presentation.active;
+  const replacing =
+    manual && presentation.status.phase === 'pending' && presentation.status.actualRaster !== null;
+  const [slowReplacement, setSlowReplacement] = useState(false);
+  useEffect(() => {
+    setSlowReplacement(false);
+    if (!replacing) return;
+    const timer = setTimeout(() => setSlowReplacement(true), 500);
+    return () => clearTimeout(timer);
+  }, [replacing]);
   return (
     <>
       {manual &&
@@ -218,7 +229,7 @@ export function ReviewStagePresentationFeedback({
               })}
           </div>
         )}
-      {manual && presentation.status.phase !== 'ready' ? (
+      {manual && presentation.status.phase !== 'ready' && (!replacing || slowReplacement) ? (
         <div
           role={presentation.status.phase === 'failed' ? 'alert' : 'status'}
           className={[
@@ -230,7 +241,9 @@ export function ReviewStagePresentationFeedback({
             {translate(
               presentation.status.phase === 'failed'
                 ? 'gallery.videoReview.previewFailed'
-                : 'gallery.videoReview.previewLoading'
+                : replacing
+                  ? 'gallery.videoReview.previewUpdating'
+                  : 'gallery.videoReview.previewLoading'
             )}
           </span>
           {presentation.status.phase === 'failed' ? (
