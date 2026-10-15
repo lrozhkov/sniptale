@@ -568,6 +568,7 @@ function ReviewZoomRegionBlock(
     <div
       role="button"
       data-cut-suppressed={cutOverlap ? 'true' : 'false'}
+      data-review-removal-key={`focus:${region.id}`}
       tabIndex={0}
       aria-label={label}
       title={`${label}${region.spotlight || region.border ? '' : ` · ${scaleLabel}`}`}

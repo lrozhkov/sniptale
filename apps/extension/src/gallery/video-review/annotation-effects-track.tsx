@@ -374,6 +374,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               aria-pressed={props.selectedId === instance.id}
               aria-disabled={props.busy}
               data-annotation-effect-id={instance.id}
+              data-review-removal-key={`annotation:${instance.id}`}
               data-annotation-effect-row={rows.get(instance.id)}
               data-enabled={instance.enabled}
               title={`${name} ${interval}`}

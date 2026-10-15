@@ -314,10 +314,10 @@
       "file": "apps/extension/src/gallery/video-review/annotation-effects-track.tsx",
       "symbol": "ReviewAnnotationEffectsTrack",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "ed90f9d0c98e8e88cc4f643a92dcd7662af7267b4601e8e5d9342da0b6134781",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any independent gesture receiver, writer, recovery policy or lifecycle authority. Remove when analysis models this cohesive plate interaction.",
+      "astHash": "f80e3b4c2669fdeccacb5e2c49302ee08202b8c267f9d2a071d00b9a8479fd99",
       "signatureHash": "fdc66e6782295ab2c2d3ce1464a54f9fe32bc714d5d4d20100f0fc95e3f7d488",
-      "reason": "tool-noise: One drag receiver owns capture, deferred admission, preview, completion and cancellation. Lock checks preserve selection and return before gesture creation. Nested plate callbacks use that same receiver and injected commands. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: The removal identity attribute changes only plate markup. The existing plate interaction keeps its gesture admission, preview, commit and cancellation owners. Animation and cleanup belong to observeReviewRemovalMotion in the timeline pane. Read-only removal_motion_diagnosis confirmed no added state, writer, effect or recovery authority in this body. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -325,10 +325,10 @@
       "file": "apps/extension/src/gallery/video-review/annotation-effects-track.tsx",
       "symbol": "ReviewAnnotationEffectsTrack.props.instances.map callback",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "6f582448b9397489a3ac256bce93d4f5b84aeac57cb803054c181ccc91486f66",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any independent gesture receiver, writer, recovery policy or lifecycle authority. Remove when analysis models this cohesive plate interaction.",
+      "astHash": "92ba458ef7fcfe5a34ec3f6bb3f9f6dd904d573f724fa82ba097e34ec7d1f1c2",
       "signatureHash": "d8427a2f080e07cab8e2e1b9281c95636919bebb648e95170ef07bda38814baf",
-      "reason": "tool-noise: One drag receiver owns capture, deferred admission, preview, completion and cancellation. Lock checks preserve selection and return before gesture creation. Nested plate callbacks use that same receiver and injected commands. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: The removal identity attribute changes only plate markup. The existing plate interaction keeps its gesture admission, preview, commit and cancellation owners. Animation and cleanup belong to observeReviewRemovalMotion in the timeline pane. Read-only removal_motion_diagnosis confirmed no added state, writer, effect or recovery authority in this body. Final complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-15"
     },
     {
@@ -781,6 +781,17 @@
       "reviewDate": "2026-10-15",
       "reason": "tool-noise: The existing editor/timeline binding forwards only navigationRevision from the playback owner. Score 5 has no increase. This change adds no branch, state authority, gesture, resource or persistence owner. Extracting another JSX adapter would only forward the same transport values. Main inspected the exact diff. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, gesture, persistence writer, resource or recovery lifetime. Remove when the analyzer models this cohesive UI binding. Fresh independent architecture review must validate this classification."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/zoom-track.tsx",
+      "symbol": "ReviewZoomRegionBlock",
+      "owner": "extension:gallery:video-review",
+      "astHash": "94f44a77ca30535d5f0fd4bbe255fd6d168250e894425a17801e61c0b47e9bd5",
+      "signatureHash": "e191e2b6ea387f287758559b067b9d5389c757a450e72c5f8b8984702629d44e",
+      "reviewDate": "2026-10-15",
+      "reason": "tool-noise: The removal identity attribute changes only plate markup. The existing plate interaction keeps its gesture admission, preview, commit and cancellation owners. Animation and cleanup belong to observeReviewRemovalMotion in the timeline pane. Read-only removal_motion_diagnosis confirmed no added state, writer, effect or recovery authority in this body. Final complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when the exact body or signature changes. Reassess any independent gesture receiver, writer, recovery policy or lifecycle authority. Remove when analysis models this cohesive plate interaction."
     }
   ]
 }

@@ -93,6 +93,7 @@ export function ReviewTextTrack(props: TextTrackProps) {
               aria-pressed={props.selectedId === fragment.id}
               aria-disabled={props.busy}
               data-text-id={fragment.id}
+              data-review-removal-key={`text:${fragment.id}`}
               data-dragging={gesture.draggingId === fragment.id ? 'true' : undefined}
               className={[
                 'absolute min-w-px touch-none select-none overflow-hidden rounded border px-3 text-left text-[11px]',

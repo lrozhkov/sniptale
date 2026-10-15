@@ -127,6 +127,7 @@ function ReviewEditBlock(
   return (
     <div
       data-ui="gallery.videoReview.editBlock"
+      data-review-removal-key={`edit:${edit.id}`}
       data-cut-suppressed={covered.length ? 'true' : 'false'}
       title={caption}
       className={`absolute rounded border text-xs ${position} ${reviewTimelineItemTone(selected, edit.kind)}`}

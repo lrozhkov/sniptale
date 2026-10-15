@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { observeReviewRemovalMotion } from './timeline-removal-motion';
 
 type Row = { body: HTMLDivElement; header: HTMLDivElement; ruler: boolean };
 type Registry = { register(row: Row): () => void };
@@ -39,6 +40,10 @@ export function ReviewTimelinePanes(props: {
   const rows = useRef(new Set<Row>());
   const refresh = useRef(() => {});
   const mirrored = useRef({ labels: null as number | null, time: null as number | null });
+  useLayoutEffect(() => {
+    const viewport = props.viewport.current;
+    if (viewport) return observeReviewRemovalMotion(viewport);
+  }, [props.viewport]);
   const sync = useCallback(
     (source: 'labels' | 'time') => {
       const left = labels.current;

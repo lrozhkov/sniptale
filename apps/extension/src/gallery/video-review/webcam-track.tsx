@@ -197,6 +197,7 @@ function ReviewWebcamTrackMarkers({
           type="button"
           key={range.id}
           title={translate('gallery.videoReview.webcamHidden')}
+          data-review-removal-key={`webcam-hidden:${range.id}`}
           aria-label={`${translate('gallery.videoReview.webcamHidden')} ${range.start}–${range.end}`}
           className={
             'absolute inset-y-0.5 z-20 flex items-center justify-center overflow-hidden ' +

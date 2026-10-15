@@ -240,6 +240,7 @@ function ReviewOriginalGainBlock(props: {
       title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
       data-ui="gallery.videoReview.originalAudioRange"
       data-audio-id={range.id}
+      data-review-removal-key={`original-audio:${range.id}`}
       className={`absolute z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
         rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
       style={{

@@ -323,6 +323,7 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
     <div
       role="button"
       data-audio-id={clip.id}
+      data-review-removal-key={`audio:${clip.id}`}
       tabIndex={0}
       aria-label={accessibleLabel}
       data-cut-suppressed={props.cutSuppressed ? 'true' : 'false'}
