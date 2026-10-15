@@ -213,3 +213,16 @@ it('holds each playback page until the edge and advances by most of a viewport',
   }
   expect(props.onSeek).not.toHaveBeenCalled();
 });
+
+it('keeps paging when a paused zoom scroll arrives after Play', () => {
+  const { host, props } = renderTimeline({ duration: 10, time: 5 });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  changeZoom(host, '50');
+  const left = viewport.scrollLeft;
+  renderTimeline({ ...props, playing: true });
+  act(() => viewport.dispatchEvent(new Event('scroll')));
+  renderTimeline({ ...props, playing: true, time: 8 });
+  expect(viewport.scrollLeft).toBeGreaterThan(left);
+});
