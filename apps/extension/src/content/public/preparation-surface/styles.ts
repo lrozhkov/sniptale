@@ -1,3 +1,4 @@
+import inspectorSurfaceStyles from '../../../ui/compact-inspector-controls/inspector-surface.css?inline';
 import baseStyles from '@sniptale/ui/styles?inline';
 import aiModalStyles from '@sniptale/ui/styles/ai-modal?inline';
 import glassStyles from '@sniptale/ui/styles/glass?inline';
@@ -14,10 +15,18 @@ import frameAnnotationInteractionStyles from '../../../features/highlighter/fram
 import frameAnnotationCalloutFontStyles from '../../../features/highlighter/frame-annotation/callout/font.css?inline';
 import contentHostStyles from './host.css?inline';
 
+export { installContentInterfaceFonts } from './interface-fonts';
+
 const CONTENT_ENTRYPOINT_FONT_URL_PATTERNS = [
   /url\((['"]?)\/node_modules\/@fontsource-variable\/manrope\/files\/(manrope-[\w-]+\.woff2)\1\)/g,
   /url\((['"]?)@fontsource-variable\/manrope\/files\/(manrope-[\w-]+\.woff2)\1\)/g,
   /url\((['"]?)\.\/(manrope-[\w-]+\.woff2)\1\)/g,
+] as const;
+
+const CONTENT_ENTRYPOINT_INTERFACE_FONT_URL_PATTERNS = [
+  /url\((['"]?)\/node_modules\/@fontsource-variable\/inter\/files\/(inter-[\w-]+\.woff2)\1\)/g,
+  /url\((['"]?)@fontsource-variable\/inter\/files\/(inter-[\w-]+\.woff2)\1\)/g,
+  /url\((['"]?)\.\/(inter-[\w-]+\.woff2)\1\)/g,
 ] as const;
 
 const CONTENT_ENTRYPOINT_CALLOUT_FONT_URL_PATTERNS = [
@@ -277,6 +286,14 @@ function resolveRuntimeAssetUrl(resourcePath: string): string | null {
 }
 
 export function resolveContentEntrypointStyleUrls(styles: string): string {
+  const withInterfaceUrls = CONTENT_ENTRYPOINT_INTERFACE_FONT_URL_PATTERNS.reduce(
+    (resolvedStyles, pattern) =>
+      resolvedStyles.replace(pattern, (match, _quote: string, fileName: string) => {
+        const url = resolveRuntimeAssetUrl(`assets/${fileName}`);
+        return url ? `url("${url}")` : match;
+      }),
+    styles
+  );
   const withManropeUrls = CONTENT_ENTRYPOINT_FONT_URL_PATTERNS.reduce(
     (resolvedStyles, pattern, index) => {
       return resolvedStyles.replace(pattern, (_match, _quote: string, fileName: string) => {
@@ -289,7 +306,7 @@ export function resolveContentEntrypointStyleUrls(styles: string): string {
         return runtimeUrl ? `url("${runtimeUrl}")` : _match;
       });
     },
-    styles
+    withInterfaceUrls
   );
   return CONTENT_ENTRYPOINT_CALLOUT_FONT_URL_PATTERNS.reduce((resolvedStyles, pattern) => {
     return resolvedStyles.replace(pattern, (_match, _quote: string, fileName: string) => {
@@ -304,6 +321,7 @@ export function createContentEntrypointStyles(): string {
     resolveContentEntrypointStyleUrls(
       [
         contentHostStyles,
+        inspectorSurfaceStyles,
         baseStyles,
         aiModalStyles,
         glassStyles,

@@ -71,7 +71,7 @@ export function PageStyleCommentField(props: {
       <div
         data-focus-modality={focusModality}
         className={[
-          'overflow-visible rounded-[9px] border bg-[var(--sniptale-color-surface-input)]',
+          'overflow-visible rounded-[4px] border bg-[var(--sniptale-color-surface-input)]',
           'border-[color:var(--sniptale-color-border-strong)]',
           COMMENT_FOCUS_CLASS_NAMES[focusModality],
         ].join(' ')}
@@ -80,7 +80,8 @@ export function PageStyleCommentField(props: {
           ref={textareaRef}
           aria-describedby={describedBy}
           className={[
-            'block min-h-14 max-h-40 w-full resize-none overflow-y-hidden rounded-t-[8px]',
+            'sniptale-design-review-authored-text block min-h-14 max-h-40 w-full',
+            'resize-none overflow-y-hidden rounded-t-[4px]',
             'border-0 bg-transparent px-3 pb-2 pt-3 text-xs leading-5',
             'text-[var(--sniptale-color-text-primary)] outline-none',
             'placeholder:text-[var(--sniptale-color-text-secondary)]',
@@ -144,7 +145,7 @@ export function PageStyleCommentField(props: {
       </p>
       {props.state.commitFailed ? (
         <p
-          className="text-[10px] leading-4 text-[var(--sniptale-color-danger)]"
+          className="text-xs leading-4 text-[var(--sniptale-color-danger)]"
           id={errorId}
           role="alert"
         >
@@ -153,7 +154,7 @@ export function PageStyleCommentField(props: {
       ) : null}
       {hasVoiceError ? (
         <p
-          className="text-[10px] leading-4 text-[var(--sniptale-color-danger)]"
+          className="text-xs leading-4 text-[var(--sniptale-color-danger)]"
           id={voiceErrorId}
           role="alert"
         >

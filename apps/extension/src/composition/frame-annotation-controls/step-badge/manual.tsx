@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import type {
   StepBadgeAnchor,
   StepBadgePreset,
@@ -57,6 +58,7 @@ type StepBadgeManualSettingsProps = {
 };
 
 export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
+  const inspector = useInspectorLayout();
   const selectedAnchor = props.settings.anchor ?? 'top-left';
   const selectedOffsets = props.settings.offsetDirections ?? [];
   const sections = [
@@ -75,7 +77,7 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
   const renderSection = (section: ManualSection) => {
     if (section === 'numbering') {
       return (
-        <div className="grid gap-3">
+        <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
           <StepBadgeAutoSection {...props} embedded settings={props.settings} />
           {!props.isAuto ? (
             <StepBadgeValueSection

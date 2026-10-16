@@ -27,6 +27,7 @@ export function ToolbarDesignReviewControls(props: {
   return (
     <ContentToolbarGroup dataUi="content.toolbar.design-review-controls" utilities>
       <ContentToolbarButton
+        tone="property"
         active={props.panelOpen}
         aria-pressed={props.panelOpen}
         dataUi="content.toolbar.design-review-panel-button"
@@ -43,6 +44,7 @@ export function ToolbarDesignReviewControls(props: {
         <FeedbackCollectionIcon size={20} strokeWidth={2} />
       </ContentToolbarButton>
       <ContentToolbarButton
+        data-content-tool="true"
         active={mode.measurementsEnabled}
         aria-pressed={mode.measurementsEnabled}
         disabled={!mode.enabled}
@@ -60,6 +62,7 @@ export function ToolbarDesignReviewControls(props: {
         <Ruler size={20} strokeWidth={2} />
       </ContentToolbarButton>
       <ContentToolbarButton
+        data-content-tool="true"
         active={mode.measurementsExpanded}
         aria-pressed={mode.measurementsExpanded}
         disabled={!mode.enabled}

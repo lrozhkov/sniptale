@@ -62,7 +62,10 @@ function isEditableTarget(element: Element): boolean {
 }
 
 function resolveActivationMode(element: Element): ActivationBridgeMode {
-  return element.closest('[data-sniptale-activation-bridge="defer"]') ? 'defer' : 'immediate';
+  return element.matches('[data-command-press]') ||
+    element.closest('[data-sniptale-activation-bridge="defer"]')
+    ? 'defer'
+    : 'immediate';
 }
 
 export function resolveActivationTarget(event: Event, root: EventTarget): ActivationTarget | null {

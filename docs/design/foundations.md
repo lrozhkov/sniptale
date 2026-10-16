@@ -4,12 +4,12 @@
 
 ## Typography and hierarchy
 
-| Role | Family | Size / line height | Weight |
+| Role | Family role | Size / line height | Weight |
 | --- | --- | --- | --- |
-| Parameter name, value, command, option | Inter | 13px / 18px | 500 |
-| Caption, auxiliary metadata, secondary hint | Inter | 12px / 16px | 400 |
-| Explanatory prose and errors | Inter | 14px / 20px | 400 |
-| Structural group heading | Inter | 14px / 20px | 600 |
+| Parameter name, value, command, option | Interface | 13px / 18px | 500 |
+| Caption, auxiliary metadata, secondary hint | Interface | 12px / 16px | 400 |
+| Explanatory prose and errors | Interface | 14px / 20px | 400 |
+| Structural group heading | Interface | 14px / 20px | 600 |
 
 Inter is the current interface family, not a component requirement. Use the bundled interface font with Cyrillic, Latin, and numeric coverage. Keep its license with the asset. Names use secondary foreground. Values use primary foreground. Selection does not increase font weight. Use tabular digits where values change in place. Do not change typography between light and dark themes. Long names and values can wrap. Preserve complete dimensions and readable errors rather than hiding overflow.
 
@@ -19,9 +19,13 @@ Keep prose within 45–75 characters where practical. Control labels can use the
 
 `packages/ui/src/styles/design-tokens.css` owns family selection through CSS parameters. `--sniptale-font-interface` selects the migrated interface family, including portaled menus. Components use this role, not a literal family name. The existing `--sniptale-font-sans` retains the current family for pending surfaces. A migrated surface binds that existing parameter to the interface role. Remove this rollout distinction when the remaining consumers permit it.
 
-`packages/ui/src/styles/fonts.css` owns bundled face declarations, weights, and language subsets. The stable `Sniptale Interface` face alias currently maps to Inter assets. To replace this bundled family, update its face assets. Change the family parameter only when selecting another declared family or fallback stack. Keep size, line height, weight, and foreground roles separate from family selection. Recheck actual text fit after replacement, including Russian, English, narrow controls, and expanded text.
+`packages/ui/src/styles/fonts.css` owns bundled face declarations, weights, and language subsets. The stable `Sniptale Interface` face alias currently maps to Inter assets. To replace this bundled family, update its face assets. Change the family parameter only when selecting another registered family or fallback stack. Keep size, line height, weight, and foreground roles separate from family selection. Recheck actual text fit after replacement, including Russian, English, narrow controls, and expanded text.
+
+Content UI registers the stable interface alias explicitly. Replace its backing declarations to use another bundled face. Do not select an unregistered alias through the family parameter. New bundled files also require build asset and manifest inventory updates.
 
 `--sniptale-font-document-sans` selects the default family for authored sans-serif documents. Keep this role independent from the interface family. Standalone exported documents bind it to their bundled document faces.
+
+Check the loaded font in the runtime that shows the changed surface, including detached layers and embedded UI. A CSS family declaration or a successful asset request does not prove that the browser uses the face. Check registered faces and painted glyphs for Russian and English. Keep face descriptors with the bundled declarations. Reuse the runtime's font installation owner when the surface requires explicit registration. A load failure must preserve usable fallback text and existing interactions.
 
 Do not replace fonts inside authored canvas text, captions, or exports through an interface token change. These values belong to the document or renderer. The excluded popup retains its current font contract.
 

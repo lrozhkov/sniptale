@@ -1,8 +1,9 @@
+import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
+import { Field } from '../field-shell';
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from 'lucide-react';
 import { Bold, Italic, Strikethrough, Underline } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../../../platform/i18n';
-import { FieldResetButton } from '../field-shell';
 import type { DesignReviewActions, DesignReviewViewState } from '../../types';
 import { propertyDefaultValue, propertyModified, propertyValue } from '../../value-editing/values';
 import { hasTextDecorationLine, toggleTextDecorationLine } from './decoration';
@@ -15,23 +16,16 @@ function ToggleButton(props: {
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <ProductGlassBoldButton
+      active={props.active}
       aria-label={props.label}
       aria-pressed={props.active}
+      title={props.label}
       disabled={props.disabled}
-      data-active={props.active}
-      className={[
-        'inline-flex h-7 w-7 items-center justify-center rounded-[7px] border transition',
-        'border-[color:var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
-        'hover:bg-[var(--sniptale-color-surface-hover)] disabled:opacity-45',
-        'data-[active=true]:border-[color:var(--sniptale-color-accent)]',
-        'data-[active=true]:text-[var(--sniptale-color-accent)]',
-      ].join(' ')}
       onClick={props.onClick}
     >
       {props.children}
-    </button>
+    </ProductGlassBoldButton>
   );
 }
 
@@ -43,27 +37,13 @@ function IconButtonRow(props: {
   onReset: () => void;
 }) {
   return (
-    <div className="group/section-row grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-2">
-      <div className="flex min-h-5 items-center justify-between gap-2">
-        <span
-          className={[
-            'text-[11px] font-semibold',
-            props.modified
-              ? 'text-[var(--sniptale-color-accent)]'
-              : 'text-[var(--sniptale-color-text-secondary)]',
-          ].join(' ')}
-        >
-          {props.label}
-        </span>
-        <FieldResetButton
-          disabled={props.disabled}
-          label={props.label}
-          modified={props.modified}
-          onReset={props.onReset}
-        />
-      </div>
+    <Field
+      label={props.label}
+      modified={props.modified}
+      onReset={props.disabled ? undefined : props.onReset}
+    >
       <div className="flex flex-wrap gap-1">{props.children}</div>
-    </div>
+    </Field>
   );
 }
 

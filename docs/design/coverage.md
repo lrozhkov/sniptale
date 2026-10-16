@@ -77,6 +77,12 @@ Form owners retain validation, drafts, Save/Cancel and pending admission. Passwo
 
 Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-settings-design.spec.ts`. Existing settings, provider, permission, privacy, transfer and collection suites retain their separate behavioral role. A permission-gated native-app screen does not prove native-host integration.
 
+## On-page content integration
+
+Content toolbars, annotation settings, Design Review and AutoBlur adopt shared command and parameter presentation at their concrete surfaces. Owned portals retain theme and interface typography. The content bootstrap registers bundled interface faces from its trusted stylesheet. Authored page text, annotations and drawing previews retain their existing font owners.
+
+Native composition proof lives in `extension-critical-content-design.spec.ts` and `extension-critical-content-controls-design.spec.ts` under `tooling/test/e2e/extension-critical/`. These checks cover host isolation, actual browser zoom, constrained placement, drafts, Undo, nested layers and drawing preferences. Existing focus, drawing and snapshot export suites retain gesture and authored-content proof. Recording controls remain a separate migration area.
+
 ## Integration exclusions
 
 Preserve crop coordinates, media decoding/import, native file acquisition, recording lifecycle, device permissions, color/paint internals, persistence, and production Undo. Do not infer these engines from the bounded probes. A specimen can exercise local pending/error/recovery states without claiming native-engine parity. All ordinary reference requirements in this inventory have working examples.

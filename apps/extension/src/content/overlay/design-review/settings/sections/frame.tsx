@@ -12,7 +12,7 @@ type SectionProps = {
 
 export function BoxSection({ actions, disabled, state }: SectionProps) {
   return (
-    <div className="grid gap-2" data-ui="content.design-review.settings-layout">
+    <div className="grid gap-1" data-ui="content.design-review.settings-layout">
       <FrameSizeFields actions={actions} disabled={disabled} state={state} />
       <LinkedSideFields
         disabled={disabled}
@@ -38,7 +38,7 @@ export function BoxSection({ actions, disabled, state }: SectionProps) {
 
 function FrameSizeFields({ actions, disabled, state }: SectionProps) {
   return (
-    <div className="grid grid-cols-1 gap-y-2">
+    <div className="grid grid-cols-1 gap-y-1">
       <NumericField
         disabled={disabled}
         label={translate('content.designReview.width')}

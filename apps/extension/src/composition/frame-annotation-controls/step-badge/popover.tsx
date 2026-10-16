@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState } from 'react';
 
 import type {
@@ -48,6 +49,7 @@ export function FutureStepBadgeSettingsPopover(props: {
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
 }) {
+  const inspector = useInspectorLayout();
   const locale = useAppLocale();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [local, setLocal] = useState(props.settings);
@@ -109,6 +111,9 @@ export function FutureStepBadgeSettingsPopover(props: {
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
       className={[
+        inspector
+          ? 'sniptale-compact-workspace sniptale-inspector-surface sniptale-content-appearance-surface'
+          : '',
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
         'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',

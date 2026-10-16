@@ -136,7 +136,12 @@ function calculateCanonicalPopoverRect(params: {
   const bottomY = params.surfaceRect.y + params.surfaceRect.height + gap;
   const bottomAvailable = Math.max(0, params.viewport.height - viewportMargin - bottomY);
   const placeBelow = height <= bottomAvailable;
-  const y = placeBelow ? bottomY : params.surfaceRect.y - gap - height;
+  const preferredY = placeBelow ? bottomY : params.surfaceRect.y - gap - height;
+  const y = clamp(
+    preferredY,
+    viewportMargin,
+    Math.max(viewportMargin, params.viewport.height - height - viewportMargin)
+  );
   return { x, y, width, height };
 }
 
@@ -242,11 +247,102 @@ function calculateMainToolbarPopoverRect(params: {
     params.displayMode === 'vertical'
       ? [candidates.right, candidates.left, candidates.down, candidates.up]
       : [candidates.down, candidates.up, candidates.right, candidates.left];
-  return (
-    orderedCandidates.find((candidate) =>
-      isInsideViewport(candidate, params.viewport, viewportMargin)
-    ) ?? orderedCandidates[0]!
+  const fitting = orderedCandidates.find((candidate) =>
+    isInsideViewport(candidate, params.viewport, viewportMargin)
   );
+  if (fitting) return fitting;
+  const availableCandidates = orderedCandidates.map((candidate) => {
+    const availableHeight =
+      candidate === candidates.down
+        ? params.viewport.height - viewportMargin - downEdge
+        : candidate === candidates.up
+          ? upEdge - viewportMargin
+          : params.viewport.height - viewportMargin * 2;
+    const available = { ...candidate, height: Math.max(0, Math.min(height, availableHeight)) };
+    available.y =
+      candidate === candidates.up
+        ? upEdge - available.height
+        : candidate === candidates.down
+          ? downEdge
+          : clamp(
+              candidate.y,
+              viewportMargin,
+              params.viewport.height - available.height - viewportMargin
+            );
+    return available;
+  });
+  const usable = availableCandidates.filter(
+    (candidate) =>
+      isInsideViewport(candidate, params.viewport, viewportMargin) &&
+      !rectsOverlap(candidate, params.toolbarRect) &&
+      !rectsOverlap(candidate, params.anchorRect)
+  );
+  return usable.reduce(
+    (largest, candidate) => (candidate.height > largest.height ? candidate : largest),
+    usable[0] ?? availableCandidates[0]!
+  );
+}
+
+interface FramePopoverPlacementSession {
+  anchorEl: HTMLElement;
+  anchorRect: FloatingRect;
+  frameId: string;
+  preferSidePlacement: boolean;
+  resolvedRect?: FloatingRect;
+  surfaceRect: FloatingRect;
+  uiScale: number;
+}
+
+function resolveFramePopoverPlacement(params: {
+  session: FramePopoverPlacementSession;
+  anchorRect: FloatingRect;
+  alignQuickControlToAnchor: boolean;
+  avoidRect: FloatingRect | undefined;
+  mainToolbar: ReturnType<typeof getMainToolbar>;
+  size: { width: number; height: number };
+  viewport: { width: number; height: number };
+  uiScale: number;
+}) {
+  const {
+    session,
+    anchorRect,
+    alignQuickControlToAnchor,
+    avoidRect,
+    mainToolbar,
+    size,
+    viewport,
+    uiScale,
+  } = params;
+  const calculatedRect = mainToolbar
+    ? calculateMainToolbarPopoverRect({
+        anchorRect,
+        displayMode: mainToolbar.displayMode,
+        size,
+        toolbarRect: mainToolbar.rect,
+        viewport,
+        uiScale,
+      })
+    : calculateCanonicalPopoverRect({
+        alignQuickControlToAnchor,
+        anchorRect: session.anchorRect,
+        ...(avoidRect ? { avoidRect } : {}),
+        preferSidePlacement: session.preferSidePlacement,
+        surfaceRect: session.surfaceRect,
+        size,
+        viewport,
+        uiScale,
+      });
+  const previousRect = session.resolvedRect;
+  const previousSizedRect = previousRect
+    ? { ...previousRect, width: size.width, height: size.height }
+    : undefined;
+  const keepPreviousPosition =
+    !mainToolbar &&
+    session.preferSidePlacement &&
+    previousSizedRect !== undefined &&
+    isInsideViewport(previousSizedRect, viewport, VIEWPORT_MARGIN * uiScale) &&
+    (avoidRect === undefined || !rectsOverlap(previousSizedRect, avoidRect));
+  return keepPreviousPosition ? previousSizedRect : calculatedRect;
 }
 
 export function useFramePopoverPosition(params: {
@@ -260,15 +356,7 @@ export function useFramePopoverPosition(params: {
 }) {
   const [, refresh] = React.useReducer((value) => value + 1, 0);
   const uiScale = readContentUiScaleCompensation(params.anchorEl);
-  const placementSessionRef = React.useRef<{
-    anchorEl: HTMLElement;
-    anchorRect: FloatingRect;
-    frameId: string;
-    preferSidePlacement: boolean;
-    resolvedRect?: FloatingRect;
-    surfaceRect: FloatingRect;
-    uiScale: number;
-  } | null>(null);
+  const placementSessionRef = React.useRef<FramePopoverPlacementSession | null>(null);
   const placementSession = placementSessionRef.current;
 
   if (!params.isOpen) {
@@ -334,13 +422,20 @@ export function useFramePopoverPosition(params: {
   const activePlacementSession = placementSessionRef.current;
   if (!activePlacementSession) return getHiddenStyle();
   const popover = params.popoverRef.current;
+  const mainToolbar = getMainToolbar(params.anchorEl);
+  const body = mainToolbar
+    ? popover?.querySelector<HTMLElement>(':scope > .sniptale-content-popover-body')
+    : undefined;
+  const naturalHeight =
+    popover && body
+      ? Math.max(popover.offsetHeight, popover.offsetHeight - body.clientHeight + body.scrollHeight)
+      : (popover?.offsetHeight ?? 0);
   const layoutSize =
     popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
-      ? { width: popover.offsetWidth, height: popover.offsetHeight }
+      ? { width: popover.offsetWidth, height: naturalHeight }
       : params.fallbackSize;
   const size = { width: layoutSize.width * uiScale, height: layoutSize.height * uiScale };
   const viewport = { width: window.innerWidth, height: window.innerHeight };
-  const mainToolbar = getMainToolbar(params.anchorEl);
   const avoidRect = activePlacementSession.preferSidePlacement
     ? params.quickControlPlacement === 'anchor-aligned'
       ? undefined
@@ -348,34 +443,18 @@ export function useFramePopoverPosition(params: {
         ? params.frameRect
         : getCalloutAvoidanceRect(params.frameId)
     : undefined;
-  const calculatedRect = mainToolbar
-    ? calculateMainToolbarPopoverRect({
-        anchorRect: toRect(params.anchorEl.getBoundingClientRect()),
-        displayMode: mainToolbar.displayMode,
-        size,
-        toolbarRect: mainToolbar.rect,
-        viewport,
-        uiScale,
-      })
-    : calculateCanonicalPopoverRect({
-        alignQuickControlToAnchor: params.quickControlPlacement === 'anchor-aligned',
-        anchorRect: activePlacementSession.anchorRect,
-        ...(avoidRect ? { avoidRect } : {}),
-        preferSidePlacement: activePlacementSession.preferSidePlacement,
-        surfaceRect: activePlacementSession.surfaceRect,
-        size,
-        viewport,
-        uiScale,
-      });
-  const previousRect = activePlacementSession.resolvedRect;
-  const previousSizedRect = previousRect
-    ? { ...previousRect, width: size.width, height: size.height }
-    : undefined;
-  const keepPreviousPosition =
-    activePlacementSession.preferSidePlacement &&
-    previousSizedRect !== undefined &&
-    (avoidRect === undefined || !rectsOverlap(previousSizedRect, avoidRect));
-  const rect = keepPreviousPosition ? previousSizedRect : calculatedRect;
+  const rect = resolveFramePopoverPlacement({
+    session: activePlacementSession,
+    anchorRect: mainToolbar
+      ? toRect(params.anchorEl.getBoundingClientRect())
+      : activePlacementSession.anchorRect,
+    alignQuickControlToAnchor: params.quickControlPlacement === 'anchor-aligned',
+    avoidRect,
+    mainToolbar,
+    size,
+    viewport,
+    uiScale,
+  });
   activePlacementSession.resolvedRect = rect;
   return {
     position: 'fixed',
@@ -383,6 +462,9 @@ export function useFramePopoverPosition(params: {
     left: rect.x,
     maxWidth: 'calc(var(--sniptale-content-ui-viewport-width) - 16px)',
     maxHeight: 'none',
+    ...(mainToolbar && rect.height < size.height
+      ? { '--sniptale-main-toolbar-popover-max-height': `${rect.height / uiScale}px` }
+      : {}),
     overflow: 'visible',
     zIndex: 2147483647,
     pointerEvents: 'auto',

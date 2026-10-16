@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useLayoutEffect, useState } from 'react';
 import { Move, Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
 import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
@@ -249,6 +250,7 @@ function renderDisableScreenshotModeItem(props: {
 function ToolbarSettingsDropdownContent(
   props: ToolbarSettingsDropdownProps & { placement: 'up' | 'down' }
 ) {
+  const adopted = React.useContext(CommandPressScope);
   const placement = props.placement;
   const menuPlacement = resolveToolbarMenuPlacement(props.displayMode, placement);
   const menuProps = {
@@ -260,7 +262,7 @@ function ToolbarSettingsDropdownContent(
   };
 
   return (
-    <ProductToolbarMenu {...menuProps}>
+    <ProductToolbarMenu {...menuProps} className={adopted ? 'sniptale-content-menu-adopted' : ''}>
       {props.onFreePlacementChange ? (
         <ToolbarSettingsItem
           icon={<Move aria-hidden className="sniptale-popover-icon" />}

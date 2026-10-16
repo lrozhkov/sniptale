@@ -1,3 +1,5 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useAppLocale } from '../../../platform/i18n';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
@@ -53,58 +55,63 @@ function CalloutSettingsPopoverSurface(props: {
     onCreated: props.state.markTemplateCreated,
   });
   return (
-    <ContentPopoverAdapter
-      isOpen={isOpen}
-      anchorEl={props.request.anchorEl}
-      portalTarget={props.portalTarget}
-      popoverRef={props.popoverRef}
-      className={[
-        'sniptale-callout-settings-popover sniptale-glass-popover',
-        'sniptale-glass-popover--wide sniptale-content-popover--compact',
-        'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
-      ].join(' ')}
-      style={{ ...props.presentation.style, width: POPOVER_WIDTH }}
-      dataUi="content.callout-settings.popover"
-    >
-      <CalloutSettingsPopoverContent
-        {...(frameColors ? { frameColors } : {})}
-        handleDelete={props.handleDelete}
-        headerContext="element"
-        headerDrag={props.presentation.drag}
-        handleSettingChange={props.state.handleSettingChange}
-        localSettings={props.state.localSettings}
-        onApplyPreset={props.state.applyPreset}
-        onForkPreset={props.state.forkPreset}
-        onApplyToFuture={() =>
-          dispatchFutureFrameDefaultsChanged({
-            kind: 'callout',
-            settings: createDefaultCalloutSettings(
-              props.state.localSettings.style,
-              props.state.localSettings.sourcePresetId,
-              {
-                anchor: props.state.localSettings.placement.anchor,
-                connectorAttachments: props.state.localSettings.placement.connectorAttachments,
-                side: props.state.localSettings.placement.side,
-              },
-              { titleText: props.state.localSettings.content.titleText }
-            ),
-          })
-        }
-        onResetPreset={(preset) => {
-          void props.presets.editor.reset(preset).then((restored) => {
-            if (restored) props.state.applyPreset(restored);
-          });
-        }}
-        onShowPresets={props.presets.catalog.refresh}
-        onTogglePreset={(preset) => void props.presets.catalog.toggle(preset)}
-        pendingPresetIds={props.presets.catalog.pendingPresetIds}
-        presets={props.presets.catalog.visiblePresets}
-        presetError={props.presets.catalog.error}
-        saveSection={saveSection}
-        onClose={onClose}
-        onNestedLayerChange={props.onNestedLayerChange}
-      />
-    </ContentPopoverAdapter>
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <ContentPopoverAdapter
+          isOpen={isOpen}
+          anchorEl={props.request.anchorEl}
+          portalTarget={props.portalTarget}
+          popoverRef={props.popoverRef}
+          className={[
+            'sniptale-compact-workspace sniptale-inspector-surface sniptale-content-appearance-surface',
+            'sniptale-callout-settings-popover sniptale-glass-popover',
+            'sniptale-glass-popover--wide sniptale-content-popover--compact',
+            'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
+          ].join(' ')}
+          style={{ ...props.presentation.style, width: POPOVER_WIDTH }}
+          dataUi="content.callout-settings.popover"
+        >
+          <CalloutSettingsPopoverContent
+            {...(frameColors ? { frameColors } : {})}
+            handleDelete={props.handleDelete}
+            headerContext="element"
+            headerDrag={props.presentation.drag}
+            handleSettingChange={props.state.handleSettingChange}
+            localSettings={props.state.localSettings}
+            onApplyPreset={props.state.applyPreset}
+            onForkPreset={props.state.forkPreset}
+            onApplyToFuture={() =>
+              dispatchFutureFrameDefaultsChanged({
+                kind: 'callout',
+                settings: createDefaultCalloutSettings(
+                  props.state.localSettings.style,
+                  props.state.localSettings.sourcePresetId,
+                  {
+                    anchor: props.state.localSettings.placement.anchor,
+                    connectorAttachments: props.state.localSettings.placement.connectorAttachments,
+                    side: props.state.localSettings.placement.side,
+                  },
+                  { titleText: props.state.localSettings.content.titleText }
+                ),
+              })
+            }
+            onResetPreset={(preset) => {
+              void props.presets.editor.reset(preset).then((restored) => {
+                if (restored) props.state.applyPreset(restored);
+              });
+            }}
+            onShowPresets={props.presets.catalog.refresh}
+            onTogglePreset={(preset) => void props.presets.catalog.toggle(preset)}
+            pendingPresetIds={props.presets.catalog.pendingPresetIds}
+            presets={props.presets.catalog.visiblePresets}
+            presetError={props.presets.catalog.error}
+            saveSection={saveSection}
+            onClose={onClose}
+            onNestedLayerChange={props.onNestedLayerChange}
+          />
+        </ContentPopoverAdapter>
+      </InspectorLayout>
+    </CommandPressScope>
   );
 }
 

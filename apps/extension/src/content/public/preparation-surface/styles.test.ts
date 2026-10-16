@@ -184,3 +184,49 @@ it('registers locally scoped property focus styles in the content bundle', () =>
     "[data-ui='content.design-review.settings'][data-focus-modality='keyboard']"
   );
 });
+
+it('maps every Interface subset to the existing emitted asset from supported source forms', () => {
+  for (const subset of ['cyrillic', 'latin-ext', 'latin']) {
+    const file = `inter-${subset}-wght-normal.woff2`;
+    for (const prefix of [
+      '/node_modules/@fontsource-variable/inter/files/',
+      '@fontsource-variable/inter/files/',
+      './',
+    ]) {
+      expect(resolveContentEntrypointStyleUrls(`src: url("${prefix}${file}")`)).toBe(
+        `src: url("chrome-extension://sniptale/assets/${file}")`
+      );
+    }
+  }
+  expect(readFileSync(STYLES_SOURCE_PATH, 'utf8')).toContain(
+    'compact-inspector-controls/inspector-surface.css?inline'
+  );
+});
+
+it('keeps an unresolved Interface declaration when runtime URL resolution is unavailable', () => {
+  runtimeInfoGetUrlMock.mockImplementationOnce(() => {
+    throw new Error('runtime unavailable');
+  });
+  const source = 'url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")';
+  expect(resolveContentEntrypointStyleUrls(source)).toBe(source);
+});
+
+it('resolves existing Manrope assets independently of the stable Interface face alias', () => {
+  const file = 'manrope-latin-wght-normal.woff2';
+  for (const [prefix, target] of [
+    [
+      '/node_modules/@fontsource-variable/manrope/files/',
+      'node_modules/@fontsource-variable/manrope/files/',
+    ],
+    ['@fontsource-variable/manrope/files/', 'fonts/'],
+    ['./', 'fonts/'],
+  ]) {
+    const descriptors =
+      '@font-face {font-family:"Sniptale Interface";font-weight:200 800;' +
+      'font-style:normal;unicode-range:U+0000-00FF;src:';
+    const source = `${descriptors}url("${prefix}${file}") format("woff2-variations");}`;
+    expect(resolveContentEntrypointStyleUrls(source)).toBe(
+      `${descriptors}url("chrome-extension://sniptale/${target}${file}") format("woff2-variations");}`
+    );
+  }
+});

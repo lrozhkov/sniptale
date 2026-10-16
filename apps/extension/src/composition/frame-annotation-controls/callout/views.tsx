@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { CalloutAnchor, CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
 import { useState } from 'react';
 
@@ -84,11 +85,13 @@ export function CalloutPresetSection(props: {
                   onClick={() => props.onApplyPreset(preset)}
                   showActiveIndicator
                 >
-                  <CalloutPresetPreview
-                    compact
-                    placement={preset.placement}
-                    style={resolveCalloutColorBindings(preset.style, props.frameColors ?? {})}
-                  />
+                  <span className="sniptale-content-annotation-preview">
+                    <CalloutPresetPreview
+                      compact
+                      placement={preset.placement}
+                      style={resolveCalloutColorBindings(preset.style, props.frameColors ?? {})}
+                    />
+                  </span>
                   <ProductGlassPresetMeta>
                     <AnnotationTemplatePresetMetaLine
                       name={<PresetNameWithOverflowHint name={displayName} />}
@@ -97,7 +100,9 @@ export function CalloutPresetSection(props: {
                   </ProductGlassPresetMeta>
                 </ProductGlassPresetItem>
                 <span className="sniptale-callout-preset-actions">
-                  <button
+                  <ProductActionButton
+                    compact
+                    tone="secondary"
                     aria-label={translate('content.templateFork.fork')}
                     className="sniptale-callout-preset-action"
                     data-template-fork-source={preset.id}
@@ -107,11 +112,13 @@ export function CalloutPresetSection(props: {
                     type="button"
                   >
                     <CopyPlus size={15} />
-                  </button>
+                  </ProductActionButton>
                   {preset.origin === 'system' &&
                   preset.customized === true &&
                   props.onResetPreset ? (
-                    <button
+                    <ProductActionButton
+                      compact
+                      tone="secondary"
                       aria-label={translate('highlighter.calloutPresets.reset')}
                       className="sniptale-callout-preset-action"
                       disabled={pending}
@@ -120,9 +127,11 @@ export function CalloutPresetSection(props: {
                       type="button"
                     >
                       <RotateCcw size={15} />
-                    </button>
+                    </ProductActionButton>
                   ) : null}
-                  <button
+                  <ProductActionButton
+                    compact
+                    tone="secondary"
                     aria-label={translate(
                       disabled ? 'content.callout.showPreset' : 'content.callout.hidePreset'
                     )}
@@ -135,7 +144,7 @@ export function CalloutPresetSection(props: {
                     type="button"
                   >
                     {disabled ? <Eye size={15} /> : <EyeOff size={15} />}
-                  </button>
+                  </ProductActionButton>
                 </span>
               </div>
             );

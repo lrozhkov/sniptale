@@ -26,7 +26,7 @@ export function ImageSection({ actions, disabled, state }: ImageSectionProps) {
   }
 
   return (
-    <div className="grid gap-2" data-ui="content.design-review.settings-image">
+    <div className="grid gap-1" data-ui="content.design-review.settings-image">
       <ImageFitFields actions={actions} disabled={disabled} state={state} />
     </div>
   );
@@ -34,7 +34,7 @@ export function ImageSection({ actions, disabled, state }: ImageSectionProps) {
 
 function ImageFitFields({ actions, disabled, state }: ImageSectionProps) {
   return (
-    <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2">
+    <div className="grid grid-cols-1 gap-x-2 gap-y-1">
       <SelectField
         disabled={disabled}
         label={translate('content.designReview.objectFit')}

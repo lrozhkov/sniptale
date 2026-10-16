@@ -115,3 +115,39 @@
   width: 18px;
   height: 18px;
 }
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'] {
+  gap: min(4px, var(--sniptale-toolbar-gap));
+  /* Viewport fitting measures this root during resize, so its geometry must settle immediately. */
+  transition: none;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-btn[data-command-press]
+  svg {
+  width: 16px;
+  height: 16px;
+}
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-btn.sniptale-full-page-chevron[data-command-press]
+  svg {
+  width: 12px;
+  height: 12px;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'] .sniptale-drag-handle {
+  width: 36px;
+  height: 24px;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-content-menu-adopted
+  .sniptale-toolbar-menu-item
+  > svg,
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-content-menu-adopted
+  .sniptale-toolbar-menu-item
+  > .sniptale-toolbar-mode-icon {
+  width: 16px;
+  height: 16px;
+}

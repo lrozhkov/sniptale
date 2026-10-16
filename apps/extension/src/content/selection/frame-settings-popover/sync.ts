@@ -1,3 +1,4 @@
+import { isComposedEventWithinElement } from '@sniptale/ui/dom-events';
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import {
@@ -37,6 +38,7 @@ function isFramePopoverInteraction(event: MouseEvent) {
 }
 
 export function useFrameSettingsPopoverOutsideClose(args: {
+  anchorEl?: HTMLElement | null;
   isOpen: boolean;
   onClose: () => void;
   popoverRef: RefObject<HTMLDivElement | null>;
@@ -44,7 +46,9 @@ export function useFrameSettingsPopoverOutsideClose(args: {
   usePopoverOutsideClose({
     ...args,
     shouldIgnoreOutsideEvent: (event) =>
-      isClickInsideAnyToolbar(event) || isFramePopoverInteraction(event),
+      isComposedEventWithinElement(event, args.anchorEl ?? null) ||
+      isClickInsideAnyToolbar(event) ||
+      isFramePopoverInteraction(event),
   });
 }
 

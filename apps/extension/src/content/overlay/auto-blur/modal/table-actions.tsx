@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { CheckSquare, ListCollapse, ListTree, Square } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 
@@ -8,10 +9,11 @@ export function AutoBlurTableActions(props: {
   toggleSelectAll: () => void;
 }) {
   return (
-    <div className="sniptale-ai-spoiler-actions">
-      <button
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <ProductActionButton
+        compact
+        tone="secondary"
         type="button"
-        className="sniptale-ctrl-btn"
         onClick={props.toggleExpandAll}
         title={
           props.isAnyExpanded
@@ -27,10 +29,11 @@ export function AutoBlurTableActions(props: {
         {props.isAnyExpanded
           ? translate('content.autoBlur.collapseAllButton')
           : translate('content.autoBlur.expandAllButton')}
-      </button>
-      <button
+      </ProductActionButton>
+      <ProductActionButton
+        compact
+        tone="secondary"
         type="button"
-        className={`sniptale-ctrl-btn${props.isAnySelected ? ' active' : ''}`}
         onClick={props.toggleSelectAll}
         title={
           props.isAnySelected
@@ -46,7 +49,7 @@ export function AutoBlurTableActions(props: {
         {props.isAnySelected
           ? translate('content.autoBlur.clearSelectionButton')
           : translate('content.autoBlur.selectAllButton')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

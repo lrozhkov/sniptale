@@ -1,3 +1,4 @@
+import { isComposedEventWithinElement } from '../dom-events';
 import { createContext, useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react';
 
 /** Enables the native command press cycle for a migrated surface and its portals. */
@@ -51,9 +52,10 @@ export function useCommandPress({
     const element = button.current;
     const document = element?.ownerDocument;
     const window = document?.defaultView;
+    const localRoot = element?.getRootNode();
     const onPointerUp = (event: PointerEvent) => {
       if (source.current !== 'pointer' || event.pointerId !== pointerId.current) return;
-      if (!(event.target instanceof Node) || !element?.contains(event.target)) {
+      if (!isComposedEventWithinElement(event, element)) {
         canceledPointer.current = true;
       }
       release();
@@ -64,14 +66,25 @@ export function useCommandPress({
     const onVisibility = () => {
       if (document?.hidden) cancel();
     };
+    const onExternalEscape = (event: Event) => {
+      if ('key' in event && event.key === 'Escape' && !isComposedEventWithinElement(event, element))
+        cancel();
+    };
     document?.addEventListener('pointerup', onPointerUp, true);
     document?.addEventListener('pointercancel', onPointerCancel, true);
     document?.addEventListener('visibilitychange', onVisibility);
+    document?.addEventListener('keydown', onExternalEscape, true);
+    // Content editing bridges deliver local key events inside their ShadowRoot.
+    if (localRoot instanceof ShadowRoot)
+      localRoot.addEventListener('keydown', onExternalEscape, true);
     window?.addEventListener('blur', cancel);
     return () => {
       document?.removeEventListener('pointerup', onPointerUp, true);
       document?.removeEventListener('pointercancel', onPointerCancel, true);
       document?.removeEventListener('visibilitychange', onVisibility);
+      document?.removeEventListener('keydown', onExternalEscape, true);
+      if (localRoot instanceof ShadowRoot)
+        localRoot.removeEventListener('keydown', onExternalEscape, true);
       window?.removeEventListener('blur', cancel);
     };
   }, [held, enabled]);

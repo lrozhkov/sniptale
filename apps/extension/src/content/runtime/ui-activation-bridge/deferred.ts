@@ -1,3 +1,6 @@
+import { isTrustedPointerEvent } from '../../platform/trusted-events';
+import { getEventPath } from './targets';
+
 const DEFERRED_ACTIVATION_FALLBACK_MS = 1000;
 
 type DeferredActivationListeners = {
@@ -64,6 +67,10 @@ function activateDeferred(params: DeferredActivationParams, state: DeferredActiv
 }
 
 export function scheduleDeferredActivation(params: DeferredActivationParams): void {
+  if (params.target.matches('[data-command-press]')) {
+    scheduleCommandRelease(params);
+    return;
+  }
   const state: DeferredActivationState = {
     activated: false,
     cleanupListeners: () => {},
@@ -87,4 +94,79 @@ export function scheduleDeferredActivation(params: DeferredActivationParams): vo
     target: params.target,
   });
   state.fallbackTimer = window.setTimeout(activate, DEFERRED_ACTIVATION_FALLBACK_MS);
+}
+/** Marked commands retain native press/release ownership instead of the legacy hold fallback. */
+function scheduleCommandRelease(params: DeferredActivationParams): void {
+  let phase: 'held' | 'released' | 'finished' = 'held';
+  let releaseTimer: number | null = null;
+  let nativeClickReached = false;
+  const document = params.target.ownerDocument;
+  const window = document.defaultView;
+  if (!window) return;
+
+  const finish = () => {
+    phase = 'finished';
+    if (releaseTimer !== null) window.clearTimeout(releaseTimer);
+    for (const target of [params.root, window]) {
+      target.removeEventListener('pointerup', onPointerUp, true);
+      target.removeEventListener('pointercancel', onPointerCancel, true);
+      target.removeEventListener('lostpointercapture', onLostCapture, true);
+      target.removeEventListener('keydown', onKeyDown, true);
+    }
+    params.target.removeEventListener('click', onClick, true);
+    window.removeEventListener('blur', finish);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
+  const matchesPointer = (event: Event) =>
+    isTrustedPointerEvent(event) &&
+    'pointerId' in event &&
+    event.pointerId === params.event.pointerId;
+  const canActivate = () =>
+    params.target.isConnected &&
+    params.root.contains(params.target) &&
+    params.target.matches('[data-command-press]') &&
+    !params.target.matches(':disabled, [aria-disabled="true"]');
+  const activate = () => {
+    const accepted = phase === 'released' && !nativeClickReached && canActivate();
+    finish();
+    if (accepted) {
+      params.onActivate(params.target);
+      params.dispatchActivation(params.target, params.event);
+    }
+  };
+  const onPointerUp = (event: Event) => {
+    if (phase !== 'held' || !matchesPointer(event)) return;
+    if (!getEventPath(event).includes(params.target) || !canActivate()) {
+      finish();
+      return;
+    }
+    phase = 'released';
+    // A delivered native click wins before the host-cancelled-click fallback runs.
+    releaseTimer = window.setTimeout(activate, 0);
+  };
+  const onPointerCancel = (event: Event) => {
+    if (matchesPointer(event)) finish();
+  };
+  const onLostCapture = (event: Event) => {
+    if (phase === 'held' && matchesPointer(event)) finish();
+  };
+  const onKeyDown = (event: Event) => {
+    if ('key' in event && event.key === 'Escape') finish();
+  };
+  const onVisibility = () => {
+    if (document.hidden) finish();
+  };
+  const onClick = (event: Event) => {
+    if (!params.isBridgedEvent(event)) nativeClickReached = true;
+  };
+
+  for (const target of [params.root, window]) {
+    target.addEventListener('pointerup', onPointerUp, true);
+    target.addEventListener('pointercancel', onPointerCancel, true);
+    target.addEventListener('lostpointercapture', onLostCapture, true);
+    target.addEventListener('keydown', onKeyDown, true);
+  }
+  params.target.addEventListener('click', onClick, true);
+  window.addEventListener('blur', finish);
+  document.addEventListener('visibilitychange', onVisibility);
 }

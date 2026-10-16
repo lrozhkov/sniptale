@@ -1,3 +1,5 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   FrameAnnotationCreationControls,
@@ -109,70 +111,76 @@ export function FutureFrameStyleControls(props: {
 
   const creationSettings = toCreationSettings(style);
   return (
-    <FrameAnnotationCreationControls
-      activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
-      context="content"
-      frameActive={frameActive}
-      calloutTemplateSourceControl={{
-        onChange: (source) => setAnnotationTemplateSource('callout', source),
-        value: templateSources.callout,
-      }}
-      {...(props.futureFrameCalloutActions
-        ? { enableCallout: props.futureFrameCalloutActions.enable }
-        : {})}
-      {...(props.futureFrameStepBadgeActions
-        ? { enableStepBadge: props.futureFrameStepBadgeActions.enable }
-        : {})}
-      onChange={(next) => {
-        const previous = style;
-        const nextStyle = fromCreationSettings(next);
-        localForkRevisionRef.current += 1;
-        activeForkDraftsRef.current = selectAnnotationForkDrafts(nextStyle);
-        setStyle(nextStyle);
-        if (next.effectMode !== previous.effectMode) {
-          props.onFutureFrameEffectModeChange(next.effectMode);
-        }
-        if (next.borderSettings !== previous.borderSettings) {
-          setFrameSessionBorderPreset(next.borderSettings);
-        }
-        if (next.callout !== previous.futureCallout) {
-          props.futureFrameCalloutActions?.set(next.callout);
-        }
-        if (next.stepBadge !== previous.futureStepBadge) {
-          props.futureFrameStepBadgeActions?.set(next.stepBadge);
-        }
-      }}
-      onFrameActiveChange={(active) => {
-        setHighlighterCreationEnabled(active);
-        setFrameActive(active);
-      }}
-      onMenuChange={(menu) => props.toolbarMenuState.setActiveMenuType(toToolbarMenu(menu))}
-      portalTarget={resolveContentPortalTarget()}
-      stepBadgeTemplateSourceControl={{
-        onChange: (source) => setAnnotationTemplateSource('stepBadge', source),
-        value: templateSources.stepBadge,
-      }}
-      renderFramePopover={(popover) => (
-        <FrameSettingsPopover
-          anchorEl={popover.anchorEl}
-          blurSettings={popover.settings.blurSettings}
-          borderSettings={popover.settings.borderSettings}
-          compact={props.compactMenus ?? false}
-          effectMode={popover.settings.effectMode}
-          focusSettings={popover.settings.focusSettings}
-          frameId={FUTURE_FRAME_ID}
-          frameRect={EMPTY_FRAME_RECT}
-          isOpen={popover.isOpen}
-          onApplyToFrame={(patch) => popover.onChange({ ...popover.settings, ...patch })}
-          onClose={popover.onClose}
-          onEffectModeChange={(effectMode) => popover.onChange({ ...popover.settings, effectMode })}
-          scope="session"
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <FrameAnnotationCreationControls
+          activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
+          context="content"
+          frameActive={frameActive}
+          calloutTemplateSourceControl={{
+            onChange: (source) => setAnnotationTemplateSource('callout', source),
+            value: templateSources.callout,
+          }}
+          {...(props.futureFrameCalloutActions
+            ? { enableCallout: props.futureFrameCalloutActions.enable }
+            : {})}
+          {...(props.futureFrameStepBadgeActions
+            ? { enableStepBadge: props.futureFrameStepBadgeActions.enable }
+            : {})}
+          onChange={(next) => {
+            const previous = style;
+            const nextStyle = fromCreationSettings(next);
+            localForkRevisionRef.current += 1;
+            activeForkDraftsRef.current = selectAnnotationForkDrafts(nextStyle);
+            setStyle(nextStyle);
+            if (next.effectMode !== previous.effectMode) {
+              props.onFutureFrameEffectModeChange(next.effectMode);
+            }
+            if (next.borderSettings !== previous.borderSettings) {
+              setFrameSessionBorderPreset(next.borderSettings);
+            }
+            if (next.callout !== previous.futureCallout) {
+              props.futureFrameCalloutActions?.set(next.callout);
+            }
+            if (next.stepBadge !== previous.futureStepBadge) {
+              props.futureFrameStepBadgeActions?.set(next.stepBadge);
+            }
+          }}
+          onFrameActiveChange={(active) => {
+            setHighlighterCreationEnabled(active);
+            setFrameActive(active);
+          }}
+          onMenuChange={(menu) => props.toolbarMenuState.setActiveMenuType(toToolbarMenu(menu))}
+          portalTarget={resolveContentPortalTarget()}
+          stepBadgeTemplateSourceControl={{
+            onChange: (source) => setAnnotationTemplateSource('stepBadge', source),
+            value: templateSources.stepBadge,
+          }}
+          renderFramePopover={(popover) => (
+            <FrameSettingsPopover
+              anchorEl={popover.anchorEl}
+              blurSettings={popover.settings.blurSettings}
+              borderSettings={popover.settings.borderSettings}
+              compact={props.compactMenus ?? false}
+              effectMode={popover.settings.effectMode}
+              focusSettings={popover.settings.focusSettings}
+              frameId={FUTURE_FRAME_ID}
+              frameRect={EMPTY_FRAME_RECT}
+              isOpen={popover.isOpen}
+              onApplyToFrame={(patch) => popover.onChange({ ...popover.settings, ...patch })}
+              onClose={popover.onClose}
+              onEffectModeChange={(effectMode) =>
+                popover.onChange({ ...popover.settings, effectMode })
+              }
+              scope="session"
+            />
+          )}
+          settings={creationSettings}
+          showCallout={props.futureFrameCalloutActions !== undefined}
+          showStepBadge={props.futureFrameStepBadgeActions !== undefined}
         />
-      )}
-      settings={creationSettings}
-      showCallout={props.futureFrameCalloutActions !== undefined}
-      showStepBadge={props.futureFrameStepBadgeActions !== undefined}
-    />
+      </InspectorLayout>
+    </CommandPressScope>
   );
 }
 

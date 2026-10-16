@@ -7,7 +7,10 @@ import {
 } from '../../platform/dom-host';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getContentRuntimeServices } from '../../application/runtime-services/services';
-import { createContentEntrypointStyles } from '../../public/preparation-surface/styles';
+import {
+  createContentEntrypointStyles,
+  installContentInterfaceFonts,
+} from '../../public/preparation-surface/styles';
 import {
   createShadowHost,
   createShadowRootWithStyles,
@@ -114,6 +117,9 @@ export function initializeTopLevelContentEntry(): void {
     existingHost?.getAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE) === contentRuntimeMarkerVersion &&
     hasRegisteredContentRuntimeCleanup()
   ) {
+    if (existingHost.shadowRoot) {
+      void installContentInterfaceFonts(existingHost.shadowRoot).catch(() => undefined);
+    }
     return;
   }
 
@@ -133,6 +139,7 @@ export function initializeTopLevelContentEntry(): void {
   const { appContainer } = initializeContentUiRoots(shadow);
   const disposeContentUiActivationBridge = installContentUiActivationBridge(shadow);
   mountContentHost(host);
+  void installContentInterfaceFonts(shadow).catch(() => undefined);
   const disposeContentUiScaleCompensation = installContentUiScaleCompensation(host);
 
   const root = createRoot(appContainer);

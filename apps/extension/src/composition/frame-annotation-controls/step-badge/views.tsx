@@ -1,3 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { TextField, ToggleField } from '../../../ui/compact-inspector-controls';
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 
 import {
@@ -49,8 +52,11 @@ function StepBadgeReorderButton(props: {
   title: string;
   onReorder?: (direction: 'up' | 'down', frameId: string) => void;
 }) {
+  const inspector = useInspectorLayout();
+  const Button = inspector ? ProductActionButton : ProductGlassMiniButton;
   return (
-    <ProductGlassMiniButton
+    <Button
+      {...(inspector ? { compact: true, tone: 'secondary' as const } : {})}
       onClick={(event) => {
         event.stopPropagation();
         event.nativeEvent.stopImmediatePropagation();
@@ -60,7 +66,7 @@ function StepBadgeReorderButton(props: {
       onMouseDown={(event) => event.preventDefault()}
     >
       {props.label}
-    </ProductGlassMiniButton>
+    </Button>
   );
 }
 
@@ -72,18 +78,29 @@ export function StepBadgeAutoSection(props: {
   onAutoModeChange: (auto: boolean) => void;
   onTypeChange: (type: 'number' | 'letter') => void;
 }) {
+  const inspector = useInspectorLayout();
   const content = (
     <>
-      <ProductGlassToggleRow
-        title={translate('content.stepBadge.autoTitle')}
-        hint={translate('content.stepBadge.autoHint')}
-        control={
-          <ProductGlassSwitch
-            onClick={() => props.onAutoModeChange(!props.isAuto)}
-            on={props.isAuto}
+      {inspector ? (
+        <div title={translate('content.stepBadge.autoHint')}>
+          <ToggleField
+            label={translate('content.stepBadge.autoTitle')}
+            value={props.isAuto}
+            onChange={props.onAutoModeChange}
           />
-        }
-      />
+        </div>
+      ) : (
+        <ProductGlassToggleRow
+          title={translate('content.stepBadge.autoTitle')}
+          hint={translate('content.stepBadge.autoHint')}
+          control={
+            <ProductGlassSwitch
+              onClick={() => props.onAutoModeChange(!props.isAuto)}
+              on={props.isAuto}
+            />
+          }
+        />
+      )}
 
       {props.isAuto ? (
         <StepBadgeAutoFields
@@ -110,6 +127,7 @@ export function StepBadgeValueSection(props: {
   value: string;
   onReorder?: (direction: 'up' | 'down', frameId: string) => void;
 }) {
+  const inspector = useInspectorLayout();
   const valueControl = (
     <ProductGlassRow>
       {props.isAuto ? (
@@ -144,6 +162,47 @@ export function StepBadgeValueSection(props: {
       ) : null}
     </ProductGlassRow>
   );
+  if (inspector) {
+    const field = (
+      <TextField
+        label={translate('content.stepBadge.valueSection')}
+        type="text"
+        value={props.value}
+        disabled={props.isAuto}
+        maxLength={2}
+        placeholder={props.isAuto ? translate('content.stepBadge.autoPlaceholder') : ''}
+        onChange={(event) => props.onValueChange(event.target.value)}
+      />
+    );
+    const content = props.isAuto ? (
+      <div className="flex items-center gap-1">
+        <StepBadgeReorderButton
+          direction="up"
+          frameId={props.frameId}
+          label="-"
+          title={translate('content.stepBadge.moveUp')}
+          {...(props.onReorder ? { onReorder: props.onReorder } : {})}
+        />
+        <div className="min-w-0 flex-1">{field}</div>
+        <StepBadgeReorderButton
+          direction="down"
+          frameId={props.frameId}
+          label="+"
+          title={translate('content.stepBadge.moveDown')}
+          {...(props.onReorder ? { onReorder: props.onReorder } : {})}
+        />
+      </div>
+    ) : (
+      field
+    );
+    return props.embedded ? (
+      content
+    ) : (
+      <ContentPopoverSection dataUi="content.step-badge.value-section">
+        {content}
+      </ContentPopoverSection>
+    );
+  }
   if (props.embedded) {
     return (
       <PropertyField label={translate('content.stepBadge.valueSection')}>

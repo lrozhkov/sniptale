@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import React from 'react';
 import { toggleToolbarMenu } from '../menu/toggle';
@@ -13,20 +14,23 @@ export function ToolbarCaptureActionToggle(props: {
     props;
 
   return (
-    <button
+    <ContentToolbarButton
+      tone="property"
+      type="button"
       ref={buttonRef as React.Ref<HTMLButtonElement>}
       onClick={(event) => {
         event.stopPropagation();
         toggleToolbarMenu(showCaptureMenu, 'capture', closeMenus, setShowCaptureMenu);
       }}
-      className="sniptale-btn sniptale-toggle"
-      data-ui="content.toolbar.capture-action-button"
-      data-active="true"
-      data-menu-indicator="true"
+
+      dataUi="content.toolbar.capture-action-button"
+      menuIndicator
+      aria-haspopup="menu"
+      aria-expanded={showCaptureMenu}
       title={translate('content.toolbar.afterCaptureTitle')}
       data-menu-open={showCaptureMenu ? 'true' : 'false'}
     >
       {getCaptureActionIcon()}
-    </button>
+    </ContentToolbarButton>
   );
 }

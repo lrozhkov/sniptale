@@ -56,23 +56,30 @@ describe('shared drawing option controls', () => {
     expect(markup).toContain('20px');
     expect(markup.replace(/<[^>]*>/g, '')).toBe('');
   });
-  it('places text size and family before foreground and background colors', () => {
+  it.each([false, true])('preserves text previews and color order with scope=%s', (scoped) => {
     const markup = renderToStaticMarkup(
-      <DrawingTextOptions
-        backgroundColor={null}
-        color="#123456"
-        colors={['#123456']}
-        floatingBoundaryRef={{ current: null }}
-        floatingPlacement="auto"
-        fontSize={20}
-        fontFamily="sans"
-        vertical={false}
-        onBackgroundColorChange={vi.fn()}
-        onColorChange={vi.fn()}
-        onFontSizeChange={vi.fn()}
-        onFontFamilyChange={vi.fn()}
-      />
+      <CommandPressScope value={scoped}>
+        <DrawingTextOptions
+          backgroundColor={null}
+          color="#123456"
+          colors={['#123456']}
+          floatingBoundaryRef={{ current: null }}
+          floatingPlacement="auto"
+          fontSize={20}
+          fontFamily="sans"
+          vertical={false}
+          onBackgroundColorChange={vi.fn()}
+          onColorChange={vi.fn()}
+          onFontSizeChange={vi.fn()}
+          onFontFamilyChange={vi.fn()}
+        />
+      </CommandPressScope>
     );
+    expect(markup).toContain('font-family:');
+    expect(markup).toContain('>Aa</span>');
+    expect(markup).toContain('font-size:13px');
+    expect(markup).toContain('font-size:14px');
+    expect(markup).toContain('font-size:15.5px');
     const color = markup.indexOf('shared.ui.color-selector');
     expect(markup.lastIndexOf('content.toolbar.drawing-options.text.size-')).toBeLessThan(color);
     expect(markup.lastIndexOf('content.toolbar.drawing-options.text.font-')).toBeLessThan(color);

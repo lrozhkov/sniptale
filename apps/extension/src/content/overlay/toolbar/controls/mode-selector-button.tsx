@@ -13,6 +13,7 @@ export function ModeSelectorButton(props: {
 }) {
   return (
     <ContentToolbarButton
+      tone="property"
       ref={props.triggerRef}
       type="button"
       className="sniptale-mode-selector-btn"

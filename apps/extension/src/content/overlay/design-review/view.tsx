@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { useAppLocale } from '../../../platform/i18n';
 import { BrowserAnnotationMarkers } from '../annotation-markers/view';
 import { DesignReviewFeedbackPanel } from './feedback-panel/view';
@@ -23,7 +24,7 @@ export function DesignReviewSurface(props: {
         showChrome={showChrome}
       />
       {showChrome ? (
-        <>
+        <CommandPressScope value={true}>
           <DesignReviewFeedbackPanel
             onClose={controller.panel.close}
             onOpenRecord={controller.panel.openRecord}
@@ -34,7 +35,7 @@ export function DesignReviewSurface(props: {
             open={controller.inspectorOpen}
             state={controller.viewState}
           />
-        </>
+        </CommandPressScope>
       ) : null}
     </>
   );

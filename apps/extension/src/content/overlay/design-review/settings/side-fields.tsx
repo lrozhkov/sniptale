@@ -20,7 +20,7 @@ const SIDE_LABEL_KEYS = [
 const COMPACT_VALUES_CLASS_NAME = ['w-full min-w-0'].join(' ');
 
 const AXIS_GROUP_CLASS_NAME = [
-  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[9px]',
+  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[4px]',
   'border border-[var(--sniptale-color-border-soft)] px-2 py-1',
 ].join(' ');
 
@@ -154,7 +154,12 @@ function ExpandedAxisGroup(props: {
               className="grid grid-cols-[minmax(5rem,0.7fr)_minmax(0,1fr)] items-center gap-2"
               key={property}
             >
-              <span className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">
+              <span
+                className={[
+                  'truncate text-[13px] leading-[18px] font-medium',
+                  'text-[var(--sniptale-color-text-secondary)]',
+                ].join(' ')}
+              >
                 {label}
               </span>
               <SideValueControl
@@ -183,7 +188,7 @@ function SideFieldLabel(props: { label: string; modifiedCount: number }) {
     <div className="flex min-w-0 items-center gap-1">
       <span
         className={[
-          'text-[11px] font-semibold',
+          'text-[13px] leading-[18px] font-medium',
           props.modifiedCount > 0
             ? 'text-[var(--sniptale-color-accent)]'
             : 'text-[var(--sniptale-color-text-secondary)]',

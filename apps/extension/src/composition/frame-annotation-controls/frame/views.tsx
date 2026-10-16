@@ -1,3 +1,6 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+import type { ReactNode } from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState } from 'react';
 import { CopyPlus, Eye, EyeOff } from 'lucide-react';
 
@@ -102,7 +105,18 @@ interface FrameSettingsPopoverContentProps {
   };
 }
 
+function FrameEffectParameterGroup(props: { children: ReactNode }) {
+  return useInspectorLayout() ? (
+    <ContentPopoverSection>
+      <div className="sniptale-parameter-stack">{props.children}</div>
+    </ContentPopoverSection>
+  ) : (
+    props.children
+  );
+}
+
 export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentProps) {
+  const inspector = useInspectorLayout();
   const workflow = useTemplateForkWorkflow({
     ...(props.selectedPresetId ? { activeTemplateId: props.selectedPresetId } : {}),
     onFork: props.handleForkPreset ?? props.handleSelectPreset,
@@ -159,31 +173,35 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
             }}
           />
           {props.effectMode === 'blur' ? (
-            <>
+            <FrameEffectParameterGroup>
               <FrameBlurControls
+                embedded={inspector}
                 handleBlurChange={props.handleBlurChange}
                 handleBlurTypeChange={props.handleBlurTypeChange}
                 settings={props.localBlurSettings}
               />
               <FrameDecorationToggle
+                embedded={inspector}
                 onChange={props.handleBlurShowBorderChange}
                 showBorder={props.localBlurSettings.showBorder ?? false}
               />
-            </>
+            </FrameEffectParameterGroup>
           ) : null}
 
           {props.effectMode === 'focus' ? (
-            <>
+            <FrameEffectParameterGroup>
               <FrameFocusControls
+                embedded={inspector}
                 handleFocusBlurChange={props.handleFocusBlurChange}
                 handleFocusChange={props.handleFocusChange}
                 settings={props.localFocusSettings}
               />
               <FrameDecorationToggle
+                embedded={inspector}
                 onChange={props.handleFocusShowBorderChange}
                 showBorder={props.localFocusSettings.showBorder ?? false}
               />
-            </>
+            </FrameEffectParameterGroup>
           ) : null}
 
           <FrameBorderSection
@@ -408,7 +426,9 @@ function FramePresetRow(props: {
         </ProductGlassPresetMeta>
       </ProductGlassPresetItem>
       <span className="sniptale-frame-style-preset-actions">
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           aria-label={translate('content.templateFork.fork')}
           className="sniptale-frame-style-preset-action"
           data-frame-style-action="fork"
@@ -423,8 +443,10 @@ function FramePresetRow(props: {
           type="button"
         >
           <CopyPlus size={15} />
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          compact
+          tone="secondary"
           aria-label={visibilityActionLabel}
           className="sniptale-frame-style-preset-action"
           data-frame-style-action="toggle-visibility"
@@ -438,7 +460,7 @@ function FramePresetRow(props: {
           type="button"
         >
           {isEnabled ? <EyeOff size={15} /> : <Eye size={15} />}
-        </button>
+        </ProductActionButton>
       </span>
     </div>
   );

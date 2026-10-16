@@ -116,14 +116,14 @@ describe('toolbar static tooltips', () => {
     expect(inactiveButton?.getAttribute('title')).toBe('После снимка');
     expect(inactiveButton?.getAttribute('data-tooltip')).toBeNull();
     expect(inactiveButton?.className.includes('sniptale-capture-active')).toBe(false);
-    expect(inactiveButton?.getAttribute('data-active')).toBe('true');
+    expect(inactiveButton?.getAttribute('aria-expanded')).toBe('false');
 
     await renderCaptureActionToggle('copy');
     const activeButton = document.querySelector('button');
     expect(activeButton?.getAttribute('title')).toBe('После снимка');
     expect(activeButton?.getAttribute('data-tooltip')).toBeNull();
     expect(activeButton?.className.includes('sniptale-capture-active')).toBe(false);
-    expect(activeButton?.getAttribute('data-active')).toBe('true');
+    expect(activeButton?.getAttribute('aria-expanded')).toBe('false');
   }, 15000);
 
   it('keeps viewport tooltip static even when emulation is active', async () => {

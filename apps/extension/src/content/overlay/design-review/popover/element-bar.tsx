@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Check, ClipboardCopy, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
@@ -76,7 +77,7 @@ export function DesignReviewElementBar(props: {
       <button
         type="button"
         className={[
-          'min-w-0 flex-1 text-left font-mono text-[10px]',
+          'min-w-0 flex-1 text-left font-mono text-xs leading-4',
           'text-[var(--sniptale-color-text-dim)]',
           'hover:text-[var(--sniptale-color-text-primary)]',
           'rounded-[4px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
@@ -131,10 +132,12 @@ function ElementActionButton(props: {
   onClick: () => void;
 }) {
   return (
-    <button
+    <ContentToolbarButton
+      tone={props.danger ? 'danger' : props.active ? 'property' : 'utility'}
+      active={props.active ?? false}
       type="button"
       className={[
-        'inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[7px]',
+        'inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[4px]',
         'border border-transparent active:bg-[var(--sniptale-color-surface-hover)]',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         'disabled:cursor-default disabled:opacity-50',
@@ -152,6 +155,6 @@ function ElementActionButton(props: {
       onClick={props.onClick}
     >
       {props.children}
-    </button>
+    </ContentToolbarButton>
   );
 }

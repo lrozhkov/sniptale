@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { act } from 'react';
+import { act, useState } from 'react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToolbarShellContent } from './view';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { useContext } from 'react';
 import { installContentUiActivationBridge } from '../../../runtime/ui-activation-bridge';
 
 vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
@@ -12,7 +15,8 @@ vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
   isTrustedPointerEvent: vi.fn(() => true),
 }));
 
-const { useContentUiScaleMock } = vi.hoisted(() => ({
+const { useContentUiScaleMock, commandMocks } = vi.hoisted(() => ({
+  commandMocks: { enabled: false, activate: vi.fn() },
   useContentUiScaleMock: vi.fn(() => 1),
 }));
 
@@ -22,7 +26,26 @@ vi.mock('../../../platform/dom-host', async (importOriginal) => ({
 }));
 
 vi.mock('../controls/primary', () => ({
-  ToolbarPrimaryControls: () => <div data-testid="toolbar-primary" />,
+  ToolbarPrimaryControls: () => {
+    const [open, setOpen] = useState(false);
+    return (
+      <div data-testid="toolbar-primary" data-command-scope={String(useContext(CommandPressScope))}>
+        {commandMocks.enabled ? (
+          <ContentToolbarButton
+            tone="property"
+            data-testid="scoped-command"
+            aria-expanded={open}
+            onClick={() => {
+              commandMocks.activate();
+              setOpen(!open);
+            }}
+          >
+            Open
+          </ContentToolbarButton>
+        ) : null}
+      </div>
+    );
+  },
 }));
 
 vi.mock('../controls/secondary', () => ({
@@ -38,12 +61,13 @@ function renderToolbarShell(
     isDragging: boolean;
     freePlacement: boolean;
     dockPreview: 'top' | 'bottom' | 'left' | 'right' | null;
-  }
+  },
+  videoRecordingMode = false
 ) {
   useContentUiScaleMock.mockReturnValue(uiScale);
   return renderToStaticMarkup(
     <ToolbarShellContent
-      toolbarProps={{} as never}
+      toolbarProps={{ videoRecordingMode } as never}
       viewModel={
         {
           derivedState: {
@@ -66,6 +90,16 @@ function renderToolbarShell(
 }
 
 describe('ToolbarShellContent', () => {
+  it.each([false, true])('adopts ordinary chrome only outside recording mode=%s', (recording) => {
+    const container = document.createElement('div');
+    container.innerHTML = renderToolbarShell(true, null, 1, undefined, recording);
+    const toolbar = container.querySelector('[data-ui="content.toolbar.root"]');
+    expect(toolbar?.classList.contains('sniptale-content-toolbar-adopted')).toBe(!recording);
+    expect(
+      container.querySelector('[data-testid="toolbar-primary"]')?.getAttribute('data-command-scope')
+    ).toBe(String(!recording));
+  });
+
   it.each([false, true])('keeps pointer focus cleared with activation bridge=%s', (bridged) => {
     const host = document.createElement('div');
     document.body.append(host);
@@ -116,6 +150,18 @@ describe('ToolbarShellContent', () => {
       toolbar?.append(button);
       button.focus();
       expect(shadow.activeElement).toBe(button);
+      if (!bridged) {
+        act(() =>
+          icon.dispatchEvent(
+            new MouseEvent('pointerdown', {
+              bubbles: true,
+              cancelable: true,
+              composed: true,
+              button: 0,
+            })
+          )
+        );
+      }
       const press = new MouseEvent(bridged ? 'pointerdown' : 'mousedown', {
         bubbles: true,
         cancelable: true,
@@ -249,5 +295,81 @@ it.each(['top', 'bottom', 'left', 'right', null] as const)(
       })
     ).not.toContain('content.toolbar.dock-guides');
     expect(renderToolbarShell(true)).not.toContain('content.toolbar.dock-guides');
+  }
+);
+
+it.each([false, true])(
+  'preserves a focused command activation after pointer blur, recording=%s',
+  (recording) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const root = createRoot(shadow);
+    commandMocks.enabled = true;
+    commandMocks.activate.mockClear();
+    try {
+      act(() =>
+        root.render(
+          <ToolbarShellContent
+            toolbarProps={{ videoRecordingMode: recording } as never}
+            viewModel={
+              {
+                derivedState: {
+                  toolbarRef: { current: null },
+                  isDragging: false,
+                  displayMode: 'horizontal',
+                  position: { x: 24, y: 12 },
+                  positionReady: true,
+                  handleMouseDown: vi.fn(),
+                },
+                toolbarMenuState: { activeMenuType: null },
+              } as never
+            }
+            onHoverCapture={vi.fn()}
+            onViewportChange={vi.fn()}
+          />
+        )
+      );
+      const button = shadow.querySelector<HTMLButtonElement>('[data-testid="scoped-command"]')!;
+      act(() => button.focus());
+      expect(shadow.activeElement).toBe(button);
+      const dispatch = (type: string, buttons: number, detail = 0) => {
+        const event = new MouseEvent(type, {
+          bubbles: true,
+          composed: true,
+          cancelable: true,
+          button: 0,
+          buttons,
+          detail,
+        });
+        Object.defineProperty(event, 'pointerId', { value: 1 });
+        act(() => button.dispatchEvent(event));
+        return event;
+      };
+      const down = dispatch('pointerdown', 1);
+      const focusedAfterPointer = shadow.activeElement === button;
+      const mouseDown = dispatch('mousedown', 1);
+      dispatch('pointerup', 0);
+      dispatch('click', 0, 1);
+      expect(commandMocks.activate).toHaveBeenCalledOnce();
+      expect(button.getAttribute('aria-expanded')).toBe('true');
+      expect(down.defaultPrevented).toBe(false);
+      expect(mouseDown.defaultPrevented).toBe(true);
+      expect(focusedAfterPointer).toBe(recording);
+      expect(shadow.activeElement).not.toBe(button);
+      expect(button.getAttribute('data-pressing')).not.toBe('true');
+      // A keyboard activation keeps its deliberate focus and invokes the same command.
+      act(() => {
+        button.focus();
+        button.click();
+      });
+      expect(shadow.activeElement).toBe(button);
+      expect(commandMocks.activate).toHaveBeenCalledTimes(2);
+      expect(button.getAttribute('aria-expanded')).toBe('false');
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      commandMocks.enabled = false;
+    }
   }
 );

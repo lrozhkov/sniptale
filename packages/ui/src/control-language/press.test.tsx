@@ -20,8 +20,14 @@ function Command({ disabled = false }: { disabled?: boolean }) {
     </button>
   );
 }
-function pointer(type: string, target: EventTarget, buttons = 1) {
-  const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, buttons });
+function pointer(type: string, target: EventTarget, buttons = 1, composed = false) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    composed,
+    button: 0,
+    buttons,
+  });
   Object.defineProperty(event, 'pointerId', { value: 1 });
   act(() => target.dispatchEvent(event));
 }
@@ -85,6 +91,59 @@ it('cancels Space with Escape and prevents repeated Enter activation', () => {
   key('keyup', 'Enter');
   expect(command).not.toHaveBeenCalled();
 });
+it.each(['input', 'input-local', 'document'] as const)(
+  'cancels a held Clear command when Escape reaches the focused %s without claiming Escape',
+  (escapeTarget) => {
+    function Clear() {
+      const press = useCommandPress({
+        onPointerDown: (event) => event.preventDefault(),
+        onClick: command,
+      });
+      return (
+        <button {...press.props} data-pressing={press.pressed}>
+          Clear
+        </button>
+      );
+    }
+    const domainEscape = vi.fn();
+    act(() =>
+      root.render(
+        <>
+          <input onKeyDown={domainEscape} />
+          <Clear />
+        </>
+      )
+    );
+    const input = host.querySelector('input');
+    const button = host.querySelector('button');
+    if (!input || !button) throw new Error('Focused Clear fixture is required');
+    input.focus();
+    pointer('pointerdown', button);
+    expect(document.activeElement).toBe(input);
+    expect(button.dataset['pressing']).toBe('true');
+    const escape =
+      escapeTarget === 'input-local'
+        ? new Event('keydown', { bubbles: true, cancelable: true })
+        : new KeyboardEvent('keydown', {
+            key: 'Escape',
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+          });
+    if (escapeTarget === 'input-local') Object.defineProperty(escape, 'key', { value: 'Escape' });
+    act(() => (escapeTarget === 'document' ? document : input).dispatchEvent(escape));
+    expect(escape.defaultPrevented).toBe(false);
+    if (escapeTarget !== 'document') expect(domainEscape).toHaveBeenCalledTimes(1);
+    pointer('pointerup', button, 0);
+    act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+    expect(command).not.toHaveBeenCalled();
+    expect(button.dataset['pressing']).toBe('false');
+    pointer('pointerdown', button);
+    pointer('pointerup', button, 0);
+    act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+    expect(command).toHaveBeenCalledTimes(1);
+  }
+);
 it('clears an active press when disabled and removes interruption listeners on unmount', () => {
   const button = host.querySelector('button')!;
   pointer('pointerdown', button);
@@ -238,3 +297,58 @@ it('detaches active interruption listeners when the scope is disabled', () => {
   expect(command).toHaveBeenCalledTimes(1);
   remove.mockRestore();
 });
+
+function renderShadowCommand() {
+  act(() => root.unmount());
+  const shadow = host.attachShadow({ mode: 'open' });
+  root = createRoot(shadow);
+  act(() =>
+    root.render(
+      <CommandPressScope value={true}>
+        <ProductActionButton onClick={command}>Run</ProductActionButton>
+        <button data-outside>Other</button>
+      </CommandPressScope>
+    )
+  );
+  return {
+    button: shadow.querySelector<HTMLButtonElement>('button')!,
+    child: shadow.querySelector<HTMLElement>('.sniptale-command-content')!,
+    outside: shadow.querySelector<HTMLButtonElement>('[data-outside]')!,
+  };
+}
+
+it('accepts a native pointer click from a composed release inside Shadow DOM', () => {
+  const { button, child } = renderShadowCommand();
+  pointer('pointerdown', child, 1, true);
+  expect(button.dataset['pressing']).toBe('true');
+  const nativeReleaseTarget = vi.fn();
+  const observeRelease = (event: Event) => nativeReleaseTarget(event.target);
+  document.addEventListener('pointerup', observeRelease, true);
+  pointer('pointerup', child, 0, true);
+  document.removeEventListener('pointerup', observeRelease, true);
+  expect(nativeReleaseTarget).toHaveBeenCalledWith(host);
+  expect(button.dataset['pressing']).not.toBe('true');
+  act(() =>
+    child.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, detail: 1 }))
+  );
+  expect(command).toHaveBeenCalledTimes(1);
+});
+
+it.each(['outside', 'cancel'] as const)(
+  'rejects a composed Shadow DOM %s release and preserves a later keyboard click',
+  (ending) => {
+    const { button, child, outside } = renderShadowCommand();
+    pointer('pointerdown', child, 1, true);
+    if (ending === 'cancel') pointer('pointercancel', child, 0, true);
+    pointer('pointerup', ending === 'outside' ? outside : child, 0, true);
+    expect(button.dataset['pressing']).not.toBe('true');
+    act(() =>
+      child.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, detail: 1 }))
+    );
+    expect(command).not.toHaveBeenCalled();
+    act(() =>
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, detail: 0 }))
+    );
+    expect(command).toHaveBeenCalledTimes(1);
+  }
+);

@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useCallback, useRef, useState } from 'react';
 import { Archive, Copy, Download, Settings2 } from 'lucide-react';
 import {
@@ -60,6 +61,7 @@ function AnnotationExportDropdown(
     triggerRef: React.RefObject<HTMLButtonElement | null>;
   }
 ) {
+  const adopted = React.useContext(CommandPressScope);
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.triggerRef,
     displayMode: props.displayMode,
@@ -72,6 +74,7 @@ function AnnotationExportDropdown(
   return (
     <ToolbarMenuDropdown dataUi="content.toolbar.annotation-export-menu" menuRef={props.menuRef}>
       <ProductToolbarMenu
+        className={adopted ? 'sniptale-content-menu-adopted' : ''}
         compact={props.compactMenus}
         placement={menuPlacement}
         style={style}

@@ -38,7 +38,7 @@ const BORDER_GROUPS = [
 
 export function BorderSection({ actions, disabled, state }: BorderSectionProps) {
   return (
-    <div className="grid gap-2" data-ui="content.design-review.settings-border">
+    <div className="grid gap-1" data-ui="content.design-review.settings-border">
       {BORDER_GROUPS.map((group) => (
         <LinkedSideFields
           key={group.key}

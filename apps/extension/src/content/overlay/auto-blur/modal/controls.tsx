@@ -5,9 +5,7 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import { getBorderPresetDisplayName } from '../../../../features/highlighter/presets/display-name';
 import { translate, useAppLocale } from '../../../../platform/i18n';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
-import { CompactSelect, NumericRow } from '../../../../ui/compact-inspector-controls';
-import { HighlighterPresetPropertyField as PropertyField } from '../../../../ui/highlighter-preset-editor/inspector-field';
+import { NumericRow, SelectField, ToggleField } from '../../../../ui/compact-inspector-controls';
 import { buildBlurTypeOptions } from '../../../../composition/frame-annotation-controls/frame/helpers';
 
 export function AutoBlurBlurControls(props: {
@@ -27,16 +25,16 @@ export function AutoBlurBlurControls(props: {
     props.setBlurSettings({ ...props.blurSettings, ...patch });
 
   return (
-    <section className="sniptale-auto-blur-appearance sniptale-modal-field-surface grid gap-4">
+    <section className="sniptale-auto-blur-appearance sniptale-inspector-surface grid gap-2">
       <div className="grid gap-1">
-        <div className="text-sm font-semibold text-[var(--sniptale-color-text)]">
+        <div className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]">
           {translate('content.autoBlur.appearanceTitle')}
         </div>
-        <div className="text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
+        <div className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
           {translate('content.autoBlur.appearanceDescription')}
         </div>
       </div>
-      <div className="grid gap-3">
+      <div className="sniptale-parameter-stack">
         <NumericRow
           appearance="plain"
           label={translate('content.autoBlur.blurStrength')}
@@ -47,39 +45,29 @@ export function AutoBlurBlurControls(props: {
           scrub={{ max: 25, min: 1 }}
           value={props.blurSettings.amount}
         />
-        <PropertyField label={translate('content.autoBlur.blurType')}>
-          <CompactSelect<BlurType>
-            appearance="plain"
-            aria-label={translate('content.autoBlur.blurType')}
-            onChange={(blurType) => updateBlurSettings({ blurType })}
-            options={buildBlurTypeOptions().map((option) => ({
-              label: option.label,
-              value: option.value,
-            }))}
-            value={props.blurSettings.blurType}
-          />
-        </PropertyField>
-        <PropertyField label={translate('content.autoBlur.showBorder')}>
-          <div className="flex justify-end">
-            <ProductGlassSwitch
-              aria-label={translate('content.autoBlur.showBorder')}
-              on={showBorder}
-              onClick={() => updateBlurSettings({ showBorder: !showBorder })}
-            />
-          </div>
-        </PropertyField>
-        <PropertyField label={translate('content.autoBlur.frameTemplate')}>
-          <CompactSelect
-            appearance="plain"
-            aria-label={translate('content.autoBlur.frameTemplate')}
-            onChange={(borderPresetId) => updateBlurSettings({ borderPresetId })}
-            options={props.borderPresets.map((preset) => ({
-              label: getBorderPresetDisplayName(preset, locale),
-              value: preset.id,
-            }))}
-            value={selectedPresetId}
-          />
-        </PropertyField>
+        <SelectField<BlurType>
+          label={translate('content.autoBlur.blurType')}
+          onChange={(blurType) => updateBlurSettings({ blurType })}
+          options={buildBlurTypeOptions().map((option) => ({
+            label: option.label,
+            value: option.value,
+          }))}
+          value={props.blurSettings.blurType}
+        />
+        <ToggleField
+          label={translate('content.autoBlur.showBorder')}
+          value={showBorder}
+          onChange={(showBorder) => updateBlurSettings({ showBorder })}
+        />
+        <SelectField
+          label={translate('content.autoBlur.frameTemplate')}
+          onChange={(borderPresetId) => updateBlurSettings({ borderPresetId })}
+          options={props.borderPresets.map((preset) => ({
+            label: getBorderPresetDisplayName(preset, locale),
+            value: preset.id,
+          }))}
+          value={selectedPresetId}
+        />
       </div>
     </section>
   );

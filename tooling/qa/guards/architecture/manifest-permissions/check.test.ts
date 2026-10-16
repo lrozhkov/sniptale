@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { createTempRoot } from '../../../test-support/test-helpers';
+import { createTempRoot, writeFile, writeJson } from '../../../test-support/test-helpers';
 import { collectManifestPermissionViolations } from './check.mjs';
 import {
   createContentScriptPolicyName,
@@ -383,3 +383,100 @@ it('rejects malformed manifest categories and directory-shaped policy owners', (
     ])
   );
 });
+
+function emittedFontFixture(resource = 'assets/inter-latin.woff2') {
+  const root = createTempRoot('verify-manifest-emitted-font-');
+  const resourceEntry = { resources: [resource], matches: ['https://*/*'], use_dynamic_url: true };
+  writeFixture(root, {
+    webAccessibleResources: [resourceEntry],
+    policyWebAccessibleResources: [createWebAccessibleResourcePolicyName(resourceEntry)],
+  });
+  if (!resource.includes('*')) fs.unlinkSync(`${root}/apps/extension/public/${resource}`);
+  writeFile(
+    root,
+    'apps/extension/vite.config.ts',
+    `
+    function createRollupOptions() {
+      return { output: { assetFileNames: 'assets/[name].[ext]' } };
+    }
+    export default defineConfig(({ mode }) => ({ build: { rollupOptions: createRollupOptions(mode) } }));
+  `
+  );
+  writeJson(root, 'packages/ui/package.json', {
+    exports: { './styles': './src/styles/index.css' },
+  });
+  writeFile(root, 'packages/ui/src/styles/index.css', "@import './fonts.css';");
+  writeFile(
+    root,
+    'packages/ui/src/styles/fonts.css',
+    `
+    @font-face {font-family: Interface;src:url('@fontsource-variable/inter/files/inter-latin.woff2');}
+  `
+  );
+  writeFile(
+    root,
+    'node_modules/@fontsource-variable/inter/files/inter-latin.woff2',
+    'font fixture'
+  );
+  return root;
+}
+
+it('accepts a concrete emitted font derived from reachable CSS and the stable Vite output contract', () => {
+  const root = emittedFontFixture();
+  expect(collectManifestPermissionViolations({ rootDir: root })).toEqual([]);
+});
+
+it.each([
+  'missing-source',
+  'unrelated-source',
+  'unreachable-css',
+  'output-drift',
+  'ambiguous-source',
+])('rejects an emitted font when its source evidence fails: %s', (failure) => {
+  const root = emittedFontFixture();
+  if (failure === 'missing-source')
+    fs.unlinkSync(`${root}/node_modules/@fontsource-variable/inter/files/inter-latin.woff2`);
+  if (failure === 'unrelated-source')
+    writeFile(
+      root,
+      'packages/ui/src/styles/fonts.css',
+      "@font-face {src:url('@fontsource-variable/inter/files/different.woff2');}"
+    );
+  if (failure === 'unreachable-css')
+    writeFile(root, 'packages/ui/src/styles/index.css', '.surface { color: red; }');
+  if (failure === 'output-drift') {
+    const config = `${root}/apps/extension/vite.config.ts`;
+    fs.writeFileSync(
+      config,
+      fs.readFileSync(config, 'utf8').replace('[name].[ext]', '[name]-[hash].[ext]')
+    );
+  }
+  if (failure === 'ambiguous-source') {
+    fs.appendFileSync(
+      `${root}/packages/ui/src/styles/fonts.css`,
+      "@font-face {src:url('@fontsource/other/files/inter-latin.woff2');}"
+    );
+    writeFile(root, 'node_modules/@fontsource/other/files/inter-latin.woff2', 'different font');
+  }
+  expect(collectManifestPermissionViolations({ rootDir: root })).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ message: expect.stringContaining('points to a missing file') }),
+    ])
+  );
+});
+
+it.each(['assets/runtime.js', 'assets/image.png', 'assets/*'])(
+  'keeps unrelated emitted assets and wildcards rejected: %s',
+  (resource) => {
+    const root = emittedFontFixture(resource);
+    expect(collectManifestPermissionViolations({ rootDir: root })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining(
+            resource.includes('*') ? 'must list concrete files' : 'points to a missing file'
+          ),
+        }),
+      ])
+    );
+  }
+);

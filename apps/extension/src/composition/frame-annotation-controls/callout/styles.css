@@ -113,3 +113,27 @@
   cursor: default;
   opacity: 0.4;
 }
+
+.sniptale-content-appearance-surface .sniptale-callout-preset-list {
+  gap: 4px;
+}
+
+.sniptale-content-appearance-surface .sniptale-callout-preset-row .sniptale-glass-preset-item {
+  padding-right: 120px;
+}
+
+.sniptale-content-appearance-surface .sniptale-callout-preset-actions {
+  gap: 4px;
+}
+
+.sniptale-content-appearance-surface .sniptale-callout-preset-action {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.sniptale-content-appearance-surface .sniptale-callout-preset-action:hover:not(:disabled),
+.sniptale-content-appearance-surface .sniptale-callout-preset-action:focus-visible {
+  color: var(--sniptale-color-text-primary);
+}

@@ -87,7 +87,7 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
     color: var(--sniptale-color-text-primary) !important;
   }
 
-  button[data-command-press]:focus-visible {
+  button[data-command-press]:focus-visible:not([data-focus-restoration='pointer']) {
     outline: 2px solid var(--sniptale-color-accent) !important;
     outline-offset: -2px;
   }

@@ -230,3 +230,97 @@
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 2px;
 }
+
+.sniptale-content-toolbar-adopted .sniptale-btn[data-command-press] {
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-content-toolbar-adopted .sniptale-btn[data-command-press] svg {
+  width: 16px;
+  height: 16px;
+}
+.sniptale-content-toolbar-adopted .sniptale-btn.sniptale-full-page-chevron[data-command-press] svg {
+  width: 12px;
+  height: 12px;
+}
+.sniptale-content-toolbar-adopted .sniptale-split-action-start[data-command-press] {
+  border-radius: 4px 0 0 4px;
+}
+.sniptale-content-toolbar-adopted .sniptale-split-action-end[data-command-press] {
+  border-radius: 0 4px 4px 0;
+}
+.sniptale-content-toolbar-adopted .sniptale-btn[data-content-tool='true'] {
+  background: transparent;
+  box-shadow: none;
+}
+.sniptale-content-toolbar-adopted .sniptale-btn[data-content-tool='true']:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sniptale-color-text-secondary) 28%, transparent);
+  background: transparent;
+}
+.sniptale-content-toolbar-adopted .sniptale-btn[data-content-tool='true'][data-active='true'] {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 35%, transparent);
+  color: var(--sniptale-color-accent);
+  background: transparent;
+  box-shadow: none;
+}
+.sniptale-content-toolbar-adopted
+  .sniptale-btn[data-content-tool='true'][data-active='true']:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, transparent);
+}
+.sniptale-content-menu-adopted.sniptale-toolbar-menu {
+  border-radius: 4px;
+  padding: 5px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-list {
+  gap: 2px;
+}
+.sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-item {
+  min-height: 36px;
+  gap: 6px;
+  border-radius: 4px;
+  padding: 8px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-popover-item-selected {
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
+  box-shadow: none;
+  font-weight: 500;
+}
+.sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-item-hint {
+  font: 400 12px / 16px var(--sniptale-font-interface);
+}
+
+.sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-item-label {
+  font: inherit;
+}
+.sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-title {
+  font: 600 14px / 20px var(--sniptale-font-interface);
+}
+.sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-item > svg,
+.sniptale-content-menu-adopted.sniptale-toolbar-menu
+  .sniptale-toolbar-menu-item
+  > .sniptale-toolbar-mode-icon {
+  width: 16px;
+  height: 16px;
+}
+/* Drag acquisition keeps its existing target while surrounding commands compact. */
+.sniptale-content-toolbar-adopted .sniptale-drag-handle {
+  height: 36px;
+}
+
+/* Drawing ribbons retain their existing preview icon geometry in both orientations. */
+.sniptale-content-toolbar-adopted
+  .sniptale-drawing-options-popover.sniptale-drawing-options-adopted
+  .sniptale-btn[data-command-press]
+  svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sniptale-content-toolbar-adopted
+  .sniptale-drawing-options-popover.sniptale-drawing-options-adopted.sniptale-toolbar-menu {
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}

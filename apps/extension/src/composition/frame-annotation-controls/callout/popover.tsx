@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState } from 'react';
 
 import type {
@@ -34,6 +35,7 @@ export function FutureCalloutSettingsPopover(props: {
   templateSourceControl?: TemplateSourceControl;
   frameColors?: CalloutFrameColors;
 }) {
+  const inspector = useInspectorLayout();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [localSettings, setLocalSettings] = useState(props.settings);
   const [nestedLayerOpen, setNestedLayerOpen] = useState(false);
@@ -126,6 +128,9 @@ export function FutureCalloutSettingsPopover(props: {
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
       className={[
+        inspector
+          ? 'sniptale-compact-workspace sniptale-inspector-surface sniptale-content-appearance-surface'
+          : '',
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
         'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',

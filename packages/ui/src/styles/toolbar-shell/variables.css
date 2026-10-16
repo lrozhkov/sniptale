@@ -22,3 +22,16 @@
     var(--sniptale-color-border-soft) 45%
   );
 }
+
+/* Content chrome opts in without changing pending recording and catalog consumers. */
+.sniptale-toolbar-root.sniptale-content-toolbar-adopted {
+  --sniptale-toolbar-shell-height: 50px;
+  --sniptale-toolbar-button-size: 32px;
+  --sniptale-toolbar-shell-padding: 6px;
+  --sniptale-toolbar-gap: 6px;
+  --sniptale-radius: 4px;
+}
+/* Drawing options retain their existing target geometry until their own migration. */
+.sniptale-content-toolbar-adopted .sniptale-drawing-options-popover {
+  --sniptale-toolbar-button-size: 36px;
+}

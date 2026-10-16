@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 // @vitest-environment jsdom
 
 import { act, createRef } from 'react';
@@ -22,6 +23,11 @@ afterEach(() => {
 });
 
 describe('StepBadgePopoverAdapter', () => {
+  function ContextProbe() {
+    const scoped = useInspectorLayout();
+    return <span data-inspector-enabled={String(scoped)} />;
+  }
+
   it('opts the numbering settings surface into compact density', () => {
     act(() => {
       root.render(
@@ -31,11 +37,16 @@ describe('StepBadgePopoverAdapter', () => {
           isOpen
           popoverRef={createRef<HTMLDivElement>()}
         >
+          <ContextProbe />
           Numbering settings
         </StepBadgePopoverAdapter>
       );
     });
 
+    expect(
+      document.querySelector('.sniptale-step-badge-popover.sniptale-inspector-surface')
+    ).not.toBeNull();
+    expect(document.querySelector('[data-inspector-enabled="true"]')).not.toBeNull();
     expect(
       document
         .querySelector('.sniptale-step-badge-popover')

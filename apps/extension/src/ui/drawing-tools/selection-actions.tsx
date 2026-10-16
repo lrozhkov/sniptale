@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import {
   ArrowDown,
   ArrowUp,
@@ -15,6 +17,21 @@ import { translate } from '../../platform/i18n';
 
 function DrawingDeselectOption(props: { onClick: () => void }) {
   const label = translate('content.toolbar.drawingDeselect');
+  const scoped = useContext(CommandPressScope);
+  if (scoped) {
+    return (
+      <ContentToolbarButton
+        type="button"
+        tone="close"
+        title={label}
+        dataUi="content.toolbar.drawing-options.deselect"
+        className="!h-7 !min-h-7 !w-7 !min-w-7 !rounded-[4px] !p-0"
+        onClick={props.onClick}
+      >
+        <X aria-hidden size={16} />
+      </ContentToolbarButton>
+    );
+  }
   return (
     <button
       type="button"
@@ -45,6 +62,7 @@ interface LayerCombinationActions {
 }
 
 function DrawingLayerCombinationActions(props: LayerCombinationActions) {
+  const scoped = useContext(CommandPressScope);
   const groupLabel = translate(
     props.canUngroup ? 'editor.toolbar.ungroupLayers' : 'editor.toolbar.groupLayers'
   );
@@ -53,11 +71,12 @@ function DrawingLayerCombinationActions(props: LayerCombinationActions) {
       {props.showMerge ? (
         <ContentToolbarButton
           type="button"
+          tone={scoped ? 'utility' : 'default'}
           dataUi="drawing.selection.actions.merge"
           aria-label={translate('editor.toolbar.mergeLayers')}
           title={translate('editor.toolbar.mergeLayers')}
           disabled={!props.canMerge}
-          className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !rounded-md !p-0"
+          className={`aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !p-0 ${scoped ? '!rounded-[4px]' : '!rounded-md'}`}
           onClick={props.onMerge}
         >
           <Layers3 aria-hidden size={16} />
@@ -65,11 +84,12 @@ function DrawingLayerCombinationActions(props: LayerCombinationActions) {
       ) : null}
       <ContentToolbarButton
         type="button"
+        tone={scoped ? 'utility' : 'default'}
         dataUi={`drawing.selection.actions.${props.canUngroup ? 'ungroup' : 'group'}`}
         aria-label={groupLabel}
         title={groupLabel}
         disabled={!props.canGroup && !props.canUngroup}
-        className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !rounded-md !p-0"
+        className={`aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !p-0 ${scoped ? '!rounded-[4px]' : '!rounded-md'}`}
         onClick={props.canUngroup ? props.onUngroup : props.onGroup}
       >
         {props.canUngroup ? <Ungroup aria-hidden size={16} /> : <Group aria-hidden size={16} />}
@@ -89,6 +109,7 @@ export function DrawingSelectionActions(props: {
   onDeselect: () => void;
   layerCombination?: LayerCombinationActions;
 }) {
+  const scoped = useContext(CommandPressScope);
   const moves = [
     { direction: 'front', icon: ChevronsUp, label: translate('editor.toolbar.frontLayer') },
     { direction: 'forward', icon: ArrowUp, label: translate('editor.toolbar.raiseSelection') },
@@ -104,11 +125,12 @@ export function DrawingSelectionActions(props: {
         <ContentToolbarButton
           key={direction}
           type="button"
+          tone={scoped ? 'utility' : 'default'}
           dataUi={`drawing.selection.actions.${direction}`}
           aria-label={label}
           title={label}
           disabled={!props.canReorder}
-          className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !rounded-md !p-0"
+          className={`aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !p-0 ${scoped ? '!rounded-[4px]' : '!rounded-md'}`}
           onClick={() => props.onMove(direction)}
         >
           <Icon aria-hidden size={16} />
@@ -123,11 +145,12 @@ export function DrawingSelectionActions(props: {
       ) : null}
       <ContentToolbarButton
         type="button"
+        tone={scoped ? 'utility' : 'default'}
         dataUi="drawing.selection.actions.duplicate"
         aria-label={translate('editor.toolbar.duplicateLayer')}
         title={translate('editor.toolbar.duplicateLayer')}
         disabled={!props.canDuplicate}
-        className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !rounded-md !p-0"
+        className={`aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !p-0 ${scoped ? '!rounded-[4px]' : '!rounded-md'}`}
         onClick={props.onDuplicate}
       >
         <Copy aria-hidden size={16} />
@@ -139,7 +162,7 @@ export function DrawingSelectionActions(props: {
         aria-label={translate('content.toolbar.drawingDelete')}
         title={translate('content.toolbar.drawingDelete')}
         disabled={!props.canDelete}
-        className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !rounded-md !p-0"
+        className={`aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !p-0 ${scoped ? '!rounded-[4px]' : '!rounded-md'}`}
         onClick={props.onDelete}
       >
         <Trash2 aria-hidden size={16} />

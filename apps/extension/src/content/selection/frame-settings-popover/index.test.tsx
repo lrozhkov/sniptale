@@ -338,6 +338,37 @@ describe('FrameSettingsPopover loading state', () => {
   });
 });
 
+describe('FrameSettingsPopover effect parameter composition', () => {
+  it.each(['blur', 'focus'] as const)(
+    'keeps %s fields and its border toggle in one scoped parameter group',
+    (effectMode) => {
+      storageMocks.loadHighlighterSettings.mockReturnValue(
+        new Promise<HighlighterSettings>(() => undefined)
+      );
+      renderPopover({ effectMode });
+      const popover = document.querySelector('.sniptale-frame-settings-popover')!;
+      const numericRows = [
+        ...popover.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]'),
+      ];
+      const toggle = popover.querySelector('[role="switch"]')!;
+      expect(toggle).not.toBeNull();
+      const section = toggle.closest('.sniptale-content-popover-section');
+      expect(section).not.toBeNull();
+      expect(numericRows.length).toBe(effectMode === 'blur' ? 1 : 2);
+      for (const row of numericRows)
+        expect(row.closest('.sniptale-content-popover-section')).toBe(section);
+      expect(section?.firstElementChild?.classList).toContain('sniptale-parameter-stack');
+      if (effectMode === 'blur') {
+        expect(
+          popover
+            .querySelector('button[aria-haspopup="listbox"]')
+            ?.closest('.sniptale-content-popover-section')
+        ).toBe(section);
+      }
+    }
+  );
+});
+
 describe('FrameSettingsPopover pending blur edits', () => {
   it('keeps a local blur edit when persisted defaults resolve later', async () => {
     const deferredSettings = createDeferred<HighlighterSettings>();

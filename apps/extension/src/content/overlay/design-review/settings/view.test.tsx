@@ -6,6 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { DesignReviewSettings } from './view';
 import { NumericField } from './numeric-field';
+import { CssTextField } from './text-fields';
+import { translate } from '../../../../platform/i18n';
 
 const actions: DesignReviewActions = {
   close: vi.fn(),
@@ -190,4 +192,200 @@ it('tracks keyboard and portaled pointer intent without changing the settings se
   expect(panel.querySelector('button[aria-pressed="true"]')?.getAttribute('aria-label')).toBe(
     'Текст'
   );
+});
+
+it('clears CSS text through its native callback and preserves empty fallback and focus', () => {
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <CssTextField
+        disabled={false}
+        label="Object position"
+        value="10% 20%"
+        defaultValue="normal"
+        onChange={onChange}
+      />
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  const clear = container.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+  expect(clear).not.toBeNull();
+  act(() => clear.click());
+  expect(onChange).toHaveBeenCalledExactlyOnceWith('normal');
+  expect(document.activeElement).toBe(input);
+  act(() =>
+    root.render(
+      <CssTextField
+        disabled={false}
+        label="Object position"
+        value="normal"
+        defaultValue="normal"
+        onChange={onChange}
+      />
+    )
+  );
+  expect(input.value).toBe('');
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
+  act(() =>
+    root.render(
+      <CssTextField disabled label="Object position" value="10% 20%" onChange={onChange} />
+    )
+  );
+  expect(input.disabled).toBe(true);
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
+  expect(onChange).toHaveBeenCalledOnce();
+});
+
+it('preserves text-property toggles, accepted-value reset, and disabled admission through canonical rows', () => {
+  const localActions = { ...actions, updateValue: vi.fn(), resetValue: vi.fn() };
+  const defaults = {
+    'font-weight': '400',
+    'font-style': 'normal',
+    'text-decoration': 'none',
+    'text-align': 'left',
+  };
+  const render = (values: DesignReviewViewState['values'], disabled = false) =>
+    act(() =>
+      root.render(
+        <DesignReviewSettings
+          actions={localActions}
+          disabled={disabled}
+          state={{ ...state, defaultValues: defaults, values }}
+        />
+      )
+    );
+  const button = (label: string) => {
+    const found = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (node) => node.getAttribute('aria-label') === label
+    );
+    expect(found).toBeDefined();
+    return found!;
+  };
+  render(defaults);
+  for (const [key, property, value] of [
+    ['fontWeight', 'font-weight', 'bold'],
+    ['fontStyle', 'font-style', 'italic'],
+    ['optionUnderline', 'text-decoration', 'underline'],
+    ['optionLineThrough', 'text-decoration', 'line-through'],
+    ['optionCenter', 'text-align', 'center'],
+    ['optionRight', 'text-align', 'right'],
+    ['optionJustify', 'text-align', 'justify'],
+  ] as const) {
+    act(() => button(translate(`content.designReview.${key}`)).click());
+    expect(localActions.updateValue).toHaveBeenLastCalledWith(property, value);
+  }
+  const modified = {
+    'font-weight': 'bold',
+    'font-style': 'italic',
+    'text-decoration': 'underline line-through',
+    'text-align': 'center',
+  };
+  render(modified);
+  for (const [key, property, value] of [
+    ['fontWeight', 'font-weight', '400'],
+    ['fontStyle', 'font-style', 'normal'],
+    ['optionUnderline', 'text-decoration', 'line-through'],
+    ['optionLineThrough', 'text-decoration', 'underline'],
+    ['optionCenter', 'text-align', 'left'],
+  ] as const) {
+    act(() => button(translate(`content.designReview.${key}`)).click());
+    expect(localActions.updateValue).toHaveBeenLastCalledWith(property, value);
+  }
+  for (const key of ['textStyleGroup', 'textAlign'] as const) {
+    act(() =>
+      button(
+        `${translate(`content.designReview.${key}`)}: ${translate('content.designReview.resetProperty')}`
+      ).click()
+    );
+  }
+  expect(localActions.resetValue.mock.calls).toEqual([
+    ['font-weight'],
+    ['font-style'],
+    ['text-decoration'],
+    ['text-align'],
+  ]);
+  const calls = localActions.updateValue.mock.calls.length;
+  render(modified, true);
+  const bold = button(translate('content.designReview.fontWeight'));
+  expect(bold.disabled).toBe(true);
+  act(() => bold.click());
+  expect(localActions.updateValue).toHaveBeenCalledTimes(calls);
+});
+
+it('keeps section field updates attached to their page CSS property and selected image', async () => {
+  const updateValue = vi.fn();
+  const localActions = { ...actions, updateValue };
+  act(() =>
+    root.render(<DesignReviewSettings actions={localActions} disabled={false} state={state} />)
+  );
+  const button = (label: string) => {
+    const found = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (node) => node.getAttribute('aria-label') === label
+    );
+    expect(found).toBeDefined();
+    return found!;
+  };
+  const edit = (label: string, value: string) => {
+    const input = Array.from(container.querySelectorAll<HTMLInputElement>('input')).find(
+      (node) => node.getAttribute('aria-label') === label
+    );
+    expect(input).toBeDefined();
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+      input!.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  edit(translate('content.designReview.fontSize'), '18');
+  expect(updateValue).toHaveBeenLastCalledWith('font-size', '18px');
+  for (const [key, option, property] of [
+    ['fontFamily', 'Inter', 'font-family'],
+    ['lineHeight', '1.5', 'line-height'],
+    ['letterSpacing', '1px', 'letter-spacing'],
+  ] as const) {
+    act(() => button(translate(`content.designReview.${key}`)).click());
+    const choice = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+      (node) => node.textContent?.trim() === option
+    );
+    expect(choice).toBeDefined();
+    await act(async () => choice!.click());
+    expect(updateValue).toHaveBeenLastCalledWith(property, expect.any(String));
+  }
+  act(() => button(translate('content.designReview.sectionFrame')).click());
+  edit(translate('content.designReview.width'), '50%');
+  expect(updateValue).toHaveBeenLastCalledWith('width', '50%');
+  edit(translate('content.designReview.height'), '3em');
+  expect(updateValue).toHaveBeenLastCalledWith('height', '3em');
+  act(() => button(translate('content.designReview.sectionAppearance')).click());
+  act(() => button(translate('content.designReview.boxShadow')).click());
+  const enabled = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+    (node) => node.textContent?.trim() === translate('content.designReview.shadowEnabled')
+  );
+  expect(enabled).toBeDefined();
+  await act(async () => enabled!.click());
+  expect(updateValue).toHaveBeenLastCalledWith('box-shadow', expect.any(String));
+  const image = document.createElement('img');
+  const selection = state.selection;
+  if (!selection) throw new Error('Selection fixture is required');
+  act(() =>
+    root.render(
+      <DesignReviewSettings
+        actions={localActions}
+        disabled={false}
+        state={{
+          ...state,
+          selection: { ...selection, kind: 'image', element: image },
+          values: { 'object-fit': 'fill', 'object-position': '50% 50%' },
+        }}
+      />
+    )
+  );
+  act(() => button(translate('content.designReview.objectFit')).click());
+  const cover = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+    (node) => node.textContent?.trim() === translate('content.designReview.optionCover')
+  );
+  expect(cover).toBeDefined();
+  await act(async () => cover!.click());
+  expect(updateValue).toHaveBeenLastCalledWith('object-fit', 'cover');
+  edit(translate('content.designReview.objectPosition'), '10% 20%');
+  expect(updateValue).toHaveBeenLastCalledWith('object-position', '10% 20%');
 });

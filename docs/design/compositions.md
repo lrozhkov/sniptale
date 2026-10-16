@@ -39,7 +39,7 @@ Do not expand these groups into text segments or dropdowns solely to apply a gen
 
 A group heading can supply the visible name of its first control when both identify the same parameter. Omit the repeated visible label, but retain the control's accessible name and group association. The consumer declares this relationship explicitly. Do not remove labels by matching strings across the DOM. Distinct nested parameters retain their own labels even when their wording overlaps.
 
-One layout owner sets height, alignment, spacing, and group insets across value types. Child controls fit that geometry. Reset child margins and competing minimum heights. Hidden contextual tools do not add gaps. Compare mixed rows. Do not repair spacing through parameter-name selectors or individual offsets.
+One layout owner sets height, alignment, spacing, and group insets across value types. Child controls fit that geometry. Component boundaries do not create semantic groups. Related fields share one group inset, without stacked section padding between their rows. Reset child margins and competing minimum heights. Hidden contextual tools do not add gaps. Compare mixed rows. Do not repair spacing through parameter-name selectors or individual offsets.
 
 Measure parameter rhythm between visible label baselines. A compact one-line row uses 32px height and 4px separation. Inline swatches and utility buttons must not impose a larger minimum height. Let multiline content and errors expand explicitly. Hidden controls reserve no space.
 

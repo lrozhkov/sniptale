@@ -25,6 +25,8 @@ Keep the title, current selection, primary command, blocking status, and recover
 
 Do not change representation during an active press, editing transaction, drag, or menu selection. Recompute after content changes, font readiness, and owner resizing. Avoid a hidden-caption measurement loop. Do not invent one universal viewport breakpoint for all toolbars or inspectors.
 
+Measure settled geometry. Do not animate the geometry that a fit calculation changes. Repeated resize feedback must reach a stable layout.
+
 ## Source-backed local patterns
 
 | Existing owner | Pattern to preserve |

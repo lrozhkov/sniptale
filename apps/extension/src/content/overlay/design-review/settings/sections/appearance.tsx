@@ -12,7 +12,7 @@ type SectionProps = {
 
 export function AppearanceSection({ actions, disabled, state }: SectionProps) {
   return (
-    <div className="grid gap-2" data-ui="content.design-review.settings-appearance">
+    <div className="grid gap-1" data-ui="content.design-review.settings-appearance">
       <ColorField
         disabled={disabled}
         label={translate('content.designReview.backgroundColor')}

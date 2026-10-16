@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useRef } from 'react';
 import {
   Bot,
@@ -224,6 +225,7 @@ function ToolbarModeMenu(props: {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   triggerProps: ToolbarModeButtonsProps;
 }) {
+  const adopted = React.useContext(CommandPressScope);
   const placement = getToolbarMenuPosition(props.triggerRef.current, 320);
   const menuPlacement = resolveToolbarMenuPlacement(
     props.triggerProps.displayMode ?? 'horizontal',
@@ -246,6 +248,7 @@ function ToolbarModeMenu(props: {
   return (
     <div ref={props.menuRef as React.Ref<HTMLDivElement>}>
       <ProductToolbarMenu
+        className={adopted ? 'sniptale-content-menu-adopted' : ''}
         compact={props.triggerProps.compactMenus ?? false}
         title={translate('content.toolbar.modeMenuTitle')}
         variant="capture"
@@ -321,6 +324,7 @@ function PageEditingModeButton(props: {
     <ContentToolbarButton
       type="button"
       active={props.active}
+      data-content-tool="true"
       aria-pressed={props.active}
       aria-label={copy.label}
       dataUi={`content.toolbar.page-editing-mode.${props.mode}`}

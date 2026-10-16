@@ -50,7 +50,8 @@ function QuickOptionButton(props: {
       title={props.label}
       dataUi={props.dataUi}
       className={[
-        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !p-0',
+        scoped ? '!rounded-[4px]' : '!rounded-md',
         !scoped && props.active ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
       ].join(' ')}
       onClick={props.onClick}
@@ -287,7 +288,10 @@ export function ArrowDrawDirectionOption(props: {
       aria-pressed={props.active}
       title={label}
       dataUi={props.dataUi}
-      className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
+      className={[
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !p-0',
+        scoped ? '!rounded-[4px]' : '!rounded-md',
+      ].join(' ')}
       onClick={() => props.onChange(!props.active)}
     >
       <ArrowDownLeft aria-hidden size={16} />
@@ -420,7 +424,8 @@ function DrawingFillToggle(props: {
       title={props.label}
       dataUi={props.dataUi}
       className={[
-        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !p-0',
+        scoped ? '!rounded-[4px]' : '!rounded-md',
         'focus-visible:!outline-solid focus-visible:!outline-2 focus-visible:!outline-offset-2',
         'focus-visible:!outline-[color:var(--sniptale-color-text-primary)]',
         scoped

@@ -42,6 +42,11 @@ const MANROPE_FONT_FILES = [
   'manrope-latin-ext-wght-normal.woff2',
   'manrope-latin-wght-normal.woff2',
 ] as const;
+const INTERFACE_FONT_FILES = [
+  'inter-cyrillic-wght-normal.woff2',
+  'inter-latin-ext-wght-normal.woff2',
+  'inter-latin-wght-normal.woff2',
+] as const;
 const RELEASE_OXC_MINIFY_OPTIONS = {
   codegen: true,
   compress: {
@@ -121,6 +126,21 @@ function copyDevExtensionFonts(): Plugin {
           MANROPE_FONT_FILES.map((fileName) =>
             copyManropeFontForCrxDev(server.config.build.outDir, fileName)
           )
+        );
+        await Promise.all(
+          INTERFACE_FONT_FILES.map(async (fileName) => {
+            const source = join(
+              BUILD_LAYOUT.repositoryRoot,
+              'node_modules',
+              '@fontsource-variable',
+              'inter',
+              'files',
+              fileName
+            );
+            const target = join(server.config.build.outDir, 'assets', fileName);
+            await mkdir(dirname(target), { recursive: true });
+            await copyFile(source, target);
+          })
         );
         copied = true;
       };

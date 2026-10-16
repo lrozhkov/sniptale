@@ -79,7 +79,7 @@ export function FeedbackList(props: {
               key={record.annotationId}
               type="button"
               className={[
-                'block w-full rounded-[9px] border-l-2 px-3 py-3 text-left',
+                'block w-full rounded-[4px] border-l px-3 py-3 text-left',
                 'border-transparent hover:bg-[var(--sniptale-color-surface-input)]',
                 'focus-visible:border-[color:var(--sniptale-color-accent)] focus-visible:outline-none',
               ].join(' ')}
@@ -99,12 +99,12 @@ export function FeedbackList(props: {
                 <strong className={`text-xs ${getDesignReviewActionTone(action)}`}>
                   {translate(option.labelKey)}
                 </strong>
-                <span className="ml-auto truncate text-[10px] text-[var(--sniptale-color-text-dim)]">
+                <span className="ml-auto truncate text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
                   {getElementLabel(record)}
                 </span>
               </span>
               <span
-                className="mt-2 block overflow-hidden pl-6 text-xs leading-5"
+                className="sniptale-design-review-authored-text mt-2 block overflow-hidden pl-6 text-xs leading-5"
                 data-ui="content.design-review.feedback-summary"
                 style={{
                   WebkitBoxOrient: 'vertical',
@@ -114,7 +114,7 @@ export function FeedbackList(props: {
               >
                 {getRecordSummary(record)}
               </span>
-              <span className="mt-1 block pl-6 text-[10px] text-[var(--sniptale-color-text-dim)]">
+              <span className="mt-1 block pl-6 text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
                 {translate('content.designReview.panelPage')} {getPageLabel(record)}
               </span>
             </button>

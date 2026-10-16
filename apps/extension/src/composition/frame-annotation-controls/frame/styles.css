@@ -103,3 +103,23 @@
 .sniptale-frame-style-editor-layer {
   display: contents;
 }
+
+.sniptale-content-appearance-surface .sniptale-frame-style-preset-row .sniptale-glass-preset-item {
+  padding-right: 80px;
+}
+
+.sniptale-content-appearance-surface .sniptale-frame-style-preset-actions {
+  gap: 4px;
+}
+
+.sniptale-content-appearance-surface .sniptale-frame-style-preset-action {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.sniptale-content-appearance-surface .sniptale-frame-style-preset-action:hover:not(:disabled),
+.sniptale-content-appearance-surface .sniptale-frame-style-preset-action:focus-visible {
+  color: var(--sniptale-color-text-primary);
+}
