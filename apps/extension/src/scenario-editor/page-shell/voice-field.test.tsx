@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VoiceInputServerEvent } from '@sniptale/runtime-contracts/voice-input';
 const io = vi.hoisted(() => ({
+  phase: 'idle' as 'idle' | 'stopping',
   start: vi.fn(),
   stop: vi.fn(),
   change: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('../../composition/voice-input/session', () => ({
     io.transcript = args.onTranscript;
     return {
       actions: { start: io.start, stop: io.stop },
-      state: { active: false, audioLevel: 0, phase: 'idle', errorCode: null },
+      state: { active: false, audioLevel: 0, phase: io.phase, errorCode: null },
     };
   },
 }));
@@ -38,6 +39,7 @@ let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
   vi.clearAllMocks();
+  io.phase = 'idle';
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.append(host);
@@ -273,4 +275,31 @@ it('hides migrated Clear while disabled without changing the accepted text', asy
   );
   expect(host.querySelector('.sniptale-field-clear')).toBeNull();
   expect(field().value).toBe('hello world');
+});
+
+it('keeps the stopping dictation status exposed after focus leaves the field', async () => {
+  io.phase = 'stopping';
+  await mount();
+  expect(host.querySelector('.guide-voice-field')?.hasAttribute('data-voice-visible')).toBe(true);
+});
+
+it('provides an ordinary field placeholder without adding text to authored prose', async () => {
+  const renderField = (props: {
+    singleLine?: boolean;
+    formControl?: boolean;
+    placeholder?: string;
+  }) =>
+    act(async () =>
+      root.render(
+        <GuideVoiceField aria-label="Project name" value="" onValueChange={vi.fn()} {...props} />
+      )
+    );
+  await renderField({ singleLine: true });
+  expect(field().placeholder).toBe('Project name');
+  await renderField({ formControl: true, placeholder: 'Write a request' });
+  expect(field().placeholder).toBe('Write a request');
+  await renderField({ formControl: true });
+  expect(field().placeholder).toBe('Project name');
+  await renderField({});
+  expect(field().placeholder).toBe('');
 });

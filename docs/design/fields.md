@@ -53,3 +53,10 @@ Empty editable fields keep an explicit placeholder. Preserve a useful caller exa
 Fields with trailing actions use one compound row: a shrinking flexible field and automatic action width. Pin actions to the trailing edge. Expand the field across the available space. Preserve this relationship at narrow and wide container widths.
 
 Reserve usable text space separately from Clear, voice, and submit targets in compound fields. Adding an action must not consume the query or value area. Use an explicit text budget for the editing role and let translated action labels keep their natural width. Measure the remaining text area after padding and reserved targets. The outer field width alone does not prove usability.
+
+
+For a field with Clear and dictation, reserve each target independently of its visibility. Removing an empty-field Clear must not move the microphone or change text wrapping. Keep a usable text budget before collapsing other header commands. A multiline AI prompt can retain separate upper Clear and lower dictation actions. Preserve that composition instead of forcing both actions onto one line.
+
+Idle dictation uses a quiet icon that brightens on hover. Keep active, stopping, and error feedback visible outside hover and focus. Derive document editing icons from the local paper and ink, including Clear hover. Do not use a dark shell's bright foreground on light document content. Clearing a dictated draft stops its insertion owner before accepting the empty value. Reject late speech for that cleared placement while preserving a new deliberate recording.
+
+Integration references: [Guide voice fields](../../apps/extension/src/scenario-editor/page-shell/voice-field.tsx) and [review composer](../../apps/extension/src/gallery/video-review/composer.tsx). Their existing native scenarios cover real field composition. The field specimen does not replace browser speech acquisition or permission handling.

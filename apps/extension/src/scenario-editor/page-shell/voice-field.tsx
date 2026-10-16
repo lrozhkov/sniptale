@@ -116,7 +116,9 @@ export function GuideVoiceField(props: VoiceFieldProps) {
     className: props.className,
     disabled: props.disabled,
     maxLength: props.maxLength ?? GUIDE_LIMITS.maxTextLength,
-    placeholder: props.placeholder,
+    placeholder:
+      props.placeholder ??
+      (props.singleLine || props.formControl ? props['aria-label'] : undefined),
     style: props.style,
     value: props.value,
     ...bindings,
@@ -124,7 +126,13 @@ export function GuideVoiceField(props: VoiceFieldProps) {
   return (
     <span
       className="guide-voice-field"
-      data-voice-visible={voice.state.active || voice.state.errorCode !== null || undefined}
+      data-voice-visible={
+        voice.state.active ||
+        voice.state.phase === 'stopping' ||
+        voice.state.errorCode !== null ||
+        undefined
+      }
+      data-clearable={(compact && props.clearable !== false) || undefined}
       data-single-line={props.singleLine || undefined}
       onClickCapture={(event) => {
         if (

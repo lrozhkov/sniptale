@@ -122,9 +122,48 @@ for (const theme of ['light', 'dark'] as const) {
     expect(mic).not.toBeNull();
     expect(mic!.y).toBeGreaterThan(field!.y + 8);
     expect(mic!.y + mic!.height).toBeLessThanOrEqual(field!.y + field!.height);
-    await testInfo.attach(`ai-instruction-${theme}`, {
-      body: await page.screenshot(),
-      contentType: 'image/png',
+    const prompt = dialog.locator('.guide-ai-prompt-input textarea');
+    const acceptedPrompt = await prompt.inputValue();
+    expect(
+      await dialog.locator('[data-ui="scenario.voice-input"]').evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        return node.contains(
+          document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+        );
+      })
+    ).toBe(true);
+
+    await dialog.locator('.guide-ai-prompt-input .guide-voice-field').hover();
+    const clearHit = await dialog
+      .locator('.guide-ai-prompt-input .sniptale-field-clear')
+      .evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        const style = getComputedStyle(node);
+        const parent = node.parentElement!;
+        const textarea = parent.querySelector('textarea')!;
+        return {
+          owned: node.contains(top),
+          top: top?.outerHTML.slice(0, 180),
+          box: box.toJSON(),
+          position: style.position,
+          z: style.zIndex,
+          pointer: style.pointerEvents,
+          parent: parent.className,
+          fieldZ: getComputedStyle(textarea).zIndex,
+        };
+      });
+    expect(clearHit.owned, JSON.stringify(clearHit)).toBe(true);
+    await dialog.locator('.guide-ai-prompt-input .sniptale-field-clear').click();
+    await expect(prompt).toHaveValue('');
+    await expect(prompt).toBeFocused();
+    const clearedMic = (await dialog.locator('[data-ui="scenario.voice-input"]').boundingBox())!;
+    expect(Math.abs(clearedMic.x - mic!.x)).toBeLessThanOrEqual(1);
+    await prompt.fill(acceptedPrompt);
+
+    await page.screenshot({
+      path: testInfo.outputPath(`ai-instruction-${theme}.png`),
+      fullPage: false,
     });
     await dialog.getByRole('button', { name: 'Get suggestions', exact: true }).click();
     await expect(dialog.locator('[aria-busy="true"]')).toBeVisible();

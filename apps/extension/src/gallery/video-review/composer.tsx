@@ -61,7 +61,10 @@ export function ReviewComposer(props: {
           disabled={props.busy}
           rows={4}
           maxLength={100_000}
-          onChange={(text) => props.onChange({ ...props.annotation, text })}
+          onChange={(text) => {
+            voice.stop();
+            props.onChange({ ...props.annotation, text });
+          }}
           onSelect={voice.moveCaret}
         />
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-2">

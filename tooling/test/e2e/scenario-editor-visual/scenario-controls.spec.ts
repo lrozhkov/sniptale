@@ -81,7 +81,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('document dictation controls overlay prose without changing content flow', async ({
+test('document dictation controls reserve a stable readable editing strip', async ({
   page,
   hostOrigin,
 }) => {
@@ -116,15 +116,9 @@ test('document dictation controls overlay prose without changing content flow', 
   expect(Object.keys(metrics).length, 'document exposes voice fields').toBeGreaterThan(0);
   for (const [label, metric] of Object.entries(metrics)) {
     expect.soft(metric.inside, `${label}: controls stay inside the field`).toBe(1);
-    if (metric.prose) {
-      expect
-        .soft(metric.paddingRight, `${label}: overlay does not narrow prose`)
-        .toBe(metric.paddingLeft);
-    } else {
-      expect
-        .soft(metric.paddingRight, `${label}: title retains its control strip`)
-        .toBeGreaterThanOrEqual(metric.controlWidth + metric.rightInset);
-    }
+    expect
+      .soft(metric.paddingRight, `${label}: text stays clear of both editing actions`)
+      .toBeGreaterThanOrEqual(metric.controlWidth + metric.rightInset);
   }
   issues.assertClean();
 });
@@ -189,10 +183,13 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
       const control = field.querySelector<HTMLElement>('.guide-voice-control')!;
       const fieldRect = input.getBoundingClientRect();
       const controlRect = control.getBoundingClientRect();
+      const clearRect = field.querySelector('.sniptale-field-clear')?.getBoundingClientRect();
+      const stripRight = Math.max(controlRect.right, clearRect?.right ?? controlRect.right);
+      const stripLeft = Math.min(controlRect.left, clearRect?.left ?? controlRect.left);
       metrics[`${input.getAttribute('aria-label') ?? input.tagName}#${index++}`] = {
-        rightInset: fieldRect.right - controlRect.right,
+        rightInset: fieldRect.right - stripRight,
         paddingRight: parseFloat(getComputedStyle(input).paddingRight),
-        controlWidth: controlRect.width,
+        controlWidth: stripRight - stripLeft,
         inside:
           controlRect.top >= fieldRect.top - 1 && controlRect.bottom <= fieldRect.bottom + 1
             ? 1
@@ -725,4 +722,134 @@ test('MV3 fixture applies the configured CSS viewport before application navigat
     ...viewport,
     dpr: 1,
   });
+});
+
+for (const locale of ['ru', 'en'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const viewport of [
+      { width: 1280, height: 560 },
+      { width: 1920, height: 900 },
+    ]) {
+      test(`voice and Clear stay aligned ${locale} ${theme} ${viewport.width}`, async ({
+        page,
+        hostOrigin,
+      }, info) => {
+        await openVisualHarness(page, hostOrigin, theme, locale, viewport);
+        const name = page.locator('.guide-project-name .guide-voice-field');
+        const prose = page.locator('.guide-document .guide-voice-field:has(textarea)').first();
+        for (const [role, field] of [
+          ['name', name],
+          ['prose', prose],
+        ] as const) {
+          const input = field.locator('input, textarea');
+          await input.scrollIntoViewIfNeeded();
+          await input.fill('A readable example with text and two separate actions');
+          await input.focus();
+          const microphone = field.locator('.guide-voice-control');
+          const clear = field.locator('.sniptale-field-clear');
+          await expect(clear).toBeVisible();
+          if (role === 'prose') {
+            await expect
+              .soft(microphone.locator('button').first())
+              .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+            await clear.hover();
+            const contrast = await clear.evaluate((node) => {
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d')!;
+              const luminance = (color: string) => {
+                context.fillStyle = color;
+                context.fillRect(0, 0, 1, 1);
+                return [...context.getImageData(0, 0, 1, 1).data]
+                  .slice(0, 3)
+                  .reduce((sum, channel, index) => {
+                    const value = channel / 255;
+                    return (
+                      sum +
+                      (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4) *
+                        [0.2126, 0.7152, 0.0722][index]!
+                    );
+                  }, 0);
+              };
+              const foreground = luminance(getComputedStyle(node).color);
+              const paper = luminance(getComputedStyle(node).getPropertyValue('--guide-paper'));
+              return (Math.max(foreground, paper) + 0.05) / (Math.min(foreground, paper) + 0.05);
+            });
+            expect
+              .soft(contrast, 'Clear must remain visible on the authored paper')
+              .toBeGreaterThanOrEqual(3);
+          }
+
+          const before = await microphone.boundingBox();
+          const fieldBefore = (await input.boundingBox())!;
+          const textBefore = await input.evaluate(
+            (node) => getComputedStyle(node).paddingInlineEnd
+          );
+          const clearBox = (await clear.boundingBox())!;
+          expect.soft(before!.x + before!.width).toBeLessThanOrEqual(clearBox.x - 1);
+          await page.screenshot({ path: info.outputPath(`${role}-focused.png`), fullPage: false });
+          await clear.click();
+          await expect(input).toHaveValue('');
+          if (role === 'name')
+            await expect.soft(input).toHaveAttribute('placeholder', /.+/, { timeout: 500 });
+          await expect(input).toBeFocused();
+          const after = (await microphone.boundingBox())!;
+          const fieldAfter = (await input.boundingBox())!;
+          const insetBefore = fieldBefore.x + fieldBefore.width - before!.x - before!.width;
+          const insetAfter = fieldAfter.x + fieldAfter.width - after.x - after.width;
+          expect
+            .soft(Math.abs(insetBefore - insetAfter), `${role}: microphone target stays in place`)
+            .toBeLessThanOrEqual(1);
+          expect
+            .soft(
+              await input.evaluate((node) => getComputedStyle(node).paddingInlineEnd),
+              `${role}: text width stays stable`
+            )
+            .toBe(textBefore);
+          await page.screenshot({ path: info.outputPath(`${role}-cleared.png`), fullPage: false });
+        }
+      });
+    }
+  }
+}
+
+test('voice header keeps text room at desktop minimum widths', async ({
+  page,
+  hostOrigin,
+}, info) => {
+  for (const width of [1100, 1279, 1280, 1281]) {
+    await openVisualHarness(page, hostOrigin, 'light', 'en', { width, height: 560 });
+    const header = page.locator('.guide-page-header');
+    const input = header.locator('.guide-project-name input');
+    const room = await input.evaluate((node) => {
+      const style = getComputedStyle(node);
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d')!;
+      context.font = style.font;
+      return {
+        available:
+          node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        minimum: context.measureText('0').width * 8,
+      };
+    });
+    expect(room.available, JSON.stringify(room)).toBeGreaterThanOrEqual(room.minimum - 1);
+    for (const icon of await header.locator('button[data-icon-only="true"] svg').all())
+      await expect(icon).toBeVisible();
+    if (width < 1280) {
+      const scrolled = await page.locator('.guide-page').evaluate((root) => {
+        let owner: Element | null = root;
+        while (owner) {
+          if (owner.scrollWidth > owner.clientWidth) {
+            owner.scrollLeft = owner.scrollWidth;
+            if (owner.scrollLeft > 0) return true;
+          }
+          owner = owner.parentElement;
+        }
+        return false;
+      });
+      expect(scrolled, 'The minimum desktop workspace keeps an actual outer scroll owner').toBe(
+        true
+      );
+    }
+    await page.screenshot({ path: info.outputPath(`header-${width}.png`), fullPage: false });
+  }
 });

@@ -283,7 +283,10 @@
   top: 4px;
   right: 4px;
 }
-.sniptale-scenario-workspace .guide-ai-prompt-input .guide-voice-control {
+.sniptale-scenario-workspace
+  .guide-ai-prompt-input
+  .guide-voice-field[data-clearable]
+  .guide-voice-control {
   top: auto;
   right: 8px;
 }
@@ -302,4 +305,8 @@
   border-radius: 4px;
   padding: 8px;
   font: 500 13px / 18px var(--sniptale-font-interface);
+}
+
+.sniptale-scenario-workspace .guide-ai-prompt-input .guide-voice-field[data-clearable] > textarea {
+  padding-inline-end: 40px;
 }

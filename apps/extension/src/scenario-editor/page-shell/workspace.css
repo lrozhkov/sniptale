@@ -1862,8 +1862,7 @@ html[data-guide-width-resizing] * {
     .guide-block-height,
     .guide-action-menu-anchor > button,
     .guide-image-tools > button,
-    .guide-insertion-chrome > button,
-    .guide-voice-control > button
+    .guide-insertion-chrome > button
   ):hover:not(:disabled):not([aria-pressed='true']) {
   background: color-mix(
     in srgb,
@@ -1993,8 +1992,7 @@ html[data-guide-height-resizing] * {
     .guide-block-grip,
     .guide-block-width,
     .guide-block-height,
-    .guide-image-tools > button,
-    .guide-voice-control > button
+    .guide-image-tools > button
   ) {
   --guide-tool-surface: rgb(from var(--guide-paper) r g b / 0.94);
   --guide-tool-border: color-mix(in srgb, var(--guide-ink) 18%, transparent);
@@ -2018,8 +2016,7 @@ html[data-guide-height-resizing] * {
     .guide-block-grip,
     .guide-block-width,
     .guide-block-height,
-    .guide-image-tools > button,
-    .guide-voice-control > button
+    .guide-image-tools > button
   ):not(:hover):not(:active):not([aria-expanded='true']):not([aria-pressed='true']) {
   background: var(--guide-tool-surface) !important;
 }
@@ -2030,9 +2027,7 @@ html[data-guide-height-resizing] * {
   > button[aria-expanded='true'] {
   background: var(--guide-tool-hover-surface) !important;
 }
-.guide-page
-  .guide-document
-  :is(.guide-image-tools > button, .guide-voice-control > button)[aria-pressed='true'] {
+.guide-page .guide-document .guide-image-tools > button[aria-pressed='true'] {
   border-color: var(--sniptale-color-accent);
   background: color-mix(
     in srgb,
@@ -2040,12 +2035,7 @@ html[data-guide-height-resizing] * {
     var(--guide-tool-surface)
   ) !important;
 }
-.guide-page
-  .guide-document
-  :is(
-    .guide-image-surface .guide-image-tools > button,
-    .guide-voice-field .guide-voice-control > button
-  ):disabled {
+.guide-page .guide-document :is(.guide-image-surface .guide-image-tools > button):disabled {
   opacity: 1;
   border-color: var(--guide-muted);
   color: var(--guide-muted) !important;
@@ -2059,8 +2049,7 @@ html[data-guide-height-resizing] * {
     .guide-block-width,
     .guide-block-height,
     .guide-action-menu-anchor > button,
-    .guide-image-tools > button,
-    .guide-voice-control > button
+    .guide-image-tools > button
   ):hover:not(:disabled):not([aria-pressed='true']) {
   background: var(--guide-tool-hover-surface) !important;
   color: var(--guide-ink) !important;
@@ -2069,12 +2058,10 @@ html[data-guide-height-resizing] * {
 .guide-page .guide-voice-control > button {
   border: 0;
   background: transparent;
-  color: var(--sniptale-color-text-primary);
   box-shadow: none;
 }
 .guide-page .guide-voice-control > button:hover:not(:disabled) {
-  background: var(--sniptale-color-surface-hover);
-  color: var(--sniptale-color-text-primary-strong);
+  background: transparent;
 }
 .guide-outline-row .guide-item-actions .guide-action-menu-anchor > button {
   border: 0;
@@ -2583,16 +2570,33 @@ html[data-guide-height-resizing] * {
   top: 4px;
   transform: none;
 }
-.sniptale-scenario-workspace .guide-voice-field:has(> .sniptale-field-clear) .guide-voice-control {
-  right: 32px;
+.sniptale-scenario-workspace .guide-voice-field[data-clearable] .guide-voice-control {
+  right: 40px;
 }
-.sniptale-scenario-workspace
-  .guide-voice-field:has(> .sniptale-field-clear)
-  > :is(input, textarea) {
+.sniptale-scenario-workspace .guide-voice-field[data-clearable] > :is(input, textarea) {
   padding-inline-end: 68px;
 }
 @container guide-nav (max-width: 180px) {
   .sniptale-scenario-workspace .guide-section-tab [data-command-caption] {
     display: none;
   }
+}
+
+.sniptale-scenario-workspace .guide-project-name {
+  min-width: calc(8ch + 70px);
+}
+.sniptale-scenario-workspace .guide-project-name-measure {
+  padding-inline-end: 68px;
+}
+
+.guide-document .guide-voice-field {
+  --sniptale-color-text-dim: color-mix(in srgb, var(--guide-ink) 65%, var(--guide-paper));
+  --sniptale-color-text-secondary: color-mix(in srgb, var(--guide-ink) 65%, var(--guide-paper));
+  --sniptale-color-text-primary: var(--guide-ink);
+  --sniptale-color-text-primary-strong: var(--guide-ink);
+}
+
+.sniptale-scenario-workspace .guide-voice-field:is(:hover, :focus-within) > .sniptale-field-clear {
+  opacity: 1;
+  pointer-events: auto;
 }
