@@ -2,46 +2,21 @@
 
 This file is generated from the installed production dependency closure, package-lock, and reviewed pinned sources.
 
-## Manrope bundled font
+## Golos UI bundled font
 
-- Source package: `@fontsource-variable/manrope` 5.3.0
+- Source package: `@sniptale/ui`
+- Font version: `2.000`
 - License: `OFL-1.1`
-- Copyright: Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)
-- License text: [`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt)
+- Copyright: Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos UI".
+- License text: [`packages/ui/src/styles/golos-ui/LICENSE.txt`](packages/ui/src/styles/golos-ui/LICENSE.txt)
 
-| Bundled file | Installed source | SHA-256 |
+| Bundled file | Source file | SHA-256 |
 | --- | --- | --- |
-| `apps/extension/public/fonts/manrope-cyrillic-wght-normal.woff2` | `node_modules/@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2` | `c268b459a9329e59fecf39a17618efd44c71735532048d60b12aab76a8c14914` |
-| `apps/extension/public/fonts/manrope-latin-ext-wght-normal.woff2` | `node_modules/@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2` | `3911b66d9f2e005a4b989223405d0e5032619c668597ba467cc76a23c8fffcfb` |
-| `apps/extension/public/fonts/manrope-latin-wght-normal.woff2` | `node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2` | `a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972` |
+| `packages/ui/src/styles/golos-ui/golos-ui-vf.woff2` | `packages/ui/src/styles/golos-ui/golos-ui-vf.woff2` | `ec7584959184bcbd5b6cf65c5aacc2ad3ca3afc42ec3b0976f0260c33d1900a1` |
 
 The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
 
 ## Production dependency licenses
-
-### `@fontsource-variable/inter` 5.3.0
-
-- Installed path: `node_modules/@fontsource-variable/inter`
-- Declared license expression: `OFL-1.1`
-- Selected license: `OFL-1.1`
-- License source class: `installed-file`
-- License source: `node_modules/@fontsource-variable/inter/LICENSE`
-- License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt`](LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt)
-- License text SHA-256: `3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345`
-- Repository/source: https://github.com/fontsource/font-files.git
-
-### `@fontsource-variable/manrope` 5.3.0
-
-- Installed path: `node_modules/@fontsource-variable/manrope`
-- Declared license expression: `OFL-1.1`
-- Selected license: `OFL-1.1`
-- License source class: `installed-file`
-- License source: `node_modules/@fontsource-variable/manrope/LICENSE`
-- License storage: `canonical-file`
-- Redistributed license text: [`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt)
-- License text SHA-256: `d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30`
-- Repository/source: https://github.com/fontsource/font-files.git
 
 ### `@fontsource/marck-script` 5.3.0
 

@@ -17,16 +17,10 @@ import contentHostStyles from './host.css?inline';
 
 export { installContentInterfaceFonts } from './interface-fonts';
 
-const CONTENT_ENTRYPOINT_FONT_URL_PATTERNS = [
-  /url\((['"]?)\/node_modules\/@fontsource-variable\/manrope\/files\/(manrope-[\w-]+\.woff2)\1\)/g,
-  /url\((['"]?)@fontsource-variable\/manrope\/files\/(manrope-[\w-]+\.woff2)\1\)/g,
-  /url\((['"]?)\.\/(manrope-[\w-]+\.woff2)\1\)/g,
-] as const;
-
 const CONTENT_ENTRYPOINT_INTERFACE_FONT_URL_PATTERNS = [
-  /url\((['"]?)\/node_modules\/@fontsource-variable\/inter\/files\/(inter-[\w-]+\.woff2)\1\)/g,
-  /url\((['"]?)@fontsource-variable\/inter\/files\/(inter-[\w-]+\.woff2)\1\)/g,
-  /url\((['"]?)\.\/(inter-[\w-]+\.woff2)\1\)/g,
+  /url\((['"]?)\/packages\/ui\/src\/styles\/golos-ui\/(golos-ui-vf\.woff2)\1\)/g,
+  /url\((['"]?)\.\/golos-ui\/(golos-ui-vf\.woff2)\1\)/g,
+  /url\((['"]?)\.\/(golos-ui-vf\.woff2)\1\)/g,
 ] as const;
 
 const CONTENT_ENTRYPOINT_CALLOUT_FONT_URL_PATTERNS = [
@@ -294,26 +288,12 @@ export function resolveContentEntrypointStyleUrls(styles: string): string {
       }),
     styles
   );
-  const withManropeUrls = CONTENT_ENTRYPOINT_FONT_URL_PATTERNS.reduce(
-    (resolvedStyles, pattern, index) => {
-      return resolvedStyles.replace(pattern, (_match, _quote: string, fileName: string) => {
-        const resourcePath =
-          index === 0
-            ? `node_modules/@fontsource-variable/manrope/files/${fileName}`
-            : `fonts/${fileName}`;
-        const runtimeUrl = resolveRuntimeAssetUrl(resourcePath);
-
-        return runtimeUrl ? `url("${runtimeUrl}")` : _match;
-      });
-    },
-    withInterfaceUrls
-  );
   return CONTENT_ENTRYPOINT_CALLOUT_FONT_URL_PATTERNS.reduce((resolvedStyles, pattern) => {
     return resolvedStyles.replace(pattern, (_match, _quote: string, fileName: string) => {
       const runtimeUrl = resolveRuntimeAssetUrl(`fonts/${fileName}`);
       return runtimeUrl ? `url("${runtimeUrl}")` : _match;
     });
-  }, withManropeUrls);
+  }, withInterfaceUrls);
 }
 
 export function createContentEntrypointStyles(): string {

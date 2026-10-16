@@ -70,6 +70,7 @@ function ReviewCaptionStyleControls(props: {
 export function ReviewCaptionSceneControls(props: {
   settings: ReviewCaptionSettings | undefined;
   disabled?: boolean;
+  locked?: boolean;
   onChange(settings: ReviewCaptionSettings): void;
 }) {
   const settings = props.settings ?? createReviewCaptionSettings();
@@ -77,14 +78,20 @@ export function ReviewCaptionSceneControls(props: {
     <div className="min-w-0 space-y-2" data-ui="gallery.videoReview.captionScene">
       <ToggleField
         value={settings.enabled}
-        disabled={props.disabled}
+        disabled={props.disabled || props.locked}
         label={translate('gallery.videoReview.captionsEnabled')}
         onChange={(enabled) => props.onChange({ ...settings, enabled })}
       />
+      {props.locked && (
+        <p className="m-0 text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('gallery.videoReview.textTrack')} —{' '}
+          {translate('videoEditor.timeline.trackLocked')}
+        </p>
+      )}
       {settings.enabled && (
         <ReviewCaptionStyleControls
           style={settings.style}
-          disabled={props.disabled ?? false}
+          disabled={!!(props.disabled || props.locked)}
           onChange={(style) => props.onChange({ ...settings, style })}
         />
       )}

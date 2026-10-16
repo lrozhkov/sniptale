@@ -82,7 +82,7 @@ function renderReadyHint(
   }
 
   return (
-    <div className="px-1 text-[11px] text-[var(--sniptale-color-text-dim)]">
+    <div className="px-1 text-[11px] text-[var(--sniptale-color-text-muted)]">
       {translate('popup.export.noSelectableTabsHint')}
     </div>
   );

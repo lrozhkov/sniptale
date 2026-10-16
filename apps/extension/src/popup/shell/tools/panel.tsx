@@ -70,7 +70,7 @@ const TOOL_BUTTON_CLASS_NAME = [
 const OPEN_TOOLBAR_CLASS_NAME = [TOOL_BUTTON_CLASS_NAME, 'h-[50px] min-h-[50px]'].join(' ');
 const TOOL_ICON_CLASS_NAME = ['flex h-7 w-7 shrink-0 items-center justify-center'].join(' ');
 const TOOL_GLYPH_CLASS_NAME = [
-  'h-5 w-5 text-[var(--sniptale-color-text-secondary)]',
+  'h-5 w-5 stroke-[1.75] text-[var(--sniptale-color-text-secondary)]',
   'transition-transform duration-180 ease-out motion-reduce:transition-none',
   'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
 ].join(' ');
@@ -102,7 +102,7 @@ function ToolButton(props: {
         <span className="block text-[11px] font-semibold leading-tight text-[var(--sniptale-color-text-primary)]">
           {label}
         </span>
-        <span className="mt-0.5 line-clamp-2 block text-[9px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">
+        <span className="mt-0.5 line-clamp-2 block text-[10px] leading-3 text-[var(--sniptale-color-text-muted)]">
           {hint}
         </span>
       </span>

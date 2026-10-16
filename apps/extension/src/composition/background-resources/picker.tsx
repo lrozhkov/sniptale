@@ -117,32 +117,36 @@ export function BackgroundImagePicker(props: {
           if (file) void run(async (signal) => ({ file: await prepareImage(file, signal) }));
         }}
       />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={backgroundActionClassName}
+          className={`${backgroundActionClassName} grow`}
           disabled={isBusy}
           onClick={() => input.current?.click()}
         >
           {isBusy && pendingId === undefined ? (
             <LoaderCircle
               size={14}
-              className="animate-spin motion-reduce:animate-none"
+              className="shrink-0 animate-spin motion-reduce:animate-none"
               aria-hidden="true"
             />
           ) : (
-            <FolderOpen size={14} />
+            <FolderOpen size={14} className="shrink-0" aria-hidden="true" />
           )}
-          {translate('settings.editor.backgrounds.upload')}
+          <span className="min-w-0 whitespace-normal">
+            {translate('settings.editor.backgrounds.upload')}
+          </span>
         </button>
         <button
           type="button"
-          className={backgroundActionClassName}
+          className={`${backgroundActionClassName} grow`}
           disabled={isBusy}
           onClick={() => setLibrary(true)}
         >
-          <Library size={14} />
-          {translate('settings.editor.backgrounds.library')}
+          <Library size={14} className="shrink-0" aria-hidden="true" />
+          <span className="min-w-0 whitespace-normal">
+            {translate('settings.editor.backgrounds.library')}
+          </span>
         </button>
       </div>
       {(failed || catalog.status === 'failed') && (

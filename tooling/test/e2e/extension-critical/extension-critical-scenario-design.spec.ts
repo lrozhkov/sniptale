@@ -288,7 +288,7 @@ async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
   const title = page.getByRole('textbox', { name: t('scenario.editor.projectLabel'), exact: true });
   const text = page.locator('article#first textarea.guide-description');
   const authoredBefore = await authoredStyle(page);
-  expect(authoredBefore.family).toContain('Manrope');
+  expect(authoredBefore.family).toContain('Sniptale Interface');
   expect(authoredBefore.size).toBe('16px');
   expect(authoredBefore.lineHeight).toBe('26.4px');
   expect(authoredBefore.weight).toBe('400');

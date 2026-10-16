@@ -288,7 +288,7 @@ header.reference-header {
   margin: 4px 0;
 }
 .material-sample strong {
-  font-weight: 600;
+  font-weight: var(--font-heading-weight);
 }
 .focus-probe {
   width: 100%;
@@ -440,14 +440,14 @@ html[data-input-mode='pointer'] .theme input:focus-visible + .property-face {
   cursor: text;
 }
 .theme :is(.text-label, .number-label, .field-label) {
-  cursor: pointer;
+  cursor: default;
 }
 .theme :disabled {
   cursor: not-allowed;
 }
 
 .theme :is(.number-value-shell input, .number-unit, .control, .search, .text-input, .param-value) {
-  font: 500 var(--font-control-size)/var(--font-control-line) var(--font-ui);
+  font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
   color: var(--text);
 }
 
@@ -472,7 +472,7 @@ html[data-input-mode='pointer'] .theme input:focus-visible + .property-face {
   margin: 0;
 }
 .density-action > .sample-label {
-  font: 500 var(--font-control-size)/var(--font-control-line) var(--font-ui);
+  font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
   margin: 0 0 4px;
 }
 @media (max-width: 760px) {
@@ -487,9 +487,10 @@ html[data-input-mode='pointer'] .theme input:focus-visible + .property-face {
   font-optical-sizing: auto;
 }
 .theme .reference-case h3 {
+  color: var(--secondary);
   font-size: 14px;
   line-height: 20px;
-  font-weight: 600;
+  font-weight: var(--font-heading-weight);
 }
 .theme
   :is(
@@ -520,7 +521,7 @@ html[data-input-mode='pointer'] .theme input:focus-visible + .property-face {
 }
 
 .dialog-header h3 {
-  font-weight: 600;
+  font-weight: var(--font-heading-weight);
 }
 .text-fit.action-button {
   max-width: 100%;

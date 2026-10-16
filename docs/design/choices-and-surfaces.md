@@ -29,15 +29,15 @@ Stacked fields keep 8px between fields and 4px between name and value. Keep the 
 
 Measure labels, descriptions, icons, check column, padding, and an actual scrollbar. Clamp to the viewport and wrap long values. In a narrow inspector, an explicit section boundary defines menu width and horizontal position across name and value columns. The surface declares content-fit or full-column placement. A full-column menu covers the group’s name/value region. A content-fit menu can align to the trailing field edge. Neither mode can cover the inspector scrollbar or adjacent category rail.
 
-Measure the content box after actual padding, borders, and scrollbar width. Do not create per-parameter width exceptions. Use 5px shell padding, 8px option padding, a 36px minimum row, and the shared 4px radius. Use light glass with the [shared fallbacks](foundations.md). Long lists scroll inside the menu. Use a narrow neutral scrollbar separated from highlighting.
+Measure the content box after actual padding, borders, and scrollbar width. Do not create per-parameter width exceptions. Use 5px shell padding, 8px option padding, a 32px minimum row, and the shared 4px radius. Use light glass with the [shared fallbacks](foundations.md). Long lists scroll inside the menu. Use a narrow neutral scrollbar separated from highlighting.
 
 Reserve scrollbar space only when overflow exists. Necessary check columns remain stable.
 
 ## Pointer and keyboard contract
 
-The label, field padding, label/value gap, and trigger share one activation region. Only the value field or dropdown trigger owns hover paint. Name or gap hover does not highlight the row. Preserve the declared label activation and visible keyboard focus. A click opens or closes once. Reopening requires another activation. Prevent label forwarding from reopening the menu. Preserve native text editing inside searchable triggers.
+Only the actual dropdown trigger and its complete padding activate the menu. Parameter names and label/value gaps remain inactive. Retain accessible names through aria-labelledby without native label forwarding. A click opens or closes once. Preserve visible keyboard focus and native text editing inside searchable triggers.
 
-Unused space outside the declared field remains inactive. Options have contiguous hit regions. Paint highlight surfaces with 1px top/bottom insets, without dead click gaps. Hover never commits a value. Clear pointer highlighting over disabled rows, menu padding, and outside the menu. The accepted check remains visible. Resume from an available keyboard option when arrow navigation returns.
+Unused space outside the declared field remains inactive. Options use 32px minimum rows and true 2px gaps. Descriptions and wrapped content increase row height naturally. Do not force rich options into 32px. Keep neighboring selected and hovered surfaces visibly separate. Gaps do not activate options. Hover never commits a value. Clear pointer highlighting over disabled rows, menu padding, and outside the menu. The accepted check remains visible. Resume from an available keyboard option when arrow navigation returns.
 
 Keep the active option visible and distinguish it from accepted selection.
 
@@ -50,3 +50,5 @@ Represent mixed, empty, custom, loading, unavailable, and error states explicitl
 Segment motion must not delay acceptance. Initial layout and resize do not animate selection. The chevron folds upward while open. Keep its drawing box and stroke fixed. Do not animate field geometry on hover. Respect reduced motion and dismiss through the layer owner when the anchor becomes invisible.
 
 [WAI combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
+
+In the explicit compact inspector, segments use 32px height and 6px horizontal padding per option. Stack segments below their name before fallback. Use a dropdown only when complete labels and actual insets exceed the full available width. General controls retain their existing height.

@@ -303,27 +303,23 @@ export function ReviewCursorPathSettings(props: {
   return (
     <fieldset
       disabled={props.disabled}
-      className="m-0 min-w-0 border-0 p-0"
+      className="sniptale-parameter-stack m-0 min-w-0 border-0 p-0"
       data-ui="cursorFocusPath.settings"
     >
-      <div className="min-w-0 space-y-1.5">
-        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {translate('videoEditor.sidebar.cursorFocusMode')}
-        </span>
-        <SegmentedRow
-          columns={2}
-          ariaLabel={translate('videoEditor.sidebar.cursorFocusMode')}
-          value={props.path.mode}
-          options={[
-            { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
-            {
-              value: 'follow',
-              label: translate('videoEditor.sidebar.cursorFocusFollow'),
-            },
-          ]}
-          onChange={(mode) => props.onChange({ ...props.path, mode })}
-        />
-      </div>
+      <SegmentedRow
+        label={translate('videoEditor.sidebar.cursorFocusMode')}
+        columns={2}
+        ariaLabel={translate('videoEditor.sidebar.cursorFocusMode')}
+        value={props.path.mode}
+        options={[
+          { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
+          {
+            value: 'follow',
+            label: translate('videoEditor.sidebar.cursorFocusFollow'),
+          },
+        ]}
+        onChange={(mode) => props.onChange({ ...props.path, mode })}
+      />
       <ReviewCameraFollowSettings
         global
         settings={

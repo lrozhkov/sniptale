@@ -1,9 +1,7 @@
 import interfaceFaces from '@sniptale/ui/styles/fonts?raw';
 import designTokens from '@sniptale/ui/styles/design-tokens?raw';
-import interCyrillic from '@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2?inline';
-import interExtended from '@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2?inline';
-import interLatin from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?inline';
-import interfaceLicense from '@fontsource-variable/inter/LICENSE?raw';
+import golosVariable from '@sniptale/ui/styles/interface-font?inline';
+import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
 import { getTourNarrationTargets } from '../project/tour-resources';
 import script from './runtime.js?tour-player-script';
 import styles from './player.css?raw';
@@ -77,17 +75,15 @@ function escape(value: string): string {
 }
 // Project the canonical interface declarations without importing application styles or authored faces.
 function interfaceFontStyles(): string {
-  const sources = new Map([
-    ['@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2', interCyrillic],
-    ['@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2', interExtended],
-    ['@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', interLatin],
-  ]);
+  const sources = new Map([['./golos-ui/golos-ui-vf.woff2', golosVariable]]);
   const faces = [...interfaceFaces.matchAll(/@font-face\s*\{[^}]*\}/gu)]
     .map(([block]) => block)
     .filter((block) => /font-family:\s*'Sniptale Interface'\s*;/u.test(block));
-  if (faces.length !== sources.size) throw new Error('Unexpected Tour interface font subsets.');
+  if (faces.length !== sources.size) throw new Error('Unexpected Tour interface font weights.');
   const seen = new Set<string>();
   const embedded = faces.map((face) => {
+    if (!/font-weight:\s*400\s+700\s*;/u.test(face))
+      throw new Error('Unexpected Tour interface font weight range.');
     const urls = [...face.matchAll(/url\(\s*(['"])([^'"]+)\1\s*\)/gu)];
     const url = urls[0]?.[2];
     const data = url ? sources.get(url) : undefined;

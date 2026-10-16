@@ -70,7 +70,7 @@ export function useReviewPanelLayout(enabled: boolean) {
   };
   const clamp = (panel: Panel, value: number) =>
     Math.round(Math.max(bounds[panel].min, Math.min(bounds[panel].max, value)));
-  const inspectorWidth = enabled ? clamp('inspector', preferences.inspector ?? 320) : 320;
+  const inspectorWidth = enabled ? clamp('inspector', preferences.inspector ?? 330) : 320;
   const timelineHeight =
     enabled && preferences.timeline !== null ? clamp('timeline', preferences.timeline) : null;
   const current = useRef({ enabled, preferences, bounds });

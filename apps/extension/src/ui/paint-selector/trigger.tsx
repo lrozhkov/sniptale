@@ -54,11 +54,7 @@ export function PaintSelectorTrigger(props: {
   };
   if (inspector)
     return (
-      <InspectorParameterRow
-        label={props.label}
-        valueMinimum={148}
-        onActivate={() => props.buttonRef.current?.click()}
-      >
+      <InspectorParameterRow label={props.label} valueMinimum={132}>
         <div className="sniptale-paint-value">
           {props.draft.kind === 'solid' ? (
             <ColorValue

@@ -133,7 +133,9 @@
     "./viewport-pan": "./src/viewport-pan/index.ts",
     "./product-modal/native-drawer": "./src/product-modal/native-drawer.tsx",
     "./material-browser/selectable-card": "./src/material-browser/selectable-card.tsx",
-    "./control-language/press": "./src/control-language/press.ts"
+    "./control-language/press": "./src/control-language/press.ts",
+    "./styles/interface-font-license": "./src/styles/golos-ui/LICENSE.txt",
+    "./styles/interface-font": "./src/styles/golos-ui/golos-ui-vf.woff2"
   },
   "dependencies": {
     "@sniptale/foundation": "0.5.1",

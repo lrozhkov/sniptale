@@ -23,7 +23,7 @@ const baseManifest = {
   web_accessible_resources: [
     {
       matches: ['http://*/*', 'https://*/*'],
-      resources: ['fonts/manrope-latin-wght-normal.woff2'],
+      resources: ['assets/golos-ui-vf.woff2'],
     },
   ],
   sandbox: {
@@ -42,7 +42,7 @@ const basePolicy = {
     {
       name: [
         'web_accessible_resources:',
-        '{"resources":["fonts/manrope-latin-wght-normal.woff2"],',
+        '{"resources":["assets/golos-ui-vf.woff2"],',
         '"matches":["http://*/*","https://*/*"],"extensionIds":[],"useDynamicUrl":false}',
       ].join(''),
     },

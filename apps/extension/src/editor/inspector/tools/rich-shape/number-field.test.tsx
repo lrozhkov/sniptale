@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { NumberField } from './number-field';
+import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -14,12 +15,13 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function renderNumberField(onChange: (value: number) => void) {
+function renderNumberField(onChange: (value: number) => void, inspector = false) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root?.render(<NumberField label="Size" value={16} min={10} max={20} onChange={onChange} />);
+    const field = <NumberField label="Size" value={16} min={10} max={20} onChange={onChange} />;
+    root?.render(inspector ? <InspectorLayout>{field}</InspectorLayout> : field);
   });
 }
 
@@ -91,42 +93,22 @@ it('selects the complete numeric draft on focus for replacement typing', () => {
   expect(input().selectionEnd).toBe(input().value.length);
 });
 
-it('toggles editing from the parameter name without reopening or taking over the stepper', () => {
+it('keeps the inspector name passive while direct numeric editing and stepping remain available', () => {
   const onChange = vi.fn();
-  renderNumberField(onChange);
+  renderNumberField(onChange, true);
   const name = [...container!.querySelectorAll('span')].find(
     (node) => node.textContent === 'Size'
   )!;
-  const clickName = () => {
-    const down = new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true });
-    name.dispatchEvent(down);
-    expect(down.defaultPrevented).toBe(true);
-    name.click();
-  };
-  const blurred = vi.fn();
-  input().addEventListener('blur', blurred);
-  act(clickName);
+  act(() => name.click());
+  expect(document.activeElement).not.toBe(input());
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => input().focus());
   expect(document.activeElement).toBe(input());
   expect(input().selectionStart).toBe(0);
   expect(input().selectionEnd).toBe(input().value.length);
-  const inputDown = new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true });
-  act(() => input().dispatchEvent(inputDown));
-  expect(inputDown.defaultPrevented).toBe(false);
-  act(() => input().click());
-  expect(document.activeElement).toBe(input());
-  act(clickName);
-  expect(document.activeElement).not.toBe(input());
-  expect(blurred).toHaveBeenCalledOnce();
-  act(clickName);
-  expect(document.activeElement).toBe(input());
-  const gap = name.parentElement!;
-  const gapDown = new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true });
-  act(() => gap.dispatchEvent(gapDown));
-  expect(gapDown.defaultPrevented).toBe(true);
-  act(() => gap.click());
-  expect(document.activeElement).not.toBe(input());
-  act(() => gap.click());
-  expect(document.activeElement).toBe(input());
+  act(() => change('18'));
+  act(() => input().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })));
+  expect(onChange).toHaveBeenLastCalledWith(18);
   const increase = container!.querySelector<HTMLButtonElement>(
     '[aria-label="Size editor.compact.increaseAriaSuffix"]'
   )!;
@@ -135,6 +117,6 @@ it('toggles editing from the parameter name without reopening or taking over the
     increase.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
   );
   act(() => increase.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
-  expect(input().value).toBe('17');
-  expect(onChange).toHaveBeenLastCalledWith(17);
+  expect(input().value).toBe('19');
+  expect(onChange).toHaveBeenLastCalledWith(19);
 });

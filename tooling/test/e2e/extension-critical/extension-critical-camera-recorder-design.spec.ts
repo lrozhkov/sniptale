@@ -22,7 +22,7 @@ import {
 
 const START = '[data-ui="popup.video-setup.start-recording-button"]';
 const CAMERA_ROUTE = '/apps/extension/src/camera-recorder/index.html';
-const interfaceBackingFace = 'Inter';
+const interfaceBackingFace = 'Golos UI';
 const sizes = [
   { width: 960, height: 720 },
   { width: 1280, height: 560 },
@@ -253,7 +253,10 @@ async function geometry(page: Page) {
     await expect(button).toHaveCSS('border-radius', '4px');
     await expect(button).toHaveCSS('font-size', '13px');
     await expect(button).toHaveCSS('line-height', '18px');
-    await expect(button).toHaveCSS('font-weight', '500');
+    await expect(button).toHaveCSS(
+      'font-weight',
+      (await button.getAttribute('data-active')) === 'true' ? '500' : '400'
+    );
     const rect = await button.boundingBox();
     expect(rect).not.toBeNull();
     expect(rect!.x).toBeGreaterThanOrEqual(0);

@@ -27,9 +27,6 @@
 .parameter-row[data-label='inherited'] {
   grid-template-columns: minmax(0, 1fr);
 }
-.parameter-row[data-activates='true'] {
-  cursor: pointer;
-}
 .parameter-value > .choice-field,
 .parameter-value .property-fallback {
   display: block;

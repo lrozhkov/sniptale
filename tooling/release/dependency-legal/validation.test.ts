@@ -5,7 +5,7 @@ import path from 'node:path';
 import { expect, it } from 'vitest';
 
 import { generateDependencyLegalClosure } from './index.mjs';
-import { createLegalFixture, TEST_MANROPE } from './test-support';
+import { createLegalFixture, TEST_INTERFACE_FONT } from './test-support';
 import { writeDependencyLegalClosure } from './output.mjs';
 import { validateDependencyLegalClosure } from './validation.mjs';
 
@@ -17,6 +17,7 @@ async function seedBaseLegalFiles(repoRoot: string) {
   const baseLegal = new Map([
     ['LICENSE', 'AGPL fixture\n'],
     ['LICENSES/OFL-1.1.txt', 'OFL fixture\n'],
+    ['packages/ui/src/styles/golos-ui/LICENSE.txt', 'Golos OFL fixture\n'],
     ['NOTICE', 'Notice fixture\n'],
     ['THIRD_PARTY_NOTICES.md', 'generated below'],
   ]);
@@ -43,7 +44,11 @@ async function seedValidationFixture() {
   });
   const baseLegal = await seedBaseLegalFiles(repoRoot);
   const closure = await generateDependencyLegalClosure({ repoRoot, reviewedSelections: [] });
-  await writeDependencyLegalClosure({ closure, manrope: TEST_MANROPE, outputRoot: repoRoot });
+  await writeDependencyLegalClosure({
+    closure,
+    interfaceFont: TEST_INTERFACE_FONT,
+    outputRoot: repoRoot,
+  });
   const legalPaths = [
     ...baseLegal.keys(),
     'THIRD_PARTY_DEPENDENCIES.json',
@@ -60,7 +65,7 @@ async function seedValidationFixture() {
   await fs.writeFile(
     path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json'),
     JSON.stringify({
-      bundledAssets: [{ ...TEST_MANROPE, id: 'manrope' }],
+      bundledAssets: [{ ...TEST_INTERFACE_FONT, id: 'golos-ui' }],
       dependencyLegal: {
         canonicalLicenseAliases: [],
         licenseDirectory: 'LICENSES/dependencies',

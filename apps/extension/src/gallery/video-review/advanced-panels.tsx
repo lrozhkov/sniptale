@@ -113,6 +113,7 @@ export function ReviewSceneProperties(props: {
   onPreviewBackground?(background: QuickEditAdvancedState['background'] | null): void;
   canvas: QuickEditAdvancedState['canvas'];
   captions?: QuickEditAdvancedState['captions'];
+  captionsLocked?: boolean;
   onCaptions?(settings: NonNullable<QuickEditAdvancedState['captions']>): void;
   presentation?: ComponentProps<typeof ReviewPresentationBinding>;
   watermark?: ComponentProps<typeof ReviewWatermarkInspector>;
@@ -220,6 +221,7 @@ export function ReviewSceneProperties(props: {
                     content: (
                       <ReviewCaptionSceneControls
                         settings={props.captions}
+                        locked={props.captionsLocked ?? false}
                         onChange={props.onCaptions}
                         disabled={props.busy}
                       />

@@ -64,8 +64,8 @@
   overflow-wrap: anywhere;
   line-height: var(--font-control-line);
 }
-.field.choice-field:hover > .control:not(:disabled),
-.field.choice-field:hover > .search:not(:disabled) {
+.field.choice-field > .control:hover:not(:disabled),
+.field.choice-field > .search:hover:not(:disabled) {
   border-color: var(--hover-border);
   background: var(--hover);
 }
@@ -129,6 +129,9 @@
   --muted: #eeeef2;
 }
 .options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: auto;
@@ -153,14 +156,15 @@
   border-radius: 999px;
 }
 .option {
-  font: 500 var(--font-control-size)/var(--font-control-line) var(--font-ui);
+  flex-shrink: 0;
+  font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18px;
   gap: 8px;
   align-items: center;
-  min-height: 36px;
-  padding: 8px;
+  min-height: 32px;
+  padding: 6px 8px;
   margin: 0;
   border-radius: var(--radius-control);
   line-height: 1.4;
@@ -195,7 +199,7 @@
   background: var(--active-row);
 }
 .option[aria-selected='true'] {
-  font-weight: 500;
+  font-weight: var(--font-control-weight);
 }
 .option[aria-disabled='true'] {
   opacity: 0.48;
@@ -329,7 +333,7 @@
   cursor: inherit;
 }
 .property-face {
-  font: 500 var(--font-control-size)/var(--font-control-line) var(--font-ui);
+  font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
   position: relative;
   z-index: 1;
   display: flex;
@@ -344,7 +348,7 @@
 }
 .property-option input:checked + .property-face {
   color: var(--text);
-  font-weight: 500;
+  font-weight: var(--font-control-weight);
 }
 .property-option input:focus-visible + .property-face {
   outline: 2px solid var(--focus);

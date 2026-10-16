@@ -1,9 +1,8 @@
 import { Search, X } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server.browser';
 import tokens from '@sniptale/ui/styles/design-tokens?raw';
-import latin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?inline';
-import cyrillic from '@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2?inline';
-import extended from '@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2?inline';
+import interfaceFont from '@sniptale/ui/styles/interface-font?inline';
+import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
 import viewerScript from './html-viewer.js?raw';
 import navigationCss from './reader-navigation.css?raw';
 import { GuideReadingNavigation } from './reader-navigation';
@@ -39,14 +38,11 @@ export async function buildGuideHtml(
     ...project,
     items: project.items.map((item) => ({ ...item, id: `guide-item-${item.id}` })),
   };
-  const fonts = [latin, cyrillic, extended]
-    .map(
-      (url, index) =>
-        `@font-face{font-family:Guide${index};font-style:normal;font-weight:200 800;src:url("${url}") format("woff2");}`
-    )
-    .join('');
+  const fonts =
+    `@font-face{font-family:"Sniptale Interface";font-style:normal;font-weight:400 700;` +
+    `src:url("${interfaceFont}") format("woff2");}`;
   const base =
-    ':root{--sniptale-font-document-sans:Guide0,Guide1,Guide2,sans-serif;' +
+    ':root{--sniptale-font-document-sans:var(--sniptale-font-interface);' +
     '--sniptale-font-sans:var(--sniptale-font-document-sans)}*{box-sizing:border-box}' +
     'body{margin:0;padding:24px;font-family:var(--sniptale-font-sans);' +
     'background:var(--sniptale-color-surface-canvas);' +
@@ -73,6 +69,9 @@ export async function buildGuideHtml(
           <style>{tokens + fonts + base + documentCss + viewerCss + navigationCss}</style>
         </head>
         <body>
+          <pre hidden data-guide-interface-font-license="">
+            {interfaceLicense}
+          </pre>
           <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}>
             <defs>
               {media.rasters.map((raster, index) => (

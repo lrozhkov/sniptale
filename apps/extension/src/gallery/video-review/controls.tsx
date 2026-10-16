@@ -56,10 +56,12 @@ const iconSelection =
 export const reviewIconButtonClassName = iconButtonBase + iconHoverBorder + iconSelection;
 
 /** Compact lane toggles brighten their icon while retaining a quiet border. */
-export const reviewCompactTrackButtonClassName = iconButtonBase + iconSelection;
+export const reviewCompactTrackButtonClassName =
+  'review-track-compact ' + iconButtonBase + iconSelection;
 
 /** Lane status highlights suppression; aria-pressed still reports whether the lane is enabled. */
 export const reviewTrackStatusButtonClassName =
+  'review-track-status ' +
   iconButtonBase +
   iconHoverBorder +
   ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +

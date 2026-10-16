@@ -4,6 +4,7 @@
 .sniptale-compact-workspace,
 .sniptale-compact-workspace[data-theme] {
   --sniptale-font-sans: var(--sniptale-font-interface);
+  --sniptale-color-text-primary: var(--sniptale-color-text-interface);
   --sniptale-radius-sm: 4px;
   --sniptale-radius-md: 4px;
   --sniptale-radius-lg: 8px;
@@ -12,8 +13,14 @@
   --sniptale-media-header-radius: 4px;
   --sniptale-inspector-range-track-height: 3px;
   --sniptale-inspector-range-thumb-size: 14px;
-  --sniptale-inspector-range-bottom: 8px;
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  --sniptale-inspector-range-bottom: 4px;
+  --sniptale-parameter-row-height: 40px;
+  --sniptale-parameter-control-height: 32px;
+  --sniptale-parameter-context-space: 8px;
+  --sniptale-parameter-range-hit-height: 8px;
+  --sniptale-parameter-range-hit-top: -4px;
+  --sniptale-numeric-stepper-inset: -16px;
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   user-select: none;
 }
 .sniptale-compact-workspace :is(input, textarea, [contenteditable='true'], [role='alert']) {
@@ -24,7 +31,7 @@
 .sniptale-compact-workspace.sniptale-modal,
 .sniptale-compact-workspace .sniptale-modal {
   border-radius: 8px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-compact-workspace :is(.sniptale-modal-header, .sniptale-modal-header-sm) {
   padding: 12px 16px;
@@ -39,7 +46,7 @@
 }
 .sniptale-compact-workspace
   :is(.sniptale-modal-title, .sniptale-modal-title-sm, .sniptale-confirm-title) {
-  font: 600 14px / 20px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface-heading) 14px / 20px var(--sniptale-font-interface);
 }
 .sniptale-compact-workspace .sniptale-confirm-message {
   font: 400 14px / 20px var(--sniptale-font-interface);
@@ -86,7 +93,7 @@
     [data-inspector-toggle]
   ):not(.sniptale-parameter-row)
   > span:first-child {
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 1.5 var(--sniptale-font-sans);
   color: var(--sniptale-color-text-secondary);
   white-space: normal;
   overflow: visible;
@@ -101,7 +108,7 @@
     [data-ui='shared.ui.color-selector.trigger'] input,
     [data-ui='shared.ui.color-selector.picker-trigger']
   ) {
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 1.5 var(--sniptale-font-sans);
 }
 .sniptale-inspector-surface [data-ui='shared.ui.compact-select'] > button {
   height: auto;
@@ -138,7 +145,7 @@
 .sniptale-inspector-surface .sniptale-input,
 .sniptale-inspector-surface .sniptale-textarea {
   border-radius: var(--sniptale-radius-sm);
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 1.5 var(--sniptale-font-sans);
 }
 .sniptale-inspector-surface .sniptale-input {
   height: 32px;
@@ -172,7 +179,7 @@
 .sniptale-inspector-surface summary {
   min-height: 32px;
   border-radius: var(--sniptale-radius-sm);
-  font: 500 13px / 20px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 20px var(--sniptale-font-sans);
 }
 .sniptale-inspector-surface summary:hover {
   color: var(--sniptale-color-text-primary-strong);
@@ -224,7 +231,7 @@
   white-space: normal;
   overflow-wrap: anywhere;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: var(--sniptale-font-weight-interface);
   line-height: 1.5;
 }
 
@@ -260,7 +267,7 @@
     background: transparent !important;
     box-shadow: none !important;
     color: var(--sniptale-color-text-secondary) !important;
-    font: 500 12px / 1.5 var(--sniptale-font-sans) !important;
+    font: var(--sniptale-font-weight-interface) 12px / 1.5 var(--sniptale-font-sans) !important;
     white-space: normal;
   }
   .sniptale-inspector-surface
@@ -290,24 +297,24 @@
   outline: none;
 }
 .sniptale-inspector-surface [data-ui='shared.ui.color-selector.value-trigger'] {
-  font-weight: 500;
+  font-weight: var(--sniptale-font-weight-interface);
 }
 .sniptale-inspector-surface [data-ui='shared.ui.compact-inspector.text-field'] > input {
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 1.5 var(--sniptale-font-sans);
   border-radius: var(--sniptale-radius-sm);
 }
 
 .sniptale-compact-workspace .sniptale-inspector-surface {
   --sniptale-compact-font-size: 13px;
-  --sniptale-compact-control-height: 32px;
+  --sniptale-compact-control-height: var(--sniptale-parameter-control-height);
 }
 .sniptale-compact-workspace .sniptale-parameter-row {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   align-items: center;
   min-width: 0;
-  min-height: 32px;
-  padding: 0 8px;
+  min-height: var(--sniptale-parameter-row-height);
+  padding: 0 8px var(--sniptale-parameter-context-space);
   gap: 8px;
   border: 0;
   background: transparent;
@@ -315,6 +322,7 @@
 }
 .sniptale-compact-workspace .sniptale-parameter-row[data-layout='stacked'] {
   grid-template-columns: minmax(0, 1fr);
+  padding-bottom: 0;
   gap: 4px;
 }
 .sniptale-compact-workspace
@@ -322,12 +330,15 @@
   > .sniptale-parameter-name {
   display: flex;
   align-items: center;
-  min-height: 32px;
+  min-height: var(--sniptale-parameter-control-height);
 }
 .sniptale-compact-workspace .sniptale-parameter-row > .sniptale-parameter-name {
   min-width: 0;
+  min-height: var(--sniptale-parameter-control-height);
+  display: flex;
+  align-items: center;
   overflow-wrap: anywhere;
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-secondary);
   cursor: default;
 }
@@ -338,11 +349,11 @@
   margin: 0;
 }
 .sniptale-compact-workspace .sniptale-parameter-row [data-ui='shared.ui.compact-select'] > button {
-  min-height: 32px;
+  min-height: var(--sniptale-parameter-control-height);
   height: auto;
   padding: 6px 8px;
   border: 0;
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
 }
 .sniptale-compact-workspace .sniptale-parameter-row [data-ui='shared.ui.compact-select'] .truncate {
   white-space: normal;
@@ -350,26 +361,45 @@
   overflow-wrap: anywhere;
 }
 
+.sniptale-compact-workspace .sniptale-text-compound {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  gap: 6px;
+}
+.sniptale-compact-workspace .sniptale-text-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sniptale-compact-workspace .sniptale-text-value > input::placeholder {
+  color: var(--sniptale-color-text-muted);
+  opacity: 1;
+  font-style: italic;
+}
 .sniptale-compact-workspace .sniptale-text-value {
   position: relative;
   min-width: 0;
 }
 .sniptale-compact-workspace .sniptale-text-value > input {
-  min-height: 32px;
-  height: 32px;
-  padding: 6px 32px 6px 8px;
+  min-height: var(--sniptale-parameter-control-height);
+  height: var(--sniptale-parameter-control-height);
+  padding: 2px 28px 2px 8px;
   border: 1px solid transparent;
   background: transparent;
   border-radius: 4px;
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   text-align: start;
 }
 .sniptale-compact-workspace .sniptale-text-value > input:is(:hover, :focus) {
+  border-color: var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-input);
 }
 .sniptale-compact-workspace .sniptale-field-clear {
   position: absolute;
-  inset-inline-end: 4px;
+  inset-inline-end: 0;
   top: 4px;
   display: grid;
   place-items: center;
@@ -394,7 +424,7 @@
   border-radius: 4px;
 }
 .sniptale-compact-workspace [data-ui='shared.ui.color-selector.trigger'] button {
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
 }
 
 .sniptale-compact-workspace .sniptale-property-choice {
@@ -404,18 +434,18 @@
 .sniptale-compact-workspace .sniptale-property-segments {
   display: grid;
   gap: 2px;
-  padding: 2px;
+  padding: 0 2px;
   border-radius: 4px;
   background: var(--sniptale-color-surface-input);
 }
 @layer utilities {
   .sniptale-compact-workspace .sniptale-property-segments > button {
-    min-height: 28px !important;
-    height: 28px !important;
-    padding: 4px 10px !important;
+    min-height: var(--sniptale-parameter-control-height) !important;
+    height: var(--sniptale-parameter-control-height) !important;
+    padding: 6px !important;
     border: 0 !important;
     border-radius: 4px !important;
-    font: 500 13px / 18px var(--sniptale-font-sans) !important;
+    font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans) !important;
     white-space: nowrap;
   }
   .sniptale-compact-workspace .sniptale-property-segments > button[aria-pressed='true'] {
@@ -430,6 +460,7 @@
 .sniptale-parameter-menu,
 .sniptale-parameter-menu[data-theme] {
   --sniptale-font-sans: var(--sniptale-font-interface);
+  --sniptale-color-text-primary: var(--sniptale-color-text-interface);
   --sniptale-radius-sm: 4px;
   padding: 5px;
   border-radius: 4px;
@@ -439,12 +470,15 @@
 }
 .sniptale-parameter-menu [role='option'] {
   border-color: transparent;
-  min-height: 36px;
-  margin: 0;
-  padding: 8px;
+  min-height: 32px;
+  margin: 0 0 2px;
+  padding: 6px 8px;
   border-radius: 4px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
   color: var(--sniptale-color-text-primary);
+}
+.sniptale-parameter-menu [role='option']:last-child {
+  margin-bottom: 0;
 }
 .sniptale-parameter-menu [role='option'][aria-selected='true'],
 .sniptale-parameter-menu [role='option']:hover:not(:disabled) {
@@ -464,7 +498,7 @@
 }
 @layer utilities {
   .sniptale-compact-workspace .sniptale-parameter-row {
-    min-height: 32px !important;
+    min-height: var(--sniptale-parameter-row-height) !important;
   }
   .sniptale-compact-workspace
     [data-ui='shared.ui.compact-inspector.numeric-row'].sniptale-parameter-row {
@@ -477,7 +511,7 @@
   gap: 8px;
   min-width: 0;
   min-height: 32px;
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
 }
 .sniptale-compact-workspace .sniptale-paint-swatch-trigger {
   display: grid;
@@ -605,7 +639,7 @@
   min-height: 80px;
   padding: 8px 32px 8px 8px;
   border-radius: 4px;
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   text-align: start;
   resize: vertical;
 }
@@ -618,7 +652,7 @@
     --sniptale-field-height: 32px;
     --sniptale-field-radius: 4px;
     --sniptale-field-padding-block: 4px;
-    font: 500 13px / 18px var(--sniptale-font-interface) !important;
+    font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface) !important;
   }
 }
 .sniptale-parameter-menu .sniptale-select-value-label-menu {
@@ -630,7 +664,7 @@
 .sniptale-compact-workspace
   .sniptale-parameter-row:has(> .sniptale-parameter-value button[aria-haspopup='listbox']:enabled)
   > .sniptale-parameter-name {
-  cursor: pointer;
+  cursor: default;
 }
 .sniptale-compact-workspace
   [data-ui='shared.ui.compact-inspector.textarea-field']
@@ -639,8 +673,8 @@
 }
 
 .sniptale-compact-workspace .sniptale-static-parameter-row {
-  align-items: start;
-  padding-block: 7px;
+  align-items: center;
+  padding-block: 0 var(--sniptale-parameter-context-space);
 }
 
 @layer utilities {
@@ -649,7 +683,7 @@
   }
 }
 
-/* Parameter names retain activation without owning the value's hover paint. */
+/* Parameter names do not activate editors or own value hover paint. */
 .sniptale-compact-workspace .sniptale-parameter-row > .sniptale-parameter-name {
   white-space: normal;
   overflow: visible;
@@ -671,32 +705,41 @@
 }
 
 .sniptale-compact-workspace .sniptale-numeric-value {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline-start: auto;
   min-width: 0;
-  gap: 8px;
-  height: 32px;
+  justify-content: flex-end;
+  gap: 4px;
+  height: var(--sniptale-parameter-control-height);
   color: var(--sniptale-color-text-primary);
 }
 .sniptale-compact-workspace .sniptale-numeric-entry {
   display: flex;
   align-items: center;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   height: 100%;
   gap: 4px;
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 4px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-compact-workspace .sniptale-numeric-entry:hover {
+  border-color: var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-input);
 }
 .sniptale-compact-workspace .sniptale-numeric-entry:focus-within {
-  border-color: var(--sniptale-color-border-accent-strong);
+  border-color: var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-input);
 }
 .sniptale-compact-workspace [data-ui='shared.ui.compact-inspector.numeric-stepper'] {
-  width: 32px;
+  position: absolute;
+  inset-inline-end: var(--sniptale-numeric-stepper-inset, 0px);
+  top: 0;
+  height: 32px;
+  width: 20px;
   align-items: center;
   pointer-events: none;
 }
@@ -728,8 +771,8 @@
     font: inherit !important;
   }
   .sniptale-compact-workspace .sniptale-parameter-row[data-has-scrub='true'] {
-    min-height: 40px !important;
-    padding-block: 0 16px !important;
+    min-height: var(--sniptale-parameter-row-height) !important;
+    padding-block: 0 var(--sniptale-parameter-context-space) !important;
     align-items: start;
   }
   .sniptale-compact-workspace
@@ -737,22 +780,22 @@
     > .sniptale-parameter-name {
     display: flex;
     align-items: center;
-    min-height: 24px;
+    min-height: var(--sniptale-parameter-control-height);
   }
   .sniptale-compact-workspace
     .sniptale-parameter-row[data-has-scrub='true']
     [data-ui='shared.ui.compact-inspector.numeric-value-field'] {
-    height: 24px !important;
+    height: var(--sniptale-parameter-control-height) !important;
   }
   .sniptale-compact-workspace
     .sniptale-parameter-row[data-has-scrub='true']
     [data-ui='shared.ui.compact-inspector.numeric-stepper']
     > button {
-    height: 12px;
+    height: 16px;
   }
   .sniptale-compact-workspace .sniptale-parameter-row[data-has-scrub='true'] input[type='range'] {
-    --sniptale-range-shell-height: 16px !important;
-    top: -8px !important;
+    --sniptale-range-shell-height: var(--sniptale-parameter-range-hit-height) !important;
+    top: var(--sniptale-parameter-range-hit-top) !important;
   }
 }
 
@@ -761,7 +804,88 @@
     outline: none !important;
   }
 }
-.sniptale-compact-workspace .sniptale-numeric-entry:has(> input:focus-visible) {
-  outline: 2px solid var(--sniptale-color-accent);
+.sniptale-compact-workspace
+  .sniptale-numeric-entry:has(> input:focus-visible:not([data-pointer-focus])) {
+  outline: 1px solid var(--sniptale-color-accent);
+  outline-offset: -1px;
+}
+
+/* Compact parameters share a text band and reserve their contextual-tool strip. */
+.sniptale-compact-workspace .sniptale-parameter-unlabelled {
+  min-width: 0;
+  padding: 0 8px var(--sniptale-parameter-context-space);
+}
+.sniptale-compact-workspace .sniptale-parameter-row .sniptale-property-choice {
+  min-height: var(--sniptale-parameter-control-height);
+}
+.sniptale-compact-workspace .sniptale-numeric-entry > input {
+  field-sizing: content;
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  font-variant-numeric: tabular-nums !important;
+}
+/* Three editable digits retain two digit-widths of spare room without moving the unit edge. */
+.sniptale-compact-workspace .sniptale-numeric-entry > input:focus {
+  min-width: 5ch;
+  padding-inline-start: 1ch;
+}
+
+.sniptale-compact-workspace
+  .sniptale-parameter-row
+  [data-ui='shared.ui.color-selector.picker-trigger'],
+.sniptale-compact-workspace .sniptale-parameter-row .sniptale-paint-swatch-trigger {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+.sniptale-compact-workspace
+  .sniptale-parameter-row
+  [data-ui='shared.ui.color-selector.picker-trigger']
+  > span,
+.sniptale-compact-workspace .sniptale-parameter-row .sniptale-paint-swatch-trigger > span {
+  width: 16px;
+  height: 16px;
+}
+
+.sniptale-compact-workspace .sniptale-parameter-row [data-ui='shared.ui.color-selector.trigger'],
+.sniptale-compact-workspace .sniptale-parameter-row .sniptale-paint-value {
+  min-height: var(--sniptale-parameter-control-height);
+  height: var(--sniptale-parameter-control-height);
+}
+.sniptale-compact-workspace .sniptale-parameter-row .sniptale-glass-switch {
+  height: var(--sniptale-parameter-control-height);
+  min-height: var(--sniptale-parameter-control-height);
+}
+.sniptale-compact-workspace .sniptale-parameter-row .sniptale-glass-switch::before {
+  top: 15px;
+}
+.sniptale-compact-workspace .sniptale-parameter-row .sniptale-glass-switch-thumb {
+  top: 8px;
+}
+
+.sniptale-compact-workspace .sniptale-parameter-row.sniptale-boolean-parameter {
+  grid-template-columns: minmax(0, 1fr) 40px;
+}
+
+/* Inline color editing uses the same neutral surface as numeric and text values. */
+.sniptale-compact-workspace [data-ui='shared.ui.color-selector.trigger'] span:has(> input) {
+  border: 1px solid var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-input);
+  border-radius: 4px;
+}
+.sniptale-compact-workspace [data-ui='shared.ui.color-selector.trigger'] span:has(> input) > input {
+  background: transparent;
+  outline: none;
+}
+.sniptale-compact-workspace [data-ui='shared.ui.color-selector.trigger']:has(input:focus-visible) {
+  outline: none;
+}
+.sniptale-compact-workspace
+  [data-ui='shared.ui.color-selector.trigger']
+  span:has(> input:focus-visible),
+.sniptale-compact-workspace .sniptale-text-value > input:focus-visible {
+  outline: 1px solid var(--sniptale-color-accent) !important;
   outline-offset: -1px;
 }

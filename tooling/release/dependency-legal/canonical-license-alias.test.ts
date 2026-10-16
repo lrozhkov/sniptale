@@ -12,17 +12,17 @@ it('deduplicates an exact policy-owned canonical license and rejects policy drif
       {
         files: { LICENSE: license },
         license: 'OFL-1.1',
-        name: '@fontsource-variable/manrope',
-        version: '5.2.8',
+        name: '@fontsource/marck-script',
+        version: '5.3.0',
       },
     ],
-    rootDependencies: { '@fontsource-variable/manrope': '^5' },
+    rootDependencies: { '@fontsource/marck-script': '^5' },
   });
   const alias = {
     archivePath: 'LICENSES/OFL-1.1.txt',
-    packageName: '@fontsource-variable/manrope',
+    packageName: '@fontsource/marck-script',
     sha256: createHash('sha256').update(license).digest('hex'),
-    version: '5.2.8',
+    version: '5.3.0',
   };
 
   const closure = await generateDependencyLegalClosure({
@@ -41,7 +41,7 @@ it('deduplicates an exact policy-owned canonical license and rejects policy drif
       repoRoot,
     })
   ).rejects.toThrow(
-    'Canonical dependency license digest drift for @fontsource-variable/manrope@5.2.8.'
+    'Canonical dependency license digest drift for @fontsource/marck-script@5.3.0.'
   );
   await expect(
     generateDependencyLegalClosure({ canonicalLicenseAliases: [alias, alias], repoRoot })

@@ -6,7 +6,7 @@ import { focusNextCompactInput } from '@sniptale/ui/compact-inspector-controls/f
 import { cx } from './shared';
 import { X } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { InspectorParameterRow, useInspectorLayout, toggleInspectorFieldEditing } from './layout';
+import { InspectorParameterRow, useInspectorLayout } from './layout';
 
 const TEXT_FIELD_LABEL_CLASS_NAME = [
   'select-none break-words',
@@ -29,10 +29,11 @@ function commitTextValue(
 export interface TextFieldProps extends ProductInputProps {
   inputClassName?: string | undefined;
   label: string;
+  trailingActions?: React.ReactNode;
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { className, invalid = false, label, ...props },
+  { className, invalid = false, label, trailingActions, ...props },
   ref
 ) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -47,28 +48,30 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
     return (
       <InspectorParameterRow
         label={label}
-        valueMinimum={144}
+        valueMinimum={trailingActions ? 220 : 144}
         valueText={String(props.value ?? uncontrolledText)}
         className={className}
         dataUi="shared.ui.compact-inspector.text-field"
-        onActivate={() => toggleInspectorFieldEditing(inputRef.current)}
       >
-        <div className="sniptale-text-value">
-          <TextFieldInput
-            invalid={invalid}
-            label={label}
-            lastCommittedValueRef={lastCommittedValueRef}
-            setEditing={setEditing}
-            setInputRef={setInputRef}
-            {...props}
-            onChange={(event) => {
-              setUncontrolledText(event.currentTarget.value);
-              props.onChange?.(event);
-            }}
-          />
-          {!props.disabled && !props.readOnly && hasText ? (
-            <InspectorFieldClear label={label} target={inputRef} />
-          ) : null}
+        <div className={trailingActions ? 'sniptale-text-compound' : 'contents'}>
+          <div className="sniptale-text-value">
+            <TextFieldInput
+              invalid={invalid}
+              label={label}
+              lastCommittedValueRef={lastCommittedValueRef}
+              setEditing={setEditing}
+              setInputRef={setInputRef}
+              {...props}
+              onChange={(event) => {
+                setUncontrolledText(event.currentTarget.value);
+                props.onChange?.(event);
+              }}
+            />
+            {!props.disabled && !props.readOnly && hasText ? (
+              <InspectorFieldClear label={label} target={inputRef} />
+            ) : null}
+          </div>
+          {trailingActions ? <div className="sniptale-text-actions">{trailingActions}</div> : null}
         </div>
       </InspectorParameterRow>
     );
@@ -155,6 +158,7 @@ function TextFieldInput({
     <input
       {...props}
       ref={setInputRef}
+      placeholder={props.placeholder ?? label}
       aria-label={props['aria-label'] ?? label}
       aria-invalid={invalid || undefined}
       onFocus={(event) => handleTextFieldFocus(event, setEditing, onFocus)}

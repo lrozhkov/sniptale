@@ -82,7 +82,7 @@ export function installContentInterfaceFonts(
           display: rule.style.getPropertyValue('font-display') as FontDisplay,
           style: rule.style.getPropertyValue('font-style'),
           weight: rule.style.getPropertyValue('font-weight'),
-          unicodeRange: rule.style.getPropertyValue('unicode-range'),
+          unicodeRange: rule.style.getPropertyValue('unicode-range') || 'U+0-10FFFF',
         },
       },
     ];

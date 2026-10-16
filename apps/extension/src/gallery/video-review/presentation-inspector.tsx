@@ -14,12 +14,7 @@ import {
   ToggleField,
 } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
-import {
-  ReviewButton,
-  ReviewDetails,
-  reviewDeleteButtonClassName,
-  reviewSelectFieldClassName,
-} from './controls';
+import { ReviewButton, ReviewDetails, reviewSelectFieldClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 import { ReviewPresentationMediaPreview } from './presentation-media-preview';
 
@@ -216,7 +211,7 @@ function Bookend(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
             label={label(
               props.slot === 'intro' ? 'presentationResetIntro' : 'presentationResetOutro'
             )}
-            className={`${reviewDeleteButtonClassName} mt-3`}
+            className="review-inspector-parameter-command"
             onClick={() => props.onChange(patch({ ...control, mode: 'none' }))}
           >
             <RotateCcw size={14} aria-hidden="true" />
@@ -284,6 +279,7 @@ function FadeFields(
               props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
             )}
             disabled={props.previewDisabled || !props.onJoinPreview}
+            className="review-inspector-parameter-command"
             onClick={() => props.onJoinPreview?.(props.slot, 'fade')}
           >
             <Play size={14} aria-hidden="true" />

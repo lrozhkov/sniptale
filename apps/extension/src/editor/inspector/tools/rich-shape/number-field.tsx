@@ -3,7 +3,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { translate } from '../../../../platform/i18n';
 import { clampNumber, FieldShell } from './field-shared';
-import { toggleInspectorFieldEditing } from '../../../../ui/compact-inspector-controls/layout';
 
 const STEPPER_BUTTON_CLASS_NAME = [
   'flex h-[15px] w-5 items-center justify-center rounded-[4px]',
@@ -110,12 +109,8 @@ export function NumberField(props: {
   onChange: (value: number) => void;
 }) {
   const field = useNumberFieldState(props);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   return (
-    <FieldShell
-      label={props.label}
-      onActivate={() => toggleInspectorFieldEditing(inputRef.current)}
-    >
+    <FieldShell label={props.label}>
       <div
         className={[
           'group flex items-center gap-1 rounded-[4px] border px-2 transition',
@@ -123,7 +118,7 @@ export function NumberField(props: {
           'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
         ].join(' ')}
       >
-        <NumberFieldInput label={props.label} field={field} inputRef={inputRef} />
+        <NumberFieldInput label={props.label} field={field} />
         <StepperButtons
           label={props.label}
           disabledDown={props.min !== undefined && field.value <= props.min}
@@ -176,15 +171,10 @@ function useNumberFieldState(props: {
   return { applyStep, commitDraft, draft, setDraft, updateDraft, value };
 }
 
-function NumberFieldInput(props: {
-  field: ReturnType<typeof useNumberFieldState>;
-  label: string;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-}) {
+function NumberFieldInput(props: { field: ReturnType<typeof useNumberFieldState>; label: string }) {
   const { field } = props;
   return (
     <input
-      ref={props.inputRef}
       aria-label={props.label}
       inputMode="decimal"
       type="text"

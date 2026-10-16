@@ -65,7 +65,7 @@ afterEach(() => {
 it('loads the selected bundled face and actual text once before measuring and reuses its painted surface', async () => {
   const value = settings();
   const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
-  expect(load).toHaveBeenCalledWith('700 24px "Sniptale Sans"', value.text.value);
+  expect(load).toHaveBeenCalledWith('700 24px "Sniptale Interface"', value.text.value);
   expect(load.mock.invocationCallOrder[0]).toBeLessThan(
     vi.mocked(contexts[0]!.measureText).mock.invocationCallOrder[0]!
   );
@@ -561,7 +561,7 @@ it('loads and paints italic with the same font description in preview and export
   const value = settings();
   value.text.italic = true;
   const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
-  expect(load).toHaveBeenCalledWith('italic 700 24px "Sniptale Sans"', value.text.value);
-  expect(contexts[0]!.font).toBe('italic 700 24px "Sniptale Sans"');
+  expect(load).toHaveBeenCalledWith('italic 700 24px "Sniptale Interface"', value.text.value);
+  expect(contexts[0]!.font).toBe('italic 700 24px "Sniptale Interface"');
   painter.dispose();
 });

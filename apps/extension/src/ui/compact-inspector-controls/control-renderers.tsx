@@ -56,7 +56,7 @@ function InspectorSegments<T extends string>(
       if (!context) return;
       context.font = `500 13px ${getComputedStyle(element).fontFamily}`;
       const width = props.options.reduce(
-        (sum, option) => sum + context.measureText(option.label).width + 20,
+        (sum, option) => sum + context.measureText(option.label).width + 12,
         0
       );
       setDropdown(!iconOnly && width + 4 + 2 * (props.options.length - 1) > element.clientWidth);

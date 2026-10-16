@@ -1,6 +1,7 @@
 import { RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { BackgroundImagePicker } from '../../composition/background-resources/picker';
 import { prepareStaticLogo, StaticLogoError } from '../../workflows/background-images/static-logo';
 import {
@@ -189,7 +190,7 @@ const anchorOptions = [
 function WatermarkPlacementFields(props: Binding) {
   const { settings, onChange } = props;
   return (
-    <div className="min-w-0 space-y-2">
+    <div className="sniptale-parameter-stack">
       <SegmentedRow
         columns={2}
         ariaLabel={translate('gallery.videoReview.watermarkLayout')}
@@ -238,15 +239,15 @@ function WatermarkSinglePlacement(props: Binding) {
   };
   return (
     <>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('gallery.videoReview.watermarkAnchor')}
-        </span>
+      <InspectorParameterRow
+        label={translate('gallery.videoReview.watermarkAnchor')}
+        valueMinimum={116}
+      >
         <div
           role="group"
           aria-label={translate('gallery.videoReview.watermarkAnchor')}
           data-ui="watermark.anchors"
-          className="grid grid-cols-3 gap-1"
+          className="ml-auto grid w-max grid-cols-3 gap-1"
         >
           {anchorOptions.map(([anchor, arrow]) => (
             <ContentToolbarButton
@@ -261,7 +262,7 @@ function WatermarkSinglePlacement(props: Binding) {
             </ContentToolbarButton>
           ))}
         </div>
-      </div>
+      </InspectorParameterRow>
       <ReviewDetails
         label={translate('gallery.videoReview.watermarkPositionExact')}
         preferenceId="watermark.position"

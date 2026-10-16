@@ -4,13 +4,13 @@
 
 ## Structure
 
-Use persistent secondary labels and primary editable values. A placeholder is an example, not a label. Use a single-line field for short text, multiline input for prose, and a search field for filtering. Inspector fields remain quiet at rest. Form fields can retain the neutral surface and boundary required by the form context. Keep 32px default height, 4px label gap, and the shared typography. Let multiline content use its own scroll/resize owner.
+Use persistent secondary labels and primary editable values. A placeholder is an example, not a label. Use a single-line field for short text, multiline input for prose, and a search field for filtering. Editable text and color inputs have no surface or frame at rest. Hover or focus reveals a neutral surface and subtle boundary. Keep their input target usable at rest. Keep 32px default height, 4px label gap, and the shared typography. Let multiline content use its own scroll/resize owner.
 
 Read-only values remain selectable and copyable. Disabled values retain their actual content. Mixed values are explicit and are not a literal accepted string such as “Different values.”
 
 ## Continuous interaction
 
-The input owns its hover paint. Hovering the label or intervening gap does not highlight the row or value. Preserve label activation and text editing inside the input. The label uses an activation cursor rather than a text-selection cursor. A repeated label click ends editing once. Do not let native label forwarding immediately return to editing. A later label click re-enters editing. Clicking within the input does not end editing.
+The input owns its hover paint and activation. Parameter names and intervening gaps do not focus or activate editors. Use aria-labelledby to retain the accessible name without native label forwarding. Boolean named toggles retain their explicit action. Clicking within the input preserves editing.
 
 Pointer focus does not draw the keyboard-only frame. Tab retains visible focus.
 
@@ -43,3 +43,11 @@ Ordinary text aligns to the writing direction's start edge, including inspector 
 A multiline content editor occupies the group's full width below its name, including narrow inspectors. Do not squeeze authored prose into the compact trailing value column. Use an 80px minimum editing area, start-aligned text, vertical resizing, and the shared top-right Clear target. Short single-line properties retain the inline construction. Select this layout by editing role, not the field's name.
 
 In narrow inspectors, move text editors below their labels before reducing the editable width. Multiline content always uses a separate full-width editor.
+
+The explicit compact inspector uses a 32px input in the first band of a 40px parameter row. Preserve the 8px lower strip across equivalent inline controls. Stacked label/control constructions omit this dormant strip. Their 32px name band, 4px gap, and 32px control occupy 68px. General forms retain their 32px control height. Stack long editors below their names before narrowing the editable text.
+
+Inline text, numeric, and HEX editors share a quiet idle state and a light neutral 1px boundary with a subtle surface during editing. Keep keyboard focus distinct with a 1px accent frame. Numeric units remain visible outside the editable value. See [Numeric controls](numbers.md) for expansion and alignment.
+
+Empty editable fields keep an explicit placeholder. Preserve a useful caller example. Otherwise reuse the translated field name. Keep placeholders distinct from accepted text and readable in both themes. Do not use placeholder text as the accessible label.
+
+Fields with trailing actions use one compound row: a shrinking flexible field and automatic action width. Pin actions to the trailing edge. Expand the field across the available space. Preserve this relationship at narrow and wide container widths.

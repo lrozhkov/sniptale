@@ -240,7 +240,7 @@ async function withHost(
   const pending: Promise<void>[] = [];
   const observe = (page: Page) =>
     page.on('response', (response) => {
-      if (page.url().startsWith(origin) && /inter-.*\.woff2/u.test(response.url()))
+      if (page.url().startsWith(origin) && /\/golos-ui-vf\.woff2(?:$|\?)/u.test(response.url()))
         pending.push(
           response.body().then((bytes) => {
             fonts.push({ url: response.url(), status: response.status(), bytes: bytes.byteLength });
@@ -292,11 +292,19 @@ async function assertBundledFont(
     );
     const latin = await document.fonts.load('500 13px "Sniptale Interface"', 'Interface');
     const cyrillic = await document.fonts.load('500 13px "Sniptale Interface"', 'Интерфейс');
+    const latinRegular = await document.fonts.load('400 13px "Sniptale Interface"', 'Interface');
+    const cyrillicRegular = await document.fonts.load('400 13px "Sniptale Interface"', 'Интерфейс');
     return {
       registered: registered.map((font) => ({
         family: font.family,
         status: font.status,
         unicodeRange: font.unicodeRange,
+        weight: font.weight,
+      })),
+      latinRegular: latinRegular.map((font) => ({ family: font.family, status: font.status })),
+      cyrillicRegular: cyrillicRegular.map((font) => ({
+        family: font.family,
+        status: font.status,
       })),
       latin: latin.map((font) => ({ family: font.family, status: font.status })),
       cyrillic: cyrillic.map((font) => ({ family: font.family, status: font.status })),
@@ -307,15 +315,21 @@ async function assertBundledFont(
     info.outputPath('native-font-evidence.json'),
     JSON.stringify({ faces, painted, fonts }, null, 2)
   );
-  expect
-    .soft(faces.registered.length, 'Actual document FontFace registration is required')
-    .toBeGreaterThanOrEqual(2);
+  expect.soft(faces.registered.length, 'Actual document FontFace registration is required').toBe(1);
+  expect.soft(faces.registered.map((font) => font.weight)).toEqual(['400 700']);
+  expect.soft(faces.registered.every((font) => font.unicodeRange === 'U+0-10FFFF')).toBe(true);
   expect
     .soft(faces.latin.length, 'Latin face must load; check() alone is insufficient')
     .toBeGreaterThan(0);
-  expect.soft(faces.cyrillic.length, 'Cyrillic face must load').toBeGreaterThan(0);
+  expect.soft(faces.cyrillic.length, 'Cyrillic Medium face must load').toBeGreaterThan(0);
+  expect.soft(faces.latinRegular.length, 'Latin Regular face must load').toBeGreaterThan(0);
+  expect.soft(faces.cyrillicRegular.length, 'Cyrillic Regular face must load').toBeGreaterThan(0);
   expect
-    .soft([...faces.latin, ...faces.cyrillic].every((font) => font.status === 'loaded'))
+    .soft(
+      [...faces.latin, ...faces.cyrillic, ...faces.latinRegular, ...faces.cyrillicRegular].every(
+        (font) => font.status === 'loaded'
+      )
+    )
     .toBe(true);
   expect.soft(painted.length, 'Inspect actual painted label glyphs').toBeGreaterThan(0);
   expect
@@ -323,24 +337,21 @@ async function assertBundledFont(
       painted.every((sample) =>
         sample.fonts.some(
           (font: { isCustomFont: boolean; familyName: string; glyphCount: number }) =>
-            font.isCustomFont && /Inter/u.test(font.familyName) && font.glyphCount > 0
+            font.isCustomFont && /^Golos UI VF$/u.test(font.familyName) && font.glyphCount > 0
         )
       ),
-      'Every sampled ordinary label must paint with bundled Inter'
+      'Every sampled ordinary label must paint with bundled Golos UI VF'
     )
     .toBe(true);
-  for (const subset of ['latin', 'cyrillic'])
-    expect
-      .soft(
-        fonts.some(
-          (font) =>
-            font.url.includes(`inter-${subset}-wght-normal.woff2`) &&
-            font.status === 200 &&
-            font.bytes > 1000
-        ),
-        `Content document must receive actual ${subset} font bytes`
-      )
-      .toBe(true);
+  expect
+    .soft(
+      fonts.some(
+        (font) =>
+          font.url.endsWith('/golos-ui-vf.woff2') && font.status === 200 && font.bytes > 1000
+      ),
+      'Content document must receive actual Golos UI VF font bytes'
+    )
+    .toBe(true);
 }
 
 async function assertChrome(panel: Locator, theme: Theme, info: TestInfo, name: string) {
@@ -414,7 +425,7 @@ async function assertChrome(panel: Locator, theme: Theme, info: TestInfo, name: 
     await expect.soft(label).toHaveCSS('font-family', /Sniptale Interface/u);
     await expect.soft(label).toHaveCSS('font-size', '13px');
     await expect.soft(label).toHaveCSS('line-height', '18px');
-    await expect.soft(label).toHaveCSS('font-weight', '500');
+    await expect.soft(label).toHaveCSS('font-weight', '400');
   }
 }
 

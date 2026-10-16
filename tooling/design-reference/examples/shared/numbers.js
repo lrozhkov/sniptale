@@ -218,7 +218,7 @@ export function NumericField({
       });
       controls.append(button);
     }
-    valueShell.append(controls);
+    valueShell.prepend(controls);
   }
   window.addEventListener('pointerup', stopRepeat, { signal: abort.signal });
   window.addEventListener('blur', stopRepeat, { signal: abort.signal });

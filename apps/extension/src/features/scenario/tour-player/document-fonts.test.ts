@@ -2,7 +2,7 @@
 import { expect, it, vi } from 'vitest';
 import canonicalFaces from '@sniptale/ui/styles/fonts?raw';
 import canonicalTokens from '@sniptale/ui/styles/design-tokens?raw';
-import interfaceLicense from '@fontsource-variable/inter/LICENSE?raw';
+import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
 import { createTourDocument } from '../project/factories';
 import { buildTourPlayerHtml, type TourPlayerLabels } from './document';
 const labels: TourPlayerLabels = {
@@ -30,7 +30,7 @@ function fixture() {
   return { tour: createTourDocument('fonts'), title: 'Fonts', labels, assets: [] };
 }
 
-it('embeds canonical interface subsets, family and license without adding executable content', async () => {
+it('embeds canonical Golos UI variable face, family and license without adding executable content', async () => {
   expect(canonicalFaces).toContain('@font-face');
   const html = await buildTourPlayerHtml(fixture());
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -39,7 +39,9 @@ it('embeds canonical interface subsets, family and license without adding execut
   const canonical = [...canonicalFaces.matchAll(/@font-face\s*\{[^}]*\}/gu)]
     .map(([face]) => face)
     .filter((face) => face.includes("font-family: 'Sniptale Interface'"));
-  expect(faces).toHaveLength(3);
+  expect(faces).toHaveLength(1);
+  expect(faces[0]).toMatch(/font-weight:\s*400\s+700\s*;/u);
+  expect(faces.every((face) => !face.includes('unicode-range'))).toBe(true);
   for (const [index, face] of faces.entries()) {
     expect(face.replace(/url\([^)]*\)/gu, 'url(embedded)')).toBe(
       canonical[index]!.replace(/url\([^)]*\)/gu, 'url(embedded)')
@@ -49,11 +51,11 @@ it('embeds canonical interface subsets, family and license without adding execut
   expect(css.match(/--sniptale-font-interface:\s*([^;]+);/u)?.[1]).toBe(
     canonicalTokens.match(/--sniptale-font-interface:\s*([^;]+);/u)![1]
   );
-  expect(css.match(/url\([^)]*\)/gu)).toHaveLength(3);
+  expect(css.match(/url\([^)]*\)/gu)).toHaveLength(1);
   expect(css).not.toContain('@fontsource');
   expect(css).not.toContain('Sniptale Sans');
   expect(doc.querySelector('[data-tour-interface-font-license]')?.textContent).toBe(
-    interfaceLicense
+    interfaceLicense.replace(/\r\n?/gu, '\n')
   );
   expect(doc.querySelector('[data-tour-interface-font-license]')?.hasAttribute('hidden')).toBe(
     true
@@ -66,18 +68,17 @@ it('embeds canonical interface subsets, family and license without adding execut
   );
 });
 
-it.each(['missing', 'duplicate', 'unexpected'] as const)(
-  'refuses a %s canonical font subset before producing an artifact',
+it.each(['missing', 'duplicate', 'unexpected', 'wrong range'] as const)(
+  'refuses a %s canonical variable font before producing an artifact',
   async (change) => {
     const source =
       change === 'missing'
         ? canonicalFaces.replace(/@font-face\s*\{[^}]*\}/u, '')
         : change === 'duplicate'
-          ? canonicalFaces.replace(
-              'inter-cyrillic-wght-normal.woff2',
-              'inter-latin-wght-normal.woff2'
-            )
-          : canonicalFaces.replace('inter-cyrillic-wght-normal.woff2', 'unknown.woff2');
+          ? canonicalFaces.replace(/(@font-face\s*\{[^}]*\})/u, '$1\n$1')
+          : change === 'wrong range'
+            ? canonicalFaces.replace(/font-weight:\s*400\s+700\s*;/u, 'font-weight: 400;')
+            : canonicalFaces.replace('golos-ui-vf.woff2', 'unknown.woff2');
     vi.resetModules();
     vi.doMock('@sniptale/ui/styles/fonts?raw', () => ({ default: source }));
     try {

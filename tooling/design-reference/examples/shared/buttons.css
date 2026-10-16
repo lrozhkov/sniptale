@@ -29,7 +29,7 @@
 .action-button[data-kind='primary'] {
   color: var(--text);
   background: var(--surface-hover);
-  font-weight: 500;
+  font-weight: var(--font-control-weight);
 }
 .action-button[data-kind='primary']:hover {
   background: color-mix(in srgb, var(--surface-hover), var(--text) 6%);
@@ -85,7 +85,7 @@
 }
 .pressed-action[aria-pressed='true'] {
   background: var(--surface-hover);
-  font-weight: 500;
+  font-weight: var(--font-control-weight);
 }
 .button-check {
   display: grid;
@@ -154,7 +154,7 @@
 /* Surface, priority, persistent mode, and physical press are separate dimensions. */
 .action-button {
   font-family: var(--font-ui);
-  font-weight: 500;
+  font-weight: var(--font-control-weight);
   font-size: var(--font-control-size);
   user-select: none;
   touch-action: manipulation;
@@ -387,4 +387,59 @@
 .button-cycle-phase,
 .button-caption {
   font-weight: 400;
+}
+
+/* Labeled panel commands use weight and neutral surfaces, without toolbar frames. */
+.theme .action-button:not(.icon-action):is([data-appearance='command'], [data-appearance='mode']) {
+  font-weight: var(--font-control-weight);
+  --command-stroke: var(--font-control-stroke);
+}
+.theme
+  .action-button:not(.icon-action):is(
+    [data-appearance='command'],
+    [data-appearance='mode']
+  ):hover:not(:disabled) {
+  font-weight: var(--font-control-hover-weight);
+  --command-stroke: var(--font-control-hover-stroke);
+}
+.theme
+  .action-button:not(.icon-action):is(
+    [data-appearance='command'],
+    [data-appearance='mode']
+  )[aria-pressed='true'],
+.theme
+  .action-button:not(.icon-action):is(
+    [data-appearance='command'],
+    [data-appearance='mode']
+  )[aria-pressed='true']:hover {
+  font-weight: var(--font-control-selected-weight);
+  background: var(--surface-hover);
+  --command-stroke: var(--font-control-selected-stroke);
+}
+.theme
+  .action-button:not(.icon-action):is([data-appearance='command'], [data-appearance='mode'])
+  svg[viewBox='0 0 24 24']:not([fill]):not(:has([fill])) {
+  stroke-width: var(--command-stroke);
+}
+.theme .property-options[data-presentation='labeled-tools'] .property-face {
+  font-weight: var(--font-control-weight);
+  --command-stroke: var(--font-control-stroke);
+}
+.theme
+  .property-options[data-presentation='labeled-tools']
+  .property-option:hover:not(:has(input:checked, input:disabled))
+  .property-face {
+  font-weight: var(--font-control-hover-weight);
+  --command-stroke: var(--font-control-hover-stroke);
+  box-shadow: none;
+}
+.theme .property-options[data-presentation='labeled-tools'] input:checked + .property-face {
+  font-weight: var(--font-control-selected-weight);
+  --command-stroke: var(--font-control-selected-stroke);
+}
+.theme
+  .property-options[data-presentation='labeled-tools']
+  .property-face
+  svg:not([fill]):not(:has([fill])) {
+  stroke-width: var(--command-stroke);
 }

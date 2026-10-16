@@ -24,7 +24,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('activates color text through its name and padding without opening the picker', () => {
+it('keeps color names and padding inert while its value edits and selects all text', () => {
   const change = vi.fn();
   const render = (disabled = false) =>
     act(() =>
@@ -44,6 +44,14 @@ it('activates color text through its name and padding without opening the picker
   const row = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
   const label = row.querySelector<HTMLElement>('.sniptale-parameter-name')!;
   act(() => label.click());
+  expect(host.querySelector('input')).toBeNull();
+  act(() => row.click());
+  expect(host.querySelector('input')).toBeNull();
+  act(() =>
+    row
+      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.value-trigger"]')!
+      .click()
+  );
   const input = host.querySelector<HTMLInputElement>('input')!;
   expect(input).not.toBeNull();
   expect(document.activeElement).toBe(input);
@@ -52,8 +60,18 @@ it('activates color text through its name and padding without opening the picker
     host.querySelector('[data-ui="shared.ui.color-selector"]')?.getAttribute('data-open')
   ).toBe('false');
   act(() => label.click());
-  expect(host.querySelector('input')).toBeNull();
+  expect(host.querySelector('input')).toBe(input);
+  expect(document.activeElement).toBe(input);
   act(() => row.click());
+  expect(host.querySelector('input')).toBe(input);
+  expect(document.activeElement).toBe(input);
+  act(() => input.blur());
+  expect(host.querySelector('input')).toBeNull();
+  act(() =>
+    row
+      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.value-trigger"]')!
+      .click()
+  );
   const next = host.querySelector<HTMLInputElement>('input')!;
   expect(document.activeElement).toBe(next);
   act(() => {
@@ -63,7 +81,7 @@ it('activates color text through its name and padding without opening the picker
     );
     next.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  act(() => label.click());
+  act(() => next.blur());
   expect(host.querySelector('input')).toBe(next);
   expect(next.value).toBe('invalid');
   expect(next.getAttribute('aria-invalid')).toBe('true');
@@ -77,7 +95,7 @@ it('activates color text through its name and padding without opening the picker
   expect(change).not.toHaveBeenCalled();
 });
 
-it('opens and closes a choice once through its label and row padding', () => {
+it('keeps choice names and padding inert while its trigger opens and closes', () => {
   const change = vi.fn();
   act(() =>
     root.render(
@@ -98,11 +116,21 @@ it('opens and closes a choice once through its label and row padding', () => {
   const label = row.querySelector<HTMLElement>('.sniptale-parameter-name')!;
   const trigger = row.querySelector<HTMLButtonElement>('button')!;
   act(() => label.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => row.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => trigger.click());
   expect(trigger.getAttribute('aria-expanded')).toBe('true');
   act(() => label.click());
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => label.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
   act(() => row.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => trigger.click());
   expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  act(() => trigger.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
   expect(change).not.toHaveBeenCalled();
 });
 
@@ -134,7 +162,7 @@ it('clears a controlled draft without accepting it and keeps input focus', () =>
   expect(commit).toHaveBeenCalledExactlyOnceWith('');
 });
 
-it('ends and resumes text editing through repeated label activation', () => {
+it('keeps text names and padding inert while the input retains native focus', () => {
   act(() =>
     root.render(
       <InspectorLayout>
@@ -144,11 +172,16 @@ it('ends and resumes text editing through repeated label activation', () => {
   );
   const input = host.querySelector<HTMLInputElement>('input')!;
   const label = host.querySelector<HTMLElement>('.sniptale-parameter-name')!;
-  act(() => label.click());
-  expect(document.activeElement).toBe(input);
+  const row = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
   act(() => label.click());
   expect(document.activeElement).not.toBe(input);
+  act(() => row.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => input.focus());
+  expect(document.activeElement).toBe(input);
   act(() => label.click());
+  expect(document.activeElement).toBe(input);
+  act(() => row.click());
   expect(document.activeElement).toBe(input);
 });
 
@@ -207,7 +240,7 @@ it('clears an uncontrolled draft without restoring its initial value on rerender
   expect(document.activeElement).toBe(input);
 });
 
-it('accepts a numeric draft once when repeated label activation ends editing', () => {
+it('keeps numeric names and padding inert and accepts its draft once on blur', () => {
   const commit = vi.fn();
   act(() =>
     root.render(
@@ -226,16 +259,26 @@ it('accepts a numeric draft once when repeated label activation ends editing', (
   );
   const label = host.querySelector<HTMLElement>('.sniptale-parameter-name')!;
   const input = host.querySelector<HTMLInputElement>('input[type=text]')!;
+  const row = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
   act(() => label.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => row.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => input.focus());
   expect(document.activeElement).toBe(input);
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '15');
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   act(() => label.click());
+  expect(document.activeElement).toBe(input);
+  act(() => row.click());
+  expect(document.activeElement).toBe(input);
+  expect(commit).not.toHaveBeenCalled();
+  act(() => input.blur());
   expect(document.activeElement).not.toBe(input);
   expect(commit).toHaveBeenCalledExactlyOnceWith(15);
-  act(() => label.click());
+  act(() => input.focus());
   expect(document.activeElement).toBe(input);
 });
 
@@ -251,6 +294,12 @@ it('clears multiline drafts through their existing change path without committin
   }
   act(() => root.render(<Draft />));
   const input = host.querySelector<HTMLTextAreaElement>('textarea')!;
+  act(() => host.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => host.querySelector<HTMLElement>('.sniptale-parameter-row')!.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => input.focus());
+  expect(document.activeElement).toBe(input);
   act(() => host.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
   expect(document.activeElement).toBe(input);
   act(() => host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
@@ -304,7 +353,7 @@ it('retains an unaccepted mixed value after checkbox activation', () => {
   expect(input.indeterminate).toBe(true);
 });
 
-it('activates an adaptive dropdown through its parameter name and padding', () => {
+it('activates an adaptive dropdown only through its actual trigger', () => {
   const activate = vi.fn();
   act(() =>
     root.render(
@@ -318,12 +367,11 @@ it('activates an adaptive dropdown through its parameter name and padding', () =
     )
   );
   act(() => host.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
-  expect(activate).toHaveBeenCalledTimes(1);
-  expect(document.activeElement).toBe(host.querySelector('button'));
+  expect(activate).not.toHaveBeenCalled();
   act(() => host.querySelector<HTMLElement>('.sniptale-parameter-row')!.click());
-  expect(activate).toHaveBeenCalledTimes(2);
+  expect(activate).not.toHaveBeenCalled();
   act(() => host.querySelector('button')!.click());
-  expect(activate).toHaveBeenCalledTimes(3);
+  expect(activate).toHaveBeenCalledTimes(1);
 });
 
 it('cancels a held clear command without changing or accepting its draft', () => {

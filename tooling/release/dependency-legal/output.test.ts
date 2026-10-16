@@ -6,7 +6,7 @@ import path from 'node:path';
 import { expect, it } from 'vitest';
 
 import { formatThirdPartyNotices, writeDependencyLegalClosure } from './output.mjs';
-import { TEST_MANROPE } from './test-support';
+import { TEST_INTERFACE_FONT } from './test-support';
 
 const LICENSE_TEXT = 'MPL text\n';
 const ENTRY = {
@@ -24,15 +24,16 @@ const ENTRY = {
   version: '1.0.0',
 };
 
-it('formats stable notices with supplied Manrope metadata and artifact hashes', () => {
-  const notices = formatThirdPartyNotices({ entries: [ENTRY], manrope: TEST_MANROPE });
+it('formats stable notices with supplied Interface font metadata and artifact hashes', () => {
+  const notices = formatThirdPartyNotices({ entries: [ENTRY], interfaceFont: TEST_INTERFACE_FONT });
 
-  expect(notices).toContain('@fontsource-variable/manrope` 5.2.8');
+  expect(notices).toContain('Source package: `@sniptale/ui`');
+  expect(notices).toContain('Font version: `2.000`');
   expect(notices).toContain(
-    `node_modules/@fontsource-variable/manrope/files/manrope-cyrillic.woff2\` | \`${'b'.repeat(64)}`
+    `packages/ui/src/styles/golos-ui/golos-ui-cyrillic.woff2\` | \`${'b'.repeat(64)}`
   );
   expect(notices).toContain('MPL-2.0 corresponding source');
-  expect(notices.indexOf('manrope-cyrillic')).toBeLessThan(notices.indexOf('manrope-latin'));
+  expect(notices.indexOf('golos-ui-cyrillic')).toBeLessThan(notices.indexOf('golos-ui-latin'));
 });
 
 it('writes the manifest, notices, and exact license directory without implicit invocation', async () => {
@@ -46,7 +47,7 @@ it('writes the manifest, notices, and exact license directory without implicit i
       entries: [ENTRY],
       licenseFiles: [{ archivePath: ENTRY.archivePath, contents: LICENSE_TEXT }],
     },
-    manrope: TEST_MANROPE,
+    interfaceFont: TEST_INTERFACE_FONT,
     outputRoot,
   });
 
@@ -72,7 +73,7 @@ it('rejects stale license contents before writing an output set', async () => {
         entries: [ENTRY],
         licenseFiles: [{ archivePath: ENTRY.archivePath, contents: 'changed' }],
       },
-      manrope: TEST_MANROPE,
+      interfaceFont: TEST_INTERFACE_FONT,
       outputRoot,
     })
   ).rejects.toThrow(`Dependency license digest drift: ${ENTRY.archivePath}`);
@@ -99,7 +100,7 @@ it('rejects pinned source metadata that does not match archived output bytes', a
         entries: [pinnedEntry],
         licenseFiles: [{ archivePath: ENTRY.archivePath, contents: LICENSE_TEXT }],
       },
-      manrope: TEST_MANROPE,
+      interfaceFont: TEST_INTERFACE_FONT,
       outputRoot,
     })
   ).rejects.toThrow(`Dependency license provenance drift: ${ENTRY.archivePath}`);
@@ -120,7 +121,7 @@ it('reuses an exact canonical license file without writing a dependency copy', a
 
   await writeDependencyLegalClosure({
     closure: { entries: [canonicalEntry], licenseFiles: [] },
-    manrope: TEST_MANROPE,
+    interfaceFont: TEST_INTERFACE_FONT,
     outputRoot,
   });
 
@@ -142,7 +143,7 @@ it('rejects a missing or drifted canonical license before replacing generated fi
   await expect(
     writeDependencyLegalClosure({
       closure: { entries: [canonicalEntry], licenseFiles: [] },
-      manrope: TEST_MANROPE,
+      interfaceFont: TEST_INTERFACE_FONT,
       outputRoot,
     })
   ).rejects.toThrow(`Canonical dependency license file is missing: ${canonicalPath}`);
@@ -152,7 +153,7 @@ it('rejects a missing or drifted canonical license before replacing generated fi
   await expect(
     writeDependencyLegalClosure({
       closure: { entries: [canonicalEntry], licenseFiles: [] },
-      manrope: TEST_MANROPE,
+      interfaceFont: TEST_INTERFACE_FONT,
       outputRoot,
     })
   ).rejects.toThrow(`Canonical dependency license digest drift: ${canonicalPath}`);

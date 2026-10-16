@@ -13,15 +13,6 @@ function propertyRow(label, choice) {
   return ParameterRow({
     label,
     content: choice.element,
-    activate: () => {
-      const trigger = choice.element.querySelector(
-        '.property-fallback:not([hidden]) [role=combobox]'
-      );
-      if (trigger) {
-        trigger.click();
-        trigger.focus();
-      } else choice.inputs.find((input) => input.checked && !input.disabled)?.focus();
-    },
   }).element;
 }
 const status = (text) => el('p', { class: 'composition-status', role: 'status', text });
@@ -42,12 +33,6 @@ function dropdown(parent, label, options, value, config = {}) {
   const row = ParameterRow({
     label,
     content: field,
-    activate: () => {
-      if (!choice.trigger.disabled) {
-        choice.trigger.click();
-        choice.trigger.focus();
-      }
-    },
   });
   parent.append(row.element);
   const choice = createDropdown(field, label, options, value, config);

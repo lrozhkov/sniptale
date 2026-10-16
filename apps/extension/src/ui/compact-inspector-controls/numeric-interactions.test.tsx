@@ -103,7 +103,7 @@ it('keeps units display-only while editing and restores invalid drafts', () => {
     setInputValue(input(), '75%');
   });
 
-  expect(container?.textContent).not.toContain('%');
+  expect(container?.textContent).toContain('%');
   expect(input().value).toBe('75');
   expect(onPreviewValue).not.toHaveBeenCalled();
 
@@ -116,7 +116,7 @@ it('keeps units display-only while editing and restores invalid drafts', () => {
   expect(onCommitValue).not.toHaveBeenCalled();
 });
 
-it('keeps the unit hidden when the stepper changes an active edit field', () => {
+it('keeps the unit visible outside the input when the stepper changes an active edit field', () => {
   const { onCommitValue } = renderNumeric({ step: 1, unit: 'px', value: 18 });
   const increase = container?.querySelector<HTMLButtonElement>(
     'button[aria-label="Opacity increase"]'
@@ -129,7 +129,7 @@ it('keeps the unit hidden when the stepper changes an active edit field', () => 
   });
 
   expect(input().value).toBe('19');
-  expect(container?.textContent).not.toContain('px');
+  expect(container?.textContent).toContain('px');
   expect(onCommitValue).toHaveBeenCalledWith(19);
 });
 

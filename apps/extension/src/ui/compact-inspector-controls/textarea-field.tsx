@@ -2,7 +2,7 @@ import { CompactTextarea } from './primitives';
 import { cx } from './shared';
 import { forwardRef, useRef } from 'react';
 import type { ProductTextareaProps } from '@sniptale/ui/product-form-controls';
-import { InspectorParameterRow, useInspectorLayout, toggleInspectorFieldEditing } from './layout';
+import { InspectorParameterRow, useInspectorLayout } from './layout';
 import { InspectorFieldClear } from './text-field';
 
 const TEXTAREA_FIELD_LABEL_CLASS_NAME = [
@@ -35,7 +35,6 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
           stacked
           className={className}
           dataUi="shared.ui.compact-inspector.textarea-field"
-          onActivate={() => toggleInspectorFieldEditing(input.current)}
         >
           <div className="sniptale-text-value" data-multiline="true">
             <CompactTextarea

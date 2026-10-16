@@ -8,28 +8,34 @@ These rules apply across groups. Group documents add semantic and interaction di
 
 | Role | Family role | Size / line height | Weight |
 | --- | --- | --- | --- |
-| Parameter name, value, command, option | Interface | 13px / 18px | 500 |
+| Parameter name, value, command, option | Interface | 13px / 18px | 400 |
 | Caption, auxiliary metadata, secondary hint | Interface | 12px / 16px | 400 |
 | Explanatory prose and errors | Interface | 14px / 20px | 400 |
-| Structural group heading | Interface | 14px / 20px | 600 |
+| Structural group heading | Interface | 14px / 20px | 500 |
 
-Inter is the current interface family, not a component requirement. Bundle Cyrillic, Latin, numeric coverage, and the license. Names use secondary foreground. Values use primary foreground. Selection does not increase weight. Use tabular digits for changing values. Both themes retain identical typography. Wrap long names and values. Preserve complete dimensions and readable errors. Keep prose within 45–75 characters where practical.
+[Golos UI](https://www.paratype.ru/catalog/font/pt/golos-ui) is the current interface family, not a component requirement. Do not substitute Golos Text. Bundle Cyrillic, Latin, numeric coverage, and the license. Names use secondary foreground. Values use primary foreground. Ordinary value selection does not increase weight. Labeled panel tools use the explicit 400/450/500 interaction variant in [Buttons](buttons.md). Use tabular digits for changing values. Both themes retain identical typography. Wrap long names and values. Preserve complete dimensions and readable errors. Keep prose within 45–75 characters where practical.
+
+Calibrate roles for the chosen family. A numeric weight does not guarantee equal visual density across families. Ordinary controls use regular weight. Group headings use medium weight and secondary or inherited foreground. Keep weights and metrics identical across themes, with semantic foreground colors. Avoid pure black or white as default emphasis. Do not combine heavier weight, maximum contrast, and increased size for ordinary controls.
+
+Normal text retains at least 4.5:1 contrast. Thin rasterized strokes can reduce apparent contrast. Check rendered Russian and English text. This minimum does not define a maximum contrast. [Fluent typography](https://fluent2.microsoft.design/typography) demonstrates regular body roles and separate emphasis roles. [Material typography](https://m3.material.io/styles/typography/applying-type) provides another role reference.
 
 ### Font ownership
 
-`packages/ui/src/styles/design-tokens.css` owns family parameters. Components and portaled menus use `--sniptale-font-interface`, never literal family names. Pending surfaces retain `--sniptale-font-sans`. Migrated surfaces bind it to the interface role. Remove this distinction when remaining consumers permit it.
+`packages/ui/src/styles/design-tokens.css` owns family parameters. Components and portaled menus use `--sniptale-font-interface`, never literal family names. The compatibility token `--sniptale-font-sans` uses the same family through `--sniptale-font-document-sans`. The popup uses the same bundled interface family. Calibrate its compact roles within its own shell: body 400, labels 450, headings 500, and stronger emphasis 550. Preserve its established geometry and semantic status colors. Do not copy these surface-specific weights into other interfaces.
 
-`packages/ui/src/styles/fonts.css` owns faces, weights, and language subsets. Its stable `Sniptale Interface` alias currently maps to Inter assets. Replace backing assets to change the bundled family. Select another family parameter only for a registered face or fallback stack. Keep family selection independent from size, line height, weight, and foreground. New files require build-asset and manifest inventory updates.
+`packages/ui/src/styles/fonts.css` owns faces and weights. The `Sniptale Sans` face preserves the family alias in stored documents. This alias uses the same Golos UI bytes as `Sniptale Interface`. New default text uses `Sniptale Interface`. The bundled Golos UI variable font supports weights from 400 through 700, including 600. Ordinary roles use 400 and 500 for calm hierarchy. Font capability does not determine role weight. Golos UI checks found stable advances for tested Russian and English strings at 400, 500, 600, and 700. All glyph advances also matched from 400 to 500. This evidence does not prove equal advances for every weight or language. Its stable `Sniptale Interface` alias currently maps to Golos UI assets. Replace backing assets in this face owner to change the bundled family. Keep component family references unchanged. Select another family parameter only for a registered face or fallback stack. Keep family selection independent from size, line height, weight, and foreground. New files require build-asset and manifest inventory updates.
 
 Content UI explicitly registers the stable alias. Reuse each runtime's installation owner and retain descriptors with bundled declarations. After replacement, check registered faces and painted Russian/English glyphs, narrow controls, and expanded text. Check detached layers, embedded UI, inherited status/duration, and controls. CSS declarations, asset requests, or child overrides alone do not prove font use. Load failure preserves usable fallback text and interactions.
 
-`--sniptale-font-document-sans` independently selects authored documents' default sans-serif family. Standalone exports bind it to bundled document faces. Interface changes must not replace authored canvas text, captions, or export fonts. These belong to document/rendering owners. The excluded popup retains its font contract.
+`--sniptale-font-document-sans` selects the default sans-serif family for new documents. It uses `--sniptale-font-interface`. Standalone exports embed the same Golos UI font. Font replacement must preserve explicit family choices in stored canvas text and captions. Document and rendering owners retain these values. Existing exported media remains unchanged.
 
 ## Geometry and density
 
 | Element | Default geometry |
 | --- | --- |
-| Button, input, closed dropdown, parameter row | 32px minimum height |
+| Ordinary button, input, closed dropdown, parameter row | 32px minimum height |
+| Explicit compact inspector, inline | 32px control band + 8px contextual strip = 40px row |
+| Explicit compact inspector, stacked | 32px name + 4px gap + 32px control = 68px row |
 | Explicit larger density | 40px or 48px, same text role |
 | Related inspector rows | 4px gap, without extra component margins |
 | Related commands | 8px gap |
@@ -63,4 +69,4 @@ Declare canonical CSS layer order before independently loaded rules. Scoped sele
 
 ## Sources
 
-[WCAG contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html), [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html), [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html), [Inter](https://rsms.me/inter/).
+[WCAG contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html), [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html), [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html), [Golos UI](https://www.paratype.ru/catalog/font/pt/golos-ui).

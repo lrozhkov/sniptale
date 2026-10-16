@@ -13,7 +13,7 @@ import {
   type SavedViewer,
 } from './web-snapshot-viewer-design.fixture';
 
-const interfaceBackingFace = 'Inter';
+const interfaceBackingFace = 'Golos UI';
 const ui = (page: Page, id: string) => page.locator(`[data-ui="${id}"]`);
 const tr = (composition: Composition, key: TranslationKey) => translate(key, composition.locale);
 
@@ -56,7 +56,10 @@ async function chromeGeometry(page: Page, info: TestInfo) {
     await expect(control).toHaveCSS('border-radius', '4px');
     await expect(control).toHaveCSS('font-size', '13px');
     await expect(control).toHaveCSS('line-height', '18px');
-    await expect(control).toHaveCSS('font-weight', '500');
+    await expect(control).toHaveCSS(
+      'font-weight',
+      (await control.getAttribute('data-command-press')) !== null ? '400' : '500'
+    );
   }
   const heading = toolbar.getByText(title, { exact: true });
   await expect(heading).toHaveCSS('font-size', '14px');

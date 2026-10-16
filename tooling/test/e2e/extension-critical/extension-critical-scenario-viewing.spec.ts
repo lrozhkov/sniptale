@@ -270,7 +270,7 @@ test('built Library opens full guide and tour HTML with isolation and committed 
   ).toEqual({ storage: false, parentAccess: false, network: false, extension: false });
   expect(
     await child.evaluate(() => getComputedStyle(document.querySelector('article')!).fontFamily)
-  ).toContain('Guide0');
+  ).toContain('Sniptale Interface');
   await content.locator('.guide-read-image').hover();
   await content.locator('[data-guide-open]').click();
   await expect(content.locator('dialog')).toBeVisible();
@@ -703,7 +703,7 @@ test('built guide keeps bundled document fonts independent from viewer commands'
       await document.fonts.ready;
       return getComputedStyle(article).fontFamily;
     });
-  await expect.poll(font).toContain('Guide0');
+  await expect.poll(font).toContain('Sniptale Interface');
   const original = await font();
   await guide.evaluate(() =>
     document.documentElement.style.setProperty('--sniptale-font-interface', 'monospace')

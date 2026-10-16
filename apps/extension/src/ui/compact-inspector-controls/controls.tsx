@@ -19,6 +19,7 @@ export function ToggleField(props: {
     <InspectorParameterRow
       label={props.label}
       keepInline
+      className="sniptale-boolean-parameter"
       onActivate={() => trigger.current?.click()}
     >
       <ProductGlassSwitch
@@ -47,7 +48,12 @@ export function CheckboxField(props: {
     if (input.current) input.current.indeterminate = props.indeterminate ?? false;
   });
   return (
-    <InspectorParameterRow label={props.label} keepInline onActivate={() => input.current?.click()}>
+    <InspectorParameterRow
+      label={props.label}
+      keepInline
+      className="sniptale-boolean-parameter"
+      onActivate={() => input.current?.click()}
+    >
       <input
         ref={input}
         type="checkbox"
@@ -96,7 +102,6 @@ export function ColorField({
   ...props
 }: CompactColorSelectorProps & { layout?: 'inline' | 'stacked' }) {
   const [open, setOpen] = useState(false);
-  const valueHost = useRef<HTMLDivElement>(null);
   const inspector = useInspectorLayout();
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -107,26 +112,12 @@ export function ColorField({
     return (
       <InspectorParameterRow
         label={props.label}
-        valueMinimum={148}
+        valueMinimum={140}
         stacked={layout === 'stacked'}
         dataUi="shared.ui.compact-inspector.color-field"
         className={className}
-        {...(props.disabled || open
-          ? {}
-          : {
-              onActivate: () => {
-                const input = valueHost.current?.querySelector<HTMLInputElement>('input');
-                if (input) input.blur();
-                else
-                  valueHost.current
-                    ?.querySelector<HTMLButtonElement>(
-                      '[data-ui="shared.ui.color-selector.value-trigger"]'
-                    )
-                    ?.click();
-              },
-            })}
       >
-        <div ref={valueHost} className="w-full min-w-0">
+        <div className="w-full min-w-0">
           <CompactColorSelector
             {...props}
             className="w-full min-w-0"
@@ -176,7 +167,6 @@ export function SelectField<T extends string>(props: {
 }) {
   const [open, setOpen] = useState(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
   const inspector = useInspectorLayout();
 
   if (inspector)
@@ -186,13 +176,8 @@ export function SelectField<T extends string>(props: {
         valueText={props.options.find((option) => option.value === props.value)?.label}
         dataUi="shared.ui.compact-inspector.select-field"
         className={props.className}
-        onActivate={() => {
-          trigger.current?.focus({ preventScroll: true });
-          trigger.current?.click();
-        }}
       >
         <CompactSelect
-          ref={trigger}
           aria-label={props.label}
           value={props.value}
           options={props.options}
@@ -262,7 +247,7 @@ export function SegmentedRow<T extends string>(props: {
   );
 
   if (props.label === undefined) {
-    return selector;
+    return inspector ? <div className="sniptale-parameter-unlabelled">{selector}</div> : selector;
   }
 
   if (inspector)

@@ -6,8 +6,16 @@
 :host([data-theme='dark']),
 :host([data-theme='light']) {
   --sniptale-font-interface: 'Sniptale Interface', 'Segoe UI', sans-serif;
-  --sniptale-font-document-sans:
-    'Sniptale Sans', 'Manrope Variable', 'Manrope', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --sniptale-font-weight-interface: 400;
+  --sniptale-font-weight-interface-heading: 500;
+  --sniptale-font-weight-interface-emphasis: 500;
+  --sniptale-control-font-weight: var(--sniptale-font-weight-interface);
+  --sniptale-control-font-weight-hover: 450;
+  --sniptale-control-font-weight-active: var(--sniptale-font-weight-interface-emphasis);
+  --sniptale-control-icon-stroke: 1.75;
+  --sniptale-control-icon-stroke-hover: 1.875;
+  --sniptale-control-icon-stroke-active: 2;
+  --sniptale-font-document-sans: var(--sniptale-font-interface);
   --sniptale-font-sans: var(--sniptale-font-document-sans);
 
   --sniptale-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -63,6 +71,7 @@
   --sniptale-color-border-accent-strong: rgba(249, 115, 22, 0.8);
 
   --sniptale-color-text-primary: #f4f4f5;
+  --sniptale-color-text-interface: #dedee3;
   --sniptale-color-text-primary-strong: #fafafa;
   --sniptale-color-text-inverse: #ffffff;
   --sniptale-color-text-secondary: #bcbcc4;
@@ -128,6 +137,7 @@
   --sniptale-color-border-accent-strong: rgba(249, 115, 22, 0.64);
 
   --sniptale-color-text-primary: #27272a;
+  --sniptale-color-text-interface: #3f3f46;
   --sniptale-color-text-primary-strong: #09090b;
   --sniptale-color-text-inverse: #ffffff;
   --sniptale-color-text-secondary: #4b5563;

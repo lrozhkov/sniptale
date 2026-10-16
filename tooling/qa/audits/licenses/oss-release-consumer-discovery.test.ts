@@ -25,7 +25,7 @@ it('discovers every supported release consumer category and ignores tests', asyn
   write(
     root,
     'apps/extension/manifest.json',
-    'manrope-latin-wght-normal.woff2\nmarck-script-cyrillic-400-normal.woff2\n'
+    'golos-ui-vf.woff2\nmarck-script-cyrillic-400-normal.woff2\n'
   );
   write(root, 'tooling/qa/core/focused.test.ts', "import './verify-oss-release-surface.mjs';\n");
   write(
@@ -46,7 +46,7 @@ it('discovers every supported release consumer category and ignores tests', asyn
   write(
     root,
     'tasks/local-plan.json',
-    'package-dist.mjs verify-oss-release-surface.mjs manrope-latin-wght-normal.woff2\n'
+    'package-dist.mjs verify-oss-release-surface.mjs golos-ui-vf.woff2\n'
   );
 
   const consumers = discoverOssReleaseConsumers(root);
@@ -65,10 +65,10 @@ it.each([
 ])('rejects an omitted authoritative release integration: %s', async (relativePath) => {
   const root = createTempRoot('oss-release-consumer-omission-');
   write(root, 'package.json', '{"scripts":{"ci:release":"node release.mjs"}}\n');
-  write(root, 'apps/extension/manifest.json', 'manrope-latin-wght-normal.woff2\n');
-  write(root, 'apps/extension/build/layout.data.json', 'manrope-latin-wght-normal.woff2\n');
-  write(root, 'apps/extension/vite.config.ts', 'manrope-latin-wght-normal.woff2\n');
-  write(root, 'packages/ui/src/styles/fonts.css', 'manrope-latin-wght-normal.woff2\n');
+  write(root, 'apps/extension/manifest.json', 'golos-ui-vf.woff2\n');
+  write(root, 'apps/extension/build/layout.data.json', 'golos-ui-vf.woff2\n');
+  write(root, 'apps/extension/vite.config.ts', 'golos-ui-vf.woff2\n');
+  write(root, 'packages/ui/src/styles/fonts.css', 'golos-ui-vf.woff2\n');
   write(root, 'tooling/release/package/package-dist.mjs', "import './oss-release-policy.mjs';\n");
   for (const integration of [
     'tooling/qa/composition/checkpoint/focused-triggered/execution.mjs',

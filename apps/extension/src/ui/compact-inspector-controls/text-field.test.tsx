@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { TextField } from './text-field';
+import { InspectorLayout } from './layout';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -98,3 +99,25 @@ it('deduplicates blur commits and blurs the field on Escape', () => {
   expect(onValueCommit).toHaveBeenCalledTimes(1);
   expect(document.activeElement).not.toBe(first);
 });
+
+it.each([false, true])(
+  'provides a readable empty hint and preserves explicit examples (inspector=%s)',
+  (inspector) => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const fields = (
+      <>
+        <TextField label="Title" />
+        <TextField label="URL" placeholder="example.com" />
+      </>
+    );
+    act(() => root?.render(inspector ? <InspectorLayout>{fields}</InspectorLayout> : fields));
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Title"]')?.placeholder
+    ).toBe('Title');
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="URL"]')?.placeholder).toBe(
+      'example.com'
+    );
+  }
+);

@@ -15,6 +15,6 @@
   ],
   "include": ["unresolved", "unlisted", "binaries"],
   "ignoreBinaries": ["codeql", "flock", "gcc", "mkfifo", "printf", "xwininfo"],
-  "ignoreDependencies": ["@fontsource/marck-script", "@fontsource-variable/manrope"],
+  "ignoreDependencies": ["@fontsource/marck-script"],
   "ignore": [".tmp/**", "coverage/**", "dist/**", "docs/**", "cases/**"]
 }

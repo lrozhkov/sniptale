@@ -95,7 +95,7 @@ async function admitSource(context: BrowserContext, extensionId: string, origin:
 }
 
 async function installRichSource(context: BrowserContext, origin: string) {
-  const font = await readFile('apps/extension/public/fonts/manrope-latin-wght-normal.woff2');
+  const font = await readFile('packages/ui/src/styles/golos-ui/golos-ui-vf.woff2');
   const image = Buffer.from(
     [
       'iVBORw0KGgoAAAANSUhEUgAAAPAAAACQCAIAAAC5w3GfAAACaUlEQVR42u3SQU0DABQFwWezIamICsACx0qoDKyBjv2T',

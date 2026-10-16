@@ -124,22 +124,22 @@ export function validateNoticeContents(root, policy) {
   const noticesPath = path.resolve(root, 'THIRD_PARTY_NOTICES.md');
   const notice = existsSync(noticePath) ? readFileSync(noticePath, 'utf8') : '';
   const notices = existsSync(noticesPath) ? readFileSync(noticesPath, 'utf8') : '';
-  for (const marker of [policy.project.copyright, policy.project.license, 'Manrope']) {
+  for (const marker of [policy.project.copyright, policy.project.license, 'Golos UI']) {
     if (marker && !notice.includes(marker))
       errors.push(`NOTICE is missing required marker: ${marker}`);
   }
-  const manrope = policy.bundledAssets.find((asset) => asset.id === 'manrope');
+  const interfaceFont = policy.bundledAssets.find((asset) => asset.id === 'golos-ui');
   for (const marker of [
-    manrope?.copyright,
-    manrope?.sourcePackage,
-    manrope?.version,
-    manrope?.license,
+    interfaceFont?.copyright,
+    interfaceFont?.sourcePackage,
+    interfaceFont?.version,
+    interfaceFont?.license,
   ]) {
     if (marker && !notices.includes(marker)) {
       errors.push(`third-party notice is missing required marker: ${marker}`);
     }
   }
-  for (const artifact of manrope?.artifacts ?? []) {
+  for (const artifact of interfaceFont?.artifacts ?? []) {
     if (!notices.includes(artifact.path) || !notices.includes(artifact.sha256)) {
       errors.push(`third-party notice is missing bundled artifact: ${artifact.path}`);
     }

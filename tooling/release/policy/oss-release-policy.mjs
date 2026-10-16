@@ -3,14 +3,19 @@ import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+export const INTERFACE_FONT_PATH = 'packages/ui/src/styles/golos-ui/golos-ui-vf.woff2';
+export const INTERFACE_FONT_LICENSE_PATH = 'packages/ui/src/styles/golos-ui/LICENSE.txt';
+
 export const OSS_RELEASE_POLICY_PATH = 'tooling/configs/qa/oss-release.data.json';
 export const REQUIRED_RELEASE_LEGAL_PATHS = [
   'LICENSE',
   'LICENSES/OFL-1.1.txt',
+  'packages/ui/src/styles/golos-ui/LICENSE.txt',
   'NOTICE',
   'THIRD_PARTY_NOTICES.md',
 ];
 export const CANONICAL_LICENSE_DIGESTS = new Map([
+  [INTERFACE_FONT_LICENSE_PATH, 'c8e985ff79ce19d0c8029ef5d772c18044cdcafb5294e629722c979d169820a9'],
   ['LICENSE', 'e9df4c4e4e64b8168a71c3c67668dcffabbe8fca11d4ac4a7d5482562cd1679c'],
   ['LICENSES/OFL-1.1.txt', 'd826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30'],
 ]);

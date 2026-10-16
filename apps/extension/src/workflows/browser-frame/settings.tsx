@@ -1,5 +1,5 @@
 import { SegmentedRow, TextField } from '../../ui/compact-inspector-controls';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { type WindowHeader } from '../../features/browser-frame/header';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { useWindowHeaderEditing, type WindowHeaderSettingsProps } from './editing';
@@ -16,6 +16,16 @@ export function WindowHeaderSettings({
   useAppLocale();
   const inspector = useInspectorLayout();
   const editing = useWindowHeaderEditing({ header, onChange, disabled });
+  const iconControls =
+    header?.kind === 'browser' ? (
+      <WindowHeaderIconControls
+        header={header}
+        busy={editing.busy}
+        onWebsite={editing.toggleFavicon}
+        onClearFile={editing.clearFile}
+        onFile={editing.loadFile}
+      />
+    ) : null;
   return (
     <fieldset
       disabled={disabled}
@@ -62,21 +72,16 @@ export function WindowHeaderSettings({
             onCommit={(title) => editing.patch({ title })}
           />
           {header.kind === 'browser' ? (
-            <div className="flex min-w-0 items-end gap-1.5">
+            <div className={inspector ? 'min-w-0' : 'flex min-w-0 items-end gap-1.5'}>
               <HeaderTextField
                 label={translate('windowHeader.address')}
                 value={header.url}
                 maxLength={2048}
                 placeholder="example.com"
                 onCommit={editing.changeAddress}
+                trailingActions={inspector ? iconControls : undefined}
               />
-              <WindowHeaderIconControls
-                header={header}
-                busy={editing.busy}
-                onWebsite={editing.toggleFavicon}
-                onClearFile={editing.clearFile}
-                onFile={editing.loadFile}
-              />
+              {inspector ? null : iconControls}
             </div>
           ) : null}
         </>
@@ -106,6 +111,7 @@ function HeaderSegments<T extends string>({
     return (
       <SegmentedRow
         label={label}
+        layout="stacked"
         columns={options.length === 2 ? 2 : 3}
         ariaLabel={label}
         value={value}
@@ -140,12 +146,14 @@ function HeaderTextField({
   value,
   maxLength,
   placeholder,
+  trailingActions,
   onCommit,
 }: {
   label: string;
   value: string;
   maxLength: number;
   placeholder?: string;
+  trailingActions?: ReactNode;
   onCommit: (value: string) => void | Promise<void>;
 }) {
   const [draft, setDraft] = useState(value);
@@ -156,6 +164,7 @@ function HeaderTextField({
       value={draft}
       maxLength={maxLength}
       placeholder={placeholder}
+      trailingActions={trailingActions}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={(event) => {
         const next = event.target.value.slice(0, maxLength).replace(/[\uD800-\uDFFF]/gu, '');

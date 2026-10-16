@@ -35,7 +35,8 @@ function createRoot(
 function declaration(
   source: string,
   family = 'Sniptale Interface',
-  weight = '100 900'
+  weight = '100 900',
+  unicodeRange = 'U+0400-045F'
 ): CSSFontFaceRule {
   const properties: Record<string, string> = {
     'font-family': `"${family}"`,
@@ -43,7 +44,7 @@ function declaration(
     'font-weight': weight,
     'font-style': 'normal',
     'font-display': 'swap',
-    'unicode-range': 'U+0400-045F',
+    'unicode-range': unicodeRange,
   };
   return {
     type: CSSRule.FONT_FACE_RULE,
@@ -148,16 +149,13 @@ it('skips unavailable runtime resolution without caching success or contacting t
   expect(add).toHaveBeenCalledOnce();
 });
 
-it.each([
-  'fonts/manrope-latin-wght-normal.woff2',
-  'node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2',
-])(
+it.each(['assets/golos-ui-vf.woff2', 'assets/replacement-font.woff2'])(
   'supports replacing the stable Interface alias with an existing bundled family: %s',
   async (path) => {
     const source = `url("chrome-extension://owned/${path}") format("woff2-variations")`;
     const { root, add } = createRoot([
-      declaration(source, 'Sniptale Interface', '200 800'),
-      declaration(source, 'Sniptale Sans', '200 800'),
+      declaration(source, 'Sniptale Interface', '400 700'),
+      declaration(source, 'Sniptale Sans', '400 700'),
       declaration(
         'url("chrome-extension://owned/fonts/marck.woff2")',
         'Sniptale Handwritten',
@@ -168,7 +166,7 @@ it.each([
     const createFace = vi.fn(() => loaded);
     await installContentInterfaceFonts(root, { createFace });
     expect(createFace).toHaveBeenCalledExactlyOnceWith('Sniptale Interface', source, {
-      weight: '200 800',
+      weight: '400 700',
       style: 'normal',
       display: 'swap',
       unicodeRange: 'U+0400-045F',
@@ -216,4 +214,24 @@ it.each([
   await installContentInterfaceFonts(root, { createFace });
   expect(createFace).toHaveBeenCalledOnce();
   expect(add).toHaveBeenCalledOnce();
+});
+
+it('uses the native full-range default for complete Golos UI faces', async () => {
+  const { root, add } = createRoot([
+    declaration(
+      'url("chrome-extension://owned/assets/golos-ui-vf.woff2")',
+      'Sniptale Interface',
+      '500',
+      ''
+    ),
+  ]);
+  const loaded = face();
+  const createFace = vi.fn(() => loaded);
+  await installContentInterfaceFonts(root, { createFace });
+  expect(createFace).toHaveBeenCalledExactlyOnceWith(
+    'Sniptale Interface',
+    'url("chrome-extension://owned/assets/golos-ui-vf.woff2")',
+    { weight: '500', style: 'normal', display: 'swap', unicodeRange: 'U+0-10FFFF' }
+  );
+  expect(add).toHaveBeenCalledExactlyOnceWith(loaded);
 });

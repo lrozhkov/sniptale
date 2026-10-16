@@ -17,7 +17,7 @@ Tab from command menus exits relative to the root trigger. Nested Right enters. 
 
 ## Geometry and material
 
-Menus share the light-glass surface, 5px shell inset, 8px row padding, and 36px minimum option row. Their hit regions remain contiguous despite 1px painted top/bottom insets. Content-toolbar menus use a compact variant: 32px minimum rows, 6px vertical and 8px horizontal padding, 2px row separation, and the same 5px shell inset. Multiline copy increases row height. Anchored editors can use 12px content insets. Dialogs use the shared 8px radius and compact content-driven spacing. Do not reserve a large empty dialog height for short copy. Use clear title/body/action separation.
+Menus share the light-glass surface, 5px shell inset, 8px row padding, and 32px minimum option row. Leave true 2px gaps between options. Content-toolbar menus use a compact variant: 32px minimum rows, 6px vertical and 8px horizontal padding, 2px row separation, and the same 5px shell inset. Multiline copy increases row height. Anchored editors can use 12px content insets. Dialogs use the shared 8px radius and compact content-driven spacing. Do not reserve a large empty dialog height for short copy. Use clear title/body/action separation.
 
 Dialog headers and bodies use 16px horizontal and 12px vertical insets. Footers use 16px horizontal and 8px vertical insets, with 8px between commands. Titles use the structural heading role. Messages use the appropriate text role. These defaults do not replace specialized recording strips or edge drawers.
 
@@ -29,7 +29,7 @@ At short heights, content scrolls while actions remain reachable through their a
 
 Opening an editor creates a draft from the accepted value. Preview can update the local specimen without accepting it. Apply checks the draft and commits once. Cancel, outside dismissal, or Escape restores accepted data according to the owner contract. An inner editor can consume Escape before its parent. A second Escape must still dismiss the parent. The native eyedropper can suspend dismissal during its browser session. Cancellation retains accepted data and restores normal dismissal.
 
-A color parameter row contains secondary name, right-aligned HEX input, and a trailing swatch. Use an elastic name, 116px HEX column, 32px swatch target, 8px gaps, and 32px minimum row height. The visible swatch is 20px with 4px corners. Long names can wrap and increase height. Errors appear below the row. Sample acceptance feedback is diagnostic, not a required product caption.
+A color parameter row contains secondary name, right-aligned HEX input, and a trailing swatch. Use an elastic name, 116px HEX column, 32px swatch target, 8px gaps, and 32px minimum row height. The ordinary visible swatch is 20px with 4px corners. The explicit compact inspector uses a 32px target with a 16px visible swatch. Its value construction reserves at least 140px for HEX, gap, and swatch. Its 40px row contains a 32px first band and an 8px contextual strip. The color-code input has no surface or frame at rest. Editing reveals its neutral surface. Preserve visible keyboard focus. Parameter names do not activate the editor. Long names can wrap and increase height. Errors appear below the row. Sample acceptance feedback is diagnostic, not a required product caption.
 
 The simplified palette/HEX/alpha popup proves transactions only. Preserve the existing CompactColorSelector and CompactPaintSelector for complete color-plane and gradient behavior.
 
@@ -39,7 +39,7 @@ Device-selection curtains belong to the extension popup. They are not a generic 
 
 [WAI dialog](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/), [menu](https://www.w3.org/WAI/ARIA/apg/patterns/menubar/).
 
-Textual color values select their complete contents on initial focus through pointer, Tab, or label activation. This supports direct replacement with a pasted color. A second click within the focused field can place the caret. Keep ordinary editing, IME, paste, validation, acceptance, and cancellation intact. Declare this color-value variant explicitly. Do not select all text on focus for every ordinary text field.
+Textual color values select their complete contents on initial focus through pointer or Tab. This supports direct replacement with a pasted color. A second click within the focused field can place the caret. Keep ordinary editing, IME, paste, validation, acceptance, and cancellation intact. Declare this color-value variant explicitly. Do not select all text on focus for every ordinary text field.
 
 Use native browser `title` for optional hints throughout the application. Do not create custom tooltip layers. Keep required information in visible content and preserve complete accessible names.
 

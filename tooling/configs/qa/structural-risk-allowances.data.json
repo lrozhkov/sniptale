@@ -567,11 +567,11 @@
       "file": "apps/extension/src/gallery/video-review/advanced-panels.tsx",
       "symbol": "ReviewSceneProperties",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One JSX composition orders scene sections and passes existing callbacks. The crop preview is another input to the existing canvas section. This function has no state, effects or write authority. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
+      "reason": "tool-noise: One JSX composition orders scene sections and passes existing callbacks. The candidate forwards the existing text-track lock to caption controls. The binding retains lock-state authority. Caption controls retain disabled presentation. This function has no state, effects, writer or recovery authority. Independent read-only diagnosis checked the exact diff. Final architecture review must validate the complete candidate.",
       "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-14",
-      "astHash": "c18726787019e0f6b003415e2d5d1dc913aa24d3e089ceb3d1b109beed195146",
-      "signatureHash": "49151e8ba8e59b7ca5b176b41bea902f3e30299bec03c3cd045e34adbb54a23e"
+      "reviewDate": "2026-10-16",
+      "astHash": "34297f5c7a0b82510258cc063763f0e5ca8cb85bac454b8aaef32e9d5599bb74",
+      "signatureHash": "64a50dbe99393258ba872341940cfa442dbe0243c42c6a259dc14b303d4e4387"
     },
     {
       "rule": "structural-file-risk",

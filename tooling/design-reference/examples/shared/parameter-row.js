@@ -1,5 +1,5 @@
 import { el } from './dom.js';
-export function ParameterRow({ label, content, layout = 'inline', showLabel = true, activate }) {
+export function ParameterRow({ label, content, layout = 'inline', showLabel = true }) {
   const name = el('span', { class: 'parameter-name', text: label }),
     value = el('div', { class: 'parameter-value' }, content),
     element = el(
@@ -12,16 +12,6 @@ export function ParameterRow({ label, content, layout = 'inline', showLabel = tr
       [name, value]
     );
   name.hidden = !showLabel;
-  if (activate) {
-    element.dataset.activates = 'true';
-    element.addEventListener('pointerdown', (event) => {
-      if (event.button === 0 && (event.target === element || name.contains(event.target)))
-        event.preventDefault();
-    });
-    element.addEventListener('click', (event) => {
-      if (event.target === element || name.contains(event.target)) activate();
-    });
-  }
   let observer, changes;
   function fit() {
     if (

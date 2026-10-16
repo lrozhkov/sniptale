@@ -424,3 +424,52 @@ it('restores the accepted numeric value on Escape before blur acceptance', async
     style: { ...comment().style, fontSize: 12 },
   });
 });
+
+it.each([
+  { name: 'overlayStart', value: '3', patch: { start: 3 } },
+  { name: 'overlayEnd', value: '7', patch: { end: 7 } },
+  { name: 'overlayWidth', value: '300', patch: { style: { width: 300 } } },
+  { name: 'overlayFontSize', value: '18', patch: { style: { fontSize: 18 } } },
+  { name: 'overlayPadding', value: '12', patch: { style: { padding: 12 } } },
+  { name: 'overlayRadius', value: '8', patch: { style: { radius: 8 } } },
+])('keeps $name passive while direct numeric editing commits', async ({ name, value, patch }) => {
+  const onPatch = vi.fn();
+  await act(async () =>
+    renderEditor(
+      <ReviewCanvasCommentEditor
+        comment={comment()}
+        annotations={[]}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const input = host.querySelector<HTMLInputElement>(
+    `input[aria-label="gallery.videoReview.${name}"]`
+  )!;
+  const label = input
+    .closest('.sniptale-parameter-row')!
+    .querySelector<HTMLSpanElement>('.sniptale-parameter-name')!;
+  await act(async () => label.click());
+  expect(document.activeElement).not.toBe(input);
+  expect(onPatch).not.toHaveBeenCalled();
+
+  await act(async () => {
+    input.focus();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(document.activeElement).toBe(input);
+  expect(input.value).toBe(value);
+  expect(onPatch).not.toHaveBeenCalled();
+  await act(async () => input.blur());
+  expect(onPatch).toHaveBeenCalledWith(
+    expect.objectContaining(
+      'style' in patch ? { style: expect.objectContaining(patch.style) } : patch
+    )
+  );
+});

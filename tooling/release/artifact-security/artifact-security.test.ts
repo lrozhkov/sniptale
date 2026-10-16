@@ -28,7 +28,7 @@ const baseManifest = {
   web_accessible_resources: [
     {
       matches: ['http://*/*', 'https://*/*'],
-      resources: ['fonts/manrope-latin-wght-normal.woff2'],
+      resources: ['assets/golos-ui-vf.woff2'],
     },
   ],
   sandbox: {
@@ -47,7 +47,7 @@ const basePolicy = {
     {
       name: [
         'web_accessible_resources:',
-        '{"resources":["fonts/manrope-latin-wght-normal.woff2"],',
+        '{"resources":["assets/golos-ui-vf.woff2"],',
         '"matches":["http://*/*","https://*/*"],"extensionIds":[],"useDynamicUrl":false}',
       ].join(''),
     },
@@ -339,6 +339,8 @@ it.each([
   'assets/app.js',
   'viewer.html',
   'assets/image.png',
+  'assets/golos-ui-vf.woff2.js',
+  'assets/golos-ui-other.woff2',
   'contentRuntime',
 ])('rejects unsafe web-accessible resource family %s', async (resource) => {
   await expectVerifierRejects(

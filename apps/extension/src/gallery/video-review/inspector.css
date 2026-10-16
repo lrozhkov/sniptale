@@ -4,17 +4,16 @@
   display: flex;
   align-items: center;
   min-height: 32px;
-  font: 600 13px / 20px var(--sniptale-font-sans);
-  color: var(--sniptale-color-text-primary);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
 }
 [data-ui='gallery.videoReview.inspector'] :is(label, legend) {
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-secondary);
 }
 [data-ui='gallery.videoReview.inspector']
-  input:not([type='range']):not([type='checkbox']):not([type='file']),
-[data-ui='gallery.videoReview.inspector'] textarea {
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  :where(input:not([type='range']):not([type='checkbox']):not([type='file']), textarea) {
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-primary);
   background: var(--sniptale-color-surface-panel);
   border-radius: var(--sniptale-radius-sm);
@@ -115,8 +114,8 @@
   padding: 0;
   list-style: none;
   border-radius: var(--sniptale-radius-sm);
-  color: var(--sniptale-color-text-primary);
-  font: 600 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 20px var(--sniptale-font-sans);
   cursor: pointer;
 }
 [data-ui='gallery.videoReview.disclosure'] > summary::-webkit-details-marker {
@@ -131,6 +130,7 @@
   min-height: 0;
   margin: 0;
   font: inherit;
+  color: inherit;
   overflow-wrap: anywhere;
 }
 [data-ui='gallery.videoReview.disclosure'] > summary > svg {
@@ -156,7 +156,7 @@
 }
 [data-ui='gallery.videoReview.disclosure'][data-level='group'] > summary {
   min-height: 28px;
-  font: 500 12px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 18px var(--sniptale-font-sans);
 }
 [data-ui='gallery.videoReview.disclosure'] > .review-inspector-section-body {
   padding-top: 8px;
@@ -166,7 +166,7 @@
 }
 [data-ui='gallery.videoReview.inspector'] .review-inspector-phase > legend {
   color: var(--sniptale-color-text-primary);
-  font: 500 12px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 18px var(--sniptale-font-sans);
 }
 [data-ui='gallery.videoReview.inspectorCategories'] {
   margin-inline: -12px;
@@ -182,7 +182,7 @@
   [data-ui='shared.categorized-inspector.section-heading'] {
   min-height: 32px;
   margin-bottom: 8px;
-  font: 600 13px / 20px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 20px var(--sniptale-font-sans);
   overflow-wrap: anywhere;
 }
 [data-ui='gallery.videoReview.inspectorCategories'] > nav button {
@@ -195,17 +195,17 @@
   color: var(--sniptale-color-text-primary-strong);
 }
 [data-ui='gallery.videoReview.inspectorCategories'] > nav button[aria-pressed='true'] {
-  background: var(--sniptale-color-accent-soft);
-  color: var(--sniptale-color-accent);
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
 }
 [data-ui='gallery.videoReview.inspectorCategories'] > nav button[aria-pressed='true']:hover {
-  color: var(--sniptale-color-accent-emphasis);
+  color: var(--sniptale-color-text-primary);
 }
 [data-ui='gallery.videoReview.zoomPreview'] > div:first-child {
   flex-wrap: wrap;
 }
 [data-ui='gallery.videoReview.zoomPreview'] h5 {
-  font: 500 12px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 18px var(--sniptale-font-sans);
 }
 @layer utilities {
   :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType']) {
@@ -232,7 +232,7 @@
   :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType'])
     button[aria-pressed='true'] {
     color: var(--sniptale-color-text-primary) !important;
-    font-weight: 500 !important;
+    font-weight: var(--sniptale-font-weight-interface) !important;
   }
   :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType'])
     button:hover:not(:disabled) {
@@ -315,6 +315,11 @@
   container: review-inspector-content / inline-size;
 }
 
+[data-ui='gallery.videoReview.inspectorSections'][data-presentation='all'] {
+  /* The inspector already contributes an 8px gap after its navigation boundary. */
+  padding-top: 4px;
+}
+
 .review-inspector-section-column {
   display: contents;
 }
@@ -381,13 +386,13 @@
 .sniptale-compact-workspace [data-ui='gallery.videoReview.disclosure'] > summary {
   min-height: 32px;
   padding-inline: 8px;
-  font: 600 14px / 20px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface-heading) 14px / 20px var(--sniptale-font-sans);
 }
 .sniptale-compact-workspace
   [data-ui='gallery.videoReview.disclosure'][data-level='group']
   > summary {
   min-height: 28px;
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 18px var(--sniptale-font-sans);
 }
 .sniptale-compact-workspace [data-ui='gallery.videoReview.disclosure'] > summary:hover {
   box-shadow: none;
@@ -398,10 +403,27 @@
   padding-top: 8px;
 }
 .sniptale-compact-workspace [data-ui='gallery.videoReview.inspector'] :is(label, legend) {
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
 }
 .sniptale-compact-workspace
   [data-ui='shared.ui.compact-inspector.numeric-value-field']
   :is(input, span) {
-  font: 500 13px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
+}
+
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.inspector']
+  :is([data-ui='background.image.picker'], .review-background-swatches) {
+  min-width: 0;
+  padding-inline: 8px;
+}
+.sniptale-compact-workspace .review-inspector-section-body > button {
+  margin-inline: 8px;
+  max-width: calc(100% - 16px);
+}
+
+.sniptale-compact-workspace .review-inspector-parameter-command {
+  width: calc(100% - 16px);
+  margin-inline: 8px;
+  justify-content: flex-start;
 }

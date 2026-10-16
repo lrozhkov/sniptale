@@ -408,7 +408,7 @@ async function authoredPreviewBoundary(page: Page, extensionId: string, info: Te
       };
     });
   const before = await read();
-  expect(before.family).toContain('Manrope');
+  expect(before.family).toContain('Sniptale Interface');
   await expect(preview).toHaveText(/\S/);
   const shell = ui(page, 'settings.page.root');
   const interfaceNode = ui(page, 'settings.sidebar').getByRole('button').first();

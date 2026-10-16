@@ -1,7 +1,4 @@
-import {
-  InspectorParameterRow,
-  toggleInspectorFieldEditing,
-} from '../../ui/compact-inspector-controls/layout';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { CompactPaintSelector } from '../../ui/paint-selector';
 import {
   ColorField,
@@ -45,20 +42,14 @@ function ReviewOverlayTimeFields(props: {
   onInputEnd(value: string): void;
   onCommit(window: { start?: number | undefined; end?: number | undefined }): void;
 }) {
-  const startInput = useRef<HTMLInputElement>(null);
-  const endInput = useRef<HTMLInputElement>(null);
   return (
     <fieldset className="sniptale-parameter-stack">
       <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('gallery.videoReview.overlayWindow')}
       </legend>
       <div className="sniptale-parameter-stack">
-        <InspectorParameterRow
-          label={translate('gallery.videoReview.overlayStart')}
-          onActivate={() => toggleInspectorFieldEditing(startInput.current)}
-        >
+        <InspectorParameterRow label={translate('gallery.videoReview.overlayStart')}>
           <input
-            ref={startInput}
             data-ui="gallery.videoReview.overlayStartInput"
             aria-label={translate('gallery.videoReview.overlayStart')}
             type="number"
@@ -75,12 +66,8 @@ function ReviewOverlayTimeFields(props: {
               bg-transparent px-2 py-1 text-right tabular-nums"
           />
         </InspectorParameterRow>
-        <InspectorParameterRow
-          label={translate('gallery.videoReview.overlayEnd')}
-          onActivate={() => toggleInspectorFieldEditing(endInput.current)}
-        >
+        <InspectorParameterRow label={translate('gallery.videoReview.overlayEnd')}>
           <input
-            ref={endInput}
             data-ui="gallery.videoReview.overlayEndInput"
             aria-label={translate('gallery.videoReview.overlayEnd')}
             type="number"
@@ -396,7 +383,6 @@ function ReviewCommentStyleFields(props: {
   busy: boolean;
   onPatch(patch: Partial<Omit<CanvasComment, 'id'>>): void;
 }) {
-  const inputs = useRef(new Map<string, HTMLInputElement>());
   const patch = (style: Partial<CanvasComment['style']>) =>
     props.onPatch({ style: { ...props.style, ...style } });
   return (
@@ -454,17 +440,9 @@ function ReviewCommentStyleFields(props: {
             },
           ] as const
         ).map((field) => (
-          <InspectorParameterRow
-            key={field.key}
-            label={translate(field.label)}
-            onActivate={() => toggleInspectorFieldEditing(inputs.current.get(field.key) ?? null)}
-          >
+          <InspectorParameterRow key={field.key} label={translate(field.label)}>
             <input
               type="number"
-              ref={(input) => {
-                if (input) inputs.current.set(field.key, input);
-                else inputs.current.delete(field.key);
-              }}
               aria-label={translate(field.label)}
               min={field.min}
               max={field.max}

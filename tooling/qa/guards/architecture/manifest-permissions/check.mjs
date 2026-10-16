@@ -203,6 +203,27 @@ function collectStyleFiles(rootDir, directory) {
   });
 }
 
+function isWithinDirectory(directory, file) {
+  const relative = path.relative(directory, file);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function resolveFontSource(rootDir, stylesheet, specifier, stylesDirectory) {
+  if (/^@fontsource(?:-variable)?\/[a-z0-9-]+\/files\/[^/]+\.woff2$/u.test(specifier)) {
+    return path.join(rootDir, 'node_modules', specifier);
+  }
+  if (!specifier.startsWith('./') && !specifier.startsWith('../')) return null;
+  const source = path.resolve(rootDir, path.dirname(stylesheet), specifier);
+  if (!isWithinDirectory(stylesDirectory, source)) return null;
+  if (!isWithinDirectory(fs.realpathSync(stylesDirectory), fs.realpathSync(source))) return null;
+  return source;
+}
+
 function emittedFontResourceExists(rootDir, resource) {
   if (!/^assets\/[a-zA-Z0-9][a-zA-Z0-9._-]*\.woff2$/u.test(resource)) return false;
   try {
@@ -213,6 +234,8 @@ function emittedFontResourceExists(rootDir, resource) {
       return false;
     const entry = path.posix.join('packages/ui', exported);
     if (!entry.startsWith('packages/ui/')) return false;
+    const stylesDirectory = path.resolve(rootDir, 'packages/ui/src/styles');
+    if (!isWithinDirectory(stylesDirectory, path.resolve(rootDir, entry))) return false;
     const files = collectStyleFiles(rootDir, path.posix.dirname(entry));
     const readFile = (file) => fs.readFileSync(path.join(rootDir, file), 'utf8');
     const graph = collectModuleImportGraph({ root: rootDir, files, readFile });
@@ -227,7 +250,12 @@ function emittedFontResourceExists(rootDir, resource) {
       }
     }
     const sources = new Set();
+    let invalidSource = false;
     for (const stylesheet of reachable) {
+      const stylesheetPath = path.resolve(rootDir, stylesheet);
+      if (!isWithinDirectory(stylesDirectory, stylesheetPath)) return false;
+      if (!isWithinDirectory(fs.realpathSync(stylesDirectory), fs.realpathSync(stylesheetPath)))
+        return false;
       postcss.parse(readFile(stylesheet)).walkAtRules('font-face', (rule) => {
         rule.walkDecls('src', (declaration) => {
           const urls = [
@@ -235,15 +263,15 @@ function emittedFontResourceExists(rootDir, resource) {
           ];
           if (urls.length !== 1) return;
           const specifier = urls[0][1] ?? urls[0][2] ?? urls[0][3];
-          if (!/^@fontsource(?:-variable)?\/[a-z0-9-]+\/files\/[^/]+\.woff2$/u.test(specifier))
-            return;
           if (`assets/${path.posix.basename(specifier)}` !== resource) return;
-          const source = path.join(rootDir, 'node_modules', specifier);
-          if (fs.existsSync(source) && fs.statSync(source).isFile()) sources.add(source);
+          const source = resolveFontSource(rootDir, stylesheet, specifier, stylesDirectory);
+          if (source && fs.existsSync(source) && fs.statSync(source).isFile())
+            sources.add(fs.realpathSync(source));
+          else invalidSource = true;
         });
       });
     }
-    return sources.size === 1;
+    return !invalidSource && sources.size === 1;
   } catch {
     return false;
   }
@@ -350,14 +378,16 @@ function collectWebAccessibleResourcePolicy(entry, index, file) {
           ),
         ]
   );
-  const hasManrope = (isStringArray(entry.resources) ? entry.resources : []).some((resource) =>
-    /^fonts\/manrope-[\w-]+\.woff2$/u.test(resource)
+  const hasBundledFont = (isStringArray(entry.resources) ? entry.resources : []).some(
+    (resource) =>
+      resource === 'assets/golos-ui-vf.woff2' ||
+      /^fonts\/marck-script-[\w-]+\.woff2$/u.test(resource)
   );
-  if (hasManrope && entry.use_dynamic_url !== true) {
+  if (hasBundledFont && entry.use_dynamic_url !== true) {
     violations.push(
       createSchemaViolation(
         file,
-        `web_accessible_resources[${index}] Manrope fonts require use_dynamic_url: true.`
+        `web_accessible_resources[${index}] Bundled fonts require use_dynamic_url: true.`
       )
     );
   }

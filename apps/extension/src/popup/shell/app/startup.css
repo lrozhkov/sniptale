@@ -7,8 +7,12 @@
   --popup-initial-text: rgba(244, 244, 245, 0.58);
   --popup-initial-active-text: #f4f4f5;
   --popup-initial-accent: #f97316;
-  --sniptale-font-sans:
-    'Sniptale Sans', 'Manrope Variable', 'Manrope', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --sniptale-font-sans: var(
+    --sniptale-font-interface,
+    'Sniptale Interface',
+    'Segoe UI',
+    sans-serif
+  );
 }
 
 :root[data-theme='light'] {
@@ -53,6 +57,19 @@ body {
 }
 
 .popup-react-shell {
+  --sniptale-popup-font-weight-label: 450;
+  --sniptale-popup-font-weight-heading: 500;
+  --sniptale-popup-font-weight-emphasis: 550;
+  --font-weight-medium: var(--sniptale-popup-font-weight-label);
+  --font-weight-semibold: var(--sniptale-popup-font-weight-heading);
+  --font-weight-bold: var(--sniptale-popup-font-weight-emphasis);
+  --sniptale-color-text-primary: var(--sniptale-color-text-interface);
+  --sniptale-font-sans: var(
+    --sniptale-font-interface,
+    'Sniptale Interface',
+    'Segoe UI',
+    sans-serif
+  );
   box-sizing: border-box;
   position: relative;
   width: 392px;
@@ -61,6 +78,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.popup-react-shell
+  button[aria-pressed='true']:enabled
+  [class~='text-[var(--sniptale-color-text-muted)]'] {
+  color: var(--sniptale-color-text-secondary);
 }
 
 .popup-react-shell__tabs {

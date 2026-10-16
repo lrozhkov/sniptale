@@ -27,11 +27,6 @@
       "source": "LICENSES/OFL-1.1.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt",
-      "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
-      "source": "LICENSES/dependencies/@fontsource-variable__inter-5.3.0.txt"
-    },
-    {
       "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
       "sha256": "bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c",
       "source": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt"
@@ -238,18 +233,23 @@
     },
     {
       "archivePath": "NOTICE",
-      "sha256": "a35ee4ae151a38693b3faaf4fe9bd9d28d5587969e7557bc3136aee47d333ef5",
+      "sha256": "ca04f3ab3cfdb979c94ad3adb04bc07d2a3b8db1cca680ebf3663422102a5d9a",
       "source": "NOTICE"
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "43a82da1da49e1a56e7ed918ea00f21105a6443d3b223f7234a98cc855c0191a",
+      "sha256": "fa6e6db03a03182f5dbfe597902239909d20898cfe7bf4771bbc75964b147788",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "933beac1cfc7a8a744b3453c5291835f49f5c35b37c6ec4dee187bd28300e178",
+      "sha256": "e6ca66f965946462a665812006ada94d234c363e12255b2fda8cf06d71587632",
       "source": "THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "archivePath": "packages/ui/src/styles/golos-ui/LICENSE.txt",
+      "sha256": "c8e985ff79ce19d0c8029ef5d772c18044cdcafb5294e629722c979d169820a9",
+      "source": "packages/ui/src/styles/golos-ui/LICENSE.txt"
     }
   ],
   "bundledAssets": [
@@ -273,26 +273,17 @@
       ]
     },
     {
-      "id": "manrope",
-      "sourcePackage": "@fontsource-variable/manrope",
-      "version": "5.3.0",
+      "id": "golos-ui",
+      "sourcePackage": "@sniptale/ui",
+      "version": "2.000",
       "license": "OFL-1.1",
-      "copyright": "Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)",
+      "licensePath": "packages/ui/src/styles/golos-ui/LICENSE.txt",
+      "copyright": "Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name \"Golos UI\".",
       "artifacts": [
         {
-          "path": "apps/extension/public/fonts/manrope-cyrillic-wght-normal.woff2",
-          "sha256": "c268b459a9329e59fecf39a17618efd44c71735532048d60b12aab76a8c14914",
-          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2"
-        },
-        {
-          "path": "apps/extension/public/fonts/manrope-latin-ext-wght-normal.woff2",
-          "sha256": "3911b66d9f2e005a4b989223405d0e5032619c668597ba467cc76a23c8fffcfb",
-          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2"
-        },
-        {
-          "path": "apps/extension/public/fonts/manrope-latin-wght-normal.woff2",
-          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972",
-          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2"
+          "path": "packages/ui/src/styles/golos-ui/golos-ui-vf.woff2",
+          "sha256": "ec7584959184bcbd5b6cf65c5aacc2ad3ca3afc42ec3b0976f0260c33d1900a1",
+          "sourcePath": "packages/ui/src/styles/golos-ui/golos-ui-vf.woff2"
         }
       ]
     }
@@ -314,14 +305,7 @@
   "dependencyLegal": {
     "manifestPath": "THIRD_PARTY_DEPENDENCIES.json",
     "licenseDirectory": "LICENSES/dependencies",
-    "canonicalLicenseAliases": [
-      {
-        "packageName": "@fontsource-variable/manrope",
-        "version": "5.3.0",
-        "archivePath": "LICENSES/OFL-1.1.txt",
-        "sha256": "d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30"
-      }
-    ],
+    "canonicalLicenseAliases": [],
     "pinnedSources": [
       {
         "packageName": "@iconify-icons/tabler",

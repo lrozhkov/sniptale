@@ -375,8 +375,8 @@ export default {
   Изображение: 'Image',
   'Иконка помогает распознать команду. Для очевидного «Применить» она не обязательна. Icon-only получает доступное имя.':
     'An icon helps identify a command. An obvious Apply action needs no icon. Icon-only commands have accessible names.',
-  'Иконка с текстом: выбранный вариант получает нейтральную подложку и основной цвет текста. Без оранжевого текста, рамки и галочки. Шрифт Inter 13 px / 500, иконка 16 px.':
-    'Icon with text: the selected option uses a neutral surface and primary text. No orange text, border, or checkmark. Inter 13 px / 500, with a 16 px icon.',
+  'Иконка с текстом: выбранный вариант получает нейтральную подложку и основной цвет текста. Без оранжевого текста, рамки и галочки. Шрифт Golos UI 13 px / 400, иконка 16 px.':
+    'Icon with text: the selected option uses a neutral surface and primary text. No orange text, border, or checkmark. Golos UI 13 px / 400, with a 16 px icon.',
   'Иконки тулбара: прозрачный фон, тонкая рамка активного режима сохраняется и усиливается при наведении. Галочек нет. Стрелка появляется только у раскрывающихся кнопок.':
     'Toolbar icons have transparent backgrounds. The active mode keeps a thin border that strengthens on hover. No checkmarks. Only disclosure buttons have arrows.',
   'Импортировать файл': 'Import file',

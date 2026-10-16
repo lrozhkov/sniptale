@@ -11,6 +11,7 @@ import {
 } from '../../features/video/review/text-document';
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
 import { useReviewText } from './use-review-text';
+import { translate } from '../../platform/i18n';
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
@@ -58,6 +59,24 @@ it('starts globally disabled and preserves the configured appearance across disa
   act(() => toggle.click());
   act(() => toggle.click());
   expect(JSON.parse(host.querySelector('output')!.textContent!).style.position).toBe('top');
+});
+it('disables scene caption editing with a visible reason while the text track is locked', async () => {
+  const change = vi.fn();
+  const settings = { ...createReviewCaptionSettings(), enabled: true };
+  await act(async () =>
+    root.render(<ReviewCaptionSceneControls settings={settings} locked onChange={change} />)
+  );
+  const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  expect(toggle.disabled).toBe(true);
+  expect(host.textContent).toContain(translate('videoEditor.timeline.trackLocked'));
+  act(() => toggle.click());
+  expect(change).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLFieldSetElement>('fieldset')!.disabled).toBe(true);
+  await act(async () =>
+    root.render(<ReviewCaptionSceneControls settings={settings} locked={false} onChange={change} />)
+  );
+  act(() => toggle.click());
+  expect(change).toHaveBeenCalledExactlyOnceWith({ ...settings, enabled: false });
 });
 it('shows inherited/local style compactly and never stales retained voice by appearance changes', async () => {
   const snapshot = { ...phrase, textId: phrase.id, kind: 'microphone' as const };

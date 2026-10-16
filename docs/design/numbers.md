@@ -10,13 +10,13 @@ Preserve the product mapping, units, precision, snapping, valid boundaries, and 
 
 ## Row geometry and hierarchy
 
-Parameter names remain secondary. Values and units remain primary with tabular digits where useful. Hover paint belongs to the editable value, not the name or whole row. Align visible numeric and color value edges. Keep alignment stable when steppers appear or editing starts. Use the shared 32px row for ordinary parameters. A contextual numeric row uses a 40px minimum height with a 24px edit region and a 16px lower slider strip. Keep the input hit region and 14px thumb inside that strip. Use a 3px painted track. Wrapped names can increase this allocation. Hover does not change row height or add margins to the group's 4px gap. The lower slider target remains separate from the direct label/value editing targets and cannot overlap the next parameter.
+Parameter names remain secondary. Values and units remain primary with tabular digits where useful. Hover paint belongs to the editable value, not the name or whole row. Align visible numeric and color value edges. Keep alignment stable when steppers appear or editing starts. Ordinary forms retain the shared 32px control. The explicit compact inspector uses a 40px row for every equivalent parameter. Its first band contains a 32px control. Its lower 8px strip contains contextual tools. Keep the slider target and thumb clear of label text and the next row. Use a 3px painted track. Wrapped names can increase this allocation. Hover does not change row height or add margins to the group's 4px gap. The lower slider target remains separate from the direct label/value editing targets and cannot overlap the next parameter.
 
 The exact editable value is the equivalent pointer and keyboard control for the smaller supplementary strip. Do not apply that target exception to a standalone slider. At narrow widths, wrap a label or stack its value before text becomes unreadable. Prevent local clipping.
 
 ## Editing and acceptance
 
-Label activation enters editing. A repeated label click ends editing once through the existing blur contract. The next click can enter editing again. Clicking inside the input retains editing. Preserve accepted values separately from previews and drafts. Validate before acceptance. Enter accepts valid input. Escape restores the accepted value in the sample.
+Only the numeric input and its actual padding activate editing. Parameter names and row gaps do not focus or activate controls. Keep the accessible name through aria-labelledby. Clicking inside the input retains editing. Preserve accepted values separately from previews and drafts. Validate before acceptance. Enter accepts valid input. Escape restores the accepted value in the sample.
 
 Invalid blur retains the invalid draft and error without changing the accepted value. Keep a valid custom off-step value unless the domain explicitly requires quantization. Do not accept an invalid intermediate string or silently replace it with a bound. Record any different product commit/blur behavior before integration.
 
@@ -40,4 +40,6 @@ NumericField accepts separate scrubMin/scrubMax and typed min/max bounds. A vali
 
 Use editable=false for a range-only setting. Its value remains read-only while the range supports pointer and keyboard input.
 
-On initial focus in an editable numeric field, select the complete value. Support pointer, keyboard, and label activation. A later click inside the focused field can place the caret. Keep the contextual slider hidden during text editing.
+Keep units visible outside the editable text during focus and draft changes. The editor can expand toward the leading edge while its trailing unit edge stays fixed. Give short values a comfortable minimum of 5ch during editing. Keep leading inner space when longer drafts expand the editor. Do not compress the editor to its current digits or reserve an oversized fixed width. Use the same light neutral 1px boundary and input surface as inline text and HEX editors. On initial focus in an editable numeric field, select the complete value. Support pointer and keyboard activation of the input. A later click inside the focused field can place the caret. Keep the contextual slider hidden during text editing.
+
+Place the 20px stepper at the trailing edge with absolute positioning. Reveal it contextually. Do not reserve an empty trailing gutter at rest. It can extend up to 8px into a verified surrounding gutter. Keep it inside the viewport and clear of adjacent controls. Keep arrows near their value. Pointer focus retains a neutral surface. Keyboard focus uses a visible 1px frame.

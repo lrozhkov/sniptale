@@ -27,7 +27,7 @@ function InspectorSectionHeading(props: { control?: ReactNode; label: string }) 
     <div
       className={[
         'mb-2 flex min-h-7 items-center justify-between gap-2',
-        'text-[13px] font-semibold leading-5 text-[var(--sniptale-color-text-primary)]',
+        'text-[13px] font-medium leading-5 text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       data-ui="shared.categorized-inspector.section-heading"
     >
@@ -55,7 +55,7 @@ function InspectorSectionNavigationItem<SectionId extends string>(props: {
           'focus-visible:outline-none focus-visible:ring-2',
           'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
           props.active
-            ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]'
+            ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
             : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
         ].join(' ')}
         onClick={props.onClick}

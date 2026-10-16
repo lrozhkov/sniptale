@@ -51,7 +51,7 @@ export function ReviewComposer(props: {
         start={anchor.kind === 'point' ? anchor.time : anchor.start}
         end={anchor.kind === 'point' ? anchor.time : anchor.end}
       />
-      <div>
+      <div className="grid min-w-0 gap-2">
         <TextareaField
           ref={textarea}
           label={translate('gallery.videoReview.commentText')}
@@ -64,7 +64,7 @@ export function ReviewComposer(props: {
           onChange={(text) => props.onChange({ ...props.annotation, text })}
           onSelect={voice.moveCaret}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-2">
           <VoiceInputButton
             dataUi="gallery.videoReview.voice"
             disabled={props.busy}
@@ -81,7 +81,6 @@ export function ReviewComposer(props: {
             <ReviewButton
               label={translate('gallery.videoReview.discard')}
               disabled={props.busy}
-              className={reviewTextButtonClassName}
               onClick={() => {
                 voice.stop();
                 props.onDiscard();
@@ -90,7 +89,6 @@ export function ReviewComposer(props: {
             <ReviewButton
               label={translate('gallery.videoReview.save')}
               primary
-              className={reviewTextButtonClassName}
               disabled={props.busy || !props.annotation.text.trim()}
               onClick={() => {
                 voice.stop();

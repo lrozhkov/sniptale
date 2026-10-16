@@ -54,7 +54,7 @@ export function InspectorParameterRow(props: {
       props.valueText ? context.measureText(props.valueText).width + 40 : 0,
       props.valueOptions?.length
         ? props.valueOptions.reduce(
-            (width, text) => width + context.measureText(text).width + 20,
+            (width, text) => width + context.measureText(text).width + 12,
             0
           ) +
             4 +
@@ -85,18 +85,6 @@ export function InspectorParameterRow(props: {
       observer.disconnect();
     };
   }, [fit]);
-  const getActivation = () => {
-    if (props.onActivate) return props.onActivate;
-    const dropdown = row.current?.querySelector<HTMLButtonElement>(
-      '.sniptale-parameter-value button[aria-haspopup="listbox"]:enabled'
-    );
-    return dropdown
-      ? () => {
-          dropdown.focus({ preventScroll: true });
-          dropdown.click();
-        }
-      : undefined;
-  };
   const isActivation = (target: EventTarget) =>
     target instanceof Element && !target.closest('button,input,textarea,select,a,[role="slider"]');
   return (
@@ -108,11 +96,11 @@ export function InspectorParameterRow(props: {
       className={cx('sniptale-parameter-row', props.className)}
       onBlurCapture={() => queueMicrotask(fit)}
       onPointerDown={(event) => {
-        if (getActivation() && event.button === 0 && isActivation(event.target))
+        if (props.onActivate && event.button === 0 && isActivation(event.target))
           event.preventDefault();
       }}
       onClick={(event) => {
-        const activate = getActivation();
+        const activate = props.onActivate;
         if (activate && isActivation(event.target)) {
           event.stopPropagation();
           activate();

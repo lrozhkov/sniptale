@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { webcrypto } from 'node:crypto';
+import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { expect, it, vi } from 'vitest';
 import {
@@ -67,8 +68,13 @@ it('serializes canonical content safely with local styles, fonts and private ima
   );
   vi.unstubAllGlobals();
   const stylesheet = document.querySelector('style')?.textContent ?? '';
-  expect(stylesheet).toContain('font-family:Guide0');
-  expect(stylesheet).toContain('--sniptale-font-document-sans:Guide0,Guide1,Guide2,sans-serif');
+  expect(stylesheet).not.toContain('Manrope');
+  expect(stylesheet.match(/@font-face/g)).toHaveLength(1);
+  const license = document.querySelector('[data-guide-interface-font-license]');
+  expect(license?.textContent).toBe(interfaceLicense.replace(/\r\n?/gu, '\n'));
+  expect(license?.hasAttribute('hidden')).toBe(true);
+  expect(stylesheet).toContain('font-family:"Sniptale Interface"');
+  expect(stylesheet).toContain('--sniptale-font-document-sans:var(--sniptale-font-interface)');
   expect(document.querySelector('article')?.style.getPropertyValue('--guide-font')).toBe(
     'var(--sniptale-font-document-sans, var(--sniptale-font-sans))'
   );

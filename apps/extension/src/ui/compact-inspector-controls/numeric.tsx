@@ -9,7 +9,7 @@ import { NumericRangeScrub } from './numeric-range-scrub';
 import { NumericStepper } from './stepper';
 import { useNumericValueFieldState } from './numeric-value-state';
 import { TextWithOverflowHint } from './overflow-hint';
-import { useInspectorLayout, toggleInspectorFieldEditing } from './layout';
+import { useInspectorLayout } from './layout';
 
 export interface NumericValueFieldProps {
   /** Enter commits then advances by default; blur ends an isolated inspector edit. */
@@ -63,9 +63,15 @@ function NumericValueFieldView({
 }) {
   const quietFocus = props.focusAppearance === 'quiet';
   const inspector = useInspectorLayout();
+  const [pointerFocus, setPointerFocus] = useState(false);
   const value = (
     <>
-      <NumericValueInput props={props} state={state} />
+      <NumericValueInput
+        props={props}
+        state={state}
+        pointerFocus={pointerFocus}
+        setPointerFocus={setPointerFocus}
+      />
       <NumericUnitLabel state={state} />
     </>
   );
@@ -85,9 +91,24 @@ function NumericValueFieldView({
         props.className
       )}
     >
-      {inspector ? <span className="sniptale-numeric-entry">{value}</span> : value}
+      {inspector ? (
+        <span
+          className="sniptale-numeric-entry"
+          onPointerDown={(event) => {
+            if (event.button !== 0 || props.disabled || event.target === state.inputRef.current)
+              return;
+            event.preventDefault();
+            setPointerFocus(true);
+            state.inputRef.current?.focus();
+          }}
+        >
+          {value}
+        </span>
+      ) : (
+        value
+      )}
       <NumericStepper disabled={props.disabled} label={props.label} onStep={state.applyStep} />
-      {quietFocus && (
+      {quietFocus && !inspector && (
         <span
           aria-hidden="true"
           className={[
@@ -104,33 +125,46 @@ function NumericValueFieldView({
 function NumericValueInput({
   props,
   state,
+  pointerFocus,
+  setPointerFocus,
 }: {
   props: NumericValueFieldProps;
   state: ReturnType<typeof useNumericValueFieldState>;
+  pointerFocus: boolean;
+  setPointerFocus(value: boolean): void;
 }) {
   return (
     <input
       ref={state.inputRef}
+      data-pointer-focus={pointerFocus || undefined}
       aria-label={props.label}
       disabled={props.disabled}
       inputMode="decimal"
+      size={Math.max(1, state.draft.length)}
       type="text"
       value={state.draft}
       placeholder={props.value === null ? '—' : undefined}
       onFocus={(event) => state.handleFocus(event, props.disabled === true)}
       onChange={state.handleChange}
-      onBlur={state.commitDraft}
-      onKeyDown={state.handleKeyDown}
-      onPointerDown={state.handlePointerDown}
+      onBlur={() => {
+        setPointerFocus(false);
+        state.commitDraft();
+      }}
+      onKeyDown={(event) => {
+        setPointerFocus(false);
+        state.handleKeyDown(event);
+      }}
+      onPointerDown={(event) => {
+        setPointerFocus(true);
+        state.handlePointerDown(event);
+      }}
       className={COMPACT_INLINE_VALUE_INPUT_CLASS_NAME}
     />
   );
 }
 
 function NumericUnitLabel({ state }: { state: ReturnType<typeof useNumericValueFieldState> }) {
-  const focused =
-    typeof document !== 'undefined' && document.activeElement === state.inputRef.current;
-  if (!state.unitLabel || state.editing || focused) {
+  if (!state.unitLabel) {
     return null;
   }
 
@@ -173,27 +207,6 @@ export function NumericRow({
       data-range-visible={range.visible ? 'true' : 'false'}
       data-has-scrub={scrub ? 'true' : undefined}
       data-layout={inspector ? 'inline' : undefined}
-      data-activates={inspector ? 'true' : undefined}
-      onPointerDown={(event) => {
-        if (
-          inspector &&
-          event.button === 0 &&
-          event.target instanceof Element &&
-          !event.target.closest('input,button')
-        )
-          event.preventDefault();
-      }}
-      onClick={(event) => {
-        if (
-          !inspector ||
-          !(event.target instanceof Element) ||
-          event.target.closest('input,button')
-        )
-          return;
-        const input = event.currentTarget.querySelector<HTMLInputElement>('input[type="text"]');
-        event.stopPropagation();
-        toggleInspectorFieldEditing(input);
-      }}
       onPointerMove={range.show}
       onPointerLeave={range.hide}
       onFocusCapture={(event) => {

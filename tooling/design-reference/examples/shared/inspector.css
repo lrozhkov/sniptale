@@ -1,6 +1,7 @@
 /* Shared compact inspector context. Component owners retain input and state logic. */
 .inspector-controls {
-  --inspector-row: 32px;
+  --inspector-row: 40px;
+  --inspector-control: 32px;
   --inspector-gap: 4px;
   --inspector-group-gap: 8px;
   font-size: var(--font-control-size);
@@ -16,15 +17,15 @@
 }
 .inspector-controls .number-value-shell {
   width: 104px;
-  min-height: 32px;
-  padding-inline: 6px;
+  min-height: var(--inspector-control);
+  padding-inline: 0 8px;
 }
 .inspector-controls .number-value-shell input {
-  height: 24px;
+  height: 32px;
 }
 .inspector-controls .ref-number[data-variant='contextual'] .number-row {
   min-height: 40px;
-  padding-bottom: 16px;
+  padding-bottom: 8px;
 }
 .inspector-controls .context-range-shell {
   bottom: 0;
@@ -37,23 +38,26 @@
 }
 .inspector-controls .selection-option {
   font-size: var(--font-control-size);
-  min-height: 32px;
+  min-height: var(--inspector-control);
   padding-block: 2px;
   gap: 6px;
 }
 .inspector-controls .property-group legend {
+  min-height: var(--inspector-control);
+  display: flex;
+  align-items: center;
   margin-bottom: 4px;
 }
-.inspector-controls .property-face {
+.inspector-controls .property-options[data-presentation='segments'] .property-face {
   font-size: var(--font-control-size);
-  min-height: 26px;
-  padding: 4px 6px;
+  min-height: var(--inspector-control);
+  padding: 2px 6px;
 }
 .inspector-controls .control,
 .inspector-controls .search {
   font-size: var(--font-control-size);
-  min-height: 32px;
-  padding: 4px 6px;
+  min-height: var(--inspector-control);
+  padding: 2px 6px;
 }
 .inspector-controls .field-label {
   margin: 0;
@@ -66,7 +70,7 @@
   padding: 0 var(--disclosure-inset) 4px;
 }
 .inspector-controls .param-row {
-  min-height: 32px;
+  min-height: var(--inspector-control);
 }
 .inspector-controls .text-field[data-context='inspector'] {
   display: grid;
@@ -78,21 +82,21 @@
   margin: 0;
 }
 .inspector-controls .text-input {
-  min-height: 32px;
-  padding: 6px;
+  min-height: var(--inspector-control);
+  padding: 2px 6px;
   text-align: start;
 }
 .inspector-controls .field-description,
 .inspector-controls .field-error {
   grid-column: 1/-1;
 }
-/* Contextual ranges retain their own 16px strip below the 24px editing area. */
+/* Contextual ranges retain their own 8px strip below the 32px editing area. */
 .inspector-controls .ref-number[data-variant='contextual'] .number-value-shell {
-  height: 24px;
-  min-height: 24px;
+  height: 32px;
+  min-height: 32px;
 }
 .inspector-controls .ref-number[data-variant='contextual'] .number-value-shell input {
-  height: 22px;
+  height: 30px;
 }
 .inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-input,
 .inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-clear {
@@ -103,13 +107,68 @@
 .inspector-controls .color-entry > .text-field[data-context='inspector'] {
   display: contents;
 }
-/* Text editing moves below its label when the local inspector cannot provide a useful value column. */
-@container (max-width:360px) {
-  .inspector-controls .text-field[data-context='inspector'] {
+.inspector-controls .reference-disclosure[data-kind='group'] > .disclosure-body {
+  padding-top: 8px;
+}
+/* Equivalent compact parameters share a 32px first band and an 8px tool strip. */
+.inspector-controls .selection-setting,
+.inspector-controls .param-row,
+.inspector-controls .text-field[data-context='inspector'],
+.inspector-controls .color-entry,
+.inspector-controls .field {
+  min-height: var(--inspector-row);
+  padding-bottom: 8px;
+  align-items: start;
+}
+.inspector-controls .selection-setting > span,
+.inspector-controls .number-label,
+.inspector-controls .text-label,
+.inspector-controls .field-label {
+  min-height: var(--inspector-control);
+  display: flex;
+  align-items: center;
+  padding-block: 0;
+}
+.inspector-controls .number-value-shell input {
+  padding-inline: 0 8px;
+}
+.inspector-controls .number-stepper {
+  width: 20px;
+}
+.inspector-controls .property-options[data-presentation='segments'] {
+  padding: 0;
+}
+.inspector-controls .color-entry {
+  grid-template-columns: minmax(0, 1fr) 100px 32px;
+  gap: 8px;
+}
+.inspector-controls .color-entry .text-input {
+  height: var(--inspector-control);
+  min-height: var(--inspector-control);
+  text-align: end;
+}
+.inspector-controls .color-swatch.action-button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  height: 32px;
+}
+.inspector-controls .color-swatch:before {
+  width: 16px;
+  height: 16px;
+}
+.inspector-controls .color-entry > .text-field[data-context='inspector'] {
+  padding-bottom: 0;
+}
+/* Long text and authored prose occupy the full available width. */
+@container (max-width: 360px) {
+  .inspector-controls .text-field[data-context='inspector']:not(.color-entry > *) {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
+    padding-bottom: 0;
   }
   .inspector-controls .text-field[data-context='inspector'] > .text-label {
+    min-height: var(--inspector-control);
     grid-column: 1;
     grid-row: 1;
   }
@@ -120,20 +179,58 @@
   }
 }
 
-.inspector-controls .reference-disclosure[data-kind='group'] > .disclosure-body {
-  padding-top: 8px;
-}
-.inspector-controls .color-swatch.action-button {
-  width: var(--inspector-row);
+.inspector-controls .parameter-row {
   min-height: var(--inspector-row);
-  height: var(--inspector-row);
+  padding-bottom: 8px;
+  align-items: start;
+}
+.inspector-controls .parameter-name {
+  min-height: var(--inspector-control);
+  display: flex;
+  align-items: center;
+  padding-block-start: 0;
+}
+.inspector-controls .parameter-value > .choice-field {
+  min-height: var(--inspector-control);
+  padding-bottom: 0;
+}
+.inspector-controls .parameter-value > .choice-field > .field-label,
+.inspector-controls .parameter-value .property-fallback > .field-label,
+.inspector-controls .parameter-value .property-group > legend {
+  min-height: 0;
 }
 
-@container (max-width:360px) {
-  .inspector-controls .text-field[data-context='inspector'] > .text-label {
-    padding-block-start: calc((var(--inspector-row) - var(--font-control-line))/2);
-  }
+/* Color codes retain numeric idle treatment without changing ordinary text fields. */
+.inspector-controls .color-entry .text-input {
+  background: transparent;
+  border-color: transparent;
 }
-.inspector-controls .text-field[data-context='inspector']:has(> textarea) > .text-label {
-  padding-block-start: calc((var(--inspector-row) - var(--font-control-line))/2);
+.inspector-controls .color-entry .text-input:focus {
+  background: var(--sniptale-color-surface-input);
+  border-color: var(--divider);
+}
+.inspector-controls
+  .parameter-row:is([data-layout='stacked'], [data-fit='stacked'], [data-label-fit='stacked']) {
+  padding-bottom: 0;
+}
+
+.inspector-controls .color-entry .text-input[aria-invalid='true'] {
+  border-color: var(--sniptale-color-danger);
+}
+
+.inspector-controls
+  .parameter-row:is([data-layout='stacked'], [data-fit='stacked'], [data-label-fit='stacked'])
+  > .parameter-name:not([hidden]) {
+  min-height: var(--inspector-control);
+  padding-block-start: 0;
+}
+
+.inspector-controls .context-range-shell {
+  height: 8px;
+}
+.inspector-controls .context-range-shell input.number-range {
+  --sniptale-range-shell-height: 8px;
+}
+.inspector-controls .context-track {
+  top: 2.5px;
 }

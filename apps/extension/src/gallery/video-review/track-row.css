@@ -1,8 +1,56 @@
 /* Lane actions use icon feedback while preserving their hit area and keyboard focus. */
 @layer utilities {
-  [data-ui='gallery.videoReview.trackHeader'] [data-track-controls] button {
+  :is(
+    [data-ui='gallery.videoReview.trackHeader'] [data-track-controls],
+    [data-ui='gallery.videoReview.trackControls']
+  ) {
+    --sniptale-command-selected-surface: transparent;
+    --sniptale-command-selected-foreground: var(--sniptale-color-accent);
+  }
+
+  :is(
+      [data-ui='gallery.videoReview.trackHeader'] [data-track-controls],
+      [data-ui='gallery.videoReview.trackControls']
+    )
+    button {
     border-width: 0 !important;
     background: transparent !important;
+  }
+
+  :is(
+      [data-ui='gallery.videoReview.trackHeader'] [data-track-controls],
+      [data-ui='gallery.videoReview.trackControls']
+    )
+    button:enabled:hover {
+    --sniptale-command-selected-foreground: var(--sniptale-color-accent-emphasis);
+  }
+
+  [data-ui='gallery.videoReview.trackHeader'] button.review-track-status {
+    --sniptale-command-selected-foreground: var(--sniptale-color-text-secondary);
+    width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding-inline: 4px !important;
+  }
+
+  [data-ui='gallery.videoReview.trackHeader'] button.review-track-status:enabled:hover {
+    --sniptale-command-selected-foreground: var(--sniptale-color-text-primary);
+  }
+
+  :is([data-ui='gallery.videoReview.trackHeader'], [data-ui='gallery.videoReview.trackControls'])
+    button.review-track-compact {
+    width: 24px !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    padding-inline: 4px !important;
+  }
+
+  :is(
+      [data-ui='gallery.videoReview.trackHeader'] [data-track-controls],
+      [data-ui='gallery.videoReview.trackControls']
+    )
+    button:disabled {
+    --sniptale-command-selected-foreground: var(--sniptale-color-text-muted);
   }
 }
 

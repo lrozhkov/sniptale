@@ -20,7 +20,6 @@ export function createDropdown(field, label, initialOptions, initialValue, confi
   const labelEl = document.createElement('label');
   labelEl.className = 'field-label';
   labelEl.id = uid + '-label';
-  labelEl.htmlFor = uid;
   labelEl.textContent = label;
   const trigger = document.createElement(config.search ? 'input' : 'button');
   trigger.id = uid;
@@ -200,9 +199,9 @@ export function createDropdown(field, label, initialOptions, initialValue, confi
       r = row ? getComputedStyle(row) : null,
       f = getComputedStyle(popup),
       px = (v) => parseFloat(v) || 0;
-    ctx.font = r?.font || '500 13px Inter';
+    ctx.font = r?.font || getComputedStyle(field).font;
     const primary = Math.max(0, ...options.map((o) => ctx.measureText(o.label).width));
-    ctx.font = '400 12px Inter';
+    ctx.font = '400 12px ' + getComputedStyle(popup).fontFamily;
     const secondary = Math.max(
       0,
       ...options.map((o) => ctx.measureText(o.description || '').width)
@@ -325,27 +324,6 @@ export function createDropdown(field, label, initialOptions, initialValue, confi
             ];
     updateActive();
   }
-  labelEl.addEventListener('pointerdown', (event) => event.preventDefault());
-  function toggleFromField(event) {
-    event.preventDefault();
-    if (trigger.disabled) return;
-    const wasOpen = visible;
-    if (wasOpen) {
-      trigger.focus({ preventScroll: true });
-      close();
-    } else {
-      trigger.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      trigger.focus({ preventScroll: true });
-      open();
-    }
-  }
-  labelEl.addEventListener('click', toggleFromField);
-  field.addEventListener('pointerdown', (event) => {
-    if (event.target === field) event.preventDefault();
-  });
-  field.addEventListener('click', (event) => {
-    if (event.target === field) toggleFromField(event);
-  });
   trigger.addEventListener('click', () => (config.search ? open() : visible ? close() : open()));
   if (config.search) {
     trigger.addEventListener('focus', open);

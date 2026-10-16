@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { generateDependencyLegalClosure } from './index.mjs';
 import { generateRepositoryDependencyLegal } from './generate-dependency-legal.mjs';
 import { validateDependencyLegalClosure } from './validation.mjs';
-import { createLegalFixture, TEST_MANROPE } from './test-support';
+import { createLegalFixture, TEST_INTERFACE_FONT } from './test-support';
 import { seedTestOssReleasePolicy } from '../policy/oss-release-policy.test-support';
 import {
   assertReleaseLegalPayload,
@@ -94,7 +94,7 @@ it('requires every generated modified-source file at the release packaging bound
   await seedTestOssReleasePolicy(repoRoot);
   const policyPath = path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json');
   const policy = JSON.parse(await fs.readFile(policyPath, 'utf8'));
-  policy.bundledAssets = [{ ...TEST_MANROPE, id: 'manrope' }];
+  policy.bundledAssets = [{ ...TEST_INTERFACE_FONT, id: 'golos-ui' }];
   policy.dependencyLegal = {
     manifestPath: 'THIRD_PARTY_DEPENDENCIES.json',
     licenseDirectory: 'LICENSES/dependencies',

@@ -19,19 +19,22 @@
 }
 .number-label {
   color: var(--secondary);
-  font-weight: 500;
+  font-weight: var(--font-control-weight);
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .number-value-shell {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 110px;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: end;
   min-height: 32px;
   border: 1px solid transparent;
   border-radius: var(--radius);
-  padding: 0 6px;
+  padding: 0 8px;
   color: var(--text);
 }
 .number-value-shell:hover {
@@ -44,7 +47,9 @@
 }
 .number-value-shell input {
   min-width: 0;
-  width: 100%;
+  width: auto;
+  field-sizing: content;
+  flex: 0 1 auto;
   height: 28px;
   text-align: right;
   background: transparent;
@@ -53,6 +58,7 @@
   outline: none;
   font: inherit;
   font-variant-numeric: tabular-nums;
+  padding-inline-end: 0;
 }
 .number-unit {
   white-space: nowrap;
@@ -163,6 +169,10 @@ input.number-range::-moz-range-thumb {
   display: none;
 }
 .number-stepper {
+  position: absolute;
+  right: -8px;
+  top: 0;
+  width: 20px;
   display: flex;
   flex-direction: column;
   opacity: 0;
@@ -249,7 +259,7 @@ input.number-range::-moz-range-thumb {
   }
 }
 .number-range:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 1px solid var(--focus);
   outline-offset: 2px;
 }
 .number-value-shell:focus-within {
@@ -257,7 +267,7 @@ input.number-range::-moz-range-thumb {
   border-color: var(--divider);
 }
 html[data-input-mode='keyboard'] .number-value-shell:focus-within {
-  outline: 2px solid var(--focus);
+  outline: 1px solid var(--focus);
   outline-offset: 2px;
 }
 html[data-input-mode='pointer'] .number-range:focus-visible {
@@ -270,18 +280,18 @@ html[data-input-mode='pointer'] .number-range:focus-visible {
 /* Contextual text and range targets occupy separate, fixed-height strips. */
 .ref-number[data-variant='contextual'] .number-row {
   min-height: 40px;
-  padding-bottom: 16px;
+  padding-bottom: 8px;
 }
 .ref-number[data-variant='contextual'] .number-value-shell {
-  height: 24px;
-  min-height: 24px;
+  height: 32px;
+  min-height: 32px;
 }
 .ref-number[data-variant='contextual'] .number-value-shell input {
-  height: 22px;
+  height: 30px;
 }
 .ref-number[data-variant='contextual'] .number-stepper button {
   width: 20px;
-  height: 12px;
+  height: 16px;
 }
 
 .number-error {
@@ -301,4 +311,9 @@ html[data-input-mode='pointer'] .number-range:focus-visible {
 }
 .ref-number[data-outside-range='true'] input[type='range']::-moz-range-thumb {
   opacity: 0;
+}
+
+.number-value-shell input:focus {
+  min-width: 5ch;
+  padding-inline-start: 1ch;
 }
