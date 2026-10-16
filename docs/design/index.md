@@ -8,6 +8,8 @@ Identify the surface through [Surface-specific patterns](surfaces.md) first. The
 
 Read [Compositions](compositions.md) when controls share a parameter editor or screen. Read [Layout adaptation](responsive.md) for resizing, compaction, overflow, and target viewports. Read [Runtime boundaries](runtime.md) for shells, portals, embedded UI, and cross-editor rollout. Do not read all sections for a local control change.
 
+Use [Font families](fonts.md) for replacement and installation, [Field accessories](field-accessories.md) for Clear and dictation, and [Parameter layout](parameter-layout.md) for detailed construction. [Command activation](command-press.md) owns the complete press cycle.
+
 | Task | Rules | Working example |
 | --- | --- | --- |
 | Typography, spacing, radii, contrast, focus | [Foundations](foundations.md) | [Foundations](../../tooling/design-reference/examples/foundations/index.html) |
@@ -37,6 +39,6 @@ Read [Compositions](compositions.md) when controls share a parameter editor or s
 
 ## Use and verification
 
-The [catalog](../../tooling/design-reference/index.html) is the only example index. Each group has one page and one rule document. The [tool guide](../../tooling/design-reference/README.md) explains local serving and the runtime boundary. [Verification](verification.md) defines the acceptance checks and unproven integration boundaries. [Coverage](coverage.md) maps inspected product surfaces to this reference.
+The [catalog](../../tooling/design-reference/index.html) is the only example index. Each group has one page and one rule entry. Entries route focused subtopics without copying rules. The [tool guide](../../tooling/design-reference/README.md) explains local serving and the runtime boundary. [Verification](verification.md) defines the acceptance checks and unproven integration boundaries. [Coverage](coverage.md) maps inspected product surfaces to this reference.
 
 The existing product color selector remains authoritative for its complete picker UI. Circular checkbox geometry, glass tuning, and the thin slider track remain proposed visual decisions pending user acceptance. Do not claim full accessibility compliance from prototype checks.

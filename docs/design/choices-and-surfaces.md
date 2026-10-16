@@ -4,9 +4,7 @@
 
 ## Segment fit
 
-Keep translated segment labels on one line without splitting words or increasing height. Prefer equal segment widths when they fit. Allow intrinsic minimum widths when unequal labels would otherwise force a dropdown. Stack below the label before changing representation. Use a dropdown only when complete intrinsic labels, individual padding, actual gaps, and insets exceed the full group width. Preserve value, label, disabled options, and commit timing. Do not change presentation during a press, focus-owned edit, or open menu. Reevaluate after the interaction ends.
-
-Measure fit with the active locale and loaded font, not a viewport breakpoint alone. Tiles, compact icon properties, and toolbar tools retain their own presentation contracts. This rule applies to ordinary segmented property choices.
+Follow [layout adaptation](responsive.md#compaction-order) for intrinsic fit, stacking, and deferred representation changes.
 
 ## Choose the presentation
 
@@ -53,4 +51,4 @@ Segment motion must not delay acceptance. Initial layout and resize do not anima
 
 [WAI combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
 
-In the explicit compact inspector, segments use 32px height and 6px horizontal padding per option. Stack segments below their name before fallback. Use a dropdown only when complete labels and actual insets exceed the full available width. General controls retain their existing height.
+Compact inspector segments use 32px height and 6px horizontal padding per option. General controls retain their existing height.

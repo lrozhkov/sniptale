@@ -11,11 +11,11 @@
 | Choose exactly one value in a named group | Radio | Effect mode |
 | Execute work once | [Command](buttons.md) | Record, export, apply |
 
-A single checkbox is valid. Checkbox does not mean batch action. Immediate filter updates do not turn selection into a switch. An immediately applied true/false parameter uses a switch, rather than a dropdown containing enabled and disabled. A live preview does not remove a form's Save/Cancel contract.
+A checkbox can represent one item, not only batch actions. Immediate filter updates do not turn selection into a switch. An immediately applied true/false parameter uses a switch, rather than a dropdown containing enabled and disabled. A live preview does not remove a form's Save/Cancel contract.
 
-A switch can accept an immediate project edit with Undo or a persistent default for future operations. A checkbox can include a source in one upcoming operation without implying that the source currently operates. During recording, a microphone command or switch must expose its actual current action and state. A persistent processing setting with a live test uses a switch when no Save applies.
+Switches can apply immediate project edits with Undo or persistent defaults for future operations. A checkbox can include a source in one upcoming operation without implying that the source currently operates. During recording, a microphone command or switch must expose its actual current action and state. A persistent processing setting with a live test uses a switch when no Save applies.
 
-A multiple-object boolean editor can contain different values. Use a trailing native checkbox with its indeterminate state when this editor must represent mixed values. A switch cannot represent mixed values. Keep the same control while the selected objects change. Selecting a mixed checkbox applies the enabled value through the existing edit owner.
+A multiple-object boolean editor can contain different values. Use a trailing indeterminate native checkbox for mixed boolean values. A switch cannot represent mixed values. Keep the control when selected objects change. Selecting a mixed checkbox applies the enabled value through the existing edit owner.
 
 Keep accepted configuration, pending application, rejected constraints, and unsupported capabilities distinct. Status dots and current-step markers are not radio controls.
 
@@ -30,9 +30,9 @@ Use Checkbox layout=parameter for deferred parameter rows. Do not make the name 
 
 ## Drawing and states
 
-The default prototype uses an 18px disc, the shared orange vector check, and an optically centered radio dot. Explicit 16px and 20px specimens demonstrate density changes. They are not competing default designs. Do not redraw the check or radio dot inside consumers. Keep aspect ratios, centers, and stroke widths stable. A switch uses a pale thumb, thin track, and position plus accent to indicate its enabled state.
+The default prototype uses an 18px disc, the shared orange vector check, and an optically centered radio dot. The 16px and 20px specimens demonstrate density variants, not alternative defaults. Consumers must not redraw checks or radio dots. Keep aspect ratios, centers, and stroke widths stable. A switch uses a pale thumb, thin track, and position plus accent to indicate its enabled state.
 
-Keep the small neutral glow: near white in dark theme, dark in light theme. Do not restore orange glow. The 28px checkbox target and switch target are independent of drawing size. Preserve disabled checked values rather than drawing every unavailable control as off. Use empty/check/dash for the parent selection scope. Individual items show only their own selection.
+Keep the small neutral glow: near white in dark theme, dark in light theme. Do not restore orange glow. The 28px checkbox target and switch target are independent of drawing size. Preserve disabled checked values. Unavailable does not mean off. Use empty/check/dash for the parent selection scope. Individual items show only their own selection.
 
 Name the scope of Select all. Keep parent state synchronized with available children.
 
@@ -52,6 +52,6 @@ Use existing product control owners and preserve their state contracts. The comp
 
 The neutral filter specimen uses the shared circle with a gray unchecked surface and theme-inverted selected surface/check. It removes orange from this filter variant only. The default parameter checkbox remains unchanged. Filter labels can brighten on hover and use weight 600 when selected. Reserve that width so selection does not move counts or neighbors. Align the disc, first label line, and count centers. Keep counts in a fixed trailing column when labels wrap.
 
-This exception applies to category/facet selection, not parameter names. Parameter names remain secondary at weight 500. The library's current GalleryFacetOptionRow uses a neutral rounded-square checkbox. Preserve that product shape until a separate decision approves a replacement. The neutral circular filter specimen is a new proposal, not an approved global change.
+This exception applies to category/facet selection, not parameter names. Parameter names remain secondary at weight 400. GalleryFacetOptionRow uses neutral rounded-square checkboxes. Preserve that product shape until a separate decision approves a replacement. The neutral circular filter specimen is a new proposal, not an approved global change.
 
-The explicit compact inspector places boolean controls in the first 32px band of a 40px parameter row. Reserve the lower 8px contextual strip across equivalent parameters. Keep 4px between rows. Named boolean toggles retain their declared action. This variant does not change ordinary form or collection geometry.
+Compact inspector booleans occupy the first 32px band of 40px rows. Reserve the lower 8px contextual strip across equivalent parameters. Keep 4px between rows. Named boolean toggles retain their declared action. This variant does not change ordinary form or collection geometry.
