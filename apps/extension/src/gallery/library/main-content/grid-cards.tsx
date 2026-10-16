@@ -142,7 +142,6 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
         onToggleSelection={props.onToggleSelection}
         selected={props.selected}
       />
-      {!isList ? <GalleryGridCardKindBadge kind={props.item.kind} /> : null}
     </div>
   );
 }
@@ -177,17 +176,13 @@ function GalleryGridCardKindBadge(props: { kind: GalleryItem['kind'] }) {
   const Icon = getKindIcon(props.kind);
 
   return (
-    <div
-      className={cx(
-        'absolute z-10 inline-flex items-center justify-center rounded-[4px] border',
-        'border-[var(--sniptale-color-border-soft)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]',
-        'text-[var(--sniptale-color-text-secondary)]',
-        'right-3 top-3 h-8 w-8'
-      )}
+    <span
+      className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[var(--sniptale-color-text-secondary)]"
+      data-ui="gallery.card.kind"
+      title={getGalleryItemKindLabel(props.kind)}
     >
-      <Icon className="h-4 w-4" />
-    </div>
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </span>
   );
 }
 
@@ -290,6 +285,7 @@ const GalleryGridCard = memo(
             props.item.type !== 'video-project' &&
             props.item.type !== 'quick-edit-project' ? (
               <GalleryGridDetails
+                leading={<GalleryGridCardKindBadge kind={props.item.kind} />}
                 compact={props.viewMode === 'compact-grid'}
                 item={props.item}
                 onPreviewOpen={props.onPreviewOpen}
@@ -299,6 +295,7 @@ const GalleryGridCard = memo(
         )}
         {!isList ? (
           <GalleryProjectDetails
+            leading={<GalleryGridCardKindBadge kind={props.item.kind} />}
             item={props.item}
             viewMode={props.viewMode}
             onPreviewOpen={props.onPreviewOpen}

@@ -162,6 +162,18 @@ it('renders media and project metadata through their canonical layouts', async (
   expect(container.textContent).toContain('1280×720');
   expect(container.textContent).toContain('2.5 gallery.preview.durationSuffix');
 
+  await act(async () =>
+    root.render(
+      <PreviewMetadataCards
+        item={createMediaItem({ kind: 'recording', mimeType: 'video/webm', duration: null })}
+      />
+    )
+  );
+  const duration = [...container.querySelectorAll('dt')].find(
+    (node) => node.textContent === 'gallery.preview.duration'
+  );
+  expect(duration?.nextElementSibling?.textContent).toBe('—');
+
   await act(async () => root.render(<PreviewMetadataCards item={createScenarioItem()} />));
   expect(container.textContent).toContain('gallery.app.createdLabel');
   expect(container.textContent).toContain('gallery.app.updatedLabel');

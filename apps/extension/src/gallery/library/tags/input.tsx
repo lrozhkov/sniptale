@@ -78,6 +78,7 @@ function GalleryTagInputField(props: {
             ? 'w-[calc(12ch+2rem)] shrink-0 text-[13px] font-normal'
             : 'min-w-0 flex-1'
         )}
+        style={{ fontFamily: 'var(--sniptale-font-document-sans)' }}
       >
         <input
           aria-label={props.placeholder}

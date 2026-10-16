@@ -165,7 +165,7 @@ it('wires compact search, sort, and centered view-mode controls without manual r
     'transition-[width,border-color,background-color]'
   );
   expect(input.parentElement?.className).toContain('w-36');
-  expect(listModeButton.className).toContain('h-full');
+  expect(listModeButton.className).toContain('h-8');
   expect(listModeButton.querySelector('svg')?.classList.contains('block')).toBe(true);
 
   act(() => {

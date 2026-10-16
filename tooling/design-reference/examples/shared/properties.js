@@ -1,5 +1,6 @@
 import { el } from './dom.js';
 import { ActionButton, icon } from './buttons.js';
+import { Disclosure } from './navigation.js';
 export function PropertyList({ items }) {
   const status = el('p', { class: 'property-feedback', role: 'status' }),
     list = el('dl', { class: 'display-properties' });
@@ -54,5 +55,11 @@ export function RelatedObjects({ items }) {
     ]);
     list.append(el('li', {}, link));
   }
-  return list;
+  return Disclosure({
+    label: 'Связанные объекты',
+    preferenceKey: ['properties', 'related'],
+    initiallyOpen: false,
+    kind: 'information',
+    content: list,
+  }).element;
 }

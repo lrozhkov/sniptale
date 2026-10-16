@@ -19,6 +19,8 @@ import {
   Trash2,
   Undo2,
   X,
+  ChevronDown,
+  FolderOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -188,10 +190,16 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
             value={`${item.width}×${item.height}`}
           />
         ) : null}
-        {item.duration !== null ? (
+        {item.duration !== null ||
+        ['recording', 'video', 'audio'].includes(item.kind) ||
+        /^(video|audio)\//u.test(item.mimeType) ? (
           <PreviewMetadataCard
             label={translate('gallery.preview.duration')}
-            value={`${item.duration.toFixed(1)} ${translate('gallery.preview.durationSuffix')}`}
+            value={
+              item.duration === null
+                ? '—'
+                : `${item.duration.toFixed(1)} ${translate('gallery.preview.durationSuffix')}`
+            }
           />
         ) : null}
         {item.recordingGroupView ? (
@@ -252,10 +260,23 @@ export function PreviewProjectUsage({
   trashMode,
 }: Pick<PreviewPanelProps, 'item' | 'trashMode'>) {
   const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
+  if (!mediaId) return null;
+  return <PreviewProjectUsageDetails key={mediaId} mediaId={mediaId} trashMode={trashMode} />;
+}
+
+/** Object identity resets disclosure and pending lookup before another source is shown. */
+function PreviewProjectUsageDetails({
+  mediaId,
+  trashMode,
+}: {
+  mediaId: string;
+  trashMode?: boolean | undefined;
+}) {
+  const [expanded, setExpanded] = useState(false);
   const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   useEffect(() => {
-    if (!mediaId) return;
+    if (!expanded) return;
     let active = true;
     let inFlight = false;
     let queued = false;
@@ -299,51 +320,59 @@ export function PreviewProjectUsage({
       clearTimeout(timer);
       unsubscribe();
     };
-  }, [mediaId]);
+  }, [mediaId, expanded]);
 
-  if (!mediaId) return null;
   return (
-    <section aria-label={translate('gallery.preview.usedInProjects')}>
-      <div className={previewSectionLabelClassName}>
-        {translate('gallery.preview.usedInProjects')}
+    <details
+      className="gallery-preview-disclosure"
+      data-ui="gallery.preview.projectUsage"
+      aria-label={translate('gallery.preview.usedInProjects')}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary>
+        <FolderOpen size={14} aria-hidden="true" />
+        <span>{translate('gallery.preview.usedInProjects')}</span>
+        <ChevronDown size={14} aria-hidden="true" />
+      </summary>
+      <div className="gallery-preview-disclosure-body">
+        {status === 'loading' ? <div>{translate('gallery.preview.projectsLoading')}</div> : null}
+        {status === 'error' ? <div>{translate('gallery.preview.projectsUnavailable')}</div> : null}
+        {status === 'ready' && usage.length === 0 ? (
+          <div className="text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate('gallery.preview.projectsEmpty')}
+          </div>
+        ) : null}
+        {status === 'ready' ? (
+          <div className="space-y-1">
+            {usage.map((project) =>
+              trashMode ? (
+                <p key={`${project.kind}:${project.id}`} className="break-words px-3 py-2 text-sm">
+                  {project.name}
+                </p>
+              ) : (
+                <ProductActionButton
+                  compact
+                  tone="secondary"
+                  key={`${project.kind}:${project.id}`}
+                  type="button"
+                  className="gallery-preview-related"
+                  title={project.name}
+                  onClick={() => {
+                    if (project.kind === 'video') void openVideoEditorPage(project.id, null);
+                    if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
+                    if (project.kind === 'review')
+                      void openGalleryPage({ mediaId: project.id, quickEdit: true });
+                  }}
+                >
+                  <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{project.name}</span>
+                </ProductActionButton>
+              )
+            )}
+          </div>
+        ) : null}
       </div>
-      {status === 'loading' ? <div>{translate('gallery.preview.projectsLoading')}</div> : null}
-      {status === 'error' ? <div>{translate('gallery.preview.projectsUnavailable')}</div> : null}
-      {status === 'ready' && usage.length === 0 ? (
-        <div className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.preview.projectsEmpty')}
-        </div>
-      ) : null}
-      {status === 'ready' ? (
-        <div className="space-y-1">
-          {usage.map((project) =>
-            trashMode ? (
-              <p key={`${project.kind}:${project.id}`} className="break-words px-3 py-2 text-sm">
-                {project.name}
-              </p>
-            ) : (
-              <ProductActionButton
-                compact
-                tone="secondary"
-                key={`${project.kind}:${project.id}`}
-                type="button"
-                className="gallery-preview-related"
-                title={project.name}
-                onClick={() => {
-                  if (project.kind === 'video') void openVideoEditorPage(project.id, null);
-                  if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
-                  if (project.kind === 'review')
-                    void openGalleryPage({ mediaId: project.id, quickEdit: true });
-                }}
-              >
-                <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 truncate">{project.name}</span>
-              </ProductActionButton>
-            )
-          )}
-        </div>
-      ) : null}
-    </section>
+    </details>
   );
 }
 

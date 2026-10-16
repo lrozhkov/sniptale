@@ -173,7 +173,7 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
     throw new Error('Expected preview panel controls');
   }
 
-  setInputValue(input, 'renamed.png');
+  setInputValue(input, 'renamed');
   act(() => {
     closeButton.click();
   });
@@ -207,7 +207,7 @@ it('keeps the filename name passive while the input retains direct editing', () 
   act(() => input.focus());
   act(() => name.click());
   expect(document.activeElement).toBe(input);
-  setInputValue(input, 'direct-edit.png');
+  setInputValue(input, 'direct-edit');
   expect(props.onFilenameChange).toHaveBeenCalledWith('direct-edit.png');
   expect(props.onSave).not.toHaveBeenCalled();
 });
@@ -587,7 +587,7 @@ it('shows permanent storage after promotion and omits active draft expiry in Tra
       item: { ...baseProps.item, lifecycle: { savedAt: 2, storageClass: 'library', updatedAt: 2 } },
     })
   );
-  expect(container?.textContent).toContain('gallery.app.permanentStorage');
+  expect(container?.querySelector('[title="gallery.app.permanentStorage"]')).not.toBeNull();
   render(
     createProps({
       trashMode: true,
@@ -600,4 +600,39 @@ it('shows permanent storage after promotion and omits active draft expiry in Tra
   );
   expect(container?.textContent).not.toContain('gallery.app.draftExpires');
   expect(container?.textContent).not.toContain('gallery.app.draftNoExpiration');
+});
+
+it('edits the file stem while retaining its extension outside the editor', () => {
+  const props = createProps({ item: createMediaItem({ filename: 'preview.png' }) });
+  render(props);
+  const input = container!.querySelector<HTMLInputElement>('input')!;
+  expect(input.value).toBe('preview');
+  expect(
+    container!.querySelector('[data-ui="gallery.preview.filenameExtension"]')?.textContent
+  ).toBe('.png');
+  act(() => setInputValue(input, 'renamed'));
+  expect(props.onFilenameChange).toHaveBeenLastCalledWith('renamed.png');
+  render({ ...props, filenameDraft: '' });
+  act(() => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(props.onFilenameChange).toHaveBeenLastCalledWith('preview.png');
+});
+
+it('closes a focused whitespace-only file stem without saving its extension alone', () => {
+  let draft = 'preview.png';
+  const onClose = vi.fn(() => draft);
+  render(
+    createProps({
+      item: createMediaItem({ filename: 'preview.png' }),
+      onFilenameChange: (value) => {
+        draft = value;
+      },
+      onClose,
+    })
+  );
+  const input = container!.querySelector<HTMLInputElement>('input')!;
+  input.focus();
+  setInputValue(input, '   ');
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(document.activeElement).toBe(input);
+  expect(onClose).toHaveReturnedWith('');
 });

@@ -22,6 +22,16 @@ Long descriptions wrap. Identifiers can break at safe character boundaries when 
 
 Static values wrap by default, so full content stays available without a tooltip or extra Tab stop. Use the [text-fitting policy](localization.md) when a bounded row requires shortening. Retain padding before a trailing action. Text must not extend under its hit target. Do not replace a missing value with zero. Use a localized absence label such as Not available.
 
+Keep a duration row for time-based media when its value is not yet available. Display an absence marker instead of zero.
+
+For filename editing, keep the immutable extension outside the editable stem. Pass the complete filename to the existing save owner. Empty input must not save an extension alone. Project names retain their ordinary text contract, including dots.
+
+## Supplemental groups
+
+Put optional provenance and related-object lists in compact information disclosures. Start them closed for each selected object. Keep padding and a trailing chevron on the summary. A small neutral icon identifies informational content. Follow [Navigation](navigation.md) for disclosure geometry.
+
+Defer a related-object lookup when only the collapsed group consumes its result. Closing the group or changing objects must prevent stale results. Preserve the existing invalidation, retry, and navigation owners. Keep loading, error, and empty content inside the body. These states must not resize the summary. Do not defer data required by another visible consumer.
+
 ## Copyable values
 
 Interface labels and hints remain outside mouse text selection. An explicit Copy command provides the full technical value without introducing a text caret across the row. Copy actions use the utility icon treatment: brighten the icon on hover, without a new filled surface or frame. Give the action a specific accessible name, such as Copy source identifier.
@@ -36,4 +46,4 @@ A neutral row can brighten its text on hover. Keep adjacent rows visually separa
 
 ## Existing consumers
 
-The library preview's PreviewMetadataCards and PreviewProjectUsage establish the informational and navigation roles. Their current local border and radius treatments do not define new generic tokens. Product acquisition, usage lookup, navigation, and clipboard permissions remain with their existing owners.
+The library preview's PreviewMetadataCards and PreviewProjectUsage establish the informational and navigation roles. Product acquisition, usage lookup, navigation, and clipboard permissions remain with their existing owners.

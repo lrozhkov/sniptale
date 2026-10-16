@@ -5,6 +5,7 @@ import type { GalleryItem } from '../items';
 import { canOpenGalleryProject } from '../items/types';
 import { translate } from '../../../platform/i18n';
 import { ArrowUpRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 const PROJECT_ACTION_CLASS_NAME =
   'gallery-project-open inline-flex items-center justify-start gap-1.5 text-left';
@@ -79,6 +80,7 @@ export function GalleryProjectOpenAction(props: {
 }
 
 export function GalleryProjectDetails(props: {
+  leading?: ReactNode;
   item: GalleryItem;
   viewMode: GalleryViewMode;
   onPreviewOpen: (item: GalleryItem) => void;
@@ -104,6 +106,7 @@ export function GalleryProjectDetails(props: {
             : 'flex h-[72px] shrink-0 items-end gap-1 border-t border-[var(--sniptale-color-border-soft)] px-4 py-2'
       }
     >
+      {!isList ? props.leading : null}
       {!isList ? (
         <div className={`flex min-w-0 flex-1 flex-col ${isCompact ? 'gap-0.5' : 'gap-1'}`}>
           <button

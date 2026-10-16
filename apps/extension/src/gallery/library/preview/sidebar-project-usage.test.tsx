@@ -49,6 +49,15 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+async function openUsage() {
+  const details = container.querySelector('details');
+  if (!details) return;
+  await act(async () => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle'));
+  });
+}
+
 function pendingUsage() {
   let resolve!: (usage: MediaAssetProjectUsage[]) => void;
   let reject!: (reason: Error) => void;
@@ -67,6 +76,7 @@ it('shows loading until resolved and exposes all linked project navigation route
       <PreviewProjectUsage item={createMediaItem({ id: 'display-id', entityId: 'media-id' })} />
     )
   );
+  await openUsage();
   expect(mocks.usage).toHaveBeenCalledExactlyOnceWith('media-id');
   expect(container.textContent).toContain('gallery.preview.projectsLoading');
   expect(container.querySelectorAll('button')).toHaveLength(0);
@@ -78,7 +88,7 @@ it('shows loading until resolved and exposes all linked project navigation route
     ])
   );
   expect(container.textContent).not.toContain('gallery.preview.projectsLoading');
-  expect(container.querySelector('section')?.getAttribute('aria-label')).toBe(
+  expect(container.querySelector('details')?.getAttribute('aria-label')).toBe(
     'gallery.preview.usedInProjects'
   );
   const buttons = [...container.querySelectorAll('button')];
@@ -98,6 +108,7 @@ it('shows linked project names without navigation in Trash', async () => {
     { id: 'video-1', name: 'Video project', kind: 'video', primary: true },
   ]);
   await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} trashMode />));
+  await openUsage();
   expect(container.textContent).toContain('Video project');
   expect(container.querySelector('button')).toBeNull();
   expect(mocks.video).not.toHaveBeenCalled();
@@ -108,6 +119,7 @@ it('shows empty usage and uses the item id when entity identity is absent', asyn
   const item = createMediaItem({ id: 'media-fallback' });
   delete item.entityId;
   await act(async () => root.render(<PreviewProjectUsage item={item} />));
+  await openUsage();
   expect(mocks.usage).toHaveBeenCalledExactlyOnceWith('media-fallback');
   expect(container.textContent).toContain('gallery.preview.projectsEmpty');
   expect(container.querySelectorAll('button')).toHaveLength(0);
@@ -116,6 +128,7 @@ it('shows empty usage and uses the item id when entity identity is absent', asyn
 it('shows lookup failure without offering stale project navigation', async () => {
   mocks.usage.mockRejectedValue(new Error('Database unavailable'));
   await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  await openUsage();
   expect(container.textContent).toContain('gallery.preview.projectsUnavailable');
   expect(container.textContent).not.toContain('gallery.preview.projectsLoading');
   expect(container.textContent).not.toContain('gallery.preview.projectsEmpty');
@@ -126,6 +139,7 @@ it.each([createScenarioItem(), createVideoProjectItem()])(
   'omits usage lookup for non-media item $kind',
   async (item) => {
     await act(async () => root.render(<PreviewProjectUsage item={item} />));
+    await openUsage();
     expect(container.textContent).toBe('');
     expect(mocks.usage).not.toHaveBeenCalled();
   }
@@ -139,9 +153,11 @@ it.each(['resolve', 'reject'] as const)(
     await act(async () =>
       root.render(<PreviewProjectUsage item={createMediaItem({ entityId: 'old' })} />)
     );
+    await openUsage();
     await act(async () =>
       root.render(<PreviewProjectUsage item={createMediaItem({ entityId: 'current' })} />)
     );
+    await openUsage();
     await act(async () => {
       if (outcome === 'resolve')
         pending.resolve([{ id: 'stale', name: 'Stale project', kind: 'video', primary: false }]);
@@ -157,6 +173,7 @@ it('reloads on project invalidation and ignores the old result', async () => {
   const pending = pendingUsage();
   mocks.usage.mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
   await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  await openUsage();
   const invalidate = mocks.subscribe.mock.calls[0]?.[0];
   expect(invalidate).toBeTypeOf('function');
   await act(async () => invalidate());
@@ -173,6 +190,7 @@ it('retries an unavailable usage lookup after a library change', async () => {
     .mockRejectedValueOnce(new Error('unavailable'))
     .mockResolvedValueOnce([{ id: 'video', name: 'Video', kind: 'video', primary: false }]);
   await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  await openUsage();
   expect(container.textContent).toContain('gallery.preview.projectsUnavailable');
   const invalidate = mocks.subscribe.mock.calls[0]?.[0];
   await act(async () => invalidate());
@@ -185,6 +203,7 @@ it('ends loading for a stuck lookup instead of spinning indefinitely', async () 
   try {
     mocks.usage.mockReturnValue(new Promise(() => undefined));
     await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+    await openUsage();
     await act(async () => vi.advanceTimersByTimeAsync(8_000));
     expect(container.textContent).not.toContain('gallery.preview.projectsLoading');
     expect(container.textContent).toContain('gallery.preview.projectsUnavailable');
@@ -197,6 +216,7 @@ it('coalesces a burst of invalidations while a request is pending', async () => 
   const pending = pendingUsage();
   mocks.usage.mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
   await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  await openUsage();
   const invalidate = mocks.subscribe.mock.calls[0]?.[0];
   await act(async () => {
     for (let i = 0; i < 100; i++) invalidate();
@@ -216,10 +236,46 @@ it('refreshes the primary quick-edit name after metadata invalidation while reta
       <PreviewProjectUsage item={createMediaItem({ id: 'source', entityId: 'source' })} />
     )
   );
+  await openUsage();
   expect(container.textContent).toContain('Original edit');
   await act(async () => mocks.subscribe.mock.calls[0]?.[0]());
   expect(container.textContent).not.toContain('Original edit');
   expect(container.textContent).toContain('Renamed edit');
   await act(async () => container.querySelector('button')?.click());
   expect(mocks.gallery).toHaveBeenCalledExactlyOnceWith({ mediaId: 'source', quickEdit: true });
+});
+
+it('defers project lookup until its disclosure opens', async () => {
+  mocks.usage.mockResolvedValue([]);
+  await act(async () =>
+    root.render(<PreviewProjectUsage item={createMediaItem({ entityId: 'lazy-source' })} />)
+  );
+  expect(mocks.usage).not.toHaveBeenCalled();
+  const details = container.querySelector('details')!;
+  await act(async () => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle'));
+  });
+  expect(mocks.usage).toHaveBeenCalledExactlyOnceWith('lazy-source');
+});
+
+it('ignores a pending result after closing and loads fresh links on reopening', async () => {
+  const pending = pendingUsage();
+  mocks.usage
+    .mockReturnValueOnce(pending.promise)
+    .mockResolvedValueOnce([{ id: 'fresh', name: 'Fresh project', kind: 'video', primary: false }]);
+  await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  await openUsage();
+  const details = container.querySelector('details')!;
+  await act(async () => {
+    details.open = false;
+    details.dispatchEvent(new Event('toggle'));
+  });
+  await act(async () =>
+    pending.resolve([{ id: 'stale', name: 'Stale project', kind: 'video', primary: false }])
+  );
+  expect(container.textContent).not.toContain('Stale project');
+  await openUsage();
+  expect(container.textContent).toContain('Fresh project');
+  expect(mocks.usage).toHaveBeenCalledTimes(2);
 });

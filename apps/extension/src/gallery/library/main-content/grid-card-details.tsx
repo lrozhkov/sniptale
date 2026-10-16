@@ -5,8 +5,10 @@ import { formatDate, getRecordingGroupRoleLabel } from '../ui';
 import { translate } from '../../../platform/i18n';
 import { GalleryProjectOpenAction, getGalleryProjectSummary } from '../ui/project-presentation';
 import { GalleryGridCardDate } from './grid-card-date';
+import type { ReactNode } from 'react';
 
 interface GalleryCardDetailsProps {
+  leading?: ReactNode;
   compact?: boolean;
   item: GalleryItem;
   onPreviewOpen: (item: GalleryItem) => void;
@@ -268,9 +270,10 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
       )}
       <div
         data-ui={props.compact ? 'gallery.compact.metadata' : 'gallery.large.metadata'}
-        className={`flex items-center justify-between gap-2 whitespace-nowrap text-xs
+        className={`flex min-w-0 w-full items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]`}
       >
+        {props.leading}
         <GalleryGridCardDate items={[props.item]} compact={Boolean(props.compact)} />
         <span className="shrink-0">
           {props.item.size > 0

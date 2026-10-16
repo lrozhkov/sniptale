@@ -606,10 +606,14 @@ it('shows only the deletion date for drafts in grid cards', () => {
   const compactMetadata = container?.querySelector('[data-ui="gallery.compact.metadata"]');
   expect(compactMetadata?.className).toContain('whitespace-nowrap');
   expect(compactMetadata?.textContent).toContain('date:99');
-  expect(compactMetadata?.querySelector('[title]')?.getAttribute('title')).toBe(
-    `${translate('gallery.app.draftExpires')} date:99`
+  expect(
+    compactMetadata
+      ?.querySelector('[title]:not([data-ui="gallery.card.kind"])')
+      ?.getAttribute('title')
+  ).toBe(`${translate('gallery.app.draftExpires')} date:99`);
+  expect(compactMetadata?.querySelector('svg.lucide-trash-2')?.classList.toString()).toContain(
+    'lucide-trash'
   );
-  expect(compactMetadata?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
 });
 
 it('shows grouped recording role and member count outside the thumbnail', () => {

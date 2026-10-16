@@ -71,3 +71,29 @@
 .sniptale-library-workspace [data-ui='gallery.list.row'] > * {
   position: relative;
 }
+
+@layer utilities {
+  .sniptale-library-workspace
+    button:is(
+      .sniptale-library-view-mode,
+      .gallery-saved-view-action
+    )[data-command-press][data-command-tone][data-command-chrome] {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    border-color: transparent !important;
+    background: transparent !important;
+  }
+  .sniptale-library-workspace
+    button.sniptale-library-view-mode[data-command-press][data-command-chrome][aria-pressed='true'] {
+    color: var(--sniptale-color-accent) !important;
+  }
+  .sniptale-library-workspace
+    button.sniptale-library-view-mode[data-command-press][data-command-chrome][aria-pressed='true']:hover {
+    color: var(--sniptale-color-accent-emphasis) !important;
+  }
+  .sniptale-library-workspace
+    button.gallery-saved-view-action[data-danger='true']:hover:not(:disabled) {
+    color: var(--sniptale-color-danger) !important;
+  }
+}

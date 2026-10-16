@@ -89,7 +89,7 @@ it.each(['compact-grid', 'large-grid'] as const)(
     );
     expect(metadata?.textContent).toContain('date:3');
     expect(metadata?.textContent).not.toContain('date:1');
-    const icon = metadata?.querySelector('svg');
+    const icon = metadata?.querySelector('svg.lucide-trash-2');
     expect(icon?.classList.toString()).toContain('lucide-trash');
     expect(icon?.getAttribute('aria-hidden')).toBe('true');
     expect(icon?.classList.toString()).toContain('h-3.5 w-3.5 shrink-0');
@@ -140,7 +140,7 @@ it.each(['compact-grid', 'large-grid'] as const)(
     );
     expect(metadata?.textContent).toContain('date:3');
     expect(metadata?.textContent).not.toContain('date:1');
-    const icon = metadata?.querySelector('svg');
+    const icon = metadata?.querySelector('svg.lucide-trash-2');
     expect(icon?.classList.toString()).toContain('lucide-trash');
     expect(icon?.getAttribute('aria-hidden')).toBe('true');
     expect(icon?.classList.toString()).toContain('h-3.5 w-3.5 shrink-0');

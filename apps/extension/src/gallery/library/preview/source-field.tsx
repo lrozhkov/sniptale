@@ -1,5 +1,5 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { RotateCw } from 'lucide-react';
+import { ChevronDown, Info, RotateCw } from 'lucide-react';
 import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { translate } from '../../../platform/i18n';
@@ -28,9 +28,18 @@ export function PreviewSourceField({
   const title =
     item.sourceTitle?.trim() || (isGalleryScenarioExportItem(item) ? item.project.name : null);
   return (
-    <section aria-label={translate('gallery.preview.source')}>
-      <h3 className="gallery-preview-section-label">{translate('gallery.preview.source')}</h3>
-      <div className="space-y-2 text-[13px] font-normal leading-[18px]">
+    <details
+      key={item.id}
+      data-ui="gallery.preview.source"
+      className="gallery-preview-disclosure"
+      aria-label={translate('gallery.preview.source')}
+    >
+      <summary>
+        <Info size={14} aria-hidden="true" />
+        <span>{translate('gallery.preview.source')}</span>
+        <ChevronDown size={14} aria-hidden="true" />
+      </summary>
+      <div className="gallery-preview-disclosure-body space-y-2 text-[13px] font-normal leading-[18px]">
         <dl className="gallery-preview-properties">
           <SourceRow
             label={translate('gallery.preview.origin')}
@@ -109,6 +118,6 @@ export function PreviewSourceField({
           </div>
         ) : null}
       </div>
-    </section>
+    </details>
   );
 }

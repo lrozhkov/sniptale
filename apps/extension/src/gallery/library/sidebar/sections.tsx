@@ -108,10 +108,10 @@ function GalleryFacetOptionRow(props: {
       <span
         className={cx(
           'min-w-0 flex-1 truncate text-[13px] leading-[18px] transition-colors',
-          'group-hover/facet-row:text-[var(--sniptale-color-text-primary-strong)]',
+          'group-hover/facet-row:text-[var(--sniptale-color-text-primary)]',
           props.checked
-            ? 'font-semibold text-[var(--sniptale-color-text-primary-strong)]'
-            : 'font-medium text-[var(--sniptale-color-text-secondary)]'
+            ? 'font-medium text-[var(--sniptale-color-text-primary)]'
+            : 'font-normal text-[var(--sniptale-color-text-secondary)]'
         )}
       >
         {props.label}
@@ -183,7 +183,7 @@ function GalleryFacetSection(props: {
                   event.stopPropagation();
                   props.onClear?.();
                 }}
-                className="sniptale-dismiss-button h-8 w-8 shrink-0"
+                className="sniptale-dismiss-button sniptale-library-utility h-8 w-8 shrink-0"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </ProductActionButton>
@@ -217,7 +217,7 @@ function GalleryFacetSection(props: {
                 onClick={() => setSearch('')}
                 aria-label={translate('gallery.app.facetClearSearch')}
                 title={translate('gallery.app.facetClearSearch')}
-                className="sniptale-dismiss-button h-8 w-8 shrink-0"
+                className="sniptale-dismiss-button sniptale-library-utility h-8 w-8 shrink-0"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </ProductActionButton>

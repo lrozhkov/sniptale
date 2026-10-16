@@ -1,7 +1,7 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useId, useState, type ReactNode } from 'react';
 import {
-  ChevronDown,
+  Info,
   Library,
   ListChecks,
   PanelLeftClose,
@@ -55,25 +55,15 @@ function GalleryTrashSummaryText({
       {compact ? (
         <span title={translate('gallery.app.trashSizeExplanation')}>{sizeText}</span>
       ) : (
-        <details className="group/size">
-          <summary
-            className="flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-[4px] px-2
-              [&::-webkit-details-marker]:hidden focus-visible:outline-2
-            focus-visible:outline-[var(--sniptale-color-accent)]"
-          >
-            <span className="min-w-0 flex-1">
-              {translate('gallery.app.trashTotalSize')}: {sizeText}
-            </span>
-            <ChevronDown
-              aria-hidden="true"
-              className="h-3.5 w-3.5 shrink-0 transition-transform group-open/size:rotate-180
-                motion-reduce:transition-none"
-            />
-          </summary>
-          <p className="px-2 pt-2 text-sm leading-5 font-normal">
-            {translate('gallery.app.trashSizeExplanation')}
-          </p>
-        </details>
+        <span
+          className="flex min-h-8 items-center gap-2"
+          title={translate('gallery.app.trashSizeExplanation')}
+        >
+          <Info size={14} aria-hidden="true" />
+          <span>
+            {translate('gallery.app.trashTotalSize')}: {sizeText}
+          </span>
+        </span>
       )}
     </>
   );
@@ -230,7 +220,6 @@ function GalleryTrashControls(props: GallerySidebarProps) {
   const trashRetention = useTrashRetentionPolicy();
   return (
     <section className="flex flex-col gap-4 pb-3" aria-label={translate('gallery.app.trashTitle')}>
-      <h2 className="text-sm leading-5 font-semibold">{translate('gallery.app.trashTitle')}</h2>
       <div
         data-ui="gallery.trash.summary"
         role="status"

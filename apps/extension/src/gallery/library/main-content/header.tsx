@@ -37,8 +37,10 @@ function cx(...values: Array<string | false | null | undefined>) {
 
 const galleryDangerBannerButtonClassName = 'shrink-0';
 
-const viewModeButtonClassName =
-  'relative z-10 inline-flex h-full w-8 items-center justify-center rounded-[4px] leading-none transition-colors';
+const viewModeButtonClassName = [
+  'sniptale-library-view-mode inline-flex h-8 w-8 shrink-0 items-center justify-center',
+  'rounded-[4px] leading-none transition-colors',
+].join(' ');
 
 interface GalleryHeaderStorageProps {
   activeStorageBarClass: string;
@@ -369,6 +371,7 @@ function GalleryViewModeButton(props: {
       compact
       type="button"
       aria-pressed={props.active}
+      data-command-chrome="true"
       title={props.label}
       aria-label={props.label}
       onClick={props.onClick}
@@ -394,30 +397,13 @@ function GalleryViewModeToggle(props: {
   onViewModeChange: GalleryMainContentProps['onViewModeChange'];
   viewMode: GalleryViewMode;
 }) {
-  const activeIndex = ['list', 'compact-grid', 'large-grid'].indexOf(props.viewMode);
-
   return (
     <div
       aria-label={translate('gallery.app.viewModeLabel')}
       role="group"
-      className={[
-        'relative grid h-8 w-[6.5rem] shrink-0 grid-cols-3 items-center',
-        'overflow-hidden rounded-[4px] border p-0.5',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-      ].join(' ')}
+      data-ui="gallery.header.view-mode"
+      className="flex h-8 shrink-0 items-center gap-1"
     >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-0.5 top-0.5 rounded-[4px]
-          bg-[var(--sniptale-color-surface-hover)]
-          transition-transform duration-200 ease-out motion-reduce:transition-none"
-        style={{
-          left: '0.125rem',
-          width: 'calc((100% - 0.25rem) / 3)',
-          transform: `translateX(${Math.max(0, activeIndex) * 100}%)`,
-        }}
-      />
       <GalleryViewModeButton
         active={props.viewMode === 'list'}
         icon={AlignJustify}

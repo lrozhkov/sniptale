@@ -196,6 +196,38 @@ for (const locale of ['ru', 'en'] as const) {
             })
           ).toHaveCSS('box-shadow', 'none');
           await expect(surface.locator('[data-gallery-keyboard-id]')).toHaveCount(2);
+          await page.mouse.move(0, 0);
+          const modeGroup = page.getByRole('group', {
+            name: label('gallery.app.viewModeLabel'),
+            exact: true,
+          });
+          await expect
+            .soft(modeGroup)
+            .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+          await expect
+            .soft(modeGroup.locator('button[aria-pressed="true"]'))
+            .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+          const selectedMode = modeGroup.locator('button[aria-pressed="true"]');
+          const selectedColor = await selectedMode.evaluate((node) => {
+            const sample = document.createElement('span');
+            sample.style.color = 'var(--sniptale-color-accent)';
+            node.append(sample);
+            const color = getComputedStyle(sample).color;
+            sample.remove();
+            return color;
+          });
+          await expect(selectedMode).toHaveCSS('color', selectedColor);
+          if (mode !== 'viewModeList') {
+            const item = card(names[0]!);
+            const previewBounds = (await item
+              .locator('[data-ui="gallery.grid.thumbnail-viewport"]')
+              .boundingBox())!;
+            const kindBounds = (await item.locator('svg.lucide-image').last().boundingBox())!;
+            expect
+              .soft(kindBounds.y)
+              .toBeGreaterThanOrEqual(previewBounds.y + previewBounds.height);
+          }
+
           await expect(
             surface.getByRole('button', { name: names[0], exact: true }).first()
           ).toBeInViewport();
@@ -248,6 +280,15 @@ for (const locale of ['ru', 'en'] as const) {
         if ((await facet.getAttribute('open')) === null) await facet.locator('summary').click();
         await expect(facet).toHaveAttribute('open', '');
         await screenshot(page, info, 'expanded-format-facet');
+        await facet.locator('label').first().click();
+        const clearFacet = facet.getByRole('button', {
+          name: `${label('gallery.app.facetClear')} ${label('gallery.app.facetTitle.format')}`,
+          exact: true,
+        });
+        await clearFacet.hover();
+        await expect(clearFacet).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await screenshot(page, info, 'facet-clear-hover');
+        await clearFacet.click();
 
         await card(names[0]!).getByRole('button', { name: names[0], exact: true }).first().click();
         const inspector = page.locator('[data-ui="gallery.preview.inspector"]');
@@ -263,6 +304,25 @@ for (const locale of ['ru', 'en'] as const) {
           await expect(property).toHaveCSS('line-height', '18px');
         }
         await screenshot(page, info, 'preview-metadata');
+        const nextItem = page
+          .getByRole('button', { name: label('gallery.preview.next'), exact: true })
+          .first();
+        const previousItem = page
+          .getByRole('button', { name: label('gallery.preview.previous'), exact: true })
+          .first();
+        const forward = await nextItem.isEnabled();
+        await (forward ? nextItem : previousItem).click();
+        await expect(
+          inspector.locator('details').filter({
+            has: page.locator('summary').filter({ hasText: label('gallery.preview.properties') }),
+          })
+        ).toHaveCount(1);
+        await expect(
+          inspector.locator('[data-ui="gallery.preview.filenameExtension"]')
+        ).toHaveCount(1);
+        await (forward ? previousItem : nextItem).click();
+        await expect(filename).toHaveValue(names[0]!.replace(/\.[^.]+$/u, ''));
+
         const filenameRow = inspector.locator('.gallery-preview-filename');
         const filenameName = filenameRow.getByText(label('gallery.preview.filename'), {
           exact: true,
@@ -294,7 +354,13 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(filename).toHaveValue('');
         await expect(filename).toHaveAttribute('placeholder', label('gallery.preview.filename'));
         await expect(filename).toBeFocused();
-        await filename.fill(names[0]!);
+        await filename.fill('   ');
+        await filename.press('Escape');
+        await expect(inspector).toBeHidden();
+        await expect(card(names[0]!)).toBeVisible();
+        await card(names[0]!).getByRole('button', { name: names[0], exact: true }).first().click();
+        await expect(filename).toHaveValue(names[0]!.replace(/\.[^.]+$/u, ''));
+        await filename.fill(names[0]!.replace(/\.[^.]+$/u, ''));
         await inspector
           .getByRole('button', { name: label('gallery.app.addTags'), exact: true })
           .click();
@@ -363,6 +429,9 @@ for (const locale of ['ru', 'en'] as const) {
             available:
               input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
             minimum: context.measureText('0').width * 12,
+            font: style.font,
+            parentFont: getComputedStyle(input.parentElement!).font,
+            parentWidth: input.parentElement!.getBoundingClientRect().width,
           };
         });
         expect(queryRoom.available, JSON.stringify(queryRoom)).toBeGreaterThanOrEqual(
@@ -515,6 +584,9 @@ for (const locale of ['ru', 'en'] as const) {
         await searchLibrary(page, 'beta-v1.webm');
         await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
         const inspector = page.locator('[data-ui="gallery.preview.inspector"]');
+        const usage = inspector.locator('[data-ui="gallery.preview.projectUsage"]');
+        await expect(usage).not.toHaveAttribute('open');
+        await usage.locator('summary').click();
         const related = inspector.getByRole('button', { name: longName, exact: true });
         await expect(related).toBeVisible();
         await related.scrollIntoViewIfNeeded();
@@ -544,6 +616,8 @@ for (const locale of ['ru', 'en'] as const) {
           true
         );
         await screenshot(page, info, `related-long-${viewport.name}`);
+        const source = inspector.locator('[data-ui="gallery.preview.source"]');
+        await source.locator('summary').click();
         const link = inspector.getByRole('link', { name: sourceUrl, exact: true });
         await link.scrollIntoViewIfNeeded();
         await expect(link).toBeInViewport({ ratio: 1 });
@@ -576,4 +650,80 @@ for (const locale of ['ru', 'en'] as const) {
       }
     });
   }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`library saved views and trash composition ru ${theme}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await openLibrary(page, extensionId, 'ru', theme);
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
+    await page.evaluate(async () => {
+      const emptyFacets = {
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      };
+      await chrome.storage.local.set({
+        sniptale_gallery_saved_views: {
+          version: 1,
+          views: [
+            {
+              id: 'saved-one',
+              name: 'Длинное пользовательское имя сохранённого представления',
+              folderFilter: 'all',
+              createdAt: 1,
+              updatedAt: 1,
+              filters: { activeTags: [], facetFilters: emptyFacets, scope: 'all' },
+            },
+            {
+              id: 'saved-two',
+              name: 'Второй вид',
+              folderFilter: 'all',
+              createdAt: 2,
+              updatedAt: 2,
+              filters: { activeTags: [], facetFilters: emptyFacets, scope: 'all' },
+            },
+          ],
+        },
+      });
+    });
+    await page.reload();
+    const name = 'Длинное пользовательское имя сохранённого представления';
+    const view = page.getByRole('button', { name, exact: true });
+    await expect(view).toBeVisible();
+    await view.hover();
+    const remove = page.getByRole('button', {
+      name: `${label('gallery.app.savedViewDelete')} ${name}`,
+      exact: true,
+    });
+    await expect(remove).toBeVisible();
+    await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    const idle = await remove.evaluate((node) => getComputedStyle(node).color);
+    await remove.hover();
+    await expect(remove).not.toHaveCSS('color', idle);
+    await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await screenshot(page, info, 'saved-view-hover');
+    await remove.focus();
+    await expect(remove).toBeFocused();
+    await page.locator('[data-ui="gallery.sidebar.footer"] button').first().click();
+    const summary = page.locator('[data-ui="gallery.trash.summary"]');
+    await expect(summary).toContainText(label('gallery.app.trashSummaryCount'));
+    await expect(summary.locator('details')).toHaveCount(0);
+    await expect(summary.locator('[title]').first()).toHaveAttribute(
+      'title',
+      label('gallery.app.trashSizeExplanation')
+    );
+    await expect(page.locator('[data-ui="gallery.trash.retention"]')).toBeVisible();
+    await screenshot(page, info, 'trash-summary');
+    await page.getByRole('button', { name: label('gallery.keyboard.title'), exact: true }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await screenshot(page, info, 'keyboard-help');
+  });
 }

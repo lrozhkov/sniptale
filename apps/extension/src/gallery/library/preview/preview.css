@@ -133,3 +133,63 @@
 .gallery-preview-filename-input .sniptale-field-clear:hover {
   color: var(--sniptale-color-text-primary);
 }
+
+.gallery-preview-filename-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.gallery-preview-filename-value .gallery-preview-filename-input {
+  flex: 1;
+  min-width: 0;
+}
+.gallery-preview-filename-extension {
+  flex-shrink: 0;
+  color: var(--sniptale-color-text-secondary);
+}
+.gallery-preview-disclosure {
+  min-width: 0;
+}
+.gallery-preview-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding-inline: 8px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--sniptale-color-text-secondary);
+  font: 400 13px / 18px var(--sniptale-font-interface);
+}
+.gallery-preview-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.gallery-preview-disclosure > summary > span {
+  flex: 1;
+  min-width: 0;
+}
+.gallery-preview-disclosure > summary > svg {
+  flex-shrink: 0;
+}
+.gallery-preview-disclosure > summary > svg:last-child {
+  transition: transform 120ms ease-out;
+}
+.gallery-preview-disclosure[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.gallery-preview-disclosure > summary:hover {
+  color: var(--sniptale-color-text-primary);
+}
+.gallery-preview-disclosure > summary:focus-visible {
+  outline: 1px solid var(--sniptale-color-focus-ring);
+  outline-offset: -1px;
+}
+.gallery-preview-disclosure-body {
+  padding: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gallery-preview-disclosure > summary > svg:last-child {
+    transition: none;
+  }
+}

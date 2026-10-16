@@ -113,7 +113,9 @@ function SavedViewRowAction(props: {
   const Icon = props.icon;
   return (
     <ProductActionButton
-      tone={props.danger ? 'danger' : 'secondary'}
+      tone="secondary"
+      data-command-chrome="true"
+      data-danger={props.danger || undefined}
       compact
       type="button"
       disabled={props.disabled}
@@ -123,7 +125,7 @@ function SavedViewRowAction(props: {
       }}
       aria-label={`${props.label} ${props.viewName}`}
       title={props.label}
-      className="h-8 w-8 shrink-0"
+      className="sniptale-library-utility gallery-saved-view-action h-8 w-8 shrink-0"
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
     </ProductActionButton>

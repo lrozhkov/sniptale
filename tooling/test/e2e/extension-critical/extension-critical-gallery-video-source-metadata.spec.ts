@@ -95,10 +95,8 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: exported.filename, exact: true }).first().click();
       const inspector = page.locator('[data-ui="gallery.preview.inspectorContent"]');
-      const source = inspector.getByRole('region', {
-        name: label('gallery.preview.source'),
-        exact: true,
-      });
+      const source = inspector.locator('[data-ui="gallery.preview.source"]');
+      await source.locator('summary').click();
       await expect(source).toContainText(label('gallery.preview.captureTab'));
       await expect(source).toContainText(label('gallery.preview.recordedActions'));
       await expect(source).not.toContainText(label('gallery.preview.sourceUnavailable'));
@@ -107,7 +105,10 @@ for (const variant of [
       expect(
         await inspector.evaluate((node) => node.scrollWidth - node.clientWidth)
       ).toBeLessThanOrEqual(1);
-      await page.screenshot({ path: testInfo.outputPath('export-recording-source.png') });
+      await page.screenshot({
+        path: testInfo.outputPath('export-recording-source.png'),
+        fullPage: false,
+      });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

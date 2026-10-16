@@ -5,6 +5,7 @@ import {
 } from '../shared/web-snapshot';
 
 export const galleryPreviewMessages = defineMessageSource({
+  properties: { ru: 'Свойства', en: 'Properties' },
   openExport: { ru: 'Просмотреть сохранённый HTML', en: 'View saved HTML' },
   exportFileUnavailable: {
     ru: 'HTML-файл этой записи не сохранён в библиотеке. Откройте скачанный файл или создайте новый экспорт из проекта.',

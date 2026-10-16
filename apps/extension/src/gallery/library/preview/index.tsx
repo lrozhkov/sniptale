@@ -1,4 +1,5 @@
 import './preview.css';
+import { BadgeCheck, ChevronDown, Info } from 'lucide-react';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { hasGalleryKeyboardLayer } from '../keyboard/context';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -68,8 +69,16 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
           <CategoryIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
           {FOLDER_LABELS[folder]}
         </h2>
-        <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
-          {formatDate(props.item.createdAt)}
+        <div className="mt-1 flex items-center gap-2 text-sm text-[var(--sniptale-color-text-muted)]">
+          <span>{formatDate(props.item.createdAt)}</span>
+          {!props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
+            <span
+              title={translate('gallery.app.permanentStorage')}
+              aria-label={translate('gallery.app.permanentStorage')}
+            >
+              <BadgeCheck size={14} aria-hidden="true" />
+            </span>
+          ) : null}
         </div>
         {isDraft && !props.trashMode ? (
           <div
@@ -83,10 +92,6 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
             </span>
             {!props.trashMode ? <PreviewPromotionAction {...props} /> : null}
           </div>
-        ) : !props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
-          <div className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.app.permanentStorage')}
-          </div>
         ) : null}
       </div>
     </div>
@@ -99,6 +104,14 @@ function PreviewFilenameField(
   const editable = !props.trashMode && isMetadataEditable(props.item);
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const isFile = isGalleryMediaItem(props.item) || isGalleryScenarioExportItem(props.item);
+  const dot = isFile ? props.item.filename.lastIndexOf('.') : -1;
+  const extension =
+    dot > 0 && dot < props.item.filename.length - 1 ? props.item.filename.slice(dot) : '';
+  const stem =
+    extension && props.filenameDraft.endsWith(extension)
+      ? props.filenameDraft.slice(0, -extension.length)
+      : props.filenameDraft;
 
   return (
     <div className="gallery-preview-filename">
@@ -112,30 +125,49 @@ function PreviewFilenameField(
           {props.filenameDraft}
         </p>
       ) : (
-        <div className="gallery-preview-filename-input">
-          <input
-            ref={inputRef}
-            aria-labelledby={inputId}
-            placeholder={translate(
-              isGalleryScenarioItem(props.item)
-                ? 'gallery.preview.scenarioName'
-                : 'gallery.preview.filename'
-            )}
-            value={props.filenameDraft}
-            onChange={(event) => props.onFilenameChange(event.target.value)}
-            readOnly={!editable}
-            className="w-full min-w-0 bg-transparent text-[13px] font-normal leading-[18px]
-              text-[var(--sniptale-color-text-primary)] outline-none"
-          />
-          {props.filenameDraft ? (
-            <InspectorFieldClear
-              target={inputRef}
-              label={translate(
+        <div className="gallery-preview-filename-value">
+          <div className="gallery-preview-filename-input">
+            <input
+              ref={inputRef}
+              aria-labelledby={inputId}
+              placeholder={translate(
                 isGalleryScenarioItem(props.item)
                   ? 'gallery.preview.scenarioName'
                   : 'gallery.preview.filename'
               )}
+              value={stem}
+              onChange={(event) =>
+                props.onFilenameChange(
+                  event.target.value.trim() ? event.target.value + extension : ''
+                )
+              }
+              onBlur={() => {
+                if (!stem.trim()) props.onFilenameChange(props.item.filename);
+              }}
+              aria-describedby={extension ? `${inputId}-extension` : undefined}
+              readOnly={!editable}
+              className="w-full min-w-0 bg-transparent text-[13px] font-normal leading-[18px]
+              text-[var(--sniptale-color-text-primary)] outline-none"
             />
+            {stem ? (
+              <InspectorFieldClear
+                target={inputRef}
+                label={translate(
+                  isGalleryScenarioItem(props.item)
+                    ? 'gallery.preview.scenarioName'
+                    : 'gallery.preview.filename'
+                )}
+              />
+            ) : null}
+          </div>
+          {extension ? (
+            <span
+              id={`${inputId}-extension`}
+              data-ui="gallery.preview.filenameExtension"
+              className="gallery-preview-filename-extension"
+            >
+              {extension}
+            </span>
           ) : null}
         </div>
       )}
@@ -166,7 +198,16 @@ function PreviewPanelSidebar(
           trashMode={Boolean(props.trashMode)}
         />
         <UnavailableProjectNotice item={props.item} />
-        <PreviewMetadataCards item={props.item} />
+        <details key={`metadata:${props.item.id}`} className="gallery-preview-disclosure" open>
+          <summary>
+            <Info size={14} aria-hidden="true" />
+            <span>{translate('gallery.preview.properties')}</span>
+            <ChevronDown size={14} aria-hidden="true" />
+          </summary>
+          <div className="gallery-preview-disclosure-body">
+            <PreviewMetadataCards item={props.item} />
+          </div>
+        </details>
         <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
         <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
         <PreviewTagEditor
