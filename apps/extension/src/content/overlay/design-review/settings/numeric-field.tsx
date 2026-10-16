@@ -121,7 +121,7 @@ function NumericUnitLabel(props: { id: string; unit: string }) {
       id={props.id}
       className={[
         'pointer-events-none absolute right-8 top-1/2 translate-x-0 -translate-y-1/2',
-        'text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-dim)]',
+        'text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-dim)]',
       ].join(' ')}
     >
       {props.unit}

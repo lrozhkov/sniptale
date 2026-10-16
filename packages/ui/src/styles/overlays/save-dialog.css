@@ -198,7 +198,7 @@
 /* The content consumer adopts this presentation; pending consumers retain their surface. */
 .sniptale-save-dialog-adopted {
   border-radius: 8px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
   --sniptale-font-sans: var(--sniptale-font-interface);
 }
 
@@ -208,7 +208,7 @@
 }
 
 .sniptale-save-dialog-adopted .sniptale-modal-title {
-  font: 600 14px / 20px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface-heading) 14px / 20px var(--sniptale-font-interface);
   overflow-wrap: anywhere;
 }
 
@@ -252,7 +252,7 @@
 
 .sniptale-save-dialog.sniptale-save-dialog-adopted .sniptale-label-sm {
   margin: 0;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
   letter-spacing: normal;
   color: var(--sniptale-color-text-secondary);
 }
@@ -364,14 +364,31 @@
 }
 
 .sniptale-save-dialog-adopted .sniptale-save-dialog-checkbox-row {
+  width: 100%;
+  min-height: 32px;
   align-items: flex-start;
   gap: 8px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-checkbox-row > span {
+  min-width: 0;
+  flex: 1;
+  padding-block: 7px;
 }
 
 .sniptale-save-dialog-adopted .sniptale-save-dialog-checkbox-row input {
   flex-shrink: 0;
-  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  margin: 8px 0 0;
+  accent-color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-checkbox-row input:focus-visible {
+  outline: 2px solid var(--sniptale-color-border-accent-strong);
+  outline-offset: 2px;
 }
 
 .sniptale-save-dialog-clear {

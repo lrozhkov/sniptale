@@ -156,7 +156,7 @@ function ExpandedAxisGroup(props: {
             >
               <span
                 className={[
-                  'truncate text-[13px] leading-[18px] font-medium',
+                  'truncate text-[13px] leading-[18px] font-normal',
                   'text-[var(--sniptale-color-text-secondary)]',
                 ].join(' ')}
               >
@@ -188,7 +188,7 @@ function SideFieldLabel(props: { label: string; modifiedCount: number }) {
     <div className="flex min-w-0 items-center gap-1">
       <span
         className={[
-          'text-[13px] leading-[18px] font-medium',
+          'text-[13px] leading-[18px] font-normal',
           props.modifiedCount > 0
             ? 'text-[var(--sniptale-color-accent)]'
             : 'text-[var(--sniptale-color-text-secondary)]',

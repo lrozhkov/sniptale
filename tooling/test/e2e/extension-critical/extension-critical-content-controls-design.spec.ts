@@ -39,8 +39,8 @@ async function withinViewport(root: Locator) {
 async function ordinaryName(name: Locator) {
   await expect(name).toHaveCSS('font-size', '13px');
   await expect(name).toHaveCSS('line-height', '18px');
-  await expect(name).toHaveCSS('font-weight', '500');
-  await expect(name).toHaveCSS('font-family', /Inter/u);
+  await expect.soft(name).toHaveCSS('font-weight', '400', { timeout: 500 });
+  await expect(name).toHaveCSS('font-family', /Sniptale Interface/u);
 }
 
 async function textInsideTarget(button: Locator) {
@@ -325,6 +325,10 @@ async function inspectDesignReview(page: Page, composition: Composition, info: T
     })
     .click();
   const width = settings.getByRole('textbox', { name: widthLabel, exact: true });
+  await expect.soft(width).toHaveCSS('font-weight', '400', { timeout: 500 });
+  await expect
+    .soft(width.locator('..').locator(':scope > span[id]'))
+    .toHaveCSS('font-weight', '400', { timeout: 500 });
   await width.fill('210');
   await expect(target).toHaveCSS('width', '210px');
   await settings
@@ -396,7 +400,7 @@ async function inspectDesignReview(page: Page, composition: Composition, info: T
   const preview = ui(page, 'content.design-review.feedback-preview');
   await withinViewport(preview);
   await expect(preview).toHaveAttribute('data-theme', composition.theme);
-  await expect(preview).toHaveCSS('font-family', /Inter/u);
+  await expect(preview).toHaveCSS('font-family', /Sniptale Interface/u);
   await expect(preview).toHaveCSS('border-radius', '4px');
   await expect(preview).toContainText('Review composition:');
   await capture(page, info, 'review-feedback-preview');
@@ -547,7 +551,7 @@ async function inspectAutoBlur(page: Page, composition: Composition, info: TestI
   await template.click();
   const choices = page.getByRole('listbox');
   await withinViewport(choices);
-  await expect(choices).toHaveCSS('font-family', /Inter/u);
+  await expect(choices).toHaveCSS('font-family', /Sniptale Interface/u);
   await page.keyboard.press('Escape');
   await expect(template).toBeFocused();
   await capture(page, info, 'auto-blur-review');
@@ -610,7 +614,7 @@ async function inspectDrawing(page: Page, popup: Page, composition: Composition,
       await trigger.click();
       const picker = ui(page, 'shared.ui.color-selector.picker-layer');
       await withinViewport(picker);
-      await expect(picker).toHaveCSS('font-family', /Inter/u);
+      await expect(picker).toHaveCSS('font-family', /Sniptale Interface/u);
       await page.getByRole('button', { name: /^(Cancel|Отмена)$/u }).click();
       await expect(picker).toHaveCount(0);
       expect(await trigger.getAttribute('style')).toBe(accepted);

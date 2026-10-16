@@ -206,13 +206,16 @@ async function saveComposition(page: Page, c: Composition, info: TestInfo) {
   ).toBeVisible();
   const filename = dialog.locator('#save-dialog-filename');
   await expect(dialog.getByRole('heading')).toHaveCSS('font-size', '14px');
+  await expect.soft(dialog.getByRole('heading')).toHaveCSS('font-weight', '500', { timeout: 500 });
   await expect(filename).toHaveAccessibleName(tr(c, 'content.saveDialog.filenameLabel'));
   await expect(filename).toHaveCSS('border-radius', '4px');
   await expect(dialog.locator('label[for="save-dialog-filename"]')).toHaveCSS(
     'letter-spacing',
     'normal'
   );
-  await expect(dialog.locator('label[for="save-dialog-filename"]')).toHaveCSS('font-weight', '500');
+  await expect
+    .soft(dialog.locator('label[for="save-dialog-filename"]'))
+    .toHaveCSS('font-weight', '400', { timeout: 500 });
   await filename.fill(filenameDraft);
   const clearLabel = tr(c, 'shared.ui.clearField').replace(
     '{field}',
@@ -250,6 +253,15 @@ async function saveComposition(page: Page, c: Composition, info: TestInfo) {
   });
   await remember.check();
   await expect(remember).toBeChecked();
+  const rememberLabel = remember.locator('..');
+  await expect.soft(rememberLabel).toHaveCSS('font-weight', '400', { timeout: 500 });
+  const rememberGeometry = await rememberLabel.evaluate((node) => {
+    const input = node.querySelector('input')!.getBoundingClientRect();
+    const text = node.querySelector('span')!.getBoundingClientRect();
+    return { gap: input.left - text.right, height: node.getBoundingClientRect().height };
+  });
+  expect.soft(rememberGeometry.gap).toBeGreaterThanOrEqual(7);
+  expect.soft(rememberGeometry.height).toBeGreaterThanOrEqual(32);
   for (const size of [...sizes, { width: 960, height: 560 }]) {
     await page.setViewportSize(size);
     await inViewport(page, dialog);

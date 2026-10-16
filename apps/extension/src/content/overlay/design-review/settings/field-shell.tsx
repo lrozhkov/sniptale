@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 
 export const PAGE_STYLE_CONTROL_CLASS_NAME =
-  '!h-8 !rounded-[4px] !px-2 !text-[13px] !leading-[18px] !font-medium';
+  '!h-8 !rounded-[4px] !px-2 !text-[13px] !leading-[18px] !font-normal';
 export const PAGE_STYLE_SELECT_CLASS_NAME = PAGE_STYLE_CONTROL_CLASS_NAME;
 
 export function Field(props: {

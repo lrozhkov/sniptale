@@ -35,13 +35,12 @@ export function SaveDialogSessionFooter(props: {
 }) {
   return (
     <label className="sniptale-save-dialog-checkbox-row">
+      <span>{translate('content.saveDialog.rememberPreset')}</span>
       <input
         type="checkbox"
         checked={props.checked}
         onChange={(event) => props.onChange(event.target.checked)}
-        className="sniptale-checkbox"
       />
-      <span>{translate('content.saveDialog.rememberPreset')}</span>
     </label>
   );
 }

@@ -38,6 +38,10 @@ Some properties allow a wider typed domain than their contextual scrub range. De
 
 Some device settings expose a slider and read-only value. Preserve that range-only contract rather than adding direct numeric editing during visual alignment. The shared [Numbers](numbers.md) owner defines the actual variants.
 
+## Property expressions
+
+A property editor can accept expressions, keywords, and units. Keep complete text entry and the existing parser and recovery owner. A numeric current value does not justify a control that accepts only numbers. A field for these values can remain stacked and use the available width. The [design review fields](../../apps/extension/src/content/overlay/design-review/settings/numeric-field.tsx) preserve this text contract.
+
 ## Product references
 
 Preserve existing crop, timeline, media, and inspector owners rather than copying the probes into product state. The complete color/paint selector remains authoritative in apps/extension/src/ui/color-selector/index.tsx and its existing shared packages. Read about the sample color transaction in [Layers](layers.md). Review [Coverage](coverage.md) before using these examples as a complete screen implementation reference.
