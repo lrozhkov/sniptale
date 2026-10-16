@@ -13,7 +13,7 @@ function MotionFocusCoordinateFields(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <NumberInput
         label={translate('videoEditor.sidebar.motionFocusXLabel')}
         value={props.focusPoint?.x ?? props.panel.project.width / 2}
@@ -85,7 +85,7 @@ export function ManualFocusFields(props: {
     props.panel.placementMode.motionRegionId === props.motionRegionId;
 
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       <MotionFocusButtons
         isPickingOnStage={isPickingOnStage}
         motionRegionId={props.motionRegionId}

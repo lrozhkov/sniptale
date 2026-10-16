@@ -81,7 +81,7 @@ export const ExportProgressOverlay: React.FC<ExportProgressOverlayProps> = ({
             estimate={status.timeEstimate}
             active={status.phase === 'PREPARING' || status.phase === 'RENDERING'}
           />
-          <ol className="grid grid-cols-4 gap-2 text-[11px] text-[var(--sniptale-color-text-muted)]">
+          <ol className="grid grid-cols-4 gap-2 text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
             {STAGES.map((stage, index) => (
               <li
                 key={stage}

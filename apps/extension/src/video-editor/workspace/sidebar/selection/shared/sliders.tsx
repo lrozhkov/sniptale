@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { CompactInspectorUnit } from '../../../../../ui/compact-inspector-controls/shared';
 import { useDedupedNumberChange } from './number-commit';
@@ -160,6 +161,7 @@ function resolveSliderScrub(props: SliderFieldProps, display: SliderDisplayMappi
 }
 
 export function SliderField(props: SliderFieldProps) {
+  const inspector = useInspectorLayout();
   const disabledProps = props.disabled === undefined ? {} : { disabled: props.disabled };
   const changeValue = useDedupedNumberChange(props.onChange, props.value);
   const separateCommitValue = useDedupedNumberChange(props.onCommit ?? props.onChange, props.value);
@@ -188,7 +190,7 @@ export function SliderField(props: SliderFieldProps) {
     <NumericRow
       appearance="plain"
       focusAppearance="accent-box"
-      className="min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!"
+      {...(inspector ? {} : { className: 'min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!' })}
       label={props.label}
       max={display.max}
       min={display.min}

@@ -3,7 +3,7 @@ import type { ProjectAssetUse } from '../../../features/video/project/media-usag
 import { VideoEditorWorkspaceHeaderActions } from '../floating/top-panels';
 import { useWorkspaceTrackPresentation } from './track-presentation';
 import React, { useEffect, useState } from 'react';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { CompactSegmentedSelector } from '../../../ui/compact-inspector-controls/control-renderers';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorSourceViewer } from './source-viewer';
@@ -561,18 +561,20 @@ function WorkspaceViewerHeading({
   return (
     <div className="flex h-9 min-w-0 items-center gap-2">
       {source ? (
-        <SegmentedSwitch
-          density="compact"
+        <CompactSegmentedSelector
+          columns={2}
           ariaLabel={translate('videoEditor.app.viewerSwitch')}
-          activeId={sourceActive ? 'source' : 'montage'}
+          value={sourceActive ? 'source' : 'montage'}
           options={[
-            { id: 'source', label: translate('videoEditor.app.sourceViewer') },
-            { id: 'montage', label: translate('videoEditor.app.montageViewer') },
+            { value: 'source', label: translate('videoEditor.app.sourceViewer') },
+            { value: 'montage', label: translate('videoEditor.app.montageViewer') },
           ]}
           onChange={(id) => onChange(id === 'source')}
         />
       ) : (
-        <span className="text-xs font-semibold">{translate('videoEditor.app.montageViewer')}</span>
+        <span className="text-sm leading-5 font-semibold">
+          {translate('videoEditor.app.montageViewer')}
+        </span>
       )}
       {sourceActive ? (
         <span

@@ -108,16 +108,32 @@ function EditorStartCard(props: { item: EditorStartItem; start: EditorStartProps
       {...press.props}
       data-command-press={scoped ? '' : undefined}
       data-pressing={press.pressed ? 'true' : undefined}
-      className={cardClassName}
+      className={`${cardClassName} ${scoped ? '!rounded-[4px]' : ''}`}
       title={item.title}
       data-ui="editor.start.project"
     >
       <EditorStartThumbnail item={item} fallback={start.icon} />
-      <span className={scoped ? 'sniptale-command-content block px-3 py-2' : 'block px-4 py-3'}>
-        <span className="line-clamp-2 min-h-10 break-words text-sm font-medium leading-5">
+      <span
+        className={
+          scoped
+            ? 'sniptale-command-content !flex !flex-col !items-start px-3 py-2'
+            : 'block px-4 py-3'
+        }
+      >
+        <span
+          className={[
+            'line-clamp-2 min-h-10 break-words font-medium',
+            scoped ? 'text-[13px] leading-[18px]' : 'text-sm leading-5',
+          ].join(' ')}
+        >
           {item.title}
         </span>
-        <span className="mt-1 block truncate text-xs text-[var(--sniptale-color-text-secondary)]">
+        <span
+          className={[
+            'mt-1 block truncate text-xs text-[var(--sniptale-color-text-secondary)]',
+            scoped ? 'font-normal leading-4' : '',
+          ].join(' ')}
+        >
           {item.unavailable ? start.unavailableLabel : item.detail}
         </span>
       </span>
@@ -133,7 +149,7 @@ function EditorStartSearch(props: {
   const scoped = useContext(CommandPressScope);
   const input = useRef<HTMLInputElement>(null);
   return (
-    <label className={`${searchClassName} relative ${scoped ? 'pr-8' : ''}`}>
+    <label className={`${searchClassName} relative ${scoped ? '!h-8 !rounded-[4px] pr-8' : ''}`}>
       <Search size={16} aria-hidden="true" />
       <span className="sr-only">{props.label}</span>
       <input
@@ -141,7 +157,10 @@ function EditorStartSearch(props: {
         autoFocus
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
-        className="bg-transparent text-sm outline-none"
+        className={[
+          'bg-transparent outline-none',
+          scoped ? 'min-w-0 w-full text-[13px] font-medium leading-[18px]' : 'text-sm',
+        ].join(' ')}
         placeholder={props.label}
       />
       {scoped && props.value ? <InspectorFieldClear label={props.label} target={input} /> : null}
@@ -184,10 +203,13 @@ function EditorStartRecent(
     visible: EditorStartItem[];
   }
 ) {
+  const scoped = useContext(CommandPressScope);
   return (
     <section aria-label={props.recentLabel} className="mt-8">
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">{props.recentLabel}</h2>
+        <h2 className={scoped ? 'text-sm leading-5 font-semibold' : 'text-lg font-semibold'}>
+          {props.recentLabel}
+        </h2>
         {props.browse ? (
           <EditorStartSearch
             label={props.searchLabel}
@@ -234,6 +256,7 @@ function handleStartDrop(event: DragEvent<HTMLElement>, onDropFile: (file: File)
 
 /** Presentation-only start surface; editor adapters own reads and navigation. */
 export function EditorStart(props: EditorStartProps) {
+  const scoped = useContext(CommandPressScope);
   const onDropFile = props.onDropFile;
   const [browse, setBrowse] = useState(false);
   const [query, setQuery] = useState('');
@@ -247,7 +270,7 @@ export function EditorStart(props: EditorStartProps) {
       data-ui="editor.start"
       onDragOver={props.onDropFile ? (event) => event.preventDefault() : undefined}
       onDrop={onDropFile ? (event) => handleStartDrop(event, onDropFile) : undefined}
-      className={rootClassName}
+      className={`${rootClassName} ${scoped ? '!h-full !min-h-0 !p-6' : ''}`}
     >
       <div className="mx-auto max-w-[1080px]">
         <header className={headerClassName}>
@@ -256,7 +279,15 @@ export function EditorStart(props: EditorStartProps) {
               {props.icon}
             </span>
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight">{props.title}</h1>
+              <h1
+                className={
+                  scoped
+                    ? 'text-xl leading-7 font-semibold tracking-normal'
+                    : 'text-2xl font-semibold tracking-tight'
+                }
+              >
+                {props.title}
+              </h1>
               <p className="mt-2 text-sm text-[var(--sniptale-color-text-secondary)]">
                 {props.description}
               </p>

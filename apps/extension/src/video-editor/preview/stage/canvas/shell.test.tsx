@@ -91,7 +91,7 @@ describe('preview-stage/shell', () => {
     expect(markup).toContain('videoEditor.stage.enterFullscreen');
     expect(markup).toContain('data-ui="video-editor.preview.fullscreen-toggle"');
     expect(markup).toContain('sniptale-glass-toolbar-button');
-    expect(markup).toContain('!w-9');
+    expect(markup).toContain('!w-8');
   });
 });
 

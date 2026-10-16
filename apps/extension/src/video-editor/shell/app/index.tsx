@@ -1,3 +1,7 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+import '../../../ui/compact-inspector-controls/inspector-surface.css';
+import '../../styles/interface.css';
 import { WorkspacePreferencesProvider } from '../../runtime/controller/workspace-preferences';
 import React, { useState } from 'react';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
@@ -19,14 +23,20 @@ export const App: React.FC = () => {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   useVideoEditorWheelZoomGuard();
   return (
-    <WorkspacePreferencesProvider>
-      <VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen}>
-        <VideoEditorShellGate
-          commandPaletteOpen={commandPaletteOpen}
-          setCommandPaletteOpen={setCommandPaletteOpen}
-        />
-      </VideoEditorCompositionProvider>
-    </WorkspacePreferencesProvider>
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <div className="sniptale-compact-workspace sniptale-video-workspace">
+          <WorkspacePreferencesProvider>
+            <VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen}>
+              <VideoEditorShellGate
+                commandPaletteOpen={commandPaletteOpen}
+                setCommandPaletteOpen={setCommandPaletteOpen}
+              />
+            </VideoEditorCompositionProvider>
+          </WorkspacePreferencesProvider>
+        </div>
+      </InspectorLayout>
+    </CommandPressScope>
   );
 };
 

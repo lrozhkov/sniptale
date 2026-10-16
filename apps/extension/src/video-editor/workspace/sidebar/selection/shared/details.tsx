@@ -11,7 +11,7 @@ export function InspectorDetails(props: InspectorDisclosureProps) {
       open={open}
       onOpenChange={setOpen}
       dataUi="video-editor.inspector.disclosure"
-      bodyClassName="space-y-2 pt-2"
+      bodyClassName="sniptale-parameter-stack space-y-2 pt-2"
     />
   );
 }

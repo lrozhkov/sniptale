@@ -3,6 +3,7 @@ import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { TextField, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { ToggleField } from '../shared/controls';
@@ -13,17 +14,22 @@ export function TrackGeneralFields(props: {
   onToggleTrackVisibility?: WorkspaceSidebarSelectionPanelProps['onToggleTrackVisibility'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }) {
+  const inspector = useInspectorLayout();
   return (
     <>
       <TextField
-        className="!min-h-9 !bg-transparent !px-0 !py-0 data-[editing=false]:!border-transparent"
+        className={
+          inspector
+            ? undefined
+            : '!min-h-9 !bg-transparent !px-0 !py-0 data-[editing=false]:!border-transparent'
+        }
         key={`${props.selectedTrack.id}:${props.selectedTrack.name}`}
         defaultValue={props.selectedTrack.name}
         label={translate('videoEditor.sidebar.trackNameLabel')}
         readOnly={!props.onRenameTrack}
         onValueCommit={(name) => props.onRenameTrack?.(props.selectedTrack.id, name)}
       />
-      <div className="space-y-2">
+      <div className="sniptale-parameter-stack space-y-2">
         {props.selectedTrack.kind !== VideoTrackKind.AUDIO ? (
           <ToggleField
             checked={props.selectedTrack.visible}
@@ -78,7 +84,10 @@ export function TrackLayoutFields({
   const setHeight = (value: number) =>
     panelPrefs.setTrackHeight(track.id, Math.round(value / 0.25) * 0.25);
   return (
-    <div className="space-y-2" data-ui="video-editor.inspector.track-layout">
+    <div
+      className="sniptale-parameter-stack space-y-2"
+      data-ui="video-editor.inspector.track-layout"
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.app.trackOrder')}

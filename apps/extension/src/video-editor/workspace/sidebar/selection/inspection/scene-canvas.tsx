@@ -43,7 +43,7 @@ export function SceneCanvasFields(props: {
     (item) => item.width === width && item.height === height
   );
   return (
-    <div className="space-y-3" data-ui="video-editor.scene.canvas">
+    <div className="sniptale-parameter-stack space-y-3" data-ui="video-editor.scene.canvas">
       <SelectInput
         label={translate('videoEditor.sidebar.canvasFormatLabel')}
         value={format?.id ?? 'custom'}

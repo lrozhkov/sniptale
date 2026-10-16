@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ColorField, SelectInput, ToggleField } from './controls';
 import { OptionButtonsField } from './option-buttons';
 import { SliderField } from './sliders';
+import { InspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../platform/i18n')>();
@@ -273,3 +274,29 @@ function registerWideSegmentedLabelsTest() {
     expect(container?.querySelector('button')?.className).toContain('!whitespace-normal');
   });
 }
+
+it('uses canonical label activation for a scoped boolean and preserves disabled fieldset admission', () => {
+  const onChange = vi.fn();
+  act(() =>
+    root?.render(
+      <InspectorLayout>
+        <ToggleField checked label="Visible" onChange={onChange} />
+      </InspectorLayout>
+    )
+  );
+  const toggle = container!.querySelector('button[role="switch"]')!;
+  expect(toggle.getAttribute('aria-checked')).toBe('true');
+  act(() => container!.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
+  expect(onChange).toHaveBeenCalledExactlyOnceWith(false);
+  act(() =>
+    root?.render(
+      <InspectorLayout>
+        <fieldset disabled>
+          <ToggleField checked label="Visible" onChange={onChange} />
+        </fieldset>
+      </InspectorLayout>
+    )
+  );
+  act(() => container!.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
+  expect(onChange).toHaveBeenCalledTimes(1);
+});

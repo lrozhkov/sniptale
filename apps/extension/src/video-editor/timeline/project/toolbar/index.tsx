@@ -114,7 +114,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         '@max-[1000px]/timeline:[--timeline-control-height:28px]',
         '@max-[1000px]/timeline:[--timeline-control-width:24px]',
         '@max-[1000px]/timeline:[--timeline-control-gap:2px]',
-        '[&_svg]:size-[18px] @max-[1400px]/timeline:[&_svg]:size-4 @max-[1000px]/timeline:[&_svg]:size-[14px]',
+        '[&_svg]:size-4',
       ].join(' ')}
     >
       <fieldset
@@ -128,6 +128,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
       <ProjectTimelinePlaybackSummary {...controlsProps.playback} />
       <div className="flex items-center justify-end gap-[var(--timeline-control-gap)]">
         <ContentToolbarButton
+          tone="utility"
           className={toolbarIconButtonClassName}
           title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
           disabled={editingDisabled || !history.canUndo}
@@ -137,6 +138,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
           <Undo2 aria-hidden="true" />
         </ContentToolbarButton>
         <ContentToolbarButton
+          tone="utility"
           className={toolbarIconButtonClassName}
           title={`${translate('videoEditor.app.redo')} (${translate('videoEditor.app.redoShortcut')})`}
           disabled={editingDisabled || !history.canRedo}
@@ -153,7 +155,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         />
         {header && (
           <ContentToolbarButton
-            className={`${toolbarIconButtonClassName} !border-transparent !shadow-none`}
+            className={toolbarIconButtonClassName}
             title={translate('videoEditor.app.magnetButton')}
             active={header.grid.magnetEnabled}
             aria-pressed={header.grid.magnetEnabled}

@@ -16,6 +16,7 @@ import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import type { VideoProjectEffectTarget } from '../../../../../features/video/project/effect-instance/types';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import { getCurrentLocale, translate } from '../../../../../platform/i18n';
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { TextField } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectEffectInstancePatch } from '../../../../contracts/commands/patches';
 import { NumberInput } from '../inputs/number';
@@ -174,13 +175,13 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
   );
   if (props.hideTitle && instance.target.kind === 'scene') {
     return (
-      <section className="space-y-3" data-effect-instance={instance.id}>
+      <section className="sniptale-parameter-stack space-y-3" data-effect-instance={instance.id}>
         {content}
       </section>
     );
   }
   return (
-    <section className="space-y-3" data-effect-instance={instance.id}>
+    <section className="sniptale-parameter-stack space-y-3" data-effect-instance={instance.id}>
       <InspectorDetails
         initiallyOpen
         preferenceId={`effect-instance:${instance.target.kind}:${snapshot?.documentId ?? 'unavailable'}:${(
@@ -214,7 +215,7 @@ function EffectInstanceStartTime(props: EffectInstanceCardProps): React.JSX.Elem
   if (!clip) return null;
   const owner = props.instance.rangeMode === 'owner';
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <SelectInput
         label={translate('videoEditor.effectsLibrary.fxScope')}
         disabled={props.disabled ?? false}
@@ -438,6 +439,7 @@ function EffectControl(props: {
   value: number | string;
 }): React.JSX.Element {
   const editing = useEffectPresetEditing(props.instanceId, props.controls);
+  const inspector = useInspectorLayout();
   const label = readLocaleText(props.control.label) || props.control.id;
   const update = (value: number | string) =>
     props.onUpdate(props.instanceId, { controls: { [props.control.id]: value } });
@@ -483,7 +485,11 @@ function EffectControl(props: {
   const value = typeof props.value === 'string' ? props.value : props.control.defaultValue;
   return (
     <TextField
-      className="!min-h-9 !bg-transparent !px-0 !py-0 data-[editing=false]:!border-transparent"
+      className={
+        inspector
+          ? undefined
+          : '!min-h-9 !bg-transparent !px-0 !py-0 data-[editing=false]:!border-transparent'
+      }
       defaultValue={value}
       disabled={props.disabled ?? false}
       key={`${props.instanceId}:${props.control.id}:${value}`}

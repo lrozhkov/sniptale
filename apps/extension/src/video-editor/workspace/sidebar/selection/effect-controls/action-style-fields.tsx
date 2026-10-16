@@ -22,7 +22,7 @@ export function ActionClickStyleFields(
   const change = (patch: Partial<VideoActionClickStyle>) =>
     props.onChange({ ...props.value, ...patch });
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack space-y-2">
       <ColorField
         className="min-h-8! border-transparent! bg-transparent! px-0! py-0!"
         label={translate('videoEditor.sidebar.actionColor')}
@@ -78,7 +78,7 @@ export function ActionKeyStyleFields(
   const change = (patch: Partial<VideoActionKeyStyle>) =>
     props.onChange({ ...props.value, ...patch });
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack space-y-2">
       <SelectInput
         label={translate('videoEditor.sidebar.keyPosition')}
         value={props.value.position}

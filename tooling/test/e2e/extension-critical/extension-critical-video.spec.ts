@@ -620,7 +620,10 @@ test('real video export completes after automatic library save, repeats and surv
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1600, height: 1100 });
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/video-editor/index.html`);
+  await expect(page.locator('[data-ui="editor.start"]')).toBeVisible();
+  await page.locator('[data-ui="editor.start.actions"]').getByRole('button').first().click();
   await expect(page.locator('[data-ui="video-editor.workspace.root"]')).toBeVisible();
+  const locale = (await page.locator('html').getAttribute('lang')) === 'ru' ? 'ru' : 'en';
   await page
     .locator('input[type=file][accept*="video/"]')
     .first()
@@ -630,8 +633,8 @@ test('real video export completes after automatic library save, repeats and surv
     .getByRole('button', { name: 'cache-source.webm', exact: true })
     .click();
   await page
-    .locator('[data-ui="video-editor.source-viewer"]')
-    .getByRole('button', { name: /^Append$|^В конец$/ })
+    .locator('[data-ui="video-editor.source-placement"]')
+    .getByTitle(translate('videoEditor.app.materialsAppend', locale), { exact: true })
     .click();
   await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(1);
   await expectProductionProjectInLibrary(page);
@@ -645,8 +648,16 @@ test('real video export completes after automatic library save, repeats and surv
     }
     const previousDownloads = await page.evaluate(() => chrome.downloads.search({}));
     const previousIds = previousDownloads.map((download) => download.id);
-    await page.locator('[data-ui="video-editor.timeline.toolbar.export"]').click();
-    await page.getByRole('button', { name: /^Start export$|^Начать экспорт$/ }).click();
+    await page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]').click();
+    await page
+      .getByRole('button', { name: translate('videoEditor.app.exportButton', locale), exact: true })
+      .click();
+    await page
+      .getByRole('button', {
+        name: translate('videoEditor.exportDialog.submit', locale),
+        exact: true,
+      })
+      .click();
     await expect
       .poll(
         async () => {
@@ -681,7 +692,7 @@ test('real video export completes after automatic library save, repeats and surv
   await page.screenshot({
     path: testInfo.outputPath('saved-project-export.png'),
     animations: 'disabled',
-    fullPage: true,
+    fullPage: false,
   });
   await writeFile(
     testInfo.outputPath('saved-project-export-metrics.json'),

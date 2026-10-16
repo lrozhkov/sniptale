@@ -7,7 +7,7 @@ import {
 } from './shell';
 
 const STAGE_FRAME_CLASS_NAME = [
-  'relative flex min-h-0 flex-1 overflow-hidden rounded-[14px] border',
+  'relative flex min-h-0 flex-1 overflow-hidden rounded-[4px] border',
   'border-[color:var(--sniptale-color-border-soft)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_97%,var(--sniptale-color-surface-canvas)_3%)]',
 ].join(' ');

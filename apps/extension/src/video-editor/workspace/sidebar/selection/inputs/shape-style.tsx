@@ -15,7 +15,7 @@ export function renderShapeStyleFields(
   if (!selectedClip || !isShapeClip(selectedClip)) return null;
   const connector = isConnectorShapeType(selectedClip.shapeType);
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       {connector ? null : (
         <ColorField
           label={translate('videoEditor.sidebar.fillLabel')}

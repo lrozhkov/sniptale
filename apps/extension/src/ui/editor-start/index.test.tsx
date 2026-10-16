@@ -217,3 +217,36 @@ it('keeps pending editor starts outside the compact press and clear contract', (
   ).toBe(false);
   expect(container.querySelector('.sniptale-field-clear')).toBeNull();
 });
+
+it('keeps unavailable and pending projects inert in the migrated start surface', () => {
+  const onSelect = vi.fn();
+  const onCreate = vi.fn();
+  act(() =>
+    root.render(
+      <CommandPressScope value={true}>
+        <EditorStart
+          {...labels}
+          items={[{ id: 'one', title: 'One', detail: '', unavailable: true }]}
+          status="ready"
+          pending
+          onSelect={onSelect}
+          onCreate={onCreate}
+          onOpen={vi.fn()}
+          onRetry={vi.fn()}
+        />
+      </CommandPressScope>
+    )
+  );
+  const project = container.querySelector<HTMLButtonElement>('[data-ui="editor.start.project"]')!;
+  const create = container.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.start.actions"] button'
+  )!;
+  act(() => {
+    project.click();
+    create.click();
+  });
+  expect(project.disabled).toBe(true);
+  expect(create.disabled).toBe(true);
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onCreate).not.toHaveBeenCalled();
+});

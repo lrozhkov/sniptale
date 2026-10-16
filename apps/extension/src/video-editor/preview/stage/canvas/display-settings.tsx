@@ -66,9 +66,11 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
       <ContentToolbarButton
         ref={triggerRef}
         type="button"
+        tone="property"
         dataUi="video.preview.display-settings"
-        className="!h-9 !gap-1.5 !px-2.5 !shadow-none active:!translate-y-0 whitespace-nowrap"
+        className="!h-8 !w-auto !gap-1.5 !px-2.5 !shadow-none active:!translate-y-0 whitespace-nowrap"
         aria-label={translate('videoEditor.stage.displaySettings')}
+        title={translate('videoEditor.stage.displaySettings')}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
@@ -88,7 +90,10 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
             <div
               ref={menuRef}
               id={id}
-              className="rounded-xl bg-[var(--sniptale-color-surface-canvas)] outline-none"
+              className={[
+                'sniptale-compact-workspace sniptale-extension-surface rounded-[4px]',
+                'bg-[var(--sniptale-color-surface-canvas)] outline-none',
+              ].join(' ')}
               tabIndex={-1}
               role="dialog"
               aria-label={translate('videoEditor.stage.displaySettings')}
@@ -134,7 +139,7 @@ function DisplayChoiceSection<T extends string>(props: {
         'pb-2 last-of-type:border-b-0',
       ].join(' ')}
     >
-      <legend className="px-2 py-1 text-[11px] font-semibold text-[var(--sniptale-color-text-muted)]">
+      <legend className="px-2 py-1 text-sm leading-5 font-semibold text-[var(--sniptale-color-text-muted)]">
         {props.label}
       </legend>
       {props.options.map((option) => (
@@ -142,7 +147,7 @@ function DisplayChoiceSection<T extends string>(props: {
           key={option.value}
           title={option.title}
           className={[
-            'flex min-h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-xs',
+            'flex min-h-9 cursor-pointer items-center gap-2 rounded-[4px] px-2 text-[13px] leading-[18px] font-medium',
             'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-panel)]',
             'has-[:focus-visible]:outline has-[:focus-visible]:outline-1',
             'has-[:focus-visible]:outline-[var(--sniptale-color-focus-ring)]',
@@ -169,7 +174,7 @@ function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
     <ProductDropdownMenu
       className={[
         '!relative !inset-auto !m-0 !w-full !min-w-0',
-        '!max-h-[calc(100vh-32px)] overflow-y-auto !p-2',
+        '!max-h-[calc(100vh-32px)] overflow-y-auto !rounded-[4px] !p-[5px]',
       ].join(' ')}
     >
       <DisplayChoiceSection
@@ -213,7 +218,8 @@ function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
       />
       <label
         className={[
-          'flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs',
+          'flex min-h-8 cursor-pointer items-center gap-2 rounded-[4px] px-2 py-1 text-[13px]',
+          'leading-[18px] font-medium',
           'text-[var(--sniptale-color-text-primary)] has-[:disabled]:opacity-50',
           'has-[:disabled]:cursor-default',
         ].join(' ')}

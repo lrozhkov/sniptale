@@ -33,6 +33,7 @@ vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) 
 }));
 
 import { ProjectTimelineToolbar } from './index';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 
 type ProjectTimelineToolbarTestProps = ComponentProps<typeof ProjectTimelineToolbar>;
 
@@ -109,7 +110,11 @@ function renderToolbar() {
   root = createRoot(nextContainer);
 
   act(() => {
-    root?.render(<ProjectTimelineToolbar {...createToolbarProps()} />);
+    root?.render(
+      <CommandPressScope value={true}>
+        <ProjectTimelineToolbar {...createToolbarProps()} />
+      </CommandPressScope>
+    );
   });
 
   return nextContainer;
@@ -248,4 +253,30 @@ it('places autosave directly after redo and binds its switch', () => {
   act(() => autosave!.querySelector<HTMLButtonElement>('button')!.click());
   act(() => document.querySelector<HTMLInputElement>('[role="switch"]')!.click());
   expect(history.onAutosaveChange).toHaveBeenCalledWith(false);
+});
+
+it('keeps scoped history commands quiet and cancels their armed keyboard press', () => {
+  const rendered = renderToolbar();
+  const undo = rendered.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.undo"]'
+  )!;
+  const before = history.onUndo.mock.calls.length;
+  expect(undo.dataset['commandChrome']).toBe('true');
+  expect(undo.querySelector(':scope > .sniptale-command-content svg')).not.toBeNull();
+  expect(undo.hasAttribute('aria-pressed')).toBe(false);
+  act(() => {
+    undo.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+  });
+  expect(undo.dataset['pressing']).toBe('true');
+  act(() => {
+    undo.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    undo.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+  });
+  expect(undo.dataset['pressing']).toBeUndefined();
+  expect(history.onUndo).toHaveBeenCalledTimes(before);
+  const magnet = rendered.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.magnet"]'
+  )!;
+  expect(magnet.getAttribute('aria-pressed')).toBe('true');
+  expect(magnet.dataset['commandChrome']).toBeUndefined();
 });

@@ -12,6 +12,7 @@ export function VideoEditorWorkspaceHeaderActions(props: {
   return (
     <div className="flex shrink-0 items-center gap-1">
       <ContentToolbarButton
+        tone="property"
         className="!h-9 !w-9 !min-w-9 !px-0"
         dataUi="video-editor.viewer.scene"
         title={translate('videoEditor.sidebar.sceneProperties')}

@@ -81,10 +81,10 @@ export function renderClipLinkFields(
     <>
       {companions.length > 0 ? (
         <div className="mb-3 border-b border-[var(--sniptale-color-border-subtle)] pb-3">
-          <div className="flex min-w-0 items-center gap-2 text-xs">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-[13px]">
             <Link2 size={14} className="shrink-0" aria-hidden="true" />
             <span
-              className="min-w-0 flex-1 truncate"
+              className="min-w-0 flex-1 break-words"
               title={companions.map((item) => item.name).join(', ')}
             >
               {companions.map((item) => item.name).join(', ')}

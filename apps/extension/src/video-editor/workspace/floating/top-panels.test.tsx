@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -59,39 +61,45 @@ it('offers Scene and only the hidden inspector opener, without legacy tool butto
   }
 });
 
-it('marks Scene active only while its inspector is open and clears it for another selection', () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const host = document.createElement('div');
-  const root = createRoot(host);
-  const render = (inspectorOpen: boolean) =>
-    act(() =>
-      root.render(
-        <VideoEditorWorkspaceHeaderActions
-          inspectorOpen={inspectorOpen}
-          onOpenInspector={vi.fn()}
-        />
-      )
-    );
-  try {
-    actions.sceneSelected = true;
-    render(true);
-    const button = () =>
-      host.querySelector<HTMLButtonElement>('[data-ui="video-editor.viewer.scene"]')!;
-    expect(button().getAttribute('aria-pressed')).toBe('true');
-    expect(button().getAttribute('data-active')).toBe('true');
-    expect(button().className).toContain('sniptale-glass-toolbar-button--active');
-    render(false);
-    expect(button().getAttribute('aria-pressed')).toBe('false');
-    actions.sceneSelected = false;
-    render(true);
-    expect(button().getAttribute('aria-pressed')).toBe('false');
-    expect(button().getAttribute('data-active')).toBeNull();
-  } finally {
-    actions.sceneSelected = false;
-    act(() => root.unmount());
-    vi.unstubAllGlobals();
+it.each([true, false])(
+  'marks Scene active only while its inspector is open (compact=%s)',
+  (compact) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const render = (inspectorOpen: boolean) =>
+      act(() =>
+        root.render(
+          <CommandPressScope value={compact}>
+            <VideoEditorWorkspaceHeaderActions
+              inspectorOpen={inspectorOpen}
+              onOpenInspector={vi.fn()}
+            />
+          </CommandPressScope>
+        )
+      );
+    try {
+      actions.sceneSelected = true;
+      render(true);
+      const button = () =>
+        host.querySelector<HTMLButtonElement>('[data-ui="video-editor.viewer.scene"]')!;
+      expect(button().getAttribute('aria-pressed')).toBe('true');
+      expect(button().getAttribute('data-active')).toBe('true');
+      expect(button().getAttribute('data-command-property')).toBe(compact ? 'true' : null);
+      expect(button().className).not.toContain('sniptale-glass-toolbar-button--active');
+      render(false);
+      expect(button().getAttribute('aria-pressed')).toBe('false');
+      actions.sceneSelected = false;
+      render(true);
+      expect(button().getAttribute('aria-pressed')).toBe('false');
+      expect(button().getAttribute('data-active')).toBeNull();
+    } finally {
+      actions.sceneSelected = false;
+      act(() => root.unmount());
+      vi.unstubAllGlobals();
+    }
   }
-});
+);
 
 it('opens each closed library mode directly and removes both openers when the panel opens', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

@@ -35,7 +35,7 @@ export function AudioEnvelopeFields({
   startValue: number;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <SliderField
         disabled={disabled}
         label={translate('videoEditor.sidebar.volumeEnvelopeStartLabel')}

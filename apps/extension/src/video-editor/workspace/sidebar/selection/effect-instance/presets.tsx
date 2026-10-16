@@ -11,6 +11,7 @@ import {
   type EffectPresetPreferences,
 } from '../../../../../features/video/project/effect-bundle/catalog/presets';
 import { type getCurrentLocale, translate, useAppLocale } from '../../../../../platform/i18n';
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import { SelectInput } from '../shared/controls';
 import { InspectorActionButton } from '../shared/actions';
 
@@ -149,6 +150,7 @@ function PresetLibraryActions({
 }) {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
+  const nameInput = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLDivElement>(null);
   const wasNaming = useRef(false);
   useEffect(() => {
@@ -185,18 +187,27 @@ function PresetLibraryActions({
             });
           }}
         >
-          <input
-            autoFocus
-            maxLength={120}
-            disabled={busy}
-            value={name}
-            aria-label={translate('videoEditor.effectsLibrary.presetName')}
-            onChange={(event) => setName(event.target.value)}
-            className={[
-              'min-w-0 w-full rounded-[var(--sniptale-radius-sm)] border bg-transparent px-2 text-xs',
-              'border-[var(--sniptale-color-border-soft)]',
-            ].join(' ')}
-          />
+          <div className="sniptale-text-value">
+            <input
+              ref={nameInput}
+              autoFocus
+              maxLength={120}
+              disabled={busy}
+              value={name}
+              aria-label={translate('videoEditor.effectsLibrary.presetName')}
+              onChange={(event) => setName(event.target.value)}
+              className={[
+                'min-w-0 w-full rounded-[var(--sniptale-radius-sm)] border bg-transparent px-2 text-xs',
+                'border-[var(--sniptale-color-border-soft)]',
+              ].join(' ')}
+            />
+            {!busy && name ? (
+              <InspectorFieldClear
+                label={translate('videoEditor.effectsLibrary.presetName')}
+                target={nameInput}
+              />
+            ) : null}
+          </div>
           <div className="video-inspector-preset-confirmation">
             <InspectorActionButton tone="primary" disabled={busy || !name.trim()} type="submit">
               {translate('common.actions.save')}

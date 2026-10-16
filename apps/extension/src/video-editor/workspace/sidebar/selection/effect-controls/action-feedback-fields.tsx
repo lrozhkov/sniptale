@@ -107,7 +107,7 @@ export function ActionFeedbackFields(props: FeedbackProps) {
   return (
     <fieldset
       disabled={props.disabled}
-      className="min-w-0 space-y-2"
+      className="sniptale-parameter-stack min-w-0 space-y-2"
       data-ui="video-editor.action-feedback-fields"
     >
       <FeedbackSoundFields style={style} target={props.target} preset={preset} change={change} />

@@ -9,7 +9,7 @@ Reuse group components. A screen must not redraw checks, radio dots, chevrons, f
 
 ## Compact parameter editor
 
-Keep one value-column policy across related parameters. Use 32px rows and 4px gaps without extra child bottom margins. Names remain secondary. Values remain primary. Do not increase text weight when a boolean becomes true. Immediate boolean parameters use trailing switches. Deferred form parameters use trailing checkboxes. Selection lists retain leading checkboxes. Read [Selection](selection.md) before choosing the primitive.
+Keep one value-column policy across related parameters. Use 32px rows and 4px gaps without extra child margins. Names remain secondary. Values remain primary. Do not increase text weight when a boolean becomes true. Immediate boolean parameters use trailing switches. Deferred form parameters use trailing checkboxes. Selection lists retain leading checkboxes. Read [Selection](selection.md) before choosing the primitive.
 
 Contextual number ranges fit inside their row and hide during direct editing. Revealing them does not move neighbors. Errors can increase height. Absent status, error, and scroll content must not reserve visible space. Long labels can wrap. Check visual spacing between visible content as well as element boxes.
 

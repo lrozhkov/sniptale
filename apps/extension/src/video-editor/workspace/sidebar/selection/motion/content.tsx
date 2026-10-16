@@ -26,7 +26,7 @@ export function MotionCameraFields(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       {props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL ||
       props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
       props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
@@ -66,7 +66,7 @@ export function MotionTimingFields(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       <MotionBindingField {...props} />
       <MotionDurationField
         duration={props.motionRegion.duration}
@@ -116,7 +116,7 @@ export function MotionBehaviorFields(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
       <MotionEasingField
         motionRegionId={props.motionRegion.id}
@@ -190,7 +190,7 @@ function MotionZoomFields(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <SliderField
         label={translate('videoEditor.sidebar.motionZoomInLabel')}
         value={props.motionRegion.zoomInDuration}
@@ -241,7 +241,7 @@ function MotionPlacementFields(props: {
 
 export function MotionOverview(props: { motionRegion: VideoProjectMotionRegion }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <DetailList>
         <DetailItem
           label={translate('videoEditor.sidebar.motionFocusLabel')}

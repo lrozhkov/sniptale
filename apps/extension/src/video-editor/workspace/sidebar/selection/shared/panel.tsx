@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
+import { StatusRow } from '../../../../../ui/compact-inspector-controls';
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 
 export const PANEL_SECTION_CLASS_NAME = 'space-y-3';
 
 export const PANEL_HEADING_CLASS_NAME =
-  'text-[13px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]';
+  'text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]';
 export const PANEL_META_CLASS_NAME =
   'text-[length:var(--sniptale-compact-font-size,12px)] text-[var(--sniptale-color-text-secondary)]';
 export const PANEL_DIVIDER_CLASS_NAME =
@@ -14,6 +16,8 @@ export function DetailList({ children }: { children: ReactNode }) {
 }
 
 export function DetailItem({ label, value }: { label: string; value: ReactNode }) {
+  const inspector = useInspectorLayout();
+  if (inspector) return <StatusRow label={label} value={value} />;
   return (
     <div
       className="grid grid-cols-2 items-baseline gap-3 border-b

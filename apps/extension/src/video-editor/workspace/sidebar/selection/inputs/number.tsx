@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { useRef } from 'react';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { CompactInspectorUnit } from '../../../../../ui/compact-inspector-controls/shared';
@@ -29,6 +30,7 @@ export function NumberInput({
   disabled?: boolean;
 }) {
   const gesture = useRef<'pointer' | 'keyboard' | null>(null);
+  const inspector = useInspectorLayout();
   const finish = () => {
     gesture.current = null;
     onCommit?.();
@@ -42,7 +44,7 @@ export function NumberInput({
     <NumericRow
       appearance="plain"
       focusAppearance="accent-box"
-      className="py-0! grid-cols-[minmax(0,1fr)_auto]!"
+      {...(inspector ? {} : { className: 'py-0! grid-cols-[minmax(0,1fr)_auto]!' })}
       label={label}
       value={numericValue}
       min={min}

@@ -14,13 +14,13 @@ export function InspectorGroupSection(props: {
         <div className="flex items-baseline justify-between gap-3">
           {props.label ? <p className={PANEL_META_CLASS_NAME}>{props.label}</p> : <span />}
           {props.meta ? (
-            <span className="text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]">
+            <span className="text-xs font-normal text-[var(--sniptale-color-text-secondary)]">
               {props.meta}
             </span>
           ) : null}
         </div>
       ) : null}
-      <div className="space-y-2">{props.children}</div>
+      <div className="sniptale-parameter-stack space-y-2">{props.children}</div>
     </section>
   );
 }

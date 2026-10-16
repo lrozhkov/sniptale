@@ -133,7 +133,7 @@ export function InspectCursorPath(props: CursorInspectorProps) {
   const { path, selectKey } = state;
   return (
     <div
-      className="space-y-3"
+      className="sniptale-parameter-stack space-y-3"
       data-ui="cursorFocusPath.inspector"
       title={
         props.project.cursorTrack?.captureMode === 'embedded-fallback'
@@ -200,8 +200,11 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
       );
     });
   return (
-    <fieldset className="m-0 min-w-0 border-0 p-0" data-ui="cursorFocusPath.settings">
-      <div className="min-w-0 space-y-1.5">
+    <fieldset
+      className="sniptale-parameter-stack m-0 min-w-0 border-0 p-0"
+      data-ui="cursorFocusPath.settings"
+    >
+      <div className="sniptale-parameter-stack min-w-0 space-y-1.5">
         <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.sidebar.cursorFocusMode')}
         </span>
@@ -317,7 +320,7 @@ function CursorInspectorGeometry({ state }: { state: CursorInspectorState }) {
         label={translate('videoEditor.sidebar.cursorFocusHandles')}
       >
         {(['incoming', 'outgoing'] as const).map((handle) => (
-          <div key={handle} className="space-y-2">
+          <div key={handle} className="sniptale-parameter-stack space-y-2">
             {(['x', 'y'] as const).map((axis) => (
               <NumberInput
                 key={axis}
@@ -458,8 +461,11 @@ export function InspectCameraFollowSettings(props: {
     </div>
   );
   return (
-    <fieldset className="m-0 min-w-0 space-y-2 border-0 p-0" data-ui="cameraFollow.settings">
-      <div className="min-w-0 space-y-1.5">
+    <fieldset
+      className="sniptale-parameter-stack m-0 min-w-0 space-y-2 border-0 p-0"
+      data-ui="cameraFollow.settings"
+    >
+      <div className="sniptale-parameter-stack min-w-0 space-y-1.5">
         <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
           {label('videoEditor.sidebar.cameraZoneSize')}
         </span>
@@ -476,7 +482,7 @@ export function InspectCameraFollowSettings(props: {
           }
         />
       </div>
-      <div className="min-w-0 space-y-1.5">
+      <div className="sniptale-parameter-stack min-w-0 space-y-1.5">
         <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
           {label('videoEditor.sidebar.cameraMovement')}
         </span>

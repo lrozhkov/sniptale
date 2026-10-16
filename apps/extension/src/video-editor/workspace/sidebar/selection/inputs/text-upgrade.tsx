@@ -34,7 +34,7 @@ export function TextTemplateUpgradeFields(props: {
       <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>
         {translate('videoEditor.sidebar.textTemplateUpgradeDescription')}
       </p>
-      <div className="space-y-3">
+      <div className="sniptale-parameter-stack space-y-3">
         <SelectInput
           label={translate('videoEditor.sidebar.annotationTemplateLabel')}
           value={templateKind}

@@ -19,7 +19,7 @@ function renderClipFadeFields(
 ) {
   if (!selectedClip) return null;
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <SliderField
         label={translate('videoEditor.sidebar.fadeInLabel')}
         disabled={selectedTrackLocked}

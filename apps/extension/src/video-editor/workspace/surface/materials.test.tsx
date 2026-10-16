@@ -47,12 +47,13 @@ function renderMaterials() {
   );
   project.assets = [asset];
   const onSelect = vi.fn();
+  const onRename = vi.fn();
   const onRemoveUnused = vi.fn();
   const onImport = { audio: vi.fn(), image: vi.fn(), video: vi.fn() };
   act(() =>
     root.render(
       <VideoEditorMaterials
-        onRename={vi.fn()}
+        onRename={onRename}
         onShowUse={vi.fn()}
         onRemoveUnused={onRemoveUnused}
         onOpenLibrary={onOpenLibrary}
@@ -63,7 +64,7 @@ function renderMaterials() {
       />
     )
   );
-  return { asset, onSelect, onImport, project, onRemoveUnused };
+  return { asset, onSelect, onRename, onImport, project, onRemoveUnused };
 }
 
 it('opens the selected source without editing the timeline or filling the list with placement controls', () => {
@@ -425,4 +426,44 @@ it('starts a local material drag from the source button and prevents it while pl
   act(() => pendingButton.dispatchEvent(blocked));
   expect(blocked.defaultPrevented).toBe(true);
   expect(materialDrag.start).toHaveBeenCalledTimes(1);
+});
+
+it('clears material search without dismissing it or activating a source', () => {
+  const { onSelect } = renderMaterials();
+  document.body.append(container);
+  act(() =>
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.search"]')!.click()
+  );
+  const input = container.querySelector<HTMLInputElement>('input:not([type="file"])')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      'missing'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(container.querySelector('[data-material-id]')).toBeNull();
+  act(() => container.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
+  expect(input.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(container.querySelector('[data-material-id]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="video-editor.materials.search"]')).toBeNull();
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
+it('clears a rename draft without committing and Escape retains the source name', () => {
+  const { asset, onRename } = renderMaterials();
+  document.body.append(container);
+  act(() => container.querySelector<HTMLButtonElement>('[data-material-rename]')!.click());
+  const input = container.querySelector<HTMLInputElement>('input:not([type="file"])')!;
+  act(() => container.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
+  expect(input.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(onRename).not.toHaveBeenCalled();
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(container.querySelector('input:not([type="file"])')).toBeNull();
+  expect(
+    container.querySelector('[data-material-id] button[aria-pressed]')?.getAttribute('aria-label')
+  ).toBe(asset.name);
+  expect(onRename).not.toHaveBeenCalled();
 });

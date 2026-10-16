@@ -15,7 +15,7 @@ function TextStyleFields(props: {
   onRememberRecentColor?: WorkspaceSidebarProps['onRememberRecentColor'];
 }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <TextTypographyFields {...props} />
       <TextColorFields {...props} />
     </div>
@@ -155,7 +155,7 @@ export function renderTextStyleFields(
   }
 
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <TextStyleFields
         clipId={selectedClip.id}
         disabled={selectedTrackLocked}

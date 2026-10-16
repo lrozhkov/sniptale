@@ -12,8 +12,8 @@ function cx(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
 }
 
-const ROW_SHELL_CLASS_NAME = 'grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-[10px] px-3 py-3';
-const CARD_SHELL_CLASS_NAME = 'rounded-[16px] px-3 py-3';
+const ROW_SHELL_CLASS_NAME = 'grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-[4px] px-3 py-3';
+const CARD_SHELL_CLASS_NAME = 'rounded-[4px] px-3 py-3';
 
 const ACTIVE_ITEM_CLASS_NAME = [
   'border-[color:var(--sniptale-color-border-accent-strong)]',
@@ -24,12 +24,12 @@ const DEFAULT_ITEM_CLASS_NAME =
   'border-[color:var(--sniptale-color-border-soft)] bg-[color:var(--sniptale-color-surface-panel)]';
 
 const ACTION_ICON_SIZE: Record<LibraryItemVariant, number> = {
-  card: 14,
-  row: 13,
+  card: 16,
+  row: 16,
 };
 
 const ACTION_HEIGHT_CLASS_NAME: Record<LibraryItemVariant, string> = {
-  card: 'h-10',
+  card: 'h-8',
   row: '!h-8 !min-h-8',
 };
 
@@ -85,7 +85,7 @@ export function LibraryItemShell(props: {
 
 export function LibraryItemTitle({ children }: { children: ReactNode }) {
   return (
-    <p className="truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+    <p className="break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
       {children}
     </p>
   );
@@ -95,7 +95,7 @@ export function LibraryItemMetadataLine({ values }: { values: Array<string | nul
   const visibleValues = values.filter(Boolean);
 
   return (
-    <p className="truncate text-xs text-[var(--sniptale-color-text-secondary)]">
+    <p className="break-words text-xs text-[var(--sniptale-color-text-secondary)]">
       {visibleValues.join(' · ')}
     </p>
   );

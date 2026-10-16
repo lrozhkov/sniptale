@@ -9,6 +9,8 @@
 | Library cards, rows, filters and batch actions | Collections, Selection, Buttons | Preserve virtual geometry, hidden selection and separate open targets |
 | Library preview properties and related projects | Properties, Fields, Collections | Plain name/value rows, complete values, native Clear and navigation |
 | Library backup, import, recovery and deletion | Layers, Fields, Buttons | Visible warnings, retry, cancellation and reachable short-height actions |
+| Standalone video materials, export and recording | Buttons, Fields, Collections | Preserve project, import, export and recording admission |
+| Standalone timeline, preview and inspector | Specialized, Compositions | Keep gesture geometry, canvas fonts and shared parameter construction |
 | Image editor floating chrome, tools and layers | Buttons, Collections, Specialized | Preserve docking, dense row actions, gestures and document authority |
 | Image scene, browser header, dimensions and metadata | Compositions, Properties, Choices | Shared rows, bounded intrinsic content and full translated values |
 | Scene proportions, resolution, Fit/Crop | Choices, Compositions | Full-column menu and source/custom values |
@@ -50,6 +52,12 @@ The actual-product composition proof lives in `tooling/test/e2e/extension-critic
 The image editor adopts the shared parameter and command owners through its runtime entry. Floating panels retain their docking, resizing, canvas coordinates, tool gestures, and history contracts. Dense layer commands retain their existing dimensions. Shared start pages and color layers apply compact presentation only within the migrated context.
 
 The native-product proof lives in `tooling/test/e2e/extension-critical/extension-critical-image-design.spec.ts`. It imports a real PNG and checks panel modes, layer editing, paint cancellation, browser headers, dimensions, commands, native export, text fitting, and layout transitions. Existing editing and persistence tests retain their separate behavioral role.
+
+## Standalone video editor integration
+
+The standalone video editor adopts shared parameter construction and command feedback through its application shell. Materials keep their collection-row geometry. Detached menus adopt the interface font and theme. Timeline lanes, clip handles, time mapping, preview rendering, and document fonts remain with their specialized owners. Migrated parameter stacks exclude legacy compatibility margins.
+
+The native-product proof lives in `tooling/test/e2e/extension-critical/extension-critical-standalone-video-design.spec.ts`. It covers import, insertion, selection, commands, menus, export settings, preview controls, language, theme, and container transitions. Existing export and timeline suites retain their separate behavioral role.
 
 ## Integration exclusions
 

@@ -101,7 +101,7 @@ export function PreviewStageZoomNavigator(props: {
       type="button"
       aria-label={translate('videoEditor.stage.previewNavigator')}
       className={[
-        'absolute bottom-3 right-3 z-20 overflow-hidden rounded-[8px] border p-0 shadow-md',
+        'absolute bottom-3 right-3 z-20 overflow-hidden rounded-[4px] border p-0 shadow-md',
         'border-[color:var(--sniptale-color-border-strong)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_92%,transparent)]',
         'focus-visible:outline-none focus-visible:ring-2',
@@ -124,7 +124,7 @@ export function PreviewStageZoomNavigator(props: {
         });
       }}
     >
-      <span className="absolute inset-1 rounded-[5px] bg-[color:var(--sniptale-color-surface-canvas)] opacity-70" />
+      <span className="absolute inset-1 rounded-[4px] bg-[color:var(--sniptale-color-surface-canvas)] opacity-70" />
       <canvas
         ref={thumbnailRef}
         aria-hidden="true"

@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+
+import { act, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { VideoEditorFloatingDocumentBar } from './document-bar';
@@ -126,4 +130,38 @@ it('replaces project identity with source navigation while recovery stays in the
   expect(markup).not.toContain('Product Demo Recording');
   expect(markup).not.toContain('<input');
   expect(markup).not.toContain('common.actions.retry');
+});
+
+it('clears live project identity through its normal rename callback and keeps input focus', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const rename = vi.fn();
+  function LiveDocument() {
+    const [projectName, setName] = useState('Demo');
+    hookMocks.header.mockReturnValue({
+      ...createHeaderProps(),
+      projectName,
+      onRenameProject: (name: string) => {
+        rename(name);
+        setName(name);
+      },
+    });
+    hookMocks.history.mockReturnValue({ error: null });
+    return <VideoEditorFloatingDocumentBar />;
+  }
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() => root.render(<LiveDocument />));
+    const input = host.querySelector<HTMLInputElement>('input')!;
+    act(() => host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
+    expect(rename).toHaveBeenCalledExactlyOnceWith('');
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(host.querySelector('.sniptale-field-clear')).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
 });

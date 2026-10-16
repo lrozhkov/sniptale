@@ -26,7 +26,7 @@ export function ProjectTimelineToolbarActionButton({
       aria-label={label}
       className={[
         toolbarIconButtonClassName,
-        '@min-[1600px]/timeline:!w-auto @min-[1600px]/timeline:!gap-2 @min-[1600px]/timeline:!px-2.5',
+        '@min-[1600px]/timeline:!w-auto @min-[1600px]/timeline:!gap-1.5 @min-[1600px]/timeline:!px-2.5',
       ].join(' ')}
       disabled={disabled}
       onClick={onClick}
