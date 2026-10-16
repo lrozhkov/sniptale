@@ -313,7 +313,7 @@ export function ReviewTrackControls(props: {
         </>
       ) : null}
       {props.density ? (
-        <div className="flex shrink-0 items-center">
+        <div className="ml-auto flex shrink-0 items-center">
           <ReviewTrackHeightButton {...props.density} />
         </div>
       ) : null}
@@ -427,6 +427,14 @@ function ReviewAnnotationToolControl(props: {
       </ReviewButton>
       {tool.active ? (
         <>
+          {required ? (
+            <span id={requiredId} className="text-[var(--sniptale-color-danger)]">
+              <span aria-hidden="true">*</span>
+              <span className="sr-only">
+                {translate('gallery.videoReview.annotationEffectsRequired')}
+              </span>
+            </span>
+          ) : null}
           <ProductSelect
             menuClassName="sniptale-parameter-menu"
             aria-label={translate('gallery.videoReview.annotationEffectsChoose')}
@@ -442,14 +450,6 @@ function ReviewAnnotationToolControl(props: {
             disabled={busy || tool.pending || tool.phase !== 'ready' || !tool.options.length}
             onChange={(value) => admit(() => tool.onChoose(value))}
           />
-          {required ? (
-            <span id={requiredId} className="-ml-1 text-[var(--sniptale-color-danger)]">
-              <span aria-hidden="true">*</span>
-              <span className="sr-only">
-                {translate('gallery.videoReview.annotationEffectsRequired')}
-              </span>
-            </span>
-          ) : null}
           <ReviewAnnotationToolFeedback {...props} hint={hint} />
         </>
       ) : null}

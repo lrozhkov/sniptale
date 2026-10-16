@@ -44,7 +44,7 @@ Use [Choices](choices-and-surfaces.md) for segments or dropdown representations 
 
 ## Integration references
 
-Use existing product control owners and preserve their state contracts. The sample's circular checkbox remains a proposal pending final visual acceptance. [WAI checkbox](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/), [radio](https://www.w3.org/WAI/ARIA/apg/patterns/radio/),
+Use existing product control owners and preserve their state contracts. The compact line presentation uses `ProductGlassSwitch` with `sniptale-compact-switch` outside an inspector. It shares the inspector switch drawing and retains its own keyboard target. The sample's circular checkbox remains a proposal pending final visual acceptance. [WAI checkbox](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/), [radio](https://www.w3.org/WAI/ARIA/apg/patterns/radio/),
 
 [switch](https://www.w3.org/WAI/ARIA/apg/patterns/switch/).
 

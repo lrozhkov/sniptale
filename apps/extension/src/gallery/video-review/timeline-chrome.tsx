@@ -15,7 +15,6 @@ import {
   X,
   Repeat2,
   Play,
-  Pause,
   SkipBack,
   SkipForward,
   BetweenHorizontalStart,
@@ -240,10 +239,12 @@ export function ReviewToolbar(props: {
           onClick={props.onPlay}
           disabled={props.busy}
           className={plain}
-          aria-pressed={props.playing}
         >
           {props.playing ? (
-            <Pause size={16} strokeWidth={2.2} aria-hidden="true" />
+            <svg viewBox="0 0 16 16" className="!size-4" fill="currentColor" aria-hidden="true">
+              <rect x="4" y="3" width="2" height="10" />
+              <rect x="10" y="3" width="2" height="10" />
+            </svg>
           ) : (
             <Play size={16} strokeWidth={2.2} aria-hidden="true" />
           )}
@@ -285,7 +286,6 @@ export function ReviewToolbar(props: {
         >
           {props.historyControls}
         </div>
-        <ReviewKeyboardHelp />
         <ReviewZoomSlider value={props.zoom} onChange={props.onZoom} />
         <ReviewButton
           label={translate('gallery.videoReview.fit')}
@@ -312,6 +312,7 @@ export function ReviewToolbar(props: {
             </ReviewButton>
           </>
         ) : null}
+        <ReviewKeyboardHelp />
       </div>
     </div>
   );
@@ -397,12 +398,6 @@ export function ReviewHistoryControls(props: {
           key={direction}
           chrome
           label={translate(`gallery.videoReview.${direction}`)}
-          toolbarPriority={1}
-          toolbarLabel={translate(
-            direction === 'undo'
-              ? 'gallery.videoReview.toolbarUndo'
-              : 'gallery.videoReview.toolbarRedo'
-          )}
           className={plain}
           disabled={
             props.busy || (direction === 'undo' ? props.cursor === 0 : props.cursor >= props.length)

@@ -425,6 +425,12 @@ for (const locale of ['ru', 'en'] as const) {
               lineHeight: Number.parseFloat(
                 getComputedStyle(row.querySelector('.sniptale-parameter-name')!).lineHeight
               ),
+              visibleTextBounds: (() => {
+                const range = document.createRange();
+                range.selectNodeContents(row.querySelector('.sniptale-parameter-name')!);
+                const bounds = range.getBoundingClientRect();
+                return { top: bounds.top, bottom: bounds.bottom };
+              })(),
               visibleTextHeight: (() => {
                 const range = document.createRange();
                 range.selectNodeContents(row.querySelector('.sniptale-parameter-name')!);
@@ -437,11 +443,10 @@ for (const locale of ['ru', 'en'] as const) {
             expect(row.lineHeight).toBe(18);
             expect(row.nameHeight + 0.5).toBeGreaterThanOrEqual(row.visibleTextHeight);
             expect(row.height + 0.5).toBeGreaterThanOrEqual(row.nameHeight);
-            expect(
-              Math.abs(
-                row.nameHeight / row.lineHeight - Math.round(row.nameHeight / row.lineHeight)
-              )
-            ).toBeLessThanOrEqual(0.5 / row.lineHeight);
+            expect(row.visibleTextBounds.top + 0.5).toBeGreaterThanOrEqual(row.nameTop);
+            expect(row.visibleTextBounds.bottom).toBeLessThanOrEqual(
+              row.nameTop + row.nameHeight + 0.5
+            );
           }
           expect(
             Math.abs(pair[1]!.nameTop - pair[0]!.nameTop - pair[0]!.height - 4)

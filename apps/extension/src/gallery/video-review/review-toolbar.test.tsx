@@ -105,6 +105,10 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
       translate('gallery.videoReview.annotationEffectsRequired')
     );
     expect(selector().hasAttribute('aria-required')).toBe(false);
+    expect(
+      document.getElementById(description!)!.compareDocumentPosition(selector()) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     tool.phase = 'loading';
     tool.options = [];
     await render('advanced');
@@ -440,7 +444,13 @@ it('keeps one global density control available in both editing modes without tog
           `[aria-label="${translate('gallery.videoReview.compactTrackHeight')}"]`
         );
         expect(buttons).toHaveLength(1);
-        expect(buttons[0]!.parentElement!.className).not.toContain('ml-auto');
+        expect(buttons[0]!.title).toBe(
+          translate(
+            compact
+              ? 'gallery.videoReview.normalTrackHeight'
+              : 'gallery.videoReview.compactTrackHeight'
+          )
+        );
         expect(buttons[0]!.getAttribute('aria-pressed')).toBe(String(compact));
         await act(async () => buttons[0]!.click());
       }

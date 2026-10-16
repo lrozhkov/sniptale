@@ -1,10 +1,10 @@
 import { createPortal } from 'react-dom';
 import { useReviewTrackHeader } from './timeline-panes';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { createContext, useContext, type ReactNode } from 'react';
 import type { QuickEditTrack, QuickEditUiState } from '../../features/video/review/advanced/types';
 import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
-import { Rows3, Lock, Unlock } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, Lock, Unlock } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { ReviewButton, reviewCompactTrackButtonClassName } from './controls';
 import './track-row.css';
@@ -99,7 +99,7 @@ function ReviewTrackHeader({
   locked,
   unavailable,
 }: {
-  row: Pick<TrackRowProps, 'track' | 'muted' | 'label' | 'icon' | 'controls'>;
+  row: Pick<TrackRowProps, 'track' | 'muted' | 'label' | 'icon' | 'controls' | 'ruler'>;
   controls: ReviewTrackControlsState | null;
   enabled: boolean;
   locked: boolean;
@@ -116,10 +116,11 @@ function ReviewTrackHeader({
       onPointerDown={(event) => event.stopPropagation()}
     >
       {track && track !== 'source' && controls?.configuring ? (
-        <ProductToggle
-          size="sm"
-          className="scale-75"
-          checked={enabled}
+        <ProductGlassSwitch
+          className="sniptale-compact-switch shrink-0"
+          role="switch"
+          aria-checked={enabled}
+          on={enabled}
           disabled={unavailable || controls.busy}
           aria-label={`${translate('gallery.videoReview.trackEnabled')}: ${props.label}`}
           title={unavailable ? translate('gallery.videoReview.trackUnavailable') : undefined}
@@ -127,27 +128,31 @@ function ReviewTrackHeader({
         />
       ) : null}
       {props.icon}
-      <span className="min-w-0 flex-1 text-[11px]" title={props.label}>
-        <span data-track-label className="inline-block whitespace-nowrap">
-          {props.label}
-        </span>
-      </span>
-      <div data-track-controls className="flex shrink-0 items-center">
-        {props.controls}
-        {track && controls ? (
-          <ReviewButton
-            label={`${translate(
-              locked ? 'gallery.videoReview.trackUnlock' : 'gallery.videoReview.trackLock'
-            )}: ${props.label}`}
-            aria-pressed={locked}
-            disabled={controls.busy || unavailable}
-            className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
-            onClick={() => controls.setLocked(track, !locked)}
-          >
-            {locked ? <Lock size={14} aria-hidden /> : <Unlock size={14} aria-hidden />}
-          </ReviewButton>
-        ) : null}
-      </div>
+      {!props.ruler ? (
+        <>
+          <span className="min-w-0 flex-1 text-[11px]" title={props.label}>
+            <span data-track-label className="inline-block whitespace-nowrap">
+              {props.label}
+            </span>
+          </span>
+          <div data-track-controls className="flex shrink-0 items-center">
+            {props.controls}
+            {track && controls ? (
+              <ReviewButton
+                label={`${translate(
+                  locked ? 'gallery.videoReview.trackUnlock' : 'gallery.videoReview.trackLock'
+                )}: ${props.label}`}
+                aria-pressed={locked}
+                disabled={controls.busy || unavailable}
+                className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+                onClick={() => controls.setLocked(track, !locked)}
+              >
+                {locked ? <Lock size={14} aria-hidden /> : <Unlock size={14} aria-hidden />}
+              </ReviewButton>
+            ) : null}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -186,7 +191,11 @@ export function ReviewTrackHeightButton(props: { compact: boolean; onToggle(): v
       className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
       onClick={props.onToggle}
     >
-      <Rows3 size={14} aria-hidden />
+      {props.compact ? (
+        <ChevronsUpDown size={14} aria-hidden />
+      ) : (
+        <ChevronsDownUp size={14} aria-hidden />
+      )}
     </ReviewButton>
   );
 }

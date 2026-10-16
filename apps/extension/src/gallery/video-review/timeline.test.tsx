@@ -76,7 +76,7 @@ it('keeps the transport icon-only and stable while its accessible Play/Pause act
   const pause = host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.pause"]')!;
   expect(pause.title).toBe('gallery.videoReview.pause');
   expect(pause.textContent).toBe('');
-  expect(pause.querySelector('svg.lucide-pause')).not.toBeNull();
+  expect(pause.querySelectorAll('svg rect')).toHaveLength(2);
   expect(pause.className).toBe(play.className);
 });
 
@@ -494,13 +494,14 @@ it('fits the time plane to live CSS width without a resize-observer frame of ove
   expect(viewport.style.overflowX).toBe('hidden');
 });
 
-it('keeps export navigation last and available while timeline edits are busy', async () => {
+it('keeps export before keyboard help and available while timeline edits are busy', async () => {
   const onOpenExport = vi.fn();
   renderTimeline({ busy: true, onOpenExport });
   const buttons = environment.host!.querySelectorAll<HTMLButtonElement>(
     '[data-ui="gallery.videoReview.toolbar"] button'
   );
-  const opener = buttons[buttons.length - 1]!;
+  expect(buttons[buttons.length - 1]!.getAttribute('aria-label')).toBe('gallery.keyboard.title');
+  const opener = buttons[buttons.length - 2]!;
   expect(opener.getAttribute('aria-label')).toBe('gallery.videoReview.exportSection');
   expect(opener.getAttribute('title')).toBe('gallery.videoReview.exportSection');
   expect(opener.previousElementSibling?.getAttribute('data-ui')).toBe(

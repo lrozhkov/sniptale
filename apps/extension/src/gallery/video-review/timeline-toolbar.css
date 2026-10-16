@@ -128,7 +128,7 @@
 
 @layer utilities {
   .sniptale-compact-workspace .review-command {
-    font: 500 13px / 18px var(--sniptale-font-sans) !important;
+    font: var(--sniptale-control-font-weight) 13px / 18px var(--sniptale-font-sans) !important;
   }
 }
 

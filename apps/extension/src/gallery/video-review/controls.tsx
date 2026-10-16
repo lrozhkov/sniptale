@@ -47,7 +47,8 @@ const iconButtonBase =
   'enabled:hover:!text-[var(--sniptale-color-text-primary)] ' +
   'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
 
-const iconHoverBorder = ' enabled:hover:!border-[var(--sniptale-color-border-strong)] ';
+const iconHoverBorder =
+  ' enabled:hover:!border-[color-mix(in_srgb,var(--sniptale-color-text-secondary)_28%,transparent)] ';
 const iconSelection =
   ' aria-pressed:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-pressed:hover:!text-[var(--sniptale-color-accent-emphasis)]';

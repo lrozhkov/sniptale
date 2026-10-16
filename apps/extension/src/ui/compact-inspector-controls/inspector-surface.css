@@ -202,7 +202,7 @@
   border-color: var(--sniptale-color-accent);
   box-shadow: none;
 }
-.sniptale-inspector-surface .sniptale-glass-switch:disabled {
+:is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch):disabled {
   opacity: 0.4;
 }
 .sniptale-inspector-surface
@@ -578,7 +578,8 @@
   outline-offset: 2px;
 }
 
-.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch {
+.sniptale-compact-workspace
+  :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch) {
   position: relative;
   display: block;
   width: 40px;
@@ -590,7 +591,8 @@
   box-shadow: none;
   transform: none;
 }
-.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch::before {
+.sniptale-compact-workspace
+  :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch)::before {
   content: '';
   position: absolute;
   inset-inline: 12px;
@@ -599,10 +601,16 @@
   border-radius: 1px;
   background: var(--sniptale-color-text-dim);
 }
-.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch--on::before {
+.sniptale-compact-workspace
+  :is(
+    .sniptale-inspector-surface .sniptale-glass-switch--on,
+    .sniptale-compact-switch.sniptale-glass-switch--on
+  )::before {
   background: var(--sniptale-color-accent);
 }
-.sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch-thumb {
+.sniptale-compact-workspace
+  :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch)
+  .sniptale-glass-switch-thumb {
   position: absolute;
   top: 6px;
   inset-inline-start: 4px;
@@ -616,13 +624,17 @@
   transition: transform 110ms var(--sniptale-ease-standard);
 }
 .sniptale-compact-workspace
-  .sniptale-inspector-surface
-  .sniptale-glass-switch--on
+  :is(
+    .sniptale-inspector-surface .sniptale-glass-switch--on,
+    .sniptale-compact-switch.sniptale-glass-switch--on
+  )
   .sniptale-glass-switch-thumb {
   transform: translateX(16px);
 }
 @media (prefers-reduced-motion: reduce) {
-  .sniptale-compact-workspace .sniptale-inspector-surface .sniptale-glass-switch-thumb {
+  .sniptale-compact-workspace
+    :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch)
+    .sniptale-glass-switch-thumb {
     transition: none;
   }
 }
