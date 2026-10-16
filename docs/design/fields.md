@@ -51,3 +51,5 @@ Inline text, numeric, and HEX editors share a quiet idle state and a light neutr
 Empty editable fields keep an explicit placeholder. Preserve a useful caller example. Otherwise reuse the translated field name. Keep placeholders distinct from accepted text and readable in both themes. Do not use placeholder text as the accessible label.
 
 Fields with trailing actions use one compound row: a shrinking flexible field and automatic action width. Pin actions to the trailing edge. Expand the field across the available space. Preserve this relationship at narrow and wide container widths.
+
+Reserve usable text space separately from Clear, voice, and submit targets in compound fields. Adding an action must not consume the query or value area. Use an explicit text budget for the editing role and let translated action labels keep their natural width. Measure the remaining text area after padding and reserved targets. The outer field width alone does not prove usability.

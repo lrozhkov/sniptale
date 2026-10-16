@@ -337,7 +337,7 @@ export function PreviewProjectUsage({
                 }}
               >
                 <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 break-words">{project.name}</span>
+                <span className="min-w-0 truncate">{project.name}</span>
               </ProductActionButton>
             )
           )}

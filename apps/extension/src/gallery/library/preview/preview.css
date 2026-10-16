@@ -1,5 +1,5 @@
 .gallery-preview-panel {
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-interface);
 }
 
 .gallery-preview-properties {
@@ -50,7 +50,9 @@
   white-space: normal !important;
   text-align: start;
   overflow-wrap: anywhere;
-  font: 500 13px / 18px var(--sniptale-font-interface) !important;
+  font-size: 13px !important;
+  line-height: 18px !important;
+  font-family: var(--sniptale-font-interface) !important;
 }
 
 .gallery-preview-related,
@@ -76,12 +78,16 @@
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 4px;
   padding: 6px 8px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-interface);
 }
 
 .gallery-preview-tag-add {
   width: 32px;
   padding: 0 !important;
+}
+
+.gallery-preview-filename > .gallery-preview-section-label {
+  font-weight: 400;
 }
 
 .gallery-preview-filename-input {
@@ -91,6 +97,12 @@
   min-height: 32px;
   border: 1px solid transparent;
   border-radius: 4px;
+  background: transparent;
+}
+
+.gallery-preview-filename-input:has(input:is(:hover, :focus)),
+.gallery-preview-filename-input:has(.sniptale-field-clear:is(:hover, :focus)) {
+  border-color: var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-input);
 }
 
@@ -120,8 +132,4 @@
 
 .gallery-preview-filename-input .sniptale-field-clear:hover {
   color: var(--sniptale-color-text-primary);
-}
-
-.gallery-preview-filename label[for] {
-  cursor: pointer;
 }

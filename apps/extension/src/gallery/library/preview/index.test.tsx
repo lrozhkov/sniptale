@@ -196,18 +196,26 @@ it('clears the filename draft through input and restores focus without accepting
   expect(container?.querySelector('.sniptale-field-clear')).toBeNull();
 });
 
-it('toggles filename editing from its label without changing the draft', () => {
+it('keeps the filename name passive while the input retains direct editing', () => {
   const props = createProps({ item: createMediaItem() });
   render(props);
   const input = container?.querySelector('input');
-  const label = container?.querySelector('label');
-  act(() => label?.click());
-  expect(document.activeElement).toBe(input);
-  act(() => label?.click());
+  const name = container?.querySelector<HTMLElement>('.gallery-preview-section-label');
+  if (!input || !name) throw new Error('Missing filename editor');
+  act(() => name.click());
   expect(document.activeElement).not.toBe(input);
-  act(() => label?.click());
+  act(() => input.focus());
+  act(() => name.click());
   expect(document.activeElement).toBe(input);
-  expect(props.onFilenameChange).not.toHaveBeenCalled();
+  setInputValue(input, 'direct-edit.png');
+  expect(props.onFilenameChange).toHaveBeenCalledWith('direct-edit.png');
+  expect(props.onSave).not.toHaveBeenCalled();
+});
+
+it('shows the translated filename name as an empty draft placeholder', () => {
+  render(createProps({ item: createMediaItem(), filenameDraft: '' }));
+  const input = container?.querySelector('input');
+  expect(input?.placeholder).toBe('gallery.preview.filename');
 });
 
 it('renders source link when available and fallback copy when missing', () => {
@@ -543,7 +551,9 @@ it('allows editing the selected HTML export filename', () => {
   const input = container?.querySelector('input');
   expect(input).toBeInstanceOf(HTMLInputElement);
   expect(input?.readOnly).toBe(false);
-  expect(input?.labels?.[0]?.textContent).toBe('gallery.preview.filename');
+  const name = document.getElementById(input!.getAttribute('aria-labelledby')!);
+  expect(name?.textContent).toBe('gallery.preview.filename');
+  expect(input?.labels).toHaveLength(0);
 });
 
 it('edits the active quick-edit project name and makes it read-only in Trash', async () => {

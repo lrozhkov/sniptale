@@ -1,5 +1,4 @@
 import './preview.css';
-import { toggleInspectorFieldEditing } from '../../../ui/compact-inspector-controls/layout';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { hasGalleryKeyboardLayer } from '../keyboard/context';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -65,7 +64,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
   return (
     <div className="shrink-0" data-ui="gallery.preview.inspectorHeader">
       <div className="min-w-0">
-        <h2 className="flex min-h-9 items-center gap-2 pr-20 text-[14px] leading-5 font-semibold">
+        <h2 className="flex min-h-9 items-center gap-2 pr-20 text-[14px] leading-5 font-medium">
           <CategoryIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
           {FOLDER_LABELS[folder]}
         </h2>
@@ -103,32 +102,29 @@ function PreviewFilenameField(
 
   return (
     <div className="gallery-preview-filename">
-      <label
-        htmlFor={editable ? inputId : undefined}
-        onClick={(event) => {
-          if (!editable) return;
-          event.preventDefault();
-          toggleInspectorFieldEditing(inputRef.current);
-        }}
-        className="gallery-preview-section-label"
-      >
+      <span id={inputId} className="gallery-preview-section-label">
         {isGalleryScenarioItem(props.item)
           ? translate('gallery.preview.scenarioName')
           : translate('gallery.preview.filename')}
-      </label>
+      </span>
       {!editable ? (
-        <p className="break-words text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-primary)]">
+        <p className="break-words text-[13px] font-normal leading-[18px] text-[var(--sniptale-color-text-primary)]">
           {props.filenameDraft}
         </p>
       ) : (
         <div className="gallery-preview-filename-input">
           <input
             ref={inputRef}
-            id={inputId}
+            aria-labelledby={inputId}
+            placeholder={translate(
+              isGalleryScenarioItem(props.item)
+                ? 'gallery.preview.scenarioName'
+                : 'gallery.preview.filename'
+            )}
             value={props.filenameDraft}
             onChange={(event) => props.onFilenameChange(event.target.value)}
             readOnly={!editable}
-            className="w-full min-w-0 bg-transparent text-[13px] font-medium leading-[18px]
+            className="w-full min-w-0 bg-transparent text-[13px] font-normal leading-[18px]
               text-[var(--sniptale-color-text-primary)] outline-none"
           />
           {props.filenameDraft ? (

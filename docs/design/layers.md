@@ -44,3 +44,5 @@ Textual color values select their complete contents on initial focus through poi
 Use native browser `title` for optional hints throughout the application. Do not create custom tooltip layers. Keep required information in visible content and preserve complete accessible names.
 
 Keep text and swatch alignment stable during hover and editing. Hovering the parameter name does not highlight its color field. Preserve color-plane geometry and transactional picker behavior.
+
+Autocomplete suggestions are floating layers. They must remain outside a clipping field or inspector scrollport. Use the existing portal, theme, placement, and interaction owners. Keep text focus in the combobox. Keep its active option visible inside the menu scrollport. Escape closes suggestions before the surrounding editor. Preserve draft text and explicit-submit behavior. Adjacent active and hovered options retain the common menu gap.

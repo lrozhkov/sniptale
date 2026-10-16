@@ -30,7 +30,7 @@ export function PreviewSourceField({
   return (
     <section aria-label={translate('gallery.preview.source')}>
       <h3 className="gallery-preview-section-label">{translate('gallery.preview.source')}</h3>
-      <div className="space-y-2 text-[13px] font-medium leading-[18px]">
+      <div className="space-y-2 text-[13px] font-normal leading-[18px]">
         <dl className="gallery-preview-properties">
           <SourceRow
             label={translate('gallery.preview.origin')}

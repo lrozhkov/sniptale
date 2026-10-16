@@ -57,7 +57,7 @@ export function render(root, { manifest }) {
   const related = RelatedObjects({
     items: [
       {
-        name: 'Демонстрация продукта · финальная версия',
+        name: 'Демонстрация продукта · финальная версия — настройка сложного проекта и дополнительных сцен',
         href: '#related-project-' + root.dataset.theme,
       },
       { name: 'Обучающее видео для новой команды', href: '#related-project-' + root.dataset.theme },

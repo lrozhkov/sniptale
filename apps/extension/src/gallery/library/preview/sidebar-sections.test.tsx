@@ -48,9 +48,13 @@ function createProps(onPromote?: () => Promise<void>): PreviewPanelProps {
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.restoreAllMocks();
 });
 
 it('applies the exact tag selected from the filtered suggestion list', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() =>
+    DOMRect.fromRect({ x: 100, y: 100, width: 335, height: 32 })
+  );
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -77,9 +81,11 @@ it('applies the exact tag selected from the filtered suggestion list', async () 
   await act(async () => addTagsButton?.click());
   const input = container.querySelector('input');
   await act(async () => input?.focus());
-  const alphaSuggestion = [...container.querySelectorAll('button')].find((button) =>
-    button.textContent?.includes('alpha')
+  const alphaSuggestion = [...document.querySelectorAll('[role="option"]')].find(
+    (button) => button.textContent === 'alpha'
   );
+  expect(alphaSuggestion).toBeInstanceOf(HTMLButtonElement);
+  expect(container.contains(alphaSuggestion ?? null)).toBe(false);
   await act(async () =>
     alphaSuggestion?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
   );

@@ -48,7 +48,7 @@ export function RelatedObjects({ items }) {
       );
       continue;
     }
-    const link = el('a', { class: 'related-object', href: item.href }, [
+    const link = el('a', { class: 'related-object', href: item.href, title: item.name }, [
       icon('M7 17 L17 7 M7 7 H17 V17'),
       content,
     ]);

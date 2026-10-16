@@ -12,7 +12,7 @@
 | Related object that can open | Navigation row with object name and navigation icon | Open the declared destination |
 | Operation on the current object | Command | Follow [Buttons](buttons.md) |
 
-A static property is not a disabled input. Do not draw an input surface, caret, dropdown arrow, or hover frame around it. Do not dim a valid informational value as if it were unavailable. Use a definition list for a property set. Keep names secondary and values primary at the shared 13px/18px weight 500. A property label does not become bold because the value is important or present.
+A static property is not a disabled input. Do not draw an input surface, caret, dropdown arrow, or hover frame around it. Do not dim a valid informational value as if it were unavailable. Use a definition list for a property set. Keep names secondary and values primary at the shared 13px/18px regular weight. Structural section headings use their separate heading role. A present value does not increase weight. A property label does not become bold because the value is important or present.
 
 ## Geometry and text
 
@@ -32,7 +32,7 @@ Keep its target at least 24px. Keep focus on the command after copying. Report s
 
 A related-project row navigates. It does not select the project or change the current property. Use a real link when a URL exists. Preserve modified-click, new-tab, keyboard, and browser link behavior. Use the existing command owner when product navigation requires an extension API instead of a URL. Use one consistent navigation icon for a related-object list. Do not add a checkbox or dropdown chevron.
 
-A neutral row can brighten its text on hover. Keep adjacent rows visually separate with 4px spacing. Wrap object names when space allows. If a compact list must truncate, expose the full name through hover and keyboard focus. Loading, failure, empty results, and unavailable references have distinct readable states. An unavailable reference displays its name and reason as plain content. Do not display a working-looking navigation target.
+A neutral row can brighten its text on hover. Keep adjacent rows visually separate with 4px spacing. User-authored object names in compact navigation buttons occupy one line. Truncate excess text at the trailing edge with an ellipsis. Keep the full stored and accessible name. Use the native browser title to expose the complete name on hover. Plain informational names can wrap. Loading, failure, empty results, and unavailable references have distinct readable states. An unavailable reference displays its name and reason as plain content. Do not display a working-looking navigation target.
 
 ## Existing consumers
 

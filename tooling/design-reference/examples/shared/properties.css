@@ -10,7 +10,7 @@
   min-height: 32px;
   align-items: baseline;
   padding-block: 7px;
-  font: 500 13px/18px var(--font-ui);
+  font: 400 13px/18px var(--font-ui);
 }
 .display-property dt {
   color: var(--secondary);
@@ -51,6 +51,8 @@
   display: none;
 }
 .related-objects {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -65,7 +67,7 @@
   min-height: 32px;
   box-sizing: border-box;
   color: var(--secondary);
-  font: 500 13px/18px var(--font-ui);
+  font: 400 13px/18px var(--font-ui);
   text-decoration: none;
   border-radius: 4px;
 }
@@ -80,7 +82,9 @@
 }
 .related-object span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .related-object:hover,
 .related-object:active {
@@ -95,7 +99,7 @@
   gap: 2px;
   padding: 7px 8px;
   color: var(--secondary);
-  font: 500 13px/18px var(--font-ui);
+  font: 400 13px/18px var(--font-ui);
 }
 .related-unavailable > span {
   overflow-wrap: anywhere;

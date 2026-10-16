@@ -44,7 +44,7 @@ function GallerySelectionTagInput(
     <GalleryTagInputDisclosure
       allTags={props.allTags ?? []}
       compact
-      expandedClassName="w-56 shrink-0"
+      expandedClassName="w-max max-w-full shrink-0"
       explicitSubmit
       onChange={props.onSelectionTagDraftChange}
       onSubmit={props.onApplySelectionTag}
