@@ -1,3 +1,5 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { translate } from '../../../../platform/i18n';
 import {
@@ -118,37 +120,40 @@ export function ScenarioRecorderSidebar(
       : { forcedHighlightVersion: props.forcedHighlightVersion }),
   });
   return (
-    <>
-      <ScenarioRecorderSidebarSurface
-        {...props}
-        highlightedStepId={highlightedStepId}
-        onDeleteStep={sidebarState.openDeleteStep}
-        onInspectStep={sidebarState.openInspectedStep}
-        onPreviewOpen={sidebarState.openPreviewStep}
-        onProjectMenuToggle={() => sidebarState.setProjectMenuOpen((open) => !open)}
-        onProjectMenuClose={sidebarState.closeProjectMenu}
-        projectMenuOpen={sidebarState.projectMenuOpen}
-        stepsContainerRef={stepsContainerRef}
-      />
-      {renderScenarioRecorderSidebarOverlays(sidebarState)}
-      <ProductConfirmDialog
-        isOpen={sidebarState.deleteStepId !== null}
-        title={translate('scenario.content.deleteStep')}
-        message={translate('scenario.content.deleteStepMessage')}
-        confirmText={translate('common.actions.delete')}
-        cancelText={translate('common.actions.cancel')}
-        onCancel={() => sidebarState.setDeleteStepId(null)}
-        onConfirm={() => {
-          if (
-            sidebarState.deleteStepId &&
-            props.recentSteps.some((step) => step.id === sidebarState.deleteStepId)
-          )
-            props.onDeleteStep(sidebarState.deleteStepId);
-          sidebarState.setDeleteStepId(null);
-        }}
-        backdropClassName="!z-[2147483648]"
-      />
-    </>
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <ScenarioRecorderSidebarSurface
+          {...props}
+          highlightedStepId={highlightedStepId}
+          onDeleteStep={sidebarState.openDeleteStep}
+          onInspectStep={sidebarState.openInspectedStep}
+          onPreviewOpen={sidebarState.openPreviewStep}
+          onProjectMenuToggle={() => sidebarState.setProjectMenuOpen((open) => !open)}
+          onProjectMenuClose={sidebarState.closeProjectMenu}
+          projectMenuOpen={sidebarState.projectMenuOpen}
+          stepsContainerRef={stepsContainerRef}
+        />
+        {renderScenarioRecorderSidebarOverlays(sidebarState)}
+        <ProductConfirmDialog
+          isOpen={sidebarState.deleteStepId !== null}
+          title={translate('scenario.content.deleteStep')}
+          message={translate('scenario.content.deleteStepMessage')}
+          confirmText={translate('common.actions.delete')}
+          cancelText={translate('common.actions.cancel')}
+          onCancel={() => sidebarState.setDeleteStepId(null)}
+          onConfirm={() => {
+            if (
+              sidebarState.deleteStepId &&
+              props.recentSteps.some((step) => step.id === sidebarState.deleteStepId)
+            )
+              props.onDeleteStep(sidebarState.deleteStepId);
+            sidebarState.setDeleteStepId(null);
+          }}
+          dialogClassName="sniptale-compact-workspace"
+          backdropClassName="!z-[2147483648]"
+        />
+      </InspectorLayout>
+    </CommandPressScope>
   );
 }
 

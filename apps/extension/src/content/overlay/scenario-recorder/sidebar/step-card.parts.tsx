@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ArrowUp, ArrowDown, Info, Trash2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { ScenarioRecorderSidebarStep } from './types';
@@ -9,24 +10,20 @@ import { ScenarioRecorderStepPreview } from './step-card.preview';
 
 function ScenarioRecorderDeleteButton(props: { onDelete: () => void }) {
   return (
-    <button
+    <ProductActionButton
+      tone="danger"
       type="button"
       onClick={(event) => {
         event.stopPropagation();
         props.onDelete();
       }}
       data-ui="content.scenario.sidebar.step-delete"
-      className="flex h-7 w-7 items-center justify-center
-        rounded-full border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_78%,transparent)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_48%,transparent)]
-        text-[var(--sniptale-color-danger)] transition-colors
-        hover:border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_24%,var(--sniptale-color-border-soft)_76%)]
-        hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_36%,transparent)]"
+      className={SCENARIO_RECORDER_RAIL_BUTTON_CLASS_NAME}
       title={translate('scenario.content.deleteStep')}
       aria-label={translate('scenario.content.deleteStep')}
     >
-      <Trash2 className="h-3.5 w-3.5" />
-    </button>
+      <Trash2 className="size-4" />
+    </ProductActionButton>
   );
 }
 
@@ -54,7 +51,8 @@ function ScenarioRecorderStepActions(props: StepActionProps) {
           direction === 'up' ? 'scenario.content.moveStepUp' : 'scenario.content.moveStepDown'
         );
         return (
-          <button
+          <ProductActionButton
+            tone="secondary"
             key={direction}
             type="button"
             disabled={destination === null}
@@ -70,15 +68,16 @@ function ScenarioRecorderStepActions(props: StepActionProps) {
             }}
           >
             {direction === 'up' ? (
-              <ArrowUp aria-hidden="true" size={14} />
+              <ArrowUp aria-hidden="true" size={16} />
             ) : (
-              <ArrowDown aria-hidden="true" size={14} />
+              <ArrowDown aria-hidden="true" size={16} />
             )}
-          </button>
+          </ProductActionButton>
         );
       })}
       {props.step.metadata ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
           type="button"
           onClick={(event) => {
             handleStepActionClick(event);
@@ -89,8 +88,8 @@ function ScenarioRecorderStepActions(props: StepActionProps) {
           title={translate('scenario.content.viewMetadata')}
           aria-label={translate('scenario.content.viewMetadata')}
         >
-          <Info className="h-3.5 w-3.5" />
-        </button>
+          <Info className="size-4" />
+        </ProductActionButton>
       ) : null}
       <ScenarioRecorderDeleteButton onDelete={() => props.onDeleteStep(props.step.id)} />
     </div>
@@ -106,11 +105,11 @@ export function ScenarioRecorderStepRail(props: StepActionProps) {
       {props.step.numberLabel !== null && (
         <div
           data-ui="content.scenario.sidebar.step-number"
-          className="flex min-h-7 min-w-7 max-w-20 items-center justify-center rounded-full border
+          className="flex min-h-7 min-w-7 max-w-20 items-center justify-center rounded-[4px] border
             px-1.5 text-center [overflow-wrap:anywhere]
             border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_58%,transparent)]
-            text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
+            text-[12px] leading-4 font-normal text-[var(--sniptale-color-text-primary)]"
         >
           {props.step.numberLabel}
         </div>
@@ -131,13 +130,18 @@ export function ScenarioRecorderStepBody(props: {
   onPreviewOpen: (step: ScenarioRecorderSidebarStep) => void;
   step: ScenarioRecorderSidebarStep;
 }) {
+  const title =
+    props.step.title || `${translate('scenario.content.step')} ${props.step.numberLabel ?? ''}`;
+  const previewLabel = `${translate('gallery.keyboard.open')}: ${title}`;
   return (
     <div className="min-w-0">
       <div className="flex min-w-0 items-start justify-between gap-3 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-hidden">
-          <div className="line-clamp-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-            {props.step.title ||
-              `${translate('scenario.content.step')} ${props.step.numberLabel ?? ''}`}
+          <div
+            title={title}
+            className="line-clamp-2 text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]"
+          >
+            {title}
           </div>
         </div>
       </div>
@@ -148,6 +152,8 @@ export function ScenarioRecorderStepBody(props: {
       >
         <button
           type="button"
+          aria-label={previewLabel}
+          title={previewLabel}
           onClick={(event) => {
             event.stopPropagation();
             props.onPreviewOpen(props.step);

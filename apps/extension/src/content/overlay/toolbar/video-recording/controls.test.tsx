@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ToolbarVideoRecordingControls } from './controls';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { createRecordingDrawingOwner } from './drawing-session';
 import {
   INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
@@ -89,14 +90,16 @@ function renderPhase(
   const recording = { drawingOwner, state, ...actions } satisfies ToolbarVideoRecordingProps;
   act(() =>
     root.render(
-      <ToolbarVideoRecordingControls
-        displayMode={displayMode}
-        onCollapse={vi.fn()}
-        onCompactMenusChange={vi.fn()}
-        onDisplayModeChange={vi.fn()}
-        recording={recording}
-        toolbarMenuState={toolbarMenuState}
-      />
+      <CommandPressScope value={true}>
+        <ToolbarVideoRecordingControls
+          displayMode={displayMode}
+          onCollapse={vi.fn()}
+          onCompactMenusChange={vi.fn()}
+          onDisplayModeChange={vi.fn()}
+          recording={recording}
+          toolbarMenuState={toolbarMenuState}
+        />
+      </CommandPressScope>
     )
   );
   return actions;
@@ -156,6 +159,29 @@ it('explains that Start uses the saved popup Video settings without adding new U
   const start = queryButton('content.toolbar.video-recording.start');
   expect(start?.title).toBe('content.toolbar.videoRecordingStartHint');
   expect(start?.textContent).toBe('');
+});
+
+it('preserves the original Start event through the adopted command owner', () => {
+  const actions = renderPhase('idle');
+  const start = queryButton('content.toolbar.video-recording.start')!;
+  const nativeEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+  act(() => start.dispatchEvent(nativeEvent));
+  expect(actions.onStart).toHaveBeenCalledExactlyOnceWith(nativeEvent);
+});
+
+it('keeps a paused lifecycle command distinct from persistent tools and properties', () => {
+  renderPhase('paused');
+  const resume = queryButton('content.toolbar.video-recording.resume')!;
+  expect(resume.hasAttribute('data-active')).toBe(false);
+  expect(resume.hasAttribute('aria-pressed')).toBe(false);
+  expect(resume.hasAttribute('data-command-press')).toBe(true);
+  const microphone = queryButton('content.toolbar.video-recording.microphone.toggle')!;
+  expect(microphone.getAttribute('data-command-property')).toBe('true');
+  expect(microphone.getAttribute('aria-pressed')).toBe('false');
+  expect(microphone.parentElement?.hasAttribute('data-active')).toBe(false);
+  expect(
+    queryButton('content.toolbar.video-recording.navigation')?.getAttribute('data-content-tool')
+  ).toBe('true');
 });
 
 it('uses recording navigation grouping without a visible pin control', () => {

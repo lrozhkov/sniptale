@@ -41,7 +41,7 @@ function ScenarioStepPreviewFallback() {
     <div
       className="flex h-full w-full items-center justify-center
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_88%,transparent)]
-        text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--sniptale-color-text-muted)]"
+        text-[12px] leading-4 font-normal text-[var(--sniptale-color-text-muted)]"
     >
       {translate('scenario.content.step')}
     </div>
@@ -75,7 +75,7 @@ export function ScenarioRecorderStepPreview(props: { className?: string; preview
       data-ui="content.scenario.sidebar.step-preview"
       className={[
         previewClassName,
-        'overflow-hidden rounded-[12px] border border-[var(--sniptale-color-border-soft)]',
+        'overflow-hidden rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_88%,transparent)]',
       ].join(' ')}
     >

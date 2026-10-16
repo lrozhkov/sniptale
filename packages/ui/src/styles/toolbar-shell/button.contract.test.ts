@@ -21,6 +21,16 @@ describe('toolbar-shell button contract', () => {
   });
 });
 
+it('keeps compact popover headings separate from structural dialog headings', () => {
+  const title = toolbarShellButtonStylesheet.match(
+    /\.sniptale-content-menu-adopted\.sniptale-toolbar-menu \.sniptale-toolbar-menu-title\s*\{([^}]+)\}/u
+  )?.[1];
+  expect(title).toContain('font: 500 12px / 16px var(--sniptale-font-interface);');
+  expect(title).toContain('color: var(--sniptale-color-text-secondary);');
+  expect(title).toContain('text-transform: none;');
+  expect(title).toContain('letter-spacing: normal;');
+});
+
 it('marks open menus on their indicator and gives menu triggers a compact keyboard focus', () => {
   expect(toolbarShellButtonStylesheet).toContain(
     ".sniptale-btn[data-menu-indicator='true'][aria-expanded='true']::before"

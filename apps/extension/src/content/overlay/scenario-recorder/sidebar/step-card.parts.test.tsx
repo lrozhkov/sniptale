@@ -121,6 +121,13 @@ function verifiesPreviewOpen() {
 
   expect(container?.textContent).toContain('scenario.content.step 1');
   expect(container?.textContent).not.toContain('step-1');
+  const preview = container?.querySelector(
+    '[data-ui="content.scenario.sidebar.step-preview-button"]'
+  );
+  expect(preview?.getAttribute('aria-label')).toBe(
+    'gallery.keyboard.open: scenario.content.step 1'
+  );
+  expect(preview?.getAttribute('title')).toBe('gallery.keyboard.open: scenario.content.step 1');
 
   act(() => {
     container

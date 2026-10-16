@@ -1,4 +1,6 @@
-import { Fragment } from 'react';
+import { Fragment, useContext } from 'react';
+import { CommandPressScope } from '../control-language/press';
+import { ProductActionButton } from '../product-modal/actions';
 import { Check, FileSearch, FolderKanban, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
@@ -18,10 +20,17 @@ export function PickerSection(props: {
   hiddenTitle?: boolean;
   title: string;
 }) {
+  const scoped = useContext(CommandPressScope);
   return (
     <section className="grid gap-2">
       {props.hiddenTitle ? null : (
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]">
+        <div
+          className={
+            scoped
+              ? 'text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]'
+              : 'text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]'
+          }
+        >
           {props.title}
         </div>
       )}
@@ -71,10 +80,17 @@ function EmptyProjectState(props: {
   noResultsLabel: string;
   projectsCount: number;
 }) {
+  const scoped = useContext(CommandPressScope);
   return (
     <div
-      className="rounded-[16px] border border-dashed border-[var(--sniptale-color-border-soft)]
-        px-4 py-4 text-sm text-[var(--sniptale-color-text-muted)]"
+      className={
+        scoped
+          ? 'rounded-[4px] p-3 text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-secondary)]'
+          : [
+              'rounded-[16px] border border-dashed border-[var(--sniptale-color-border-soft)]',
+              'px-4 py-4 text-sm text-[var(--sniptale-color-text-muted)]',
+            ].join(' ')
+      }
     >
       {props.projectsCount === 0 ? props.emptyLabel : props.noResultsLabel}
     </div>
@@ -125,6 +141,7 @@ function ProjectPickerList(props: {
 }
 
 export function CreateProjectSection(props: SearchableProjectPickerCreateProjectProps) {
+  const scoped = useContext(CommandPressScope);
   const createButtonDataUi = buildSearchableProjectPickerDataUi(
     props.dataUiPrefix,
     'create-button'
@@ -134,6 +151,18 @@ export function CreateProjectSection(props: SearchableProjectPickerCreateProject
     return null;
   }
 
+  if (scoped)
+    return (
+      <ProductActionButton
+        tone="primary"
+        onClick={() => void props.onCreateProject()}
+        {...(createButtonDataUi === undefined ? {} : { 'data-ui': createButtonDataUi })}
+        className="w-full gap-1.5"
+      >
+        <Plus className="size-4 shrink-0" aria-hidden="true" />
+        {props.createButtonLabel}
+      </ProductActionButton>
+    );
   return (
     <button
       type="button"
@@ -188,7 +217,23 @@ function ProjectPickerRow(props: {
   presentation: 'compact' | 'default';
   project: SearchableProjectPickerProject;
 }) {
+  const scoped = useContext(CommandPressScope);
   const rowDataUi = props.dataUi === undefined ? {} : { 'data-ui': props.dataUi };
+  if (scoped)
+    return (
+      <ProductActionButton
+        tone="toggle"
+        active={props.active}
+        aria-pressed={props.active}
+        onClick={props.onSelect}
+        title={props.project.name}
+        {...rowDataUi}
+        className="min-w-0 w-full !justify-start gap-1.5"
+      >
+        <FolderKanban className="size-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 truncate">{props.project.name}</span>
+      </ProductActionButton>
+    );
   const rowClassName = [
     'flex items-center gap-3 rounded-[16px] border transition',
     props.presentation === 'compact' ? 'px-2.5 py-2' : 'px-3 py-3',

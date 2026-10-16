@@ -33,6 +33,7 @@ export type SearchableProjectPickerContentProps = SearchableProjectPickerOptiona
 };
 
 export type SearchableProjectPickerLayoutProps = SearchableProjectPickerContentProps & {
+  renderSearchField?: (props: SearchableProjectPickerSearchProps) => ReactNode;
   onSearchQueryChange: (value: string) => void;
   searchId: string;
   searchPlaceholder: string;

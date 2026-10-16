@@ -13,7 +13,12 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 vi.mock('@sniptale/ui/product-modal', () => ({
   ProductModal: (props: { children: React.ReactNode }) => <div>{props.children}</div>,
   ProductModalBody: (props: { children: React.ReactNode }) => <div>{props.children}</div>,
-  ProductModalHeader: (props: { title: string }) => <div>{props.title}</div>,
+  ProductModalHeader: (props: { title: string; closeTitle?: string; onClose?: () => void }) => (
+    <div>
+      {props.title}
+      <button aria-label={props.closeTitle} title={props.closeTitle} onClick={props.onClose} />
+    </div>
+  ),
 }));
 
 let container: HTMLDivElement | null = null;
@@ -181,3 +186,12 @@ function runScenarioCaptureMetadataDialogSuite() {
 }
 
 describe('ScenarioCaptureMetadataDialog', runScenarioCaptureMetadataDialogSuite);
+
+it('names the metadata close command and preserves its close callback', () => {
+  const onClose = vi.fn();
+  renderMetadataDialog({ onClose, view: fullManualView });
+  const close = container?.querySelector('button');
+  expect(close?.getAttribute('aria-label')).toBe('common.actions.close');
+  act(() => close?.click());
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

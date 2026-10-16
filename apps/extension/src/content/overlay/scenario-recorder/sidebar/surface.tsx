@@ -1,4 +1,3 @@
-import { getControlIconButtonClassName } from '@sniptale/ui/control-language';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { AppWindow } from 'lucide-react';
 import type { MouseEvent, MouseEventHandler, RefObject } from 'react';
@@ -53,7 +52,8 @@ function ScenarioRecorderSidebarFooter(props: {
 }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-      <button
+      <ProductActionButton
+        tone="secondary"
         type="button"
         onClick={(event) => void props.onCaptureVisible(event)}
         disabled={props.captureBusy}
@@ -61,10 +61,10 @@ function ScenarioRecorderSidebarFooter(props: {
         data-ui="content.scenario.sidebar.capture-visible"
         aria-label={translate('content.toolbar.visibleArea')}
         title={translate('content.toolbar.visibleArea')}
-        className={getControlIconButtonClassName({ density: 'compact' })}
+        className="size-8"
       >
-        <AppWindow aria-hidden="true" size={18} />
-      </button>
+        <AppWindow aria-hidden="true" size={16} />
+      </ProductActionButton>
       <ProductActionButton
         tone="primary"
         disabled={props.captureBusy}
@@ -81,8 +81,9 @@ function ScenarioRecorderSidebarFooter(props: {
 
 function getScenarioRecorderSidebarSurfaceClassName(dragging: boolean) {
   return [
-    'sniptale-scenario-recorder-sidebar pointer-events-auto fixed z-40 flex min-w-0 flex-col',
-    'w-[336px] max-h-[calc(100vh-24px)] gap-3 overflow-hidden rounded-[22px] border p-3',
+    'sniptale-scenario-recorder-sidebar sniptale-compact-workspace pointer-events-auto',
+    'fixed z-40 flex min-w-0 flex-col',
+    'w-[336px] max-h-[calc(100vh-24px)] gap-3 overflow-hidden rounded-[4px] border p-3',
     'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_88%,transparent)]',
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_98%,transparent)]',
     'shadow-[0_18px_38px_color-mix(in_srgb,var(--sniptale-color-overlay)_14%,transparent)]',
@@ -107,9 +108,9 @@ function ScenarioRecorderSidebarRecentSteps(props: ScenarioRecorderSidebarStepLi
   if (props.recentSteps.length === 0) {
     return (
       <p
-        className="rounded-[18px] border border-dashed border-[var(--sniptale-color-border-soft)]
+        className="rounded-[4px] border border-dashed border-[var(--sniptale-color-border-soft)]
           bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_34%,transparent)]
-          p-4 text-sm text-[var(--sniptale-color-text-muted)]"
+          p-3 text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-muted)]"
       >
         {translate('scenario.content.sidebarEmpty')}
       </p>

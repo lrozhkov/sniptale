@@ -29,6 +29,8 @@ Check the loaded font in the runtime that shows the changed surface, including d
 
 Do not replace fonts inside authored canvas text, captions, or exports through an interface token change. These values belong to the document or renderer. The excluded popup retains its current font contract.
 
+Check inherited interface text, including status and duration, as well as controls. A child font override does not establish the parent font.
+
 ## Geometry and density
 
 | Element | Default geometry |

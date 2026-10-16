@@ -23,8 +23,9 @@
   );
 }
 
-/* Content chrome opts in without changing pending recording and catalog consumers. */
+/* Adopted content chrome uses interface roles without changing unscoped consumers. */
 .sniptale-toolbar-root.sniptale-content-toolbar-adopted {
+  font-family: var(--sniptale-font-interface);
   --sniptale-toolbar-shell-height: 50px;
   --sniptale-toolbar-button-size: 32px;
   --sniptale-toolbar-shell-padding: 6px;

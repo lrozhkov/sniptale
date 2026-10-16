@@ -2,6 +2,7 @@ import { useDeferredValue, useId, useMemo, useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { SearchableProjectPickerLayout } from './layout';
 import { matchesQuery, normalizeQuery, resolveRecentProjects } from './helpers';
+import type { SearchableProjectPickerSearchProps } from './types';
 
 type SearchableProjectPickerProject = {
   id: string;
@@ -31,6 +32,11 @@ type SearchableProjectPickerProps = {
   searchQuery?: string;
   searchPlaceholder: string;
   presentation?: 'compact' | 'default';
+  /**
+   * Renders search presentation from the supplied query, change callback, field ID, and placeholder.
+   * The picker retains query filtering and project mutation callbacks.
+   */
+  renderSearchField?: (props: SearchableProjectPickerSearchProps) => ReactNode;
 };
 
 function resolveRecentProjectsArgs(args: {
@@ -203,5 +209,8 @@ function buildSearchableProjectPickerLayoutProps(
     visibleProjects: pickerState.visibleProjects,
     ...(props.dataUiPrefix === undefined ? {} : { dataUiPrefix: props.dataUiPrefix }),
     ...(props.renderProjectRow === undefined ? {} : { renderProjectRow: props.renderProjectRow }),
+    ...(props.renderSearchField === undefined
+      ? {}
+      : { renderSearchField: props.renderSearchField }),
   };
 }

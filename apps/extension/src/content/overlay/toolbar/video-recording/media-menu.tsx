@@ -1,5 +1,6 @@
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
@@ -151,6 +152,7 @@ function RecordingMediaDeviceMenu(props: {
   return (
     <ToolbarMenuDropdown dataUi={`${props.dataUi}.dropdown`} menuRef={control.menuRef}>
       <ProductToolbarMenu
+        className="sniptale-content-menu-adopted"
         compact
         title={props.label}
         placement={control.dropdown.menuPlacement}
@@ -192,36 +194,38 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
   const control = useRecordingMediaControl(props);
   const Icon = props.active ? props.activeIcon : props.inactiveIcon;
   return (
-    <div
-      className="sniptale-split-action sniptale-full-page-wrapper"
-      data-active={props.active ? 'true' : 'false'}
-    >
-      <button
-        className="sniptale-btn sniptale-toggle sniptale-split-action-start sniptale-full-page-primary"
-        data-active={props.active ? 'true' : 'false'}
+    <div className="sniptale-split-action sniptale-full-page-wrapper">
+      <ContentToolbarButton
+        type="button"
+        tone="property"
+        className="sniptale-split-action-start sniptale-full-page-primary"
+        active={props.active}
+        aria-pressed={props.active}
         disabled={props.disabled || control.switching}
         title={props.label}
-        data-ui={`${props.dataUi}.toggle`}
+        dataUi={`${props.dataUi}.toggle`}
         onClick={() => void control.runToggle()}
       >
         <Icon size={18} />
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        tone="property"
         ref={control.triggerRef}
-        className="sniptale-btn sniptale-split-action-end sniptale-full-page-chevron"
+        className="sniptale-split-action-end sniptale-full-page-chevron"
         disabled={props.disabled || control.switching}
         aria-expanded={control.open}
         aria-haspopup="menu"
         title={props.label}
         data-menu-open={control.open ? 'true' : 'false'}
-        data-ui={`${props.dataUi}.menu`}
+        dataUi={`${props.dataUi}.menu`}
         onClick={(event) => {
           event.stopPropagation();
           control.toggleMenu();
         }}
       >
         <ChevronDown size={14} />
-      </button>
+      </ContentToolbarButton>
       <RecordingMediaDeviceMenu
         control={control}
         dataUi={props.dataUi}
@@ -232,8 +236,8 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
         <div
           role="alert"
           className={
-            'absolute top-[calc(100%+10px)] right-0 max-w-56 rounded-md ' +
-            'bg-[var(--sniptale-color-danger-subtle)] px-2 py-1 text-xs ' +
+            'absolute top-[calc(100%+10px)] right-0 max-w-56 rounded-[4px] select-text ' +
+            'bg-[var(--sniptale-color-danger-subtle)] px-2 py-1 text-[14px] leading-5 font-normal ' +
             'text-[var(--sniptale-color-danger)]'
           }
         >

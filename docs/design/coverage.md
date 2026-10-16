@@ -81,7 +81,7 @@ Native composition proof lives in `tooling/test/e2e/extension-critical/extension
 
 Content toolbars, annotation settings, Design Review and AutoBlur adopt shared command and parameter presentation at their concrete surfaces. Owned portals retain theme and interface typography. The content bootstrap registers bundled interface faces from its trusted stylesheet. Authored page text, annotations and drawing previews retain their existing font owners.
 
-Native composition proof lives in `extension-critical-content-design.spec.ts` and `extension-critical-content-controls-design.spec.ts` under `tooling/test/e2e/extension-critical/`. These checks cover host isolation, actual browser zoom, constrained placement, drafts, Undo, nested layers and drawing preferences. Existing focus, drawing and snapshot export suites retain gesture and authored-content proof. Recording controls remain a separate migration area.
+Native composition proof lives in `extension-critical-content-design.spec.ts` and `extension-critical-content-controls-design.spec.ts` under `tooling/test/e2e/extension-critical/`. These checks cover host isolation, actual browser zoom, constrained placement, drafts, Undo, nested layers and drawing preferences. Existing focus, drawing and snapshot export suites retain gesture and authored-content proof. Recording controls have their own integration checks below.
 
 ## Saved-page viewer integration
 
@@ -98,6 +98,14 @@ The camera recorder adopts shared commands and interface typography within its l
 The recorder has its own window contract. Check the actual recorder window separately from controlled CSS viewports. Do not impose the desktop editor minimum width on this surface.
 
 Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-camera-recorder-design.spec.ts`. It opens the recorder from the actual popup with synthetic media, device permission and registration. Existing recording lifecycle suites retain their separate engine and retention proof.
+
+## Content recorder integration
+
+The scenario recorder sidebar and active recording toolbar adopt shared commands within their existing content surfaces. The sidebar retains its drag target, step order, previews and capture actions. Its preview and metadata layers own keyboard focus, Escape and opener restoration. The project picker retains query and creation state. Its search renderer uses the existing text and Clear owner.
+
+Recording retains trusted Start admission, lifecycle commands, device selection, spotlight settings and specialized drawing controls. Property choices use neutral accepted states. Drawing modes retain their tool presentation. Media, clocks, gestures, capture and persistence keep their existing owners.
+
+Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-content-recorder-design.spec.ts`. Existing scenario, drawing and recording lifecycle suites retain their separate behavioral role. The extension popup remains excluded.
 
 ## Integration exclusions
 

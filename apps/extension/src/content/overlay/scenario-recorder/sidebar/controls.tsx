@@ -1,4 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState } from 'react';
+import { TextField } from '../../../../ui/compact-inspector-controls/text-field';
 import { SearchableProjectPicker } from '@sniptale/ui/searchable-project-picker';
 import { translate } from '../../../../platform/i18n';
 
@@ -15,17 +17,19 @@ export type ScenarioSidebarControlsProps = {
 export function ScenarioSidebarCaptureMode(props: ScenarioSidebarControlsProps) {
   return (
     <fieldset className="grid min-w-0 gap-1.5" data-ui="content.scenario.sidebar.capture-mode">
-      <legend className="mb-1 text-xs font-semibold text-[var(--sniptale-color-text-muted-strong)]">
+      <legend className="mb-1 text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
         {translate('scenario.content.captureMode')}
       </legend>
-      <div className="grid grid-cols-2 gap-1 rounded-[14px] bg-[var(--sniptale-color-surface-hover)] p-1">
+      <div className="grid grid-cols-2 gap-1">
         {(['manual', 'by-click'] as const).map((mode) => {
           const disabled = mode === 'by-click' && props.byClickDisabled;
           const label = translate(
             mode === 'manual' ? 'scenario.content.modeManual' : 'scenario.content.modeByClick'
           );
           return (
-            <button
+            <ProductActionButton
+              tone="toggle"
+              active={props.captureMode === mode}
               key={mode}
               type="button"
               aria-pressed={props.captureMode === mode}
@@ -39,16 +43,10 @@ export function ScenarioSidebarCaptureMode(props: ScenarioSidebarControlsProps) 
                     : 'scenario.content.modeByClickHint'
               )}
               onClick={() => void props.onSetCaptureMode(mode)}
-              className="min-w-0 rounded-[10px] px-2 py-2 text-xs font-semibold
-                text-[var(--sniptale-color-text-primary)] transition
-                aria-pressed:bg-[var(--sniptale-color-surface-panel)]
-                aria-pressed:shadow-sm hover:bg-[var(--sniptale-color-surface-panel)]
-                focus-visible:outline-2 focus-visible:outline-offset-2
-                focus-visible:outline-[var(--sniptale-color-border-accent-strong)]
-                disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-w-0 disabled:opacity-50"
             >
               {label}
-            </button>
+            </ProductActionButton>
           );
         })}
       </div>
@@ -85,7 +83,7 @@ export function ScenarioSidebarProjectPicker(
   return (
     <div
       data-ui="content.scenario.sidebar.project-picker"
-      className="min-h-0 rounded-[14px] border border-[var(--sniptale-color-border-soft)] p-2
+      className="min-h-0 rounded-[4px] border border-[var(--sniptale-color-border-soft)] p-2
         [&_[data-ui$='project-list']]:max-h-[148px] [&_[data-ui$='project-list']]:gap-1"
     >
       <SearchableProjectPicker
@@ -98,21 +96,34 @@ export function ScenarioSidebarProjectPicker(
         onCreateProject={() => run(() => props.onCreateProject(query))}
         onSearchQueryChange={setQuery}
         onSelectProject={(projectId) => void run(() => props.onProjectSelect(projectId))}
+        renderSearchField={({ onChange, searchId, searchPlaceholder, value, dataUiPrefix }) => (
+          <TextField
+            id={searchId}
+            label={searchPlaceholder}
+            value={value}
+            onChange={(event) => onChange(event.currentTarget.value)}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-autocomplete="none"
+            data-ui={`${dataUiPrefix}.search-input`}
+          />
+        )}
         renderProjectRow={({ active, dataUi, onSelect, project }) => (
-          <button
+          <ProductActionButton
+            tone="toggle"
+            active={active}
             type="button"
             data-ui={dataUi}
             onClick={onSelect}
             disabled={busy}
             aria-pressed={active}
             title={project.name}
-            className="flex min-h-8 w-full min-w-0 items-center rounded-md border-0 px-2 py-1 text-left text-xs
-              text-[var(--sniptale-color-text-primary)] aria-pressed:bg-[var(--sniptale-color-surface-hover)]
-              hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-2
-              focus-visible:outline-[var(--sniptale-color-border-accent-strong)] disabled:opacity-50"
+            className="min-w-0 w-full !justify-start disabled:opacity-50"
           >
             <span className="truncate">{project.name}</span>
-          </button>
+          </ProductActionButton>
         )}
         presentation="compact"
         projects={props.projects}

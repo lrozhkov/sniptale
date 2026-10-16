@@ -21,6 +21,8 @@ Menus share the light-glass surface, 5px shell inset, 8px row padding, and 36px 
 
 Dialog headers and bodies use 16px horizontal and 12px vertical insets. Footers use 16px horizontal and 8px vertical insets, with 8px between commands. Titles use the structural heading role. Messages use the appropriate text role. These defaults do not replace specialized recording strips or edge drawers.
 
+Compact popover headers use Interface 12px / 16px, weight 500, and secondary foreground. Use normal case and normal letter spacing. Do not apply the structural dialog heading role. Omit a header that repeats the trigger or first parameter name.
+
 At short heights, content scrolls while actions remain reachable through their actual owner. Modal focus stays within the dialog. Destructive confirmation initially focuses Cancel.
 
 ## Drafts and color

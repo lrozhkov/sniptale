@@ -90,14 +90,14 @@ function renderToolbarShell(
 }
 
 describe('ToolbarShellContent', () => {
-  it.each([false, true])('adopts ordinary chrome only outside recording mode=%s', (recording) => {
+  it.each([false, true])('adopts ordinary chrome in recording mode=%s', (recording) => {
     const container = document.createElement('div');
     container.innerHTML = renderToolbarShell(true, null, 1, undefined, recording);
     const toolbar = container.querySelector('[data-ui="content.toolbar.root"]');
-    expect(toolbar?.classList.contains('sniptale-content-toolbar-adopted')).toBe(!recording);
+    expect(toolbar?.classList.contains('sniptale-content-toolbar-adopted')).toBe(true);
     expect(
       container.querySelector('[data-testid="toolbar-primary"]')?.getAttribute('data-command-scope')
-    ).toBe(String(!recording));
+    ).toBe('true');
   });
 
   it.each([false, true])('keeps pointer focus cleared with activation bridge=%s', (bridged) => {
@@ -355,7 +355,7 @@ it.each([false, true])(
       expect(button.getAttribute('aria-expanded')).toBe('true');
       expect(down.defaultPrevented).toBe(false);
       expect(mouseDown.defaultPrevented).toBe(true);
-      expect(focusedAfterPointer).toBe(recording);
+      expect(focusedAfterPointer).toBe(false);
       expect(shadow.activeElement).not.toBe(button);
       expect(button.getAttribute('data-pressing')).not.toBe('true');
       // A keyboard activation keeps its deliberate focus and invokes the same command.

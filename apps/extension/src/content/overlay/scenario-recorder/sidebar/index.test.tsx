@@ -10,7 +10,7 @@ import type { ScenarioSidebarControlsProps } from './controls';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) => (key === 'shared.ui.clearField' ? 'Clear {field}' : key),
 }));
 
 const onDeleteStep = vi.fn();
@@ -543,4 +543,85 @@ it('keeps manual capture concise and exposes the panel capture action', async ()
   expect(
     container?.querySelector('[data-ui="content.scenario.sidebar.capture-visible"]')
   ).not.toBeNull();
+});
+
+it.each(['preview', 'metadata'] as const)(
+  'contains keyboard focus in the %s layer and restores its opener after Escape',
+  async (layer) => {
+    await renderSidebar([{ ...DEFAULT_STEPS[0]!, metadata: createSidebarMetadata() }]);
+    const trigger = container?.querySelector<HTMLButtonElement>(
+      layer === 'preview'
+        ? '[data-ui="content.scenario.sidebar.step-preview-button"]'
+        : '[data-ui="content.scenario.sidebar.step-info"]'
+    );
+    if (!trigger) throw new Error('Missing overlay opener');
+    trigger.focus();
+    act(() => trigger.click());
+    const dialog = container?.querySelector<HTMLElement>('[role="dialog"]');
+    const close = dialog?.querySelector<HTMLButtonElement>('button[title="common.actions.close"]');
+    expect(close).toBeDefined();
+    expect(document.activeElement).toBe(close);
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+
+    act(() => close?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+    expect(document.activeElement).toBe(close);
+    act(() => close?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+
+    expect(container?.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  }
+);
+
+it('preserves deliberate outside focus when the preview closes', async () => {
+  await renderSidebar();
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.scenario.sidebar.step-preview-button"]'
+  );
+  act(() => trigger?.click());
+  const outside = document.createElement('button');
+  document.body.append(outside);
+  try {
+    outside.focus();
+    act(() =>
+      container
+        ?.querySelector<HTMLButtonElement>(
+          '[data-ui="content.scenario.sidebar.floating-preview-close"]'
+        )
+        ?.click()
+    );
+    expect(container?.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(outside);
+  } finally {
+    outside.remove();
+  }
+});
+
+it('clears the controlled project query, restores field focus, and does not create a project', async () => {
+  const onCreateProject = vi.fn(async () => undefined);
+  await renderSidebar(DEFAULT_STEPS, 0, null, 0, { x: 300, y: 96 }, { onCreateProject });
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.scenario.sidebar.project-button"]')
+      ?.click()
+  );
+  const input = container?.querySelector<HTMLInputElement>(
+    '[data-ui="content.scenario.sidebar.project-picker.search-input"]'
+  );
+  if (!input) throw new Error('Missing project search input');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      'New project'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const clear = container?.querySelector<HTMLButtonElement>('.sniptale-field-clear');
+  expect(clear?.getAttribute('title')).toContain('scenario.content.projectSearchPlaceholder');
+  act(() => clear?.click());
+  expect(input.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker.create-button"]')
+  ).toBeNull();
+  expect(onCreateProject).not.toHaveBeenCalled();
 });

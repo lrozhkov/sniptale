@@ -68,25 +68,17 @@ export function ToolbarShellContent(props: {
           uiScale
         )}
       >
-        <CommandPressScope value={!toolbarProps.videoRecordingMode}>
+        <CommandPressScope value={true}>
           <ContentToolbarShell
             ref={derivedState.toolbarRef}
-            className={[
-              'sniptale-content-ui-zoom-surface',
-              toolbarProps.videoRecordingMode ? '' : 'sniptale-content-toolbar-adopted',
-            ].join(' ')}
+            className="sniptale-content-ui-zoom-surface sniptale-content-toolbar-adopted"
             dragging={derivedState.isDragging}
             dataUi="content.toolbar.root"
             data-display-mode={derivedState.displayMode}
             data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
             data-menu-open={menuOpen ? 'true' : undefined}
-            onPointerDownCapture={
-              toolbarProps.videoRecordingMode ? undefined : blurPointerActivatedToolbarFocus
-            }
-            onMouseDownCapture={(event) => {
-              preventPointerActivatedToolbarFocus(event);
-              if (toolbarProps.videoRecordingMode) blurPointerActivatedToolbarFocus(event);
-            }}
+            onPointerDownCapture={blurPointerActivatedToolbarFocus}
+            onMouseDownCapture={preventPointerActivatedToolbarFocus}
             onMouseOverCapture={onHoverCapture}
           >
             <ContentToolbarDragHandle onPointerDown={derivedState.handleMouseDown}>

@@ -296,7 +296,10 @@
   font: inherit;
 }
 .sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-title {
-  font: 600 14px / 20px var(--sniptale-font-interface);
+  font: 500 12px / 16px var(--sniptale-font-interface);
+  color: var(--sniptale-color-text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
 }
 .sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-item > svg,
 .sniptale-content-menu-adopted.sniptale-toolbar-menu
