@@ -81,7 +81,7 @@ export function EditorInspectorTemplateCards(props: {
   }));
 
   return (
-    <div className="space-y-3" data-editor-template-cards="true">
+    <div className="space-y-2" data-editor-template-cards="true">
       {props.annotationTagFiltering === true ? (
         <AnnotationTemplateQueryControls
           activeFilterTagIds={tagState.state.activeFilterTagIds}

@@ -6,23 +6,23 @@ type SelectorColumns = 1 | 2 | 3 | 4 | 5;
 
 function getSelectorColumnsClassName(columns: SelectorColumns): string {
   if (columns === 1) {
-    return 'grid grid-cols-1 gap-2';
+    return 'grid grid-cols-1 gap-1';
   }
   if (columns === 2) {
-    return 'grid grid-cols-2 gap-2';
+    return 'grid grid-cols-2 gap-1';
   }
   if (columns === 5) {
-    return 'grid grid-cols-5 gap-1.5';
+    return 'grid grid-cols-5 gap-1';
   }
   if (columns === 4) {
-    return 'grid grid-cols-4 gap-1.5';
+    return 'grid grid-cols-4 gap-1';
   }
 
-  return 'grid grid-cols-3 gap-2';
+  return 'grid grid-cols-3 gap-1';
 }
 
 const PREVIEW_TILE_BUTTON_CLASS_NAME = [
-  'flex min-h-14 items-center justify-center rounded-[8px] border px-2 py-2 transition',
+  'flex min-h-14 items-center justify-center rounded-[4px] border px-2 py-2 transition',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_86%,transparent)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_78%,transparent)]',
   'text-[color:var(--sniptale-color-text-secondary)]',
@@ -30,8 +30,8 @@ const PREVIEW_TILE_BUTTON_CLASS_NAME = [
 ].join(' ');
 
 const PREVIEW_TILE_BUTTON_ACTIVE_CLASS_NAME = [
-  'border-[color:var(--sniptale-color-accent)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_18%,transparent)]',
+  'border-[color:var(--sniptale-color-border-strong)]',
+  'bg-[color:var(--sniptale-color-surface-hover)]',
   'text-[color:var(--sniptale-color-text-primary)]',
 ].join(' ');
 
@@ -129,12 +129,15 @@ function PreviewTile<T extends string>(props: {
       onClick={() => props.onChange(option.value)}
       className={cx(
         PREVIEW_TILE_BUTTON_CLASS_NAME,
-        props.showLabel && 'flex-col gap-1.5',
+        props.showLabel && 'flex-col gap-1',
         active && PREVIEW_TILE_BUTTON_ACTIVE_CLASS_NAME,
         props.tileClassName
       )}
     >
-      <span aria-hidden="true" className="block w-full text-[color:var(--sniptale-color-accent)]">
+      <span
+        aria-hidden="true"
+        className="block w-full text-[color:var(--sniptale-color-text-primary)]"
+      >
         {props.renderPreview(option)}
       </span>
       {props.showLabel ? <PreviewTileLabel label={option.label} /> : null}
@@ -147,7 +150,7 @@ function PreviewTileLabel(props: { label: string }) {
     <span
       className={[
         'min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap',
-        'text-center text-[10px] font-semibold leading-3',
+        'text-center text-[12px] font-normal leading-4',
         'text-[color:var(--sniptale-color-text-secondary)]',
       ].join(' ')}
     >

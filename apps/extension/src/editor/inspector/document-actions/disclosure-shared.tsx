@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
@@ -9,14 +10,14 @@ import {
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 
 const disclosureButtonClassName = [
-  'flex w-full items-center justify-between gap-3 rounded-[12px] border border-transparent',
-  'bg-transparent px-3.5 py-3 text-left transition',
+  'flex w-full items-center justify-between gap-3 rounded-[4px] border border-transparent',
+  'bg-transparent min-h-8 px-2 py-0 text-left transition',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_82%,transparent)]',
   'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_82%,transparent)]',
 ].join(' ');
 
 const disclosureSummaryClassName = [
-  'inline-flex min-h-6 max-w-full items-center text-[12px] font-bold uppercase',
+  'inline-flex min-h-6 max-w-full items-center text-[12px] font-normal',
   'text-[color:var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
@@ -29,7 +30,7 @@ const disclosureMetaClassName = [
   'text-[color:var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
-export const disclosureContentClassName = 'space-y-3 px-3.5 pb-1 pt-0.5';
+export const disclosureContentClassName = 'sniptale-parameter-stack px-2 pb-1 pt-2';
 
 const logger = createLogger({ namespace: 'EditorDocumentActionsDisclosure' });
 
@@ -98,8 +99,11 @@ export function DisclosureButton(props: {
   title: string;
 }) {
   return (
-    <button
+    <ProductActionButton
+      compact
+      tone="secondary"
       type="button"
+      data-ui="editor.file-actions.disclosure"
       className={disclosureButtonClassName}
       onClick={props.onToggle}
       aria-expanded={props.isOpen}
@@ -118,7 +122,7 @@ export function DisclosureButton(props: {
             {props.title}
           </span>
           {props.description ? (
-            <span className="mt-0.5 block text-[11px] text-[color:var(--sniptale-color-text-secondary)]">
+            <span className="mt-0.5 block text-[12px] text-[color:var(--sniptale-color-text-secondary)]">
               {props.description}
             </span>
           ) : null}
@@ -128,6 +132,6 @@ export function DisclosureButton(props: {
         {props.summary ? <span className={disclosureSummaryClassName}>{props.summary}</span> : null}
         <DisclosureState isOpen={props.isOpen} />
       </span>
-    </button>
+    </ProductActionButton>
   );
 }

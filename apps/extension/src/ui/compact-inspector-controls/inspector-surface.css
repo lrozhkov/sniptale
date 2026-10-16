@@ -1,7 +1,8 @@
 @layer theme, base, components, utilities;
 
 /* Rollout boundary: pending editor surfaces and popup keep their current tokens. */
-.sniptale-compact-workspace {
+.sniptale-compact-workspace,
+.sniptale-compact-workspace[data-theme] {
   --sniptale-font-sans: var(--sniptale-font-interface);
   --sniptale-radius-sm: 4px;
   --sniptale-radius-md: 4px;
@@ -502,6 +503,7 @@
 }
 .sniptale-compact-workspace .sniptale-parameter-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   min-width: 0;
   gap: 4px;
@@ -641,4 +643,15 @@
   [data-ui='shared.ui.compact-inspector.textarea-field']
   > .sniptale-parameter-name {
   min-height: 18px;
+}
+
+.sniptale-compact-workspace .sniptale-static-parameter-row {
+  align-items: start;
+  padding-block: 7px;
+}
+
+@layer utilities {
+  .sniptale-compact-workspace [data-ui='shared.ui.compact-inspector.numeric-value-field'] {
+    border-radius: 4px !important;
+  }
 }

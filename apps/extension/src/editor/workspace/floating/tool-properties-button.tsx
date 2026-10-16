@@ -7,7 +7,7 @@ import { useToolPropertiesPopoverLayout } from './tool-properties-popover-layout
 const TOOL_PROPERTIES_POPOVER_CLASS_NAME = floatingChromeClassNames(
   'absolute left-[var(--editor-tool-properties-popover-left)] top-[var(--editor-tool-properties-popover-top)]',
   'z-50 max-h-[var(--editor-floating-popover-max-height)]',
-  'overflow-y-auto !rounded-none px-3 py-2 [scrollbar-gutter:stable_both-edges]',
+  'overflow-y-auto !rounded-[4px] px-3 py-2 [scrollbar-gutter:stable_both-edges]',
   'max-[720px]:translate-y-0'
 );
 
@@ -31,9 +31,13 @@ export function ToolPropertiesButton(props: {
   return (
     <div className="relative">
       <ContentToolbarButton
+        tone="outline"
         ref={popoverLayout.buttonRef}
         title={props.group.title}
         active={props.active}
+        aria-expanded={props.active}
+        aria-haspopup="dialog"
+        menuIndicator
         onClick={() => props.onToggle(props.group.id)}
         dataUi={`editor.floating.tool-properties.group.${props.group.id}`}
       >

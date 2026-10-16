@@ -51,7 +51,10 @@ import {
   getActionIconClassName,
   resolveActionFeedbackBadge,
 } from './helpers';
-import type { EditorDocumentActionCommand } from './model/types';
+import type { EditorDocumentActionCommand, EditorDocumentActionGroup } from './model/types';
+import { EditorDocumentActionGroupSection } from './sections';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { useDocumentActionFeedback } from './feedback';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -154,12 +157,12 @@ it('renders the disclosure trigger as a transparent row until hover or focus', (
   const summary = Array.from(container.querySelectorAll('span'))
     .reverse()
     .find((span) => span.textContent === 'Default');
-  expect(summary?.className).toContain('text-[12px] font-bold uppercase');
+  expect(summary?.className).toContain('text-[12px] font-normal');
   expect(summary?.className).not.toContain('tracking-');
 });
 
 it('keeps document action metadata aligned with compact label typography', () => {
-  expect(actionMetaClassName).toContain('font-semibold uppercase');
+  expect(actionMetaClassName).toContain('font-normal leading-4');
   expect(actionMetaClassName).not.toContain('tracking-');
 });
 
@@ -179,11 +182,150 @@ it('resolves compact document action emphasis and feedback badges', () => {
   expect(getActionButtonClassName(action('neutral'))).toContain('bg-transparent');
   expect(getActionButtonClassName(action('danger'))).toContain('danger');
   expect(getActionButtonClassName(action('tertiary'))).toContain('text-[12px]');
-  expect(getActionIconClassName(action('primary'))).toContain('accent-emphasis');
+  expect(getActionIconClassName(action('primary'))).toContain('text-secondary');
   expect(getActionIconClassName(action('danger'))).toContain('danger');
   expect(getActionIconClassName(action('neutral'))).toContain('text-secondary');
   expect(resolveActionFeedbackBadge(action('primary'), 'saving')).not.toBeNull();
   expect(resolveActionFeedbackBadge(action('primary'), 'saved')).not.toBeNull();
   expect(resolveActionFeedbackBadge(action('primary'), 'idle')).toBeNull();
   expect(resolveActionFeedbackBadge(action('primary', 'open-image'), 'saved')).toBeNull();
+});
+
+function renderActionGroup(group: EditorDocumentActionGroup) {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() =>
+    root?.render(
+      <CommandPressScope.Provider value={true}>
+        <EditorDocumentActionGroupSection group={group} getActionStatus={() => 'idle'} />
+      </CommandPressScope.Provider>
+    )
+  );
+}
+
+it('runs native ordinary and danger commands while refusing an unavailable command', async () => {
+  const open = vi.fn();
+  const close = vi.fn().mockRejectedValue(new Error('Close refused'));
+  const unavailable = vi.fn();
+  renderActionGroup({
+    id: 'session',
+    layout: 'stack',
+    items: [
+      {
+        id: 'open-image',
+        kind: 'command',
+        emphasis: 'secondary',
+        icon: Check,
+        label: 'Open image',
+        meta: 'PNG',
+        onClick: open,
+      },
+      {
+        id: 'close-file',
+        kind: 'command',
+        emphasis: 'danger',
+        icon: Check,
+        label: 'Close image',
+        onClick: close,
+      },
+      {
+        id: 'copy-png',
+        kind: 'command',
+        emphasis: 'neutral',
+        icon: Check,
+        label: 'Copy',
+        disabled: true,
+        disabledReason: 'Clipboard unavailable',
+        onClick: unavailable,
+      },
+      {
+        id: 'image-format',
+        kind: 'content',
+        label: 'Format',
+        content: <span>Format settings</span>,
+      },
+    ],
+  });
+  const openButton = container!.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.file-actions.action.open-image"]'
+  )!;
+  const closeButton = container!.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.file-actions.action.close-file"]'
+  )!;
+  const disabledButton = container!.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.file-actions.action.copy-png"]'
+  )!;
+  expect(openButton.textContent).toContain('PNG');
+  expect(openButton.dataset['tone']).toBe('default');
+  expect(closeButton.dataset['tone']).toBe('danger');
+  expect(disabledButton.disabled).toBe(true);
+  expect(disabledButton.title).toBe('Clipboard unavailable');
+  expect(container!.textContent).toContain('Format settings');
+  await act(async () => {
+    openButton.click();
+    closeButton.click();
+    disabledButton.click();
+  });
+  await flushEffects();
+  expect(open).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledOnce();
+  expect(unavailable).not.toHaveBeenCalled();
+  expect(toastErrorMock).toHaveBeenCalledOnce();
+  expect(loggerErrorMock).toHaveBeenCalledWith('Editor action failed', expect.any(Error), {
+    action: 'document-action:close-file',
+    context: undefined,
+  });
+});
+
+it('retains save feedback, prevents pending activation, and permits retry after completion', async () => {
+  let finish = () => {};
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const save = vi.fn().mockReturnValue(pending);
+  function Actions() {
+    const feedback = useDocumentActionFeedback();
+    return (
+      <CommandPressScope.Provider value={true}>
+        <EditorDocumentActionGroupSection
+          getActionStatus={feedback.getActionStatus}
+          group={{
+            id: 'primary-save',
+            layout: 'grid',
+            items: [
+              {
+                id: 'save-image',
+                kind: 'command',
+                emphasis: 'primary',
+                icon: Check,
+                label: 'Save image',
+                meta: 'PNG',
+                onClick: () => feedback.runActionFeedback('save-image', save),
+              },
+            ],
+          }}
+        />
+      </CommandPressScope.Provider>
+    );
+  }
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => root?.render(<Actions />));
+  const button = container.querySelector<HTMLButtonElement>('button')!;
+  expect(button.hasAttribute('data-command-press')).toBe(true);
+  expect(button.textContent).toContain('PNG');
+  await act(async () => button.click());
+  expect(save).toHaveBeenCalledOnce();
+  expect(button.disabled).toBe(true);
+  expect(button.querySelector('[aria-label="common.states.saving"]')).not.toBeNull();
+  expect(button.textContent).not.toContain('PNG');
+  await act(async () => button.click());
+  expect(save).toHaveBeenCalledOnce();
+  await act(async () => finish());
+  expect(button.disabled).toBe(false);
+  expect(button.querySelector('[aria-label="common.states.saved"]')).not.toBeNull();
+  await act(async () => button.click());
+  expect(save).toHaveBeenCalledTimes(2);
 });

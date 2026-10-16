@@ -27,8 +27,8 @@ function sourceImageProps(props: EditorInspectorFramePanelProps) {
 export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps) {
   return (
     <div data-ui="editor.frame-panel" className="min-w-0">
-      <div className="space-y-4 px-3 pt-3">
-        <div className="space-y-2.5">
+      <div className="sniptale-parameter-stack px-2 pt-2">
+        <div className="sniptale-parameter-stack">
           <EditorInspectorFrameBackgroundModeControl
             frameDraft={props.frameDraft}
             lastFillModeRef={props.lastFillModeRef}
@@ -61,7 +61,7 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
         </div>
         {!isFrameBackgroundNone(props.frameDraft) && (
           <>
-            <div className="space-y-2.5">
+            <div className="sniptale-parameter-stack">
               <EditorInspectorFramePlacementSection
                 hideHeader
                 frameDraft={props.frameDraft}
@@ -75,14 +75,14 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
                 setFrameDraft={props.setFrameDraft}
               />
             </div>
-            <div className="space-y-2.5">
+            <div className="sniptale-parameter-stack">
               <EditorInspectorFrameSourceImageBasics {...sourceImageProps(props)} />
               <EditorInspectorFrameSourceImageEffects {...sourceImageProps(props)} />
             </div>
           </>
         )}
       </div>
-      <div data-ui="editor.frame.actions" className="px-3 pb-3 pt-2">
+      <div data-ui="editor.frame.actions" className="px-2 pb-2 pt-2">
         <FrameApplyButton onApplyFrame={() => props.setFrameDraft(disableFrameBackground)} />
       </div>
     </div>

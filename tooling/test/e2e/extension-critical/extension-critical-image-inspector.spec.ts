@@ -100,9 +100,23 @@ for (const variant of [
         name: label('editor.compact.workspaceMakeDefault'),
         exact: true,
       });
+      const colorField = row.locator('[data-ui="shared.ui.compact-inspector.color-field"]');
       const rowBox = (await row.boundingBox())!;
+      const fieldBox = (await colorField.boundingBox())!;
       const actionBox = (await makeDefault.boundingBox())!;
-      expect(actionBox.width).toBeLessThan(rowBox.width / 2);
+      // Labels can grow with locale and font; both targets must fit without overlapping.
+      for (const box of [fieldBox, actionBox]) {
+        expect(box.x).toBeGreaterThanOrEqual(rowBox.x - 1);
+        expect(box.x + box.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1);
+        expect(box.y).toBeGreaterThanOrEqual(rowBox.y - 1);
+        expect(box.y + box.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 1);
+      }
+      const separated =
+        fieldBox.x + fieldBox.width <= actionBox.x + 1 ||
+        actionBox.x + actionBox.width <= fieldBox.x + 1 ||
+        fieldBox.y + fieldBox.height <= actionBox.y + 1 ||
+        actionBox.y + actionBox.height <= fieldBox.y + 1;
+      expect(separated).toBe(true);
       expect(actionBox.height).toBeGreaterThanOrEqual(28);
       const colorTrigger = row.locator('[data-ui="shared.ui.color-selector.picker-trigger"]');
       const picker = ui('shared.ui.color-selector.picker');
@@ -168,9 +182,23 @@ for (const variant of [
       await expect(snap).toHaveAttribute('aria-pressed', 'true');
       await ui('editor.floating.view-controls.workspace').click();
       await ui('editor.floating.layers.mode.frame').click();
+      const kinds = ui('editor.frame.background-mode');
+      const colorLabel = label('editor.compact.frameBackgroundModeColor');
+      const dropdown = kinds.locator('button[aria-haspopup="listbox"]');
+      if (await dropdown.count()) {
+        await dropdown.click();
+        await page.getByRole('option', { name: colorLabel, exact: true }).click();
+        await expect(dropdown).toHaveAttribute('aria-expanded', 'false');
+      } else {
+        const color = kinds.getByRole('button', { name: colorLabel, exact: true });
+        await color.click();
+        await expect(color).toHaveAttribute('aria-pressed', 'true');
+      }
       const group = ui('shared.linked-padding-fields');
       const slider = ui('editor.frame.padding-slider');
-      await group.locator('span[data-padding-hover="all"]').hover();
+      const paddingHeader = group.locator('[data-padding-link="all"]').locator('..');
+      await expect(paddingHeader).toHaveAttribute('data-padding-hover', 'all');
+      await paddingHeader.hover();
       await expect(slider.locator('input')).toBeVisible();
       expect(
         Math.abs((await slider.boundingBox())!.width - (await group.boundingBox())!.width)

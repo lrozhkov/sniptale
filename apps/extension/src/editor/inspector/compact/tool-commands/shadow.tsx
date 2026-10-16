@@ -113,7 +113,7 @@ function ShadowCommandContent(props: {
 
   return (
     <CompactCommandField label={props.label}>
-      <div className="space-y-4">
+      <div className="space-y-1">
         <ShadowRangeControl
           label={translate('editor.compact.shadowSize')}
           max={100}

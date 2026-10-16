@@ -1,14 +1,32 @@
 import type React from 'react';
 
 const FIELD_LABEL_CLASS_NAME =
-  'block truncate text-[11px] font-semibold leading-4 text-[color:var(--sniptale-color-text-muted-strong)]';
+  'block break-words text-[13px] font-medium leading-[18px] text-[color:var(--sniptale-color-text-secondary)]';
 
-export function FieldShell(props: { children: React.ReactNode; label: string }) {
+export function FieldShell(props: {
+  children: React.ReactNode;
+  label: string;
+  onActivate: () => void;
+}) {
   return (
-    <label className="block min-w-0 space-y-1">
+    <div
+      className="block min-w-0 space-y-1"
+      onPointerDown={(event) => {
+        if (
+          event.button === 0 &&
+          event.target instanceof Element &&
+          !event.target.closest('input,button')
+        )
+          event.preventDefault();
+      }}
+      onClick={(event) => {
+        if (event.target instanceof Element && !event.target.closest('input,button'))
+          props.onActivate();
+      }}
+    >
       <span className={FIELD_LABEL_CLASS_NAME}>{props.label}</span>
       {props.children}
-    </label>
+    </div>
   );
 }
 

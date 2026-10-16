@@ -3,11 +3,12 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { translate } from '../../../../platform/i18n';
 import { clampNumber, FieldShell } from './field-shared';
+import { toggleInspectorFieldEditing } from '../../../../ui/compact-inspector-controls/layout';
 
 const STEPPER_BUTTON_CLASS_NAME = [
-  'flex h-[15px] w-5 items-center justify-center rounded-[5px]',
+  'flex h-[15px] w-5 items-center justify-center rounded-[4px]',
   'text-[color:var(--sniptale-color-text-muted)] transition',
-  'hover:bg-[color:var(--sniptale-color-surface-hover)] hover:text-[color:var(--sniptale-color-accent)]',
+  'hover:bg-[color:var(--sniptale-color-surface-hover)] hover:text-[color:var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 function formatNumber(value: number): string {
@@ -109,16 +110,20 @@ export function NumberField(props: {
   onChange: (value: number) => void;
 }) {
   const field = useNumberFieldState(props);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   return (
-    <FieldShell label={props.label}>
+    <FieldShell
+      label={props.label}
+      onActivate={() => toggleInspectorFieldEditing(inputRef.current)}
+    >
       <div
         className={[
-          'group flex items-center gap-1 rounded-[8px] border px-2 transition',
+          'group flex items-center gap-1 rounded-[4px] border px-2 transition',
           'border-[color:var(--sniptale-color-border-soft)]',
           'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
         ].join(' ')}
       >
-        <NumberFieldInput label={props.label} field={field} />
+        <NumberFieldInput label={props.label} field={field} inputRef={inputRef} />
         <StepperButtons
           label={props.label}
           disabledDown={props.min !== undefined && field.value <= props.min}
@@ -171,15 +176,21 @@ function useNumberFieldState(props: {
   return { applyStep, commitDraft, draft, setDraft, updateDraft, value };
 }
 
-function NumberFieldInput(props: { field: ReturnType<typeof useNumberFieldState>; label: string }) {
+function NumberFieldInput(props: {
+  field: ReturnType<typeof useNumberFieldState>;
+  label: string;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}) {
   const { field } = props;
   return (
     <input
+      ref={props.inputRef}
       aria-label={props.label}
       inputMode="decimal"
       type="text"
       value={field.draft}
       onChange={(event) => field.updateDraft(event.currentTarget.value)}
+      onFocus={(event) => event.currentTarget.select()}
       onBlur={field.commitDraft}
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
@@ -189,7 +200,7 @@ function NumberFieldInput(props: { field: ReturnType<typeof useNumberFieldState>
         }
       }}
       className={[
-        'h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-[12px]',
+        'h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-[13px] leading-[18px]',
         'font-medium text-[color:var(--sniptale-color-text-primary)] outline-none',
       ].join(' ')}
     />

@@ -1,6 +1,8 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FolderOpen, Plus, Search } from 'lucide-react';
-import { useState, type DragEvent, type ReactNode } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
+import { InspectorFieldClear } from '../compact-inspector-controls/text-field';
+import { useContext, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { EditorStartItem } from './use-items';
 import { EditorStartThumbnail } from './thumbnail';
 export { useEditorStartItems, sortEditorStartItems } from './use-items';
@@ -93,17 +95,25 @@ function EditorStartActions(props: EditorStartProps & { onBrowse: () => void }) 
 
 function EditorStartCard(props: { item: EditorStartItem; start: EditorStartProps }) {
   const { item, start } = props;
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({
+    enabled: scoped,
+    disabled: start.pending || item.unavailable,
+    onClick: () => start.onSelect(item.id),
+  });
   return (
     <button
       type="button"
       disabled={start.pending || item.unavailable}
-      onClick={() => start.onSelect(item.id)}
+      {...press.props}
+      data-command-press={scoped ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
       className={cardClassName}
       title={item.title}
       data-ui="editor.start.project"
     >
       <EditorStartThumbnail item={item} fallback={start.icon} />
-      <span className="block px-4 py-3">
+      <span className={scoped ? 'sniptale-command-content block px-3 py-2' : 'block px-4 py-3'}>
         <span className="line-clamp-2 min-h-10 break-words text-sm font-medium leading-5">
           {item.title}
         </span>
@@ -111,6 +121,57 @@ function EditorStartCard(props: { item: EditorStartItem; start: EditorStartProps
           {item.unavailable ? start.unavailableLabel : item.detail}
         </span>
       </span>
+    </button>
+  );
+}
+
+function EditorStartSearch(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const scoped = useContext(CommandPressScope);
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <label className={`${searchClassName} relative ${scoped ? 'pr-8' : ''}`}>
+      <Search size={16} aria-hidden="true" />
+      <span className="sr-only">{props.label}</span>
+      <input
+        ref={input}
+        autoFocus
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+        className="bg-transparent text-sm outline-none"
+        placeholder={props.label}
+      />
+      {scoped && props.value ? <InspectorFieldClear label={props.label} target={input} /> : null}
+    </label>
+  );
+}
+
+function EditorStartRetryCommand(props: {
+  label: string;
+  onRetry: () => void;
+  recovery?: boolean;
+}) {
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({ enabled: scoped, onClick: props.onRetry });
+  const recentClassName = scoped
+    ? [
+        'mt-2 min-h-8 rounded-[4px] px-2 text-[13px]',
+        'text-[var(--sniptale-color-text-primary)]',
+        'hover:bg-[var(--sniptale-color-surface-hover)]',
+      ].join(' ')
+    : 'mt-3 text-sm text-[var(--sniptale-color-accent-emphasis)] underline focus-visible:outline';
+  return (
+    <button
+      type="button"
+      {...press.props}
+      data-command-press={scoped ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
+      className={props.recovery ? 'mt-2 min-h-8 underline focus-visible:outline' : recentClassName}
+    >
+      {scoped ? <span className="sniptale-command-content">{props.label}</span> : props.label}
     </button>
   );
 }
@@ -128,17 +189,11 @@ function EditorStartRecent(
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">{props.recentLabel}</h2>
         {props.browse ? (
-          <label className={searchClassName}>
-            <Search size={16} aria-hidden="true" />
-            <span className="sr-only">{props.searchLabel}</span>
-            <input
-              autoFocus
-              value={props.query}
-              onChange={(event) => props.onQuery(event.target.value)}
-              className="bg-transparent text-sm outline-none"
-              placeholder={props.searchLabel}
-            />
-          </label>
+          <EditorStartSearch
+            label={props.searchLabel}
+            value={props.query}
+            onChange={props.onQuery}
+          />
         ) : null}
       </div>
       {props.status === 'loading' ? (
@@ -152,13 +207,7 @@ function EditorStartRecent(
           className="rounded-xl border border-[var(--sniptale-color-border-soft)] p-6"
         >
           <p>{props.errorLabel}</p>
-          <button
-            type="button"
-            onClick={props.onRetry}
-            className="mt-3 text-sm text-[var(--sniptale-color-accent-emphasis)] underline focus-visible:outline"
-          >
-            {props.retryLabel}
-          </button>
+          <EditorStartRetryCommand label={props.retryLabel} onRetry={props.onRetry} />
         </div>
       ) : null}
       {props.status === 'ready' && props.visible.length === 0 ? (
@@ -219,13 +268,11 @@ export function EditorStart(props: EditorStartProps) {
           <div role="alert" className="mt-4 text-sm text-[var(--sniptale-color-text-danger)]">
             <p>{props.actionError}</p>
             {props.onRecover ? (
-              <button
-                type="button"
-                onClick={props.onRecover}
-                className="mt-2 underline focus-visible:outline"
-              >
-                {props.retryLabel}
-              </button>
+              <EditorStartRetryCommand
+                label={props.retryLabel}
+                onRetry={props.onRecover}
+                recovery
+              />
             ) : null}
           </div>
         ) : null}

@@ -58,7 +58,7 @@ export function EditorInspectorGridToggleSections({
   const sections = buildGridToggleConfigs(gridEnabled, gridSnapEnabled, updateWorkspace);
 
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       {sections.map((section) => (
         <GridToggleSection key={section.id} {...section} />
       ))}

@@ -31,7 +31,9 @@ export const CompactCommandToken: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ children, className }) => (
-  <span className={cx('text-xs font-semibold uppercase text-current', className)}>{children}</span>
+  <span className={cx('text-[12px] font-medium leading-4 text-current', className)}>
+    {children}
+  </span>
 );
 
 export const CompactColorSwatchTrigger: React.FC<{
@@ -47,7 +49,7 @@ export const CompactColorSwatchTrigger: React.FC<{
       <span
         aria-hidden="true"
         className={[
-          'flex h-5 w-5 items-center justify-center rounded-[5px]',
+          'flex h-5 w-5 items-center justify-center rounded-[4px]',
           'text-[13px] font-semibold leading-none',
           'text-[color:var(--compact-command-color)]',
         ].join(' ')}
@@ -62,7 +64,7 @@ export const CompactColorSwatchTrigger: React.FC<{
     <span
       aria-hidden="true"
       className={[
-        'grid h-5 w-5 place-items-center rounded-[6px] border',
+        'grid h-5 w-5 place-items-center rounded-[4px] border',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]',
       ].join(' ')}
@@ -117,21 +119,21 @@ export const CompactCommandField: React.FC<{
   hideLabel?: boolean;
   hideValue?: boolean;
 }> = ({ label, value, children, note, className, hideLabel = false, hideValue = false }) => (
-  <div className={cx('space-y-3', className)}>
+  <div className={cx('space-y-1', className)}>
     {hideLabel ? null : (
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[12px] font-bold uppercase text-[color:var(--sniptale-color-text-secondary)]">
+        <span className="text-[13px] font-medium leading-[18px] text-[color:var(--sniptale-color-text-secondary)]">
           {label}
         </span>
         {value && !hideValue ? (
-          <span className="text-xs font-medium text-[color:var(--sniptale-color-text-secondary)]">
+          <span className="text-[13px] font-medium leading-[18px] text-[color:var(--sniptale-color-text-primary)]">
             {value}
           </span>
         ) : null}
       </div>
     )}
     {note ? (
-      <div className="text-sm leading-6 text-[color:var(--sniptale-color-text-secondary)]">
+      <div className="text-[12px] leading-4 text-[color:var(--sniptale-color-text-secondary)]">
         {note}
       </div>
     ) : null}

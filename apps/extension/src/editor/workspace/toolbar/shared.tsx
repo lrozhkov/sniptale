@@ -23,6 +23,7 @@ function SelectionAwareToolbarButton(props: {
 
   return (
     <EditorIconButton
+      variant="utility"
       title={props.title}
       onClick={() =>
         fireAndReportSelectionAwareEditorAction(

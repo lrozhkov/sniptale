@@ -1,9 +1,10 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 import { cx } from '../../chrome/ui';
 import { panelButtonClassName } from '../environment/shared';
 
 const workspaceDefaultErrorClassName = [
-  'rounded-[10px] border border-[color:var(--sniptale-color-danger)] px-3 py-2',
+  'rounded-[4px] border border-[color:var(--sniptale-color-danger)] px-3 py-2',
   'text-xs font-medium text-[color:var(--sniptale-color-danger)]',
 ].join(' ');
 
@@ -26,7 +27,9 @@ export function WorkspaceDefaultAction({
 
   return (
     <div className={variant === 'compact' ? 'contents' : 'space-y-2'}>
-      <button
+      <ProductActionButton
+        compact
+        tone="secondary"
         type="button"
         aria-label={translate('editor.compact.workspaceMakeDefault')}
         title={translate('editor.compact.workspaceMakeDefault')}
@@ -37,13 +40,13 @@ export function WorkspaceDefaultAction({
         className={cx(
           panelButtonClassName,
           'disabled:cursor-not-allowed disabled:opacity-50',
-          variant === 'compact' ? 'shrink-0 px-2 text-[11px]' : 'px-3.5'
+          variant === 'compact' ? 'shrink-0 px-2 text-[12px]' : 'px-3.5'
         )}
       >
         {isPending
           ? translate('common.states.saving')
           : translate('editor.compact.workspaceMakeDefault')}
-      </button>
+      </ProductActionButton>
       {error ? (
         <div
           role="alert"

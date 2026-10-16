@@ -104,7 +104,7 @@ export function EditorAnchoredConfirmPopover(props: {
   const style = useAnchoredPopoverPosition(props.anchorEl, 320);
   useAnchoredDialogLifecycle({
     anchorEl: props.anchorEl,
-    initialFocusSelector: '[data-confirm-action="true"]',
+    initialFocusSelector: '[data-cancel-action="true"]',
     onClose: props.onCancel,
     popoverRef,
   });
@@ -124,13 +124,14 @@ export function EditorAnchoredConfirmPopover(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
-      className="sniptale-content-popover--compact !rounded-none !w-[320px]"
+      className="sniptale-compact-workspace sniptale-image-workspace
+        sniptale-content-popover--compact !rounded-[4px] !w-[320px]"
       dataUi={props.dataUi}
       isOpen
       popoverRef={popoverRef}
       style={style}
     >
-      <div role="alertdialog" aria-labelledby={`${props.dataUi}.title`} className="space-y-4 p-2">
+      <div role="alertdialog" aria-labelledby={`${props.dataUi}.title`} className="space-y-3 p-2">
         <div>
           <div
             id={`${props.dataUi}.title`}
@@ -143,7 +144,13 @@ export function EditorAnchoredConfirmPopover(props: {
           </p>
         </div>
         <div className="flex justify-end gap-2">
-          <ProductActionButton compact tone="secondary" disabled={pending} onClick={props.onCancel}>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            data-cancel-action="true"
+            disabled={pending}
+            onClick={props.onCancel}
+          >
             {props.cancelText}
           </ProductActionButton>
           <ProductActionButton
@@ -185,7 +192,7 @@ export function EditorAnchoredHistoryChoices(props: {
     popoverRef,
   });
   const rowClass = [
-    'w-full cursor-pointer rounded-md px-3 py-2 text-left',
+    'w-full cursor-pointer rounded-[4px] px-2 py-2 text-left',
     'hover:bg-[var(--sniptale-color-surface-hover)]',
     'focus-visible:outline focus-visible:outline-2',
     'focus-visible:outline-[var(--sniptale-color-accent)]',
@@ -194,7 +201,8 @@ export function EditorAnchoredHistoryChoices(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
-      className="sniptale-content-popover--compact !rounded-none !w-[320px]"
+      className="sniptale-compact-workspace sniptale-image-workspace
+        sniptale-content-popover--compact !rounded-[4px] !w-[320px]"
       dataUi={props.dataUi}
       isOpen
       popoverRef={popoverRef}
@@ -207,34 +215,40 @@ export function EditorAnchoredHistoryChoices(props: {
         >
           {props.title}
         </div>
-        <button
-          type="button"
-          className={rowClass}
+        <ProductActionButton
+          compact
+          tone="secondary"
+          className={`${rowClass} !h-auto !justify-start !whitespace-normal`}
           data-history-start="true"
           disabled={!props.canReturnToStart}
           onClick={props.onReturnToStart}
         >
-          <span className="block text-sm text-[var(--sniptale-color-text-primary)]">
-            {props.returnLabel}
+          <span className="block text-left">
+            <span className="block text-[13px] text-[var(--sniptale-color-text-primary)]">
+              {props.returnLabel}
+            </span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+              {props.returnDescription}
+            </span>
           </span>
-          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
-            {props.returnDescription}
-          </span>
-        </button>
+        </ProductActionButton>
         <div className="mx-3 my-1 border-t border-[var(--sniptale-color-border)]" />
-        <button
-          type="button"
-          className={rowClass}
+        <ProductActionButton
+          compact
+          tone="secondary"
+          className={`${rowClass} !h-auto !justify-start !whitespace-normal`}
           data-history-original="true"
           onClick={props.onRestoreOriginal}
         >
-          <span className="block text-sm text-[var(--sniptale-color-danger)]">
-            {props.restoreLabel}
+          <span className="block text-left">
+            <span className="block text-[13px] text-[var(--sniptale-color-danger)]">
+              {props.restoreLabel}
+            </span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+              {props.restoreDescription}
+            </span>
           </span>
-          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
-            {props.restoreDescription}
-          </span>
-        </button>
+        </ProductActionButton>
       </div>
     </ContentPopoverAdapter>
   );
@@ -248,7 +262,8 @@ export function EditorAnchoredAlert(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
-      className="sniptale-content-popover--compact !rounded-none !w-[min(300px,calc(100vw-24px))]"
+      className="sniptale-compact-workspace sniptale-image-workspace
+        sniptale-content-popover--compact !rounded-[4px] !w-[min(300px,calc(100vw-24px))]"
       dataUi={props.dataUi}
       isOpen
       style={useAnchoredPopoverPosition(props.anchorEl, 300)}

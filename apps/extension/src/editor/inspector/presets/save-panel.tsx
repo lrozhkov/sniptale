@@ -4,9 +4,9 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { SelectField, TextField, cx } from '../../chrome/ui';
 import type { EditorInspectorPresetSavePanelState } from './types';
 
-const saveModeOptionClassName = 'h-10 min-h-10 whitespace-normal px-2 py-1 text-center leading-4';
+const saveModeOptionClassName = 'h-8 min-h-8 whitespace-nowrap px-2 py-1 text-center leading-4';
 const cancelButtonClassName = [
-  'inline-flex h-9 items-center justify-center rounded-[10px] px-3 text-xs font-medium',
+  'inline-flex h-8 items-center justify-center rounded-[4px] px-3 text-xs font-medium',
   'text-[color:var(--sniptale-color-text-secondary)] transition',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
   'hover:text-[color:var(--sniptale-color-text-primary)]',
@@ -102,9 +102,15 @@ function renderOverwriteHint(state: EditorInspectorPresetSavePanelState) {
 function renderSavePanelActions(state: EditorInspectorPresetSavePanelState) {
   return (
     <div className="flex items-center justify-end gap-2">
-      <button type="button" onClick={state.onCancel} className={cancelButtonClassName}>
+      <ProductActionButton
+        compact
+        tone="secondary"
+        type="button"
+        onClick={state.onCancel}
+        className={cancelButtonClassName}
+      >
         {translate('editor.compact.cancel')}
-      </button>
+      </ProductActionButton>
       <ProductActionButton
         compact
         onClick={state.onSave}
@@ -123,7 +129,7 @@ export function EditorInspectorPresetSavePanel(props: {
   return (
     <div
       className={[
-        'space-y-3 rounded-[12px] border px-3 py-3',
+        'space-y-2 rounded-[4px] border px-3 py-3',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_86%,transparent)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_74%,var(--sniptale-color-surface-panel)_26%)]',
       ].join(' ')}

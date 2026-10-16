@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import type { EditorDocumentActionGroup } from './model/types';
 import type { AsyncFeedbackStatus } from './feedback';
@@ -45,7 +46,9 @@ function EditorDocumentActionButton({
   const feedbackBadge = resolveActionFeedbackBadge(action, status);
 
   return (
-    <button
+    <ProductActionButton
+      compact
+      tone={action.emphasis === 'danger' ? 'danger' : 'secondary'}
       type="button"
       data-emphasis={action.emphasis}
       data-tone={action.emphasis === 'danger' ? 'danger' : 'default'}
@@ -67,7 +70,7 @@ function EditorDocumentActionButton({
       </span>
       {feedbackBadge ??
         (action.meta ? <span className={actionMetaClassName}>{action.meta}</span> : null)}
-    </button>
+    </ProductActionButton>
   );
 }
 

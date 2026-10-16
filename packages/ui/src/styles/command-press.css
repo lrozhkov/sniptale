@@ -69,6 +69,20 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
     color: var(--sniptale-color-text-primary) !important;
   }
 
+  button[data-command-press][data-command-property='true'] {
+    border-color: transparent !important;
+    border-radius: var(--sniptale-radius-sm, 4px) !important;
+    background: transparent !important;
+    color: var(--sniptale-color-text-secondary) !important;
+    box-shadow: none !important;
+  }
+
+  button[data-command-press][data-command-property='true']:enabled:hover,
+  button[data-command-press][data-command-property='true'][data-active='true'] {
+    background: var(--sniptale-color-surface-hover) !important;
+    color: var(--sniptale-color-text-primary) !important;
+  }
+
   button[data-command-press]:focus-visible {
     outline: 2px solid var(--sniptale-color-accent) !important;
     outline-offset: -2px;

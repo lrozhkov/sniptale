@@ -118,3 +118,13 @@ it('discards a draft on document replacement without remounting action controls'
   expect(container.querySelector('button')).toBe(button);
   expect(mocks.rename).not.toHaveBeenCalled();
 });
+
+it('clears the name draft without renaming or losing text focus', () => {
+  const clear = container.querySelector<HTMLButtonElement>('.sniptale-field-clear');
+  expect(clear).not.toBeNull();
+  act(() => clear?.click());
+  expect(input().value).toBe('');
+  expect(document.activeElement).toBe(input());
+  expect(mocks.rename).not.toHaveBeenCalled();
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
+});

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { createPortal } from 'react-dom';
 import { resolveThemeSafePortalTarget } from '@sniptale/ui/theme/safe-portal';
 import { X } from 'lucide-react';
@@ -23,13 +24,13 @@ function CompactPopoverHeader(
   props: Pick<EditorInspectorCompactPopoverProps, 'title' | 'value' | 'trigger' | 'onClose'>
 ) {
   const headerClassName = [
-    'mb-4 flex items-start justify-between gap-3 border-b',
-    'border-[color:var(--sniptale-color-border-soft)] pb-3',
+    'mb-2 flex items-start justify-between gap-2 border-b',
+    'border-[color:var(--sniptale-color-border-soft)] pb-2',
   ].join(' ');
 
   return (
     <div className={headerClassName}>
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2">
         <span className={COMPACT_POPOVER_TRIGGER_CLASSNAME}>{props.trigger}</span>
         <div className="min-w-0">
           <div className="text-sm font-semibold leading-snug text-[color:var(--sniptale-color-text-primary)]">
@@ -42,14 +43,15 @@ function CompactPopoverHeader(
           ) : null}
         </div>
       </div>
-      <button
-        type="button"
+      <ProductActionButton
+        tone="secondary"
+        data-command-chrome="true"
         onClick={props.onClose}
         className={['sniptale-dismiss-button', COMPACT_POPOVER_CLOSE_BUTTON_CLASSNAME].join(' ')}
         aria-label={translate('editor.runtime.closePopoverAria')}
       >
         <X size={16} strokeWidth={2} />
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

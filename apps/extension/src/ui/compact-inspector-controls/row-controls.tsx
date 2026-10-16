@@ -2,6 +2,7 @@ import type React from 'react';
 import { Search } from 'lucide-react';
 import { OptionRowValue, OptionToggleIndicator } from './control-renderers';
 import { cx } from './shared';
+import { InspectorParameterRow, useInspectorLayout } from './layout';
 
 function getNodeTitle(value: React.ReactNode): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -47,6 +48,24 @@ export function OptionRow(props: {
 }
 
 export function StatusRow(props: { label: React.ReactNode; value: React.ReactNode }) {
+  const inspector = useInspectorLayout();
+  if (inspector && typeof props.label === 'string') {
+    return (
+      <InspectorParameterRow
+        label={props.label}
+        className="sniptale-static-parameter-row"
+        keepInline
+        dataUi="shared.ui.compact-inspector.status-row"
+      >
+        <span
+          className="block min-w-0 [overflow-wrap:anywhere] text-right"
+          title={getNodeTitle(props.value)}
+        >
+          {props.value}
+        </span>
+      </InspectorParameterRow>
+    );
+  }
   return (
     <div
       data-ui="shared.ui.compact-inspector.status-row"

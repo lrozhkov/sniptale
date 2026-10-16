@@ -49,9 +49,14 @@ vi.mock('../../grouped', async (importOriginal) => ({
 
 vi.mock('../shared', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared')>()),
-  PanelSection: (props: { label: string; value?: string; children: React.ReactNode }) => (
+  PanelSection: (props: {
+    label: string;
+    value?: string;
+    children: React.ReactNode;
+    hideHeader?: boolean;
+  }) => (
     <section data-testid="panel-section">
-      <span>{props.label}</span>
+      {props.hideHeader ? null : <span>{props.label}</span>}
       {props.value ? <span>{props.value}</span> : null}
       {props.children}
     </section>
@@ -197,4 +202,39 @@ it('falls back to the draft layout mode when options are incomplete', async () =
   });
 
   expect(setLayoutMode).toHaveBeenCalledWith('fit-image');
+});
+
+it('omits only the section header when embedded beside additional scene parameters', async () => {
+  const onChange = vi.fn();
+  const options = [
+    { value: 'fit-image', label: 'Fit image' },
+    { value: 'expand-canvas', label: 'Expand canvas' },
+  ] satisfies Array<{ value: EditorFrameSettings['layoutMode']; label: string }>;
+  const renderPlacement = (hideHeader: boolean) =>
+    renderUi(
+      <EditorInspectorFramePlacementSection
+        frameDraft={FRAME}
+        frameLayoutModeOptions={options}
+        setLayoutMode={onChange}
+        hideHeader={hideHeader}
+      >
+        <span data-testid="adjacent-parameter">Padding</span>
+      </EditorInspectorFramePlacementSection>
+    );
+  await renderPlacement(true);
+  expect(container!.querySelector('[data-testid="panel-section"] > span')).toBeNull();
+  expect(
+    container!.querySelector('[data-testid="select-field-trigger"]')!.getAttribute('aria-label')
+  ).toBe('Placement');
+  expect(container!.querySelector('[data-testid="adjacent-parameter"]')!.textContent).toBe(
+    'Padding'
+  );
+  await act(async () =>
+    container!.querySelector<HTMLButtonElement>('[data-testid="select-field-trigger"]')!.click()
+  );
+  expect(onChange).toHaveBeenCalledWith('expand-canvas');
+  await renderPlacement(false);
+  expect(container!.querySelector('[data-testid="panel-section"] > span')!.textContent).toBe(
+    'Placement'
+  );
 });

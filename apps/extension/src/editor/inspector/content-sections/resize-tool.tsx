@@ -144,7 +144,7 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
   });
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {isCanvasMode ? (
         <CanvasCropModeSwitch
           mode={canvasCropMode}
@@ -255,7 +255,7 @@ function ResizeToolSizePanel(props: {
 
   return (
     <section aria-label={label} className={INSPECTOR_SECTION_SURFACE_CLASS_NAME}>
-      <div className="space-y-3">
+      <div className="space-y-2">
         <ResizeToolDimensionRow
           active={props.active}
           bounds={props.bounds}

@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import React from 'react';
 import { FlipHorizontal2, FlipVertical2, Move, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
 import type {
@@ -139,7 +140,7 @@ function RasterEffectEditor(props: {
       data-section="effect"
       tabIndex={-1}
     >
-      <div className="space-y-3 border-l-2 border-[color:var(--sniptale-color-border-soft)] pl-3">
+      <div className="space-y-1 border-l border-[color:var(--sniptale-color-border-soft)] pl-3">
         <EditorRasterEffectForm draftEffect={props.draftEffect} onChange={props.onChange} />
         <RasterEffectActions
           draftEffect={props.draftEffect}
@@ -195,7 +196,7 @@ function RasterEffectActions(props: {
 
   return (
     <div className="flex items-center gap-3 pb-3">
-      <button
+      <ProductActionButton
         type="button"
         className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
         onClick={() => {
@@ -207,7 +208,7 @@ function RasterEffectActions(props: {
         {translateLayerEffects(
           applied ? 'editor.toolbar.layerEffectsUpdate' : 'editor.toolbar.layerEffectsApply'
         )}
-      </button>
+      </ProductActionButton>
       {applied ? (
         <EditorIconButton
           title={translateLayerEffects('editor.toolbar.layerEffectsRemove')}

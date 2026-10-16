@@ -19,7 +19,7 @@ export function EditorInspectorSelectInput<T extends string>(props: {
   if (props.label !== undefined) {
     return (
       <CompactInspectorSelectField
-        className="min-h-8! border-transparent! bg-transparent! px-0! py-0!"
+        className="min-h-8! border-transparent! bg-transparent! py-0!"
         label={props.label}
         value={props.value}
         onChange={props.onChange}

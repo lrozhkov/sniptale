@@ -45,3 +45,5 @@ Measure parameter rhythm between visible label baselines. A compact one-line row
 
 
 Inline and stacked labels retain the same text inset from the row start. Moving a control below its label must not pull that label upward. Include text editors, dropdowns, segments, and compound resources in mixed-row checks.
+
+Every parameter stack constrains its columns to the available width. Intrinsic content must wrap or truncate inside its row. It must not widen adjacent rows.

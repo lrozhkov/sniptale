@@ -7,7 +7,7 @@ import type { RichShapeControlsProps } from './types';
 
 export function RichShapeEffectsSection(props: RichShapeControlsProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <RichShapeShadowControls {...props} />
       <RichShapeReflectionControls {...props} />
     </div>
@@ -27,7 +27,7 @@ function RichShapeShadowControls(props: RichShapeControlsProps) {
       defaultOpen={false}
       value={`${Math.round(size * 100)}%`}
     >
-      <div className="space-y-3">
+      <div className="space-y-1">
         <RangeField
           label={translate('editor.compact.richShapeSize')}
           value={Math.round(size * 100)}
@@ -111,7 +111,7 @@ function RichShapeReflectionControls(props: RichShapeControlsProps) {
       defaultOpen={false}
       value={`${Math.round(opacity * 100)}%`}
     >
-      <div className="space-y-3">
+      <div className="space-y-1">
         <PercentRangeField
           label={translate('editor.compact.richShapeTransparency')}
           value={opacity}

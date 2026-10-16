@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import { CommandPressScope, useCommandPress } from '../control-language/press';
 import { BookOpen } from 'lucide-react';
 import { AnnotatableImageToolbar } from '../annotatable-image-surface';
 import { DISABLED_EDITOR_ICON_HOVER_CLASS_NAME } from './styles.constants';
@@ -9,7 +10,7 @@ function joinClassNames(...values: Array<string | false | null | undefined>) {
 
 const EDITOR_FIELD_BORDER_CLASS_NAME = 'border-[color:var(--sniptale-color-border-soft)]';
 const EDITOR_ICON_BUTTON_BASE_CLASS_NAME = [
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border outline-none',
+  'inline-flex shrink-0 items-center justify-center border outline-none',
   'cursor-pointer',
   'transition-all duration-150 focus-visible:outline-none',
   'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0',
@@ -125,6 +126,7 @@ export const EditorIconButton = React.forwardRef<
     onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
     children: React.ReactNode;
     active?: boolean;
+    variant?: 'tool' | 'utility';
     danger?: boolean;
     disabled?: boolean;
     className?: string;
@@ -138,6 +140,7 @@ export const EditorIconButton = React.forwardRef<
     onMouseDown,
     children,
     active,
+    variant = 'tool',
     danger,
     disabled,
     className,
@@ -146,7 +149,10 @@ export const EditorIconButton = React.forwardRef<
   },
   ref
 ) {
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({ enabled: scoped, disabled, onClick });
   const buttonClassName = getEditorIconButtonClassName({
+    scoped,
     ...(active === undefined ? {} : { active }),
     ...(className === undefined ? {} : { className }),
     ...(danger === undefined ? {} : { danger }),
@@ -161,18 +167,23 @@ export const EditorIconButton = React.forwardRef<
       aria-label={title}
       aria-pressed={ariaPressed}
       onMouseDown={onMouseDown}
-      onClick={disabled ? undefined : onClick}
+      {...press.props}
+      data-command-press={scoped ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
+      data-command-chrome={scoped && variant === 'utility' ? 'true' : undefined}
+      data-command-icon={scoped ? variant : undefined}
       disabled={disabled}
       data-active={active ? 'true' : 'false'}
       {...(dataUi === undefined ? {} : { 'data-ui': dataUi })}
       className={buttonClassName}
     >
-      {children}
+      {scoped ? <span className="sniptale-command-content">{children}</span> : children}
     </button>
   );
 });
 
 function getEditorIconButtonClassName(props: {
+  scoped?: boolean;
   active?: boolean;
   className?: string;
   danger?: boolean;
@@ -180,6 +191,7 @@ function getEditorIconButtonClassName(props: {
 }) {
   return joinClassNames(
     EDITOR_ICON_BUTTON_BASE_CLASS_NAME,
+    props.scoped ? 'h-8 w-8 rounded-[4px]' : 'h-9 w-9 rounded-[8px]',
     props.active ? '' : EDITOR_ICON_BUTTON_IDLE_CLASS_NAME,
     props.active
       ? EDITOR_ICON_BUTTON_ACTIVE_CLASS_NAME

@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import React from 'react';
 import { translate } from '../../../platform/i18n';
 import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
@@ -30,7 +31,7 @@ export const EditorInspectorSizePanel: React.FC<{
   onToggleLock,
   onApply,
 }) => (
-  <div className="space-y-3">
+  <div className="space-y-2">
     <SizeControlsHeader label={label} valueText={valueText} />
     <SizeControlsRow
       width={width}
@@ -41,8 +42,14 @@ export const EditorInspectorSizePanel: React.FC<{
       onToggleLock={onToggleLock}
       dataSizePanelDimensions
     />
-    <button type="button" className={primaryPanelButtonClassName} onClick={onApply}>
+    <ProductActionButton
+      compact
+      tone="secondary"
+      type="button"
+      className={primaryPanelButtonClassName}
+      onClick={onApply}
+    >
       {translate('editor.compact.apply')}
-    </button>
+    </ProductActionButton>
   </div>
 );

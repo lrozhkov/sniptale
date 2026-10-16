@@ -1,3 +1,4 @@
+import { CommandPressScope } from '../control-language/press';
 import {
   type CSSProperties,
   type MouseEvent,
@@ -5,6 +6,7 @@ import {
   type RefObject,
   type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useState,
 } from 'react';
@@ -241,6 +243,7 @@ export function ColorSelectorFloatingLayer(props: {
   style: CSSProperties;
   ui: string;
 }) {
+  const scoped = useContext(CommandPressScope);
   const layerRef = useFloatingSurfaceWheelContainment(props.layerRef);
   const floatingPanelClassName =
     'fixed z-[2147483647] overflow-x-visible overflow-y-auto overscroll-contain';
@@ -254,7 +257,9 @@ export function ColorSelectorFloatingLayer(props: {
   return (
     <div
       ref={layerRef}
-      className={floatingPanelClassName}
+      className={
+        scoped ? `sniptale-compact-workspace ${floatingPanelClassName}` : floatingPanelClassName
+      }
       data-theme={props.portalTheme ?? undefined}
       data-floating-ui-root="true"
       {...{ [FLOATING_INTERACTION_CAPTURE_TRANSIENT_ATTRIBUTE]: 'true' }}

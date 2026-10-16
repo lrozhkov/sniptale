@@ -1,8 +1,9 @@
 import { ArrowDownLeft, Blend, Circle, PaintBucket, Square, Triangle, Type } from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { getColorAlpha, replaceColorChannels } from '@sniptale/foundation/color';
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
   DRAWING_MARKER_OPACITIES,
@@ -38,9 +39,11 @@ function QuickOptionButton(props: {
   label: string;
   onClick: () => void;
 }) {
+  const scoped = useContext(CommandPressScope);
   return (
     <ContentToolbarButton
       type="button"
+      tone={scoped ? 'property' : 'default'}
       active={props.active}
       aria-label={props.label}
       aria-pressed={props.active}
@@ -48,7 +51,7 @@ function QuickOptionButton(props: {
       dataUi={props.dataUi}
       className={[
         'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
-        props.active ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
+        !scoped && props.active ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
       ].join(' ')}
       onClick={props.onClick}
     >
@@ -273,10 +276,12 @@ export function ArrowDrawDirectionOption(props: {
   dataUi: string;
   onChange: (value: boolean) => void;
 }) {
+  const scoped = useContext(CommandPressScope);
   const label = translate('editor.compact.arrowDrawFromTip');
   return (
     <ContentToolbarButton
       type="button"
+      tone={scoped ? 'property' : 'default'}
       active={props.active}
       aria-label={label}
       aria-pressed={props.active}
@@ -404,9 +409,11 @@ function DrawingFillToggle(props: {
   emptyIconUi: string;
   onClick: () => void;
 }) {
+  const scoped = useContext(CommandPressScope);
   return (
     <ContentToolbarButton
       type="button"
+      tone={scoped ? 'property' : 'default'}
       active={props.filled}
       aria-pressed={props.filled}
       aria-label={props.label}
@@ -416,9 +423,11 @@ function DrawingFillToggle(props: {
         'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
         'focus-visible:!outline-solid focus-visible:!outline-2 focus-visible:!outline-offset-2',
         'focus-visible:!outline-[color:var(--sniptale-color-text-primary)]',
-        props.filled
-          ? '!text-[var(--sniptale-color-accent-emphasis)]'
-          : '!border-transparent !text-[var(--sniptale-color-text-secondary)]',
+        scoped
+          ? ''
+          : props.filled
+            ? '!text-[var(--sniptale-color-accent-emphasis)]'
+            : '!border-transparent !text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       onClick={props.onClick}
     >

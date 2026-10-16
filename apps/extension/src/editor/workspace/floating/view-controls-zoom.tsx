@@ -32,7 +32,7 @@ function ZoomPercentButton(props: { hasImage: boolean; zoomPercent: number }) {
       onClick={handleClick}
       dataUi="editor.floating.view-controls.zoom"
     >
-      <span className="min-w-11 text-center text-[11px] font-semibold tabular-nums">
+      <span className="min-w-11 text-center text-[13px] font-medium tabular-nums">
         {props.zoomPercent}%
       </span>
     </ContentToolbarButton>

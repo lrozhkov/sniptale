@@ -47,7 +47,7 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
   useAppLocale();
 
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <EditorWindowHeaderSettings browserFrame={browserFrame} syncBrowserFrame={syncBrowserFrame} />
       <EditorInspectorDetails
         preferenceId="browser-frame:layout"

@@ -61,7 +61,7 @@ function CompactAspectToggle({ checked, onClick }: AspectToggleProps) {
       aria-pressed={checked}
       data-ui="editor.size-controls.aspect-toggle"
       className={cx(
-        'inline-flex h-8 w-9 cursor-pointer items-center justify-center rounded-[9px] border',
+        'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-[4px] border',
         'transition-colors hover:bg-[color:var(--sniptale-color-surface-hover)]',
         'focus-visible:outline-2 focus-visible:outline-offset-2',
         'focus-visible:outline-[color:var(--sniptale-color-focus-ring)]',

@@ -14,6 +14,13 @@ it('mounts standalone and embedded Image through resource admission', async () =
   expect(render).toHaveBeenCalledOnce();
   const options = render.mock.calls[0]![0];
   expect(options.namespace).toBe('EditorEntrypoint');
-  if (!isValidElement(options.element)) throw new Error('Image entrypoint did not render');
-  expect(options.element.type).toBe(EditorResourceAdmission);
+  let element = options.element;
+  while (
+    isValidElement<{ children?: unknown }>(element) &&
+    element.type !== EditorResourceAdmission
+  ) {
+    element = element.props.children;
+  }
+  if (!isValidElement(element)) throw new Error('Image admission is missing');
+  expect(element.type).toBe(EditorResourceAdmission);
 });

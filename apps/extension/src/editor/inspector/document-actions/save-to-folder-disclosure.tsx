@@ -22,7 +22,7 @@ export function EditorDocumentSaveToFolderDisclosure(props: {
   const summaryProps = props.summary === undefined ? {} : { summary: props.summary };
 
   return (
-    <div className="space-y-2.5">
+    <div className="sniptale-parameter-stack">
       <DisclosureButton
         title={translate('editor.documentActions.saveToFolder')}
         isOpen={disclosure.isOpen}

@@ -59,7 +59,8 @@ export function EditorSaveToFolderDialog(props: {
     <ContentPopoverAdapter
       anchorEl={anchorEl}
       className={[
-        'sniptale-save-dialog !rounded-none !w-[min(560px,calc(100vw-24px))]',
+        'sniptale-compact-workspace sniptale-image-workspace sniptale-save-dialog',
+        '!rounded-[8px] !w-[min(560px,calc(100vw-24px))]',
         'max-h-[calc(100vh-5rem)] !p-0 overflow-y-auto',
       ].join(' ')}
       dataUi="editor.floating.document-bar.save-to-folder-popover"

@@ -1,3 +1,4 @@
+import { CommandPressScope } from '../control-language/press';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
@@ -90,4 +91,25 @@ it('keeps utility layout state accessible without applying selection or destruct
   expect(markup).not.toContain('sniptale-glass-toolbar-button--active');
   expect(markup).not.toContain('sniptale-toggle');
   expect(markup).not.toContain('sniptale-btn-close');
+});
+
+it('separates scoped property selection from tool mode and preserves preview content', () => {
+  const markup = renderToStaticMarkup(
+    <CommandPressScope value={true}>
+      <ContentToolbarButton tone="property" aria-pressed title="Font">
+        <span style={{ fontFamily: 'serif' }}>Aa</span>
+      </ContentToolbarButton>
+    </CommandPressScope>
+  );
+  expect(markup).toContain('data-command-property="true"');
+  expect(markup).toContain('aria-pressed="true"');
+  expect(markup).toContain('data-active="true"');
+  expect(markup).toContain('font-family:serif');
+  expect(markup).not.toContain('sniptale-glass-toolbar-button--active');
+  expect(markup).not.toContain('sniptale-toggle');
+  const pendingMarkup = renderToStaticMarkup(
+    <ContentToolbarButton active>Pending tool</ContentToolbarButton>
+  );
+  expect(pendingMarkup).not.toContain('data-command-property');
+  expect(pendingMarkup).toContain('sniptale-glass-toolbar-button--active');
 });

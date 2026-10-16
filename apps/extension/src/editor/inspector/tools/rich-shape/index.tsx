@@ -20,7 +20,7 @@ export function renderRichShapeControlsSection(
   const richShapeProps = { ...props, capabilities, roughCapable };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       {hasCapability(richShapeProps, 'line') ? <RichShapeLineSection {...richShapeProps} /> : null}
       {hasCapability(richShapeProps, 'fill') ? <RichShapeFillSection {...richShapeProps} /> : null}
       {hasCapability(richShapeProps, 'text') ? <RichShapeTextSection {...richShapeProps} /> : null}

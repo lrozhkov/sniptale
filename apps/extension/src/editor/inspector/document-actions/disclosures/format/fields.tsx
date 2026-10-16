@@ -12,11 +12,11 @@ export function EditorDocumentExportPreferencesFields(props: {
   sizeState?: EditorExportImageSizeState;
 }) {
   return (
-    <div className="space-y-3 rounded-[12px] bg-transparent px-3.5 py-2.5">
+    <div className="sniptale-parameter-stack rounded-[4px] bg-transparent px-2 py-2">
       <div
         data-ui="editor.file-actions.export-settings-header"
         className={
-          'flex items-center gap-2 text-[12px] font-bold uppercase ' +
+          'flex items-center gap-2 text-[14px] font-semibold leading-5 ' +
           'text-[color:var(--sniptale-color-text-secondary)]'
         }
       >

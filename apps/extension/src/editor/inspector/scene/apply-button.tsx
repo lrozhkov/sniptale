@@ -1,16 +1,19 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 import { INSPECTOR_SECONDARY_BUTTON_CLASS_NAME } from '../chrome';
 
 export function FrameApplyButton(props: { onApplyFrame: () => void }) {
   return (
-    <div className="pt-3">
-      <button
+    <div className="pt-0">
+      <ProductActionButton
+        compact
+        tone="secondary"
         className={`${INSPECTOR_SECONDARY_BUTTON_CLASS_NAME} justify-center px-3.5`}
         onClick={props.onApplyFrame}
         type="button"
       >
         {translate('editor.scene.resetBackground')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

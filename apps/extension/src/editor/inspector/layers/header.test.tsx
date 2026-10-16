@@ -35,7 +35,7 @@ it('renders layer insertion before navigation in the header', () => {
   expect(markup.indexOf('mock.insert')).toBeLessThan(markup.indexOf('editor.layers.auto-navigate'));
   expect(markup).not.toContain('editor.layers.show-outside-canvas');
   expect(markup).toContain('editor.toolbar.layersTitle');
-  expect(markup).toContain('text-[12px] font-semibold uppercase');
+  expect(markup).toContain('text-[12px] font-normal leading-4');
   expect(markup).not.toContain(
     'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]'
   );

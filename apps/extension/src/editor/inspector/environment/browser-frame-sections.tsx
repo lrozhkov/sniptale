@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import React, { useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
@@ -16,7 +17,7 @@ export const BrowserFrameBehaviorSections: React.FC<{
   browserFrame: BrowserFrameState;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
 }> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => (
-  <fieldset className="space-y-2.5">
+  <fieldset className="sniptale-parameter-stack">
     <legend className="sr-only">{translate('editor.compact.browserFrameLayout')}</legend>
     <SelectField
       label={translate('editor.compact.canvasBehavior')}
@@ -78,7 +79,9 @@ export const BrowserFrameResetSection: React.FC<{
           {actionError}
         </p>
       ) : null}
-      <button
+      <ProductActionButton
+        compact
+        tone="secondary"
         type="button"
         className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
         disabled={disabled || pending}
@@ -86,7 +89,7 @@ export const BrowserFrameResetSection: React.FC<{
         onClick={() => void handleReset()}
       >
         {pending ? translate('common.states.loading') : translate('windowHeader.reset')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { normalizeEditorImageSettings } from '../../../../features/editor/docume
 import { resolveEditorSourceImageGlowBlur } from '../../../../features/editor/document/image-types';
 
 const PREVIEW_CLASS_NAME = [
-  'grid h-32 overflow-hidden rounded-[12px] transition-[padding] duration-150',
+  'grid h-32 overflow-hidden rounded-[4px] transition-[padding] duration-150',
   'motion-reduce:transition-none',
 ].join(' ');
 const SOURCE_PREVIEW_CLASS_NAME = [

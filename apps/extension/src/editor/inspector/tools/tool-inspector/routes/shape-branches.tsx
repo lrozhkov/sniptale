@@ -15,7 +15,7 @@ function ShapeToolBranch(props: { onSelectShape: (entry: ShapeBrowserEntry) => v
   const customShapes = useShapeBrowserCustomShapes();
   const selectedEntryId = useEditorStore((state) => state.richShapeToolSelection?.shapeId ?? null);
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <ShapeBrowser
         additionalEntries={customShapes.entries}
         defaultSourceFilter="all"

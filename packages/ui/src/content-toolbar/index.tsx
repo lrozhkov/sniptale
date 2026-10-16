@@ -111,7 +111,7 @@ export interface ContentToolbarButtonProps extends ButtonHTMLAttributes<HTMLButt
   children: ReactNode;
   active?: boolean;
   menuIndicator?: boolean;
-  tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline';
+  tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline' | 'property';
   size?: 'default' | 'compact';
   dataUi?: string;
 }
@@ -143,6 +143,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
         {...props}
         {...press.props}
         data-command-press={scoped ? '' : undefined}
+        data-command-property={scoped && tone === 'property' ? 'true' : undefined}
         data-pressing={press.pressed ? 'true' : undefined}
         data-command-chrome={
           scoped && (tone === 'utility' || tone === 'close') ? 'true' : undefined
@@ -160,6 +161,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
             tone !== 'utility' &&
             tone !== 'outline' &&
             tone !== 'close' &&
+            tone !== 'property' &&
             'sniptale-glass-toolbar-button--active',
           tone === 'danger' && 'sniptale-glass-toolbar-button--danger',
           tone === 'danger' && 'sniptale-btn-danger',

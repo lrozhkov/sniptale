@@ -41,7 +41,7 @@ it('keeps modes available without image insertion when collapsed', () => {
   expect(markup.match(/aria-pressed="false"/g)).toHaveLength(6);
   expect(markup).not.toContain('mock.insert-image');
   expect(markup).toContain('pointer-events-auto flex shrink-0 items-center');
-  expect(markup).toContain('flex-row rounded-[14px]');
+  expect(markup).toContain('flex-row rounded-[4px]');
   expect(markup).not.toContain('editor.floating.layers.collapse-button');
   expectToolbarOrder(markup, false);
 });

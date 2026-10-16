@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Layers3, Minus, SquareMousePointer } from 'luci
 import { translate, useAppLocale } from '../../../platform/i18n';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { getLayerIcon } from '../../chrome/tool-icons';
-import { cx } from '../../chrome/ui';
+import { EditorIconButton, cx } from '../../chrome/ui';
 import { LayerRow } from './row';
 import { LayerInsertImageControl } from './file-input';
 import { ACTIVE_LAYER_NAVIGATION_BORDER_CLASS_NAME } from './header.constants';
@@ -18,7 +18,7 @@ const HEADER_FRAME_CLASS_NAME =
   'flex h-14 w-full items-center justify-between px-2 pr-3 transition';
 
 const HEADER_TOGGLE_BUTTON_CLASS_NAME =
-  'inline-flex h-8 w-8 items-center justify-center rounded-[10px] ' +
+  'inline-flex h-8 w-8 items-center justify-center rounded-[4px] ' +
   'text-[color:var(--sniptale-color-text-muted)] transition ' +
   'hover:bg-[color:var(--sniptale-color-surface-hover)] focus:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-[color:var(--sniptale-color-focus-ring)]';
@@ -28,7 +28,7 @@ const HEADER_NAVIGATION_BUTTON_CLASS_NAME =
   ` ${ACTIVE_LAYER_NAVIGATION_BORDER_CLASS_NAME}` +
   ' data-[active=true]:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_8%,transparent)]' +
   ' data-[active=true]:text-[color:var(--sniptale-color-accent-emphasis)]';
-const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-2 pb-6 pt-3';
+const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-1 pb-3 pt-2';
 
 type EditorInspectorLayersListProps = {
   layers: EditorLayerItem[];
@@ -53,17 +53,17 @@ function getListViewportClassName(args: { reserveScrollbarGutter: boolean; scrol
 
 function EditorInspectorLayersHeaderTitle(props: { layerCount: number; streamlined: boolean }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-3 px-2 text-left">
+    <div className="flex min-w-0 flex-1 items-center gap-2 px-2 text-left">
       {props.streamlined ? null : (
         <span className={cx(PANEL_ICON_CLASS_NAME, PANEL_ICON_SURFACE_CLASS_NAME)}>
           <Layers3 size={17} strokeWidth={2} />
         </span>
       )}
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-[color:var(--sniptale-color-text-primary)]">
+        <span className="block text-[14px] font-semibold leading-5 text-[color:var(--sniptale-color-text-primary)]">
           {translate('editor.toolbar.layersTitle')}
         </span>
-        <span className="block text-[12px] font-semibold uppercase text-[color:var(--sniptale-color-text-secondary)]">
+        <span className="block text-[12px] font-normal leading-4 text-[color:var(--sniptale-color-text-secondary)]">
           {props.layerCount} {translate('editor.toolbar.layerCountSuffix')}
         </span>
       </span>
@@ -89,22 +89,21 @@ function EditorInspectorLayersHeaderActions(props: {
       onClick={(event) => event.stopPropagation()}
     >
       <LayerInsertImageControl withLabel />
-      <button
-        type="button"
+      <EditorIconButton
         title={translate('editor.toolbar.layerAutoNavigate')}
         aria-label={translate('editor.toolbar.layerAutoNavigate')}
         aria-pressed={props.autoNavigateSelectedLayer}
-        data-active={props.autoNavigateSelectedLayer ? 'true' : undefined}
+        active={props.autoNavigateSelectedLayer}
         data-ui="editor.layers.auto-navigate"
         onClick={props.onToggleAutoNavigateSelectedLayer}
         className={HEADER_NAVIGATION_BUTTON_CLASS_NAME}
       >
         <SquareMousePointer size={16} className="text-current" />
-      </button>
+      </EditorIconButton>
       {props.streamlined ? null : (
         <>
-          <button
-            type="button"
+          <EditorIconButton
+            variant="utility"
             title={translate('editor.toolbar.layersTitle')}
             aria-label={translate('editor.toolbar.layersTitle')}
             onClick={handleClick}
@@ -117,7 +116,7 @@ function EditorInspectorLayersHeaderActions(props: {
             ) : (
               <ChevronUp size={16} className="text-[color:var(--sniptale-color-text-muted)]" />
             )}
-          </button>
+          </EditorIconButton>
         </>
       )}
     </div>
@@ -198,7 +197,7 @@ export const EditorInspectorLayersList = React.memo(function EditorInspectorLaye
                     key={child.id}
                     title={child.name}
                     className={[
-                      'flex min-h-7 items-center gap-2 truncate px-1 text-[11px]',
+                      'flex min-h-8 items-center gap-1 truncate px-1 text-[13px] leading-[18px]',
                       'text-[color:var(--sniptale-color-text-secondary)]',
                     ].join(' ')}
                   >

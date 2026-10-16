@@ -27,7 +27,11 @@ export function LayerInsertImageControl({ withLabel = false }: { withLabel?: boo
       />
       <EditorIconButton
         title={translate('editor.toolbar.insertImage')}
-        className={withLabel ? '!h-8 !w-auto shrink-0 gap-1 px-2 text-[11px]' : 'h-8 w-8 shrink-0'}
+        className={
+          withLabel
+            ? '!h-8 !w-auto shrink-0 gap-1.5 px-2 text-[13px] font-medium leading-[18px]'
+            : 'h-8 w-8 shrink-0'
+        }
         onClick={() => inputRef.current?.click()}
       >
         <ImagePlus size={15} strokeWidth={2} />

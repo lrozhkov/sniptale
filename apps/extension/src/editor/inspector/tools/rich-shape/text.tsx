@@ -39,7 +39,7 @@ function RichShapeTextBody(props: RichShapeControlsProps) {
   const colorLabel = translate('editor.compact.textColor');
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <SelectField
         label={translate('editor.compact.font')}
         value={fontToOption(text.fontFamily)}
@@ -194,7 +194,7 @@ function RichShapeTextInsetFields({ props }: { props: RichShapeControlsProps }) 
   };
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-semibold text-[color:var(--sniptale-color-text-muted-strong)]">
+      <div className="text-[13px] font-medium leading-[18px] text-[color:var(--sniptale-color-text-secondary)]">
         {translate('editor.compact.richShapeTextInsets')}
       </div>
       <div className="grid grid-cols-4 gap-1.5">

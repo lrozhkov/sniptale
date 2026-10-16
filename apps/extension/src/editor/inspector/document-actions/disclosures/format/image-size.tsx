@@ -13,7 +13,7 @@ export function EditorDocumentExportPreferencesImageSizeRow(props: {
       <SizeControlsHeader
         label={translate('editor.compact.imageSize')}
         valueText={`${props.sizeState.draft.width} × ${props.sizeState.draft.height}`}
-        valueClassName="text-[11px] normal-case tracking-normal"
+        valueClassName="text-[12px] normal-case tracking-normal"
       />
       <SizeControlsRow
         width={props.sizeState.draft.width}

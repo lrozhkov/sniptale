@@ -83,3 +83,58 @@ it('covers number field invalid draft recovery and stepper keyboard controls', (
   expect(onChange).toHaveBeenNthCalledWith(2, 16);
   expect(input().value).toBe('16');
 });
+
+it('selects the complete numeric draft on focus for replacement typing', () => {
+  renderNumberField(vi.fn());
+  act(() => input().focus());
+  expect(input().selectionStart).toBe(0);
+  expect(input().selectionEnd).toBe(input().value.length);
+});
+
+it('toggles editing from the parameter name without reopening or taking over the stepper', () => {
+  const onChange = vi.fn();
+  renderNumberField(onChange);
+  const name = [...container!.querySelectorAll('span')].find(
+    (node) => node.textContent === 'Size'
+  )!;
+  const clickName = () => {
+    const down = new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true });
+    name.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    name.click();
+  };
+  const blurred = vi.fn();
+  input().addEventListener('blur', blurred);
+  act(clickName);
+  expect(document.activeElement).toBe(input());
+  expect(input().selectionStart).toBe(0);
+  expect(input().selectionEnd).toBe(input().value.length);
+  const inputDown = new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true });
+  act(() => input().dispatchEvent(inputDown));
+  expect(inputDown.defaultPrevented).toBe(false);
+  act(() => input().click());
+  expect(document.activeElement).toBe(input());
+  act(clickName);
+  expect(document.activeElement).not.toBe(input());
+  expect(blurred).toHaveBeenCalledOnce();
+  act(clickName);
+  expect(document.activeElement).toBe(input());
+  const gap = name.parentElement!;
+  const gapDown = new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true });
+  act(() => gap.dispatchEvent(gapDown));
+  expect(gapDown.defaultPrevented).toBe(true);
+  act(() => gap.click());
+  expect(document.activeElement).not.toBe(input());
+  act(() => gap.click());
+  expect(document.activeElement).toBe(input());
+  const increase = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="Size editor.compact.increaseAriaSuffix"]'
+  )!;
+  increase.setPointerCapture = vi.fn();
+  act(() =>
+    increase.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
+  );
+  act(() => increase.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(input().value).toBe('17');
+  expect(onChange).toHaveBeenLastCalledWith(17);
+});

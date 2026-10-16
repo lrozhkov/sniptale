@@ -76,7 +76,7 @@ it('renders a compact anchored destructive dialog and confirms once while pendin
   const confirm = document.querySelector<HTMLButtonElement>('[data-confirm-action="true"]');
 
   expect(dialog?.querySelector('[role="alertdialog"]')).not.toBeNull();
-  expect(confirm).toBe(document.activeElement);
+  expect(document.querySelector('[data-cancel-action="true"]')).toBe(document.activeElement);
   await act(async () => {
     confirm?.click();
     confirm?.click();
@@ -130,7 +130,7 @@ it('uses a hand cursor and rounded hover surface for both history choices', () =
     '[data-ui="test.history"] button'
   )) {
     expect(button.className).toContain('cursor-pointer');
-    expect(button.className).toContain('rounded-md');
+    expect(button.className).toContain('rounded-[4px]');
   }
   expect(document.querySelector<HTMLButtonElement>('[data-history-start="true"]')?.disabled).toBe(
     true
@@ -180,7 +180,7 @@ it.each([
   const dialog = surface?.querySelector<HTMLElement>('[role="alertdialog"]');
   expect(positioner?.style.top).toBe('66px');
   expect(dialog?.className).toContain('p-2');
-  expect(dialog?.className).toContain('space-y-4');
+  expect(dialog?.className).toContain('space-y-3');
   expect(dialog?.querySelector('p')?.className).toContain('mt-2');
   expect(dialog?.textContent).toContain(title);
   expect(dialog?.textContent).toContain(message);

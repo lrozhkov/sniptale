@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import React from 'react';
 import { useState } from 'react';
 import {
@@ -14,10 +14,7 @@ import type { EditorInspectorToolsPanelProps } from './types';
 export const PanelSection: React.FC<React.ComponentProps<typeof BasePanelSection>> = (props) => (
   <BasePanelSection
     {...props}
-    surfaceClassName={cx(
-      INSPECTOR_SECTION_SURFACE_CLASS_NAME,
-      'rounded-[var(--sniptale-radius-xl)]'
-    )}
+    surfaceClassName={INSPECTOR_SECTION_SURFACE_CLASS_NAME}
     labelClassName={INSPECTOR_SECTION_LABEL_CLASS_NAME}
     valueClassName={INSPECTOR_SECTION_VALUE_CLASS_NAME}
   />
@@ -54,34 +51,27 @@ export function CollapsibleSection(props: {
       <button
         type="button"
         aria-expanded={open}
-        className={cx(INSPECTOR_SECTION_HEADER_CLASS_NAME, 'w-full items-center px-0 text-left')}
+        className={cx(
+          INSPECTOR_SECTION_HEADER_CLASS_NAME,
+          'min-h-8 w-full items-center px-2 text-left'
+        )}
         onClick={() => setOpen((next) => !next)}
       >
         <span className="flex min-w-0 items-center gap-1">
-          {open ? (
-            <ChevronDown
-              aria-hidden="true"
-              size={14}
-              strokeWidth={2.4}
-              className="shrink-0 text-[color:var(--sniptale-color-text-muted)]"
-            />
-          ) : (
-            <ChevronRight
-              aria-hidden="true"
-              size={14}
-              strokeWidth={2.4}
-              className="shrink-0 text-[color:var(--sniptale-color-text-muted)]"
-            />
-          )}
-          <span className="text-[12px] font-bold uppercase text-[color:var(--sniptale-color-text-secondary)]">
+          <span className="text-[13px] font-semibold leading-[18px] text-[color:var(--sniptale-color-text-secondary)]">
             {props.label}
           </span>
         </span>
         {props.value ? (
           <span className={INSPECTOR_SECTION_VALUE_CLASS_NAME}>{props.value}</span>
         ) : null}
+        <ChevronDown
+          aria-hidden="true"
+          size={14}
+          className={cx('shrink-0', open && 'rotate-180')}
+        />
       </button>
-      {open ? props.children : null}
+      {open ? <div className="space-y-1 pt-2">{props.children}</div> : null}
     </section>
   );
 }

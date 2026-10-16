@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EditorTechnicalDataPicker } from './technical-data-picker';
@@ -158,7 +159,7 @@ it('keeps page-data typography and colors separate from the text tool', async ()
   );
 });
 
-it('keeps font and size beside their labels with readable controls and quiet color pickers', async () => {
+it('keeps font and size in shared parameter slots with readable previews and quiet color pickers', async () => {
   await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
 
   for (const [row, options, count] of [
@@ -169,11 +170,18 @@ it('keeps font and size beside their labels with readable controls and quiet col
     const buttons = rowElement?.querySelectorAll(
       `[data-ui="editor.technical-data.${options}"] button`
     );
-    expect(rowElement?.className).toContain('items-center');
+    expect(rowElement?.className).toContain('sniptale-parameter-row');
+    expect(rowElement?.querySelector('.sniptale-parameter-name')).not.toBeNull();
+    expect(rowElement?.querySelector('.sniptale-parameter-value')).not.toBeNull();
     expect(buttons).toHaveLength(count);
     for (const button of buttons ?? []) expect(button.className).toContain('h-8');
   }
 
+  const serifPreview = container.querySelector<HTMLElement>(
+    '[data-ui="editor.technical-data.font-serif"] span[style]'
+  );
+  expect(serifPreview?.textContent).toBe('Aa');
+  expect(serifPreview?.style.fontFamily).toContain('serif');
   const pickerTriggers = container.querySelectorAll('[data-ui="shared.ui.color-selector.trigger"]');
   expect(pickerTriggers).toHaveLength(1);
   for (const trigger of pickerTriggers) {
@@ -295,4 +303,43 @@ it('reports when insertion succeeds but saving the preference fails', async () =
   expect(container.querySelector('[role="alert"]')?.textContent).toBe(
     'editor.compact.technicalDataPreferenceSaveFailed'
   );
+});
+
+it('uses neutral property choices only in migrated hosts while retaining authored previews and settings', async () => {
+  const ordinaryTextSettings = useEditorStore.getState().toolSettings.text;
+  const renderPicker = (scoped: boolean) =>
+    act(async () =>
+      root.render(
+        <CommandPressScope value={scoped}>
+          <EditorTechnicalDataPicker onInsert={vi.fn()} />
+        </CommandPressScope>
+      )
+    );
+  await renderPicker(true);
+  const font = () =>
+    container.querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.font-serif"]')!;
+  const size = () =>
+    container.querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.size-24"]')!;
+  for (const option of [font(), size()]) {
+    expect(option.dataset['commandProperty']).toBe('true');
+    expect(option.classList.contains('sniptale-toggle')).toBe(false);
+  }
+  act(() => {
+    font().click();
+    size().click();
+  });
+  expect(font().getAttribute('aria-pressed')).toBe('true');
+  expect(size().getAttribute('aria-pressed')).toBe('true');
+  expect(font().classList.contains('sniptale-glass-toolbar-button--active')).toBe(false);
+  expect(font().querySelector<HTMLElement>('span[style]')!.style.fontFamily).toContain('serif');
+  await renderPicker(false);
+  expect(font().hasAttribute('data-command-property')).toBe(false);
+  expect(size().hasAttribute('data-command-property')).toBe(false);
+  expect(font().classList.contains('sniptale-glass-toolbar-button--active')).toBe(true);
+  expect(size().classList.contains('sniptale-toggle')).toBe(true);
+  expect(useEditorStore.getState().technicalDataTextSettings).toMatchObject({
+    fontFamily: 'serif',
+    fontSize: 24,
+  });
+  expect(useEditorStore.getState().toolSettings.text).toBe(ordinaryTextSettings);
 });

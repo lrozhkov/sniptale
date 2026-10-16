@@ -38,6 +38,7 @@ export function EditorFloatingToolHistoryControls(props: {
         className={TOOL_HISTORY_CONTROLS_CLASS_NAME}
       >
         <ContentToolbarButton
+          tone="utility"
           title={getUndoButtonTitle(props.history.canUndo)}
           disabled={!props.history.canUndo}
           onClick={() => runSelectionAwareAction('toolbar-undo', () => controller.undo())}
@@ -46,6 +47,7 @@ export function EditorFloatingToolHistoryControls(props: {
           <Undo2 size={18} strokeWidth={2} />
         </ContentToolbarButton>
         <ContentToolbarButton
+          tone="utility"
           title={getRedoButtonTitle(props.history.canRedo)}
           disabled={!props.history.canRedo}
           onClick={() => runSelectionAwareAction('toolbar-redo', () => controller.redo())}
@@ -54,6 +56,7 @@ export function EditorFloatingToolHistoryControls(props: {
           <Redo2 size={18} strokeWidth={2} />
         </ContentToolbarButton>
         <ContentToolbarButton
+          tone="utility"
           ref={resetButtonRef}
           title={translate('editor.toolbar.resetOriginalTooltip')}
           disabled={!props.hasImage}

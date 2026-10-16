@@ -24,7 +24,7 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
         label={translate('editor.compact.sceneBackground')}
         value={params.backgroundSummary}
       >
-        <div className="space-y-3">
+        <div className="space-y-1">
           <EditorInspectorFrameBackgroundModeControl
             frameDraft={params.frameDraft}
             lastFillModeRef={params.lastFillModeRef}

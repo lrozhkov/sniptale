@@ -81,7 +81,7 @@ export function EditorInspectorFrameSourceImageFields(
   props: EditorInspectorFrameSourceImageFieldsProps
 ) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <EditorInspectorFrameSourceImageBasics {...props} />
       <EditorInspectorFrameSourceImageEffects {...props} />
     </div>
@@ -94,7 +94,7 @@ export function EditorInspectorFrameSourceImageBasics(
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
 
   return (
-    <div className="space-y-3" data-ui="editor.frame.source-basics">
+    <div className="sniptale-parameter-stack" data-ui="editor.frame.source-basics">
       <SourceImageRangeSection
         label={translate('editor.compact.cornerRadius')}
         max={80}
@@ -111,7 +111,7 @@ export function EditorInspectorFrameSourceImageEffects(
 ) {
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <SourceImageShadowSection props={props} settings={settings} />
       <SourceImageBorderSection props={props} settings={settings} />
     </div>
@@ -124,7 +124,7 @@ function SourceImageShadowSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <section className="space-y-2.5" data-ui="editor.frame.source-glow">
+    <section className="sniptale-parameter-stack" data-ui="editor.frame.source-glow">
       <SourceImageRangeControl
         label={translate('editor.scene.glowSize')}
         max={100}
@@ -150,7 +150,7 @@ function SourceImageBorderSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <section className="space-y-2.5" data-ui="editor.frame.source-border">
+    <section className="sniptale-parameter-stack" data-ui="editor.frame.source-border">
       <SourceImageRangeControl
         label={translate('editor.compact.blurStrokeWidth')}
         max={24}
@@ -163,7 +163,7 @@ function SourceImageBorderSection(args: {
         level="group"
         label={translate('editor.scene.borderAdvanced')}
       >
-        <div className="space-y-3">
+        <div className="sniptale-parameter-stack">
           <SelectField
             label={translate('highlighter.editor.styleLabel')}
             value={settings.strokeStyle}

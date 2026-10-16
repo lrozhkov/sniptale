@@ -8,6 +8,7 @@ import { CheckboxField, ColorField, SelectField, ToggleField } from './controls'
 import { TextField } from './text-field';
 import { NumericRow } from './numeric';
 import { TextareaField } from './textarea-field';
+import { StatusRow } from './row-controls';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -346,4 +347,20 @@ it('cancels a held clear command without changing or accepting its draft', () =>
   expect(change).not.toHaveBeenCalled();
   expect(commit).not.toHaveBeenCalled();
   expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('Scene');
+});
+
+it('presents a scoped static value without an editable or disabled control', () => {
+  const value = 'A long selected object name that must remain available';
+  act(() =>
+    root.render(
+      <InspectorLayout>
+        <StatusRow label="Selected object" value={value} />
+      </InspectorLayout>
+    )
+  );
+  const row = host.querySelector('[data-ui="shared.ui.compact-inspector.status-row"]');
+  expect(row?.textContent).toBe(`Selected object${value}`);
+  expect(row?.querySelector('[title]')?.textContent).toBe('Selected object');
+  expect(row?.querySelector('.sniptale-parameter-value')?.textContent).toBe(value);
+  expect(row?.querySelector('input,textarea,button,[aria-disabled]')).toBeNull();
 });

@@ -16,7 +16,7 @@ export function WorkspacePanelBody(props: {
   saveWorkspaceColorAsDefault: () => Promise<void> | void;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <WorkspaceColorSection {...props} />
       <WorkspacePresetSection {...props} />
       <WorkspaceDefaultAction
@@ -64,12 +64,14 @@ function WorkspacePresetSection(props: {
             key={color}
             type="button"
             title={color}
+            aria-label={color}
+            aria-pressed={props.workspaceBackgroundColor.toLowerCase() === color}
             onClick={() => props.applyWorkspaceColor(color)}
             className={cx(
-              'h-10 rounded-[12px] border transition hover:-translate-y-px',
+              'h-8 rounded-[4px] border transition-colors',
               props.workspaceBackgroundColor.toLowerCase() === color
-                ? 'border-[color:var(--sniptale-color-border-accent-strong)] ' +
-                    'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_10%,transparent)]'
+                ? 'border-[color:var(--sniptale-color-border-strong)] ' +
+                    'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-text-primary)_16%,transparent)]'
                 : 'border-[color:var(--sniptale-color-border-soft)]'
             )}
             style={{ backgroundColor: color }}

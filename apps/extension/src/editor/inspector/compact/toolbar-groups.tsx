@@ -12,7 +12,7 @@ interface EditorInspectorCompactToolbarGroupsProps {
 
 const EMPTY_STATE_CLASS_NAME = [
   'flex min-h-0 flex-1 items-center justify-center',
-  'text-xs font-semibold uppercase text-[color:var(--sniptale-color-text-muted-strong)]',
+  'text-[12px] font-normal leading-4 text-[color:var(--sniptale-color-text-muted-strong)]',
 ].join(' ');
 
 function buildCommandButtonProps(command: CompactCommand, collapsedCommandId: string | null) {
@@ -43,14 +43,14 @@ export function EditorInspectorCompactToolbarGroups({
           {groupIndex > 0 ? (
             <EditorDivider vertical={false} className="my-1 w-8 self-center" />
           ) : null}
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-1">
             {group.map((command) => (
               <EditorIconButton
                 key={command.id}
                 ref={(element) => registerCompactCommandButtonRef(command.id, element)}
                 title={command.title}
                 onClick={() => onCommandClick(command)}
-                className="h-10 w-10"
+                className="h-8 w-8"
                 {...buildCommandButtonProps(command, collapsedCommandId)}
               >
                 {resolveCompactCommandTrigger(command)}

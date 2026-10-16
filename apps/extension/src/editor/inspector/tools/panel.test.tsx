@@ -204,7 +204,7 @@ describe('inspector tool panels', () => {
     const stepGroups = getSectionChildren(stepSection);
     const textSections = getStepGroupSections(stepGroups[0] as React.ReactElement<any>);
     const shapeSections = getStepGroupSections(stepGroups[1] as React.ReactElement<any>);
-    expect(stepSection.props.className).toBe('space-y-3');
+    expect(stepSection.props.className).toBe('space-y-1');
     getControlProps(getRequiredValue(textSections[0], 'step type panel')).onChange('letter');
     getWrappedControlProps(getRequiredValue(textSections[1], 'step value panel')).onChange({
       currentTarget: { value: 'b' },
@@ -256,7 +256,7 @@ describe('inspector tool panels', () => {
     expect(
       ((cropSection.props.children as React.ReactElement<any>[])[1] as React.ReactElement<any>)
         .props.className
-    ).toBe('grid grid-cols-[auto_minmax(0,1fr)] gap-2');
+    ).toBe('grid grid-cols-[auto_minmax(0,1fr)] gap-1');
     await act(async () => {
       getRequiredValue(cropButtons[0], 'apply crop button').props.onClick();
       getRequiredValue(cropButtons[1], 'cancel crop button').props.onClick();

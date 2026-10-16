@@ -125,9 +125,9 @@ it('returns null for every legacy selection-action branch', async () => {
 });
 
 it('reuses inspector chrome button classes for tool panels', () => {
-  expect(panelButtonClassName).toContain('rounded-[12px]');
+  expect(panelButtonClassName).toContain('rounded-[4px]');
   expect(panelButtonClassName).toContain('border-none');
-  expect(primaryPanelButtonClassName).toContain('text-[12px] font-medium');
+  expect(primaryPanelButtonClassName).toContain('text-[13px] font-medium');
   expect(secondaryPanelButtonClassName).toContain(
     'hover:text-[color:var(--sniptale-color-text-primary)]'
   );

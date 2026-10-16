@@ -12,7 +12,7 @@ function EditorInspectorPresetParameters(props: {
   state: EditorInspectorPresetHeaderState;
 }) {
   return (
-    <div className="space-y-3" data-editor-preset-parameters="true">
+    <div className="space-y-2" data-editor-preset-parameters="true">
       {props.children}
       <FileActionRow
         disabled={props.state.saveDisabled}
@@ -35,7 +35,7 @@ export function EditorInspectorPresetHeader(props: {
   const { state } = props;
 
   return (
-    <div className="space-y-3" data-editor-preset-section="true">
+    <div className="space-y-2" data-editor-preset-section="true">
       <EditorInspectorPresetViewSwitch
         activeView={state.activeView}
         onChange={state.onViewChange}

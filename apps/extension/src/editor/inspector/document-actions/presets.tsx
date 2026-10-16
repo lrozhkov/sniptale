@@ -11,7 +11,7 @@ import {
 import { cx } from '../../chrome/ui';
 
 const presetPathClassName =
-  'block truncate text-[11px] text-[color:var(--sniptale-color-text-muted)]';
+  'block truncate text-[12px] text-[color:var(--sniptale-color-text-muted)]';
 
 function PresetStatusBadge(props: { isSaved: boolean; isSaving: boolean }) {
   if (props.isSaving) {

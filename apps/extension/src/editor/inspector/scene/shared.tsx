@@ -159,20 +159,20 @@ export function HeaderValueToggleSection<T extends string>(props: {
       aria-label={props.ariaLabel}
       onClick={() => props.onChange(props.nextValue)}
       className={cx(
-        'flex min-h-10 w-full items-center justify-between gap-3 rounded-[10px] border px-3',
+        'flex min-h-8 w-full items-center justify-between gap-3 rounded-[4px] border border-transparent px-2',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
         'text-left transition hover:border-[color:var(--sniptale-color-border-strong)]'
       )}
     >
       <span
-        className="min-w-0 truncate text-[12px] font-semibold text-[color:var(--sniptale-color-text-secondary)]"
+        className="min-w-0 truncate text-[13px] font-medium text-[color:var(--sniptale-color-text-secondary)]"
         title={props.label}
       >
         {props.label}
       </span>
       <span
-        className="shrink-0 text-right text-[12px] font-semibold text-[color:var(--sniptale-color-text-primary)]"
+        className="shrink-0 text-right text-[13px] font-medium text-[color:var(--sniptale-color-text-primary)]"
         title={props.value}
       >
         {props.value}

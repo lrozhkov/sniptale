@@ -18,7 +18,7 @@ import {
 export const actionLabelClassName = 'min-w-0 text-[13px] font-medium';
 
 export const actionMetaClassName =
-  'text-[10px] font-semibold uppercase text-[color:var(--sniptale-color-text-secondary)]';
+  'text-[12px] font-normal leading-4 text-[color:var(--sniptale-color-text-secondary)]';
 
 export function getActionButtonClassName(action: EditorDocumentActionCommand): string {
   if (action.emphasis === 'primary') {
@@ -41,10 +41,6 @@ export function getActionButtonClassName(action: EditorDocumentActionCommand): s
 }
 
 export function getActionIconClassName(action: EditorDocumentActionCommand): string {
-  if (action.emphasis === 'primary') {
-    return 'text-[color:var(--sniptale-color-accent-emphasis)]';
-  }
-
   if (action.emphasis === 'danger') {
     return 'text-[color:var(--sniptale-color-danger)]';
   }

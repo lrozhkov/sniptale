@@ -117,7 +117,7 @@ export function EditorInspectorFrameBackgroundFillEditor(
   }
 
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       {props.frameDraft.backgroundMode === 'gradient' ? (
         <FrameGradientPresetChoices {...props} />
       ) : null}
