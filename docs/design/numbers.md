@@ -10,7 +10,7 @@ Preserve the product mapping, units, precision, snapping, valid boundaries, and 
 
 ## Row geometry and hierarchy
 
-Parameter names remain secondary. Values and units remain primary with tabular digits where useful. Use the shared 32px row. The contextual row contains a 24px edit region and an 8px supplementary slider strip. Do not add hidden-slider height to the row or add component margins to the group's 4px gap. The lower slider target remains separate from the direct label/value editing targets.
+Parameter names remain secondary. Values and units remain primary with tabular digits where useful. Hover paint belongs to the editable value, not the name or whole row. Align visible numeric and color value edges. Keep alignment stable when steppers appear or editing starts. Use the shared 32px row for ordinary parameters. A contextual numeric row uses a 40px minimum height with a 24px edit region and a 16px lower slider strip. Keep the input hit region and 14px thumb inside that strip. Use a 3px painted track. Wrapped names can increase this allocation. Hover does not change row height or add margins to the group's 4px gap. The lower slider target remains separate from the direct label/value editing targets and cannot overlap the next parameter.
 
 The exact editable value is the equivalent pointer and keyboard control for the smaller supplementary strip. Do not apply that target exception to a standalone slider. At narrow widths, wrap a label or stack its value before text becomes unreadable. Prevent local clipping.
 

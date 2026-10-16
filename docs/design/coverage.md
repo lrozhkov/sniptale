@@ -1,122 +1,48 @@
 # Product coverage
 
-[Design index](index.md)
+[Design index](index.md) · [Surface-specific patterns](surfaces.md)
 
-[Surface-specific patterns](surfaces.md) limit generic rules for popup, timeline, canvas, and embedded UI. This bounded inventory examines the quick video inspector, library, image editor, and recording setup. It is not a whole-application coverage claim. Existing product source remains authoritative for specialized mechanics and state ownership.
+This bounded map records migrated chrome and inspected flows, not whole-application coverage. Product source owns specialized mechanics and state. Shared commands and parameter construction apply only within declared scopes. Pending consumers retain their existing contracts.
 
-| Reachable flow | Rule owners | Reference requirement |
+## Integration map
+
+Native proof paths below use `tooling/test/e2e/extension-critical/` as their base.
+
+| Surface | Adopted presentation and retained owners | Native proof |
 | --- | --- | --- |
-| Library cards, rows, filters and batch actions | Collections, Selection, Buttons | Preserve virtual geometry, hidden selection and separate open targets |
-| Library preview properties and related projects | Properties, Fields, Collections | Plain name/value rows, complete values, native Clear and navigation |
-| Library backup, import, recovery and deletion | Layers, Fields, Buttons | Visible warnings, retry, cancellation and reachable short-height actions |
-| Scenario guide/tour chrome, resources and forms | Buttons, Fields, Collections | Keep authored content, voice insertion and resource lifecycle owners |
-| Scenario properties and export controls | Compositions, Choices, Specialized | Shared parameter rows with independent document fonts and output preparation |
-| Standalone video materials, export and recording | Buttons, Fields, Collections | Preserve project, import, export and recording admission |
-| Standalone timeline, preview and inspector | Specialized, Compositions | Keep gesture geometry, canvas fonts and shared parameter construction |
-| Image editor floating chrome, tools and layers | Buttons, Collections, Specialized | Preserve docking, dense row actions, gestures and document authority |
-| Image scene, browser header, dimensions and metadata | Compositions, Properties, Choices | Shared rows, bounded intrinsic content and full translated values |
-| Scene proportions, resolution, Fit/Crop | Choices, Compositions | Full-column menu and source/custom values |
-| Inspector All/category presentation | Navigation, Compositions | [Combined presentation](../../tooling/design-reference/examples/compositions/index.html), retained values |
-| Browser header style, address, icon import | Fields, Buttons, Compositions | [URL and asynchronous icon actions](../../tooling/design-reference/examples/compositions/index.html) |
-| Background paint presets and custom paint | Choices, Layers, Specialized | Preserve actual CompactPaintSelector internals |
-| Background, presentation, watermark media | Collections, Compositions | [Resource acquisition and replacement](../../tooling/design-reference/examples/collections/index.html) |
-| Padding/radius wider typed bounds | Numbers, Specialized | [Separate typed/scrub bounds](../../tooling/design-reference/examples/numbers/index.html) |
-| Beginning/end media and fade groups | Navigation, Compositions | Nested branch and retained values |
-| Comments selection and inline editing | Collections, Fields | [Selected row and inline composer](../../tooling/design-reference/examples/collections/index.html) |
-| Tab/Screen/Camera capture setup | Selection, Compositions | Dependent source options and unavailable reasons |
-| Device, quality, countdown, viewport choice | Layers, Choices | [Popup-specific recording probe](../../tooling/design-reference/examples/compositions/index.html) |
-| Output profile/codec/resolution/FPS | Choices, Compositions | Dependent unavailable values retained |
-| Microphone processing with live test | Selection, Compositions | Persistent setting with pending/rejected capability state |
-| Gain, webcam size/crop | Numbers | Range-only value presentation |
-| Recording live actions and completion | Buttons, Compositions | Live state distinct from setup configuration |
+| Library | Navigation, filters, collections, preview, menus, dialogs. Properties retain plain rows, complete values, Clear and related-project navigation. Preserve virtual geometry, hidden selection, separate open targets, backup/import warnings, cancellation, retry, deletion and recovery. | `extension-critical-gallery-library-design.spec.ts` |
+| Image editor | Floating chrome, tools, layers, scene/header/dimensions/metadata rows with bounded intrinsic content and complete translated values. Preserve docking, resizing, canvas coordinates, gestures, history, document authority, dense layer targets and paint cancellation. Proof imports PNG and checks native export. | `extension-critical-image-design.spec.ts` |
+| Standalone video | Materials, recording/export controls, detached themed menus, preview and inspector stacks without compatibility margins. Preserve collection geometry, project/import/export admission, timeline lanes, handles, time mapping, preview rendering and document fonts. | `extension-critical-standalone-video-design.spec.ts` |
+| Scenario | Guide/tour chrome, resources, properties, forms and export controls. Preserve selection, drafts, history, persistence, resource lifecycle, voice insertion/Clear and measured header priorities. Authored guide text and exported HTML retain bundled document fonts and geometry. Tour player, embedded image editor and prepared preview retain isolated rendering. | `extension-critical-scenario-design.spec.ts` |
+| Settings | Page/unlock scopes, name/value adapter, separate sidebar/content scrolling, desktop minimum and outer scrolling. Preserve validation, drafts, Save/Cancel, pending admission, password masking/secrets, hotkey capture, menu reordering, collection gestures, permissions and authored annotation previews. Native-app presentation does not prove host integration. | `extension-critical-settings-design.spec.ts` |
+| Content | Toolbar, annotation, Design Review and AutoBlur surfaces. Portals retain theme and interface font. Bootstrap installs bundled faces from trusted CSS. Preserve host isolation, actual zoom, placement, drafts, Undo, nested layers, drawing preferences and authored page/annotation/preview fonts. | `extension-critical-content-design.spec.ts`, `extension-critical-content-controls-design.spec.ts` |
+| Saved-page viewer | Chrome, connected mode/catalog tabs, native download links and compact nonvisual resources. Preserve preview Back/Escape/focus, desktop scrolling, saved iframe fonts/selection/geometry and its token boundary. Proof saves a real package. | `extension-critical-web-snapshot-viewer-design.spec.ts` |
+| Camera recorder | Live/result commands and interface font. Preserve acquisition, devices, lifecycle, results, duration clock, local discard state/focus and actual recorder-window bounds. No desktop minimum applies. Proof starts through popup with synthetic media, permission and registration. | `extension-critical-camera-recorder-design.spec.ts` |
+| Content recorder | Sidebar and active toolbar commands. Preserve drag, step order, previews, capture, metadata focus/Escape/opener, project query/creation/search/Clear, trusted Start, lifecycle, devices and spotlight. Properties remain neutral and drawing tools retain tool states. | `extension-critical-content-recorder-design.spec.ts` |
+| Content AI | Local dialog, template/model selection and nested Escape, search Clear/focus. Preserve tree selection/filtering/column exclusions/payload, specialized tree rhythm, JSON syntax/copy/scroll/resize, prompt/voice, admission, provider settings and failure recovery. Proof uses page selection and Settings loopback provider for waiting cancellation, retained drafts, failure and retry. | `extension-critical-content-ai-design.spec.ts` |
+| Common inspector interactions | Value-only hover, keyboard focus, contextual range containment, intrinsic segment fit, Clear visibility and optical alignment. Preserve native editing and acceptance owners. | `extension-critical-inspector-interaction-design.spec.ts` |
 
-## Inspected source entry points
+Existing component and engine suites retain failure, pending, recovery, keyboard, draft, editing, persistence, voice, parser, apply-back, recording and artifact proof. Native compositions do not replace them. Check languages, themes, primary viewports, applicable breakpoint neighbors and below-minimum scrolling. Screenshots and results belong to migration records.
 
-- apps/extension/src/gallery/video-review/inspector.tsx
-- apps/extension/src/gallery/video-review/inspector-sections.tsx
-- apps/extension/src/gallery/video-review/scene-inspector.tsx
-- apps/extension/src/gallery/video-review/background-inspector.tsx
-- apps/extension/src/gallery/video-review/presentation-inspector.tsx
-- apps/extension/src/gallery/video-review/watermark-inspector.tsx
-- apps/extension/src/workflows/browser-frame/settings.tsx
-- apps/extension/src/popup/recording/video/setup/body.tsx
-- apps/extension/src/popup/recording/video/settings/layout.tsx
-- apps/extension/src/ui/popup-shell/inline-curtain/select.tsx
+## Reference requirements and inspected owners
 
-## Library integration
+Rules cover Collections, Selection, Buttons, Properties, Fields, Layers, Navigation, Choices, Numbers, Compositions and Specialized controls.
 
-The library uses the existing shared command press owner and canonical interface family. Its visual scope includes admission, loading, navigation, filters, collections, preview, menus, and dialogs. Shared preview controls retain their pending-editor contract outside the migrated command scope.
+- [Combined inspector and browser-header examples](../../tooling/design-reference/examples/compositions/index.html): All/category presentation, URL/icon actions, proportions/resolution/Fit/Crop, full-column source/custom menus, beginning/end fades and retained branches.
+- [Collection examples](../../tooling/design-reference/examples/collections/index.html): background/presentation/watermark acquisition/replacement, selected comments and inline editing.
+- [Numeric examples](../../tooling/design-reference/examples/numbers/index.html): separate typed/scrub bounds for padding/radius, gain and webcam size/crop.
+- Recording probes cover Tab/Screen/Camera dependencies, unavailable devices/quality/countdown/viewport, codec/resolution/FPS, microphone processing/live-test rejection and setup versus live/completion state. Preserve dependent unavailable output values.
 
-The actual-product composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-gallery-library-design.spec.ts`. It checks both reference languages, themes, primary viewports, header breakpoint neighbors, and below-minimum scrolling. Component tests retain failure, pending, recovery, keyboard, and draft coverage. Screenshots and run results belong to the migration record, not this document.
+Inspected source paths use `apps/extension/src/`:
 
-## Image editor integration
+- `gallery/video-review/{inspector,inspector-sections,scene-inspector,background-inspector,presentation-inspector,watermark-inspector}.tsx`
+- `workflows/browser-frame/settings.tsx`
+- `popup/recording/video/setup/body.tsx`
+- `popup/recording/video/settings/layout.tsx`
+- `ui/popup-shell/inline-curtain/select.tsx`
 
-The image editor adopts the shared parameter and command owners through its runtime entry. Floating panels retain their docking, resizing, canvas coordinates, tool gestures, and history contracts. Dense layer commands retain their existing dimensions. Shared start pages and color layers apply compact presentation only within the migrated context.
+## Exclusions
 
-The native-product proof lives in `tooling/test/e2e/extension-critical/extension-critical-image-design.spec.ts`. It imports a real PNG and checks panel modes, layer editing, paint cancellation, browser headers, dimensions, commands, native export, text fitting, and layout transitions. Existing editing and persistence tests retain their separate behavioral role.
+Preserve crop coordinates, decoding/import, native files, recording/media/clocks, device permissions, CompactPaintSelector and color/paint internals, gestures, capture, persistence and production Undo. Specimen pending/error/recovery does not prove native-engine parity. Ordinary requirements above have working examples.
 
-## Standalone video editor integration
-
-The standalone video editor adopts shared parameter construction and command feedback through its application shell. Materials keep their collection-row geometry. Detached menus adopt the interface font and theme. Timeline lanes, clip handles, time mapping, preview rendering, and document fonts remain with their specialized owners. Migrated parameter stacks exclude legacy compatibility margins.
-
-The native-product proof lives in `tooling/test/e2e/extension-critical/extension-critical-standalone-video-design.spec.ts`. It covers import, insertion, selection, commands, menus, export settings, preview controls, language, theme, and container transitions. Existing export and timeline suites retain their separate behavioral role.
-
-## Scenario editor integration
-
-The Scenario editor adopts shared commands and parameter construction through its viewport composition. Guide and tour controls retain their existing selection, draft, history and persistence owners. Voice Clear retains session and insertion handling. Header compression keeps its existing priority and measures complete command content.
-
-Authored guide text uses the document font role. Interface font changes do not replace it. Exported HTML binds the document role to its bundled faces. The editor retains authored document geometry across the compact interface boundary. The tour player, embedded image editor and prepared export preview keep their isolated rendering owners.
-
-Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-scenario-design.spec.ts`. Existing guide, tour, image, voice, history and export suites retain their separate behavioral role.
-
-## Settings integration
-
-Settings adopts the interface font and shared command scope at the page owner, including its separate unlock entry. The existing row adapter uses canonical name/value construction. Sidebar and section content keep separate vertical scroll owners. The desktop viewport retains its minimum width and outer horizontal scroll path.
-
-Form owners retain validation, drafts, Save/Cancel and pending admission. Password fields retain masking and secret handling. Native hotkey capture, context-menu reordering, collection gestures and permission requests keep their existing owners. Authored annotation previews retain their font and geometry across the interface boundary.
-
-Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-settings-design.spec.ts`. Existing settings, provider, permission, privacy, transfer and collection suites retain their separate behavioral role. A permission-gated native-app screen does not prove native-host integration.
-
-## On-page content integration
-
-Content toolbars, annotation settings, Design Review and AutoBlur adopt shared command and parameter presentation at their concrete surfaces. Owned portals retain theme and interface typography. The content bootstrap registers bundled interface faces from its trusted stylesheet. Authored page text, annotations and drawing previews retain their existing font owners.
-
-Native composition proof lives in `extension-critical-content-design.spec.ts` and `extension-critical-content-controls-design.spec.ts` under `tooling/test/e2e/extension-critical/`. These checks cover host isolation, actual browser zoom, constrained placement, drafts, Undo, nested layers and drawing preferences. Existing focus, drawing and snapshot export suites retain gesture and authored-content proof. Recording controls have their own integration checks below.
-
-## Saved-page viewer integration
-
-The saved-page viewer adopts interface typography and shared commands within its application chrome. View modes and populated catalog sections use connected tabs. Downloads retain native links. Nonvisual resources use compact rows. Inline previews retain their existing Back, Escape and focus restoration.
-
-Saved document content retains its own fonts, selection and rendering geometry. Interface tokens do not cross the saved iframe boundary. The desktop shell retains its minimum width and outer horizontal scroll path.
-
-Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-web-snapshot-viewer-design.spec.ts`. It saves a real page package before opening the viewer. Existing package, extraction, export and iframe suites retain their separate behavioral role.
-
-## Camera recorder integration
-
-The camera recorder adopts shared commands and interface typography within its live and result screens. Video acquisition, selected devices, recording state and retained results keep their existing owners. The duration clock retains its specialized presentation. Inline discard confirmation keeps its local state and logical focus targets.
-
-The recorder has its own window contract. Check the actual recorder window separately from controlled CSS viewports. Do not impose the desktop editor minimum width on this surface.
-
-Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-camera-recorder-design.spec.ts`. It opens the recorder from the actual popup with synthetic media, device permission and registration. Existing recording lifecycle suites retain their separate engine and retention proof.
-
-## Content recorder integration
-
-The scenario recorder sidebar and active recording toolbar adopt shared commands within their existing content surfaces. The sidebar retains its drag target, step order, previews and capture actions. Its preview and metadata layers own keyboard focus, Escape and opener restoration. The project picker retains query and creation state. Its search renderer uses the existing text and Clear owner.
-
-Recording retains trusted Start admission, lifecycle commands, device selection, spotlight settings and specialized drawing controls. Property choices use neutral accepted states. Drawing modes retain their tool presentation. Media, clocks, gestures, capture and persistence keep their existing owners.
-
-Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-content-recorder-design.spec.ts`. Existing scenario, drawing and recording lifecycle suites retain their separate behavioral role. The extension popup remains excluded.
-
-## Content AI integration
-
-The content AI dialog uses shared commands, interface typography and local compact surfaces. Template and model menus retain their existing selection owners. Escape closes a nested template menu before the dialog. Data search Clear restores the editable field focus.
-
-The selected data tree retains native selection controls, filtering, column exclusions and existing payload construction. Its nested controls retain their specialized compact geometry. Ordinary command sizing does not define the tree row rhythm. JSON retains monospace syntax, copy, local scrolling and resize behavior. Prompt editing, voice, request admission, provider settings and failure recovery keep their existing owners.
-
-Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-content-ai-design.spec.ts`. It enters through actual page selection and configures a synthetic loopback provider through Settings. It checks waiting cancellation, retained drafts, local failure feedback and retry. Existing request, voice, parser and apply-back suites retain their separate engine proof.
-
-## Integration exclusions
-
-Preserve crop coordinates, media decoding/import, native file acquisition, recording lifecycle, device permissions, color/paint internals, persistence, and production Undo. Do not infer these engines from the bounded probes. A specimen can exercise local pending/error/recovery states without claiming native-engine parity. All ordinary reference requirements in this inventory have working examples.
-
-Popup probes demonstrate dependencies and curtain behavior, not a replacement popup layout. The complete paint selector, timeline, canvas, and native engines remain outside this visual replacement proposal. Their existing implementations remain the reference. Product integration requires separate proof.
+Popup probes establish dependencies and curtain behavior, not replacement layout. Popup remains excluded. Complete paint selectors, timeline, canvas and native engines retain existing implementations and require separate integration proof.

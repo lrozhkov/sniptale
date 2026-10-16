@@ -227,3 +227,14 @@
     padding: 0 !important;
   }
 }
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search-clear {
+  opacity: 0;
+  pointer-events: none;
+}
+.sniptale-ai-modal-adopted .sniptale-ai-data-search:focus-within .sniptale-ai-data-search-clear,
+.sniptale-ai-modal-adopted .sniptale-ai-data-search input:hover ~ .sniptale-ai-data-search-clear,
+.sniptale-ai-modal-adopted .sniptale-ai-data-search-clear:hover {
+  opacity: 1;
+  pointer-events: auto;
+}

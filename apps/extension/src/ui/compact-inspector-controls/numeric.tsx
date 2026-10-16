@@ -62,6 +62,13 @@ function NumericValueFieldView({
   state: ReturnType<typeof useNumericValueFieldState>;
 }) {
   const quietFocus = props.focusAppearance === 'quiet';
+  const inspector = useInspectorLayout();
+  const value = (
+    <>
+      <NumericValueInput props={props} state={state} />
+      <NumericUnitLabel state={state} />
+    </>
+  );
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-value-field"
@@ -70,16 +77,15 @@ function NumericValueFieldView({
         'group/compact-numeric relative flex',
         'w-[6.25rem] shrink-0 items-center',
         'gap-0',
-        COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
-        !quietFocus && COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
+        inspector ? 'sniptale-numeric-value' : COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
+        !inspector && !quietFocus && COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
         props.invalid &&
           'border-[color:var(--sniptale-color-danger)] text-[color:var(--sniptale-color-danger)]',
         props.disabled && 'cursor-not-allowed opacity-55',
         props.className
       )}
     >
-      <NumericValueInput props={props} state={state} />
-      <NumericUnitLabel state={state} />
+      {inspector ? <span className="sniptale-numeric-entry">{value}</span> : value}
       <NumericStepper disabled={props.disabled} label={props.label} onStep={state.applyStep} />
       {quietFocus && (
         <span
@@ -165,6 +171,7 @@ export function NumericRow({
       data-ui="shared.ui.compact-inspector.numeric-row"
       data-appearance={appearance}
       data-range-visible={range.visible ? 'true' : 'false'}
+      data-has-scrub={scrub ? 'true' : undefined}
       data-layout={inspector ? 'inline' : undefined}
       data-activates={inspector ? 'true' : undefined}
       onPointerDown={(event) => {

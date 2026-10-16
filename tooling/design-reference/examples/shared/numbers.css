@@ -105,19 +105,20 @@ input.number-range::-moz-range-thumb {
 }
 .context-range-shell {
   position: absolute;
-  bottom: -1px;
-  left: calc(12px + 8px);
-  right: calc(12px + 8px);
+  bottom: 0;
+  height: 16px;
+  left: 12px;
+  right: 12px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 150ms;
 }
 .context-track {
-  height: 4px;
+  height: 3px;
   position: absolute;
-  left: 0;
-  right: 0;
-  top: -2px;
+  left: 7px;
+  right: 7px;
+  top: 6.5px;
   border-radius: 999px;
   background: linear-gradient(
     90deg,
@@ -128,13 +129,14 @@ input.number-range::-moz-range-thumb {
   );
 }
 .context-range-shell input.number-range {
-  --sniptale-range-shell-height: 24px;
-  --sniptale-range-track-height: 4px;
+  --sniptale-range-shell-height: 16px;
+  --sniptale-range-track-height: 3px;
+  --sniptale-range-thumb-size: 14px;
   position: absolute;
-  left: -8px;
-  right: -8px;
-  width: auto;
-  top: -12px;
+  left: 0;
+  right: 0;
+  width: 100%;
+  top: 0;
   margin: 0;
   pointer-events: none;
 }
@@ -265,28 +267,21 @@ html[data-input-mode='pointer'] .number-range:focus-visible {
 .ref-number:last-child {
   margin-bottom: 0;
 }
-/* Keep hover-slider targets below direct text editing, including outside inspectors. */
+/* Contextual text and range targets occupy separate, fixed-height strips. */
 .ref-number[data-variant='contextual'] .number-row {
-  min-height: 32px;
-  padding-bottom: 8px;
+  min-height: 40px;
+  padding-bottom: 16px;
 }
 .ref-number[data-variant='contextual'] .number-value-shell {
+  height: 24px;
   min-height: 24px;
 }
 .ref-number[data-variant='contextual'] .number-value-shell input {
   height: 22px;
 }
-.ref-number[data-variant='contextual'] .number-label,
-.ref-number[data-variant='contextual'] .number-value-shell {
-  position: relative;
-  z-index: 1;
-}
-.ref-number[data-variant='contextual'] .context-range-shell {
-  bottom: 4px;
-}
-.ref-number[data-variant='contextual'] .context-range-shell input.number-range {
-  --sniptale-range-shell-height: 8px;
-  top: -4px;
+.ref-number[data-variant='contextual'] .number-stepper button {
+  width: 20px;
+  height: 12px;
 }
 
 .number-error {

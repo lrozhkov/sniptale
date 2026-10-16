@@ -35,7 +35,7 @@ export function CompactSegmentedSelector<T extends string>(props: {
   );
 }
 
-/** Equal segments stay on one line; only a full-width fit failure changes representation. */
+/** Segments use intrinsic minimum widths before a full-width fit failure changes representation. */
 function InspectorSegments<T extends string>(
   props: Parameters<typeof CompactSegmentedSelector<T>>[0]
 ) {
@@ -48,22 +48,18 @@ function InspectorSegments<T extends string>(
     const fit = () => {
       if (
         !element.clientWidth ||
-        element.contains(document.activeElement) ||
+        element.matches(':focus-within') ||
         element.querySelector('[aria-expanded="true"]')
       )
         return;
       const context = document.createElement('canvas').getContext('2d');
       if (!context) return;
       context.font = `500 13px ${getComputedStyle(element).fontFamily}`;
-      const width = Math.max(
-        0,
-        ...props.options.map((option) => context.measureText(option.label).width)
+      const width = props.options.reduce(
+        (sum, option) => sum + context.measureText(option.label).width + 20,
+        0
       );
-      setDropdown(
-        !iconOnly &&
-          (width + 20) * props.options.length + 4 + 2 * (props.options.length - 1) >
-            element.clientWidth
-      );
+      setDropdown(!iconOnly && width + 4 + 2 * (props.options.length - 1) > element.clientWidth);
     };
     fit();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
@@ -97,7 +93,9 @@ function InspectorSegments<T extends string>(
           data-ui="shared.ui.compact-inspector.segmented-row"
           data-icon-only={iconOnly ? 'true' : undefined}
           className="sniptale-property-segments"
-          style={{ gridTemplateColumns: `repeat(${props.options.length}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${props.options.length}, minmax(${iconOnly ? '0' : 'max-content'}, 1fr))`,
+          }}
         >
           {props.options.map((option) => (
             <button

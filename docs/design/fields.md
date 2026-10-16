@@ -10,7 +10,7 @@ Read-only values remain selectable and copyable. Disabled values retain their ac
 
 ## Continuous interaction
 
-The label, intervening gap, and input share one continuous hover region. Preserve text editing inside the input. The label uses an activation cursor rather than a text-selection cursor. A repeated label click ends editing once. Do not let native label forwarding immediately return to editing. A later label click re-enters editing. Clicking within the input does not end editing.
+The input owns its hover paint. Hovering the label or intervening gap does not highlight the row or value. Preserve label activation and text editing inside the input. The label uses an activation cursor rather than a text-selection cursor. A repeated label click ends editing once. Do not let native label forwarding immediately return to editing. A later label click re-enters editing. Clicking within the input does not end editing.
 
 Pointer focus does not draw the keyboard-only frame. Tab retains visible focus.
 
@@ -18,7 +18,7 @@ Pointer focus does not draw the keyboard-only frame. Tab retains visible focus.
 
 Editable nonempty text fields have a trailing 24px clear target inside the field. Use the shared cross icon. Give clear an accessible name identifying its field. Dispatch the normal input event so preview and search consumers update. Hover brightens the icon without a fill or boundary. Reserve text padding so the value does not overlap the clear action.
 
-Clear changes the draft and returns focus to the input. It does not submit a form or silently change its accepted value. Keep existing Enter, blur, Escape, Save, and Cancel contracts. Hide clear when empty, read-only, or disabled. Synchronize it after input and programmatic value/state changes. A multiline clear target sits at the upper trailing edge, not the vertical center.
+Clear changes the draft and returns focus to the input. It does not submit a form or silently change its accepted value. Keep existing Enter, blur, Escape, Save, and Cancel contracts. Show Clear only while the pointer hovers over the actual input or Clear target, or focus remains within the field. Label hover does not reveal Clear. Keep a focused Clear visible. Hide clear when empty, read-only, or disabled. Synchronize it after input and programmatic value/state changes. A multiline clear target sits at the upper trailing edge, not the vertical center.
 
 Structured values such as HEX can explicitly omit clearing when an empty value is invalid.
 

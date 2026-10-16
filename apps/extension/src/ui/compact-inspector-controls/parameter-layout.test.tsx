@@ -319,6 +319,7 @@ it('activates an adaptive dropdown through its parameter name and padding', () =
   );
   act(() => host.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
   expect(activate).toHaveBeenCalledTimes(1);
+  expect(document.activeElement).toBe(host.querySelector('button'));
   act(() => host.querySelector<HTMLElement>('.sniptale-parameter-row')!.click());
   expect(activate).toHaveBeenCalledTimes(2);
   act(() => host.querySelector('button')!.click());

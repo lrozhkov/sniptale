@@ -35,7 +35,7 @@ textarea.text-input {
   border-color: transparent;
   background: transparent;
 }
-.text-field:hover > .text-input:not(:disabled):not(:read-only),
+.text-field:not(:has(> .text-label:hover)) > .text-input:hover:not(:disabled):not(:read-only),
 .text-field:focus-within > .text-input:not(:disabled):not(:read-only) {
   background: var(--surface-hover);
   border-color: var(--field-border, var(--divider));
@@ -123,7 +123,7 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   margin-bottom: 0;
 }
 
-/* Keep input as a direct child so the whole label-to-field hover owner remains intact. */
+/* Direct children keep field hover separate from label activation. */
 .text-field--clearable {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -204,4 +204,18 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
 .inspector-controls .text-field[data-context='inspector']:has(> textarea) > .text-clear {
   align-self: start;
   margin-top: 4px;
+}
+
+.text-field.text-field--clearable > .text-clear {
+  visibility: hidden;
+  pointer-events: none;
+}
+.text-field.text-field--clearable:not(:has(> .text-label:hover)):has(
+    > .text-input:hover,
+    > .text-clear:hover
+  )
+  > .text-clear,
+.text-field.text-field--clearable:focus-within > .text-clear {
+  visibility: visible;
+  pointer-events: auto;
 }

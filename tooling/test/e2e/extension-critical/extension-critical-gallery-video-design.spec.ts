@@ -156,10 +156,15 @@ for (const viewport of [
           });
           await expect(ordinary).toHaveCount(4);
           const tops = await ordinary.evaluateAll((nodes) =>
-            nodes.map((node) => node.getBoundingClientRect().top)
+            nodes.map((node) => {
+              const text = document.createRange();
+              text.selectNodeContents(node);
+              return text.getBoundingClientRect().top;
+            })
           );
           for (let index = 1; index < tops.length; index++)
-            expect(tops[index]! - tops[index - 1]!).toBeCloseTo(36, 0);
+            // Contextual entries reserve 24px text + 16px range; the color row centers its 32px field.
+            expect(tops[index]! - tops[index - 1]!).toBeCloseTo(index === 3 ? 48 : 44, 0);
           await ordinary.last().scrollIntoViewIfNeeded();
           await page.evaluate(() =>
             Promise.all(

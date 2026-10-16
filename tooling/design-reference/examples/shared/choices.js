@@ -598,7 +598,7 @@ export function PropertyChoice({
     });
     const shell = getComputedStyle(group),
       required =
-        Math.max(...widths) * inputs.length +
+        widths.reduce((total, width) => total + width, 0) +
         parseFloat(shell.paddingLeft) +
         parseFloat(shell.paddingRight) +
         parseFloat(shell.borderLeftWidth) +

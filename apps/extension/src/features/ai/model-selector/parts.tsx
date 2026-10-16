@@ -117,7 +117,7 @@ function DropdownSearchField(props: {
 }) {
   const compact = useContext(CommandPressScope);
   return (
-    <div className={compact ? 'relative px-1 pb-2 pr-7' : 'px-1 pb-2'}>
+    <div className={compact ? 'group/clearable relative px-1 pb-2 pr-7' : 'px-1 pb-2'}>
       <ProductInput
         ref={props.searchInputRef as Ref<HTMLInputElement>}
         type="text"
@@ -136,7 +136,11 @@ function DropdownSearchField(props: {
             '{field}',
             translate('aiModal.modelSearchPlaceholder')
           )}
-          className="!absolute right-1 top-1 !h-6 !w-6 !min-w-6 !p-0"
+          className={[
+            '!absolute right-1 top-1 !h-6 !w-6 !min-w-6 !p-0 opacity-0 pointer-events-none',
+            'group-hover/clearable:opacity-100 group-hover/clearable:pointer-events-auto',
+            'group-focus-within/clearable:opacity-100 group-focus-within/clearable:pointer-events-auto',
+          ].join(' ')}
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => {
             const input = props.searchInputRef.current;

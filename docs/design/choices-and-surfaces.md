@@ -4,9 +4,9 @@
 
 ## Segment fit
 
-Segment labels remain on one line. Do not split words or increase control height to accommodate translation. Measure the complete labels, equal segment widths, gaps, and insets at the actual container width. Stack below the label first. Use a dropdown only if options exceed the complete group width. Preserve value, label, disabled options, and commit timing. Do not change presentation during a press, focus-owned edit, or open menu. Reevaluate after the interaction ends.
+Keep translated segment labels on one line without splitting words or increasing height. Prefer equal segment widths when they fit. Allow intrinsic minimum widths when unequal labels would otherwise force a dropdown. Stack below the label before changing representation. Use a dropdown only when complete intrinsic labels, individual padding, actual gaps, and insets exceed the full group width. Preserve value, label, disabled options, and commit timing. Do not change presentation during a press, focus-owned edit, or open menu. Reevaluate after the interaction ends.
 
-Text fitting must use the active locale and loaded font. A viewport breakpoint alone does not prove fit. Tiles, compact icon properties, and toolbar tools retain their own presentation contracts. This rule applies to ordinary segmented property choices.
+Measure fit with the active locale and loaded font, not a viewport breakpoint alone. Tiles, compact icon properties, and toolbar tools retain their own presentation contracts. This rule applies to ordinary segmented property choices.
 
 ## Choose the presentation
 
@@ -19,23 +19,23 @@ Text fitting must use the active locale and loaded font. A viewport breakpoint a
 | Associated content panels | [Tabs](navigation.md) |
 | Exclusive drawing tool | Radio tools under [Buttons](buttons.md) |
 
-Choose by label length, comparison needs, and available width. Search filters existing values without accepting arbitrary new values. Keep accepted values when representation changes. Do not change representation during an active gesture. Segments use a neutral selected surface without an inner frame. Light-theme selection must remain distinct from both idle and hover surfaces. Selected labels retain their normal weight.
+Choose by label length, comparison, and width. Search filters existing values without accepting arbitrary new values. Preserve accepted values across representation changes and defer changes during gestures. Segments use a neutral selected surface without an inner frame. Light-theme selection must remain distinct from both idle and hover surfaces. Selected labels retain their normal weight.
 
 Dropdown selection uses the shared orange vector check, separate from the neutral active-row highlight. Do not use orange option frames, underlines, generic repeated instructions, or bold selected labels.
 
 ## Width, material, and scrolling
 
-Stacked fields keep 8px between fields and 4px between name and value. Keep the next label outside the trigger-to-menu gap. Inline inspector rows retain a 4px gap. The owner defines a stable value column. Its width does not follow the selected text or search query. A menu is at least as wide as its trigger when space permits and can expand for complete option content.
+Stacked fields keep 8px between fields and 4px between name and value. Keep the next label outside the trigger-to-menu gap. Inline inspector rows retain a 4px gap. The owner defines a stable value column independent of selected text and search queries. When space permits, menus match trigger width and expand for complete options.
 
-Measure labels, descriptions, icons, check column, padding, and an actual scrollbar. Clamp to the viewport and wrap long values. In a narrow inspector, an explicit section boundary defines menu width and horizontal position across name and value columns. The surface declares content-fit or full-column placement. A narrow full-column menu covers the name/value region inside that group. A content-fit menu can align to the trailing field edge. Neither mode can cover the inspector scrollbar or adjacent category rail.
+Measure labels, descriptions, icons, check column, padding, and an actual scrollbar. Clamp to the viewport and wrap long values. In a narrow inspector, an explicit section boundary defines menu width and horizontal position across name and value columns. The surface declares content-fit or full-column placement. A full-column menu covers the group’s name/value region. A content-fit menu can align to the trailing field edge. Neither mode can cover the inspector scrollbar or adjacent category rail.
 
-Measure the content box after actual padding, borders, and scrollbar width. Do not create per-parameter width exceptions. Use 5px shell padding, 8px option padding, a 36px minimum row, and the shared 4px radius. Use light glass with the [shared fallbacks](foundations.md). Long lists scroll inside the menu. Use a narrow neutral scrollbar and a gap between highlighting and the real scrollbar.
+Measure the content box after actual padding, borders, and scrollbar width. Do not create per-parameter width exceptions. Use 5px shell padding, 8px option padding, a 36px minimum row, and the shared 4px radius. Use light glass with the [shared fallbacks](foundations.md). Long lists scroll inside the menu. Use a narrow neutral scrollbar separated from highlighting.
 
 Reserve scrollbar space only when overflow exists. Necessary check columns remain stable.
 
 ## Pointer and keyboard contract
 
-The label, its surrounding field padding, the label/value gap, and trigger form one continuous activation region. If hovering a region highlights the field, clicking that region must activate it. A click opens or closes once. A closed menu waits for another activation before reopening. Do not forward a label activation that reopens the menu. Preserve native text editing inside searchable triggers.
+The label, field padding, label/value gap, and trigger share one activation region. Only the value field or dropdown trigger owns hover paint. Name or gap hover does not highlight the row. Preserve the declared label activation and visible keyboard focus. A click opens or closes once. Reopening requires another activation. Prevent label forwarding from reopening the menu. Preserve native text editing inside searchable triggers.
 
 Unused space outside the declared field remains inactive. Options have contiguous hit regions. Paint highlight surfaces with 1px top/bottom insets, without dead click gaps. Hover never commits a value. Clear pointer highlighting over disabled rows, menu padding, and outside the menu. The accepted check remains visible. Resume from an available keyboard option when arrow navigation returns.
 

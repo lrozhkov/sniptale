@@ -276,13 +276,18 @@
   height: 32px;
 }
 .color-entry .color-swatch:before {
-  inset: 4px;
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
 }
 .color-entry .field-error {
   grid-column: 1/-1;
   grid-row: 2;
 }
-.color-entry:hover .text-input:not(:disabled) {
+.color-entry .text-input:hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: var(--field-border, var(--divider));
 }

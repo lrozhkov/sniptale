@@ -186,7 +186,10 @@ export function SelectField<T extends string>(props: {
         valueText={props.options.find((option) => option.value === props.value)?.label}
         dataUi="shared.ui.compact-inspector.select-field"
         className={props.className}
-        onActivate={() => trigger.current?.click()}
+        onActivate={() => {
+          trigger.current?.focus({ preventScroll: true });
+          trigger.current?.click();
+        }}
       >
         <CompactSelect
           ref={trigger}

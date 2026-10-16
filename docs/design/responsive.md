@@ -20,7 +20,7 @@ Keep the title, current selection, primary command, blocking status, and recover
 2. Reduce only declared spacing variants. Do not shrink font roles or hit targets arbitrarily.
 3. Hide lower-priority captions only for an established icon-and-text family with an approved icon-only variant.
 4. Preserve the full accessible name and native browser hint. Keep critical text-only commands explicit.
-5. Stack a control below its label before changing its representation. Measure options on the full available group width. Keep a single row when it fits without text wrapping. Use a dropdown only when the full-width control still cannot fit. Preserve compact icon controls and existing overflow menus.
+5. Stack a control below its label before changing its representation. Measure options on the full available group width. Prefer equal segments, then allow intrinsic minimum widths for unequal labels. Keep a single row when complete labels fit without wrapping. Use a dropdown only when labels, individual padding, actual gaps, and insets exceed the full-width control. Preserve compact icon controls and existing overflow menus.
 6. When the desktop surface reaches its minimum, preserve that width and use the outer horizontal scroll owner.
 
 Do not change representation during an active press, editing transaction, drag, or menu selection. Recompute after content changes, font readiness, and owner resizing. Avoid a hidden-caption measurement loop. Do not invent one universal viewport breakpoint for all toolbars or inspectors.

@@ -60,7 +60,7 @@
   width: 100%;
   min-height: 32px;
 }
-.parameter-row:hover .control:not(:disabled) {
+.parameter-row .control:hover:not(:disabled) {
   background: var(--hover, var(--surface-hover));
   border-color: var(--hover-border, var(--divider));
 }
@@ -97,4 +97,10 @@
 .parameter-row:is([data-layout='stacked'], [data-fit='stacked'], [data-label-fit='stacked'])
   > .parameter-name:not([hidden]) {
   padding-block-start: calc((var(--inspector-row, 32px) - var(--font-control-line))/2);
+}
+
+.property-options[data-presentation='segments'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(max-content, 1fr);
 }

@@ -16,6 +16,7 @@ export function NumericStepper({ disabled, label, onStep }: NumericStepperProps)
 
   return (
     <span
+      data-ui="shared.ui.compact-inspector.numeric-stepper"
       className={cx(
         'flex shrink-0 flex-col opacity-0 transition-opacity',
         'group-hover/compact-numeric:opacity-100 group-focus-within/compact-numeric:opacity-100'

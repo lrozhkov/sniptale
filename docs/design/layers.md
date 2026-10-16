@@ -42,3 +42,5 @@ Device-selection curtains belong to the extension popup. They are not a generic 
 Textual color values select their complete contents on initial focus through pointer, Tab, or label activation. This supports direct replacement with a pasted color. A second click within the focused field can place the caret. Keep ordinary editing, IME, paste, validation, acceptance, and cancellation intact. Declare this color-value variant explicitly. Do not select all text on focus for every ordinary text field.
 
 Use native browser `title` for optional hints throughout the application. Do not create custom tooltip layers. Keep required information in visible content and preserve complete accessible names.
+
+Compact inspector color swatches use a 20px painted square inside a 32px activation target. Keep text and swatch alignment stable during hover and editing. Hovering the parameter name does not highlight its color field. Preserve color-plane geometry and transactional picker behavior.

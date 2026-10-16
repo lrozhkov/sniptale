@@ -23,11 +23,11 @@
   height: 24px;
 }
 .inspector-controls .ref-number[data-variant='contextual'] .number-row {
-  min-height: 32px;
-  padding-bottom: 0;
+  min-height: 40px;
+  padding-bottom: 16px;
 }
 .inspector-controls .context-range-shell {
-  bottom: 8px;
+  bottom: 0;
   left: 8px;
   right: 8px;
 }
@@ -86,30 +86,14 @@
 .inspector-controls .field-error {
   grid-column: 1/-1;
 }
-/* The contextual track occupies a dedicated lower strip, below text editing targets. */
-.inspector-controls .ref-number[data-variant='contextual'] .number-row {
-  min-height: 32px;
-  padding-bottom: 0;
-}
+/* Contextual ranges retain their own 16px strip below the 24px editing area. */
 .inspector-controls .ref-number[data-variant='contextual'] .number-value-shell {
+  height: 24px;
   min-height: 24px;
 }
 .inspector-controls .ref-number[data-variant='contextual'] .number-value-shell input {
   height: 22px;
 }
-.inspector-controls .number-label,
-.inspector-controls .number-value-shell {
-  position: relative;
-  z-index: 1;
-}
-.inspector-controls .context-range-shell {
-  bottom: 0;
-}
-.inspector-controls .context-range-shell input.number-range {
-  --sniptale-range-shell-height: 8px;
-  top: -4px;
-}
-
 .inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-input,
 .inspector-controls .text-field.text-field--clearable[data-context='inspector'] > .text-clear {
   grid-column: 2;
@@ -119,22 +103,6 @@
 .inspector-controls .color-entry > .text-field[data-context='inspector'] {
   display: contents;
 }
-/* Move range decoration below the text without moving rows or editing targets. */
-.inspector-controls {
-  --context-range-visual-offset: 3px;
-}
-.inspector-controls .context-track {
-  transform: translateY(var(--context-range-visual-offset));
-}
-.inspector-controls .context-range-shell input.number-range::-webkit-slider-runnable-track {
-  transform: translateY(var(--context-range-visual-offset));
-}
-.inspector-controls .context-range-shell input.number-range::-moz-range-track,
-.inspector-controls .context-range-shell input.number-range::-moz-range-progress,
-.inspector-controls .context-range-shell input.number-range::-moz-range-thumb {
-  transform: translateY(var(--context-range-visual-offset));
-}
-
 /* Text editing moves below its label when the local inspector cannot provide a useful value column. */
 @container (max-width:360px) {
   .inspector-controls .text-field[data-context='inspector'] {

@@ -43,8 +43,7 @@ export function InspectorParameterRow(props: {
     const element = row.current;
     const label = name.current;
     if (!element || !label || !element.clientWidth || props.stacked || props.keepInline) return;
-    if (element.contains(document.activeElement) || element.querySelector('[aria-expanded="true"]'))
-      return;
+    if (element.matches(':focus-within') || element.querySelector('[aria-expanded="true"]')) return;
     const context = document.createElement('canvas').getContext('2d');
     if (!context) return;
     context.font = getComputedStyle(label).font;
@@ -54,8 +53,10 @@ export function InspectorParameterRow(props: {
       props.valueMinimum ?? 100,
       props.valueText ? context.measureText(props.valueText).width + 40 : 0,
       props.valueOptions?.length
-        ? (Math.max(...props.valueOptions.map((text) => context.measureText(text).width)) + 20) *
-            props.valueOptions.length +
+        ? props.valueOptions.reduce(
+            (width, text) => width + context.measureText(text).width + 20,
+            0
+          ) +
             4 +
             2 * (props.valueOptions.length - 1)
         : 0
@@ -89,7 +90,12 @@ export function InspectorParameterRow(props: {
     const dropdown = row.current?.querySelector<HTMLButtonElement>(
       '.sniptale-parameter-value button[aria-haspopup="listbox"]:enabled'
     );
-    return dropdown ? () => dropdown.click() : undefined;
+    return dropdown
+      ? () => {
+          dropdown.focus({ preventScroll: true });
+          dropdown.click();
+        }
+      : undefined;
   };
   const isActivation = (target: EventTarget) =>
     target instanceof Element && !target.closest('button,input,textarea,select,a,[role="slider"]');
