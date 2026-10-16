@@ -96,6 +96,13 @@ for (const theme of ['light', 'dark'] as const) {
     ).not.toBeChecked();
     await dialog.getByRole('button', { name: 'Entire guide', exact: true }).click();
     await dialog.getByRole('button', { name: 'Test provider / Test model', exact: true }).click();
+    const modelSearch = dialog.locator('input[type="text"]');
+    await modelSearch.fill('unmatched-model-filter');
+    await expect(dialog.getByRole('button', { name: 'Test model', exact: true })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Clear Search model...', exact: true }).click();
+    await expect(modelSearch).toHaveValue('');
+    await expect(modelSearch).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Test model', exact: true })).toBeVisible();
     await dialog.locator('input[type="text"]').press('Escape');
     await expect(dialog).toBeVisible();
     await expect(

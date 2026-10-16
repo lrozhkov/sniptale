@@ -28,6 +28,7 @@ it('shows section context, hidden numbering and image descriptions with reversib
   ];
   project.items = [{ kind: 'section', id: 'section', title: 'Preparation', paragraphs: [] }, step];
   const node = document.createElement('div');
+  document.body.append(node);
   const root = createRoot(node);
   const chooseSteps = vi.fn();
   const session = {
@@ -62,9 +63,12 @@ it('shows section context, hidden numbering and image descriptions with reversib
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   expect(node.textContent).toContain('No matching steps');
-  const clear = node.querySelector<HTMLButtonElement>('[title="Clear search"]')!;
+  const clear = node.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
   act(() => clear.click());
   expect(node.textContent).toContain('Upload');
+  expect(document.activeElement).toBe(input);
+  expect(node.querySelector('.sniptale-field-clear')).toBeNull();
   expect(chooseSteps).not.toHaveBeenCalled();
   act(() => root.unmount());
+  node.remove();
 });

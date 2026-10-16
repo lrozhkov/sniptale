@@ -78,6 +78,7 @@ export function TourLibraryPanel(
             <ContentToolbarButton
               key={id}
               className="guide-section-tab"
+              tone="property"
               title={label}
               aria-pressed={panels.leftSection === id}
               onClick={() => panels.openLeft(id)}

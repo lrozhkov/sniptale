@@ -1,3 +1,7 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
+import '../../ui/compact-inspector-controls/inspector-surface.css';
+import './interface.css';
 import { GuideImageFramingProvider, useGuideImageFramingSession } from './image-framing-session';
 import { TourHtmlExport } from './tour/export';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -34,7 +38,13 @@ import { ScenarioEditorStart } from './start';
 function ScenarioEditorViewport() {
   return (
     <div className="guide-editor-viewport">
-      <ScenarioEditorPage />
+      <CommandPressScope value={true}>
+        <InspectorLayout>
+          <div className="sniptale-compact-workspace sniptale-scenario-workspace">
+            <ScenarioEditorPage />
+          </div>
+        </InspectorLayout>
+      </CommandPressScope>
     </div>
   );
 }

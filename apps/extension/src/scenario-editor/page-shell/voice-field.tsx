@@ -1,4 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorFieldClear } from '../../ui/compact-inspector-controls/text-field';
+import { useContext, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -79,6 +81,7 @@ function useGuideVoiceField(props: VoiceFieldProps) {
   };
   return {
     bindings,
+    field,
     voice,
     stop,
     clear() {
@@ -104,7 +107,8 @@ function useGuideVoiceField(props: VoiceFieldProps) {
 
 /** Presents one compact microphone without covering the editable field or its block controls. */
 export function GuideVoiceField(props: VoiceFieldProps) {
-  const { bindings, voice, stop, start, clear } = useGuideVoiceField(props);
+  const compact = useContext(CommandPressScope);
+  const { bindings, field, voice, stop, start, clear } = useGuideVoiceField(props);
   const Input = props.formControl ? ProductInput : 'input';
   const Textarea = props.formControl ? ProductTextarea : 'textarea';
   const attributes = {
@@ -121,6 +125,15 @@ export function GuideVoiceField(props: VoiceFieldProps) {
     <span
       className="guide-voice-field"
       data-voice-visible={voice.state.active || voice.state.errorCode !== null || undefined}
+      data-single-line={props.singleLine || undefined}
+      onClickCapture={(event) => {
+        if (
+          compact &&
+          event.target instanceof Element &&
+          event.target.closest('.sniptale-field-clear')
+        )
+          stop();
+      }}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) stop();
       }}
@@ -143,7 +156,7 @@ export function GuideVoiceField(props: VoiceFieldProps) {
           onStart={start}
           onStop={stop}
         />
-        {props.clearable && (
+        {!compact && props.clearable && (
           <ContentToolbarButton
             tone="close"
             title={translate('scenario.editor.guideClearText')}
@@ -155,6 +168,9 @@ export function GuideVoiceField(props: VoiceFieldProps) {
           </ContentToolbarButton>
         )}
       </span>
+      {compact && props.clearable !== false && !props.disabled && props.value ? (
+        <InspectorFieldClear label={props['aria-label']} target={field} />
+      ) : null}
     </span>
   );
 }

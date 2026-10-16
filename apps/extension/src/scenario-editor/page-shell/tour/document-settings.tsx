@@ -1,3 +1,4 @@
+import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { createSolidPaint, getRepresentativeColor } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
 import { GuideImageUpload } from '../image-upload';
@@ -10,7 +11,6 @@ import {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Palette, MessageSquare, Trash2 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
 import { TourMarkerFields } from './object-settings';
 import { TourTextPresentation } from './fields';
@@ -49,9 +49,8 @@ export function TourDocumentSettings({
       {section === 'appearance' && (
         <>
           <div className="tour-text-field">
-            <span>{t('scenario.editor.tourAspect')}</span>
-            <CompactSelect
-              aria-label={t('scenario.editor.tourAspect')}
+            <SelectField
+              label={t('scenario.editor.tourAspect')}
               value={tour.stage.aspect}
               disabled={disabled}
               options={[
@@ -174,8 +173,8 @@ function TourStageBackgroundSettings({
       )}
       {stage.image && (
         <>
-          <CompactSelect
-            aria-label={t('scenario.editor.tourFit')}
+          <SelectField
+            label={t('scenario.editor.tourFit')}
             value={stage.imageFit ?? 'cover'}
             disabled={disabled}
             options={[

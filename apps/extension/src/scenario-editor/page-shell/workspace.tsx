@@ -109,11 +109,12 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
               key={id}
               title={label}
               aria-pressed={props.panels.leftSection === id}
+              tone="property"
               className="guide-section-tab"
               onClick={() => props.panels.openLeft(id)}
             >
               <Icon size={16} aria-hidden="true" />
-              <span>{label}</span>
+              <span data-command-caption>{label}</span>
             </ContentToolbarButton>
           ))}
         </div>
@@ -287,7 +288,7 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
     <FloatingChromePanel
       role="complementary"
       id="guide-inspector-panel"
-      className="guide-inspector-panel"
+      className="guide-inspector-panel sniptale-inspector-surface"
       hidden={!props.open}
       aria-label={t('scenario.editor.guideInspector')}
     >

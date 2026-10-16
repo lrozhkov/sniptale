@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type React from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -322,4 +323,40 @@ it('closes only the open selector on Escape and restores its trigger focus', asy
     )
   );
   expect(parentKey).toHaveBeenCalledTimes(1);
+});
+
+it.each([true, false])('preserves model search and selection with compact=%s', async (compact) => {
+  const onSelect = vi.fn();
+  await renderUi(
+    <CommandPressScope value={compact}>
+      <AIModelSelector
+        models={MODELS}
+        providers={PROVIDERS}
+        selectedModelId="model-1"
+        onSelect={onSelect}
+      />
+    </CommandPressScope>
+  );
+  const trigger = getButtons()[0]!;
+  expect(trigger.hasAttribute('data-command-press')).toBe(compact);
+  await act(async () => trigger.click());
+  const input = container!.querySelector<HTMLInputElement>('input')!;
+  await act(async () => setInputValue(input, 'missing'));
+  expect(container!.textContent).not.toContain('Llama 3.2');
+  const clearName = translate('shared.ui.clearField').replace(
+    '{field}',
+    translate('aiModal.modelSearchPlaceholder')
+  );
+  const clear = getButtons().find((button) => button.getAttribute('aria-label') === clearName);
+  expect(Boolean(clear)).toBe(compact);
+  if (clear) {
+    await act(async () => clear.click());
+    expect(document.activeElement).toBe(input);
+    expect(input.value).toBe('');
+    expect(container!.textContent).toContain('Llama 3.2');
+    expect(onSelect).not.toHaveBeenCalled();
+    const model = getButtons().find((button) => button.textContent?.includes('Llama 3.2'))!;
+    await act(async () => model.click());
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('model-2');
+  }
 });

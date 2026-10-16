@@ -176,7 +176,10 @@ export function GuideInsertActions({
             ref={ui.row}
             id={id}
             data-theme={theme ?? undefined}
-            className="sniptale-ai-modal-root guide-action-menu guide-action-menu--insert"
+            className={[
+              'sniptale-compact-workspace sniptale-scenario-workspace sniptale-ai-modal-root',
+              'guide-action-menu guide-action-menu--insert',
+            ].join(' ')}
             style={menuStyle}
             onMouseEnter={ui.hover.cancel}
             onMouseLeave={ui.hover.leave}
@@ -212,9 +215,6 @@ export function GuideInsertActions({
                   }}
                 >
                   {item.icon}
-                  <span role="tooltip" className="guide-insert-tooltip">
-                    {item.label}
-                  </span>
                 </ContentToolbarButton>
               ))}
             </div>

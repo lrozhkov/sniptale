@@ -1,3 +1,4 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Image, ArrowRight, Expand, FileText } from 'lucide-react';
@@ -72,7 +73,7 @@ export function GuideResources({
       )}
       {groups.map(({ assetId, first, uses }) => (
         <div key={assetId} className="guide-resource-row" data-resource-id={assetId}>
-          <button
+          <GuideResourceTarget
             type="button"
             className="guide-resource-main"
             title={name(first)}
@@ -99,7 +100,7 @@ export function GuideResources({
               )}
             </span>
             <span className="guide-resource-name">{name(first)}</span>
-          </button>
+          </GuideResourceTarget>
           <div className="guide-resource-actions">
             <ContentToolbarButton
               tone="utility"
@@ -128,7 +129,10 @@ export function GuideResources({
       {preview &&
         images[preview.assetId] &&
         createPortal(
-          <div className="sniptale-ai-modal-root" data-theme={theme ?? undefined}>
+          <div
+            className="sniptale-compact-workspace sniptale-scenario-workspace sniptale-ai-modal-root"
+            data-theme={theme ?? undefined}
+          >
             <GuideResourceDialog
               t={t}
               title={name(preview.first)}
@@ -149,5 +153,19 @@ export function GuideResources({
           resolveThemeSafePortalTarget(anchor.current)
         )}
     </div>
+  );
+}
+
+function GuideResourceTarget(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const press = useCommandPress(props);
+  return (
+    <button
+      {...props}
+      {...press.props}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
+    >
+      <span className="sniptale-command-content">{props.children}</span>
+    </button>
   );
 }

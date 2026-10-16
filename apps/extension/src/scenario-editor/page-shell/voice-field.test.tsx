@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -235,5 +236,41 @@ it('does not clear a disabled draft', async () => {
   expect(clear.parentElement?.lastElementChild).toBe(clear);
   expect(clear.disabled).toBe(true);
   await act(async () => clear.click());
+  expect(field().value).toBe('hello world');
+});
+
+it('clears a migrated dictated draft through one normal input event and rejects late speech', async () => {
+  await act(async () =>
+    root.render(
+      <CommandPressScope value={true}>
+        <Editor clearable />
+      </CommandPressScope>
+    )
+  );
+  await click('Start');
+  const inputEvent = vi.fn();
+  field().addEventListener('input', inputEvent);
+  const clear = host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+  expect(clear.getAttribute('aria-label')).toContain('Body');
+  await act(async () => clear.click());
+  expect(inputEvent).toHaveBeenCalledOnce();
+  expect(io.change).toHaveBeenCalledExactlyOnceWith('');
+  expect(field().value).toBe('');
+  expect(field().selectionStart).toBe(0);
+  expect(document.activeElement).toBe(field());
+  expect(host.querySelector('.sniptale-field-clear')).toBeNull();
+  await transcript('late');
+  expect(field().value).toBe('');
+});
+
+it('hides migrated Clear while disabled without changing the accepted text', async () => {
+  await act(async () =>
+    root.render(
+      <CommandPressScope value={true}>
+        <Editor clearable disabled />
+      </CommandPressScope>
+    )
+  );
+  expect(host.querySelector('.sniptale-field-clear')).toBeNull();
   expect(field().value).toBe('hello world');
 });

@@ -1,4 +1,7 @@
-import { Sparkles } from 'lucide-react';
+import { useContext } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { Sparkles, X } from 'lucide-react';
 import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from 'react';
 import type { Ref, RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
@@ -13,9 +16,11 @@ import type { getFilteredAIProviders } from './helpers';
 export function EmptyState() {
   return (
     <div
-      className="sniptale-ai-model-selector-missing flex items-center gap-2 rounded-[12px] border
-        border-[var(--sniptale-color-danger)] px-3 py-2 text-xs
-        text-[var(--sniptale-color-danger)]"
+      className={[
+        'sniptale-ai-model-selector-missing flex items-center gap-2 rounded-[12px] border',
+        'border-[var(--sniptale-color-danger)] px-3 py-2 text-xs',
+        'text-[var(--sniptale-color-danger)]',
+      ].join(' ')}
     >
       <Sparkles className="h-3.5 w-3.5" />
       {translate('aiModal.modelNotSelected')}
@@ -29,26 +34,40 @@ export function Trigger(props: {
   onToggle: () => void;
   selectedLabel: string | null;
 }) {
-  return (
-    <button
-      type="button"
-      data-invalid={!props.selectedLabel || undefined}
-      onClick={() => {
-        if (!props.disabled) {
-          props.onToggle();
-        }
-      }}
-      className="sniptale-ai-model-selector-trigger inline-flex max-w-full items-center gap-2 rounded-[12px] border
-        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] px-3 py-2
-        text-xs text-[var(--sniptale-color-text-secondary)] transition
-        hover:border-[var(--sniptale-color-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-      aria-expanded={props.isOpen}
-      disabled={props.disabled}
-    >
+  const compact = useContext(CommandPressScope);
+  const press = useCommandPress({
+    enabled: compact,
+    disabled: props.disabled,
+    onClick: props.onToggle,
+  });
+  const content = (
+    <>
       <Sparkles className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">
         {props.selectedLabel || translate('aiModal.modelUnsetOption')}
       </span>
+    </>
+  );
+  return (
+    <button
+      type="button"
+      data-invalid={!props.selectedLabel || undefined}
+      {...press.props}
+      data-command-press={compact ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
+      title={compact ? props.selectedLabel || translate('aiModal.modelUnsetOption') : undefined}
+      className={[
+        'sniptale-ai-model-selector-trigger inline-flex max-w-full items-center gap-2',
+        'rounded-[12px] border border-[var(--sniptale-color-border-soft)]',
+        'bg-[var(--sniptale-color-surface-panel)] px-3 py-2 text-xs',
+        'text-[var(--sniptale-color-text-secondary)] transition',
+        'hover:border-[var(--sniptale-color-border-strong)] disabled:cursor-not-allowed',
+        'disabled:opacity-50',
+      ].join(' ')}
+      aria-expanded={props.isOpen}
+      disabled={props.disabled}
+    >
+      {compact ? <span className="sniptale-command-content">{content}</span> : content}
     </button>
   );
 }
@@ -89,17 +108,42 @@ function DropdownSearchField(props: {
   searchQuery: string;
   setSearchQuery: Dispatch<SetStateAction<string>>;
 }) {
+  const compact = useContext(CommandPressScope);
   return (
-    <div className="px-1 pb-2">
+    <div className={compact ? 'relative px-1 pb-2 pr-7' : 'px-1 pb-2'}>
       <ProductInput
         ref={props.searchInputRef as Ref<HTMLInputElement>}
         type="text"
         value={props.searchQuery}
         onChange={(event) => props.setSearchQuery(event.target.value)}
+        aria-label={translate('aiModal.modelSearchPlaceholder')}
         placeholder={translate('aiModal.modelSearchPlaceholder')}
         style={{ height: '2rem', width: '100%' }}
         onClick={(event) => event.stopPropagation()}
       />
+      {compact && props.searchQuery ? (
+        <ContentToolbarButton
+          tone="close"
+          title={translate('shared.ui.clearField').replace(
+            '{field}',
+            translate('aiModal.modelSearchPlaceholder')
+          )}
+          className="!absolute right-1 top-1 !h-6 !w-6 !min-w-6 !p-0"
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => {
+            const input = props.searchInputRef.current;
+            if (!input || input.matches(':disabled') || input.readOnly) return;
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+              input,
+              ''
+            );
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+          }}
+        >
+          <X size={14} aria-hidden="true" />
+        </ContentToolbarButton>
+      ) : null}
     </div>
   );
 }
@@ -125,18 +169,56 @@ function DropdownProviderSections(props: {
         {provider.name}
       </ProductDropdownSectionLabel>
       {models.map((model) => (
-        <ProductDropdownItem
+        <ModelOption
           key={model.id}
-          onMouseDown={(event) => handleDropdownModelSelect(event, model.id, props.onSelect)}
+          id={model.id}
+          label={model.displayName}
           selected={model.id === props.selectedModelId}
-          className="cursor-pointer"
-        >
-          <span className="flex-1 truncate">{model.displayName}</span>
-          {model.id === props.selectedModelId ? <CheckIcon /> : null}
-        </ProductDropdownItem>
+          onSelect={props.onSelect}
+        />
       ))}
     </div>
   ));
+}
+
+function ModelOption(props: {
+  id: string;
+  label: string;
+  selected: boolean;
+  onSelect(id: string): void;
+}) {
+  const compact = useContext(CommandPressScope);
+  const mouseDown = (event: ReactMouseEvent) =>
+    handleDropdownModelSelect(event, props.id, props.onSelect);
+  const content = (
+    <>
+      <span className="flex-1 truncate">{props.label}</span>
+      {props.selected ? <CheckIcon /> : null}
+    </>
+  );
+  return compact ? (
+    <ContentToolbarButton
+      tone="property"
+      active={props.selected}
+      aria-pressed={props.selected}
+      onMouseDown={mouseDown}
+      onClick={(event) => {
+        if (event.detail === 0) handleDropdownModelSelect(event, props.id, props.onSelect);
+      }}
+      title={props.label}
+      className="!h-9 !min-h-9 !w-full !justify-start !gap-2 !rounded-[4px] !px-2"
+    >
+      {content}
+    </ContentToolbarButton>
+  ) : (
+    <ProductDropdownItem
+      onMouseDown={mouseDown}
+      selected={props.selected}
+      className="cursor-pointer"
+    >
+      {content}
+    </ProductDropdownItem>
+  );
 }
 
 function CheckIcon() {

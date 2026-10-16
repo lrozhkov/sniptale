@@ -38,7 +38,9 @@ export function guideDocumentStyle(style: GuideStyle): GuideDocumentStyle {
     '--guide-border': palette.border,
     '--guide-accent': style.accentColor ?? palette.accent,
     '--guide-font':
-      style.font === 'serif' ? 'Georgia, "Times New Roman", serif' : 'var(--sniptale-font-sans)',
+      style.font === 'serif'
+        ? 'Georgia, "Times New Roman", serif'
+        : 'var(--sniptale-font-document-sans, var(--sniptale-font-sans))',
     '--guide-padding': { compact: '1.25rem', comfortable: '2rem', spacious: '3rem' }[style.density],
     '--guide-gap': { compact: '0.75rem', comfortable: '1.25rem', spacious: '2rem' }[style.density],
     '--guide-width': { narrow: '640px', standard: '900px', wide: '1200px' }[style.contentWidth],

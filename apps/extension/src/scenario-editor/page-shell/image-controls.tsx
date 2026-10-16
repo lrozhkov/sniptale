@@ -7,7 +7,8 @@ import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from './in
 import { useGuideResourceRequest } from './resource-drawer';
 import { GuideHtmlImageFields } from './html-image-fields';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
-import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
+import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { ToggleField, TextField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   AlignLeft,
@@ -23,9 +24,6 @@ import {
   Pencil,
   ImageUp,
 } from 'lucide-react';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
-import { CompactSegmentedSelector } from '../../ui/compact-inspector-controls/control-renderers';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useImageDimensions } from './image-dimensions';
 import { useGuideImageBounds } from './layout-assistance';
 import {
@@ -289,12 +287,13 @@ function GuideImageGeometryFields({
       {framing && (
         <>
           <fieldset className="contents" disabled={geometryDisabled}>
-            <SegmentedSwitch
-              activeId={block.fit}
+            <SegmentedRow
+              label={t('scenario.editor.guideImageFit')}
+              value={block.fit}
               ariaLabel={t('scenario.editor.guideImageFit')}
               options={[
-                { id: 'contain', label: t('scenario.editor.guideImageContain') },
-                { id: 'cover', label: t('scenario.editor.guideImageCover') },
+                { value: 'contain', label: t('scenario.editor.guideImageContain') },
+                { value: 'cover', label: t('scenario.editor.guideImageCover') },
               ]}
               onChange={(fit) => geometry({ kind: 'fit', fit })}
             />
@@ -379,10 +378,9 @@ function GuideImageDescriptionFields({
         );
         return (
           <Fragment key={field}>
-            <label className="guide-image-description">
-              {label}
-              <ProductInput
-                aria-label={label}
+            <div className="guide-image-description">
+              <TextField
+                label={label}
                 value={block[field]}
                 maxLength={GUIDE_LIMITS.maxTextLength}
                 disabled={disabled}
@@ -391,7 +389,7 @@ function GuideImageDescriptionFields({
                 }
               />
               {field === 'alt' && <small>{t('scenario.editor.guideImageAltHint')}</small>}
-            </label>
+            </div>
             {field === 'caption' && (
               <GuideImageCaptionAlignment
                 block={block}
@@ -415,8 +413,8 @@ function GuideImageCaptionAlignment({
 }: Pick<Parameters<typeof GuideImageControls>[0], 'block' | 'disabled' | 'onChange' | 't'>) {
   return (
     <>
-      <span>{t('scenario.editor.guideCaptionAlignment')}</span>
-      <CompactSegmentedSelector
+      <SegmentedRow
+        label={t('scenario.editor.guideCaptionAlignment')}
         columns={3}
         ariaLabel={t('scenario.editor.guideCaptionAlignment')}
         value={block.captionAlignment ?? 'center'}
@@ -493,14 +491,12 @@ function ImageHtmlSettings({
 >) {
   return (
     <GuideInspectorGroup id="htmlImages" icon={Maximize2} title={t('scenario.editor.htmlImages')}>
-      <label className="guide-html-switch">
-        <span>{t('scenario.editor.htmlInherit')}</span>
-        <ProductToggle
-          size="sm"
+      <div className="guide-html-switch">
+        <ToggleField
+          label={t('scenario.editor.htmlInherit')}
           disabled={disabled}
-          checked={!block.htmlExport}
-          aria-label={t('scenario.editor.htmlInherit')}
-          onClick={() =>
+          value={!block.htmlExport}
+          onChange={() =>
             onChange(
               {
                 ...block,
@@ -512,7 +508,7 @@ function ImageHtmlSettings({
             )
           }
         />
-      </label>
+      </div>
       <GuideHtmlImageFields
         value={block.htmlExport ?? htmlDefaults ?? DEFAULT_HTML_IMAGES}
         disabled={disabled || !block.htmlExport}

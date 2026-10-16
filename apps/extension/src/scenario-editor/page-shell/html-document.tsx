@@ -46,7 +46,8 @@ export async function buildGuideHtml(
     )
     .join('');
   const base =
-    ':root{--sniptale-font-sans:Guide0,Guide1,Guide2,sans-serif}*{box-sizing:border-box}' +
+    ':root{--sniptale-font-document-sans:Guide0,Guide1,Guide2,sans-serif;' +
+    '--sniptale-font-sans:var(--sniptale-font-document-sans)}*{box-sizing:border-box}' +
     'body{margin:0;padding:24px;font-family:var(--sniptale-font-sans);' +
     'background:var(--sniptale-color-surface-canvas);' +
     'color:var(--sniptale-color-text-primary)}' +

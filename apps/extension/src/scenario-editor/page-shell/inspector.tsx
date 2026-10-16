@@ -1,7 +1,7 @@
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { createContext, useContext, useId, type ReactNode } from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
-import { NumericValueField } from '../../ui/compact-inspector-controls/numeric';
+import { NumericRow } from '../../ui/compact-inspector-controls/numeric';
 import './inspector.css';
 
 const InspectorCategorizedContentContext = createContext(false);
@@ -77,7 +77,7 @@ export function GuideInspectorGroup({
       )}
       <div
         id={bodyId}
-        className="guide-inspector-group-body"
+        className="guide-inspector-group-body sniptale-parameter-stack"
         data-compact-select-menu-bounds=""
         hidden={collapsible && !categorized && !expanded}
       >
@@ -106,21 +106,19 @@ export function GuideInspectorNumber({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="guide-inspector-number">
-      <span>{label}</span>
-      <NumericValueField
-        label={label}
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        precision={0}
-        disabled={disabled}
-        focusAppearance="accent-box"
-        normalizeValue={Math.round}
-        onPreviewValue={() => {}}
-        onCommitValue={onChange}
-      />
-    </div>
+    <NumericRow
+      appearance="plain"
+      label={label}
+      value={value}
+      min={min}
+      max={max}
+      step={step}
+      precision={0}
+      disabled={disabled}
+      focusAppearance="accent-box"
+      normalizeValue={Math.round}
+      onPreviewValue={() => {}}
+      onCommitValue={onChange}
+    />
   );
 }

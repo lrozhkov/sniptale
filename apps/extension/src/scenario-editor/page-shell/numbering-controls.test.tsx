@@ -6,6 +6,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideNumberingControls } from './numbering-controls';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 let host: HTMLDivElement;
 let root: Root;
 const change = vi.fn();
@@ -26,13 +27,15 @@ afterEach(() => {
 async function render(item = project.items[0]!, disabled = false) {
   await act(async () =>
     root.render(
-      <GuideNumberingControls
-        project={{ ...project, items: [item, project.items[1]!] }}
-        item={item}
-        disabled={disabled}
-        onChange={change}
-        t={createTranslator('en')}
-      />
+      <InspectorLayout>
+        <GuideNumberingControls
+          project={{ ...project, items: [item, project.items[1]!] }}
+          item={item}
+          disabled={disabled}
+          onChange={change}
+          t={createTranslator('en')}
+        />
+      </InspectorLayout>
     )
   );
 }

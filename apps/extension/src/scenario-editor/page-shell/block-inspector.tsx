@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { ToggleField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   GuideBlock,
@@ -141,8 +141,8 @@ function GuideTextSettings({
     onChange({ ...block, textStyle: { ...style, ...patch } }, null);
   return (
     <GuideInspectorGroup id="addText" icon={Type} title={t('scenario.editor.guideAddText')}>
-      <span>{t('scenario.editor.guideTextSize')}</span>
-      <CompactSegmentedSelector
+      <SegmentedRow
+        label={t('scenario.editor.guideTextSize')}
         columns={3}
         ariaLabel={t('scenario.editor.guideTextSize')}
         value={style.size}
@@ -160,8 +160,8 @@ function GuideTextSettings({
         ]}
         onChange={(size) => change({ size })}
       />
-      <span>{t('scenario.editor.guideTextAlignment')}</span>
-      <CompactSegmentedSelector
+      <SegmentedRow
+        label={t('scenario.editor.guideTextAlignment')}
         columns={3}
         ariaLabel={t('scenario.editor.guideTextAlignment')}
         value={style.alignment}
@@ -272,16 +272,12 @@ export function GuideBlockPlacement<T extends GuideBlock>({
           if (preset) onChange({ ...block, width: preset.width }, null);
         }}
       />
-      <label className="guide-html-switch">
-        <span>{t('scenario.editor.guideRowStart')}</span>
-        <ProductToggle
-          size="sm"
-          checked={block.rowStart ?? false}
-          disabled={disabled}
-          aria-label={t('scenario.editor.guideRowStart')}
-          onClick={() => onChange({ ...block, rowStart: !block.rowStart }, null)}
-        />
-      </label>
+      <ToggleField
+        label={t('scenario.editor.guideRowStart')}
+        value={block.rowStart ?? false}
+        disabled={disabled}
+        onChange={(rowStart) => onChange({ ...block, rowStart }, null)}
+      />
       {(block.kind === 'text' || block.kind === 'heading' || block.kind === 'note') && (
         <GuideBlockHeight
           key={block.id}

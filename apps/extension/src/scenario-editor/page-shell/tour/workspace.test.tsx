@@ -59,8 +59,8 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
 });
-afterEach(() => {
-  act(() => root.unmount());
+afterEach(async () => {
+  await act(async () => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
 });

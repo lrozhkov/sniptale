@@ -16,19 +16,19 @@
 }
 .scenario-viewer-header h1 {
   margin: 0;
-  font-size: 18px;
+  font: 600 14px / 20px var(--sniptale-font-interface);
   overflow-wrap: anywhere;
 }
 .scenario-viewer-header p {
   margin: 4px 0 0;
   color: var(--sniptale-color-text-secondary);
-  font-size: 13px;
+  font: 400 12px / 16px var(--sniptale-font-interface);
 }
 .scenario-viewer-header nav {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 .scenario-viewer-header a {
   color: var(--sniptale-color-text-primary);
@@ -43,6 +43,7 @@
 }
 .scenario-viewer-document > p {
   padding: 16px;
+  font: 400 14px / 20px var(--sniptale-font-interface);
 }
 .scenario-viewer-document iframe {
   border: 0;

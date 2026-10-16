@@ -66,7 +66,12 @@ it('serializes canonical content safely with local styles, fonts and private ima
     /script-src 'sha256-[A-Za-z0-9+/=]+'/
   );
   vi.unstubAllGlobals();
-  expect(document.querySelector('style')?.textContent?.includes('font-family:Guide0')).toBe(true);
+  const stylesheet = document.querySelector('style')?.textContent ?? '';
+  expect(stylesheet).toContain('font-family:Guide0');
+  expect(stylesheet).toContain('--sniptale-font-document-sans:Guide0,Guide1,Guide2,sans-serif');
+  expect(document.querySelector('article')?.style.getPropertyValue('--guide-font')).toBe(
+    'var(--sniptale-font-document-sans, var(--sniptale-font-sans))'
+  );
   expect(document.querySelector('meta[http-equiv]')?.getAttribute('content')).toContain(
     "default-src 'none'"
   );

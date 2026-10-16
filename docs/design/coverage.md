@@ -9,6 +9,8 @@
 | Library cards, rows, filters and batch actions | Collections, Selection, Buttons | Preserve virtual geometry, hidden selection and separate open targets |
 | Library preview properties and related projects | Properties, Fields, Collections | Plain name/value rows, complete values, native Clear and navigation |
 | Library backup, import, recovery and deletion | Layers, Fields, Buttons | Visible warnings, retry, cancellation and reachable short-height actions |
+| Scenario guide/tour chrome, resources and forms | Buttons, Fields, Collections | Keep authored content, voice insertion and resource lifecycle owners |
+| Scenario properties and export controls | Compositions, Choices, Specialized | Shared parameter rows with independent document fonts and output preparation |
 | Standalone video materials, export and recording | Buttons, Fields, Collections | Preserve project, import, export and recording admission |
 | Standalone timeline, preview and inspector | Specialized, Compositions | Keep gesture geometry, canvas fonts and shared parameter construction |
 | Image editor floating chrome, tools and layers | Buttons, Collections, Specialized | Preserve docking, dense row actions, gestures and document authority |
@@ -58,6 +60,14 @@ The native-product proof lives in `tooling/test/e2e/extension-critical/extension
 The standalone video editor adopts shared parameter construction and command feedback through its application shell. Materials keep their collection-row geometry. Detached menus adopt the interface font and theme. Timeline lanes, clip handles, time mapping, preview rendering, and document fonts remain with their specialized owners. Migrated parameter stacks exclude legacy compatibility margins.
 
 The native-product proof lives in `tooling/test/e2e/extension-critical/extension-critical-standalone-video-design.spec.ts`. It covers import, insertion, selection, commands, menus, export settings, preview controls, language, theme, and container transitions. Existing export and timeline suites retain their separate behavioral role.
+
+## Scenario editor integration
+
+The Scenario editor adopts shared commands and parameter construction through its viewport composition. Guide and tour controls retain their existing selection, draft, history and persistence owners. Voice Clear retains session and insertion handling. Header compression keeps its existing priority and measures complete command content.
+
+Authored guide text uses the document font role. Interface font changes do not replace it. Exported HTML binds the document role to its bundled faces. The editor retains authored document geometry across the compact interface boundary. The tour player, embedded image editor and prepared export preview keep their isolated rendering owners.
+
+Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-scenario-design.spec.ts`. Existing guide, tour, image, voice, history and export suites retain their separate behavioral role.
 
 ## Integration exclusions
 

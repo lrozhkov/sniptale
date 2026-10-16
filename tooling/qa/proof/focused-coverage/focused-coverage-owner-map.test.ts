@@ -385,3 +385,18 @@ it('selects completion refresh, body states, and native clock response proof', a
     `${root}/background/media/video/runtime/handlers/state/recording-state.clock.test.ts`
   );
 });
+
+it.each(['document-settings.tsx', 'mask-settings.tsx'])(
+  'routes tour %s to stage appearance and inherited settings proof',
+  async (file) => {
+    const module = await importOwnerMap();
+    expect(
+      module.resolveMappedCoverageOwnerTests(
+        `apps/extension/src/scenario-editor/page-shell/tour/${file}`
+      )
+    ).toEqual([
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+    ]);
+  }
+);

@@ -129,13 +129,14 @@ export function GuidePageHeader({
               )}
               <ContentToolbarButton
                 className="guide-labeled-action"
+                tone="property"
                 data-header-collapse="2"
                 title={t('scenario.editor.appearance')}
                 aria-pressed={appearanceActive}
                 onClick={onAppearance}
               >
                 <Palette size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.appearance')}</span>
+                <span data-command-caption>{t('scenario.editor.appearance')}</span>
               </ContentToolbarButton>
               <ContentToolbarButton
                 className="guide-labeled-action"
@@ -146,7 +147,7 @@ export function GuidePageHeader({
                 onClick={onPreview}
               >
                 <Download size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.guideReaderOpen')}</span>
+                <span data-command-caption>{t('scenario.editor.guideReaderOpen')}</span>
               </ContentToolbarButton>
               <GuideHistoryAutosave
                 disabled={disabled}
@@ -244,6 +245,7 @@ function GuideHistoryAutosave(props: {
       >
         <ContentToolbarButton
           type="button"
+          tone="utility"
           disabled={props.disabled || !props.canUndo}
           onClick={props.onUndo}
           title={props.t('scenario.editor.guideUndoHint')}
@@ -253,6 +255,7 @@ function GuideHistoryAutosave(props: {
         </ContentToolbarButton>
         <ContentToolbarButton
           type="button"
+          tone="utility"
           disabled={props.disabled || !props.canRedo}
           onClick={props.onRedo}
           title={props.t('scenario.editor.guideRedoHint')}

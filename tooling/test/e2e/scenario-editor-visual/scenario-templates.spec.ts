@@ -62,6 +62,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     if (!savedId) throw new Error('Missing saved template');
     const editUrl = new URL(sourceUrl);
     editUrl.searchParams.set('projectId', savedId);
+    editUrl.searchParams.delete('stepId');
     await page.goto(editUrl.toString());
     await expect(page.locator('article')).toHaveCount(1);
     await expect(page.locator('.guide-template-mode')).toBeVisible();

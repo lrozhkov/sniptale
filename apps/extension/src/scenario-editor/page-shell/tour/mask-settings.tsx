@@ -1,4 +1,5 @@
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
+import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { useTourInspectorSections } from './settings-sections';
 import { useState, type ReactNode } from 'react';
 import { createSolidPaint, getRepresentativeColor, type Paint } from '@sniptale/foundation/paint';
@@ -14,7 +15,6 @@ import {
 import { ScanLine, Palette } from 'lucide-react';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
 import { TourInspectorNumericRow } from './numeric-row';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
 import type { Translate } from '../../../platform/i18n';
 
@@ -56,16 +56,12 @@ export function TourMaskSettings({
       title={title ?? t('scenario.editor.appearance')}
     >
       {!central && value.kind !== 'redact' && (
-        <label className="guide-number-toggle">
-          <ProductToggle
-            size="sm"
-            disabled={disabled}
-            aria-label={t('scenario.editor.tourUseCentralStyle')}
-            checked={authored.inheritStyle === true}
-            onClick={() => onChange({ ...value, inheritStyle: !authored.inheritStyle })}
-          />
-          {t('scenario.editor.tourUseCentralStyle')}
-        </label>
+        <ToggleField
+          disabled={disabled}
+          label={t('scenario.editor.tourUseCentralStyle')}
+          value={authored.inheritStyle === true}
+          onChange={() => onChange({ ...value, inheritStyle: !authored.inheritStyle })}
+        />
       )}
       {controls.paint && (
         <CompactPaintSelector
@@ -125,9 +121,8 @@ export function TourMaskSettings({
       content: (
         <GuideInspectorGroup id="mask" icon={ScanLine} title={t('scenario.editor.tourMask')}>
           <div className="tour-text-field">
-            <span>{t('scenario.editor.tourMask')}</span>
-            <CompactSelect
-              aria-label={t('scenario.editor.tourMask')}
+            <SelectField
+              label={t('scenario.editor.tourMask')}
               disabled={disabled}
               value={value.kind}
               options={[
@@ -284,29 +279,18 @@ function TourHighlightAnimationFields({
   return (
     <>
       {!central && (
-        <label className="guide-number-toggle">
-          <ProductToggle
-            size="sm"
-            disabled={disabled}
-            aria-label={t('scenario.editor.tourUseTourAnimation')}
-            checked={inherited}
-            onClick={() => onChange(inherited ? value : null)}
-          />
-          {t('scenario.editor.tourUseTourAnimation')}
-        </label>
+        <ToggleField
+          disabled={disabled}
+          label={t('scenario.editor.tourUseTourAnimation')}
+          value={inherited}
+          onChange={() => onChange(inherited ? value : null)}
+        />
       )}
       {(['enter', 'exit'] as const).map((phase) => (
         <div key={phase}>
           <div className="tour-text-field">
-            <span>
-              {t(
-                phase === 'enter'
-                  ? 'scenario.editor.tourHighlightEnter'
-                  : 'scenario.editor.tourHighlightExit'
-              )}
-            </span>
-            <CompactSelect
-              aria-label={t(
+            <SelectField
+              label={t(
                 phase === 'enter'
                   ? 'scenario.editor.tourHighlightEnter'
                   : 'scenario.editor.tourHighlightExit'

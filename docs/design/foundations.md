@@ -21,6 +21,8 @@ Keep prose within 45–75 characters where practical. Control labels can use the
 
 `packages/ui/src/styles/fonts.css` owns bundled face declarations, weights, and language subsets. The stable `Sniptale Interface` face alias currently maps to Inter assets. To replace this bundled family, update its face assets. Change the family parameter only when selecting another declared family or fallback stack. Keep size, line height, weight, and foreground roles separate from family selection. Recheck actual text fit after replacement, including Russian, English, narrow controls, and expanded text.
 
+`--sniptale-font-document-sans` selects the default family for authored sans-serif documents. Keep this role independent from the interface family. Standalone exported documents bind it to their bundled document faces.
+
 Do not replace fonts inside authored canvas text, captions, or exports through an interface token change. These values belong to the document or renderer. The excluded popup retains its current font contract.
 
 ## Geometry and density

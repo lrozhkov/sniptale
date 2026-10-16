@@ -272,8 +272,8 @@ it('enables committed entry states and sends visible image frames only after exp
   await render('ready');
   expect(button('AI assistance').disabled).toBe(false);
   await act(async () => button('AI assistance').click());
-  const checkbox = document.querySelector<HTMLButtonElement>('.guide-ai-images [role="switch"]')!;
-  expect(checkbox.getAttribute('aria-checked')).toBe('false');
+  const checkbox = document.querySelector<HTMLInputElement>('input.sniptale-parameter-check')!;
+  expect(checkbox.checked).toBe(false);
   await act(async () => checkbox.click());
   expect(document.querySelector('.guide-ai-disclosure')?.textContent).toContain(
     'visible image frames'

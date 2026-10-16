@@ -1,0 +1,24 @@
+/* Capture authored document geometry before the inner interface adopts compact roles. */
+.guide-editor-viewport {
+  --guide-document-radius-sm: var(--sniptale-radius-sm);
+  --guide-document-radius-md: var(--sniptale-radius-md);
+  --guide-document-radius-lg: var(--sniptale-radius-lg);
+}
+.guide-editor-viewport > .sniptale-scenario-workspace {
+  min-width: 1280px;
+  min-height: 560px;
+  height: 100%;
+}
+.sniptale-scenario-workspace {
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-scenario-workspace .guide-document {
+  --sniptale-radius-sm: var(--guide-document-radius-sm);
+  --sniptale-radius-md: var(--guide-document-radius-md);
+  --sniptale-radius-lg: var(--guide-document-radius-lg);
+  font-weight: 400;
+  user-select: text;
+}
+.sniptale-scenario-workspace .guide-document :is(button, a, [role='button']) {
+  user-select: none;
+}

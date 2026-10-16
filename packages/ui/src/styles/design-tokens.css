@@ -6,8 +6,9 @@
 :host([data-theme='dark']),
 :host([data-theme='light']) {
   --sniptale-font-interface: 'Sniptale Interface', 'Segoe UI', sans-serif;
-  --sniptale-font-sans:
+  --sniptale-font-document-sans:
     'Sniptale Sans', 'Manrope Variable', 'Manrope', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --sniptale-font-sans: var(--sniptale-font-document-sans);
 
   --sniptale-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --sniptale-motion-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);

@@ -1,4 +1,5 @@
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { CheckboxField } from '../../ui/compact-inspector-controls';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { GuideAiPromptField } from './ai-prompt-field';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideAiScopePicker } from './ai-scope-picker';
@@ -50,13 +51,15 @@ export function GuideAiRequestForm({
         t={t}
       />
       {configuration ? (
-        <AIModelSelector
-          models={configuration.models}
-          providers={configuration.providers}
-          selectedModelId={modelId}
-          onSelect={chooseModel}
-          disabled={pending}
-        />
+        <InspectorParameterRow label={t('scenario.editor.aiEditorModel')}>
+          <AIModelSelector
+            models={configuration.models}
+            providers={configuration.providers}
+            selectedModelId={modelId}
+            onSelect={chooseModel}
+            disabled={pending}
+          />
+        </InspectorParameterRow>
       ) : (
         <p role="status">
           {t(
@@ -75,15 +78,12 @@ export function GuideAiRequestForm({
         <p>{t('scenario.editor.guideAiConfigure')}</p>
       )}
       {imageCount > 0 && (
-        <label className="guide-ai-images">
-          <ProductToggle
-            aria-label={t('scenario.editor.guideAiImages')}
-            checked={includeImages}
-            disabled={pending}
-            onClick={() => chooseImages(!includeImages)}
-          />
-          {t('scenario.editor.guideAiImages')} ({imageCount})
-        </label>
+        <CheckboxField
+          label={`${t('scenario.editor.guideAiImages')} (${imageCount})`}
+          value={includeImages}
+          disabled={pending}
+          onChange={chooseImages}
+        />
       )}
       <p className="guide-ai-disclosure">
         {t(

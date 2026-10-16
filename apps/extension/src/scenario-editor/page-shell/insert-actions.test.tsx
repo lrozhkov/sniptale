@@ -21,7 +21,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
-it('keeps insertion actions in a horizontal icon row with focusable tooltips', async () => {
+it('keeps insertion actions in a horizontal icon row with native hints', async () => {
   await act(async () =>
     root.render(
       <GuideInsertActions
@@ -46,7 +46,8 @@ it('keeps insertion actions in a horizontal icon row with focusable tooltips', a
   );
   const buttons = [...menu.querySelectorAll<HTMLButtonElement>('button')];
   expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual(['Step', 'Section']);
-  expect(buttons[0]?.querySelector('[role="tooltip"]')?.textContent).toBe('Step');
+  expect(buttons[0]?.getAttribute('title')).toBe('Step');
+  expect(menu.querySelector('[role="tooltip"]')).toBeNull();
   await act(async () =>
     trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
   );

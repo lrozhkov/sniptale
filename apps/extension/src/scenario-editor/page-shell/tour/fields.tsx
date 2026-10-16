@@ -1,3 +1,6 @@
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
+import { InspectorParameterRow } from '../../../ui/compact-inspector-controls/layout';
+import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { TourHintStyle } from './hint-style';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -13,9 +16,7 @@ import type {
   TourTextAppearance,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { GuideVoiceField } from '../voice-field';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { TourInspectorNumericRow } from './numeric-row';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import type { Translate } from '../../../platform/i18n';
 
@@ -33,8 +34,7 @@ export function TourTextField({
   singleLine?: boolean;
 }) {
   return (
-    <div className="tour-text-field">
-      <span>{label}</span>
+    <InspectorParameterRow label={label} stacked={!singleLine} valueMinimum={200}>
       <GuideVoiceField
         formControl
         clearable
@@ -46,7 +46,7 @@ export function TourTextField({
         maxLength={singleLine ? GUIDE_LIMITS.maxLabelLength : TOUR_LIMITS.maxTextLength}
         onValueChange={onChange}
       />
-    </div>
+    </InspectorParameterRow>
   );
 }
 
@@ -108,24 +108,19 @@ export function TourTextPresentation({
   return (
     <div className="tour-text-field">
       {inherit && (
-        <label className="guide-number-toggle">
-          <ProductToggle
-            size="sm"
-            disabled={disabled}
-            aria-label={t('scenario.editor.tourUseCentralStyle')}
-            checked={value === null}
-            onClick={() =>
-              onChange(
-                value ? null : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE }
-              )
-            }
-          />
-          {t('scenario.editor.tourUseCentralStyle')}
-        </label>
+        <ToggleField
+          disabled={disabled}
+          label={t('scenario.editor.tourUseCentralStyle')}
+          value={value === null}
+          onChange={() =>
+            onChange(
+              value ? null : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE }
+            )
+          }
+        />
       )}
-      <span>{presentationLabel}</span>
-      <CompactSelect
-        aria-label={presentationLabel}
+      <SelectField
+        label={presentationLabel}
         disabled={disabled}
         value={value ? effective.presentation : 'inherit'}
         options={[
@@ -157,9 +152,8 @@ export function TourTextPresentation({
       />
       {value && (
         <>
-          <span>{t('scenario.editor.tourTextAlignment')}</span>
-          <CompactSelect
-            aria-label={t('scenario.editor.tourTextAlignment')}
+          <SelectField
+            label={t('scenario.editor.tourTextAlignment')}
             value={value.alignment}
             disabled={disabled}
             options={[
@@ -186,9 +180,8 @@ export function TourTextPresentation({
                   />
                 </div>
               )}
-              <span>{t('scenario.editor.tourTextPlacement')}</span>
-              <CompactSelect
-                aria-label={t('scenario.editor.tourTextPlacement')}
+              <SelectField
+                label={t('scenario.editor.tourTextPlacement')}
                 value={value.placement}
                 disabled={disabled}
                 options={[
@@ -254,9 +247,8 @@ export function TourActionField({
   };
   return (
     <div className="tour-text-field tour-action-field">
-      <span>{t('scenario.editor.tourAction')}</span>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourAction')}
+      <SelectField
+        label={t('scenario.editor.tourAction')}
         value={kind}
         options={options}
         disabled={disabled}
@@ -271,8 +263,8 @@ export function TourActionField({
         }}
       />
       {kind === 'slide' && (
-        <CompactSelect
-          aria-label={t('scenario.editor.tourActionSlide')}
+        <SelectField
+          label={t('scenario.editor.tourActionSlide')}
           disabled={disabled}
           value={value.kind === 'slide' ? value.slideId : (tour.slides[0]?.id ?? '')}
           options={tour.slides.map((slide, index) => ({

@@ -602,8 +602,9 @@ it('inserts at a block boundary and focuses the new field before typing', async 
   await openGuideInsertionMenu(trigger);
   const command = [
     ...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button'),
-  ].find((button) => button.textContent === 'Heading');
-  await act(async () => command?.click());
+  ].find((button) => button.getAttribute('aria-label') === 'Heading');
+  expect(command).toBeDefined();
+  await act(async () => command!.click());
   const heading = container.querySelector<HTMLTextAreaElement>('.guide-block-heading');
   expect(document.activeElement).toBe(heading);
   expect(

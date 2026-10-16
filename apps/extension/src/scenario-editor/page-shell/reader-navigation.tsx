@@ -1,5 +1,4 @@
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { CompactSelect } from '../../ui/compact-inspector-controls/select';
+import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { resolveGuideNumbering } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
@@ -69,18 +68,19 @@ export function GuideReadingControls({
 }) {
   return (
     <fieldset className="guide-reading-options" disabled={disabled}>
-      <SegmentedSwitch
-        density="compact"
+      <SegmentedRow
+        columns={2}
+        label={t('scenario.editor.guideReaderMode')}
         ariaLabel={t('scenario.editor.guideReaderMode')}
-        activeId={value.mode}
+        value={value.mode}
         options={[
-          { id: 'flow', label: t('scenario.editor.guideReaderFlow') },
-          { id: 'steps', label: t('scenario.editor.guideReaderSteps') },
+          { value: 'flow', label: t('scenario.editor.guideReaderFlow') },
+          { value: 'steps', label: t('scenario.editor.guideReaderSteps') },
         ]}
         onChange={(mode) => onChange({ ...value, mode })}
       />
-      <CompactSelect
-        aria-label={t('scenario.editor.guideNavigationPosition')}
+      <SelectField
+        label={t('scenario.editor.guideNavigationPosition')}
         value={value.navigation}
         options={[
           { value: 'top', label: t('scenario.editor.guideNavigationTop') },

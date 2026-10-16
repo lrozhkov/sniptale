@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import '../../ui/compact-inspector-controls/inspector-surface.css';
 import { createTranslator, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
 import { buildScenarioEditorUrl } from '../../platform/navigation/extension-pages/scenario-editor';
 import { TourExportPreview } from './tour/export-preview';
@@ -61,7 +63,15 @@ const viewFeedback = {
 } as const;
 
 /** Read-only route presents a prepared artifact without mounting editor state. */
-export function ScenarioViewerPage({ route }: { route: ViewRoute }) {
+export function ScenarioViewerPage(props: { route: ViewRoute }) {
+  return (
+    <CommandPressScope value={true}>
+      <ScenarioViewerContent {...props} />
+    </CommandPressScope>
+  );
+}
+
+function ScenarioViewerContent({ route }: { route: ViewRoute }) {
   const t = createTranslator(useAppLocale());
   const { state, generation, cancel, refresh } = useScenarioView(route);
   usePageLocaleMetadata(
@@ -72,7 +82,7 @@ export function ScenarioViewerPage({ route }: { route: ViewRoute }) {
   const invalid = route.mode === 'invalid';
   const mode = state.status === 'ready' ? state.mode : route.mode === 'tour' ? 'tour' : 'guide';
   return (
-    <main className="scenario-viewer">
+    <main className="scenario-viewer sniptale-compact-workspace">
       <header className="scenario-viewer-header">
         <div>
           <h1>{'name' in state ? state.name : t('scenario.editor.previewTitle')}</h1>
@@ -85,17 +95,24 @@ export function ScenarioViewerPage({ route }: { route: ViewRoute }) {
         </div>
         {!invalid && (
           <nav aria-label={t('scenario.editor.previewTitle')}>
-            <ContentToolbarButton
+            <ProductActionButton
+              tone="secondary"
+              compact
               title={t('scenario.editor.viewRefresh')}
               onClick={refresh}
               disabled={state.status === 'loading'}
             >
               {t('scenario.editor.viewRefresh')}
-            </ContentToolbarButton>
+            </ProductActionButton>
             {state.status === 'loading' && (
-              <ContentToolbarButton title={t('common.actions.cancel')} onClick={cancel}>
+              <ProductActionButton
+                tone="secondary"
+                compact
+                title={t('common.actions.cancel')}
+                onClick={cancel}
+              >
                 {t('common.actions.cancel')}
-              </ContentToolbarButton>
+              </ProductActionButton>
             )}
             {route.mode !== 'export' && (
               <a href={buildScenarioEditorUrl({ projectId: route.projectId })}>

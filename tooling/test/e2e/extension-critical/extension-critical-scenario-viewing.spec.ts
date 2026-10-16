@@ -268,6 +268,10 @@ test('built Library opens full guide and tour HTML with isolation and committed 
       };
     })
   ).toEqual({ storage: false, parentAccess: false, network: false, extension: false });
+  expect(
+    await child.evaluate(() => getComputedStyle(document.querySelector('article')!).fontFamily)
+  ).toContain('Guide0');
+  await content.locator('.guide-read-image').hover();
   await content.locator('[data-guide-open]').click();
   await expect(content.locator('dialog')).toBeVisible();
   await content.locator('[data-close]').click();
@@ -304,7 +308,7 @@ test('built Library opens full guide and tour HTML with isolation and committed 
   await expect
     .poll(() =>
       player
-        .locator('audio')
+        .locator('audio:not([data-tour-music])')
         .evaluate(
           (audio) => audio instanceof HTMLAudioElement && !audio.paused && audio.currentTime > 0
         )
@@ -675,3 +679,46 @@ for (const { locale, theme } of [
     await library.close();
   });
 }
+
+test('built guide keeps bundled document fonts independent from viewer commands', async ({
+  context,
+  extensionId,
+}, info) => {
+  const library = await context.newPage();
+  await library.setViewportSize({ width: 1280, height: 560 });
+  await library.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
+  await expect(library.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+  await seed(library);
+  const before = await storedProject(library);
+  await library.reload();
+  await library.getByRole('button', { name: 'Library HTML proof', exact: true }).first().click();
+  const opening = context.waitForEvent('page');
+  await library.getByRole('link', { name: /Open guide|Открыть руководство/ }).click();
+  const guide = await opening;
+  await guide.setViewportSize({ width: 1280, height: 560 });
+  const content = guide.frameLocator('.scenario-viewer-document > iframe').frameLocator('iframe');
+  await expect(content.getByRole('heading', { name: 'Library HTML proof' })).toBeVisible();
+  const font = () =>
+    content.locator('article').evaluate(async (article) => {
+      await document.fonts.ready;
+      return getComputedStyle(article).fontFamily;
+    });
+  await expect.poll(font).toContain('Guide0');
+  const original = await font();
+  await guide.evaluate(() =>
+    document.documentElement.style.setProperty('--sniptale-font-interface', 'monospace')
+  );
+  expect(await font()).toBe(original);
+  await content.locator('.guide-read-image').hover();
+  await content.locator('[data-guide-open]').click();
+  await expect(content.locator('dialog')).toBeVisible();
+  await content.locator('[data-close]').click();
+  await expect(content.locator('dialog')).not.toBeVisible();
+  await guide.screenshot({ path: info.outputPath('guide-document-font.png'), fullPage: false });
+  expect(await storedProject(library)).toBe(before);
+  await storedProject(library, 'Saved font update');
+  await guide.getByRole('button', { name: /Refresh view|Обновить просмотр/ }).click();
+  await expect(content.getByRole('heading', { name: 'Saved font update' })).toBeVisible();
+  expect(await font()).toBe(original);
+  await guide.close();
+});

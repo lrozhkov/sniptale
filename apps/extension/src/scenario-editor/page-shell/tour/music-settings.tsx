@@ -1,5 +1,5 @@
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import { Music2, Unlink } from 'lucide-react';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import {
   createTourBackgroundMusic,
   type TourDocument,
@@ -84,28 +84,20 @@ export function TourMusicSettings({
             disabled={disabled}
             onChange={(value) => change({ ...music, volume: value / 100 })}
           />
-          <label className="guide-number-toggle">
-            <ProductToggle
-              size="sm"
-              disabled={disabled}
-              checked={music.loop}
-              aria-label={t('scenario.editor.tourMusicLoop')}
-              onClick={() => change({ ...music, loop: !music.loop })}
-            />
-            {t('scenario.editor.tourMusicLoop')}
-          </label>
-          <label className="guide-number-toggle">
-            <ProductToggle
-              size="sm"
-              disabled={disabled}
-              checked={music.ducking.enabled}
-              aria-label={t('scenario.editor.tourMusicDucking')}
-              onClick={() =>
-                change({ ...music, ducking: { ...music.ducking, enabled: !music.ducking.enabled } })
-              }
-            />
-            {t('scenario.editor.tourMusicDucking')}
-          </label>
+          <ToggleField
+            disabled={disabled}
+            value={music.loop}
+            label={t('scenario.editor.tourMusicLoop')}
+            onChange={() => change({ ...music, loop: !music.loop })}
+          />
+          <ToggleField
+            disabled={disabled}
+            value={music.ducking.enabled}
+            label={t('scenario.editor.tourMusicDucking')}
+            onChange={() =>
+              change({ ...music, ducking: { ...music.ducking, enabled: !music.ducking.enabled } })
+            }
+          />
           {music.ducking.enabled && (
             <TourInspectorNumericRow
               label={t('scenario.editor.tourMusicLevel')}

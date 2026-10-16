@@ -1,3 +1,4 @@
+import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { TourDocumentSettings } from './document-settings';
 import { TourMaskSettings, TourMaskDefaultSettings } from './mask-settings';
 import { TourCameraSettings } from './camera-settings';
@@ -30,7 +31,6 @@ import {
   MousePointer2,
   Music2,
 } from 'lucide-react';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup, InspectorCategorizedContent } from '../inspector';
@@ -368,9 +368,8 @@ function TourImageSettings(props: ImageSettingsProps) {
             onChange={(title) => onChange({ ...slide, title })}
           />
           <div className="tour-text-field">
-            <span>{t('scenario.editor.tourFit')}</span>
-            <CompactSelect
-              aria-label={t('scenario.editor.tourFit')}
+            <SelectField
+              label={t('scenario.editor.tourFit')}
               value={slide.fit}
               disabled={disabled}
               options={[
