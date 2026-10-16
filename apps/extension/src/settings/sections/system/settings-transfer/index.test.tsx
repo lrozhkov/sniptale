@@ -1,5 +1,6 @@
-import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 // @vitest-environment jsdom
+
+import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

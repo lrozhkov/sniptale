@@ -1,6 +1,7 @@
+// @vitest-environment jsdom
+
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

@@ -32,7 +32,7 @@
   --sniptale-toolbar-gap: 6px;
   --sniptale-radius: 4px;
 }
-/* Drawing options retain their existing target geometry until their own migration. */
+/* Drawing options preserve their specialized target geometry. */
 .sniptale-content-toolbar-adopted .sniptale-drawing-options-popover {
   --sniptale-toolbar-button-size: 36px;
 }

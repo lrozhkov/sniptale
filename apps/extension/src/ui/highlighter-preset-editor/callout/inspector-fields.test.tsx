@@ -1,6 +1,7 @@
+// @vitest-environment jsdom
+
 import { InspectorLayout } from '../../compact-inspector-controls/layout';
 import { renderToStaticMarkup } from 'react-dom/server';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

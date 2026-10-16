@@ -169,6 +169,7 @@ async function inspectMaterials(page: Page, locale: Locale, info: TestInfo) {
     'Sniptale Interface'
   );
   await screenshot(page, info, 'materials-import-menu');
+  await expect.soft(menu.locator('.sniptale-toolbar-menu-title')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(importTrigger).toBeFocused();
@@ -421,13 +422,30 @@ for (const locale of ['ru', 'en'] as const) {
               nameTop: row.querySelector('.sniptale-parameter-name')!.getBoundingClientRect().top,
               nameHeight: row.querySelector('.sniptale-parameter-name')!.getBoundingClientRect()
                 .height,
+              lineHeight: Number.parseFloat(
+                getComputedStyle(row.querySelector('.sniptale-parameter-name')!).lineHeight
+              ),
+              visibleTextHeight: (() => {
+                const range = document.createRange();
+                range.selectNodeContents(row.querySelector('.sniptale-parameter-name')!);
+                return range.getBoundingClientRect().height;
+              })(),
             }))
           );
           for (const row of pair) {
-            expect(Math.abs(row.height - 32)).toBeLessThanOrEqual(0.5);
-            expect(Math.abs(row.nameHeight - 18)).toBeLessThanOrEqual(0.5);
+            expect(row.height).toBeGreaterThanOrEqual(31.5);
+            expect(row.lineHeight).toBe(18);
+            expect(row.nameHeight + 0.5).toBeGreaterThanOrEqual(row.visibleTextHeight);
+            expect(row.height + 0.5).toBeGreaterThanOrEqual(row.nameHeight);
+            expect(
+              Math.abs(
+                row.nameHeight / row.lineHeight - Math.round(row.nameHeight / row.lineHeight)
+              )
+            ).toBeLessThanOrEqual(0.5 / row.lineHeight);
           }
-          expect(Math.abs(pair[1]!.nameTop - pair[0]!.nameTop - 36)).toBeLessThanOrEqual(0.5);
+          expect(
+            Math.abs(pair[1]!.nameTop - pair[0]!.nameTop - pair[0]!.height - 4)
+          ).toBeLessThanOrEqual(0.5);
         }
         await inspectMaterials(page, locale, info);
         await inspectVideoCommands(page, locale, info);

@@ -1,5 +1,6 @@
-import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 // @vitest-environment jsdom
+
+import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

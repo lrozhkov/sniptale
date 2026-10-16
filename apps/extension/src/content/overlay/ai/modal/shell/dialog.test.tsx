@@ -49,11 +49,6 @@ vi.mock('../../data-panel', async (importOriginal) => ({
   AIModalDataPanel: (_props: unknown) => <div data-ui="ai-modal.data-panel" />,
 }));
 
-vi.mock('../../template-list', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../template-list')>()),
-  TemplateList: (_props: unknown) => <div data-ui="ai-modal.template-list" />,
-}));
-
 vi.mock('../../../../../features/prompt-templates/editor', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../features/prompt-templates/editor')>()),
   PromptTemplateEditor: (_props: unknown) => null,

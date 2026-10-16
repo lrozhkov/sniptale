@@ -1,5 +1,6 @@
-import { CommandPressScope } from '@sniptale/ui/control-language/press';
 // @vitest-environment jsdom
+
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';

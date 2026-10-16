@@ -1,7 +1,8 @@
+// @vitest-environment jsdom
+
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { StepBadgeAutoSection, StepBadgeValueSection } from './views';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -457,12 +457,7 @@ function MaterialsImportMenu(props: {
             >
               <ProductToolbarMenu
                 compact
-                className={[
-                  '!rounded-[4px] !p-[5px] [&_.sniptale-toolbar-menu-title]:!text-sm',
-                  '[&_.sniptale-toolbar-menu-title]:!font-semibold',
-                  '[&_.sniptale-toolbar-menu-title]:!leading-5',
-                ].join(' ')}
-                title={translate('videoEditor.app.materialsFromDisk')}
+                className="!rounded-[4px] !p-[5px]"
                 style={{
                   position: 'relative',
                   top: 'auto',

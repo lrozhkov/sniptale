@@ -76,12 +76,6 @@ export const PRODUCT_DESIGN_SYSTEM_MENU_SURFACES_REGISTRY: DesignSystemRegistryE
         'Content > AI modal > Model menu',
         ['apps/extension/src/content/overlay/ai/modal/shell/model-selector.tsx']
       ),
-      usage(
-        'content.template-list.dropdown',
-        'Контент > Template list > Dropdown menu',
-        'Content > Template list > Dropdown menu',
-        ['apps/extension/src/content/overlay/ai/template-list/index.tsx']
-      ),
     ],
     status: 'active',
     previewFidelity: 'canonical',

@@ -104,11 +104,6 @@ vi.mock('@sniptale/ui/product-modal', async (importOriginal) => {
   };
 });
 
-vi.mock('../../template-list', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../template-list')>()),
-  TemplateList: () => <div data-ui="template-list" />,
-}));
-
 vi.mock('../../../../../features/prompt-templates/editor', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../features/prompt-templates/editor')>()),
   PromptTemplateEditor: () => null,

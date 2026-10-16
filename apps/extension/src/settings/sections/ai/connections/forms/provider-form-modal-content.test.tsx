@@ -1,5 +1,6 @@
-import { CommandPressScope } from '@sniptale/ui/control-language/press';
 // @vitest-environment jsdom
+
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 
 import type React from 'react';
 import { act } from 'react';
