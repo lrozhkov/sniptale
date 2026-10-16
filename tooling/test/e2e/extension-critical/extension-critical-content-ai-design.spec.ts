@@ -101,6 +101,8 @@ async function configure(context: BrowserContext, extensionId: string, c: Compos
     await named(settings, c, 'templates.section.addButton').click();
     await settings.locator('#template-name').fill(templateName);
     await settings.locator('#template-content').fill(templateText);
+    await expect(settings.locator('#template-name')).toHaveValue(templateName);
+    await expect(settings.locator('#template-content')).toHaveValue(templateText);
     await named(settings.getByRole('dialog'), c, 'common.actions.save').click();
     await expect(settings.getByRole('dialog')).toHaveCount(0);
     await expect(settings.getByText(templateName, { exact: true })).toBeVisible();
@@ -269,7 +271,7 @@ async function command(target: Locator) {
   await expect(target).toHaveCSS('border-radius', '4px');
   await expect(target).toHaveCSS('font-size', '13px');
   await expect(target).toHaveCSS('line-height', '18px');
-  await expect(target).toHaveCSS('font-weight', '500');
+  await expect(target).toHaveCSS('font-weight', '400');
 }
 
 async function geometry(page: Page, c: Composition) {
@@ -277,7 +279,7 @@ async function geometry(page: Page, c: Composition) {
   const heading = modal.getByText(tr(c, 'aiModal.title'), { exact: true });
   await expect(heading).toHaveCSS('font-size', '14px');
   await expect(heading).toHaveCSS('line-height', '20px');
-  await expect(heading).toHaveCSS('font-weight', '600');
+  await expect(heading).toHaveCSS('font-weight', '500');
   await expect(modal).toHaveCSS('border-radius', '8px');
   await interfaceFont(modal);
   await expect(modal.locator('.sniptale-ai-modal-context-info')).toHaveCSS('font-size', '12px');
@@ -435,6 +437,12 @@ async function models(
   await expect(providerLabel).toHaveCSS('line-height', '16px');
   await expect(providerLabel).toHaveCSS('text-transform', 'none');
   await capture(page, info, 'model-menu');
+  const bounds = (await menu.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height + 1);
   await page.keyboard.press('Escape');
   await expect(search).toHaveCount(0);
   await expect(trigger).toBeFocused();

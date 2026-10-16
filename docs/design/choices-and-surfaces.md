@@ -33,6 +33,8 @@ Measure the content box after actual padding, borders, and scrollbar width. Do n
 
 Reserve scrollbar space only when overflow exists. Necessary check columns remain stable.
 
+Searchable catalogs keep the search field visible while their results scroll. Bound the surface to the viewport and its clipping ancestors. Long user-defined names must not expand the host layout. Use a native title for truncated names. Keep text behind the surface from showing through its input and option labels.
+
 ## Pointer and keyboard contract
 
 Only the actual dropdown trigger and its complete padding activate the menu. Parameter names and label/value gaps remain inactive. Retain accessible names through aria-labelledby without native label forwarding. A click opens or closes once. Preserve visible keyboard focus and native text editing inside searchable triggers.

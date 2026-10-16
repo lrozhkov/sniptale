@@ -115,6 +115,7 @@ afterEach(async () => {
   await act(async () => {
     root?.unmount();
   });
+  vi.restoreAllMocks();
   container?.remove();
   container = null;
   root = null;
@@ -122,6 +123,9 @@ afterEach(async () => {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(100, 100, 280, 32)
+  );
 });
 
 it('renders an empty state when no models are available', async () => {
@@ -348,7 +352,7 @@ it.each([true, false])('preserves model search and selection with compact=%s', a
     translate('aiModal.modelSearchPlaceholder')
   );
   const clear = getButtons().find((button) => button.getAttribute('aria-label') === clearName);
-  expect(Boolean(clear)).toBe(compact);
+  expect(Boolean(clear)).toBe(true);
   if (clear) {
     await act(async () => clear.click());
     expect(document.activeElement).toBe(input);
@@ -359,4 +363,24 @@ it.each([true, false])('preserves model search and selection with compact=%s', a
     await act(async () => model.click());
     expect(onSelect).toHaveBeenCalledExactlyOnceWith('model-2');
   }
+});
+
+it.each([true, false])('selects a focused model by keyboard with compact=%s', async (compact) => {
+  const onSelect = vi.fn();
+  await renderUi(
+    <CommandPressScope value={compact}>
+      <AIModelSelector
+        models={MODELS}
+        providers={PROVIDERS}
+        selectedModelId="model-1"
+        onSelect={onSelect}
+      />
+    </CommandPressScope>
+  );
+  await act(async () => getButtons()[0]!.click());
+  const model = getButtons().find((button) => button.textContent?.includes('Llama 3.2'))!;
+  model.focus();
+  await act(async () => model.click());
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('model-2');
+  expect(document.activeElement).toBe(getButtons()[0]);
 });

@@ -1,8 +1,8 @@
 import { useContext } from 'react';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Sparkles, X } from 'lucide-react';
-import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from 'react';
+import { ChevronDown, X } from 'lucide-react';
+import type { CSSProperties, Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from 'react';
 import type { Ref, RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
@@ -22,7 +22,6 @@ export function EmptyState() {
         'text-[var(--sniptale-color-danger)]',
       ].join(' ')}
     >
-      <Sparkles className="h-3.5 w-3.5" />
       {translate('aiModal.modelNotSelected')}
     </div>
   );
@@ -42,10 +41,16 @@ export function Trigger(props: {
   });
   const content = (
     <>
-      <Sparkles className="h-3.5 w-3.5 shrink-0" />
-      <span className="truncate">
+      <span className="min-w-0 flex-1 truncate text-left">
         {props.selectedLabel || translate('aiModal.modelUnsetOption')}
       </span>
+      <ChevronDown
+        aria-hidden
+        className={[
+          'sniptale-select-chevron shrink-0',
+          props.isOpen ? 'sniptale-select-chevron-open' : '',
+        ].join(' ')}
+      />
     </>
   );
   return (
@@ -55,24 +60,26 @@ export function Trigger(props: {
       {...press.props}
       data-command-press={compact ? '' : undefined}
       data-pressing={press.pressed ? 'true' : undefined}
-      title={compact ? props.selectedLabel || translate('aiModal.modelUnsetOption') : undefined}
+      title={props.selectedLabel || translate('aiModal.modelUnsetOption')}
       className={[
-        'sniptale-ai-model-selector-trigger inline-flex max-w-full items-center gap-2',
-        'rounded-[12px] border border-[var(--sniptale-color-border-soft)]',
-        'bg-[var(--sniptale-color-surface-panel)] px-3 py-2 text-xs',
-        'text-[var(--sniptale-color-text-secondary)] transition',
-        'hover:border-[var(--sniptale-color-border-strong)] disabled:cursor-not-allowed',
-        'disabled:opacity-50',
+        'sniptale-ai-model-selector-trigger sniptale-select sniptale-select-sm !font-normal',
+        props.isOpen ? 'sniptale-select-open' : '',
+        props.disabled ? 'sniptale-select-disabled' : '',
       ].join(' ')}
       aria-expanded={props.isOpen}
       disabled={props.disabled}
     >
-      {compact ? <span className="sniptale-command-content">{content}</span> : content}
+      {compact ? (
+        <span className="sniptale-command-content min-w-0 w-full">{content}</span>
+      ) : (
+        content
+      )}
     </button>
   );
 }
 
 export function Dropdown(props: {
+  style: CSSProperties;
   filteredProviders: ReturnType<typeof getFilteredAIProviders>;
   onSelect: (modelId: string) => void;
   searchInputRef: RefObject<HTMLInputElement | null>;
@@ -83,11 +90,12 @@ export function Dropdown(props: {
   const compact = useContext(CommandPressScope);
   return (
     <ProductDropdownMenu
-      className={
-        compact
-          ? 'sniptale-dropdown-up sniptale-compact-workspace mt-2 min-w-[16rem] !rounded-[4px] !p-[5px]'
-          : 'sniptale-dropdown-up mt-2 min-w-[16rem]'
-      }
+      style={props.style}
+      className={[
+        compact ? 'sniptale-compact-workspace' : '',
+        '!flex !flex-col !min-w-0 !rounded-[4px] !p-[5px]',
+        '!bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]',
+      ].join(' ')}
     >
       <DropdownSearchField
         searchInputRef={props.searchInputRef}
@@ -95,17 +103,19 @@ export function Dropdown(props: {
         setSearchQuery={props.setSearchQuery}
       />
 
-      {props.filteredProviders.length === 0 ? (
-        <div className="px-3 py-2 text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('aiModal.modelsNotFound')}
-        </div>
-      ) : (
-        <DropdownProviderSections
-          filteredProviders={props.filteredProviders}
-          onSelect={props.onSelect}
-          selectedModelId={props.selectedModelId}
-        />
-      )}
+      <div className="min-h-0 overflow-y-auto overflow-x-hidden">
+        {props.filteredProviders.length === 0 ? (
+          <div className="px-3 py-2 text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate('aiModal.modelsNotFound')}
+          </div>
+        ) : (
+          <DropdownProviderSections
+            filteredProviders={props.filteredProviders}
+            onSelect={props.onSelect}
+            selectedModelId={props.selectedModelId}
+          />
+        )}
+      </div>
     </ProductDropdownMenu>
   );
 }
@@ -115,13 +125,12 @@ function DropdownSearchField(props: {
   searchQuery: string;
   setSearchQuery: Dispatch<SetStateAction<string>>;
 }) {
-  const compact = useContext(CommandPressScope);
   return (
-    <div className={compact ? 'group/clearable relative px-1 pb-2 pr-7' : 'px-1 pb-2'}>
+    <div className="group/clearable relative shrink-0 px-1 pb-2">
       <ProductInput
         ref={props.searchInputRef as Ref<HTMLInputElement>}
         type="text"
-        className={compact ? '!rounded-[4px] !text-[13px] !leading-[18px] !font-medium' : undefined}
+        className="!rounded-[4px] !pr-8 !text-[13px] !leading-[18px] !font-normal"
         value={props.searchQuery}
         onChange={(event) => props.setSearchQuery(event.target.value)}
         aria-label={translate('aiModal.modelSearchPlaceholder')}
@@ -129,7 +138,7 @@ function DropdownSearchField(props: {
         style={{ height: '2rem', width: '100%' }}
         onClick={(event) => event.stopPropagation()}
       />
-      {compact && props.searchQuery ? (
+      {props.searchQuery ? (
         <ContentToolbarButton
           tone="close"
           title={translate('shared.ui.clearField').replace(
@@ -137,7 +146,7 @@ function DropdownSearchField(props: {
             translate('aiModal.modelSearchPlaceholder')
           )}
           className={[
-            '!absolute right-1 top-1 !h-6 !w-6 !min-w-6 !p-0 opacity-0 pointer-events-none',
+            '!absolute right-2 top-1 !h-6 !w-6 !min-w-6 !p-0 opacity-0 pointer-events-none',
             'group-hover/clearable:opacity-100 group-hover/clearable:pointer-events-auto',
             'group-focus-within/clearable:opacity-100 group-focus-within/clearable:pointer-events-auto',
           ].join(' ')}
@@ -177,12 +186,12 @@ function DropdownProviderSections(props: {
 }) {
   const compact = useContext(CommandPressScope);
   return props.filteredProviders.map(({ provider, models }) => (
-    <div key={provider.id}>
+    <div key={provider.id} className="flex min-w-0 flex-col gap-0.5">
       <ProductDropdownSectionLabel
         className={
           compact
-            ? '!px-2 !py-1 !text-[12px] !leading-4 !font-medium !normal-case !tracking-normal'
-            : 'px-3 pt-1 text-[11px] uppercase tracking-[0.08em]'
+            ? '!px-2 !py-1 !text-[12px] !leading-4 !font-medium !normal-case !tracking-normal [overflow-wrap:anywhere]'
+            : 'px-2 py-1 text-xs [overflow-wrap:anywhere]'
         }
       >
         {provider.name}
@@ -225,15 +234,22 @@ function ModelOption(props: {
         if (event.detail === 0) handleDropdownModelSelect(event, props.id, props.onSelect);
       }}
       title={props.label}
-      className="!h-9 !min-h-9 !w-full !justify-start !gap-2 !rounded-[4px] !px-2"
+      className="!h-8 !min-h-8 !w-full !justify-start !gap-2 !rounded-[4px] !px-2 !font-normal"
     >
       {content}
     </ContentToolbarButton>
   ) : (
     <ProductDropdownItem
       onMouseDown={mouseDown}
+      onClick={(event) => {
+        if (event.detail === 0) handleDropdownModelSelect(event, props.id, props.onSelect);
+      }}
+      title={props.label}
       selected={props.selected}
-      className="cursor-pointer"
+      className={[
+        '!min-h-8 !rounded-[4px] !px-2 !py-1.5 !text-[13px] !leading-[18px]',
+        '!font-normal !shadow-none cursor-pointer',
+      ].join(' ')}
     >
       {content}
     </ProductDropdownItem>
@@ -243,7 +259,7 @@ function ModelOption(props: {
 function CheckIcon() {
   return (
     <svg
-      className="h-3.5 w-3.5"
+      className="h-3.5 w-3.5 shrink-0 text-[var(--sniptale-color-accent)]"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

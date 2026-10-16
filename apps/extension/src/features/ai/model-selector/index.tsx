@@ -1,6 +1,17 @@
-import { useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import {
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+} from 'react';
 import type { AIModel } from '../../../contracts/settings';
-import { useAIModelSelectorDismissState, useAIModelSelectorSearchFocus } from './hooks';
+import {
+  useAIModelSelectorDismissState,
+  useAIModelSelectorSearchFocus,
+  useAIModelSelectorMenuLayout,
+} from './hooks';
 import { Dropdown, EmptyState, Trigger } from './parts';
 import { createDismissStateArgs, resolveModelSelectorViewState } from './view-state';
 import type { AIModelSelectorProvider } from './helpers';
@@ -19,6 +30,7 @@ export interface AIModelSelectorProps {
 
 function renderAIModelSelectorDropdown(props: {
   isOpen: boolean;
+  menuStyle: CSSProperties;
   searchInputRef: RefObject<HTMLInputElement | null>;
   searchQuery: string;
   selectedModelId: string | null;
@@ -27,6 +39,7 @@ function renderAIModelSelectorDropdown(props: {
 }) {
   return props.isOpen ? (
     <Dropdown
+      style={props.menuStyle}
       filteredProviders={props.viewState.filteredProviders}
       onSelect={props.viewState.handleSelect}
       searchInputRef={props.searchInputRef}
@@ -53,6 +66,7 @@ export function AIModelSelector(props: AIModelSelectorProps) {
     })
   );
   useAIModelSelectorSearchFocus(isOpen, searchInputRef);
+  const menuStyle = useAIModelSelectorMenuLayout(isOpen, dropdownRef, setIsOpen, setSearchQuery);
 
   if (props.models.length === 0) {
     return <EmptyState />;
@@ -60,7 +74,10 @@ export function AIModelSelector(props: AIModelSelectorProps) {
 
   const viewState = resolveModelSelectorViewState({
     models: props.models,
-    onSelect: props.onSelect,
+    onSelect: (modelId) => {
+      props.onSelect(modelId);
+      dropdownRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    },
     providers: props.providers,
     searchQuery,
     selectedModelId: props.selectedModelId,
@@ -70,7 +87,7 @@ export function AIModelSelector(props: AIModelSelectorProps) {
 
   return (
     <div
-      className="relative flex min-w-0 items-center"
+      className="relative flex min-w-0 max-w-full items-center"
       ref={dropdownRef}
       onKeyDown={(event) => {
         if (event.key !== 'Escape' || !isOpen || event.defaultPrevented) return;
@@ -89,6 +106,7 @@ export function AIModelSelector(props: AIModelSelectorProps) {
       />
       {renderAIModelSelectorDropdown({
         isOpen,
+        menuStyle,
         searchInputRef,
         searchQuery,
         selectedModelId: props.selectedModelId,
