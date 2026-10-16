@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
 import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
-import { ReviewInspectorSections } from './inspector-sections';
+import { ReviewInspectorSections, type ReviewInspectorSection } from './inspector-sections';
 import { ReviewPreviewNumberRow } from './number-row';
 import { SpeechTranscriptionModelField } from './speech-profile';
 import { ReviewTextPhrase } from './speech-phrase';
@@ -16,6 +16,7 @@ import { ReviewButton, reviewTextButtonClassName } from './controls';
 
 type Props = ReviewRecognitionAccess & {
   sound?: (applying: boolean) => ReactNode;
+  renderSections?: (recognition: ReviewInspectorSection, applying: boolean) => ReactNode;
   mainVideo?: HTMLVideoElement | undefined;
   resultTime?: number | undefined;
   onJump?(time: number): void;
@@ -78,51 +79,56 @@ export function ReviewSpeechPanel(props: Props) {
               (props.target.kind === 'original' || origin.clipId === props.target.clipId)
           ))
     ) ?? [];
+  const section: ReviewInspectorSection = {
+    id: 'recognition',
+    label: translate('gallery.videoReview.recognitionTitle'),
+    icon: FileText,
+    content: (
+      <div className="min-w-0 sniptale-parameter-stack">
+        <RecognitionSettings recognition={recognition} access={props} />
+        <RecognitionFeedback recognition={recognition} />
+        {recognition.proposal && (
+          <RecognitionResult
+            key={recognition.proposal.job.id}
+            recognition={recognition}
+            access={props}
+          />
+        )}
+        {related.length > 0 && props.onSelectText && (
+          <RecognitionRelatedText
+            fragments={related}
+            onSelect={props.onSelectText}
+            disabled={recognition.running}
+          />
+        )}
+      </div>
+    ),
+  };
   return (
     <section
       className="min-w-0 space-y-3"
       data-ui="gallery.videoReview.speechPanel"
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <ReviewInspectorSections
-        sections={[
-          ...(props.sound
-            ? [
-                {
-                  id: 'audio',
-                  label: translate('gallery.videoReview.volume'),
-                  icon: AudioLines,
-                  content: props.sound(recognition.applying),
-                },
-              ]
-            : []),
-          {
-            id: 'recognition',
-            label: translate('gallery.videoReview.recognitionTitle'),
-            icon: FileText,
-            content: (
-              <div className="min-w-0 sniptale-parameter-stack">
-                <RecognitionSettings recognition={recognition} access={props} />
-                <RecognitionFeedback recognition={recognition} />
-                {recognition.proposal && (
-                  <RecognitionResult
-                    key={recognition.proposal.job.id}
-                    recognition={recognition}
-                    access={props}
-                  />
-                )}
-                {related.length > 0 && props.onSelectText && (
-                  <RecognitionRelatedText
-                    fragments={related}
-                    onSelect={props.onSelectText}
-                    disabled={recognition.running}
-                  />
-                )}
-              </div>
-            ),
-          },
-        ]}
-      />
+      {props.renderSections ? (
+        props.renderSections(section, recognition.applying)
+      ) : (
+        <ReviewInspectorSections
+          sections={[
+            ...(props.sound
+              ? [
+                  {
+                    id: 'audio',
+                    label: translate('gallery.videoReview.volume'),
+                    icon: AudioLines,
+                    content: props.sound(recognition.applying),
+                  },
+                ]
+              : []),
+            section,
+          ]}
+        />
+      )}
     </section>
   );
 }
@@ -229,7 +235,7 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
             label={translate('gallery.videoReview.recognitionSelection')}
           />
         )}
-        <div className="flex flex-wrap gap-1">
+        <div className="review-recognition-commands">
           <ReviewButton
             label={label}
             className={buttonClass}
@@ -274,7 +280,7 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
             <p>{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
           )}
           <p>{translate('gallery.videoReview.recognitionHistoryDisclosure')}</p>
-          <div className="flex flex-wrap gap-1">
+          <div className="review-recognition-commands">
             <ReviewButton
               label={translate('gallery.videoReview.speechConsentContinue')}
               className={buttonClass}
@@ -458,7 +464,7 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
           )}
         </div>
       ) : (
-        <div className="flex flex-wrap gap-1">
+        <div className="review-recognition-commands">
           <ReviewButton
             label={applyLabel}
             className={buttonClass}

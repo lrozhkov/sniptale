@@ -46,7 +46,6 @@ import {
   createQuickEditZoomRegion,
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { ReviewButton } from './controls';
 import { previewBackgroundPaint } from './zoom-preview-paint';
@@ -476,8 +475,8 @@ function ZoomPreviewHeading(props: {
 }) {
   const { region, controls } = props;
   return (
-    <div className="flex items-center justify-between gap-2">
-      <h5 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+    <div className="min-w-0 sniptale-parameter-stack">
+      <h5 className="px-2 text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
         {translate(
           region.border
             ? 'gallery.videoReview.borderPreview'
@@ -487,14 +486,13 @@ function ZoomPreviewHeading(props: {
         )}
       </h5>
       {!controls.overlay && controls.tool === 'position' && (
-        <SegmentedSwitch<'area' | 'result'>
-          dataAttribute={{ 'data-ui': 'gallery.videoReview.previewMode' }}
+        <SegmentedRow<'area' | 'result'>
+          columns={2}
           ariaLabel={translate('gallery.videoReview.zoomPreview')}
-          density="compact"
-          activeId={controls.view}
+          value={controls.view}
           options={[
-            { id: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
-            { id: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
+            { value: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
+            { value: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
           ]}
           onChange={controls.setView}
         />

@@ -10,8 +10,15 @@
   min-width: 0;
 }
 .review-spatial-context {
-  height: 2rem;
   min-width: 0;
+}
+.review-spatial-context:empty {
+  display: none;
+}
+.review-spatial-reset {
+  display: flex;
+  justify-content: flex-end;
+  padding-inline: 8px;
 }
 .review-spatial-tools .review-spatial-tool {
   flex: 0 1 28px;

@@ -40,7 +40,7 @@ export function ReviewEditRangeFields(props: {
     }
   };
   return (
-    <div data-ui="gallery.videoReview.editRangeFields" className="min-w-0 space-y-3">
+    <div data-ui="gallery.videoReview.editRangeFields" className="min-w-0 sniptale-parameter-stack">
       {(['start', 'end'] as const).map((edge) => {
         const limits = reviewEditEdgeLimits({ ...props, edit: draft, edge });
         const values = limits.values;
@@ -54,7 +54,7 @@ export function ReviewEditRangeFields(props: {
           <NumericRow
             key={edge}
             appearance="plain"
-            className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+            className="w-full"
             label={translate(
               edge === 'start' ? 'gallery.videoReview.rangeStart' : 'gallery.videoReview.rangeEnd'
             )}

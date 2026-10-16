@@ -411,7 +411,8 @@ export function InspectorPresentationComposition(parent, { theme }) {
     all = el('div', { class: 'presentation-all' }),
     split = el('div', { class: 'presentation-split' }, [rail, panel]);
   parent.append(view);
-  view.append(header, all, split);
+  const summary = el('p', { class: 'composition-status', text: 'Интервал: 0–12 с' });
+  view.append(header, summary, all, split);
   let categorized = false,
     selected = 0;
   const title = TextField({ label: 'Название сцены', value: 'Вступление', context: 'inspector' }),
@@ -442,6 +443,19 @@ export function InspectorPresentationComposition(parent, { theme }) {
       ]),
     },
   ];
+  groups.push({
+    id: 'actions',
+    label: 'Действия',
+    content: el('div', { class: 'action-row' }, [
+      ActionButton({
+        label: 'Удалить фрагмент',
+        kind: 'quiet',
+        onClick: () => {
+          summary.textContent = 'Фрагмент удалён · учебный пример';
+        },
+      }),
+    ]),
+  });
   const select = (index) => {
     selected = index;
     for (const [at, button] of [...rail.children].entries()) {

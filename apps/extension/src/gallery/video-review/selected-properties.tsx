@@ -165,8 +165,12 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 mainVideo={props.mainVideo}
                 resultTime={props.focusTime}
                 {...(props.onPreviewFrame ? { onJump: props.onPreviewFrame } : {})}
-                sound={(applying) => (
-                  <ReviewAudioInspectorSection audio={audio} busy={busy || applying} embedded />
+                renderSections={(recognition, applying) => (
+                  <ReviewAudioInspectorSection
+                    audio={audio}
+                    busy={busy || applying}
+                    recognition={recognition}
+                  />
                 )}
                 {...(props.onSelectText ? { onSelectText: props.onSelectText } : {})}
               />
@@ -301,7 +305,7 @@ function SelectedEdit(
         </p>
       ) : null}
       <div className="review-inspector-columns">
-        <div className="min-w-0 space-y-3">
+        <div className="min-w-0 sniptale-parameter-stack">
           {selected.kind === 'speed' ? (
             <ReviewSpeedOptions
               layout="inspector"
@@ -401,7 +405,7 @@ function CutTransitionFields(props: {
     >
       <fieldset
         disabled={saving}
-        className="min-w-0 space-y-2"
+        className="min-w-0 sniptale-parameter-stack"
         data-ui="gallery.videoReview.cutTransition"
       >
         <SelectField<ReviewCutTransition['type'] | 'none'>
@@ -434,7 +438,7 @@ function CutTransitionFields(props: {
               <NumericRow
                 key={field}
                 appearance="plain"
-                className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+                className="w-full"
                 label={translate(
                   field === 'total'
                     ? 'gallery.videoReview.zoomTransitionDuration'

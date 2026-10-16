@@ -55,3 +55,5 @@ Form editors keep at least 4px between visible field bounds and adjacent command
 Compound action rows preserve complete commands and canonical parameter insets. Let commands wrap by their intrinsic content when they cannot fit. Exact controls and their preset owner share the same label and value alignment. Preserve specialized numeric stepper overhang inside its verified gutter.
 
 Prove the composed variants, not only isolated controls. Include empty and populated resources, attached actions, expanded exact settings, and long translated labels. Component unit tests do not prove rendered alignment or overflow. Measure visible control bounds in the actual consumer at the required viewports.
+
+Place an object summary outside its parameter groups. Compose related inspectors from their section definitions. Do not insert a complete inspector into one parameter group. Append terminal commands after all parameter and processing groups, in both presentation modes.

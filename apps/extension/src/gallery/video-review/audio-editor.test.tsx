@@ -71,7 +71,7 @@ it('patches volume and fades from numeric fields', () => {
   expect(onPatch).toHaveBeenCalledWith({ fadeOut: 0.3 });
 });
 
-it('toggles mute and deletes the clip', async () => {
+it('keeps mute on the track indicator and deletes the clip', async () => {
   const clip = createQuickEditAudioClip({
     id: 'a1',
     assetId: 'asset:1',
@@ -80,12 +80,8 @@ it('toggles mute and deletes the clip', async () => {
     endMax: 10,
   });
   renderEditor(clip);
-  const mute = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.audioClipMute"]'
-  )!;
-  expect(mute.getAttribute('aria-pressed')).toBe('false');
-  await act(async () => mute.click());
-  expect(onPatch).toHaveBeenCalledWith({ muted: true });
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
+  expect(onPatch).not.toHaveBeenCalled();
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipDelete"]')!
@@ -111,12 +107,7 @@ it('binds inspector actions to the selected lane without duplicating its heading
   const editor = host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')!;
   expect(editor!.textContent).toContain('gallery.videoReview.interval');
   expect(editor!.textContent).not.toContain('gallery.videoReview.audioVoiceover');
-  await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipMute"]')!
-      .click()
-  );
-  expect(patchClip).toHaveBeenCalledWith('voiceover', 'a1', { muted: true });
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipDelete"]')!
@@ -128,12 +119,8 @@ it('binds inspector actions to the selected lane without duplicating its heading
   expect(
     host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')!.textContent
   ).not.toContain('gallery.videoReview.audioMusic');
-  await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipMute"]')!
-      .click()
-  );
-  expect(patchClip).toHaveBeenLastCalledWith('music', 'a1', { muted: true });
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
+  expect(patchClip).not.toHaveBeenCalled();
   act(() =>
     root.render(<ReviewAudioInspectorSection audio={{ selected: null } as never} busy={false} />)
   );
@@ -162,11 +149,7 @@ it('explains cut suppression without changing the authored mute flag or deleting
   expect(host.querySelector('[role="status"]')?.textContent).toContain(
     'gallery.videoReview.voiceoverCut'
   );
-  expect(
-    host
-      .querySelector('[aria-label="gallery.videoReview.audioClipMute"]')
-      ?.getAttribute('aria-pressed')
-  ).toBe('false');
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
   expect(onPatch).not.toHaveBeenCalled();
   expect(onDelete).not.toHaveBeenCalled();
   renderEditor(clip);

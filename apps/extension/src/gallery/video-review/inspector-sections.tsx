@@ -46,10 +46,16 @@ export function ReviewInspectorPresentation(props: {
   );
 }
 
-type ReviewSection = { id: string; label: string; icon: LucideIcon; content: ReactNode };
+/** One parameter group supplied to the selected-object inspector. */
+export type ReviewInspectorSection = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  content: ReactNode;
+};
 
 /** Selected-object commands share metadata and local geometry in either presentation mode. */
-export function reviewInspectorActions(content: ReactNode): ReviewSection {
+export function reviewInspectorActions(content: ReactNode): ReviewInspectorSection {
   return {
     id: 'actions',
     label: translate('gallery.videoReview.actionActions'),
@@ -59,7 +65,11 @@ export function reviewInspectorActions(content: ReactNode): ReviewSection {
 }
 
 /** One section definition drives both the vertical navigation and the collapsible list. */
-export function ReviewInspectorSections({ sections }: { sections: readonly ReviewSection[] }) {
+export function ReviewInspectorSections({
+  sections,
+}: {
+  sections: readonly ReviewInspectorSection[];
+}) {
   const context = useContext(PresentationContext);
   const presentation = context.value;
   const [local, setLocal] = useState<string>();
@@ -116,7 +126,7 @@ export function ReviewInspectorColumns({ children }: { children: ReactNode }) {
   return <div className="review-inspector-columns">{children}</div>;
 }
 
-export function reviewInformationSections(content: ReactNode): ReviewSection[] {
+export function reviewInformationSections(content: ReactNode): ReviewInspectorSection[] {
   return content
     ? [
         {

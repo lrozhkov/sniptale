@@ -1,3 +1,4 @@
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useMemo, useRef } from 'react';
 import { Clock3, Copy, Move, Palette, Shapes, Trash2 } from 'lucide-react';
 import {
@@ -364,17 +365,14 @@ function AnnotationParameters(
   ];
   return (
     <div data-ui="gallery.videoReview.annotationInspector">
-      <div className="flex min-h-8 min-w-0 items-center justify-between gap-2 text-xs">
-        <span className="shrink-0 text-[var(--sniptale-color-text-secondary)]">
-          {translate('gallery.videoReview.annotationName')}
-        </span>
+      <InspectorParameterRow label={translate('gallery.videoReview.annotationName')}>
         <span
-          className="min-w-0 truncate text-[var(--sniptale-color-text-primary)]"
+          className="block min-w-0 w-full truncate text-right text-[var(--sniptale-color-text-primary)]"
           title={resolveEffectLocaleText(document.label, locale)}
         >
           {resolveEffectLocaleText(document.label, locale)}
         </span>
-      </div>
+      </InspectorParameterRow>
       {editor.failure && (
         <div role="alert">
           {translate(

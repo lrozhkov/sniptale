@@ -1,5 +1,5 @@
 import { createContext, useLayoutEffect, useState, type ReactNode, type RefObject } from 'react';
-import { Focus, Move, RotateCcw, RotateCw, Scan } from 'lucide-react';
+import { Focus, Move, RotateCw, Scan } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
@@ -11,6 +11,7 @@ import {
   type ReviewSpatialControlPoint,
 } from './spatial-control-geometry';
 import { useSpatialGesture, type SpatialTool, type SpatialAxis } from './spatial-gesture';
+import { ReviewButton, reviewTextButtonClassName } from './controls';
 import './spatial-controls.css';
 
 const toolLabels = {
@@ -66,24 +67,6 @@ export function ReviewSpatialToolbar(props: {
             </ContentToolbarButton>
           );
         })}
-        <ContentToolbarButton
-          type="button"
-          size="compact"
-          tone="utility"
-          title={translate(
-            props.tool === 'position'
-              ? 'gallery.videoReview.spatialResetPosition'
-              : props.tool === 'tilt'
-                ? 'gallery.videoReview.spatialResetTilt'
-                : props.tool === 'rotation'
-                  ? 'gallery.videoReview.spatialResetRotation'
-                  : 'gallery.videoReview.spatialResetFocus'
-          )}
-          disabled={props.disabled}
-          onClick={props.onReset}
-        >
-          <RotateCcw size={14} aria-hidden />
-        </ContentToolbarButton>
       </div>
       <div className="review-spatial-context">
         {props.tool === 'tilt' ? (
@@ -104,6 +87,23 @@ export function ReviewSpatialToolbar(props: {
         ) : (
           props.children
         )}
+      </div>
+      <div className="review-spatial-reset">
+        <ReviewButton
+          type="button"
+          className={reviewTextButtonClassName}
+          label={translate(
+            props.tool === 'position'
+              ? 'gallery.videoReview.spatialResetPosition'
+              : props.tool === 'tilt'
+                ? 'gallery.videoReview.spatialResetTilt'
+                : props.tool === 'rotation'
+                  ? 'gallery.videoReview.spatialResetRotation'
+                  : 'gallery.videoReview.spatialResetFocus'
+          )}
+          disabled={props.disabled}
+          onClick={props.onReset}
+        />
       </div>
     </div>
   );
