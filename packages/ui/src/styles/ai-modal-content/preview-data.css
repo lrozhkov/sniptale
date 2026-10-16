@@ -140,3 +140,83 @@
 .sniptale-ai-field-value {
   color: var(--sniptale-text-secondary);
 }
+
+/* The content AI composition adopts compact chrome without changing JSON or tree state. */
+.sniptale-ai-modal-adopted.sniptale-ai-modal-root .sniptale-json-preview {
+  background: var(--sniptale-color-surface-input);
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 4px;
+  box-shadow: none;
+  padding: 12px;
+  user-select: text;
+}
+
+.sniptale-ai-modal-adopted .sniptale-checkbox {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  transition: none;
+}
+
+.sniptale-ai-modal-adopted .sniptale-checkbox::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--sniptale-color-border-strong);
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-panel);
+}
+
+.sniptale-ai-modal-adopted .sniptale-checkbox:hover::before {
+  border-color: var(--sniptale-color-text-secondary);
+  background: var(--sniptale-color-surface-hover);
+}
+
+.sniptale-ai-modal-adopted .sniptale-checkbox:checked::before {
+  border-color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-text-primary);
+}
+
+.sniptale-ai-modal-adopted .sniptale-checkbox:checked::after {
+  left: 9px;
+  top: 6px;
+  width: 4px;
+  height: 8px;
+  border-color: var(--sniptale-color-surface-panel);
+}
+
+.sniptale-ai-modal-adopted .sniptale-checkbox:focus-visible {
+  outline: 2px solid var(--sniptale-color-border-accent-strong);
+  outline-offset: 0;
+}
+
+.sniptale-ai-modal-adopted .sniptale-tree-row {
+  border-radius: 4px;
+  transition: background-color 120ms ease;
+}
+
+.sniptale-ai-modal-adopted .sniptale-tree-row-selected,
+.sniptale-ai-modal-adopted .sniptale-tree-row-field-selected {
+  border-color: transparent;
+  border-left-width: 1px;
+  background: var(--sniptale-color-surface-hover);
+  box-shadow: none;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-field-row {
+  font: 500 13px / 18px var(--sniptale-font-interface);
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-field-label {
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-field-value {
+  color: var(--sniptale-color-text-primary);
+}

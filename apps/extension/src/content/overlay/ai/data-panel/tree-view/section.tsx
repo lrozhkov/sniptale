@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import type { SectionNode } from '@sniptale/runtime-contracts/dom-tree';
 import { getDefaultTreeNodeState } from '../tree/helpers';
@@ -24,18 +25,23 @@ export function TreeSection({
           type="checkbox"
           className="sniptale-checkbox"
           checked={state.selected}
+          aria-label={section.title}
           onChange={() => treeRenderProps.toggleSelected(section.id)}
           onClick={(event) => event.stopPropagation()}
         />
-        <button
+        <ProductActionButton
+          tone="secondary"
+          data-command-chrome="true"
+          type="button"
           className="sniptale-expand-btn"
+          aria-expanded={state.expanded}
           onClick={() => treeRenderProps.toggleExpanded(section.id)}
           title={
             state.expanded ? translate('aiModal.collapseTitle') : translate('aiModal.expandTitle')
           }
         >
           <ExpandIcon expanded={state.expanded} size={12} />
-        </button>
+        </ProductActionButton>
         <span
           className="sniptale-ai-section-title"
           onClick={() => treeRenderProps.toggleExpanded(section.id)}

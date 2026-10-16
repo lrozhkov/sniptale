@@ -46,7 +46,8 @@ export function AIModalFooter({
           onSelect={onSelectModel}
           disabled={isLoading}
         />
-        <button
+        <ProductActionButton
+          tone="secondary"
           aria-label={translate('aiModal.openModelSettings')}
           className="sniptale-ai-modal-inline-settings"
           onClick={(event) =>
@@ -56,7 +57,7 @@ export function AIModalFooter({
           type="button"
         >
           <Settings2 aria-hidden="true" size={14} />
-        </button>
+        </ProductActionButton>
       </div>
       <div className="sniptale-ai-modal-footer-actions">
         <ProductActionButton onClick={onClose} tone="secondary">

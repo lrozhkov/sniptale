@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type React from 'react';
 import { translate } from '../../../../../platform/i18n';
 import { ExpandChevronIcon } from '../preview/icons';
@@ -35,11 +37,14 @@ export function DataSelectionPreviewHeader({
   toggleExpandAll,
   toggleSelectAll,
 }: DataSpoilerHeaderProps) {
+  const searchInput = useRef<HTMLInputElement>(null);
   const stopHeaderToggle = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
     <div className="sniptale-spoiler-header">
-      <button
+      <ProductActionButton
+        tone="secondary"
         aria-expanded={isDataSpoilerOpen}
+        title={translate('aiModal.dataForProcessingLabel')}
         className="sniptale-ai-spoiler-toggle"
         onClick={handleToggleSpoiler}
         type="button"
@@ -48,10 +53,13 @@ export function DataSelectionPreviewHeader({
         <span className="sniptale-ai-spoiler-label">
           {translate('aiModal.dataForProcessingLabel')}
         </span>
-        <span className={`sniptale-ai-spoiler-summary ${getSummaryToneClass()}`}>
+        <span
+          title={spoilerSummary}
+          className={`sniptale-ai-spoiler-summary ${getSummaryToneClass()}`}
+        >
           {spoilerSummary}
         </span>
-      </button>
+      </ProductActionButton>
       {isDataSpoilerOpen ? (
         <div
           className="sniptale-ai-spoiler-header-tools"
@@ -60,9 +68,11 @@ export function DataSelectionPreviewHeader({
           onPointerDown={stopHeaderToggle}
         >
           <label className="sniptale-ai-data-search">
-            <Search aria-hidden="true" size={13} />
+            <Search aria-hidden="true" size={16} />
             <input
+              ref={searchInput}
               aria-label={translate('aiModal.searchDataLabel')}
+              title={translate('aiModal.searchDataLabel')}
               disabled={isLoading}
               onChange={(event) => setFilterQuery(event.target.value)}
               placeholder={translate('aiModal.searchDataPlaceholder')}
@@ -70,22 +80,31 @@ export function DataSelectionPreviewHeader({
               value={filterQuery}
             />
             {filterQuery ? (
-              <button
+              <ProductActionButton
+                tone="secondary"
                 aria-label={translate('aiModal.clearSearchLabel')}
-                className="sniptale-dismiss-button sniptale-ai-data-search-clear"
+                className="sniptale-ai-data-search-clear"
+                data-command-chrome="true"
+                title={translate('aiModal.clearSearchLabel')}
+                onPointerDown={(event) => event.preventDefault()}
                 disabled={isLoading}
-                onClick={() => setFilterQuery('')}
+                onClick={() => {
+                  setFilterQuery('');
+                  searchInput.current?.focus();
+                }}
                 type="button"
               >
-                <X aria-hidden="true" size={13} />
-              </button>
+                <X aria-hidden="true" size={16} />
+              </ProductActionButton>
             ) : null}
           </label>
-          <button
+          <ProductActionButton
+            tone="toggle"
             aria-label={translate(
               showSelectedOnly ? 'aiModal.showAllDataLabel' : 'aiModal.showSelectedOnlyLabel'
             )}
             aria-pressed={showSelectedOnly}
+            active={showSelectedOnly}
             className={`sniptale-ai-data-selected-filter${showSelectedOnly ? ' active' : ''}`}
             disabled={isLoading}
             onClick={() => setShowSelectedOnly((value) => !value)}
@@ -94,8 +113,8 @@ export function DataSelectionPreviewHeader({
             )}
             type="button"
           >
-            <ListFilter aria-hidden="true" size={13} />
-          </button>
+            <ListFilter aria-hidden="true" size={16} />
+          </ProductActionButton>
           <DataSelectionPreviewActions
             isAnyExpanded={isAnyExpanded}
             isAnySelected={isAnySelected}

@@ -28,7 +28,7 @@ function createModalEscapeHandler(args: {
   voiceActive: boolean;
 }) {
   return (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -64,7 +64,7 @@ export function AIModalDialog({
   return (
     <ProductModal
       closeOnBackdrop={false}
-      dialogClassName="sniptale-ai-modal-root"
+      dialogClassName="sniptale-ai-modal-root sniptale-ai-modal-adopted sniptale-compact-workspace"
       onKeyDown={createModalEscapeHandler({ isLoading, onClose, onStopVoice, voiceActive })}
     >
       <ProductModalHeader {...headerProps} />

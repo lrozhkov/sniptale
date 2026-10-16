@@ -84,6 +84,10 @@ describe('TableSectionRows', () => {
     expect(row?.className).toContain('sniptale-tree-row-field-selected');
     expect(rendered?.container.textContent).toContain('Name: Alice');
     expect(rendered?.container.textContent).not.toContain('Role: Owner');
+    const labelId = checkbox?.getAttribute('aria-labelledby');
+    const label = labelId ? rendered?.container.ownerDocument.getElementById(labelId) : null;
+    expect(label?.textContent).toContain('Name: Alice');
+    expect(label?.textContent).not.toContain('Role: Owner');
     expect(treeRenderProps.toggleSelected).toHaveBeenCalledWith('row-1');
   });
 });

@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import { CheckboxIcon, CheckIcon, ExpandChevronIcon } from '../preview/icons';
 
@@ -24,7 +25,9 @@ export function DataSelectionPreviewActions({
       onMouseDown={stopHeaderToggle}
       onPointerDown={stopHeaderToggle}
     >
-      <button
+      <ProductActionButton
+        tone="secondary"
+        type="button"
         className="sniptale-ctrl-btn"
         onClick={(event) => {
           event.stopPropagation();
@@ -41,8 +44,10 @@ export function DataSelectionPreviewActions({
         {isAnyExpanded
           ? translate('aiModal.collapseAllButton')
           : translate('aiModal.expandAllButton')}
-      </button>
-      <button
+      </ProductActionButton>
+      <ProductActionButton
+        tone="secondary"
+        type="button"
         className={`sniptale-ctrl-btn${isAnySelected ? ' active' : ''}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -59,7 +64,7 @@ export function DataSelectionPreviewActions({
         {isAnySelected
           ? translate('aiModal.clearSelectionButton')
           : translate('aiModal.selectAllButton')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

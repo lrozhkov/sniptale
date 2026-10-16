@@ -15,6 +15,7 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 }));
 
 import { DataSelectionPreviewActions } from './actions';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -55,15 +56,17 @@ describe('DataSelectionPreviewActions', () => {
     const toggleSelectAll = vi.fn();
 
     await renderNode(
-      <div onClick={parentClick}>
-        <DataSelectionPreviewActions
-          isAnyExpanded={true}
-          isAnySelected={false}
-          isLoading={false}
-          toggleExpandAll={toggleExpandAll}
-          toggleSelectAll={toggleSelectAll}
-        />
-      </div>
+      <CommandPressScope value={true}>
+        <div onClick={parentClick}>
+          <DataSelectionPreviewActions
+            isAnyExpanded={true}
+            isAnySelected={false}
+            isLoading={false}
+            toggleExpandAll={toggleExpandAll}
+            toggleSelectAll={toggleSelectAll}
+          />
+        </div>
+      </CommandPressScope>
     );
 
     const buttons = container?.querySelectorAll<HTMLButtonElement>('button') ?? [];
@@ -83,4 +86,26 @@ describe('DataSelectionPreviewActions', () => {
     expect(toggleExpandAll).toHaveBeenCalled();
     expect(toggleSelectAll).toHaveBeenCalled();
   });
+});
+
+it('keeps scoped bulk commands unavailable while loading', async () => {
+  const toggleExpandAll = vi.fn();
+  const toggleSelectAll = vi.fn();
+  await renderNode(
+    <CommandPressScope value={true}>
+      <DataSelectionPreviewActions
+        isAnyExpanded={false}
+        isAnySelected={true}
+        isLoading
+        toggleExpandAll={toggleExpandAll}
+        toggleSelectAll={toggleSelectAll}
+      />
+    </CommandPressScope>
+  );
+  act(() => container?.querySelectorAll('button').forEach((button) => button.click()));
+  expect(toggleExpandAll).not.toHaveBeenCalled();
+  expect(toggleSelectAll).not.toHaveBeenCalled();
+  expect(
+    Array.from(container?.querySelectorAll('button') ?? []).every((button) => button.disabled)
+  ).toBe(true);
 });

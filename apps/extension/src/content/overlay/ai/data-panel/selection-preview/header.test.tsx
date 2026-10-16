@@ -142,12 +142,14 @@ describe('DataSelectionPreviewHeader', () => {
       />
     );
 
+    container?.querySelector<HTMLButtonElement>('.sniptale-ai-data-search-clear')?.focus();
     act(() =>
       container
         ?.querySelector<HTMLButtonElement>('[aria-label="aiModal.clearSearchLabel"]')
         ?.click()
     );
     expect(setFilterQuery).toHaveBeenCalledWith('');
+    expect(document.activeElement).toBe(container?.querySelector('input'));
   });
 });
 

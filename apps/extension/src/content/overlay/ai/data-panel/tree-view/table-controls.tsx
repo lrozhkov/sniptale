@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import type { TableNode } from '@sniptale/runtime-contracts/dom-tree';
 import type { TreeRenderProps } from '../tree/types';
@@ -23,15 +24,19 @@ export function TableSectionControls({
       className="sniptale-column-exclusion"
       style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}
     >
-      <button
+      <ProductActionButton
+        tone="secondary"
+        data-command-chrome="true"
+        type="button"
         className="sniptale-ai-column-toggle"
+        aria-expanded={expanded}
         onClick={() => toggleExpanded(table.id)}
         title={
           expanded ? translate('aiModal.collapseRowsTitle') : translate('aiModal.expandRowsTitle')
         }
       >
         <ExpandIcon expanded={expanded} size={11} />
-      </button>
+      </ProductActionButton>
       <span className="sniptale-column-exclusion-label">
         {translate('aiModal.excludeColumnsLabel')}
       </span>

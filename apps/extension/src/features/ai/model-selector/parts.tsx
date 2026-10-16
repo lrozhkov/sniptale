@@ -80,8 +80,15 @@ export function Dropdown(props: {
   selectedModelId: string | null;
   setSearchQuery: Dispatch<SetStateAction<string>>;
 }) {
+  const compact = useContext(CommandPressScope);
   return (
-    <ProductDropdownMenu className="sniptale-dropdown-up mt-2 min-w-[16rem]">
+    <ProductDropdownMenu
+      className={
+        compact
+          ? 'sniptale-dropdown-up sniptale-compact-workspace mt-2 min-w-[16rem] !rounded-[4px] !p-[5px]'
+          : 'sniptale-dropdown-up mt-2 min-w-[16rem]'
+      }
+    >
       <DropdownSearchField
         searchInputRef={props.searchInputRef}
         searchQuery={props.searchQuery}
@@ -114,6 +121,7 @@ function DropdownSearchField(props: {
       <ProductInput
         ref={props.searchInputRef as Ref<HTMLInputElement>}
         type="text"
+        className={compact ? '!rounded-[4px] !text-[13px] !leading-[18px] !font-medium' : undefined}
         value={props.searchQuery}
         onChange={(event) => props.setSearchQuery(event.target.value)}
         aria-label={translate('aiModal.modelSearchPlaceholder')}
@@ -163,9 +171,16 @@ function DropdownProviderSections(props: {
   onSelect: (modelId: string) => void;
   selectedModelId: string | null;
 }) {
+  const compact = useContext(CommandPressScope);
   return props.filteredProviders.map(({ provider, models }) => (
     <div key={provider.id}>
-      <ProductDropdownSectionLabel className="px-3 pt-1 text-[11px] uppercase tracking-[0.08em]">
+      <ProductDropdownSectionLabel
+        className={
+          compact
+            ? '!px-2 !py-1 !text-[12px] !leading-4 !font-medium !normal-case !tracking-normal'
+            : 'px-3 pt-1 text-[11px] uppercase tracking-[0.08em]'
+        }
+      >
         {provider.name}
       </ProductDropdownSectionLabel>
       {models.map((model) => (

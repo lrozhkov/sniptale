@@ -61,6 +61,7 @@ vi.mock('../../../../../features/prompt-templates/editor', async (importOriginal
 
 import { translate } from '../../../../../platform/i18n';
 import { AIModalDialog } from './dialog';
+import { AIModalPromptTemplatePicker } from './prompt-template-picker';
 import type { useAIModalState } from '../session';
 
 let container: HTMLDivElement | null = null;
@@ -237,4 +238,45 @@ describe('AIModalDialog', () => {
 
     expect(onClose).not.toHaveBeenCalled();
   });
+});
+
+it('keeps the parent and voice session when the template list consumes Escape', async () => {
+  const onClose = vi.fn();
+  const onStopVoice = vi.fn();
+  await renderDialog({
+    onClose,
+    onStopVoice,
+    voiceActive: true,
+    promptField: (
+      <AIModalPromptTemplatePicker
+        disabled={false}
+        isLoading={false}
+        onSelectTemplate={vi.fn(async () => undefined)}
+        templates={[{ id: 'template-1', name: 'Rewrite', content: 'Rewrite', enabled: true }]}
+      />
+    ),
+  });
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="ai-modal.template-picker"] button[aria-haspopup="listbox"]'
+  );
+  expect(trigger).not.toBeNull();
+  await act(async () => trigger?.click());
+  const option = document.querySelector<HTMLElement>('[role="option"]');
+  expect(option).not.toBeNull();
+  await act(async () => {
+    option?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
+    );
+  });
+  expect(document.querySelector('[role="option"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  expect(onStopVoice).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+  act(() =>
+    trigger?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
+    )
+  );
+  expect(onStopVoice).toHaveBeenCalledTimes(1);
+  expect(onClose).not.toHaveBeenCalled();
 });

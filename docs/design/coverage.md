@@ -107,6 +107,14 @@ Recording retains trusted Start admission, lifecycle commands, device selection,
 
 Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-content-recorder-design.spec.ts`. Existing scenario, drawing and recording lifecycle suites retain their separate behavioral role. The extension popup remains excluded.
 
+## Content AI integration
+
+The content AI dialog uses shared commands, interface typography and local compact surfaces. Template and model menus retain their existing selection owners. Escape closes a nested template menu before the dialog. Data search Clear restores the editable field focus.
+
+The selected data tree retains native selection controls, filtering, column exclusions and existing payload construction. JSON retains monospace syntax, copy, local scrolling and resize behavior. Prompt editing, voice, request admission, provider settings and failure recovery keep their existing owners.
+
+Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-content-ai-design.spec.ts`. It enters through actual page selection and configures a synthetic loopback provider through Settings. It checks waiting cancellation, retained drafts, local failure feedback and retry. Existing request, voice, parser and apply-back suites retain their separate engine proof.
+
 ## Integration exclusions
 
 Preserve crop coordinates, media decoding/import, native file acquisition, recording lifecycle, device permissions, color/paint internals, persistence, and production Undo. Do not infer these engines from the bounded probes. A specimen can exercise local pending/error/recovery states without claiming native-engine parity. All ordinary reference requirements in this inventory have working examples.

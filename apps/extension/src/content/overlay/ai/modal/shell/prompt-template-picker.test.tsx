@@ -67,7 +67,7 @@ it('copies the selected template through the canonical selection action', () => 
   expect(onSelectTemplate).toHaveBeenCalledWith(expect.objectContaining({ id: 'template-1' }));
   expect(productSelectMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      menuClassName: 'sniptale-ai-modal-template-menu',
+      menuClassName: 'sniptale-ai-modal-template-menu sniptale-ai-template-menu-adopted',
       menuScrollable: true,
       options: [{ description: 'Rewrite', label: 'Rewrite', value: 'template-1' }],
     })
