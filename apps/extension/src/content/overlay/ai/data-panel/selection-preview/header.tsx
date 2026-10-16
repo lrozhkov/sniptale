@@ -41,8 +41,7 @@ export function DataSelectionPreviewHeader({
   const stopHeaderToggle = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
     <div className="sniptale-spoiler-header">
-      <ProductActionButton
-        tone="secondary"
+      <button
         aria-expanded={isDataSpoilerOpen}
         title={translate('aiModal.dataForProcessingLabel')}
         className="sniptale-ai-spoiler-toggle"
@@ -59,7 +58,7 @@ export function DataSelectionPreviewHeader({
         >
           {spoilerSummary}
         </span>
-      </ProductActionButton>
+      </button>
       {isDataSpoilerOpen ? (
         <div
           className="sniptale-ai-spoiler-header-tools"
@@ -68,7 +67,7 @@ export function DataSelectionPreviewHeader({
           onPointerDown={stopHeaderToggle}
         >
           <label className="sniptale-ai-data-search">
-            <Search aria-hidden="true" size={16} />
+            <Search aria-hidden="true" size={13} />
             <input
               ref={searchInput}
               aria-label={translate('aiModal.searchDataLabel')}
@@ -82,9 +81,9 @@ export function DataSelectionPreviewHeader({
             {filterQuery ? (
               <ProductActionButton
                 tone="secondary"
+                data-command-chrome="true"
                 aria-label={translate('aiModal.clearSearchLabel')}
                 className="sniptale-ai-data-search-clear"
-                data-command-chrome="true"
                 title={translate('aiModal.clearSearchLabel')}
                 onPointerDown={(event) => event.preventDefault()}
                 disabled={isLoading}
@@ -94,17 +93,15 @@ export function DataSelectionPreviewHeader({
                 }}
                 type="button"
               >
-                <X aria-hidden="true" size={16} />
+                <X aria-hidden="true" size={13} />
               </ProductActionButton>
             ) : null}
           </label>
-          <ProductActionButton
-            tone="toggle"
+          <button
             aria-label={translate(
               showSelectedOnly ? 'aiModal.showAllDataLabel' : 'aiModal.showSelectedOnlyLabel'
             )}
             aria-pressed={showSelectedOnly}
-            active={showSelectedOnly}
             className={`sniptale-ai-data-selected-filter${showSelectedOnly ? ' active' : ''}`}
             disabled={isLoading}
             onClick={() => setShowSelectedOnly((value) => !value)}
@@ -113,8 +110,8 @@ export function DataSelectionPreviewHeader({
             )}
             type="button"
           >
-            <ListFilter aria-hidden="true" size={16} />
-          </ProductActionButton>
+            <ListFilter aria-hidden="true" size={13} />
+          </button>
           <DataSelectionPreviewActions
             isAnyExpanded={isAnyExpanded}
             isAnySelected={isAnySelected}

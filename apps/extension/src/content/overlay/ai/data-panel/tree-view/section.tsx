@@ -1,4 +1,3 @@
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import type { SectionNode } from '@sniptale/runtime-contracts/dom-tree';
 import { getDefaultTreeNodeState } from '../tree/helpers';
@@ -29,9 +28,7 @@ export function TreeSection({
           onChange={() => treeRenderProps.toggleSelected(section.id)}
           onClick={(event) => event.stopPropagation()}
         />
-        <ProductActionButton
-          tone="secondary"
-          data-command-chrome="true"
+        <button
           type="button"
           className="sniptale-expand-btn"
           aria-expanded={state.expanded}
@@ -41,7 +38,7 @@ export function TreeSection({
           }
         >
           <ExpandIcon expanded={state.expanded} size={12} />
-        </ProductActionButton>
+        </button>
         <span
           className="sniptale-ai-section-title"
           onClick={() => treeRenderProps.toggleExpanded(section.id)}

@@ -454,6 +454,18 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   const modal = modalRoot(page);
   const spoiler = modal.locator('.sniptale-ai-spoiler-toggle');
   if ((await spoiler.getAttribute('aria-expanded')) !== 'true') await spoiler.click();
+  const section = modal
+    .locator('.sniptale-tree-row')
+    .filter({ has: page.locator('.sniptale-expand-btn') })
+    .first();
+  const sectionBox = await section.boundingBox();
+  expect(sectionBox?.height).toBeLessThanOrEqual(34);
+  const treeCheck = section.locator('input[type="checkbox"]');
+  await expect(treeCheck).toHaveCSS('width', '16px');
+  await expect(treeCheck).toHaveCSS('height', '16px');
+  const expandBox = await section.locator('.sniptale-expand-btn').boundingBox();
+  expect(expandBox?.height).toBeLessThanOrEqual(24);
+
   const search = modal.getByRole('textbox', {
     name: tr(c, 'aiModal.searchDataLabel'),
     exact: true,
@@ -462,6 +474,9 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   await expect(search).toHaveCSS('font-size', '13px');
   await expect(search).toHaveCSS('line-height', '18px');
   await expect(search).toHaveCSS('font-weight', '500');
+  const clear = named(modal, c, 'aiModal.clearSearchLabel');
+  await expect(clear).toHaveCSS('height', '24px');
+  await expect(clear.locator('svg')).toHaveCSS('width', '13px');
   await capture(page, info, 'data-filter');
   await named(modal, c, 'aiModal.clearSearchLabel').click();
   await expect(search).toHaveValue('');

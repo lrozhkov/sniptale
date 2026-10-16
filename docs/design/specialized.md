@@ -16,8 +16,15 @@ Standardize surrounding labels, values, icons, focus, surfaces, and feedback. Do
 | Numeric scrub and stepper | Units, precision, domain limits, repeat and acceptance |
 | Color plane and eyedropper | Color model, alpha, format, draft and browser-session ownership |
 | Inspector docking/resize | Scroll owners, category rail, intermediate layouts, reachability |
+| Dense trees and structured data selection | Row rhythm, disclosure glyphs, checkbox drawings, indentation, column selection and inner scrolling |
 
 Before implementation, record the trigger, state owner, preview, acceptance, cancellation, failure, and supported limits for the affected mechanic. Map a real consumer and evidence to each claimed invariant. Preserve supported keyboard alternatives and pointer capture. Do not invent shortcuts or change domain mappings during styling.
+
+## Dense trees and structured data
+
+Apply interface font and color roles to the existing compact controls. Preserve the local row rhythm, disclosure geometry, checkbox drawings and alignment. Ordinary command targets and inspector disclosure headers do not define this geometry. Do not replace specialized controls with generic components for appearance alone.
+
+Compare a complete expanded tree before and after a change. Check single-line and multiline rows, nested groups, checked and unchecked drawings, column controls and keyboard focus. Check filtering, partial selection, expansion and actual scroll owners separately from surrounding dialog commands.
 
 ## Shared gesture contract
 
