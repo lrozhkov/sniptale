@@ -19,7 +19,7 @@
 .guide-inspector-context strong {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-weight: 600;
+  font-weight: var(--sniptale-font-weight-interface-heading);
 }
 .guide-inspector-group {
   min-width: 0;
@@ -56,7 +56,7 @@
   margin: 0;
   min-width: 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--sniptale-font-weight-interface-heading);
   line-height: 20px;
 }
 .guide-inspector-group-body {
@@ -173,7 +173,7 @@
   border-top: 1px solid var(--sniptale-color-border-soft);
 }
 .guide-inspector-panel .guide-appearance-heading h3 {
-  font: 600 14px / 20px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface-heading) 14px / 20px var(--sniptale-font-sans);
 }
 .guide-inspector-panel .guide-block-inspector {
   gap: 0;
@@ -244,7 +244,7 @@
 }
 .guide-inspector-panel > .guide-panel-heading h2 {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--sniptale-font-weight-interface-heading);
   line-height: 1.5;
 }
 .guide-inspector-panel > .guide-panel-scroll {
@@ -261,7 +261,7 @@
   padding-bottom: 0;
   border-bottom: 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--sniptale-font-weight-interface-heading);
   line-height: 20px;
   overflow-wrap: anywhere;
 }

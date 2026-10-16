@@ -253,7 +253,7 @@
   border-radius: 4px;
 }
 .sniptale-scenario-workspace .guide-export-heading h1 {
-  font: 600 14px / 20px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface-heading) 14px / 20px var(--sniptale-font-interface);
 }
 .sniptale-scenario-workspace .guide-export-status,
 .sniptale-scenario-workspace .guide-export-heading output {

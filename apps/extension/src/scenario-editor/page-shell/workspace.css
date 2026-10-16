@@ -2555,7 +2555,7 @@ html[data-guide-height-resizing] * {
 }
 .sniptale-scenario-workspace .guide-panel-heading :is(h2, strong),
 .sniptale-scenario-workspace .guide-resource-drawer-close strong {
-  font: 600 14px / 20px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface-heading) 14px / 20px var(--sniptale-font-interface);
 }
 .sniptale-scenario-workspace .guide-page-feedback {
   font: 400 14px / 20px var(--sniptale-font-interface);

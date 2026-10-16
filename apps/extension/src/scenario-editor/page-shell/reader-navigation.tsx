@@ -70,7 +70,6 @@ export function GuideReadingControls({
     <fieldset className="guide-reading-options" disabled={disabled}>
       <SegmentedRow
         columns={2}
-        label={t('scenario.editor.guideReaderMode')}
         ariaLabel={t('scenario.editor.guideReaderMode')}
         value={value.mode}
         options={[

@@ -152,7 +152,11 @@ async function recordRoles(page: Page, info: TestInfo, name: string) {
       })
     );
   await writeFile(info.outputPath(`${name}-roles.json`), JSON.stringify(roles, null, 2));
-  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath(`${name}.png`),
+    fullPage: false,
+    animations: 'disabled',
+  });
 }
 
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
@@ -172,16 +176,19 @@ async function authoredStyle(page: Page) {
 async function assertAuthoredFontIndependent(page: Page) {
   const before = await authoredStyle(page);
   const title = page.locator('.guide-project-name input');
-  const interfaceBefore = await title.evaluate((node) => getComputedStyle(node).fontFamily);
+  const chrome = page.locator('.guide-history-controls button').first();
+  const interfaceBefore = await chrome.evaluate((node) => getComputedStyle(node).fontFamily);
+  const titleBefore = await title.evaluate((node) => getComputedStyle(node).fontFamily);
   await page.locator('.guide-editor-viewport').evaluate((node: HTMLElement) => {
     node.style.setProperty('--sniptale-font-interface', 'monospace');
   });
-  await expect(title).not.toHaveCSS('font-family', interfaceBefore);
+  await expect(chrome).not.toHaveCSS('font-family', interfaceBefore);
+  await expect(title).toHaveCSS('font-family', titleBefore);
   await expect.poll(() => authoredStyle(page)).toEqual(before);
   await page.locator('.guide-editor-viewport').evaluate((node: HTMLElement) => {
     node.style.removeProperty('--sniptale-font-interface');
   });
-  await expect(title).toHaveCSS('font-family', interfaceBefore);
+  await expect(chrome).toHaveCSS('font-family', interfaceBefore);
 }
 
 async function readSaved(page: Page) {
@@ -253,7 +260,7 @@ async function canonicalInspector(page: Page) {
     await expect(name).toHaveCSS('font-family', /Sniptale Interface/);
     await expect(name).toHaveCSS('font-size', '13px');
     await expect(name).toHaveCSS('line-height', '18px');
-    await expect(name).toHaveCSS('font-weight', '500');
+    await expect(name).toHaveCSS('font-weight', '400');
   }
   const headings = panel.locator(
     '[data-ui="shared.categorized-inspector.section-heading"]:visible'
@@ -261,7 +268,7 @@ async function canonicalInspector(page: Page) {
   if (await headings.count()) {
     await expect(headings.first()).toHaveCSS('font-size', '14px');
     await expect(headings.first()).toHaveCSS('line-height', '20px');
-    await expect(headings.first()).toHaveCSS('font-weight', '600');
+    await expect.soft(headings.first()).toHaveCSS('font-weight', '500', { timeout: 500 });
   }
   const stacks = panel.locator('.sniptale-parameter-stack:visible');
   for (const stack of await stacks.all()) {
@@ -358,7 +365,11 @@ async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
   );
   await accentTrigger.click();
   await expect(ui(page, 'shared.ui.color-selector.picker')).toBeVisible();
-  await page.screenshot({ path: info.outputPath('appearance-color-open.png'), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath('appearance-color-open.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
   await page.keyboard.press('Escape');
   await expect(ui(page, 'shared.ui.color-selector.picker')).toHaveCount(0);
   await expect(accentTrigger).toBeFocused();
@@ -377,7 +388,14 @@ async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
     exact: true,
   });
   await expect(drawer).toBeVisible();
-  await page.screenshot({ path: info.outputPath('resource-drawer.png'), fullPage: false });
+  const drawerHeading = drawer.locator('.guide-resource-drawer-close strong');
+  await expect.soft(drawerHeading).toHaveCSS('font-family', /Sniptale Interface/);
+  await expect.soft(drawerHeading).toHaveCSS('font-weight', '500', { timeout: 500 });
+  await page.screenshot({
+    path: info.outputPath('resource-drawer.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
   await page.keyboard.press('Escape');
   await expect(drawer).toHaveCount(0);
   await expect(resourceTrigger).toBeFocused();
@@ -463,13 +481,20 @@ async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
   await exportTrigger.click();
   const output = page.locator('main.guide-export-workspace');
   await expect(output).toBeVisible();
+  await expect
+    .soft(output.getByText(t('scenario.editor.guideReaderMode'), { exact: true }))
+    .toHaveCount(1, { timeout: 500 });
   const outputBack = output.getByRole('button', {
     name: t('scenario.editor.guideReaderBack'),
     exact: true,
   });
   await outputBack.scrollIntoViewIfNeeded();
   await expect(outputBack).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: info.outputPath('export-workspace.png'), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath('export-workspace.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
   await outputBack.click();
   await expect(output).toHaveCount(0);
   await expect(exportTrigger).toBeFocused();
@@ -532,7 +557,11 @@ test('native scenario panel widths and below-minimum horizontal scroll', async (
         .evaluate((node) => node.scrollWidth - node.clientWidth)
     ).toBeLessThanOrEqual(1);
   }
-  await page.screenshot({ path: info.outputPath('inspector-resized.png'), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath('inspector-resized.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
   await page.setViewportSize({ width: 1100, height: 560 });
   const viewport = page.locator('.guide-editor-viewport');
   expect(await viewport.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeGreaterThan(0);
@@ -540,5 +569,9 @@ test('native scenario panel widths and below-minimum horizontal scroll', async (
     node.scrollLeft = node.scrollWidth;
   });
   expect(await viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
-  await page.screenshot({ path: info.outputPath('below-desktop-minimum.png'), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath('below-desktop-minimum.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
 });
