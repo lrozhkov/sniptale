@@ -67,7 +67,11 @@ async function openImage(page: Page, extensionId: string, locale: Locale, theme:
 }
 
 async function screenshot(page: Page, info: TestInfo, name: string) {
-  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath(`${name}.png`),
+    fullPage: false,
+    animations: 'disabled',
+  });
 }
 
 async function inViewport(target: Locator) {
@@ -237,14 +241,19 @@ async function inspectLayers(page: Page, locale: Locale, info: TestInfo) {
   const parameterName = status.locator('.sniptale-parameter-name');
   await expect(parameterName).toHaveCSS('font-size', '13px');
   await expect(parameterName).toHaveCSS('line-height', '18px');
-  await expect(parameterName).toHaveCSS('font-weight', '500');
+  await expect(parameterName).toHaveCSS('font-weight', '400');
   const firstLines = await status.evaluate((row) => {
     const name = row.querySelector('.sniptale-parameter-name');
     const value = row.querySelector('.sniptale-parameter-value > span');
     if (!name || !value) throw new Error('Layer status is missing its name or value');
-    return Math.abs(name.getBoundingClientRect().top - value.getBoundingClientRect().top);
+    const firstLineTop = (element: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getClientRects()[0]?.top ?? element.getBoundingClientRect().top;
+    };
+    return Math.abs(firstLineTop(name) - firstLineTop(value));
   });
-  expect(firstLines).toBeLessThanOrEqual(1);
+  expect.soft(firstLines).toBeLessThanOrEqual(1);
   await screenshot(page, info, 'layer-effects');
   await ui(page, 'editor.floating.layer-effects-panel.back').click();
   await expect(ui(page, 'editor.floating.layer-effects-panel')).toHaveCount(0);

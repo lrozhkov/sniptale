@@ -685,8 +685,15 @@
 }
 
 .sniptale-compact-workspace .sniptale-static-parameter-row {
-  align-items: center;
+  align-items: start;
   padding-block: 0 var(--sniptale-parameter-context-space);
+}
+.sniptale-compact-workspace .sniptale-static-parameter-row > .sniptale-parameter-name,
+.sniptale-compact-workspace .sniptale-static-parameter-row > .sniptale-parameter-value > span {
+  display: block;
+  min-height: var(--sniptale-parameter-control-height);
+  padding-block: calc((var(--sniptale-parameter-control-height) - 18px) / 2);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
 }
 
 @layer utilities {

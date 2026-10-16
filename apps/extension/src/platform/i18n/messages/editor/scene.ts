@@ -120,8 +120,8 @@ export const editorSceneMessages = defineMessageSource({
     en: 'Background image preview',
   },
   backgroundImageModeAria: {
-    ru: 'Режим background image',
-    en: 'Background image mode',
+    ru: 'Размещение фона',
+    en: 'Background placement',
   },
   backgroundImageEmptyState: {
     ru: 'Картинка не выбрана',
