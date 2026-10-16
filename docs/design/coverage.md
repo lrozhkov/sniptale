@@ -6,7 +6,7 @@ This bounded map records migrated chrome and inspected flows, not whole-applicat
 
 ## Integration map
 
-Native proof paths below use `tooling/test/e2e/extension-critical/` as their base.
+Unlinked native filenames use `tooling/test/e2e/extension-critical/` as their base.
 
 | Surface | Adopted presentation and retained owners | Native proof |
 | --- | --- | --- |
@@ -21,6 +21,7 @@ Native proof paths below use `tooling/test/e2e/extension-critical/` as their bas
 | Content recorder | Sidebar and active toolbar commands. Preserve drag, step order, previews, capture, metadata focus/Escape/opener, project query/creation/search/Clear, trusted Start, lifecycle, devices and spotlight. Properties remain neutral and drawing tools retain tool states. | `extension-critical-content-recorder-design.spec.ts` |
 | Content AI | Local dialog, template/model selection and nested Escape, search Clear/focus. Preserve tree selection/filtering/column exclusions/payload, specialized tree rhythm, JSON syntax/copy/scroll/resize, prompt/voice, admission, provider settings and failure recovery. Proof uses page selection and Settings loopback provider for waiting cancellation, retained drafts, failure and retry. | `extension-critical-content-ai-design.spec.ts` |
 | Content utilities | Compact Save dialog, filename Clear, multiline destinations and viewport property menu. Preserve trusted native actions, refusal/drafts, session choice, actual resize and restoration. | `extension-critical-content-utility-design.spec.ts` |
+| Exported Tour player | Interface fonts from canonical declarations, compact chrome and isolated authored typography. Preserve media, navigation, focus, exact admission and historical artifacts. | [Standalone](../../tooling/test/e2e/tour-player/tour-player-chrome.spec.ts), [embedded](../../tooling/test/e2e/scenario-editor-visual/scenario-tour-frame.spec.ts) |
 | Common inspector interactions | Value-only hover, keyboard focus, contextual range containment, intrinsic segment fit, Clear visibility and optical alignment. Preserve native editing and acceptance owners. | `extension-critical-inspector-interaction-design.spec.ts` |
 
 Existing component and engine suites retain failure, pending, recovery, keyboard, draft, editing, persistence, voice, parser, apply-back, recording and artifact proof. Native compositions do not replace them. Check languages, themes, primary viewports, applicable breakpoint neighbors and below-minimum scrolling. Screenshots and results belong to migration records.

@@ -1,5 +1,7 @@
 import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type TestInfo } from '@playwright/test';
+import type { TourPlayerLabels } from '../../../../apps/extension/src/features/scenario/tour-player/document';
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -95,7 +97,10 @@ const tour = {
 };
 
 /** Bundles the real document module the same way the vite plugin does, then builds the artifact. */
-async function buildPlayerHtml(documentTour: TourDocument = tour): Promise<string> {
+async function buildPlayerHtml(
+  documentTour: TourDocument = tour,
+  playerLabels: TourPlayerLabels = labels
+): Promise<string> {
   const script = (
     await build({
       absWorkingDir: repo,
@@ -108,7 +113,6 @@ async function buildPlayerHtml(documentTour: TourDocument = tour): Promise<strin
       legalComments: 'none',
     })
   ).outputFiles[0]!.text;
-  const styles = await readFile(path.join(playerDir, 'player.css'), 'utf8');
   const bundled = await build({
     absWorkingDir: repo,
     entryPoints: [path.join(playerDir, 'document.ts')],
@@ -125,14 +129,34 @@ async function buildPlayerHtml(documentTour: TourDocument = tour): Promise<strin
             path: 'tour-script',
             namespace: 'tour-inline',
           }));
-          plugin.onResolve({ filter: /\.css\?raw$/ }, () => ({
-            path: 'tour-css',
-            namespace: 'tour-inline',
+          plugin.onResolve({ filter: /\?raw$/ }, async (args) => {
+            const resolved = await plugin.resolve(args.path.slice(0, -4), {
+              resolveDir: args.resolveDir,
+              kind: 'import-statement',
+            });
+            return resolved.errors.length
+              ? { errors: resolved.errors }
+              : { path: resolved.path, namespace: 'tour-raw' };
+          });
+          plugin.onLoad({ filter: /.*/, namespace: 'tour-raw' }, async (args) => ({
+            contents: `export default ${JSON.stringify(await readFile(args.path, 'utf8'))}`,
+            loader: 'js',
           }));
-          plugin.onLoad({ filter: /.*/, namespace: 'tour-inline' }, (args) => ({
-            contents: `export default ${JSON.stringify(
-              args.path === 'tour-css' ? styles : script
-            )}`,
+          plugin.onResolve({ filter: /\.woff2\?inline$/ }, async (args) => {
+            const resolved = await plugin.resolve(args.path.slice(0, -7), {
+              resolveDir: args.resolveDir,
+              kind: 'import-statement',
+            });
+            return resolved.errors.length
+              ? { errors: resolved.errors }
+              : { path: resolved.path, namespace: 'tour-font' };
+          });
+          plugin.onLoad({ filter: /.*/, namespace: 'tour-font' }, async (args) => ({
+            contents: await readFile(args.path),
+            loader: 'dataurl',
+          }));
+          plugin.onLoad({ filter: /.*/, namespace: 'tour-inline' }, () => ({
+            contents: `export default ${JSON.stringify(script)}`,
             loader: 'js',
           }));
         },
@@ -153,7 +177,7 @@ async function buildPlayerHtml(documentTour: TourDocument = tour): Promise<strin
   return module.buildTourPlayerHtml({
     tour: documentTour,
     title: 'Demo tour',
-    labels,
+    labels: playerLabels,
     assets: [{ id: 'image', mime: 'image/png', base64: png }],
   });
 }
@@ -166,6 +190,20 @@ async function geometry(page: Page) {
 }
 
 async function expectChromeBelowFrame(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const frame = document.querySelector('.tour-viewport')?.getBoundingClientRect();
+        const toolbar = document.querySelector('.tour-toolbar')?.getBoundingClientRect();
+        return (
+          !!frame &&
+          !!toolbar &&
+          toolbar.y >= frame.bottom - 0.5 &&
+          toolbar.bottom <= innerHeight + 0.5
+        );
+      })
+    )
+    .toBe(true);
   const { viewport, toolbar } = await geometry(page);
   const pageHeight = page.viewportSize()!.height;
   expect(toolbar.y).toBeGreaterThanOrEqual(viewport.y + viewport.height - 0.5);
@@ -232,7 +270,7 @@ test.describe('standalone tour player chrome', () => {
     ['minimum', { width: 480, height: 640 }],
     ['narrow', { width: 320, height: 568 }],
   ] as const) {
-    test(`frame and bottom toolbar never overlap at ${name} size`, async ({ page }) => {
+    test(`frame and bottom toolbar never overlap at ${name} size`, async ({ page }, info) => {
       await page.setViewportSize(size);
       await page.setContent(await buildPlayerHtml());
       await expect(page.locator('[data-tour-play]')).toBeVisible();
@@ -248,12 +286,12 @@ test.describe('standalone tour player chrome', () => {
       expect(dialog.y).toBeCloseTo(player.y, 0);
       expect(dialog.height).toBeCloseTo(player.height, 0);
       expect(dialog.x + dialog.width).toBeCloseTo(player.x + player.width, 0);
-      await page.screenshot({ path: path.join(proofDir, `tour-drawer-${name}.png`) });
+      await page.screenshot({ path: info.outputPath(`tour-drawer-${name}.png`), fullPage: false });
       expect(dialog.y).toBeGreaterThanOrEqual(0);
       expect(dialog.x).toBeGreaterThanOrEqual(0);
       expect(dialog.x + dialog.width).toBeLessThanOrEqual(size.width + 0.5);
       await page.keyboard.press('Escape');
-      await page.screenshot({ path: path.join(proofDir, `tour-player-${name}.png`) });
+      await page.screenshot({ path: info.outputPath(`tour-player-${name}.png`), fullPage: false });
     });
   }
 
@@ -288,7 +326,7 @@ test.describe('standalone tour player chrome', () => {
     await expect(page.locator('[data-tour-contents]')).toBeFocused();
   });
 
-  test('explanation disclosure never repeats body copy in its heading', async ({ page }) => {
+  test('explanation disclosure never repeats body copy in its heading', async ({ page }, info) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.setContent(await buildPlayerHtml());
     const hint = page.locator('[data-tour-hint]');
@@ -298,11 +336,13 @@ test.describe('standalone tour player chrome', () => {
     await expect(hint.locator('[data-tour-hint-text]')).toHaveText(
       'This step ran the capture and stored the result.'
     );
-    await page.screenshot({ path: path.join(proofDir, 'tour-player-caption.png') });
+    await page.screenshot({ path: info.outputPath('tour-player-caption.png'), fullPage: false });
   });
 });
 
-test('tour caption area and compact chrome respect the player work area', async ({ page }) => {
+test('tour caption area and compact chrome respect the player work area', async ({
+  page,
+}, info) => {
   const check = expect.configure({ soft: true, timeout: 500 });
   await page.setViewportSize({ width: 1280, height: 800 });
   const captionTour: TourDocument = {
@@ -343,7 +383,12 @@ test('tour caption area and compact chrome respect the player work area', async 
   await page.mouse.move(0, 0);
   for (const button of await toolbar.locator('button').all()) {
     await check(button).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await check(button).toHaveCSS('border-top-width', '0px');
+    await check(button).toHaveCSS('border-top-width', '1px');
+    if ((await button.getAttribute('aria-pressed')) === 'true') {
+      await check(button).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    } else {
+      await check(button).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    }
   }
   const play = toolbar.locator('[data-tour-play]');
   await play.hover();
@@ -357,5 +402,113 @@ test('tour caption area and compact chrome respect the player work area', async 
   const viewport = await page.locator('.tour-viewport').boundingBox();
   check(drawer!.y).toBeGreaterThanOrEqual(viewport!.y - 0.5);
   check(drawer!.y + drawer!.height).toBeLessThanOrEqual(viewport!.y + viewport!.height + 0.5);
-  await page.screenshot({ path: path.join(proofDir, 'caption-work-area.png') });
+  await page.screenshot({ path: info.outputPath('caption-work-area.png'), fullPage: false });
 });
+
+async function captureChrome(page: Page, info: TestInfo, name: string) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.allSettled(
+      document
+        .getAnimations()
+        .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+        .map((animation) => animation.finished)
+    );
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+  });
+  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+}
+
+async function expectEmbeddedTypeface(page: Page, selector: string) {
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('DOM.enable');
+    await session.send('CSS.enable');
+    const { root } = await session.send('DOM.getDocument');
+    const { nodeId } = await session.send('DOM.querySelector', { nodeId: root.nodeId, selector });
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
+    expect(fonts.some((font) => font.isCustomFont && font.glyphCount > 0)).toBe(true);
+  } finally {
+    await session.detach();
+  }
+}
+
+for (const locale of ['ru', 'en'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`canonical exported chrome ${locale} ${theme}`, async ({ page }, info) => {
+      const documentTour: TourDocument = structuredClone(tour);
+      documentTour.style = {
+        ...documentTour.style,
+        text: theme === 'light' ? '#27272a' : '#f4f4f5',
+        surface: theme === 'light' ? '#fafafa' : '#27272a',
+      };
+      const localized: TourPlayerLabels =
+        locale === 'ru'
+          ? {
+              ...labels,
+              previous: 'Предыдущий шаг',
+              next: 'Следующий шаг',
+              contents: 'Оглавление интерактивного тура',
+              close: 'Закрыть',
+              finished: 'Тур завершён',
+              play: 'Воспроизвести',
+              pause: 'Приостановить',
+              manual: 'Ручное управление',
+            }
+          : labels;
+      const externalFonts: string[] = [];
+      page.on('request', (request) => {
+        if (request.resourceType() === 'font' && !request.url().startsWith('data:')) {
+          externalFonts.push(request.url());
+        }
+      });
+      await page.setViewportSize(PRIMARY_BROWSER_VIEWPORTS[0].size);
+      await page.setContent(await buildPlayerHtml(documentTour, localized));
+      const play = page.locator('[data-tour-play]');
+      await expect(play).toBeVisible();
+      await expect(page.locator('[data-tour-hint]')).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.locator('.tour-toolbar')).toHaveCSS('font-size', '13px');
+      await expect(page.locator('.tour-toolbar')).toHaveCSS('font-family', /Sniptale Interface/u);
+      await expect(page.locator('.tour-hint-text')).toHaveCSS(
+        'font-family',
+        'system-ui, sans-serif'
+      );
+      await expect(page.locator('[data-tour-seek]')).toHaveCSS('height', '28px');
+      await expect(play).toHaveCSS('height', '32px');
+      await expect(play.locator('svg')).toHaveCSS('width', '16px');
+      await expectEmbeddedTypeface(page, '.tour-time');
+      for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+        await page.setViewportSize(size);
+        await expectChromeBelowFrame(page);
+        await captureChrome(page, info, `player-${name}`);
+        const trigger = page.locator('[data-tour-contents]');
+        await trigger.click();
+        const drawer = page.locator('[data-tour-navigation]');
+        await expect(drawer).toBeVisible();
+        await expect(page.locator('.tour-contents-title')).toContainText(localized.contents);
+        await page.evaluate(() => document.fonts.ready);
+        await expectEmbeddedTypeface(page, '.tour-contents-title');
+        await captureChrome(page, info, `contents-${name}`);
+        await page.keyboard.press('Escape');
+        await expect(drawer).not.toBeVisible();
+        await expect(trigger).toBeFocused();
+      }
+      for (const width of [479, 480, 481, 320]) {
+        await page.setViewportSize({ width, height: 560 });
+        await expectChromeBelowFrame(page);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width
+        );
+      }
+      await captureChrome(page, info, 'narrow-player');
+      expect(externalFonts).toEqual([]);
+      const faces = await page.evaluate(
+        () => [...document.fonts].filter((face) => face.family === 'Sniptale Interface').length
+      );
+      expect(faces).toBe(3);
+    });
+  }
+}

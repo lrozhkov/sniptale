@@ -1,3 +1,9 @@
+import interfaceFaces from '@sniptale/ui/styles/fonts?raw';
+import designTokens from '@sniptale/ui/styles/design-tokens?raw';
+import interCyrillic from '@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2?inline';
+import interExtended from '@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2?inline';
+import interLatin from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?inline';
+import interfaceLicense from '@fontsource-variable/inter/LICENSE?raw';
 import { getTourNarrationTargets } from '../project/tour-resources';
 import script from './runtime.js?tour-player-script';
 import styles from './player.css?raw';
@@ -68,6 +74,31 @@ function escape(value: string): string {
     (character) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!
   );
+}
+// Project the canonical interface declarations without importing application styles or authored faces.
+function interfaceFontStyles(): string {
+  const sources = new Map([
+    ['@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2', interCyrillic],
+    ['@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2', interExtended],
+    ['@fontsource-variable/inter/files/inter-latin-wght-normal.woff2', interLatin],
+  ]);
+  const faces = [...interfaceFaces.matchAll(/@font-face\s*\{[^}]*\}/gu)]
+    .map(([block]) => block)
+    .filter((block) => /font-family:\s*'Sniptale Interface'\s*;/u.test(block));
+  if (faces.length !== sources.size) throw new Error('Unexpected Tour interface font subsets.');
+  const seen = new Set<string>();
+  const embedded = faces.map((face) => {
+    const urls = [...face.matchAll(/url\(\s*(['"])([^'"]+)\1\s*\)/gu)];
+    const url = urls[0]?.[2];
+    const data = url ? sources.get(url) : undefined;
+    if (urls.length !== 1 || !url || !data || seen.has(url))
+      throw new Error('Unexpected Tour interface font source.');
+    seen.add(url);
+    return face.replace(url, data);
+  });
+  const families = [...designTokens.matchAll(/--sniptale-font-interface:\s*([^;]+);/gu)];
+  if (families.length !== 1) throw new Error('Unexpected Tour interface font family.');
+  return `${embedded.join('\n')}\n:root{--sniptale-font-interface:${families[0]![1]};}`;
 }
 function imageProjection(image: TourImage | null) {
   if (!image) return null;
@@ -150,7 +181,7 @@ async function buildTourPlayerShell(args: {
     .replace(/\u2028/gu, '\\u2028')
     .replace(/\u2029/gu, '\\u2029');
   const hash = await getTourPlayerRuntimeHash();
-  const policy = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; base-uri 'none'; form-action 'none'`;
+  const policy = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; font-src data:; base-uri 'none'; form-action 'none'`;
   const labels = args.labels;
   return [
     `<!doctype html>
@@ -160,9 +191,10 @@ async function buildTourPlayerShell(args: {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${escape(policy)}">
 <title>${escape(args.title)}</title>
-<style>${styles}</style>
+<style>${interfaceFontStyles()}\n${styles}</style>
 </head>
 <body>
+<pre hidden data-tour-interface-font-license>${escape(interfaceLicense)}</pre>
 <main id="tour-player">
 <div class="tour-viewport" data-tour-viewport>
 <section class="tour-stage" data-tour-stage>

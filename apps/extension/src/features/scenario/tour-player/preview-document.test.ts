@@ -80,6 +80,19 @@ it('rejects changed executable bytes, archive-selected hashes and weakened CSP',
   expect(await admitSavedScenarioHtml(large, 'guide', f.hash)).toBe(false);
 });
 
+it('admits the exact current Tour font policy while rejecting broader sources and extra directives', async () => {
+  const current = await fixture('tour');
+  const html = current.html.replace('media-src data:;', 'media-src data:; font-src data:;');
+  expect(await admitSavedScenarioHtml(new Blob([html]), 'tour', current.hash)).toBe(true);
+  for (const modified of [
+    html.replace('font-src data:', 'font-src data: https:'),
+    html.replace('font-src data:', 'font-src *'),
+    html.replace('font-src data:;', 'font-src data:; connect-src data:;'),
+    html.replace('font-src data:;', 'font-src data:; font-src data:;'),
+  ])
+    expect(await admitSavedScenarioHtml(new Blob([modified]), 'tour', current.hash)).toBe(false);
+});
+
 // Frozen bundled guide runtime from 110c14f9a, before caption alignment.
 const retainedGuideRuntime = `(() => {
   const dialog = globalThis.document.querySelector('[data-guide-viewer]');
@@ -394,6 +407,7 @@ it.each([
       retained.html.replace('<script>', '<script>/* modified */'),
       retained.html.replace("default-src 'none'", 'default-src *'),
       retained.html.replace('media-src data:', 'media-src data: https:'),
+      retained.html.replace('media-src data:;', 'media-src data:; font-src data:;'),
       retained.html.replace('</body>', '<script>alert(1)</script></body>'),
     ])
       expect(await admitSavedScenarioHtml(new Blob([html]), 'tour', current.hash)).toBe(false);

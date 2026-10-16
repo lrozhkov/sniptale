@@ -172,6 +172,7 @@ function resolveCanonicalCoverageExclude() {
 export default defineConfig({
   plugins: [tourPlayerScript()],
   test: {
+    css: { include: [/\.css\?raw$/u] },
     include: resolveSuiteInclude(),
     ...(useProductProjects
       ? {

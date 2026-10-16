@@ -92,6 +92,7 @@
     "./styles/ai-modal/root": "./src/styles/ai-modal/root.css",
     "./styles/content-popover": "./src/styles/content-popover/index.css",
     "./styles/design-tokens": "./src/styles/design-tokens.css",
+    "./styles/fonts": "./src/styles/fonts.css",
     "./styles/feedback": "./src/styles/feedback/index.css",
     "./styles/feedback/root": "./src/styles/feedback/root.css",
     "./styles/glass/color-controls": "./src/styles/glass/color-controls.css",

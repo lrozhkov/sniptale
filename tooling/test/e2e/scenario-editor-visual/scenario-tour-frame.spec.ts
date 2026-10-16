@@ -70,7 +70,10 @@ for (const theme of ['light', 'dark'] as const) {
       .evaluate((node) => getComputedStyle(node).backgroundColor);
     await expect(page.locator('.tour-canvas')).toHaveCSS('background-color', surface);
     await info.attach(`authoring-frame-${theme}`, {
-      body: await page.screenshot(),
+      body: await page.screenshot({
+        path: info.outputPath(`authoring-frame-${theme}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
     await page
@@ -93,7 +96,10 @@ for (const theme of ['light', 'dark'] as const) {
       await page.setViewportSize(size);
       await expectFittedFrame(host);
       await info.attach(`preview-frame-${theme}-${size.width}`, {
-        body: await page.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`preview-frame-${theme}-${size.width}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
     }
@@ -107,10 +113,18 @@ for (const theme of ['light', 'dark'] as const) {
       .frameLocator('iframe')
       .locator('#tour-player');
     await expectFittedFrame(exported);
+    await exported.evaluate(async (node) => {
+      await node.ownerDocument.fonts.ready;
+    });
+    await expect(exported.locator('.tour-toolbar')).toHaveCSS('font-family', /Sniptale Interface/u);
+    await expect(exported.locator('[data-tour-play]')).toHaveCSS('height', '32px');
     await page.setViewportSize({ width: 1280, height: 560 });
     await expectFittedFrame(exported);
     await info.attach(`export-frame-${theme}`, {
-      body: await page.screenshot(),
+      body: await page.screenshot({
+        path: info.outputPath(`export-frame-${theme}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
     issues.assertClean();

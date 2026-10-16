@@ -121,6 +121,8 @@ it('mounts the caption disclosure control in the editor scaffold', () => {
   const body = shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!;
   const hint = shadow().querySelector<HTMLElement>('[data-tour-hint]')!;
   Object.defineProperty(body, 'scrollHeight', { get: () => 80 });
+  // JSDOM does not resolve unitless line-height into browser pixel geometry.
+  body.style.lineHeight = '24px';
   act(() =>
     root.render(<TourStage {...props} selection={selection} tour={structuredClone(props.tour)} />)
   );
