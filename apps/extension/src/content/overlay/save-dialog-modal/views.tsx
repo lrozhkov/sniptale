@@ -66,6 +66,10 @@ export function SaveDialogContent(props: {
       subtitle={translate('content.saveDialog.subtitle')}
       closeLabel={translate('common.actions.close')}
       filenameLabel={translate('content.saveDialog.filenameLabel')}
+      filenameClearLabel={translate('shared.ui.clearField').replace(
+        '{field}',
+        translate('content.saveDialog.filenameLabel')
+      )}
       filename={props.filename}
       filenamePlaceholder={translate('content.saveDialog.filenamePlaceholder')}
       onFilenameChange={props.onFilenameChange}

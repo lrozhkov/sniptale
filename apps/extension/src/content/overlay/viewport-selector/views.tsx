@@ -1,6 +1,7 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import type { ScreenshotWindowSizeControls } from '../toolbar/types';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
-import { Fragment, useState, type CSSProperties, type MouseEvent } from 'react';
+import { Fragment, useContext, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Scaling } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -45,6 +46,7 @@ export function ViewportSelectorButton(props: {
       onClick={props.onToggle}
       disabled={props.disabled}
       active={!isNative}
+      tone="property"
       className="sniptale-viewport-btn"
       dataUi="content.toolbar.viewport-button"
       menuIndicator
@@ -190,6 +192,7 @@ export function ViewportSelectorMenu(props: {
   presets: ViewportPreset[];
 }) {
   const locale = useAppLocale();
+  const adopted = useContext(CommandPressScope);
   const [highlightedDetail, setHighlightedDetail] = useState<string | null | undefined>(undefined);
   const presetGroups = groupViewportPresetsForSelector(props.presets);
   const detailId = 'sniptale-viewport-menu-detail';
@@ -200,6 +203,7 @@ export function ViewportSelectorMenu(props: {
     highlightedDetail === undefined ? (firstUnavailableDetail ?? null) : highlightedDetail;
   return (
     <ProductToolbarMenu
+      className={adopted ? 'sniptale-content-menu-adopted' : ''}
       compact={props.compactMenus}
       style={props.menuStyle}
       title={translate('content.toolbar.viewportMenuTitle')}

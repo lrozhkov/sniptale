@@ -1,3 +1,5 @@
+@layer theme, base, components, utilities;
+
 @import './base.css';
 @import './preview-tree.css';
 @import './template-menu.css';

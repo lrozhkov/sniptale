@@ -57,6 +57,10 @@ Check rendered backdrops: ordinary text needs 4.5:1, large text 3:1. Essential b
 
 Inspector content uses panel material. Canvas material belongs to the underlying workspace. Similar dark colors do not make these surfaces interchangeable.
 
+## Stylesheet boundaries
+
+Declare canonical CSS layer order before independently loaded rules. Scoped selectors register global layers. Check utility spacing and typography across lazy popup routes.
+
 ## Sources
 
 [WCAG contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html), [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html), [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html), [Inter](https://rsms.me/inter/).

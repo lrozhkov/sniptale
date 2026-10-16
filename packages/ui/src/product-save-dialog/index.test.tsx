@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, useState } from 'react';
+import { CommandPressScope } from '../control-language/press';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductSaveDialog, type ProductSaveDialogProps } from '@sniptale/ui/product-save-dialog';
@@ -180,5 +181,61 @@ describe('ProductSaveDialog', () => {
     expect(
       container?.querySelector<HTMLButtonElement>('.sniptale-save-dialog-system')?.disabled
     ).toBe(true);
+  });
+  it('clears the controlled draft, restores field focus, and hides Clear for empty or disabled values', () => {
+    function ControlledDialog({ disabled = false }: { disabled?: boolean }) {
+      const [filename, setFilename] = useState('capture.png');
+      return (
+        <CommandPressScope value={true}>
+          <ProductSaveDialog
+            {...createDialogProps({
+              filename,
+              disabled,
+              filenameClearLabel: 'Clear Filename',
+              onFilenameChange: setFilename,
+            })}
+          />
+        </CommandPressScope>
+      );
+    }
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => root?.render(<ControlledDialog />));
+    const input = container.querySelector<HTMLInputElement>('#save-dialog-filename')!;
+    expect(input.labels?.[0]?.textContent).toBe('Filename');
+    const clear = container.querySelector<HTMLButtonElement>('.sniptale-save-dialog-clear')!;
+    expect(clear.getAttribute('aria-label')).toBe('Clear Filename');
+    act(() => clear.click());
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(container.querySelector('.sniptale-save-dialog-clear')).toBeNull();
+    changeInputValue(input, 'replacement.png');
+    expect(container.querySelector('.sniptale-save-dialog-clear')).not.toBeNull();
+    act(() => root?.render(<ControlledDialog disabled />));
+    expect(input.value).toBe('replacement.png');
+    expect(container.querySelector('.sniptale-save-dialog-clear')).toBeNull();
+  });
+
+  it('keeps adopted commands on native release and forwards the original native click', () => {
+    const onChoosePreset = vi.fn();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        <CommandPressScope value={true}>
+          <ProductSaveDialog {...createDialogProps({ onChoosePreset })} />
+        </CommandPressScope>
+      )
+    );
+    const preset = container.querySelector<HTMLButtonElement>('.sniptale-save-dialog-item')!;
+    act(() => preset.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
+    expect(onChoosePreset).not.toHaveBeenCalled();
+    act(() => preset.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 })));
+    const click = new MouseEvent('click', { bubbles: true, button: 0, detail: 1 });
+    act(() => preset.dispatchEvent(click));
+    expect(onChoosePreset).toHaveBeenCalledTimes(1);
+    expect(onChoosePreset.mock.calls[0]?.[1].nativeEvent).toBe(click);
   });
 });

@@ -194,3 +194,218 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+/* The content consumer adopts this presentation; pending consumers retain their surface. */
+.sniptale-save-dialog-adopted {
+  border-radius: 8px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+  --sniptale-font-sans: var(--sniptale-font-interface);
+}
+
+.sniptale-save-dialog-adopted .sniptale-modal-header {
+  padding: 12px 16px;
+  gap: 8px;
+}
+
+.sniptale-save-dialog-adopted .sniptale-modal-title {
+  font: 600 14px / 20px var(--sniptale-font-interface);
+  overflow-wrap: anywhere;
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-heading {
+  min-width: 0;
+  gap: 8px;
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-heading > div:last-child {
+  min-width: 0;
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-icon-badge,
+.sniptale-save-dialog-adopted .sniptale-save-dialog-item-icon {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-adopted svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.sniptale-save-dialog-adopted .sniptale-modal-body {
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-section {
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.sniptale-save-dialog.sniptale-save-dialog-adopted .sniptale-label-sm {
+  margin: 0;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+  letter-spacing: normal;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-field {
+  position: relative;
+  min-width: 0;
+}
+
+.sniptale-save-dialog.sniptale-save-dialog-adopted .sniptale-save-dialog-input {
+  height: 32px;
+  min-height: 32px;
+  border-radius: 4px;
+  padding: 0 32px 0 8px;
+  font: inherit;
+  text-align: start;
+  background: var(--sniptale-color-surface-input);
+  border: 1px solid var(--sniptale-color-border-soft);
+  box-shadow: none;
+}
+
+.sniptale-save-dialog.sniptale-save-dialog-adopted .sniptale-save-dialog-input:focus {
+  border-color: var(--sniptale-color-accent) !important;
+  box-shadow: none !important;
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-subtitle,
+.sniptale-save-dialog-adopted .sniptale-save-dialog-section-label,
+.sniptale-save-dialog-adopted .sniptale-save-dialog-badge,
+.sniptale-save-dialog-adopted .sniptale-save-dialog-item-path,
+.sniptale-save-dialog-adopted .sniptale-save-dialog-system-hint,
+.sniptale-save-dialog-adopted .sniptale-save-dialog-empty {
+  font: 400 12px / 16px var(--sniptale-font-interface);
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-badge {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-list {
+  gap: 4px;
+}
+
+.sniptale-save-dialog-adopted :is(.sniptale-save-dialog-item, .sniptale-save-dialog-system) {
+  min-height: 40px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  gap: 8px;
+  background: transparent;
+  font: inherit;
+}
+
+.sniptale-save-dialog-adopted
+  :is(.sniptale-save-dialog-item, .sniptale-save-dialog-system):enabled:hover {
+  background: var(--sniptale-color-surface-hover);
+}
+
+.sniptale-save-dialog-adopted
+  :is(.sniptale-save-dialog-item, .sniptale-save-dialog-system):disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+:is(.sniptale-save-dialog-item, .sniptale-save-dialog-system) > .sniptale-command-content {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: start;
+}
+
+.sniptale-save-dialog-adopted
+  :is(.sniptale-save-dialog-item-title, .sniptale-save-dialog-system-label) {
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.sniptale-save-dialog-adopted
+  :is(.sniptale-save-dialog-item-copy, .sniptale-save-dialog-system-copy) {
+  gap: 2px;
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-item-path {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.sniptale-save-dialog-adopted
+  :is(.sniptale-save-dialog-item-check, .sniptale-save-dialog-system-icon) {
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-empty {
+  padding: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.sniptale-save-dialog-adopted .sniptale-modal-footer {
+  padding: 8px 16px;
+  gap: 8px;
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-checkbox-row {
+  align-items: flex-start;
+  gap: 8px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-checkbox-row input {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sniptale-save-dialog-clear {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sniptale-save-dialog-field:focus-within .sniptale-save-dialog-clear,
+.sniptale-save-dialog-filename-group:not(:has(> label:hover))
+  .sniptale-save-dialog-input:hover
+  ~ .sniptale-save-dialog-clear,
+.sniptale-save-dialog-clear:is(:hover, :focus-visible) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sniptale-save-dialog-clear:hover {
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-save-dialog-adopted .sniptale-save-dialog-filename-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
