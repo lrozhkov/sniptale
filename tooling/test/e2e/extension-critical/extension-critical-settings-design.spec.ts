@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import type { Page, TestInfo } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 
@@ -956,3 +956,139 @@ for (const theme of ['light', 'dark'] as const) {
     await screenshot(page, info, 'collection-title-and-metadata');
   });
 }
+
+async function journalFilterLabels(page: Page) {
+  const search = ui(page, 'settings.page.content-scroll').getByRole('textbox').first();
+  const filters = search.locator('..').locator('..');
+  const labels = await filters.evaluate((node) =>
+    Array.from(node.children).map((field) => {
+      const range = document.createRange();
+      range.selectNodeContents(field.firstChild!);
+      const rect = range.getBoundingClientRect();
+      return { top: rect.top, x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    })
+  );
+  for (const label of labels.slice(1)) {
+    await page.mouse.click(label.x, label.y);
+    await expect(filters.locator('[aria-expanded="true"]')).toHaveCount(0);
+  }
+  expect(
+    Math.max(...labels.map((label) => label.top)) - Math.min(...labels.map((label) => label.top))
+  ).toBeLessThanOrEqual(1);
+}
+
+async function journalResizeBounds(page: Page, info: TestInfo) {
+  for (const width of [1441, 1440, 1439, 1281, 1280, 1279, 1100]) {
+    await page.setViewportSize({ width, height: 560 });
+    await settle(page);
+    const bounds = await ui(page, 'settings.events-log.table').evaluate((node) => ({
+      table: node.getBoundingClientRect().width,
+      owner: node.parentElement!.clientWidth,
+      scroll: node.parentElement!.scrollWidth,
+    }));
+    expect(bounds.table).toBeLessThanOrEqual(Math.max(880, bounds.owner) + 1);
+    expect(bounds.scroll).toBeLessThanOrEqual(Math.max(880, bounds.owner) + 1);
+    const viewport = page.locator('.sniptale-settings-viewport');
+    if (width < 1280) {
+      await viewport.evaluate((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+      expect(await viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+    }
+    await screenshot(page, info, `journal-responsive-${width}`);
+  }
+}
+
+for (const locale of ['ru', 'en'] as const)
+  for (const theme of ['light', 'dark'] as const)
+    for (const size of [
+      { width: 1280, height: 560 },
+      { width: 1920, height: 900 },
+    ])
+      test(`native settings journal bounds ${locale} ${theme} ${size.width}`, async ({
+        page,
+        extensionId,
+      }, info) => {
+        await page.setViewportSize(size);
+        await configure(page, extensionId, locale, theme);
+        await page.evaluate(async () => {
+          const time = new Date().toISOString();
+          const entries = Array.from({ length: 24 }, (_, index) => ({
+            schemaVersion: 1,
+            time,
+            lastTime: time,
+            level: 'info',
+            source: index === 1 ? 'diagnostic-source-'.repeat(6) : 'media-preview',
+            context: index === 1 ? 'context-'.repeat(10) : 'extension-page',
+            message: index === 1 ? 'LongDiagnosticValue'.repeat(45) : `Preview ready ${index + 1}`,
+            repeats: 1,
+            dropped: 0,
+          }));
+          await chrome.storage.local.set({
+            sniptale_runtime_diagnostic_log: { version: 1, entries },
+          });
+        });
+        await route(page, extensionId, 'events-logs');
+        const table = ui(page, 'settings.events-log.table');
+        const longRow = table.locator('tbody tr').filter({ hasText: 'LongDiagnosticValue' });
+        await expect(longRow).toHaveCount(1);
+        await longRow.scrollIntoViewIfNeeded();
+        await screenshot(page, info, 'journal-long-values');
+        await journalFilterLabels(page);
+        const geometry = await table.evaluate((node) => ({
+          width: node.getBoundingClientRect().width,
+          ownerWidth: node.parentElement!.clientWidth,
+          ownerScrollWidth: node.parentElement!.scrollWidth,
+          rowHeight: Array.from(node.querySelectorAll('tbody tr'))
+            .find((row) => row.textContent?.includes('Preview ready'))!
+            .getBoundingClientRect().height,
+        }));
+        await writeFile(
+          info.outputPath('journal-geometry.json'),
+          JSON.stringify(
+            {
+              ...geometry,
+              text: await table.innerText(),
+            },
+            null,
+            2
+          )
+        );
+        const headerAlpha = await table.locator('thead').evaluate((node) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const context = canvas.getContext('2d')!;
+          context.fillStyle = getComputedStyle(node).backgroundColor;
+          context.fillRect(0, 0, 1, 1);
+          return context.getImageData(0, 0, 1, 1).data[3];
+        });
+        expect(headerAlpha).toBe(255);
+        expect(geometry.rowHeight).toBeGreaterThanOrEqual(40);
+        expect(geometry.rowHeight).toBeLessThanOrEqual(48);
+        expect(geometry.width).toBeLessThanOrEqual(Math.max(880, geometry.ownerWidth) + 1);
+        expect(geometry.ownerScrollWidth).toBeLessThanOrEqual(
+          Math.max(880, geometry.ownerWidth) + 1
+        );
+        const search = ui(page, 'settings.page.content-scroll').getByRole('textbox').first();
+        await search.fill('LongDiagnosticValue');
+        await expect(table.locator('tbody tr')).toHaveCount(1);
+        await expect(longRow).toBeVisible();
+        const pendingDownload = page.waitForEvent('download');
+        await page.getByRole('button', { name: /JSONL/u }).click();
+        const download = await pendingDownload;
+        const exported: unknown = JSON.parse(await readFile((await download.path())!, 'utf8'));
+        expect(exported).toMatchObject({
+          source: 'diagnostic-source-'.repeat(6),
+          context: 'context-'.repeat(10),
+        });
+        await search.fill('');
+        await expect(table.locator('tbody tr').filter({ hasText: 'Preview ready' })).toHaveCount(
+          23
+        );
+        await ui(page, 'events.logs.rows').evaluate((node) => {
+          node.scrollTop = 0;
+        });
+        await screenshot(page, info, 'journal-ordinary-values');
+        if (locale === 'en' && theme === 'light' && size.width === 1280)
+          await journalResizeBounds(page, info);
+      });

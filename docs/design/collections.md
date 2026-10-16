@@ -23,6 +23,10 @@ Align leading controls, titles, metadata, and trailing actions across equivalent
 
 Do not merge separate objects into a selected block or create dead click gaps between them. Cards retain their grid gaps and meaningful preview names. Reserve trailing action space only when a real action exists. Do not add Info that repeats visible metadata. Secondary actions appear on focus as well as hover and remain available on supported touch flows.
 
+Diagnostic tables use their own compact geometry. The 56px object-row minimum does not apply to table rows. Keep column widths stable when values change. Sticky headers need an opaque background so scrolled text cannot overlap their labels.
+
+Wrap long diagnostic values inside their columns. Horizontal scrolling must belong to the table region when its minimum width exceeds the available space. Preserve complete readable values and export data.
+
 ## Selection and batch scope
 
 Name Select all scope: filtered results, page, or project. Parent empty/check/dash states describe that scope. Individual checkboxes describe only their own item. Keep ordering and expansion separate from selection. The specimen selects available filtered items. Hidden selected items remain selected and participate in batch actions. Its summary exposes total and filtered selection counts. Batch action counts must agree.

@@ -6,8 +6,8 @@ import {
   runtimeLogJsonl,
   type RuntimeLogEntry,
 } from '../../../../composition/persistence/diagnostics/model';
-import { useEffect, useRef, useState } from 'react';
-import { ProductSelect } from '@sniptale/ui/product-form-controls';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { createMaintenanceLog } from '../../../../composition/persistence/library-lifecycle/maintenance-log';
 import {
@@ -243,13 +243,20 @@ function JournalTable({
 }) {
   return (
     <table
-      className="w-full min-w-[880px] border-collapse text-left text-xs"
+      className="w-full min-w-[880px] table-fixed border-collapse text-left text-xs"
       data-ui="settings.events-log.table"
     >
-      <thead className="sticky top-0 bg-[var(--sniptale-color-surface-panel)]">
+      <colgroup>
+        <col className="w-44" />
+        <col className="w-40" />
+        <col className="w-26" />
+        <col />
+        <col className="w-28" />
+      </colgroup>
+      <thead className="sticky top-0 z-10 bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]">
         <tr>
           {(['time', 'operation', 'status', 'message', 'details'] as const).map((key) => (
-            <th scope="col" key={key} className="p-3 font-semibold">
+            <th scope="col" key={key} className="px-2 py-2 font-medium">
               {translate(`settings.eventsLogs.${key}`)}
             </th>
           ))}
@@ -261,7 +268,10 @@ function JournalTable({
             key={`${entry.time}:${index}`}
             className="border-t border-[var(--sniptale-color-border-soft)] align-top"
           >
-            <td className="whitespace-nowrap p-3" title={`${entry.time} — ${entry.lastTime}`}>
+            <td
+              className="whitespace-nowrap px-2 py-1.5"
+              title={`${entry.time} — ${entry.lastTime}`}
+            >
               <time dateTime={entry.lastTime}>
                 {formatDateTime(
                   new Date(entry.lastTime),
@@ -270,13 +280,13 @@ function JournalTable({
                 )}
               </time>
             </td>
-            <td className="p-3">{entry.displayOperation}</td>
-            <td className="p-3">{entry.displayStatus}</td>
-            <td className="min-w-64 p-3">
+            <td className="px-2 py-1.5 [overflow-wrap:anywhere]">{entry.displayOperation}</td>
+            <td className="px-2 py-1.5">{entry.displayStatus}</td>
+            <td className="px-2 py-1.5 [overflow-wrap:anywhere]">
               <p>{entry.displayMessage}</p>
               <code className="text-[var(--sniptale-color-text-secondary)]">{entry.code}</code>
             </td>
-            <td className="p-3">
+            <td className="px-2 py-1.5 [overflow-wrap:anywhere]">
               <div className="space-y-1">
                 {(['candidates', 'deleted', 'moved', 'retained', 'absent', 'failed'] as const)
                   .filter((key) => entry.counts?.[key] !== undefined)
@@ -340,30 +350,34 @@ function JournalFilters({
   sources: string[];
 }) {
   const root = useRef<HTMLDivElement>(null);
+  const labelsId = useId();
   useEffect(() => {
     root.current?.querySelector<HTMLInputElement>('input')?.focus();
   }, []);
   const all = { value: 'all', label: translate('settings.eventsLogs.all') };
   return (
-    <div ref={root} className="shrink-0 space-y-2 px-4 py-3">
+    <div ref={root} className="shrink-0 space-y-2 px-2 py-2">
       <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
         {translate('settings.eventsLogs.retention')}
       </p>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-48 flex-1 text-xs">
-          {translate('settings.eventsLogs.search')}
-          <input
-            className={[
-              'mt-1 w-full rounded border border-[var(--sniptale-color-border-soft)]',
-              'bg-[var(--sniptale-color-surface-panel)] px-2 py-2',
-            ].join(' ')}
+        <div className="grid min-w-48 flex-1 gap-1">
+          <span id={`${labelsId}-search`} className="sniptale-parameter-name">
+            {translate('settings.eventsLogs.search')}
+          </span>
+          <ProductInput
+            aria-labelledby={`${labelsId}-search`}
+            className="h-8 min-h-8 w-full"
             value={filters.query}
             onChange={(event) => onChange({ ...filters, query: event.target.value })}
           />
-        </label>
-        <label className="w-48 text-xs">
-          {translate('settings.eventsLogs.operation')}
+        </div>
+        <div className="grid w-48 gap-1">
+          <span id={`${labelsId}-operation`} className="sniptale-parameter-name">
+            {translate('settings.eventsLogs.operation')}
+          </span>
           <ProductSelect
+            aria-labelledby={`${labelsId}-operation`}
             aria-label={translate('settings.eventsLogs.operation')}
             controlSize="sm"
             menuPlacement="auto"
@@ -379,10 +393,13 @@ function JournalFilters({
               ...Array.from(new Set(sources)).map((value) => ({ value, label: value })),
             ]}
           />
-        </label>
-        <label className="w-40 text-xs">
-          {translate('settings.eventsLogs.status')}
+        </div>
+        <div className="grid w-40 gap-1">
+          <span id={`${labelsId}-status`} className="sniptale-parameter-name">
+            {translate('settings.eventsLogs.status')}
+          </span>
           <ProductSelect
+            aria-labelledby={`${labelsId}-status`}
             aria-label={translate('settings.eventsLogs.status')}
             controlSize="sm"
             menuPlacement="auto"
@@ -401,10 +418,13 @@ function JournalFilters({
               })),
             ]}
           />
-        </label>
-        <label className="w-40 text-xs">
-          {translate('settings.eventsLogs.period')}
+        </div>
+        <div className="grid w-40 gap-1">
+          <span id={`${labelsId}-period`} className="sniptale-parameter-name">
+            {translate('settings.eventsLogs.period')}
+          </span>
           <ProductSelect
+            aria-labelledby={`${labelsId}-period`}
             aria-label={translate('settings.eventsLogs.period')}
             controlSize="sm"
             menuPlacement="auto"
@@ -417,7 +437,7 @@ function JournalFilters({
               { value: 'week', label: translate('settings.eventsLogs.week') },
             ]}
           />
-        </label>
+        </div>
       </div>
     </div>
   );
