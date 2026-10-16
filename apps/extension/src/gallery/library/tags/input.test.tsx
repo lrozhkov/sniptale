@@ -61,7 +61,7 @@ afterEach(() => {
 it('portals suggestions outside clipped content into their owning modal and repositions them', () => {
   const dialog = document.createElement('dialog');
   dialog.open = true;
-  dialog.dataset.theme = 'dark';
+  dialog.dataset['theme'] = 'dark';
   document.body.append(dialog);
   dialog.append(container!);
   container!.style.overflowY = 'auto';
@@ -87,8 +87,8 @@ it('portals suggestions outside clipped content into their owning modal and repo
   const list = document.querySelector<HTMLElement>('[role="listbox"]')!;
   expect(list.parentElement).toBe(dialog);
   expect(container!.contains(list)).toBe(false);
-  expect(list.dataset.theme).toBe('dark');
-  expect(list.dataset.floatingUiOwnedBy).toBe(
+  expect(list.dataset['theme']).toBe('dark');
+  expect(list.dataset['floatingUiOwnedBy']).toBe(
     input.closest('[data-floating-ui-owner-id]')?.getAttribute('data-floating-ui-owner-id')
   );
   expect(list.style.position).toBe('fixed');

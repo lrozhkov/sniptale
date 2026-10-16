@@ -12,7 +12,7 @@ Preserve location, selected object, valid drafts, and scroll through the actual 
 
 Connect true tabs with their panels. Use one Tab stop and arrows in the declared orientation, plus Home/End. Automatic activation is appropriate when panels appear without noticeable delay. Otherwise require explicit activation. Do not assign tab semantics to route links or category filters without a tab-panel relationship. Categories change on click or keyboard activation, never hover alone.
 
-Underline-style text tabs brighten on hover without a filled surface. The selected line remains separate from keyboard focus. Category rails can retain their declared selected surface. Keep insets and icon alignment stable.
+Underline-style text tabs brighten on hover without a filled surface. The selected line remains separate from keyboard focus. Do not use a property selector's filled selected surface for underline navigation. Keep the selected line on the stable target, outside the caption that moves during a press. Category rails can retain their declared selected surface. Keep insets and icon alignment stable.
 
 An inspector can represent the same sections through categories or an All view with disclosure groups. Switch presentation without losing parameter values or remembered section state. Keep category selection and disclosure preferences separate from project data and Undo. Derive columns from available content width, including the rail and group insets, rather than from the page width alone.
 
@@ -22,7 +22,7 @@ Horizontal tabs stay on one line and scroll within their navigation owner when n
 
 Use the shared inspector disclosure presentation. Native details/summary are valid primitives. Do not expose browser-default triangles or invent a separate spoiler owner for helper notes. The shared full-size chevron sits at the trailing edge and folds upward while open. Keep 8px horizontal header insets, 32px minimum height, and body text aligned with the header text.
 
-Keep an 8px body inset below the complete header target before the first control, including nested groups. Do not remove it when the first control inherits the group name. Structural headings use the shared 14px/20px weight 600 role. Nested group headings use 13px/18px at weight 500 and a 14px chevron. Keep their target at least 32px high, retain 8px edge insets, and avoid repeated section dividers.
+Keep an 8px body inset below the complete header target before the first control, including nested groups. Do not remove it when the first control inherits the group name. Structural headings use the shared 14px/20px weight 500 role. Nested group headings use 13px/18px at weight 500 and a 14px chevron. Keep their target at least 32px high, retain 8px edge insets, and avoid repeated section dividers.
 
 Expansion does not enable the feature. Avoid redundant wrappers around a single ordinary parameter. Header text remains unselectable. Preserve pointer, Enter, Space, and keyboard focus. Remember expansion by editor, semantic type, and stable group ID, not translated labels or transient object identity. Keep the target reachable after expansion and collapse.
 

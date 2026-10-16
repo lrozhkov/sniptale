@@ -13,16 +13,6 @@ export function useInspectorLayout() {
   return React.useContext(InspectorLayoutContext);
 }
 
-/** A label activation ends an existing edit or focuses its available native field. */
-export function toggleInspectorFieldEditing(input: HTMLInputElement | HTMLTextAreaElement | null) {
-  if (!input || input.matches(':disabled')) return;
-  const root = input.getRootNode();
-  const active =
-    root instanceof ShadowRoot ? root.activeElement : input.ownerDocument.activeElement;
-  if (active === input) input.blur();
-  else input.focus();
-}
-
 /** One geometry owner fits ordinary name/value rows before stacking the value. */
 export function InspectorParameterRow(props: {
   label: string;

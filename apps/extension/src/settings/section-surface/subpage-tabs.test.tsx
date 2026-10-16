@@ -39,7 +39,7 @@ it('uses ordinary route-navigation semantics and reports the selected destinatio
   const inactiveButton = container.querySelectorAll('button')[1];
   expect(activeButton?.getAttribute('title')).toBe('Images');
   expect(activeButton?.hasAttribute('data-command-press')).toBe(true);
-  expect(activeButton?.getAttribute('data-command-property')).toBe('true');
+  expect(activeButton?.getAttribute('data-command-property')).toBeNull();
   expect(activeButton?.getAttribute('aria-pressed')).toBeNull();
   expect(inactiveButton?.getAttribute('title')).toBe('Video');
   expect(container.querySelector('[role=tab]')).toBeNull();

@@ -121,7 +121,7 @@ function runSettingsPanelControlsSuite() {
     verifySettingsSwitchAndRange
   );
   it('renders the drag handle with caller-provided classes', verifyDragHandleRendering);
-  it('lets repeated name activation leave editing without changing the value', () => {
+  it('keeps a text parameter name passive and leaves direct editing available', () => {
     renderElement(
       <SettingsControlRow label="Name">
         <input aria-label="Name" defaultValue="Draft" />
@@ -130,12 +130,12 @@ function runSettingsPanelControlsSuite() {
     const field = container!.querySelector('input')!;
     const name = container!.querySelector<HTMLElement>('.sniptale-parameter-name')!;
     act(() => name.click());
-    expect(document.activeElement).toBe(field);
-    act(() => name.click());
     expect(document.activeElement).not.toBe(field);
+    act(() => field.focus());
+    expect(document.activeElement).toBe(field);
     expect(field.value).toBe('Draft');
   });
-  it('activates a dropdown from the whole parameter target once', () => {
+  it('opens a dropdown only from its control rather than its name or row gap', () => {
     const open = vi.fn();
     renderElement(
       <SettingsControlRow label="Language">
@@ -145,6 +145,9 @@ function runSettingsPanelControlsSuite() {
       </SettingsControlRow>
     );
     act(() => container!.querySelector<HTMLElement>('.sniptale-parameter-row')!.click());
+    act(() => container!.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
+    expect(open).not.toHaveBeenCalled();
+    act(() => container!.querySelector('button')!.click());
     expect(open).toHaveBeenCalledTimes(1);
   });
 

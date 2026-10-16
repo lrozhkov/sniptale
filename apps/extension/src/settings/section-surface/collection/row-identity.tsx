@@ -24,14 +24,14 @@ export function SettingsCollectionRowIdentity({ item }: { item: SettingsCollecti
       <div className="min-w-0 flex-1">
         <div
           title={typeof item.title === 'string' ? item.title : undefined}
-          className="truncate text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text)]"
+          className="truncate text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text)]"
         >
           {item.title}
         </div>
         {item.meta === undefined ? null : (
           <div
             title={typeof item.meta === 'string' ? item.meta : undefined}
-            className="truncate text-[12px] leading-4 text-[var(--sniptale-color-text-dim)]"
+            className="truncate text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]"
           >
             {item.meta}
           </div>

@@ -15,7 +15,7 @@
   height: 100%;
 }
 .sniptale-settings-workspace {
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-settings-workspace .sniptale-settings-preview {
   --sniptale-font-sans: var(--sniptale-font-document-sans);
@@ -54,7 +54,7 @@
   justify-content: flex-end;
   gap: 4px;
   color: var(--sniptale-color-text-primary);
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-settings-workspace .settings-range-field > .sniptale-range {
   margin: 0 8px;
@@ -62,7 +62,7 @@
 }
 .sniptale-settings-workspace.sniptale-compact-workspace :is(.sniptale-input, .sniptale-textarea) {
   border-radius: 4px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-settings-workspace.sniptale-compact-workspace .sniptale-input:not([type='number']) {
   text-align: start;
@@ -70,7 +70,7 @@
 .sniptale-settings-workspace.sniptale-compact-workspace :is(.sniptale-label, .sniptale-label-sm) {
   margin-bottom: 4px;
   color: var(--sniptale-color-text-secondary);
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
   letter-spacing: normal;
   text-transform: none;
 }

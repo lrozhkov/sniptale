@@ -1,12 +1,15 @@
 .content-tabs {
   display: flex;
   gap: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   align-items: stretch;
   border-bottom: 1px solid var(--divider);
 }
 .content-tabs > [role='tab'] {
   position: relative;
+  flex: none;
+  white-space: nowrap;
   min-height: 40px;
   min-width: 72px;
   max-width: 100%;

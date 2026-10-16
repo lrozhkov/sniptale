@@ -44,7 +44,7 @@ export function SettingsSubpageTabs(props: {
         const active = props.activeId === item.id;
         return (
           <ContentToolbarButton
-            tone="property"
+            tone="outline"
             active={active}
             title={item.label}
             key={item.id}
@@ -54,16 +54,17 @@ export function SettingsSubpageTabs(props: {
             onClick={() => props.onChange?.(item.id)}
             className={[
               'relative !h-8 min-h-8 !w-auto flex-none whitespace-nowrap rounded-[4px] !px-3 !py-1',
-              'text-[13px] leading-[18px] font-medium',
+              '!border-transparent !bg-transparent text-[13px] leading-[18px] font-normal',
               'transition-colors',
               'focus-visible:outline-none focus-visible:text-[var(--sniptale-color-text-primary)]',
-              'focus-visible:after:absolute focus-visible:after:inset-x-0 focus-visible:after:bottom-0',
-              'focus-visible:after:h-0.5 focus-visible:after:bg-[var(--sniptale-color-focus-ring)]',
               active
                 ? [
-                    'font-semibold text-[var(--sniptale-color-text-primary)]',
+                    'font-medium text-[var(--sniptale-color-text-primary)]',
+                    '[--sniptale-control-font-weight:var(--sniptale-control-font-weight-active)]',
+                    '[--sniptale-control-font-weight-hover:var(--sniptale-control-font-weight-active)]',
+                    "after:!block after:!content-[''] after:pointer-events-none",
                     'after:absolute after:inset-x-0 after:bottom-0 after:h-0.5',
-                    'after:bg-[var(--sniptale-color-text-secondary)]',
+                    'after:bg-[var(--sniptale-color-accent)]',
                   ].join(' ')
                 : [
                     'text-[var(--sniptale-color-text-secondary)]',

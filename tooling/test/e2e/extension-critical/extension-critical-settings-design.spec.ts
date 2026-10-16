@@ -161,7 +161,7 @@ async function assertFit(page: Page) {
       expect(role.family).toContain('Sniptale Interface');
       expect(role.size).toBe('13px');
       expect(role.lineHeight).toBe('18px');
-      expect(role.weight).toBe('500');
+      expect(role.weight).toBe('400');
     } else expect(role.height).toBeGreaterThanOrEqual(31.5);
   }
   for (const caption of await page
@@ -215,17 +215,23 @@ async function interfaceRowRhythm(page: Page, info: TestInfo) {
   expect(geometry).toHaveLength(3);
   for (const row of geometry)
     expect
-      .soft(Math.abs(row.height - 32), 'One-line Interface row height must be 32px')
+      .soft(Math.abs(row.height - 40), 'One-line Interface row height must be 40px')
       .toBeLessThanOrEqual(1);
   for (let index = 1; index < geometry.length; index++) {
     expect
       .soft(
-        Math.abs(geometry[index]!.labelTop - geometry[index - 1]!.labelTop - 36),
-        'Interface label pitch must be 36px'
+        Math.abs(geometry[index]!.labelTop - geometry[index - 1]!.labelTop - 44),
+        'Interface label pitch must be 44px'
       )
       .toBeLessThanOrEqual(1);
   }
   const language = page.locator('#settings-interface-language');
+  const languageRow = ui(page, 'settings.control-row').filter({ has: language });
+  await languageRow.locator('.sniptale-parameter-name').click();
+  await expect(
+    page.getByRole('listbox'),
+    'A parameter name must not open its dropdown'
+  ).toHaveCount(0);
   await language.click();
   const menu = page.getByRole('listbox');
   await expect(menu).toBeVisible();
@@ -279,6 +285,54 @@ async function neutralThemeChoice(page: Page, locale: Locale, info: TestInfo) {
   expect(focus.style).not.toBe('none');
   expect(focus.width).toBeGreaterThanOrEqual(2);
   await screenshot(page, info, 'theme-keyboard-focus');
+}
+
+async function verifyThemeActivation(page: Page, locale: Locale, initial: Theme) {
+  const group = page.getByRole('group', {
+    name: translate('settings.appearance.themeModeLabel', locale),
+    exact: true,
+  });
+  for (const choice of ['system', 'dark', 'light'] as const) {
+    const button = group.getByRole('button', {
+      name: translate(`settings.appearance.${choice}Option`, locale),
+      exact: true,
+    });
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    await expect(group.locator('[aria-pressed="true"]')).toHaveCount(1);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          async () =>
+            (await chrome.storage.local.get('sniptale-theme-preference'))[
+              'sniptale-theme-preference'
+            ]
+        )
+      )
+      .toBe(choice);
+  }
+  const dark = group.getByRole('button', {
+    name: translate('settings.appearance.darkOption', locale),
+    exact: true,
+  });
+  const box = (await dark.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  await expect(dark).toHaveAttribute('aria-pressed', 'false');
+  await dark.focus();
+  await page.keyboard.press('Space');
+  await expect(dark).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await expect(dark).toHaveAttribute('aria-pressed', 'true');
+  await group
+    .getByRole('button', {
+      name: translate(`settings.appearance.${initial}Option`, locale),
+      exact: true,
+    })
+    .click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', initial);
 }
 
 async function interfaceChoice(page: Page, locale: Locale) {
@@ -440,9 +494,10 @@ for (const locale of ['ru', 'en'] as const)
         await configure(page, extensionId, locale, theme);
         await interfaceRowRhythm(page, info);
         await neutralThemeChoice(page, locale, info);
+        await verifyThemeActivation(page, locale, theme);
         await expect(ui(page, 'settings.page.root')).toHaveCSS('font-size', '13px');
         await expect(ui(page, 'settings.page.root')).toHaveCSS('line-height', '18px');
-        await expect(ui(page, 'settings.page.root')).toHaveCSS('font-weight', '500');
+        await expect(ui(page, 'settings.page.root')).toHaveCSS('font-weight', '400');
         await interfaceChoice(page, locale);
         const nav = ui(page, 'settings.sidebar.nav-list');
         await expect(nav.getByRole('button')).toHaveCount(16);
@@ -849,3 +904,55 @@ test('native settings resource create forms clear names and cancel without catal
     expect(await catalog()).toEqual(before);
   }
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`native settings navigation and collection roles ${theme}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await configure(page, extensionId, 'en', theme);
+    const tabs = ui(page, 'settings.subpage-tabs').first();
+    const active = tabs.locator('button[aria-current="page"]');
+    const marker = await active.evaluate((node) => {
+      const style = getComputedStyle(node, '::after');
+      return { content: style.content, display: style.display, height: style.height };
+    });
+    expect.soft(marker.display, 'The selected route line must be painted').not.toBe('none');
+    expect.soft(marker.content).not.toBe('none');
+    expect.soft(marker.height).toBe('2px');
+    await expect.soft(active).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+    await active.hover();
+    await expect.soft(active).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+    await route(page, extensionId, 'screen-sizes');
+    const row = page.locator('[data-settings-collection-item]').first();
+    const title = row.locator('div[title]').first();
+    const metadata = row.locator(':scope > div.min-w-0 > div').nth(1);
+    await expect(metadata).toBeVisible();
+    await expect.soft(title).toHaveCSS('font-weight', '400', { timeout: 500 });
+    const contrast = await metadata.evaluate((node) => {
+      const rgb = (color: string) => (color.match(/[\d.]+/g) ?? []).map(Number);
+      const foreground = rgb(getComputedStyle(node).color);
+      let owner: Element | null = node;
+      let background: number[] = [];
+      while (owner) {
+        background = rgb(getComputedStyle(owner).backgroundColor);
+        if (background.length === 3 || background[3] === 1) break;
+        owner = owner.parentElement;
+      }
+      const luminance = (channels: number[]) =>
+        channels.slice(0, 3).reduce((sum, channel, index) => {
+          const value = channel / 255;
+          const linear = value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+          return sum + linear * [0.2126, 0.7152, 0.0722][index]!;
+        }, 0);
+      const a = luminance(foreground);
+      const b = luminance(background);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+    expect
+      .soft(contrast, 'Meaningful row metadata must remain readable')
+      .toBeGreaterThanOrEqual(4.5);
+    await screenshot(page, info, 'collection-title-and-metadata');
+  });
+}

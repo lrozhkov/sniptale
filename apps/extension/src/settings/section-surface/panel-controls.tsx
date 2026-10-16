@@ -1,10 +1,7 @@
 import { GripVertical } from 'lucide-react';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
-import { useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import {
-  InspectorParameterRow,
-  toggleInspectorFieldEditing,
-} from '../../ui/compact-inspector-controls/layout';
+import { type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 
 import { ProductRange, type ProductRangeProps } from '@sniptale/ui/product-form-controls';
 import {
@@ -60,20 +57,8 @@ export function SettingsControlRow(props: {
   valueClassName?: string;
   valueMinimum?: number;
 }) {
-  const value = useRef<HTMLDivElement>(null);
-  const activate = () => {
-    const field = value.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-      'input:not([type="range"]):not([type="checkbox"]):not(:disabled),textarea:not(:disabled)'
-    );
-    if (field) toggleInspectorFieldEditing(field);
-    else
-      value.current
-        ?.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]:enabled')
-        ?.click();
-  };
   const control = (
     <div
-      ref={value}
       data-ui="settings.control-row.value"
       className={['settings-control-value', props.valueClassName ?? ''].join(' ')}
     >
@@ -86,11 +71,7 @@ export function SettingsControlRow(props: {
       className={['w-full max-w-[720px]', props.className ?? ''].join(' ')}
     >
       {typeof props.label === 'string' ? (
-        <InspectorParameterRow
-          label={props.label}
-          valueMinimum={props.valueMinimum ?? 220}
-          onActivate={activate}
-        >
+        <InspectorParameterRow label={props.label} valueMinimum={props.valueMinimum ?? 220}>
           {control}
         </InspectorParameterRow>
       ) : (

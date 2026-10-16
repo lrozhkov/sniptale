@@ -19,7 +19,7 @@ The inline composer owns its draft until Save or Cancel. The specimen locks row 
 
 ## Row geometry
 
-Align leading controls, titles, metadata, and trailing actions across equivalent rows. Two-line object rows have a 56px minimum height. Long titles can increase height. Use the ordinary weight for titles. Secondary metadata uses the shared caption role. Keep hit regions contiguous. Paint selected and hovered surfaces 1px inside each vertical edge, creating a 2px visual separator.
+Align leading controls, titles, metadata, and trailing actions across equivalent rows. Two-line object rows have a 56px minimum height. Long titles can increase height. Use the ordinary weight for titles. Secondary metadata uses the shared caption role and readable secondary foreground. Reserve dim text for decorative or unavailable content. Meaningful metadata must meet the normal text contrast requirement. Keep hit regions contiguous. Paint selected and hovered surfaces 1px inside each vertical edge, creating a 2px visual separator.
 
 Do not merge separate objects into a selected block or create dead click gaps between them. Cards retain their grid gaps and meaningful preview names. Reserve trailing action space only when a real action exists. Do not add Info that repeats visible metadata. Secondary actions appear on focus as well as hover and remain available on supported touch flows.
 
