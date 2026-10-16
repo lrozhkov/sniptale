@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import { ModelAudioFields } from './model-audio-fields';
 import type {
   AIModelOperation,
@@ -88,19 +90,30 @@ function ModelProviderField(props: ModelFormModalContentProps) {
 }
 
 function ModelIdentityFields(props: ModelFormModalContentProps) {
+  const name = useRef<HTMLInputElement>(null);
+  const code = useRef<HTMLInputElement>(null);
   return (
     <>
       <ProductField
         label={translate('settings.aiProviders.modelNameLabel')}
         error={props.errors['displayName']}
       >
-        <ProductInput
-          type="text"
-          value={props.formData.displayName}
-          onChange={props.onDisplayNameChange}
-          placeholder={translate('settings.aiProviders.modelNamePlaceholder')}
-          invalid={Boolean(props.errors['displayName'])}
-        />
+        <div className="sniptale-text-value">
+          <ProductInput
+            ref={name}
+            type="text"
+            value={props.formData.displayName}
+            onChange={props.onDisplayNameChange}
+            placeholder={translate('settings.aiProviders.modelNamePlaceholder')}
+            invalid={Boolean(props.errors['displayName'])}
+          />
+          {props.formData.displayName && (
+            <InspectorFieldClear
+              label={translate('settings.aiProviders.modelNameLabel')}
+              target={name}
+            />
+          )}
+        </div>
       </ProductField>
 
       <ProductField
@@ -108,14 +121,23 @@ function ModelIdentityFields(props: ModelFormModalContentProps) {
         error={props.errors['modelCode']}
         hint={translate('settings.aiProviders.modelCodeHint')}
       >
-        <ProductInput
-          type="text"
-          value={props.formData.modelCode}
-          onChange={props.onModelCodeChange}
-          placeholder={translate('settings.aiProviders.modelCodePlaceholder')}
-          className="font-mono"
-          invalid={Boolean(props.errors['modelCode'])}
-        />
+        <div className="sniptale-text-value">
+          <ProductInput
+            ref={code}
+            type="text"
+            value={props.formData.modelCode}
+            onChange={props.onModelCodeChange}
+            placeholder={translate('settings.aiProviders.modelCodePlaceholder')}
+            className="font-mono"
+            invalid={Boolean(props.errors['modelCode'])}
+          />
+          {props.formData.modelCode && (
+            <InspectorFieldClear
+              label={translate('settings.aiProviders.modelCodeLabel')}
+              target={code}
+            />
+          )}
+        </div>
       </ProductField>
     </>
   );
@@ -127,7 +149,7 @@ function ModelPromptField(props: ModelFormModalContentProps) {
       label={translate('settings.aiProviders.modelPromptLabel')}
       error={props.errors['systemPrompt']}
     >
-      <div className="relative">
+      <div className="sniptale-text-value">
         <ProductTextarea
           ref={props.textareaRef as React.Ref<HTMLTextAreaElement>}
           value={props.formData.systemPrompt}
@@ -137,6 +159,12 @@ function ModelPromptField(props: ModelFormModalContentProps) {
           style={{ resize: 'none', marginBottom: 0 }}
           invalid={Boolean(props.errors['systemPrompt'])}
         />
+        {props.formData.systemPrompt && (
+          <InspectorFieldClear
+            label={translate('settings.aiProviders.modelPromptLabel')}
+            target={props.textareaRef}
+          />
+        )}
         <div
           className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
           onMouseDown={props.onResizeStart}

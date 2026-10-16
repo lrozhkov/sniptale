@@ -1,3 +1,5 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useMemo, useState, type RefObject } from 'react';
 import { writeBrowserClipboardText } from '@sniptale/platform/browser/clipboard';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
@@ -48,14 +50,15 @@ export function ImportFilePicker(props: {
       <p className="text-sm text-[var(--sniptale-color-text-muted)]">
         {translate('settings.settingsTransfer.dropFile')}
       </p>
-      <button
+      <ContentToolbarButton
+        tone="outline"
         ref={props.buttonRef}
         className={`${settingsAddButtonClassName} mt-3`}
         disabled={props.disabled}
         onClick={() => props.inputRef.current?.click()}
       >
         {translate('settings.settingsTransfer.chooseFile')}
-      </button>
+      </ContentToolbarButton>
     </div>
   );
 }
@@ -108,7 +111,8 @@ export function ImportReview(props: ImportReviewProps) {
           <span>{translate('settings.settingsTransfer.destructiveConfirm')}</span>
         </label>
       ) : null}
-      <button
+      <ProductActionButton
+        tone="secondary"
         className={settingsAddButtonClassName}
         disabled={props.busy || props.selected.size === 0 || destructiveBlocked}
         onClick={props.onCommit}
@@ -116,7 +120,7 @@ export function ImportReview(props: ImportReviewProps) {
         {props.busy
           ? translate('settings.settingsTransfer.working')
           : translate('settings.settingsTransfer.apply')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }
@@ -237,7 +241,8 @@ export function ImportReport(props: { report: SettingsTransferCommitReport; onRe
         <dd>{props.report.skipped}</dd>
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
+        <ProductActionButton
+          tone="secondary"
           className={settingsAddButtonClassName}
           disabled={copyState === 'copying'}
           onClick={() => void copyReport()}
@@ -245,18 +250,23 @@ export function ImportReport(props: { report: SettingsTransferCommitReport; onRe
           {copyState === 'copying'
             ? translate('settings.settingsTransfer.working')
             : translate('settings.settingsTransfer.copyReport')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
           className={settingsAddButtonClassName}
           onClick={() =>
             downloadSettingsTransferText('sniptale-settings-import-report.json', reportText)
           }
         >
           {translate('settings.settingsTransfer.downloadReport')}
-        </button>
-        <button className={settingsAddButtonClassName} onClick={props.onReset}>
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          className={settingsAddButtonClassName}
+          onClick={props.onReset}
+        >
           {translate('settings.settingsTransfer.done')}
-        </button>
+        </ProductActionButton>
       </div>
       {copyState === 'error' ? (
         <p className="mt-3 text-sm text-red-600" role="alert">

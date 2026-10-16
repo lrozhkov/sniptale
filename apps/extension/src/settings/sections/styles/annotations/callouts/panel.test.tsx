@@ -45,7 +45,11 @@ function createController(): CalloutPresetCatalogController {
 describe('CalloutPresetsPanel', () => {
   it('renders all fifteen system previews, default state, and catalog controls', () => {
     const markup = renderToStaticMarkup(<CalloutPresetsPanel controller={createController()} />);
-    expect(markup.match(/highlighter\.calloutPresets\.system\./g)).toHaveLength(15);
+    const document = new DOMParser().parseFromString(markup, 'text/html');
+    expect(document.body.textContent?.match(/highlighter\.calloutPresets\.system\./g)).toHaveLength(
+      15
+    );
+    expect(document.querySelectorAll('.sniptale-settings-preview')).toHaveLength(15);
     expect(markup).toContain('settings.collection.defaultBadge');
     expect(markup).toContain('settings.collection.builtInBadge');
     expect(markup).toContain('highlighter.calloutPresets.add');

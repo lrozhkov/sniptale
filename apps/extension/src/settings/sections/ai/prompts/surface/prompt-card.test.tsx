@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -99,16 +100,18 @@ it('forwards prompt edits, resize starts, and save requests', async () => {
     />
   );
   const textarea = container?.querySelector('textarea');
-  const resizeHandle = textarea?.nextElementSibling as HTMLElement | null;
+  const resizeHandle = container?.querySelector<HTMLElement>('.cursor-ns-resize');
   act(() => {
     if (textarea) {
       textarea.value = 'Changed';
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     }
     resizeHandle?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    const buttons = container?.querySelectorAll('button');
-    buttons?.[0]?.click();
-    buttons?.[1]?.click();
+    const buttons = Array.from(container?.querySelectorAll('button') ?? []);
+    buttons
+      .find((button) => button.title === translate('settings.aiProviders.globalPromptResetButton'))
+      ?.click();
+    buttons.find((button) => button.textContent === translate('common.actions.save'))?.click();
   });
   expect(handleResizeStart).toHaveBeenCalledOnce();
   expect(handleReset).toHaveBeenCalledOnce();
@@ -138,4 +141,31 @@ it('shows the generated scenario protocol separately from editable guidance', as
   expect(preview?.value).toContain('setStepTitle');
   expect(container!.querySelector('details')?.open).toBe(false);
   expect(container!.querySelectorAll('textarea:not([readonly])')).toHaveLength(1);
+});
+
+it('clears editable prompt text through the existing change callback and retains field focus', async () => {
+  const setValue = vi.fn();
+  await renderUi(
+    <CommandPressScope value={true}>
+      <AIProvidersPromptCard
+        prompt={{
+          status: { canReset: false, isDirty: true, isSaving: false, saveError: null },
+          value: 'Ordinary prompt text',
+          textareaRef: { current: null },
+          setValue,
+          handleReset: vi.fn().mockResolvedValue(undefined),
+          handleSave: vi.fn().mockResolvedValue(undefined),
+          handleResizeStart: vi.fn(),
+        }}
+        descriptionKey="settings.aiProviders.globalPromptDescription"
+        titleKey="settings.aiProviders.globalPromptTitle"
+      />
+    </CommandPressScope>
+  );
+  const textarea = container!.querySelector('textarea')!;
+  await act(async () =>
+    container!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click()
+  );
+  expect(setValue).toHaveBeenCalledWith('');
+  expect(document.activeElement).toBe(textarea);
 });

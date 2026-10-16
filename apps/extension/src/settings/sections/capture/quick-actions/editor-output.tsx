@@ -2,8 +2,8 @@ import { translate } from '../../../../platform/i18n';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { CaptureActionType, QuickAction } from '../../../../contracts/settings';
 import { afterCaptureLabels, qualityOptions } from './section/constants';
-import { SettingsSwitch } from '../../../section-surface/panel-controls';
-import { settingsMetaLabelClassName, settingsToggleRowClassName } from '../../../section-surface';
+import { CheckboxField } from '../../../../ui/compact-inspector-controls';
+import { SettingsControlRow } from '../../../section-surface';
 import { type QuickActionsSectionState } from './controller';
 import { getAllowedQuickActionAfterCaptureActions } from '../../../../features/quick-actions-presets/policy';
 
@@ -27,7 +27,7 @@ export function QuickActionsEditorAdvancedOutputFields(props: {
   }
 
   return (
-    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+    <div className="mt-3 sniptale-parameter-stack">
       <QuickActionsFormatField state={props.state} />
       <QuickActionsQualityField state={props.state} />
     </div>
@@ -39,7 +39,7 @@ export function QuickActionsEditorToggleRow(props: {
   includeExitAfterCapture?: boolean;
 }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="sniptale-parameter-stack">
       <QuickActionsBooleanToggle
         checked={Boolean(props.state.editForm?.status)}
         label={translate('settings.quickActions.enabledLabel')}
@@ -60,10 +60,7 @@ export function QuickActionsEditorToggleRow(props: {
 
 function QuickActionsFormatField(props: { state: QuickActionsEditorOutputState }) {
   return (
-    <div>
-      <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-        {translate('settings.quickActions.imageFormatLabel')}
-      </label>
+    <SettingsControlRow label={translate('settings.quickActions.imageFormatLabel')}>
       <ProductSelect
         controlSize="sm"
         value={props.state.editForm?.imageFormat || ''}
@@ -78,16 +75,13 @@ function QuickActionsFormatField(props: { state: QuickActionsEditorOutputState }
           { value: 'webp', label: translate('imageSettings.section.formatWebpLabel') },
         ]}
       />
-    </div>
+    </SettingsControlRow>
   );
 }
 
 function QuickActionsQualityField(props: { state: QuickActionsEditorOutputState }) {
   return (
-    <div>
-      <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-        {translate('settings.quickActions.qualityLabel')}
-      </label>
+    <SettingsControlRow label={translate('settings.quickActions.qualityLabel')}>
       <ProductSelect
         controlSize="sm"
         value={
@@ -108,7 +102,7 @@ function QuickActionsQualityField(props: { state: QuickActionsEditorOutputState 
           })),
         ]}
       />
-    </div>
+    </SettingsControlRow>
   );
 }
 
@@ -117,10 +111,7 @@ function QuickActionsAfterCaptureField(props: { state: QuickActionsEditorOutputS
     ? getAllowedQuickActionAfterCaptureActions(props.state.editForm)
     : null;
   return (
-    <div>
-      <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-        {translate('settings.quickActions.afterCaptureLabel')}
-      </label>
+    <SettingsControlRow label={translate('settings.quickActions.afterCaptureLabel')}>
       <ProductSelect
         controlSize="sm"
         value={props.state.editForm?.afterCapture ?? 'download_default'}
@@ -131,7 +122,7 @@ function QuickActionsAfterCaptureField(props: { state: QuickActionsEditorOutputS
           .filter(([value]) => !allowedActions || allowedActions.has(value))
           .map(([value, label]) => ({ value, label }))}
       />
-    </div>
+    </SettingsControlRow>
   );
 }
 
@@ -140,10 +131,5 @@ function QuickActionsBooleanToggle(props: {
   label: string;
   onToggle: () => void;
 }) {
-  return (
-    <div className={`${settingsToggleRowClassName} !min-h-9 !py-1.5`}>
-      <label className="text-sm text-[var(--sniptale-color-text-muted)]">{props.label}</label>
-      <SettingsSwitch checked={props.checked} size="sm" onClick={props.onToggle} />
-    </div>
-  );
+  return <CheckboxField label={props.label} value={props.checked} onChange={props.onToggle} />;
 }

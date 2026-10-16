@@ -1,3 +1,4 @@
+import { InspectorLayout } from '../../compact-inspector-controls/layout';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -89,4 +90,20 @@ it('switches from linked sizing without a visual jump and routes color source ch
   );
   await act(async () => root.unmount());
   host.remove();
+});
+
+it('adopts canonical parameter stacks without changing pending appearance groups', () => {
+  const settings = createStepBadgeSettingsFromTemplate(DEFAULT_STEP_BADGE_TEMPLATE);
+  const content = (
+    <StepBadgeAppearanceSection
+      frame={{ borderColor: '#f97316', borderWidth: 4 }}
+      onChange={vi.fn()}
+      settings={settings}
+    />
+  );
+  const pending = renderToStaticMarkup(content);
+  const migrated = renderToStaticMarkup(<InspectorLayout>{content}</InspectorLayout>);
+  expect(pending).toContain('grid gap-2');
+  expect(migrated.match(/class="sniptale-parameter-stack"/g)).toHaveLength(2);
+  expect(migrated).toContain('Цвет рамки');
 });

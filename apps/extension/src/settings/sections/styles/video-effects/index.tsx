@@ -44,11 +44,14 @@ export function VideoEffectsSection() {
           busy={controller.busy}
           onImport={controller.importFiles}
         />
-        <p className="mb-4 text-sm text-[var(--sniptale-color-text-secondary)]">
+        <p className="mb-4 text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.effectsLibrary.catalogDescription')}
         </p>
         {controller.error ? (
-          <p role="alert" className="mb-3 text-sm text-[var(--sniptale-color-danger)]">
+          <p
+            role="alert"
+            className="mb-3 text-[13px] leading-[18px] text-[var(--sniptale-color-danger)]"
+          >
             {controller.error}
           </p>
         ) : null}

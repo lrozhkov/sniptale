@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { InspectorLayout } from '../../compact-inspector-controls/layout';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -56,6 +58,7 @@ it('edits an existing preset in the shared persistent modal', async () => {
   expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(0);
   expect(document.body.textContent).toContain('Изменить шаблон комментария');
   const nameInput = document.querySelector<HTMLInputElement>('input[maxlength="64"]');
+  expect(nameInput?.parentElement?.querySelector('.sniptale-field-clear')).toBeNull();
   const tagAssignment = document.querySelector(
     '[data-ui="shared.annotation-template-tag-assignment"]'
   );
@@ -259,4 +262,45 @@ it('owns Escape dismissal and restores focus to the previous control', async () 
   await renderEditor(false);
   expect(document.activeElement).toBe(trigger);
   await act(async () => root.unmount());
+});
+
+it('clears the migrated callout name without committing or changing authored preview', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const onSave = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <CommandPressScope value={true}>
+          <InspectorLayout>
+            <CalloutPresetEditor
+              isOpen
+              isSaving={false}
+              preset={createSystemCalloutPresetCatalog()[0]!}
+              onClose={vi.fn()}
+              onSave={onSave}
+            />
+          </InspectorLayout>
+        </CommandPressScope>
+      )
+    );
+    const name = document.querySelector<HTMLInputElement>('input[maxlength="64"]')!;
+    const preview = document.querySelector(
+      '[data-ui="shared.callout-preset-editor.preview-panel"]'
+    )!;
+    const before = preview.outerHTML;
+    expect(name.getAttribute('aria-label')).not.toBeNull();
+    const clear = name.parentElement!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+    expect(clear).not.toBeNull();
+    await act(async () => clear.click());
+    expect(name.value).toBe('');
+    expect(document.activeElement).toBe(name);
+    expect(preview.outerHTML).toBe(before);
+    expect(onSave).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
 });

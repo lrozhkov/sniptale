@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 // @vitest-environment jsdom
 
 import type React from 'react';
@@ -232,4 +233,27 @@ it('wires provider field change handlers and submit through the layout body', as
   expect(props.onBaseUrlChange).toHaveBeenCalled();
   expect(props.onApiKeyChange).toHaveBeenCalled();
   expect(props.onSubmit).toHaveBeenCalled();
+});
+
+it('clears ordinary provider text through its input owner and leaves the secret field masked', async () => {
+  let changedName = 'OpenAI';
+  const props = createProps({
+    onNameChange: (event) => {
+      changedName = event.currentTarget.value;
+    },
+  });
+  await render(
+    <CommandPressScope value={true}>
+      <ProviderFormModalContent {...props} />
+    </CommandPressScope>
+  );
+  const name = container!.querySelector<HTMLInputElement>('input[type="text"]')!;
+  const clear = name.parentElement!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+  await act(async () => clear.click());
+  expect(changedName).toBe('');
+  expect(document.activeElement).toBe(name);
+  const secret = container!.querySelector<HTMLInputElement>('input[type="password"]')!;
+  expect(secret.value).toBe('');
+  expect(secret.title).toBe('');
+  expect(secret.parentElement!.querySelector('.sniptale-field-clear')).toBeNull();
 });

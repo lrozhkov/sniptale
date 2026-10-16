@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { InspectorLayout } from '../../compact-inspector-controls/layout';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -420,4 +422,30 @@ describe('BorderPresetEditorFields', () => {
       }),
     });
   });
+});
+
+it('clears only the migrated border preset name through the existing state callback', async () => {
+  const state = createState();
+  await renderFields(state);
+  const pendingName = queryFieldElements().nameInput;
+  expect(pendingName.parentElement?.querySelector('.sniptale-field-clear')).toBeNull();
+  await act(async () =>
+    root?.render(
+      <CommandPressScope value={true}>
+        <InspectorLayout>
+          <BorderPresetEditorFields state={state} />
+        </InspectorLayout>
+      </CommandPressScope>
+    )
+  );
+  const name = container!.querySelector<HTMLInputElement>(
+    'input[aria-label="highlighter.editor.nameLabel"]'
+  )!;
+  expect(name).not.toBeNull();
+  const clear = name.parentElement!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+  expect(clear).not.toBeNull();
+  await act(async () => clear.click());
+  expect(state.setName).toHaveBeenCalledWith('');
+  expect(document.activeElement).toBe(name);
+  expect(state.setWidth).not.toHaveBeenCalled();
 });

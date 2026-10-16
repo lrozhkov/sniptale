@@ -14,6 +14,7 @@ import { Circle, PaintBucket, Palette, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../color-selector';
 import { NumericRow } from '../../compact-inspector-controls';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import {
   getEffectiveStepBadgeVisualStyle,
@@ -118,8 +119,9 @@ export function StepBadgeSizeSection(props: StepBadgeAppearanceProps & { embedde
   const updateStyle = (patch: Partial<StepBadgeVisualStyle>) =>
     props.onChange({ style: { ...style, ...patch } });
   const linkedDiameter = getLinkedStepBadgeDiameter(props.frame.borderWidth);
+  const inspector = useInspectorLayout();
   const content = (
-    <div className="grid gap-2">
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-2'}>
       <PropertyField label={translate('content.stepBadge.sizeSource')}>
         <ProductGlassRow>
           <ProductGlassChip
@@ -169,8 +171,9 @@ export function StepBadgeColorSection(props: StepBadgeAppearanceProps & { embedd
   const style = getEffectiveStepBadgeVisualStyle(props.settings);
   const updateStyle = (patch: Partial<StepBadgeVisualStyle>) =>
     props.onChange({ style: { ...style, ...patch } });
+  const inspector = useInspectorLayout();
   const content = (
-    <div className="grid gap-2">
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-2'}>
       <ColorEditor
         frame={props.frame}
         label={translate('content.stepBadge.background')}

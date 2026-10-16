@@ -1,3 +1,4 @@
+import { useRef, type ComponentProps } from 'react';
 import type {
   CalloutBadgeColorSource,
   CalloutFontFamily,
@@ -18,6 +19,8 @@ import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
 import { CompactPaintSelector } from '../../paint-selector';
 import { translate } from '../../../platform/i18n';
 import { CompactSelect } from '../../compact-inspector-controls';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
+import { InspectorFieldClear } from '../../compact-inspector-controls/text-field';
 import { CALLOUT_BACKGROUND_PRESETS, CALLOUT_TEXT_PRESETS } from './inspector-palettes';
 import { resolveCalloutColorBindings } from '../../../features/highlighter/callout-color-bindings';
 import {
@@ -28,6 +31,30 @@ import {
   SettingsStack,
   type ManualContentProps,
 } from './inspector-fields';
+
+function CalloutTextInput({
+  clearLabel,
+  ...props
+}: ComponentProps<typeof ProductInput> & { clearLabel: string }) {
+  const input = useRef<HTMLInputElement>(null);
+  const inspector = useInspectorLayout();
+  const field = (
+    <ProductInput
+      {...props}
+      ref={input}
+      {...(inspector ? { 'aria-label': props['aria-label'] ?? clearLabel } : {})}
+    />
+  );
+  if (!inspector) return field;
+  return (
+    <div className="sniptale-text-value">
+      {field}
+      {!props.disabled && !props.readOnly && String(props.value ?? '').length > 0 ? (
+        <InspectorFieldClear label={clearLabel} target={input} />
+      ) : null}
+    </div>
+  );
+}
 
 const FONT_FAMILIES: CalloutFontFamily[] = ['sans', 'serif', 'mono', 'cursive'];
 const DIRECTIONS: CalloutTextDirection[] = ['auto', 'ltr', 'rtl'];
@@ -280,7 +307,8 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
       {badge.enabled ? (
         <>
           <PropertyField label={translate('content.callout.badgeTextLabel')}>
-            <ProductInput
+            <CalloutTextInput
+              clearLabel={translate('content.callout.badgeTextLabel')}
               className="sniptale-input-compact cursor-text"
               maxLength={64}
               placeholder={translate('content.callout.badgeTextPlaceholder')}
@@ -399,7 +427,8 @@ export function CalloutTitleSettings(props: ManualContentProps) {
       {title.enabled ? (
         <>
           <PropertyField label={translate('content.callout.titleTextLabel')}>
-            <ProductInput
+            <CalloutTextInput
+              clearLabel={translate('content.callout.titleTextLabel')}
               className="sniptale-input-compact cursor-text"
               maxLength={256}
               placeholder={translate('content.callout.titleTextPlaceholder')}

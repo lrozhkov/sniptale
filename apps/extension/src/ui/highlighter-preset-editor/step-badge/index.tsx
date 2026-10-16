@@ -37,6 +37,8 @@ import { StepBadgePresetPreview } from './thumbnail';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import { getDefaultStepBadgeAlphabet } from '../../../composition/frame-annotation-controls/step-badge/helpers';
 import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
+import { InspectorFieldClear } from '../../compact-inspector-controls/text-field';
 
 type StepBadgePresetEditorProps = {
   isNew?: boolean;
@@ -220,19 +222,40 @@ function PresetEditorBody(props: {
   tagIds: string[];
 }) {
   const template = createStepBadgeTemplateFromSettings(props.settings, 29.16);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const inspector = useInspectorLayout();
+  const nameInput = (
+    <ProductInput
+      ref={nameRef}
+      {...(inspector
+        ? { 'aria-label': translate('highlighter.stepBadgePresets.editor.name') }
+        : {})}
+      className="cursor-text"
+      maxLength={64}
+      style={{ cursor: 'text' }}
+      value={props.name}
+      onChange={(event) => props.setName(event.target.value)}
+    />
+  );
   return (
     <ProductModalBody compact className="space-y-4">
       <div className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-4">
         <StepBadgePresetPreview settings={template} />
         <div className="space-y-4">
           <ProductField label={translate('highlighter.stepBadgePresets.editor.name')}>
-            <ProductInput
-              className="cursor-text"
-              maxLength={64}
-              style={{ cursor: 'text' }}
-              value={props.name}
-              onChange={(event) => props.setName(event.target.value)}
-            />
+            {inspector ? (
+              <div className="sniptale-text-value">
+                {nameInput}
+                {props.name.length > 0 ? (
+                  <InspectorFieldClear
+                    label={translate('highlighter.stepBadgePresets.editor.name')}
+                    target={nameRef}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              nameInput
+            )}
           </ProductField>
           <AnnotationTemplateTagAssignment onChange={props.setTagIds} value={props.tagIds} />
         </div>

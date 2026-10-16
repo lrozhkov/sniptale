@@ -1,0 +1,851 @@
+import { randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+import type { Page, TestInfo } from '@playwright/test';
+import { expect, test } from '../support/extension-fixture';
+
+import { translate } from '../../../../apps/extension/src/platform/i18n';
+import {
+  SETTINGS_SECTION_IDS,
+  SETTINGS_SECTION_VIEWS,
+  type SettingsSectionId,
+} from '../../../../apps/extension/src/platform/navigation/extension-pages/settings-route/codec';
+
+type Locale = 'ru' | 'en';
+type Theme = 'light' | 'dark';
+const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
+
+test.use({ actionTimeout: 10_000 });
+
+async function settle(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined))
+    );
+  });
+}
+
+async function openSettings(page: Page, extensionId: string) {
+  await page.goto(
+    `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=interface-browser&view=interface`
+  );
+  await expect(page.locator('#settings-interface-language')).toBeEnabled();
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const value: unknown = (await chrome.storage.local.get('sniptale-locale-preference'))[
+          'sniptale-locale-preference'
+        ];
+        return value === 'ru' || value === 'en';
+      })
+    )
+    .toBe(true);
+  await settle(page);
+}
+
+async function sidebarWheelNavigation(page: Page, info: TestInfo) {
+  const nav = page.locator('[data-ui="settings.sidebar.nav-list"]');
+  const last = nav.getByRole('button').last();
+  const box = (await nav.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 1200);
+  await expect(
+    last,
+    'The sidebar scroll owner must expose its last section to pointer users'
+  ).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: info.outputPath('sidebar-bottom.png'), fullPage: false });
+  await last.click();
+  await expect(page).toHaveURL(/section=settings-transfer/);
+}
+
+test('native settings sidebar wheel reaches the last section at short height', async ({
+  page,
+  extensionId,
+}, info) => {
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await configure(page, extensionId, 'en', 'light');
+  await interfaceRowRhythm(page, info);
+  await neutralThemeChoice(page, 'en', info);
+  await sidebarWheelNavigation(page, info);
+  await route(page, extensionId, 'access-data', 'permissions');
+  await assertFit(page);
+  await screenshot(page, info, 'site-access-mode');
+});
+
+async function configure(page: Page, extensionId: string, locale: Locale, theme: Theme) {
+  await openSettings(page, extensionId);
+  await page.locator('#settings-interface-language').click();
+  await page
+    .getByRole('option', {
+      name: locale === 'en' ? 'English' : /^(Russian|Русский)$/u,
+      exact: true,
+    })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async () =>
+          (await chrome.storage.local.get('sniptale-locale-preference'))[
+            'sniptale-locale-preference'
+          ]
+      )
+    )
+    .toBe(locale);
+  await page.evaluate(
+    async ({ locale, theme }) => {
+      localStorage.setItem('sniptale-locale-preference', locale);
+      localStorage.setItem('sniptale-theme-preference', theme);
+      await chrome.storage.local.set({
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': theme,
+      });
+    },
+    { locale, theme }
+  );
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', locale);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  await expect(page.locator('#settings-interface-language')).toBeEnabled();
+  await settle(page);
+}
+
+async function contentReady(page: Page) {
+  const content = ui(page, 'settings.page.content-scroll');
+  await expect.poll(async () => (await content.innerText()).trim().length).toBeGreaterThan(0);
+  await expect(content.locator('.animate-pulse')).toHaveCount(0);
+  await settle(page);
+}
+
+async function route(page: Page, extensionId: string, section: SettingsSectionId, view?: string) {
+  const url = new URL(`chrome-extension://${extensionId}/apps/extension/src/settings/index.html`);
+  url.searchParams.set('section', section);
+  if (view) url.searchParams.set('view', view);
+  await page.goto(url.href);
+  await contentReady(page);
+}
+
+async function screenshot(page: Page, info: TestInfo, name: string) {
+  await settle(page);
+  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+}
+
+async function assertFit(page: Page) {
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  ).toBeLessThanOrEqual(1);
+  const content = ui(page, 'settings.page.content-scroll');
+  expect(await content.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(
+    1
+  );
+  await expect(ui(page, 'settings.sidebar.footer')).toBeInViewport({ ratio: 1 });
+  const roles = await content
+    .locator('.sniptale-parameter-name:visible, .sniptale-parameter-row:visible')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const style = getComputedStyle(node);
+        return {
+          name: node.classList.contains('sniptale-parameter-name'),
+          size: style.fontSize,
+          lineHeight: style.lineHeight,
+          weight: style.fontWeight,
+          family: style.fontFamily,
+          height: node.getBoundingClientRect().height,
+        };
+      })
+    );
+  for (const role of roles) {
+    if (role.name) {
+      expect(role.family).toContain('Sniptale Interface');
+      expect(role.size).toBe('13px');
+      expect(role.lineHeight).toBe('18px');
+      expect(role.weight).toBe('500');
+    } else expect(role.height).toBeGreaterThanOrEqual(31.5);
+  }
+  for (const caption of await page
+    .locator(
+      '[data-command-caption]:visible, button[data-ui="shared.ui.content-toolbar-button"] > .sniptale-command-content:visible'
+    )
+    .all()) {
+    const fit = await caption.evaluate((node) => {
+      const parent = node.closest('button');
+      if (!parent) throw new Error('Command content must have a button owner.');
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      const bounds = [];
+      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+        if (!text.textContent?.trim() || text.parentElement?.closest('.sr-only')) continue;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        bounds.push(
+          ...Array.from(range.getClientRects()).filter((rect) => rect.width && rect.height)
+        );
+      }
+      if (!bounds.length) return null;
+      const b = parent.getBoundingClientRect();
+      return {
+        text: parent.textContent,
+        left: Math.min(...bounds.map((rect) => rect.left)),
+        right: Math.max(...bounds.map((rect) => rect.right)),
+        parentLeft: b.left,
+        parentRight: b.right,
+      };
+    });
+    if (!fit) continue;
+    expect(
+      fit.left,
+      `${fit.text}: command content must remain inside its button`
+    ).toBeGreaterThanOrEqual(fit.parentLeft - 1);
+    expect(
+      fit.right,
+      `${fit.text}: command content must remain inside its button`
+    ).toBeLessThanOrEqual(fit.parentRight + 1);
+  }
+}
+
+async function interfaceRowRhythm(page: Page, info: TestInfo) {
+  const rows = ui(page, 'settings.page.content-scroll').locator('.sniptale-parameter-row');
+  const geometry = await rows.evaluateAll((nodes) =>
+    nodes.slice(0, 3).map((node) => ({
+      height: node.getBoundingClientRect().height,
+      labelTop: node.querySelector('.sniptale-parameter-name')!.getBoundingClientRect().top,
+    }))
+  );
+  expect(geometry).toHaveLength(3);
+  for (const row of geometry)
+    expect
+      .soft(Math.abs(row.height - 32), 'One-line Interface row height must be 32px')
+      .toBeLessThanOrEqual(1);
+  for (let index = 1; index < geometry.length; index++) {
+    expect
+      .soft(
+        Math.abs(geometry[index]!.labelTop - geometry[index - 1]!.labelTop - 36),
+        'Interface label pitch must be 36px'
+      )
+      .toBeLessThanOrEqual(1);
+  }
+  const language = page.locator('#settings-interface-language');
+  await language.click();
+  const menu = page.getByRole('listbox');
+  await expect(menu).toBeVisible();
+  await settle(page);
+  const menuStyle = await menu.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { fontSize: style.fontSize, radius: style.borderRadius };
+  });
+  expect.soft(menuStyle.fontSize).toBe('13px');
+  expect.soft(menuStyle.radius).toBe('4px');
+  const options = await menu.getByRole('option').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      height: node.getBoundingClientRect().height,
+      fontSize: getComputedStyle(node).fontSize,
+    }))
+  );
+  expect(options).toHaveLength(2);
+  for (const option of options) {
+    expect.soft(option.height).toBeGreaterThanOrEqual(35.5);
+    expect.soft(option.fontSize).toBe('13px');
+  }
+  await writeFile(
+    info.outputPath('interface-row-menu-geometry.json'),
+    JSON.stringify({ geometry, menuStyle, options }, null, 2)
+  );
+  await screenshot(page, info, 'interface-language-menu');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(language).toBeFocused();
+}
+
+async function neutralThemeChoice(page: Page, locale: Locale, info: TestInfo) {
+  const themes = page.getByRole('group', {
+    name: translate('settings.appearance.themeModeLabel', locale),
+    exact: true,
+  });
+  const selected = themes.locator('button[aria-pressed="true"]');
+  await expect(selected).toHaveCount(1);
+  await expect(
+    selected,
+    'An ordinary selected property must have no persistent inset shadow'
+  ).toHaveCSS('box-shadow', 'none');
+  await selected.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(selected).toBeFocused();
+  const focus = await selected.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) };
+  });
+  expect(focus.style).not.toBe('none');
+  expect(focus.width).toBeGreaterThanOrEqual(2);
+  await screenshot(page, info, 'theme-keyboard-focus');
+}
+
+async function interfaceChoice(page: Page, locale: Locale) {
+  const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const startup = page.getByRole('button', {
+    name: t('settings.appearance.popupStartupAriaLabel'),
+    exact: true,
+  });
+  await startup.click();
+  const menu = page.getByRole('option', {
+    name: t('settings.appearance.popupStartupOptions.menu'),
+    exact: true,
+  });
+  await menu.click();
+  await expect(startup).toContainText(t('settings.appearance.popupStartupOptions.menu'));
+  await expect(startup).toBeFocused();
+  await page.reload();
+  await expect(startup).toContainText(t('settings.appearance.popupStartupOptions.menu'));
+}
+
+async function paletteFlow(page: Page, locale: Locale, info: TestInfo) {
+  const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const anchor = ui(page, 'settings.sidebar').getByRole('button').first();
+  await anchor.focus();
+  await page.keyboard.press('Control+k');
+  const palette = ui(page, 'settings.command-palette');
+  const query = palette.getByRole('textbox');
+  await expect(query).toBeFocused();
+  await query.fill('unlikely-setting-no-match');
+  await expect(palette.getByRole('option')).toHaveCount(0);
+  await palette.locator('.sniptale-field-clear').click();
+  await expect(query).toHaveValue('');
+  await expect(query).toBeFocused();
+  await expect(palette.getByRole('option')).toHaveCount(16);
+  await query.fill(t('settings.navigation.aiConnections'));
+  await expect(palette.getByRole('option')).toHaveCount(1);
+  await screenshot(page, info, 'palette-search');
+  await page.keyboard.press('Escape');
+  await expect(palette).toHaveCount(0);
+  await page.keyboard.press('Control+k');
+  await query.fill(t('settings.navigation.aiConnections'));
+  await query.press('Enter');
+  await expect(palette).toHaveCount(0);
+  await expect(page).toHaveURL(/section=ai-connections/);
+  await contentReady(page);
+}
+
+async function providerAndModelFlow(
+  page: Page,
+  locale: Locale,
+  hostOrigin: string,
+  info: TestInfo
+) {
+  const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const providers = page.getByRole('region', {
+    name: t('settings.aiProviders.providersTitle'),
+    exact: true,
+  });
+  const addProvider = providers.getByRole('button', { name: t('common.actions.add'), exact: true });
+  await addProvider.click();
+  const dialog = page.getByRole('dialog');
+  const submit = dialog.getByRole('button', { name: t('common.actions.add'), exact: true });
+  await submit.click();
+  await expect.poll(() => dialog.locator('.sniptale-input-error').count()).toBeGreaterThan(0);
+  const name = `Settings design ${randomUUID()}`;
+  await dialog.locator('input').nth(0).fill(name);
+  await dialog.locator('input').nth(1).fill(`${hostOrigin}/v1`);
+  await dialog.locator('input[type="password"]').fill('synthetic-design-proof-no-network');
+  const cancel = dialog.getByRole('button', { name: t('common.actions.cancel'), exact: true });
+  await cancel.scrollIntoViewIfNeeded();
+  await expect(cancel).toBeInViewport({ ratio: 1 });
+  await screenshot(page, info, 'provider-draft');
+  await cancel.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(providers).not.toContainText(name);
+  await addProvider.click();
+  await expect(dialog.locator('input').first()).toHaveValue('');
+  await dialog.locator('input').nth(0).fill(name);
+  await dialog.locator('input').nth(1).fill(`${hostOrigin}/v1`);
+  await dialog.locator('input[type="password"]').fill('synthetic-design-proof-no-network');
+  await submit.scrollIntoViewIfNeeded();
+  await expect(submit).toBeInViewport({ ratio: 1 });
+  await submit.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(providers).toContainText(name);
+  await page.reload();
+  await expect(providers).toContainText(name);
+  const models = page.getByRole('region', {
+    name: t('settings.aiProviders.modelsTitle'),
+    exact: true,
+  });
+  await models.getByRole('button', { name: t('common.actions.add'), exact: true }).click();
+  await submit.scrollIntoViewIfNeeded();
+  await submit.click();
+  await expect.poll(() => dialog.locator('.sniptale-input-error').count()).toBeGreaterThan(0);
+  await dialog
+    .getByRole('button', { name: t('settings.aiProviders.modelProviderPlaceholder'), exact: true })
+    .click();
+  await page.getByRole('option', { name, exact: true }).click();
+  const modelName = dialog.getByPlaceholder(t('settings.aiProviders.modelNamePlaceholder'), {
+    exact: true,
+  });
+  await modelName.fill('Cancelled model draft');
+  await dialog
+    .getByPlaceholder(t('settings.aiProviders.modelCodePlaceholder'), { exact: true })
+    .fill('synthetic-model');
+  await cancel.scrollIntoViewIfNeeded();
+  await expect(cancel).toBeInViewport({ ratio: 1 });
+  await screenshot(page, info, 'model-draft');
+  await cancel.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(models).not.toContainText('Cancelled model draft');
+}
+
+async function authoredPreviewBoundary(page: Page, extensionId: string, info: TestInfo) {
+  await route(page, extensionId, 'annotations', 'numbering');
+  const preview = page.locator('.sniptale-settings-preview > span > span > span').first();
+  await expect(preview).toBeAttached();
+  const read = () =>
+    preview.evaluate((node) => {
+      const s = getComputedStyle(node);
+      return {
+        family: s.fontFamily,
+        size: s.fontSize,
+        weight: s.fontWeight,
+        lineHeight: s.lineHeight,
+      };
+    });
+  const before = await read();
+  expect(before.family).toContain('Manrope');
+  await expect(preview).toHaveText(/\S/);
+  const shell = ui(page, 'settings.page.root');
+  const interfaceNode = ui(page, 'settings.sidebar').getByRole('button').first();
+  const interfaceBefore = await interfaceNode.evaluate((node) => getComputedStyle(node).fontFamily);
+  await shell.evaluate((node: HTMLElement) =>
+    node.style.setProperty('--sniptale-font-interface', 'monospace')
+  );
+  await expect(interfaceNode).not.toHaveCSS('font-family', interfaceBefore);
+  expect(await read()).toEqual(before);
+  await shell.evaluate((node: HTMLElement) =>
+    node.style.removeProperty('--sniptale-font-interface')
+  );
+  await screenshot(page, info, 'authored-numbering-preview');
+}
+
+for (const locale of ['ru', 'en'] as const)
+  for (const theme of ['light', 'dark'] as const)
+    for (const size of [
+      { width: 1280, height: 560 },
+      { width: 1920, height: 900 },
+    ]) {
+      test(`native settings design ${locale} ${theme} ${size.width}x${size.height}`, async ({
+        page,
+        extensionId,
+        hostOrigin,
+      }, info) => {
+        test.setTimeout(120_000);
+        await page.setViewportSize(size);
+        await configure(page, extensionId, locale, theme);
+        await interfaceRowRhythm(page, info);
+        await neutralThemeChoice(page, locale, info);
+        await expect(ui(page, 'settings.page.root')).toHaveCSS('font-size', '13px');
+        await expect(ui(page, 'settings.page.root')).toHaveCSS('line-height', '18px');
+        await expect(ui(page, 'settings.page.root')).toHaveCSS('font-weight', '500');
+        await interfaceChoice(page, locale);
+        const nav = ui(page, 'settings.sidebar.nav-list');
+        await expect(nav.getByRole('button')).toHaveCount(16);
+        for (const [index, section] of SETTINGS_SECTION_IDS.entries()) {
+          const button = nav.getByRole('button').nth(index);
+          await button.scrollIntoViewIfNeeded();
+          await button.click();
+          await expect(button).toHaveAttribute('aria-current', 'page');
+          await expect(page).toHaveURL((url) => url.searchParams.get('section') === section);
+          await contentReady(page);
+          await assertFit(page);
+          await screenshot(page, info, `route-${section}`);
+        }
+        await paletteFlow(page, locale, info);
+        await providerAndModelFlow(page, locale, hostOrigin, info);
+        await authoredPreviewBoundary(page, extensionId, info);
+      });
+    }
+
+test('native settings subpages retain content scroll and browser navigation', async ({
+  page,
+  extensionId,
+}, info) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await configure(page, extensionId, 'ru', 'light');
+  for (const section of SETTINGS_SECTION_IDS) {
+    const views = SETTINGS_SECTION_VIEWS[section];
+    if (!views.length) continue;
+    await route(page, extensionId, section, views[0]);
+    const tabs = ui(page, 'settings.subpage-tabs').first();
+    if (section === 'native-app' && (await tabs.count()) === 0) {
+      const enable = page.getByRole('button', {
+        name: translate('settings.nativeApp.permissionEnable', 'ru'),
+        exact: true,
+      });
+      for (const view of views) {
+        await route(page, extensionId, section, view);
+        await expect(enable).toBeEnabled();
+        await screenshot(page, info, `subpage-${section}-${view}-permission-gate`);
+      }
+      continue;
+    }
+    for (const [index, view] of views.entries()) {
+      const button = tabs.getByRole('button').nth(index);
+      await button.scrollIntoViewIfNeeded();
+      await button.click();
+      await expect(button).toHaveAttribute('aria-current', 'page');
+      await expect(page).toHaveURL((url) => url.searchParams.get('view') === view);
+      await contentReady(page);
+      await assertFit(page);
+      await screenshot(page, info, `subpage-${section}-${view}`);
+    }
+  }
+  await route(page, extensionId, 'interface-browser', 'interface');
+  const tabs = ui(page, 'settings.subpage-tabs');
+  await tabs.getByRole('button').nth(1).click();
+  await expect(page).toHaveURL(/view=context-menu/);
+  await page.goBack();
+  await expect(page).toHaveURL(/view=interface/);
+  await page.goForward();
+  await expect(page).toHaveURL(/view=context-menu/);
+});
+
+test('native settings responsive layouts retain scroll controls and horizontal bounds', async ({
+  page,
+  extensionId,
+}, info) => {
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await configure(page, extensionId, 'en', 'dark');
+  const geometry = [];
+  for (const width of [1441, 1440, 1439, 1281, 1280, 1279, 1100]) {
+    await page.setViewportSize({ width, height: 560 });
+    await settle(page);
+    await assertFit(page);
+    const viewport = page.locator('.sniptale-settings-viewport');
+    if (width < 1280) {
+      expect(
+        await viewport.evaluate((node) => node.scrollWidth - node.clientWidth)
+      ).toBeGreaterThan(0);
+      await viewport.evaluate((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+      expect(await viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+      await screenshot(page, info, `responsive-${width}-scrolled-right`);
+      await viewport.evaluate((node) => {
+        node.scrollLeft = 0;
+      });
+    }
+    geometry.push(
+      await ui(page, 'settings.page.layout').evaluate((node) => ({
+        viewport: innerWidth,
+        columns: getComputedStyle(node).gridTemplateColumns,
+        width: node.getBoundingClientRect().width,
+      }))
+    );
+    await screenshot(page, info, `responsive-${width}`);
+  }
+  await writeFile(info.outputPath('responsive-geometry.json'), JSON.stringify(geometry, null, 2));
+});
+
+test('native AI unlock utility remains usable at its supported popup size', async ({
+  page,
+  extensionId,
+}, info) => {
+  await page.setViewportSize({ width: 440, height: 420 });
+  await configure(page, extensionId, 'en', 'light');
+  const url = new URL(`chrome-extension://${extensionId}/apps/extension/src/settings/index.html`);
+  url.searchParams.set('aiUnlock', '1');
+  url.searchParams.set('requestId', `synthetic-layout-proof-${randomUUID()}`);
+  await page.goto(url.href);
+  await expect(ui(page, 'settings.ai-unlock.root')).toBeVisible();
+  const dialog = page.getByRole('dialog');
+  const passphrase = dialog.locator('input[type="password"]');
+  await expect(passphrase).toBeVisible();
+  await expect(passphrase).toBeEnabled();
+  await passphrase.fill('synthetic-layout-only');
+  await expect(passphrase).toHaveAttribute('type', 'password');
+  const cancel = dialog.getByRole('button', {
+    name: translate('common.actions.cancel', 'en'),
+    exact: true,
+  });
+  await passphrase.press('Tab');
+  await expect(cancel).toBeFocused();
+  await expect(cancel).toBeInViewport({ ratio: 1 });
+  await expect(
+    dialog.getByRole('button', {
+      name: translate('settings.aiProviders.secretProtectionUnlockAction', 'en'),
+      exact: true,
+    })
+  ).toBeInViewport({ ratio: 1 });
+  const bounds = (await dialog.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(440);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(420);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  ).toBeLessThanOrEqual(1);
+  await screenshot(page, info, 'ai-unlock-440x420');
+});
+
+async function transferChoices(page: Page, extensionId: string, info: TestInfo) {
+  const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+  await route(page, extensionId, 'settings-transfer');
+  const choices = page.getByRole('group', {
+    name: t('settings.settingsTransfer.exportKindLabel'),
+    exact: true,
+  });
+  const complete = choices.getByRole('button', {
+    name: t('settings.settingsTransfer.completeBackup'),
+    exact: true,
+  });
+  const selective = choices.getByRole('button', {
+    name: t('settings.settingsTransfer.selectivePackage'),
+    exact: true,
+  });
+  await expect(complete).toHaveAttribute('aria-pressed', 'true');
+  await expect(complete).toHaveCSS('font-size', '13px');
+  await expect(complete).toHaveCSS('line-height', '18px');
+  await expect(complete).toHaveCSS('font-weight', '500');
+  await expect(complete).toHaveCSS('box-shadow', 'none');
+  await expect(complete).toHaveCSS('border-top-width', '0px');
+  await selective.click();
+  await expect(selective).toHaveAttribute('aria-pressed', 'true');
+  await expect(complete).toHaveAttribute('aria-pressed', 'false');
+  const tree = page.getByRole('tree', {
+    name: t('settings.settingsTransfer.treeLabel'),
+    exact: true,
+  });
+  await expect(tree).toBeVisible();
+  await screenshot(page, info, 'transfer-selective-choice');
+  await complete.click();
+  await expect(complete).toHaveAttribute('aria-pressed', 'true');
+  await expect(tree).toHaveCount(0);
+}
+
+async function clearPresetName(page: Page, fieldLabel: string, value: string) {
+  const dialog = page.getByRole('dialog');
+  const input = dialog.getByRole('textbox', { name: fieldLabel, exact: true });
+  await input.scrollIntoViewIfNeeded();
+  await input.fill(value);
+  const clear = dialog.getByRole('button', {
+    name: translate('shared.ui.clearField', 'en').replace('{field}', fieldLabel),
+    exact: true,
+  });
+  await expect(clear).toBeVisible();
+  await clear.click();
+  await expect(input).toHaveValue('');
+  await expect(input).toBeFocused();
+  await expect(clear).toHaveCount(0);
+  return input;
+}
+
+async function cancelPreset(page: Page, info: TestInfo, name: string) {
+  const dialog = page.getByRole('dialog');
+  const surfaces = ui(page, 'shared.highlighter-manual-inspector-surface');
+  for (const surface of await surfaces.all())
+    await expect(surface).toHaveCSS('border-radius', '4px');
+  for (const label of await dialog.locator('.sniptale-parameter-name:visible').all()) {
+    await expect(label).toHaveCSS('font-family', /Sniptale Interface/);
+    await expect(label).toHaveCSS('font-size', '13px');
+    await expect(label).toHaveCSS('line-height', '18px');
+    await expect(label).toHaveCSS('font-weight', '500');
+  }
+  const cancel = dialog.getByRole('button', {
+    name: translate('common.actions.cancel', 'en'),
+    exact: true,
+  });
+  await cancel.scrollIntoViewIfNeeded();
+  await expect(cancel).toBeInViewport({ ratio: 1 });
+  const bounds = (await dialog.boundingBox())!;
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(560);
+  await screenshot(page, info, name);
+  await cancel.click();
+  await expect(dialog).toHaveCount(0);
+}
+
+async function alignmentProperty(page: Page, info: TestInfo) {
+  const group = ui(page, 'shared.callout-alignment');
+  const selected = group.locator('.sniptale-glass-bold-button--active');
+  await expect(selected).toHaveCount(1);
+  const previousLabel = await selected.getAttribute('aria-label');
+  const target = group.getByRole('button', {
+    name: translate('content.callout.alignRight', 'en'),
+    exact: true,
+  });
+  const expected = await group.evaluate((element) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-text-primary)';
+    probe.style.backgroundColor = 'var(--sniptale-color-surface-hover)';
+    element.append(probe);
+    const style = getComputedStyle(probe);
+    const result = { color: style.color, background: style.backgroundColor };
+    probe.remove();
+    return result;
+  });
+  await page.mouse.move(10, 10);
+  await expect.soft(selected).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+  await expect.soft(selected).toHaveCSS('color', expected.color);
+  await expect.soft(selected).toHaveCSS('background-color', expected.background);
+  await expect.soft(target).toHaveAttribute('data-command-press', '');
+  await target.scrollIntoViewIfNeeded();
+  const box = (await target.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  try {
+    await expect.soft(target).toHaveAttribute('data-pressing', 'true');
+    await expect(selected).toHaveAttribute('aria-label', previousLabel!);
+  } finally {
+    await page.mouse.up();
+  }
+  await expect(target).toHaveClass(/sniptale-glass-bold-button--active/);
+  await expect(target).not.toHaveAttribute('data-pressing', 'true');
+  await page.mouse.move(10, 10);
+  await screenshot(page, info, 'callout-alignment-property');
+}
+
+test('native settings preset drafts clear names and cancel without changing their catalogs', async ({
+  page,
+  extensionId,
+}, info) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await configure(page, extensionId, 'en', 'light');
+  await transferChoices(page, extensionId, info);
+  for (const preset of [
+    { view: 'borders', add: 'highlighter.section.addButton', name: 'highlighter.editor.nameLabel' },
+    {
+      view: 'callouts',
+      add: 'highlighter.calloutPresets.add',
+      name: 'highlighter.calloutPresets.editor.name',
+    },
+    {
+      view: 'numbering',
+      add: 'highlighter.stepBadgePresets.add',
+      name: 'highlighter.stepBadgePresets.editor.name',
+    },
+  ] as const) {
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    await route(page, extensionId, 'annotations', preset.view);
+    const rows = page.locator('[data-settings-collection-item]');
+    await expect.poll(() => rows.count()).toBeGreaterThan(0);
+    const catalog = () =>
+      rows.evaluateAll((nodes) =>
+        nodes.map((node) => ({
+          id: node.getAttribute('data-settings-collection-item'),
+          title: node.querySelector('.truncate[title]')?.getAttribute('title'),
+        }))
+      );
+    const before = await catalog();
+    await page.getByRole('button', { name: t(preset.add), exact: true }).click();
+    const createName = await clearPresetName(
+      page,
+      t(preset.name),
+      'A deliberately long editable template name for this draft'
+    );
+    await createName.fill(`Cancelled create draft ${preset.view}`);
+    if (preset.view === 'callouts') await alignmentProperty(page, info);
+    await screenshot(page, info, `preset-${preset.view}-create-name`);
+    await cancelPreset(page, info, `preset-${preset.view}-create-footer`);
+    expect(await catalog()).toEqual(before);
+    const edit = rows
+      .first()
+      .getByRole('button', { name: t('settings.collection.actions.edit'), exact: true });
+    await edit.click();
+    const dialog = page.getByRole('dialog');
+    const name = dialog.getByRole('textbox', { name: t(preset.name), exact: true });
+    await expect(name).not.toHaveValue('');
+    const storedName = await name.inputValue();
+    const editedName = await clearPresetName(page, t(preset.name), `${storedName} draft`);
+    await expect(
+      dialog.getByRole('button', { name: t('common.actions.save'), exact: true })
+    ).toBeDisabled();
+    await editedName.fill(`Cancelled edit draft ${preset.view}`);
+    if (preset.view === 'callouts') {
+      await dialog
+        .getByRole('navigation')
+        .getByRole('button', { name: t('content.callout.manualTitle'), exact: true })
+        .click();
+      const titleLabel = t('content.callout.titleTextLabel');
+      const titleInput = dialog.getByRole('textbox', { name: titleLabel, exact: true });
+      if ((await titleInput.count()) === 0)
+        await dialog.getByLabel(t('content.callout.titleToggle'), { exact: true }).click();
+      await clearPresetName(page, titleLabel, 'Cancelled callout title draft');
+    }
+    await cancelPreset(page, info, `preset-${preset.view}-edit-footer`);
+    expect(await catalog()).toEqual(before);
+    await edit.click();
+    await expect(dialog.getByRole('textbox', { name: t(preset.name), exact: true })).toHaveValue(
+      storedName
+    );
+    await cancelPreset(page, info, `preset-${preset.view}-retained-name`);
+    await page.reload();
+    await contentReady(page);
+    expect(await catalog()).toEqual(before);
+  }
+});
+
+test('native settings resource create forms clear names and cancel without catalog changes', async ({
+  page,
+  extensionId,
+}, info) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await configure(page, extensionId, 'en', 'light');
+  const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+  for (const resource of [
+    {
+      section: 'annotations',
+      view: 'tags',
+      add: 'highlighter.templateTags.add',
+      name: 'highlighter.templateTags.name',
+      save: 'highlighter.templateTags.add',
+    },
+    {
+      section: 'editor-resources',
+      view: 'gradients',
+      add: 'settings.editor.gradients.add',
+      name: 'settings.editor.presetName',
+      save: 'common.actions.save',
+    },
+    {
+      section: 'editor-resources',
+      view: 'surfaces',
+      add: 'settings.editor.surfaceStyles.add',
+      name: 'settings.editor.presetName',
+      save: 'common.actions.save',
+    },
+  ] as const) {
+    await route(page, extensionId, resource.section, resource.view);
+    const add = page.getByRole('button', { name: t(resource.add), exact: true });
+    await expect(add).toBeEnabled();
+    const catalog = () =>
+      page.locator('[data-settings-collection-item]').evaluateAll((nodes) =>
+        nodes.map((node) => ({
+          id: node.getAttribute('data-settings-collection-item'),
+          title: node.querySelector('.truncate[title]')?.getAttribute('title'),
+        }))
+      );
+    await settle(page);
+    const before = await catalog();
+    await add.click();
+    const name = await clearPresetName(page, t(resource.name), `Cancelled ${resource.view} draft`);
+    const dialog = page.getByRole('dialog');
+    for (const field of await dialog.locator('.sniptale-input, .sniptale-textarea').all()) {
+      await expect(field, 'Ordinary fields retain the shared control radius in portals').toHaveCSS(
+        'border-radius',
+        '4px'
+      );
+    }
+    const save = dialog.getByRole('button', { name: t(resource.save), exact: true });
+    await expect(save).toBeDisabled();
+    await expect(name).toBeFocused();
+    await cancelPreset(page, info, `resource-${resource.view}-cleared-name`);
+    expect(await catalog()).toEqual(before);
+    await add.click();
+    await expect(dialog.getByRole('textbox', { name: t(resource.name), exact: true })).toHaveValue(
+      ''
+    );
+    await expect(save).toBeDisabled();
+    await cancelPreset(page, info, `resource-${resource.view}-reopened-create`);
+    expect(await catalog()).toEqual(before);
+  }
+});

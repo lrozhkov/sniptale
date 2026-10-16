@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import './context-menu-editor.css';
 import { useContextMenuTreeDrop } from './context-menu-tree-drop';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,13 +16,7 @@ import { ContextMenuTreeView } from './context-menu-tree';
 import { findContextMenuNode, removeContextMenuNode } from './context-menu-tree-model';
 import { useContextMenuDraftPersistence } from './use-context-menu-draft-persistence';
 
-const buttonClass = [
-  'inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg',
-  'border border-[var(--sniptale-color-border-soft)] px-3 py-1.5 text-sm',
-  'hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none',
-  'focus-visible:ring-2 ',
-  'disabled:cursor-not-allowed disabled:opacity-45',
-].join(' ');
+const buttonClass = 'gap-1.5';
 
 /** Disposable tree draft. Legacy projection is delayed until its dynamic inventories have loaded. */
 type ContextMenuEditorState = Pick<
@@ -194,13 +189,15 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
               : 'settings.appearance.contextMenuCatalogLoading'
         )}
         {failed ? (
-          <button
+          <ProductActionButton
+            compact
+            tone="secondary"
             type="button"
             className={`${buttonClass} ml-3`}
             onClick={catalogFailed ? state.retryContextMenuCatalog : state.retryContextMenuSettings}
           >
             {t('settings.appearance.contextMenuCatalogRetry')}
-          </button>
+          </ProductActionButton>
         ) : null}
       </div>
     );
@@ -213,7 +210,7 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
       <div
         ref={drag.rootRef}
         className={[
-          'context-menu-workspace grid min-w-0 overflow-hidden rounded-xl border',
+          'context-menu-workspace grid min-w-0 overflow-hidden rounded-[4px] border',
           'border-[var(--sniptale-color-border-soft)]',
           'lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,0.9fr)]',
         ].join(' ')}
@@ -252,9 +249,15 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
       {canUndo ? (
         <div className="flex items-center gap-3 text-sm" role="status">
           <span>{t('settings.appearance.contextMenuReturned')}</span>
-          <button type="button" className={buttonClass} onClick={undoRemoval}>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            type="button"
+            className={buttonClass}
+            onClick={undoRemoval}
+          >
             {t('settings.appearance.contextMenuUndoReturn')}
-          </button>
+          </ProductActionButton>
         </div>
       ) : null}
       <div aria-live="polite" className="sr-only">
@@ -272,13 +275,25 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
       ) : null}
       <div className="flex flex-wrap gap-2">
         {status === 'failed' ? (
-          <button type="button" className={buttonClass} onClick={() => void save()}>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            type="button"
+            className={buttonClass}
+            onClick={() => void save()}
+          >
             {t('settings.appearance.contextMenuRetrySave')}
-          </button>
+          </ProductActionButton>
         ) : null}
-        <button type="button" className={buttonClass} onClick={restore}>
+        <ProductActionButton
+          compact
+          tone="secondary"
+          type="button"
+          className={buttonClass}
+          onClick={restore}
+        >
           {t('settings.appearance.contextMenuRestore')}
-        </button>
+        </ProductActionButton>
       </div>
     </div>
   );

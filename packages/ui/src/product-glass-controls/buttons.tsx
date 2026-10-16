@@ -164,9 +164,11 @@ export const ProductGlassInput = forwardRef<HTMLInputElement, ProductGlassInputP
 
 export const ProductGlassBoldButton = forwardRef<HTMLButtonElement, ProductGlassBoldButtonProps>(
   function ProductGlassBoldButton(
-    { active = false, className = '', type = 'button', ...props },
+    { active = false, className = '', type = 'button', children, ...props },
     ref
   ) {
+    const scoped = useContext(CommandPressScope);
+    const press = useCommandPress({ ...props, enabled: scoped });
     return (
       <button
         ref={ref}
@@ -177,7 +179,14 @@ export const ProductGlassBoldButton = forwardRef<HTMLButtonElement, ProductGlass
           className
         )}
         {...props}
-      />
+        {...press.props}
+        data-command-press={scoped ? '' : undefined}
+        data-command-property={scoped ? 'true' : undefined}
+        data-active={scoped ? String(active) : undefined}
+        data-pressing={press.pressed ? 'true' : undefined}
+      >
+        {scoped ? <span className="sniptale-command-content">{children}</span> : children}
+      </button>
     );
   }
 );

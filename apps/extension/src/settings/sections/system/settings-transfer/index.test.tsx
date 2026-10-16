@@ -1,3 +1,4 @@
+import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -78,6 +79,11 @@ it('loads the export catalog, supports selective choice, and downloads the packa
   expect(mocks.send).toHaveBeenCalledWith({ operation: 'read-export-tree' });
 
   await clickLabel('settings.settingsTransfer.selectivePackage');
+  expect(
+    container
+      .querySelector('[aria-label="settings.settingsTransfer.selectivePackage"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
   expect(container.querySelector('input[type="radio"]')).toBeNull();
   expect(container.querySelector('[role="tree"]')).not.toBeNull();
   await clickLabel('settings.settingsTransfer.clearAll');
@@ -321,9 +327,11 @@ it('blocks file and tab changes until a pending commit publishes its report', as
 async function renderSection() {
   await act(async () =>
     root.render(
-      <SettingsNavigationLockProvider>
-        <SettingsTransferSection />
-      </SettingsNavigationLockProvider>
+      <InspectorLayout>
+        <SettingsNavigationLockProvider>
+          <SettingsTransferSection />
+        </SettingsNavigationLockProvider>
+      </InspectorLayout>
     )
   );
   await act(async () => Promise.resolve());

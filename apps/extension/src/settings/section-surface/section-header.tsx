@@ -13,7 +13,7 @@ type SettingsSectionHeaderProps = {
 export function SettingsSectionHeader({ description, kicker }: SettingsSectionHeaderProps) {
   return (
     <header className={settingsSectionHeadingWrapClassName}>
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0 space-y-1">
         <h1 className={settingsSectionKickerClassName}>{kicker}</h1>
         <p className={settingsSectionDescriptionClassName}>{description}</p>
       </div>

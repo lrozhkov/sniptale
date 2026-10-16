@@ -13,11 +13,11 @@ export function ScenarioLayoutsSection() {
   const [deleteFailed, setDeleteFailed] = useState(false);
   return (
     <section className={settingsSectionClassName} data-ui="settings.scenario-layouts">
-      <p className="mb-4 text-sm text-[var(--sniptale-color-text-secondary)]">
+      <p className="mb-4 text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
         {translate('scenario.editor.templateCatalogHelp')}
       </p>
       {state.error && (
-        <div role="alert" className="mb-3 text-sm">
+        <div role="alert" className="mb-3 text-[13px] leading-[18px]">
           <p>{translate('scenario.editor.templateCatalogFailed')}</p>
           <ProductActionButton
             tone="secondary"

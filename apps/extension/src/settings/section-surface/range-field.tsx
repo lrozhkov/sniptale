@@ -24,22 +24,22 @@ export function SettingsRangeField({
   ...props
 }: SettingsRangeFieldProps) {
   return (
-    <div className={['space-y-3', className].filter(Boolean).join(' ')}>
-      <div className="flex items-end justify-between gap-4">
+    <div className={['settings-range-field', className].filter(Boolean).join(' ')}>
+      <div className="settings-range-heading">
         <label className={[settingsMetaLabelClassName, 'mb-0 block'].join(' ')}>{label}</label>
         <div className="flex items-end gap-3">
           {aside ? <div className="flex-shrink-0">{aside}</div> : null}
-          <div className="flex min-w-[64px] items-baseline justify-end gap-1 text-right">
+          <div className="settings-range-value">
             <span
               className={
-                'text-[1.45rem] font-semibold tracking-[-0.03em] ' +
+                'text-[13px] leading-[18px] font-medium ' +
                 'text-[var(--sniptale-color-text-primary-strong)]'
               }
             >
               {displayValue}
             </span>
             {displaySuffix ? (
-              <span className="text-sm font-medium text-[var(--sniptale-color-text-dim)]">
+              <span className="text-[13px] font-medium text-[var(--sniptale-color-text-secondary)]">
                 {displaySuffix}
               </span>
             ) : null}
@@ -48,7 +48,7 @@ export function SettingsRangeField({
       </div>
       <ProductRange {...props} className={['w-full', rangeClassName].filter(Boolean).join(' ')} />
       {hint ? (
-        <p className="text-xs leading-5 text-[var(--sniptale-color-text-dim)]">{hint}</p>
+        <p className="text-xs leading-4 text-[var(--sniptale-color-text-dim)]">{hint}</p>
       ) : null}
     </div>
   );

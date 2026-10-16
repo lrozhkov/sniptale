@@ -31,7 +31,7 @@ export function AnnotationsSection(props: {
     ? (props.view as 'callouts' | 'numbering' | 'tags')
     : 'borders';
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <SettingsSubpageTabs
         activeId={view}
         ariaLabel={translate('settings.navigation.annotations')}

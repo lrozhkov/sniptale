@@ -13,8 +13,8 @@ export function SettingsCollectionRowIdentity({ item }: { item: SettingsCollecti
       {item.preview === undefined ? null : (
         <span
           className={[
-            'flex flex-none items-center justify-center overflow-hidden border',
-            item.previewVariant === 'image' ? 'h-14 w-24 rounded-md' : 'h-8 w-8 rounded-lg',
+            'sniptale-settings-preview flex flex-none items-center justify-center overflow-hidden border',
+            item.previewVariant === 'image' ? 'h-14 w-24 rounded-[4px]' : 'h-8 w-8 rounded-[4px]',
             'border-[var(--sniptale-color-border-soft)]',
           ].join(' ')}
         >
@@ -22,11 +22,19 @@ export function SettingsCollectionRowIdentity({ item }: { item: SettingsCollecti
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-[var(--sniptale-color-text)]">
+        <div
+          title={typeof item.title === 'string' ? item.title : undefined}
+          className="truncate text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text)]"
+        >
           {item.title}
         </div>
         {item.meta === undefined ? null : (
-          <div className="truncate text-xs text-[var(--sniptale-color-text-dim)]">{item.meta}</div>
+          <div
+            title={typeof item.meta === 'string' ? item.meta : undefined}
+            className="truncate text-[12px] leading-4 text-[var(--sniptale-color-text-dim)]"
+          >
+            {item.meta}
+          </div>
         )}
       </div>
     </>
@@ -44,20 +52,24 @@ export function SettingsCollectionRowMarkers({ item }: { item: SettingsCollectio
     >
       {item.supplement}
       {item.isBuiltIn ? (
-        <span className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames.neutral}`}>
+        <span
+          className={`rounded-[4px] px-2 py-0.5 text-[12px] leading-4 ${badgeToneClassNames.neutral}`}
+        >
           {translate('settings.collection.builtInBadge')}
         </span>
       ) : null}
       {item.badges?.map((badge) => (
         <span
           key={badge.id}
-          className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames[badge.tone]}`}
+          className={`rounded-[4px] px-2 py-0.5 text-[12px] leading-4 ${badgeToneClassNames[badge.tone]}`}
         >
           {badge.label}
         </span>
       ))}
       {item.isDefault ? (
-        <span className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames.success}`}>
+        <span
+          className={`rounded-[4px] px-2 py-0.5 text-[12px] leading-4 ${badgeToneClassNames.success}`}
+        >
           {translate('settings.collection.defaultBadge')}
         </span>
       ) : null}

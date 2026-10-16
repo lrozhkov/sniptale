@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { forwardRef } from 'react';
+import { forwardRef, useContext } from 'react';
+import { CommandPressScope } from '../control-language/press';
 import type { CSSProperties, Ref, ReactNode } from 'react';
 import { useFloatingSurfaceWheelContainment } from '../floating-interactions/wheel';
 import { mergeFloatingInteractionLayerStyle } from '../floating-interactions/placement';
@@ -190,6 +191,7 @@ function renderProductSelectMenuItems<T extends string>(props: ProductSelectMenu
 }
 
 function ProductSelectMenu<T extends string = string>(props: ProductSelectMenuProps<T>) {
+  const compact = useContext(CommandPressScope);
   const menuRef = useFloatingSurfaceWheelContainment(props.menuRef);
   return (
     <div
@@ -199,10 +201,13 @@ function ProductSelectMenu<T extends string = string>(props: ProductSelectMenuPr
       data-floating-ui-root="true"
       data-theme={props.portalTheme ?? undefined}
       style={resolveProductSelectPortalStyle(props.portalStyle, props.portalTheme)}
-      className={getProductSelectMenuClassName({
-        controlSize: props.controlSize,
-        menuClassName: props.menuClassName,
-      })}
+      className={joinClassNames(
+        getProductSelectMenuClassName({
+          controlSize: props.controlSize,
+          menuClassName: props.menuClassName,
+        }),
+        compact && 'sniptale-compact-workspace'
+      )}
     >
       {renderProductSelectMenuItems(props)}
     </div>

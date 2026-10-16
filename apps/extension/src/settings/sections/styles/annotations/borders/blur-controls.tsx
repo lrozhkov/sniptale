@@ -1,4 +1,5 @@
 import { Droplet, Square, Waves } from 'lucide-react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 import type { BlurType } from '../../../../../features/highlighter/contracts';
 import { translate } from '../../../../../platform/i18n';
@@ -6,10 +7,6 @@ import { SettingsSwitch } from '../../../../section-surface/panel-controls';
 import { SettingsRangeField, settingsToggleRowClassName } from '../../../../section-surface';
 import { useRangeDraftValue } from './range-draft';
 import type { HighlighterEffectsProps } from './types';
-import {
-  ACTIVE_BLUR_BACKGROUND_CLASS_NAME,
-  ACTIVE_BLUR_BORDER_CLASS_NAME,
-} from './blur-controls.constants.ts';
 
 const blurTypeOptions = [
   {
@@ -41,30 +38,20 @@ function BlurTypeOptionButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <ProductActionButton
+      compact
+      tone="toggle"
+      active={isActive}
+      aria-pressed={isActive}
       onClick={onClick}
       title={label}
-      className={[
-        'flex flex-1 flex-col items-center gap-1 rounded-[12px] px-3 py-2 text-xs transition-all',
-        isActive
-          ? ACTIVE_BLUR_BORDER_CLASS_NAME
-          : 'border border-[var(--sniptale-color-border-soft)]',
-        isActive
-          ? [
-              ACTIVE_BLUR_BACKGROUND_CLASS_NAME,
-              'text-[var(--sniptale-color-accent)]',
-              'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_6%,transparent)]',
-            ].join(' ')
-          : [
-              'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-muted)_82%,transparent)]',
-              'text-[var(--sniptale-color-text-muted)]',
-              'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_72%,transparent)]',
-            ].join(' '),
-      ].join(' ')}
+      className="min-w-0 flex-1"
     >
       {icon}
-      <span>{label}</span>
-    </button>
+      <span className="min-w-0 truncate" title={label}>
+        {label}
+      </span>
+    </ProductActionButton>
   );
 }
 
@@ -97,7 +84,7 @@ function BlurTypeOptionsList(props: {
   onBlurTypeChange: (blurType: BlurType) => void;
 }) {
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-1">
       {blurTypeOptions.map((option) => (
         <BlurTypeOptionButton
           key={option.value}
@@ -121,7 +108,7 @@ export function HighlighterBlurControls({ effects, settings }: HighlighterEffect
   const handleShowBorderChange = createShowBorderChangeHandler(props);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <SettingsRangeField
         min="1"
         max="25"
@@ -133,7 +120,12 @@ export function HighlighterBlurControls({ effects, settings }: HighlighterEffect
       />
 
       <div>
-        <label className="mb-2 block text-xs text-[var(--sniptale-color-text-secondary)]">
+        <label
+          className={[
+            'mb-1 block text-[13px] leading-[18px] font-medium',
+            'text-[var(--sniptale-color-text-secondary)]',
+          ].join(' ')}
+        >
           {translate('highlighter.section.blurTypeLabel')}
         </label>
         <BlurTypeOptionsList
@@ -143,10 +135,11 @@ export function HighlighterBlurControls({ effects, settings }: HighlighterEffect
       </div>
 
       <div className={settingsToggleRowClassName}>
-        <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        <span className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]">
           {translate('highlighter.section.showBorderLabel')}
         </span>
         <SettingsSwitch
+          aria-label={translate('highlighter.section.showBorderLabel')}
           checked={settings.defaultBlurSettings.showBorder ?? false}
           onClick={() =>
             handleShowBorderChange(!(settings.defaultBlurSettings.showBorder ?? false))

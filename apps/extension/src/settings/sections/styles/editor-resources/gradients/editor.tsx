@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { useEffect, useRef, useState } from 'react';
 import {
   ProductModal,
   ProductModalBody,
@@ -32,6 +34,7 @@ export function GradientPresetEditor(props: {
   preset: StoredGradientPreset | null;
 }) {
   const [name, setName] = useState('');
+  const nameRef = useRef<HTMLInputElement>(null);
   const [paint, setPaint] = useState<Paint>({ kind: 'gradient', gradient: fallbackGradient() });
   const [saving, setSaving] = useState(false);
   useEffect(() => {
@@ -74,16 +77,30 @@ export function GradientPresetEditor(props: {
         )}
       />
       <ProductModalBody compact>
-        <div className="grid gap-4">
-          <label className="grid gap-1 text-xs">
+        <div className="grid gap-3">
+          <label
+            className={[
+              'grid gap-1 text-[13px] leading-[18px] font-medium',
+              'text-[var(--sniptale-color-text-secondary)]',
+            ].join(' ')}
+          >
             {translate('settings.editor.presetName')}
-            <input
-              aria-label={translate('settings.editor.presetName')}
-              disabled={saving}
-              maxLength={80}
-              onChange={(event) => setName(event.target.value)}
-              value={name}
-            />
+            <div className="sniptale-text-value">
+              <ProductInput
+                ref={nameRef}
+                aria-label={translate('settings.editor.presetName')}
+                disabled={saving}
+                maxLength={80}
+                onChange={(event) => setName(event.target.value)}
+                value={name}
+              />
+              {!saving && name.length > 0 ? (
+                <InspectorFieldClear
+                  label={translate('settings.editor.presetName')}
+                  target={nameRef}
+                />
+              ) : null}
+            </div>
           </label>
           <CompactPaintSelector
             disabled={saving}

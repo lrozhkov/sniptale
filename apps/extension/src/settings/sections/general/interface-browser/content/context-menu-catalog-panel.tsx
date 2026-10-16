@@ -71,7 +71,7 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
     >
       <h3
         className={[
-          'flex h-12 shrink-0 items-center border-b px-3 text-sm font-semibold',
+          'flex h-12 shrink-0 items-center border-b px-3 text-[13px] font-semibold',
           'border-[var(--sniptale-color-border-soft)]',
         ].join(' ')}
       >
@@ -79,7 +79,7 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
       </h3>
       <div data-context-menu-scroll className="min-h-0 flex-1 overflow-y-auto p-2">
         {unused.length === 0 ? (
-          <p className="text-sm text-[var(--sniptale-color-text-muted)]">
+          <p className="text-[13px] text-[var(--sniptale-color-text-muted)]">
             {t('settings.appearance.contextMenuEmptyCatalog')}
           </p>
         ) : null}
@@ -89,7 +89,7 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
             type="button"
             data-context-menu-source="catalog"
             data-command-key={`command:${item.command}`}
-            className="touch-pan-y cursor-grab block h-10 w-full truncate rounded-md px-3 text-left text-sm
+            className="touch-pan-y cursor-grab block h-10 w-full truncate rounded-[4px] px-3 text-left text-[13px]
               hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none
 "
             title={item.label}

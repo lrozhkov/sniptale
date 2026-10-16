@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FULL_PAGE_QUALITY_ABSOLUTE_LIMITS } from '../../../../../contracts/full-page-capture';
 import { translate } from '../../../../../platform/i18n';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
@@ -16,20 +17,23 @@ const PROFILE_OPTIONS = [
 function ProfileSelector({ state }: { state: State }) {
   return (
     <div
-      className="inline-flex gap-0.5 rounded-lg bg-[var(--sniptale-color-surface-hover)] p-0.5"
+      className="inline-flex gap-0.5 rounded-[4px] bg-[var(--sniptale-color-surface-hover)]"
       role="radiogroup"
       aria-label={translate('imageSettings.section.fullPageProfileLabel')}
     >
       {PROFILE_OPTIONS.map((option) => {
         const selected = state.fullPage.policy.profile === option.value;
         return (
-          <button
+          <ProductActionButton
+            compact
+            tone="toggle"
             key={option.value}
             type="button"
             role="radio"
             aria-checked={selected}
+            active={selected}
             className={[
-              'h-7 rounded-md px-2.5 text-xs font-medium transition-colors',
+              'h-8 rounded-[4px] px-2.5 text-[13px] font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-2',
               'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
               selected
@@ -42,7 +46,7 @@ function ProfileSelector({ state }: { state: State }) {
             onClick={() => state.fullPage.handleProfileChange(option.value)}
           >
             {translate(option.labelKey)}
-          </button>
+          </ProductActionButton>
         );
       })}
     </div>
@@ -68,7 +72,7 @@ function PolicyNumber({
     <SettingsControlRow label={translate(labelKey)}>
       <NumericRow
         appearance="plain"
-        className="min-h-10 w-full !grid-cols-1 py-1.5 [&>div]:!col-start-1"
+        className="w-full"
         label={translate(labelKey)}
         labelVisible={false}
         min={min}
@@ -98,7 +102,10 @@ export function FullPageQualitySettings({ state }: { state: State }) {
           </p>
         </div>
       </div>
-      <SettingsControlRow label={translate('imageSettings.section.fullPageProfileLabel')}>
+      <SettingsControlRow
+        label={translate('imageSettings.section.fullPageProfileLabel')}
+        valueMinimum={460}
+      >
         <ProfileSelector state={state} />
       </SettingsControlRow>
       <PolicyNumber

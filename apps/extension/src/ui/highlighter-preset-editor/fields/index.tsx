@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
+import { InspectorFieldClear } from '../../compact-inspector-controls/text-field';
 import { translate } from '../../../platform/i18n';
 import { editorInputClassName } from '../constants';
 import type { EditorState } from './types';
@@ -32,23 +34,48 @@ export function BorderPresetEditorFields({
   state: EditorState;
   tagAssignment?: ReactNode;
 }) {
+  const nameRef = useRef<HTMLInputElement>(null);
+  const inspector = useInspectorLayout();
+  const nameInput = (
+    <input
+      ref={nameRef}
+      {...(inspector ? { 'aria-label': translate('highlighter.editor.nameLabel') } : {})}
+      type="text"
+      value={state.name}
+      onChange={(event) => state.setName(event.target.value)}
+      placeholder={translate('highlighter.editor.namePlaceholder')}
+      className={[
+        editorInputClassName,
+        'placeholder:text-[var(--sniptale-color-text-dim)]',
+        'focus:ring-1 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
+      ].join(' ')}
+    />
+  );
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1.5 block text-xs text-[var(--sniptale-color-text-secondary)]">
+        <label
+          className={
+            inspector
+              ? 'mb-1 block text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]'
+              : 'mb-1.5 block text-xs text-[var(--sniptale-color-text-secondary)]'
+          }
+        >
           {translate('highlighter.editor.nameLabel')}
         </label>
-        <input
-          type="text"
-          value={state.name}
-          onChange={(event) => state.setName(event.target.value)}
-          placeholder={translate('highlighter.editor.namePlaceholder')}
-          className={[
-            editorInputClassName,
-            'placeholder:text-[var(--sniptale-color-text-dim)]',
-            'focus:ring-1 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
-          ].join(' ')}
-        />
+        {inspector ? (
+          <div className="sniptale-text-value">
+            {nameInput}
+            {state.name.length > 0 ? (
+              <InspectorFieldClear
+                label={translate('highlighter.editor.nameLabel')}
+                target={nameRef}
+              />
+            ) : null}
+          </div>
+        ) : (
+          nameInput
+        )}
       </div>
       {tagAssignment}
       <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[176px_minmax(0,1fr)]">

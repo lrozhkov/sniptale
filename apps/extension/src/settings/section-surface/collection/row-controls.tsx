@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Pencil } from 'lucide-react';
 
 import { translate } from '../../../platform/i18n';
@@ -91,13 +92,14 @@ export function SettingsCollectionPrimaryActions(props: {
         />
       ) : null}
       {item.capabilities.edit ? (
-        <button
+        <ContentToolbarButton
+          tone="utility"
           type="button"
           aria-label={editLabel}
           title={item.disabledActions?.edit ?? editLabel}
           disabled={item.busy || item.disabledActions?.edit !== undefined}
           className={[
-            'flex h-8 w-8 items-center justify-center rounded-lg',
+            'flex !h-8 !w-8 !p-0 items-center justify-center rounded-[4px]',
             'text-[var(--sniptale-color-text-muted)]',
             'hover:bg-[var(--sniptale-color-surface-hover)]',
             'focus-visible:outline-none focus-visible:ring-2',
@@ -106,7 +108,7 @@ export function SettingsCollectionPrimaryActions(props: {
           onClick={() => onAction({ type: 'edit', itemId: item.id })}
         >
           <Pencil size={14} />
-        </button>
+        </ContentToolbarButton>
       ) : null}
     </>
   );

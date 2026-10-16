@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../platform/i18n';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { SETTINGS_NAV_GROUPS, type SettingsNavItem } from './registry';
@@ -12,11 +13,10 @@ interface SettingsSidebarProps {
 
 const SETTINGS_NAV_CLASS_NAME = 'flex min-h-0 flex-col overflow-hidden';
 
-const SETTINGS_ITEM_ACTIVE_CLASS_NAME =
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_20%,var(--sniptale-color-border-soft)_80%)] ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_22%,var(--sniptale-color-surface-panel)_78%)] ' +
-  'text-[var(--sniptale-color-text-primary)] ' +
-  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_10%,transparent)]';
+const SETTINGS_ITEM_ACTIVE_CLASS_NAME = [
+  'border-[var(--sniptale-color-border-soft)]',
+  'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]',
+].join(' ');
 
 const SETTINGS_ITEM_IDLE_CLASS_NAME = 'text-[var(--sniptale-color-text-muted-strong)]';
 
@@ -28,7 +28,7 @@ const SETTINGS_ITEM_IDLE_HOVER_CLASS_NAME = [
 
 const SETTINGS_ACTIVE_MARKER_CLASS_NAME =
   'absolute left-1 top-1/2 h-5 w-[2px] translate-x-0 -translate-y-1/2 rounded-full ' +
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_84%,transparent)]';
+  'bg-[var(--sniptale-color-text-secondary)]';
 
 function getSettingsSidebarFooterLabel() {
   const brand = translate('settings.navigation.footerBrand');
@@ -51,15 +51,19 @@ function SettingsSidebarItem(props: {
   const isActive = props.activeTab === props.item.id;
   const Icon = props.item.icon;
   return (
-    <button
+    <ContentToolbarButton
+      tone="property"
+      active={isActive}
       key={props.item.id}
       type="button"
+      title={translate(props.item.label)}
       disabled={props.disabled}
       aria-current={isActive ? 'page' : undefined}
       onClick={() => props.onTabChange(props.item.id)}
       className={`
-        flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border border-transparent
-        px-3 py-1.5 transition-colors
+        flex !h-auto min-h-8 !w-full cursor-pointer items-center !justify-start gap-2
+        rounded-[4px] border border-transparent
+        !px-3 !py-1 !whitespace-normal transition-colors
         text-left relative
         ${
           isActive
@@ -69,17 +73,13 @@ function SettingsSidebarItem(props: {
       `}
     >
       {isActive && <div className={SETTINGS_ACTIVE_MARKER_CLASS_NAME} />}
-      <span
-        className={
-          isActive
-            ? 'text-[var(--sniptale-color-accent)]'
-            : 'text-[var(--sniptale-color-text-secondary)]'
-        }
-      >
+      <span className="flex-none text-[var(--sniptale-color-text-secondary)]">
         <Icon size={16} />
       </span>
-      <span className="text-sm font-medium tracking-[-0.01em]">{translate(props.item.label)}</span>
-    </button>
+      <span className="min-w-0 text-[13px] leading-[18px] font-medium">
+        {translate(props.item.label)}
+      </span>
+    </ContentToolbarButton>
   );
 }
 
@@ -93,24 +93,21 @@ export function SettingsSidebar({ activeTab, disabled, onTabChange }: SettingsSi
         data-ui="settings.sidebar.header"
         className="border-b border-solid border-[var(--sniptale-color-border-soft)] px-4 py-3"
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sniptale-color-text-dim)]">
+        <p className="text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-dim)]">
           {translate('settings.navigation.sidebarEyebrow')}
         </p>
       </div>
 
       <div
         data-ui="settings.sidebar.nav-list"
-        className={[
-          'min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto p-2.5',
-          'lg:overflow-y-hidden',
-        ].join(' ')}
+        className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-2"
       >
         {SETTINGS_NAV_GROUPS.map((group) => (
           <section key={group.id} aria-labelledby={`settings-nav-group-${group.id}`}>
             <h2
               id={`settings-nav-group-${group.id}`}
               className={[
-                'mb-0.5 px-3 text-[10px] font-semibold uppercase leading-4 tracking-[0.1em]',
+                'mb-1 px-3 text-[14px] font-semibold leading-5',
                 'text-[var(--sniptale-color-text-dim)]',
               ].join(' ')}
             >
@@ -135,7 +132,7 @@ export function SettingsSidebar({ activeTab, disabled, onTabChange }: SettingsSi
         data-ui="settings.sidebar.footer"
         className="border-t border-solid border-[var(--sniptale-color-border-soft)] px-4 py-2.5"
       >
-        <p className="text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
+        <p className="text-[12px] leading-4 text-[var(--sniptale-color-text-dim)]">
           {getSettingsSidebarFooterLabel()}
         </p>
       </div>

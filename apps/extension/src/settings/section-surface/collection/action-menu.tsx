@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Check, ChevronDown, ChevronUp, MoreHorizontal, RotateCcw, Trash2 } from 'lucide-react';
 import { useId } from 'react';
 
@@ -28,7 +29,8 @@ function SettingsCollectionInlineActionButton(props: {
 }) {
   const isDisabled = props.busy || props.action.disabledReason !== undefined;
   return (
-    <button
+    <ContentToolbarButton
+      tone={props.action.id === 'delete' ? 'danger' : 'utility'}
       data-collection-inline-action={props.action.id}
       data-collection-direct-action={props.direct ? props.action.id : undefined}
       type="button"
@@ -37,7 +39,7 @@ function SettingsCollectionInlineActionButton(props: {
       disabled={isDisabled}
       title={props.action.disabledReason || props.action.label}
       className={[
-        'flex h-8 w-8 flex-none items-center justify-center rounded-lg',
+        'flex !h-8 !w-8 !p-0 flex-none items-center justify-center rounded-[4px]',
         'focus-visible:outline-none focus-visible:ring-2',
         'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
         props.action.id === 'delete'
@@ -59,7 +61,7 @@ function SettingsCollectionInlineActionButton(props: {
     >
       {props.action.icon}
       <span className="sr-only">{props.action.label}</span>
-    </button>
+    </ContentToolbarButton>
   );
 }
 
@@ -169,7 +171,8 @@ export function SettingsCollectionActionTray(props: {
           />
         ))}
       </div>
-      <button
+      <ContentToolbarButton
+        tone="utility"
         ref={interaction.triggerRef}
         type="button"
         aria-label={triggerLabel}
@@ -177,17 +180,17 @@ export function SettingsCollectionActionTray(props: {
         aria-controls={trayId}
         title={triggerLabel}
         className={[
-          'flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg',
+          'flex !h-8 !w-8 !p-0 cursor-pointer items-center justify-center rounded-[4px]',
           'focus-visible:outline-none focus-visible:ring-2',
           'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
           props.open
-            ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]'
+            ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
             : 'text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]',
         ].join(' ')}
         onClick={() => props.onOpenChange(!props.open)}
       >
         <MoreHorizontal size={16} />
-      </button>
+      </ContentToolbarButton>
     </div>
   );
 }

@@ -132,7 +132,9 @@ describe('quick actions editor output', () => {
     await renderOutput(state);
 
     const selects = Array.from(container?.querySelectorAll<HTMLSelectElement>('select') ?? []);
-    const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    const checkboxes = Array.from(
+      container?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []
+    );
 
     act(() => {
       selects[0]!.value = 'copy';
@@ -143,7 +145,7 @@ describe('quick actions editor output', () => {
       selects[2]!.dispatchEvent(new Event('change', { bubbles: true }));
       selects[2]!.value = '';
       selects[2]!.dispatchEvent(new Event('change', { bubbles: true }));
-      buttons.forEach((button) => button.click());
+      checkboxes.forEach((checkbox) => checkbox.click());
     });
 
     expect(state.updateFormField).toHaveBeenCalledWith('afterCapture', 'copy');
@@ -168,10 +170,12 @@ describe('quick actions editor output', () => {
     await renderOutput(state, false);
 
     const selects = Array.from(container?.querySelectorAll<HTMLSelectElement>('select') ?? []);
-    const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    const checkboxes = Array.from(
+      container?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []
+    );
 
     expect(selects[2]?.disabled).toBe(true);
-    expect(buttons).toHaveLength(1);
+    expect(checkboxes).toHaveLength(1);
   });
 
   it('does not offer clipboard delivery for window or screen capture', async () => {

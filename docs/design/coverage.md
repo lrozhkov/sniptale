@@ -69,6 +69,14 @@ Authored guide text uses the document font role. Interface font changes do not r
 
 Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-scenario-design.spec.ts`. Existing guide, tour, image, voice, history and export suites retain their separate behavioral role.
 
+## Settings integration
+
+Settings adopts the interface font and shared command scope at the page owner, including its separate unlock entry. The existing row adapter uses canonical name/value construction. Sidebar and section content keep separate vertical scroll owners. The desktop viewport retains its minimum width and outer horizontal scroll path.
+
+Form owners retain validation, drafts, Save/Cancel and pending admission. Password fields retain masking and secret handling. Native hotkey capture, context-menu reordering, collection gestures and permission requests keep their existing owners. Authored annotation previews retain their font and geometry across the interface boundary.
+
+Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-settings-design.spec.ts`. Existing settings, provider, permission, privacy, transfer and collection suites retain their separate behavioral role. A permission-gated native-app screen does not prove native-host integration.
+
 ## Integration exclusions
 
 Preserve crop coordinates, media decoding/import, native file acquisition, recording lifecycle, device permissions, color/paint internals, persistence, and production Undo. Do not infer these engines from the bounded probes. A specimen can exercise local pending/error/recovery states without claiming native-engine parity. All ordinary reference requirements in this inventory have working examples.

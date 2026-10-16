@@ -53,6 +53,10 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
     ) !important;
   }
 
+  button[data-command-press][data-command-tone='toggle'] {
+    box-shadow: none !important;
+  }
+
   button[data-command-press][data-command-tone='danger'] {
     color: var(--sniptale-color-danger) !important;
   }

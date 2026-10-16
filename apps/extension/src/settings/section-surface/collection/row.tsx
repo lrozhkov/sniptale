@@ -37,7 +37,7 @@ type RowProps = {
 };
 
 const rowClassName = [
-  'group relative flex min-h-[52px] items-center gap-3 border-b px-3 py-2 last:border-b-0',
+  'group relative flex min-h-14 items-center gap-3 border-b px-3 py-2 last:border-b-0',
   'border-[var(--sniptale-color-border-subtle)]',
   'transition-[background-color,box-shadow] duration-150 motion-reduce:transition-none',
 ].join(' ');

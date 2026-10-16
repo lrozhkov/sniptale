@@ -1,6 +1,6 @@
 import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
-import { SettingsControlRow, settingsMetaLabelClassName } from '../../../section-surface';
+import { SettingsControlRow } from '../../../section-surface';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
 
 export function AnnotationNewSessionDefaults(props: {
@@ -20,10 +20,10 @@ export function AnnotationNewSessionDefaults(props: {
   onTemplateSourceChange: (source: AnnotationSessionDefaults['templateSource']) => void;
 }) {
   return (
-    <section className="mb-6 space-y-1 border-b border-[var(--sniptale-color-border-subtle)] pb-6">
+    <section className="mb-3 space-y-1 border-b border-[var(--sniptale-color-border-subtle)] pb-3">
       <div className="mb-1">
-        <h2 className={settingsMetaLabelClassName}>{props.copy.sectionTitle}</h2>
-        <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        <h2 className="text-[14px] leading-5 font-semibold">{props.copy.sectionTitle}</h2>
+        <p className="mt-1 text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
           {props.copy.sectionDescription}
         </p>
       </div>

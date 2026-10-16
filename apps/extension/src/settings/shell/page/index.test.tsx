@@ -162,14 +162,17 @@ function clickButton(label: string) {
 
 function expectSettingsPageShell() {
   expect(container?.querySelector('[data-ui="settings.page.root"]')?.className).toContain(
-    'h-[100dvh]'
+    'sniptale-settings-workspace'
   );
+  expect(
+    container?.querySelector('.sniptale-settings-viewport > [data-ui="settings.page.root"]')
+  ).not.toBeNull();
   expect(container?.querySelector('[data-ui="settings.page.layout"]')?.className).toContain(
     'min-h-0'
   );
   const contentClassName = container?.querySelector('[data-ui="settings.page.content"]')?.className;
   expect(contentClassName).toContain('overflow-hidden');
-  expect(contentClassName).toContain('rounded-[28px]');
+  expect(contentClassName).toContain('rounded-[4px]');
   expect(contentClassName).toContain('border-solid');
   expect(contentClassName).toContain('border-[var(--sniptale-color-border-soft)]');
   expect(contentClassName).toContain('var(--sniptale-color-surface-panel)');

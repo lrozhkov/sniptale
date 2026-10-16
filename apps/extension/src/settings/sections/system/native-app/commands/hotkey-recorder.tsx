@@ -58,7 +58,7 @@ function HotkeyRecordButton(props: {
       aria-label={props.label}
       aria-pressed={props.recording}
       className={[
-        'sniptale-input flex h-10 min-w-0 flex-1 items-center justify-between gap-2 pr-10 text-left',
+        'sniptale-input flex h-8 min-w-0 flex-1 items-center justify-between gap-2 pr-10 text-left',
         props.recording ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
       ]
         .filter(Boolean)
@@ -72,6 +72,7 @@ function HotkeyRecordButton(props: {
       <span className="flex min-w-0 items-center gap-2">
         <Keyboard className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]" />
         <span
+          title={props.recording ? translate('settings.nativeApp.shortcutRecording') : buttonLabel}
           className={
             props.value ? 'sniptale-kbd truncate' : 'truncate text-[var(--sniptale-color-text-dim)]'
           }

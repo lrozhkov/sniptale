@@ -14,7 +14,7 @@ export function HighlighterSection() {
   if (!settings) {
     return (
       <div className="animate-fadeIn flex items-center justify-center py-12">
-        <p className="text-sm text-[var(--sniptale-color-danger)]">
+        <p className="text-[13px] leading-[18px] text-[var(--sniptale-color-danger)]">
           {translate('common.states.error')}
           {translate('highlighter.section.loadErrorSuffix')}
         </p>

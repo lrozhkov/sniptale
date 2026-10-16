@@ -11,7 +11,10 @@ import { ThemeChips } from './theme-chips';
 export function AppearanceControlsCard({ state }: { state: AppearanceSectionState }) {
   return (
     <div className="space-y-1">
-      <SettingsControlRow label={translate('settings.appearance.themeModeLabel', state.locale)}>
+      <SettingsControlRow
+        label={translate('settings.appearance.themeModeLabel', state.locale)}
+        valueMinimum={380}
+      >
         <ThemeChips state={state} />
       </SettingsControlRow>
 

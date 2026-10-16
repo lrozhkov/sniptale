@@ -119,8 +119,9 @@ function triggerQuickActionsButtons(container: HTMLDivElement) {
       .find((button) => button.textContent === 'settings.collection.actions.delete')
       ?.click();
     container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[0]?.click();
-    container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[1]?.click();
-    container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[2]?.click();
+    container
+      .querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+      .forEach((input) => input.click());
     container
       .querySelector<HTMLButtonElement>('button[title="settings.hotkeyInput.clearTitle"]')
       ?.click();

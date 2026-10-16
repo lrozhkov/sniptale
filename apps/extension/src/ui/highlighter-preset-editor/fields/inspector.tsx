@@ -19,7 +19,8 @@ import { CompactColorSelector } from '../../color-selector';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import { EditorCompactRangeField } from './sections/compact-range-field';
-import { CompactSelect, NumericValueField } from '../../compact-inspector-controls';
+import { CompactSelect, NumericValueField, ToggleField } from '../../compact-inspector-controls';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import {
   editorNativeResizableTextareaClassName,
   editorResizeHandleClassName,
@@ -95,8 +96,9 @@ function BorderColorField(props: {
 }
 
 function BorderOutlineSection(props: BorderStyleInspectorProps) {
+  const inspector = useInspectorLayout();
   return (
-    <div className="grid gap-3">
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
       <BorderColorField
         label={translate('highlighter.editor.borderColorLabel')}
         onChange={(color) => props.onChange({ color })}
@@ -128,8 +130,9 @@ function BorderOutlineSection(props: BorderStyleInspectorProps) {
 }
 
 function BorderFillSection(props: BorderStyleInspectorProps) {
+  const inspector = useInspectorLayout();
   return (
-    <div className="grid gap-3">
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
       <HighlighterFillSurfaceField
         customCss={props.style.customCss}
         inheritCustomCss={props.style.inheritCustomCss}
@@ -145,8 +148,9 @@ function BorderFillSection(props: BorderStyleInspectorProps) {
 }
 
 function BorderGeometrySection(props: BorderStyleInspectorProps) {
+  const inspector = useInspectorLayout();
   return (
-    <div className="grid gap-3">
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
       <EditorCompactRangeField
         displaySuffix="px"
         label={translate('highlighter.editor.radiusLabel')}
@@ -205,8 +209,9 @@ function BorderBlurSection(props: BorderStyleInspectorProps) {
     distortion: translate('highlighter.editor.blurTypeDistortion'),
     solid: translate('highlighter.editor.blurTypeSolid'),
   } satisfies Record<(typeof AVAILABLE_HIGHLIGHTER_BLUR_TYPES)[number], string>;
+  const inspector = useInspectorLayout();
   return (
-    <div className="grid gap-3">
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
       <EditorCompactRangeField
         label={translate('highlighter.editor.blurStrengthLabel')}
         max={25}
@@ -236,8 +241,9 @@ function BorderBlurSection(props: BorderStyleInspectorProps) {
 
 function BorderFocusSection(props: BorderStyleInspectorProps) {
   const effects = cloneBorderPresetEffects(props.style.effects);
+  const inspector = useInspectorLayout();
   return (
-    <div className="grid gap-3">
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
       <EditorCompactRangeField
         displaySuffix="%"
         label={translate('highlighter.editor.focusDimmingLabel')}
@@ -268,36 +274,66 @@ function BorderFocusSection(props: BorderStyleInspectorProps) {
 
 function BorderBehaviorSection(props: BorderStyleInspectorProps) {
   const effects = cloneBorderPresetEffects(props.style.effects);
+  const inspector = useInspectorLayout();
   return (
     <div className="grid gap-3">
-      <div className="grid gap-2">
-        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+      <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-2'}>
+        <div
+          className={
+            inspector
+              ? 'text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]'
+              : 'text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]'
+          }
+        >
           {translate('highlighter.editor.captureDefaultsTitle')}
         </div>
         <div
-          className="flex min-w-0 items-center justify-between gap-3"
+          className={inspector ? undefined : 'flex min-w-0 items-center justify-between gap-3'}
           data-ui="highlighter.editor.capture-hide-frame"
         >
-          <span className="min-w-0 flex-1 text-[11px] text-[var(--sniptale-color-text-secondary)]">
-            {translate('highlighter.editor.hideFrameDuringCaptureLabel')}
-          </span>
-          <ProductGlassSwitch
-            aria-label={translate('highlighter.editor.hideFrameDuringCaptureLabel')}
-            className="shrink-0"
-            on={effects.capture.hideFrame}
-            onClick={() =>
-              props.onChange({
-                effects: {
-                  ...effects,
-                  capture: { hideFrame: !effects.capture.hideFrame },
-                },
-              })
-            }
-          />
+          {inspector ? (
+            <ToggleField
+              label={translate('highlighter.editor.hideFrameDuringCaptureLabel')}
+              value={effects.capture.hideFrame}
+              onChange={(hideFrame) =>
+                props.onChange({ effects: { ...effects, capture: { hideFrame } } })
+              }
+            />
+          ) : (
+            <>
+              <span className="min-w-0 flex-1 text-[11px] text-[var(--sniptale-color-text-secondary)]">
+                {translate('highlighter.editor.hideFrameDuringCaptureLabel')}
+              </span>
+              <ProductGlassSwitch
+                aria-label={translate('highlighter.editor.hideFrameDuringCaptureLabel')}
+                className="shrink-0"
+                on={effects.capture.hideFrame}
+                onClick={() =>
+                  props.onChange({
+                    effects: {
+                      ...effects,
+                      capture: { hideFrame: !effects.capture.hideFrame },
+                    },
+                  })
+                }
+              />
+            </>
+          )}
         </div>
       </div>
-      <div className="grid gap-2 border-t border-solid border-[var(--sniptale-color-border-soft)] pt-3">
-        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+      <div
+        className={[
+          inspector ? 'sniptale-parameter-stack' : 'grid gap-2',
+          'border-t border-solid border-[var(--sniptale-color-border-soft)] pt-3',
+        ].join(' ')}
+      >
+        <div
+          className={
+            inspector
+              ? 'text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]'
+              : 'text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]'
+          }
+        >
           {translate('highlighter.editor.linkedTemplatesTitle')}
         </div>
         <PropertyField label={translate('highlighter.editor.linkedCalloutTemplateLabel')}>

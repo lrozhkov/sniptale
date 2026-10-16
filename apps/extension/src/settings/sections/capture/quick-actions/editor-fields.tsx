@@ -1,12 +1,14 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { LucideIcon } from 'lucide-react';
 import { Camera } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
-import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { TextField } from '../../../../ui/compact-inspector-controls';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { QuickAction, QuickActionDelay, ViewportPreset } from '../../../../contracts/settings';
 import { HotkeyInput } from './hotkey-input';
 import { allowedQuickActionIcons, delayOptions, quickActionIconMap } from './section/constants';
-import { settingsMetaLabelClassName } from '../../../section-surface';
+import { SettingsControlRow, settingsMetaLabelClassName } from '../../../section-surface';
 import { type QuickActionsSectionState } from './controller';
 import { getViewportPresetDisplayName } from '../../../../features/viewport-presets/display-name';
 import { formatViewportPresetDimensions } from '../../../../features/viewport-presets/format';
@@ -14,9 +16,9 @@ import { formatViewportPresetDimensions } from '../../../../features/viewport-pr
 const iconPickerClassName = ['flex min-h-9 flex-wrap items-center gap-1'].join(' ');
 
 const activeIconButtonClassName = [
-  'border border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_18%,var(--sniptale-color-border-soft)_82%)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_16%,transparent)]',
-  'text-[var(--sniptale-color-accent)]',
+  'border border-[var(--sniptale-color-border-strong)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_16%,transparent)]',
+  'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 function DynamicIcon(props: { className?: string; name: string }) {
@@ -45,13 +47,10 @@ function buildViewportPresetOptions(viewportPresets: ViewportPreset[] | undefine
 
 export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSectionState }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="sniptale-parameter-stack">
       <div>
-        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-          {translate('settings.quickActions.nameLabel')}
-        </label>
-        <ProductInput
-          className="h-9"
+        <TextField
+          label={translate('settings.quickActions.nameLabel')}
           type="text"
           value={props.state.editForm?.name ?? ''}
           onChange={(event) => props.state.updateFormField('name', event.target.value)}
@@ -65,11 +64,15 @@ export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSec
         </label>
         <div className={iconPickerClassName}>
           {allowedQuickActionIcons.map((iconName) => (
-            <button
+            <ProductActionButton
+              compact
+              tone="toggle"
+              active={props.state.editForm?.icon === iconName}
+              aria-pressed={props.state.editForm?.icon === iconName}
               key={iconName}
               type="button"
               onClick={() => props.state.updateFormField('icon', iconName)}
-              className={`flex h-7 w-7 items-center justify-center rounded transition-all ${
+              className={`flex h-8 w-8 items-center justify-center rounded transition-all ${
                 props.state.editForm?.icon === iconName
                   ? activeIconButtonClassName
                   : [
@@ -81,7 +84,7 @@ export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSec
               title={iconName}
             >
               <DynamicIcon name={iconName} className="h-4 w-4" />
-            </button>
+            </ProductActionButton>
           ))}
         </div>
       </div>
@@ -91,23 +94,17 @@ export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSec
 
 export function QuickActionsEditorPrimaryCaptureFields(props: { state: QuickActionsSectionState }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <div>
-        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-          {translate('settings.quickActions.hotkeyLabel')}
-        </label>
+    <div className="sniptale-parameter-stack">
+      <SettingsControlRow label={translate('settings.quickActions.hotkeyLabel')}>
         <HotkeyInput
           value={props.state.editForm?.hotkey ?? null}
           onChange={(hotkey) => props.state.updateFormField('hotkey', hotkey)}
           onError={props.state.handleHotkeyError}
           placeholder={translate('settings.quickActions.hotkeyPlaceholder')}
         />
-      </div>
+      </SettingsControlRow>
 
-      <div>
-        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-          {translate('settings.quickActions.screenshotModeLabel')}
-        </label>
+      <SettingsControlRow label={translate('settings.quickActions.screenshotModeLabel')}>
         <ProductSelect
           controlSize="sm"
           value={props.state.editForm?.screenshotMode ?? 'visible'}
@@ -130,7 +127,7 @@ export function QuickActionsEditorPrimaryCaptureFields(props: { state: QuickActi
             },
           ]}
         />
-      </div>
+      </SettingsControlRow>
     </div>
   );
 }
@@ -146,11 +143,8 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
   const viewportPresetOptions = buildViewportPresetOptions(props.viewportPresets);
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <div>
-        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-          {translate('settings.quickActions.screenEmulationLabel')}
-        </label>
+    <div className="sniptale-parameter-stack">
+      <SettingsControlRow label={translate('settings.quickActions.screenEmulationLabel')}>
         <ProductSelect
           controlSize="sm"
           menuClassName="!max-h-52"
@@ -160,12 +154,9 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
           onChange={(value) => props.state.updateFormField('viewportPresetId', value || null)}
           options={viewportPresetOptions}
         />
-      </div>
+      </SettingsControlRow>
 
-      <div>
-        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
-          {translate('settings.quickActions.delayLabel')}
-        </label>
+      <SettingsControlRow label={translate('settings.quickActions.delayLabel')}>
         <ProductSelect
           controlSize="sm"
           value={props.state.editForm?.delay === null ? '' : String(props.state.editForm?.delay)}
@@ -180,7 +171,7 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
             label: option.label,
           }))}
         />
-      </div>
+      </SettingsControlRow>
     </div>
   );
 }

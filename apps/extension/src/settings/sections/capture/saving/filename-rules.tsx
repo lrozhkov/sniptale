@@ -1,7 +1,9 @@
+import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
 import { useEffect, useRef, useState } from 'react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
+  SettingsControlRow,
   settingsCompactWorkbenchClassName,
   settingsMetaLabelClassName,
 } from '../../../section-surface';
@@ -76,28 +78,40 @@ export function FilenameRulesSettings() {
     const invalid = !isValidFilenameTemplate(draft[key] ?? '');
     return (
       <div key={key} className="space-y-1">
-        <label htmlFor={`filename-${key}`} className="text-sm font-medium">
-          {translate(`settings.filenameRules.${key}`)}
-        </label>
-        <ProductInput
-          ref={(element) => {
-            inputs.current[key] = element;
-          }}
-          id={`filename-${key}`}
-          value={draft[key] ?? ''}
-          disabled={disabled}
-          maxLength={200}
-          placeholder={
-            key === 'template'
-              ? DEFAULT_FILENAME_TEMPLATE
-              : translate('settings.filenameRules.inherit')
-          }
-          aria-invalid={invalid}
-          aria-describedby={invalid ? `filename-${key}-error` : undefined}
-          onFocus={() => setActiveField(key)}
-          onChange={(event) => change(key, event.target.value)}
-          className="w-full"
-        />
+        <SettingsControlRow label={translate(`settings.filenameRules.${key}`)}>
+          <div className="sniptale-text-value">
+            <ProductInput
+              aria-label={translate(`settings.filenameRules.${key}`)}
+              ref={(element) => {
+                inputs.current[key] = element;
+              }}
+              id={`filename-${key}`}
+              value={draft[key] ?? ''}
+              disabled={disabled}
+              maxLength={200}
+              placeholder={
+                key === 'template'
+                  ? DEFAULT_FILENAME_TEMPLATE
+                  : translate('settings.filenameRules.inherit')
+              }
+              aria-invalid={invalid}
+              aria-describedby={invalid ? `filename-${key}-error` : undefined}
+              onFocus={() => setActiveField(key)}
+              onChange={(event) => change(key, event.target.value)}
+              className="w-full"
+            />
+            {draft[key] && !disabled ? (
+              <InspectorFieldClear
+                label={translate(`settings.filenameRules.${key}`)}
+                target={{
+                  get current() {
+                    return inputs.current[key] ?? null;
+                  },
+                }}
+              />
+            ) : null}
+          </div>
+        </SettingsControlRow>
         {invalid ? (
           <p id={`filename-${key}-error`} role="alert" className="text-sm">
             {translate('settings.filenameRules.invalid')}

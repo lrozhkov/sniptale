@@ -15,8 +15,12 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 
 vi.mock('../../../../section-surface/panel-controls', async (importOriginal) => ({
   ...(await importOriginal()),
-  SettingsSwitch: ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
-    <button type="button" aria-pressed={checked} onClick={onClick}>
+  SettingsSwitch: ({
+    checked,
+    onClick,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { checked: boolean }) => (
+    <button {...props} type="button" aria-pressed={checked} onClick={onClick}>
       toggle
     </button>
   ),
@@ -156,7 +160,9 @@ describe('HighlighterBlurControls', () => {
     const range = container?.querySelector(
       'input[data-testid="settings-range"]'
     ) as HTMLInputElement;
-    const toggle = container?.querySelector('button[aria-pressed="false"]') as HTMLButtonElement;
+    const toggle = container?.querySelector(
+      'button[aria-label="highlighter.section.showBorderLabel"]'
+    ) as HTMLButtonElement;
     const distortionButton = Array.from(container?.querySelectorAll('button') ?? []).find(
       (button) => button.textContent?.includes('highlighter.section.blurTypeDistortion')
     );
@@ -188,3 +194,37 @@ describe('HighlighterBlurControls', () => {
     });
   });
 });
+
+it.each([true, undefined])(
+  'retains blur settings while toggling a %s capture border',
+  async (showBorder) => {
+    const settings = createSettings({
+      defaultBlurSettings: {
+        amount: 7,
+        blurType: 'solid',
+        ...(showBorder === undefined ? {} : { showBorder }),
+      },
+    });
+    const props = await renderControls({ effects: createEffects(), settings });
+    const toggle = container!.querySelector<HTMLButtonElement>(
+      'button[aria-label="highlighter.section.showBorderLabel"]'
+    )!;
+    const gaussian = [...container!.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.title === 'highlighter.section.blurTypeGaussian'
+    )!;
+    expect(toggle.getAttribute('aria-pressed')).toBe(String(showBorder ?? false));
+    await act(async () => {
+      toggle.click();
+      gaussian.click();
+    });
+    expect(props.effects.handleUpdateBlurSettings).toHaveBeenCalledWith({
+      amount: 7,
+      blurType: 'solid',
+      showBorder: !(showBorder ?? false),
+    });
+    expect(props.effects.handleUpdateBlurSettings).toHaveBeenCalledWith({
+      ...settings.defaultBlurSettings,
+      blurType: 'gaussian',
+    });
+  }
+);

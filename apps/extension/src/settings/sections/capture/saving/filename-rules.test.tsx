@@ -41,6 +41,7 @@ async function change(key: string, value: string) {
   });
 }
 it('previews inheritance, blocks invalid save and retains a failed draft for retry', async () => {
+  expect(container.querySelector('section')?.className).not.toMatch(/\bfunction\s|=>/u);
   await change('template', '{bad}');
   expect(button('save').disabled).toBe(true);
   expect(container.querySelector('[role="alert"]')?.textContent).toContain(

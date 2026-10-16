@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { AnnotationTemplateTag } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -26,6 +27,7 @@ export function AnnotationTemplateTagEditor(props: {
   onClose(): void;
 }) {
   const [label, setLabel] = useState('');
+  const nameRef = useRef<HTMLInputElement>(null);
   const [mergeTarget, setMergeTarget] = useState('');
   useEffect(() => {
     setLabel(
@@ -78,19 +80,28 @@ export function AnnotationTemplateTagEditor(props: {
           <label className={settingsMetaLabelClassName} htmlFor="annotation-template-tag-name">
             {translate('highlighter.templateTags.name')}
           </label>
-          <ProductInput
-            autoFocus
-            id="annotation-template-tag-name"
-            maxLength={32}
-            onChange={(event) => setLabel(event.currentTarget.value)}
-            value={label}
-          />
+          <div className="sniptale-text-value">
+            <ProductInput
+              ref={nameRef}
+              autoFocus
+              id="annotation-template-tag-name"
+              maxLength={32}
+              onChange={(event) => setLabel(event.currentTarget.value)}
+              value={label}
+            />
+            {label.length > 0 ? (
+              <InspectorFieldClear
+                label={translate('highlighter.templateTags.name')}
+                target={nameRef}
+              />
+            ) : null}
+          </div>
           {editingTag?.origin !== 'system' && options.length > 0 ? (
-            <div className="mt-4 border-t border-[var(--sniptale-color-border-soft)] pt-4">
+            <div className="mt-3 border-t border-[var(--sniptale-color-border-soft)] pt-3">
               <label className={settingsMetaLabelClassName}>
                 {translate('highlighter.templateTags.mergeTarget')}
               </label>
-              <div className="mt-1.5 flex items-center gap-2">
+              <div className="mt-1 flex items-center gap-1">
                 <ProductSelect
                   aria-label={translate('highlighter.templateTags.mergeTarget')}
                   className="min-w-0 flex-1"

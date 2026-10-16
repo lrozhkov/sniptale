@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { act, createRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { CommandPressScope } from '../control-language/press';
 import {
   ProductGlassBoldButton,
   ProductGlassChip,
@@ -42,6 +45,8 @@ describe('ProductGlass buttons', () => {
     expect(markup).toContain('sniptale-glass-input');
     expect(markup).toContain('sniptale-glass-bold-button--active');
     expect(markup).toContain('sniptale-glass-destructive');
+    expect(markup).not.toContain('data-command-property');
+    expect(markup).not.toContain('sniptale-command-content');
   });
 
   it('renders glass range fill ratio from min, max, and value', () => {
@@ -52,4 +57,60 @@ describe('ProductGlass buttons', () => {
     expect(markup).toContain('--sniptale-range-fill-ratio:79.2%');
     expect(markup).toContain('width:90%');
   });
+});
+
+it('adopts property feedback without changing its ref, accessible state, or cancellation callback', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const ref = createRef<HTMLButtonElement>();
+  const onClick = vi.fn();
+  const onPointerDown = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <CommandPressScope value={true}>
+          <ProductGlassBoldButton
+            active
+            ref={ref}
+            aria-label="Align left"
+            aria-pressed
+            onClick={onClick}
+            onPointerDown={onPointerDown}
+          >
+            <svg aria-hidden="true" />
+          </ProductGlassBoldButton>
+        </CommandPressScope>
+      )
+    );
+    const button = host.querySelector('button')!;
+    expect(ref.current).toBe(button);
+    expect(button.getAttribute('aria-label')).toBe('Align left');
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(button.dataset['commandProperty']).toBe('true');
+    expect(button.dataset['active']).toBe('true');
+    expect(button.querySelector(':scope > .sniptale-command-content > svg')).not.toBeNull();
+    const pointer = (type: string) => {
+      const event = new MouseEvent(type, { bubbles: true, button: 0, buttons: 1 });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      button.dispatchEvent(event);
+    };
+    await act(async () => pointer('pointerdown'));
+    expect(onPointerDown).toHaveBeenCalledOnce();
+    expect(button.dataset['pressing']).toBe('true');
+    expect(onClick).not.toHaveBeenCalled();
+    await act(async () => {
+      pointer('pointercancel');
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    });
+    expect(button.dataset['pressing']).toBeUndefined();
+    expect(onClick).not.toHaveBeenCalled();
+    await act(async () => button.click());
+    expect(onClick).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
 });

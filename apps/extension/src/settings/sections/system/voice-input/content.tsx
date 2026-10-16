@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { AlertCircle, CheckCircle2, Download, Mic, RefreshCw, Square } from 'lucide-react';
 import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
@@ -11,13 +12,13 @@ import {
 import type { VoiceInputSettingsController } from './controller-contract';
 
 const buttonClassName = [
-  'inline-flex min-h-10 items-center justify-center gap-2 rounded-[14px] border px-4 py-2',
+  'inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[4px] border px-4 py-2',
   'text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2',
   'focus-visible:ring-[var(--sniptale-color-accent)] disabled:cursor-not-allowed disabled:opacity-45',
 ].join(' ');
 const primaryButtonClassName = [
   buttonClassName,
-  'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent)] text-white',
+  'border-transparent bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const secondaryButtonClassName = [
   buttonClassName,
@@ -97,7 +98,7 @@ function StatusCard(props: {
 }) {
   return (
     <div className="min-w-0 py-2.5">
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--sniptale-color-text-muted)]">
+      <p className="text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-muted)]">
         {props.label}
       </p>
       <div className="mt-1 flex items-center gap-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
@@ -364,17 +365,19 @@ function VoiceInputActions({
   return (
     <div className="flex flex-wrap gap-2">
       {controller.status.microphoneAccess !== 'granted' ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
           className={primaryButtonClassName}
           type="button"
           onClick={() => void controller.actions.requestMicrophone()}
         >
           <Mic aria-hidden="true" className="h-4 w-4" />
           {translate('settings.voiceInput.allowMicrophone')}
-        </button>
+        </ProductActionButton>
       ) : null}
       {installAvailable ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
           className={secondaryButtonClassName}
           disabled={
             controller.status.installing ||
@@ -385,7 +388,7 @@ function VoiceInputActions({
         >
           <Download aria-hidden="true" className="h-4 w-4" />
           {translate('settings.voiceInput.install')}
-        </button>
+        </ProductActionButton>
       ) : null}
       <button
         className={primaryButtonClassName}
@@ -406,16 +409,18 @@ function VoiceInputActions({
             : translate('settings.voiceInput.start')}
       </button>
       {active ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
           className={secondaryButtonClassName}
           type="button"
           onClick={controller.actions.stop}
         >
           <Square aria-hidden="true" className="h-4 w-4" />
           {translate('settings.voiceInput.stop')}
-        </button>
+        </ProductActionButton>
       ) : null}
-      <button
+      <ProductActionButton
+        tone="secondary"
         className={secondaryButtonClassName}
         disabled={active || controller.status.checking}
         type="button"
@@ -423,7 +428,7 @@ function VoiceInputActions({
       >
         <RefreshCw aria-hidden="true" className="h-4 w-4" />
         {translate('settings.voiceInput.refresh')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

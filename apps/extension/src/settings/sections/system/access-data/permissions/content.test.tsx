@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -46,20 +47,22 @@ async function renderContent(view: 'optional' | 'required' = 'optional') {
 
   await act(async () => {
     root?.render(
-      <PermissionsSectionContent
-        permissions={[
-          createPermission('origins', 'prompt'),
-          createPermission('localFiles', 'granted'),
-          createPermission('nativeApp', 'prompt'),
-          createPermission('microphone', 'granted'),
-          createPermission('downloads', 'denied'),
-          createPermission('clipboard', 'error'),
-        ]}
-        onRefresh={onRefresh}
-        onRequestPermission={onRequestPermission}
-        onRevokePermission={onRevokePermission}
-        view={view}
-      />
+      <CommandPressScope value={true}>
+        <PermissionsSectionContent
+          permissions={[
+            createPermission('origins', 'prompt'),
+            createPermission('localFiles', 'granted'),
+            createPermission('nativeApp', 'prompt'),
+            createPermission('microphone', 'granted'),
+            createPermission('downloads', 'denied'),
+            createPermission('clipboard', 'error'),
+          ]}
+          onRefresh={onRefresh}
+          onRequestPermission={onRequestPermission}
+          onRevokePermission={onRevokePermission}
+          view={view}
+        />
+      </CommandPressScope>
     );
   });
 
@@ -118,9 +121,13 @@ it('renders all permission states and wires refresh/request handlers', async () 
 
   expect(askButton?.getAttribute('aria-pressed')).toBe('true');
   expect(allSitesButton?.getAttribute('aria-pressed')).toBe('false');
+  expect(askButton?.dataset['commandProperty']).toBe('true');
+  expect(askButton?.dataset['active']).toBe('true');
+  expect(allSitesButton?.dataset['active']).toBeUndefined();
 
   act(() => {
     allSitesButton?.click();
+    askButton?.click();
     nativeRequestButton?.click();
     revokeButton?.click();
     refreshButton?.click();
@@ -129,6 +136,7 @@ it('renders all permission states and wires refresh/request handlers', async () 
   expect(onRequestPermission).toHaveBeenCalledWith('origins');
   expect(onRequestPermission).toHaveBeenCalledWith('nativeApp');
   expect(onRevokePermission).toHaveBeenCalledWith('localFiles');
+  expect(onRevokePermission).toHaveBeenCalledWith('origins');
   expect(onRefresh).toHaveBeenCalledTimes(1);
 
   await renderContent('required');

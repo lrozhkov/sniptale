@@ -86,7 +86,7 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
     if (action.type === 'delete') void presets.handleDeletePreset(preset);
   };
   return (
-    <div className="mb-8">
+    <div className="mb-3">
       <SettingsCollection
         ariaLabel={translate('highlighter.section.presetsLabel')}
         toolbarControls={

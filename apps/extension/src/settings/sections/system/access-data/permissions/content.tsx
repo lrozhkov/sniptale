@@ -1,3 +1,5 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { AlertCircle, Check } from 'lucide-react';
 import {
   getControlPrimaryButtonClassName,
@@ -17,7 +19,7 @@ const requestButtonClassName = [
 ].join(' ');
 
 const permissionCardClassName = [
-  'flex items-center justify-between border-b px-4 py-3 transition-colors last:border-b-0',
+  'flex items-center justify-between gap-4 border-b px-4 py-3 transition-colors last:border-b-0',
   'border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
@@ -48,16 +50,21 @@ function StatusBadge({ state }: { state: PermissionState }) {
   return (
     <div className={`flex items-center gap-1 rounded-full border px-2.5 py-1 ${content.badgeTone}`}>
       {Icon ? <Icon size={10} /> : null}
-      <span className="text-xs font-bold uppercase tracking-wider">{content.badgeText}</span>
+      <span className="text-xs font-normal leading-4">{content.badgeText}</span>
     </div>
   );
 }
 
 function RequestButton(props: { children?: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <button onClick={props.onClick} disabled={props.disabled} className={requestButtonClassName}>
+    <ProductActionButton
+      tone="secondary"
+      onClick={props.onClick}
+      disabled={props.disabled}
+      className={requestButtonClassName}
+    >
       {props.children ?? translate('settings.permissions.allowButton')}
-    </button>
+    </ProductActionButton>
   );
 }
 
@@ -72,53 +79,46 @@ function SiteAccessModeSelector(props: {
   return (
     <div
       className={[
-        'grid grid-cols-2 gap-1 overflow-hidden rounded-[12px] border p-1 text-xs',
+        'inline-flex shrink-0 items-center gap-1 rounded-[4px] border p-1',
         'border-[var(--sniptale-color-border-strong)] bg-[var(--sniptale-color-surface-input)]',
       ].join(' ')}
       aria-label={translate('settings.permissions.siteAccessModeLabel')}
       role="group"
     >
-      <button
+      <ContentToolbarButton
+        tone="property"
         type="button"
         onClick={() => props.onRevokePermission(props.permission.id)}
+        active={askSelected}
         aria-pressed={askSelected}
-        className={getSiteAccessModeButtonClassName(askSelected)}
+        className={siteAccessModeButtonClassName}
       >
         {askSelected ? <Check size={13} aria-hidden="true" /> : null}
         {translate('settings.permissions.siteAccessAskMode')}
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        tone="property"
         type="button"
         onClick={() => props.onRequestPermission(props.permission.id)}
+        active={allSitesGranted}
         aria-pressed={allSitesGranted}
-        className={getSiteAccessModeButtonClassName(allSitesGranted)}
+        className={siteAccessModeButtonClassName}
       >
         {allSitesGranted ? <Check size={13} aria-hidden="true" /> : null}
         {translate('settings.permissions.siteAccessAllSitesMode')}
-      </button>
+      </ContentToolbarButton>
     </div>
   );
 }
 
-function getSiteAccessModeButtonClassName(selected: boolean): string {
-  return [
-    'flex min-h-9 items-center justify-center gap-1.5 rounded-[8px] px-3 font-semibold transition-colors',
-    selected
-      ? [
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_16%,var(--sniptale-color-surface-panel)_84%)]',
-          'text-[var(--sniptale-color-text-primary-strong)]',
-          'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_58%,transparent)]',
-        ].join(' ')
-      : [
-          'text-[var(--sniptale-color-text-muted-strong)]',
-          'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
-        ].join(' '),
-  ].join(' ');
-}
+const siteAccessModeButtonClassName = [
+  '!h-8 !w-auto !min-w-0 gap-1.5 !rounded-[4px] !px-2.5',
+  'whitespace-nowrap text-[13px] font-medium leading-[18px]',
+].join(' ');
 
 function PermissionStateText({ content }: { content: ReturnType<typeof getPermissionContent> }) {
   return (
-    <div className={`flex items-center gap-1.5 text-sm ${content.badgeTone}`}>
+    <div className={`flex items-center gap-1.5 text-xs font-normal leading-4 ${content.badgeTone}`}>
       {content.badgeIcon ? <content.badgeIcon size={14} /> : null}
       <span>{content.badgeText}</span>
     </div>
@@ -135,9 +135,14 @@ function OptionalPermissionControl(props: {
     return (
       <div className="flex items-center gap-2">
         <StatusBadge state={props.state} />
-        <button type="button" className={revokeButtonClassName} onClick={props.onRevoke}>
+        <ProductActionButton
+          tone="secondary"
+          type="button"
+          className={revokeButtonClassName}
+          onClick={props.onRevoke}
+        >
           {translate('settings.permissions.revokeButton')}
-        </button>
+        </ProductActionButton>
       </div>
     );
   }
@@ -159,15 +164,15 @@ function PermissionCard(props: {
 
   return (
     <div className={permissionCardClassName}>
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         <div className={permissionIconClassName}>
           <PermissionIcon size={20} />
         </div>
-        <div>
-          <h3 className="mb-0.5 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+        <div className="min-w-0 flex-1">
+          <h3 className="mb-0.5 text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-primary)]">
             {content.name}
           </h3>
-          <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
+          <p className="text-xs font-normal leading-4 text-[var(--sniptale-color-text-secondary)]">
             {content.description}
           </p>
         </div>
@@ -226,7 +231,8 @@ function PermissionStatusChecks(props: {
 function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
   return (
     <div className="mt-6 flex justify-end">
-      <button
+      <ProductActionButton
+        tone="secondary"
         onClick={props.onRefresh}
         className={
           'text-xs text-[var(--sniptale-color-text-dim)] ' +
@@ -234,7 +240,7 @@ function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
         }
       >
         {translate('settings.permissions.refreshButton')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

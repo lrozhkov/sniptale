@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { Ref } from 'react';
 
 export function SettingsSubpageTabs(props: {
@@ -17,7 +18,7 @@ export function SettingsSubpageTabs(props: {
       data-ui="settings.subpage-tabs"
       data-sticky={sticky ? 'true' : undefined}
       className={[
-        'flex flex-wrap gap-x-6 gap-y-1',
+        'flex flex-nowrap gap-1 overflow-x-auto',
         sticky
           ? [
               'sticky z-20 border-b border-[var(--sniptale-color-border-soft)]',
@@ -42,14 +43,18 @@ export function SettingsSubpageTabs(props: {
       {props.items.map((item) => {
         const active = props.activeId === item.id;
         return (
-          <button
+          <ContentToolbarButton
+            tone="property"
+            active={active}
+            title={item.label}
             key={item.id}
             type="button"
             disabled={props.disabled}
             aria-current={active ? 'page' : undefined}
             onClick={() => props.onChange?.(item.id)}
             className={[
-              'relative min-h-11 min-w-28 px-2 py-3 text-sm font-medium',
+              'relative !h-8 min-h-8 !w-auto flex-none whitespace-nowrap rounded-[4px] !px-3 !py-1',
+              'text-[13px] leading-[18px] font-medium',
               'transition-colors',
               'focus-visible:outline-none focus-visible:text-[var(--sniptale-color-text-primary)]',
               'focus-visible:after:absolute focus-visible:after:inset-x-0 focus-visible:after:bottom-0',
@@ -58,7 +63,7 @@ export function SettingsSubpageTabs(props: {
                 ? [
                     'font-semibold text-[var(--sniptale-color-text-primary)]',
                     'after:absolute after:inset-x-0 after:bottom-0 after:h-0.5',
-                    'after:bg-[var(--sniptale-color-accent)]',
+                    'after:bg-[var(--sniptale-color-text-secondary)]',
                   ].join(' ')
                 : [
                     'text-[var(--sniptale-color-text-secondary)]',
@@ -67,7 +72,7 @@ export function SettingsSubpageTabs(props: {
             ].join(' ')}
           >
             {item.label}
-          </button>
+          </ContentToolbarButton>
         );
       })}
     </nav>

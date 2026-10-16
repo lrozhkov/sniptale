@@ -7,13 +7,18 @@ import { SettingsRangeField, settingsToggleRowClassName } from '../../../../sect
 import { useRangeDraftValue } from './range-draft';
 import type { HighlighterEffectsProps } from './types';
 
-const highlighterSettingsCardClassName = [settingsCardClassName, 'p-4'].join(' ');
+const highlighterSettingsCardClassName = [settingsCardClassName, 'p-0'].join(' ');
 
 function BlurSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
   return (
-    <div className={`mb-8 ${highlighterSettingsCardClassName}`}>
-      <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-        <PenTool size={14} className="text-[var(--sniptale-color-success)]" />
+    <div className={`mb-3 ${highlighterSettingsCardClassName}`}>
+      <h3
+        className={[
+          'mb-2 flex items-center gap-2 text-[14px] leading-5 font-semibold',
+          'text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+      >
+        <PenTool size={16} aria-hidden="true" />
         {translate('highlighter.section.blurTitle')}
       </h3>
       <HighlighterBlurControls effects={effects} settings={settings} />
@@ -31,11 +36,16 @@ function FocusSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
 
   return (
     <div className={highlighterSettingsCardClassName}>
-      <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-        <PenTool size={14} className="text-[var(--sniptale-color-info)]" />
+      <h3
+        className={[
+          'mb-2 flex items-center gap-2 text-[14px] leading-5 font-semibold',
+          'text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+      >
+        <PenTool size={16} aria-hidden="true" />
         {translate('highlighter.section.focusTitle')}
       </h3>
-      <div className="space-y-4">
+      <div className="space-y-3">
         <SettingsRangeField
           type="range"
           min="0"
@@ -73,7 +83,7 @@ function FocusSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
         />
 
         <div className={settingsToggleRowClassName}>
-          <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          <span className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]">
             {translate('highlighter.section.showBorderLabel')}
           </span>
           <SettingsSwitch

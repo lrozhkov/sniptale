@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { createEventHistory } from '../../../../composition/persistence/diagnostics/event-history';
 import { createRuntimeLog } from '../../../../composition/persistence/diagnostics/runtime-log';
 import {
@@ -64,7 +65,8 @@ export function EventsLogsSection() {
             : `${filtered.length} / ${entries.length}`}
         </span>
         <div className="flex gap-2">
-          <button
+          <ProductActionButton
+            tone="secondary"
             type="button"
             className={buttonClass}
             disabled={exporting}
@@ -75,18 +77,24 @@ export function EventsLogsSection() {
             {translate(
               exporting ? 'settings.eventsLogs.exporting' : 'settings.eventsLogs.exportZip'
             )}
-          </button>
-          <button type="button" className={buttonClass} onClick={refresh}>
+          </ProductActionButton>
+          <ProductActionButton
+            tone="secondary"
+            type="button"
+            className={buttonClass}
+            onClick={refresh}
+          >
             {translate('settings.eventsLogs.refresh')}
-          </button>
-          <button
+          </ProductActionButton>
+          <ProductActionButton
+            tone="secondary"
             type="button"
             className={buttonClass}
             disabled={status !== 'ready' || !filtered.length}
             onClick={exportLog}
           >
             {translate('settings.eventsLogs.export')}
-          </button>
+          </ProductActionButton>
         </div>
       </div>
     </section>

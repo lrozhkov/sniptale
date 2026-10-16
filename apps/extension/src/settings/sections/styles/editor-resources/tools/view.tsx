@@ -51,7 +51,7 @@ export function ToolPresetsSettings() {
 
   return (
     <div className={settingsPanelClassName}>
-      <section className="space-y-4">
+      <section className="space-y-3">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {TOOL_PRESET_OWNERS.map((owner) => (
             <ProductActionButton
@@ -59,6 +59,7 @@ export function ToolPresetsSettings() {
               compact
               tone="toggle"
               active={selection.owner === owner}
+              aria-pressed={selection.owner === owner}
               onClick={() => selection.setOwner(owner)}
             >
               {getToolPresetOwnerLabel(owner)}

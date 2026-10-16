@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { InspectorLayout } from '../../compact-inspector-controls/layout';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -11,6 +13,7 @@ import type {
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 import { CalloutManualSettings } from './inspector';
 import { CalloutConnectorSettings } from './inspector-effects';
+import { CalloutBadgeSettings, CalloutTitleSettings } from './inspector-typography';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -572,4 +575,63 @@ it('shows an endpoint size only when that endpoint has a marker', () => {
   );
   expect(withMarkers).not.toContain('content.callout.frameAttachmentLabel');
   expect(withMarkers).not.toContain('content.callout.blockAttachmentLabel');
+});
+
+function OrdinaryCalloutTextHarness() {
+  const preset = createSystemCalloutPresetCatalog()[4]!;
+  const [settings, setSettings] = useState<CalloutSettings>({
+    content: { bodyHtml: '', titleText: 'Title draft' },
+    enabled: true,
+    placement: preset.placement,
+    style: {
+      ...preset.style,
+      badge: { ...preset.style.badge, enabled: true, text: 'Badge draft' },
+      title: { ...preset.style.title, enabled: true },
+    },
+  });
+  latestSettings = settings;
+  const onChange = (patch: CalloutSettingsPatch) =>
+    setSettings((current) => applyPatch(current, patch));
+  return (
+    <>
+      <CalloutBadgeSettings settings={settings} onChange={onChange} />
+      <CalloutTitleSettings settings={settings} onChange={onChange} />
+    </>
+  );
+}
+
+it('clears scoped badge and title text through their existing patch owners', async () => {
+  await act(async () =>
+    root.render(
+      <CommandPressScope value={true}>
+        <InspectorLayout>
+          <OrdinaryCalloutTextHarness />
+        </InspectorLayout>
+      </CommandPressScope>
+    )
+  );
+  const badge = container.querySelector<HTMLInputElement>('input[maxlength="64"]')!;
+  const title = container.querySelector<HTMLInputElement>('input[maxlength="256"]')!;
+  expect(container.querySelectorAll('.sniptale-field-clear')).toHaveLength(2);
+  await act(async () =>
+    badge.parentElement!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click()
+  );
+  expect(badge.value).toBe('');
+  expect(latestSettings.style.badge.text).toBe('');
+  expect(document.activeElement).toBe(badge);
+  await act(async () =>
+    title.parentElement!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click()
+  );
+  expect(title.value).toBe('');
+  expect(latestSettings.content.titleText).toBe('');
+  expect(document.activeElement).toBe(title);
+  expect(latestSettings.placement).toEqual(createSystemCalloutPresetCatalog()[4]!.placement);
+});
+
+it('keeps unscoped callout text fields without Clear controls', async () => {
+  await act(async () => root.render(<OrdinaryCalloutTextHarness />));
+  expect(container.querySelectorAll('input[maxlength="64"],input[maxlength="256"]')).toHaveLength(
+    2
+  );
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
 });

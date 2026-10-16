@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import type { LocalStorageDestination, LocalStoragePolicy } from '../../../../contracts/settings';
@@ -200,14 +201,16 @@ function TrashRetentionSection(
             )}
           </span>
           {props.trashPolicyFeedback === 'error' ? (
-            <button
+            <ProductActionButton
+              compact
+              tone="secondary"
               type="button"
               className={getControlSecondaryButtonClassName({ density: 'compact' })}
               disabled={props.busy}
               onClick={props.retryTrashPolicy}
             >
               {translate('settings.storageDrafts.retry')}
-            </button>
+            </ProductActionButton>
           ) : null}
         </div>
       ) : null}
@@ -248,7 +251,9 @@ function StorageUsageSection(props: Pick<StorageDraftsContentProps, 'usage'>) {
         )}
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           className={getControlSecondaryButtonClassName({ density: 'compact' })}
           onClick={() =>
@@ -256,7 +261,7 @@ function StorageUsageSection(props: Pick<StorageDraftsContentProps, 'usage'>) {
           }
         >
           {translate('settings.storageDrafts.privacyLink')}
-        </button>
+        </ProductActionButton>
       </div>
     </section>
   );
@@ -271,30 +276,36 @@ function DraftActionsSection(
   return (
     <section className="space-y-3 border-t border-[var(--sniptale-color-border-subtle)] pt-5">
       <SectionLabel>{translate('settings.storageDrafts.draftActionsTitle')}</SectionLabel>
-      <button
+      <ProductActionButton
+        compact
+        tone="secondary"
         type="button"
         className={getControlSecondaryButtonClassName({ density: 'compact' })}
         onClick={() => void openGalleryPage({ scope: 'temporary' })}
       >
         {translate('settings.storageDrafts.openDrafts')}
-      </button>
+      </ProductActionButton>
       <div className="flex flex-wrap gap-2 pt-2">
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
           disabled={props.busy || !props.policyLoaded || !props.policy.cleanupEnabled}
           onClick={props.onDeleteExpiredRequest}
         >
           {translate('settings.storageDrafts.deleteExpired')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
           disabled={props.busy || !props.policyLoaded}
           onClick={props.onDeleteAllRequest}
         >
           {translate('settings.storageDrafts.deleteAll')}
-        </button>
+        </ProductActionButton>
       </div>
     </section>
   );

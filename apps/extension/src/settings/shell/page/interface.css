@@ -1,0 +1,79 @@
+.sniptale-settings-viewport {
+  --settings-preview-radius-sm: var(--sniptale-radius-sm);
+  --settings-preview-radius-md: var(--sniptale-radius-md);
+  --settings-preview-radius-lg: var(--sniptale-radius-lg);
+  width: 100%;
+  height: 100dvh;
+  overflow: auto;
+  background: var(--sniptale-color-surface-canvas);
+}
+/* The background opens the unlock utility at its own 440 x 420 window size. */
+.sniptale-settings-viewport
+  > .sniptale-settings-workspace:not([data-ui='settings.ai-unlock.root']) {
+  min-width: 1280px;
+  min-height: 560px;
+  height: 100%;
+}
+.sniptale-settings-workspace {
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-settings-workspace .sniptale-settings-preview {
+  --sniptale-font-sans: var(--sniptale-font-document-sans);
+  --sniptale-radius-sm: var(--settings-preview-radius-sm);
+  --sniptale-radius-md: var(--settings-preview-radius-md);
+  --sniptale-radius-lg: var(--settings-preview-radius-lg);
+  font-family: var(--sniptale-font-document-sans);
+  font-weight: 400;
+}
+.sniptale-settings-workspace .settings-control-description {
+  margin: 0;
+  padding: 2px 8px 4px;
+  color: var(--sniptale-color-text-secondary);
+  font: 400 12px / 16px var(--sniptale-font-interface);
+}
+.sniptale-settings-workspace .settings-control-value {
+  width: 100%;
+  min-width: 0;
+}
+.sniptale-settings-workspace .settings-range-field {
+  display: grid;
+  gap: 4px;
+}
+.sniptale-settings-workspace .settings-range-heading {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+}
+.sniptale-settings-workspace .settings-range-value {
+  display: flex;
+  min-width: 64px;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px;
+  color: var(--sniptale-color-text-primary);
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-settings-workspace .settings-range-field > .sniptale-range {
+  margin: 0 8px;
+  width: calc(100% - 16px);
+}
+.sniptale-settings-workspace.sniptale-compact-workspace :is(.sniptale-input, .sniptale-textarea) {
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-settings-workspace.sniptale-compact-workspace .sniptale-input:not([type='number']) {
+  text-align: start;
+}
+.sniptale-settings-workspace.sniptale-compact-workspace :is(.sniptale-label, .sniptale-label-sm) {
+  margin-bottom: 4px;
+  color: var(--sniptale-color-text-secondary);
+  font: 500 13px / 18px var(--sniptale-font-interface);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.sniptale-settings-workspace .sniptale-text-value > .sniptale-textarea {
+  padding: 8px 32px 8px 8px;
+}

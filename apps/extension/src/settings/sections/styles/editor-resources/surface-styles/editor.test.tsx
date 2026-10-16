@@ -67,3 +67,36 @@ it('submits an edited system style atomically with its name and canonical CSS', 
   });
   act(() => root.unmount());
 });
+
+it('clears the ordinary preset name without saving and returns focus to the field', async () => {
+  const node = document.createElement('div');
+  document.body.append(node);
+  const root = createRoot(node);
+  const onSave = vi.fn();
+  try {
+    await act(async () =>
+      root.render(<SurfaceStylePresetEditor onClose={vi.fn()} onSave={onSave} open preset={null} />)
+    );
+    const input = node.querySelector<HTMLInputElement>('input')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => {
+      setter.call(input, 'Draft name');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const clear = node.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+    expect(clear).not.toBeNull();
+    await act(async () => clear.click());
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(input.maxLength).toBe(80);
+    expect(node.querySelector('.sniptale-field-clear')).toBeNull();
+    const save = [...node.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'Сохранить'
+    )!;
+    expect(save.disabled).toBe(true);
+    expect(onSave).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    node.remove();
+  }
+});

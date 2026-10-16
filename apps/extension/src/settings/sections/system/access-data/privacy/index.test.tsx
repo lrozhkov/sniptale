@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -28,7 +29,11 @@ async function renderSection() {
   }
 
   await act(async () => {
-    root?.render(<PrivacySection />);
+    root?.render(
+      <CommandPressScope value={true}>
+        <PrivacySection />
+      </CommandPressScope>
+    );
   });
 }
 
