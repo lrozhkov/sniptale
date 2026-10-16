@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import {
   CANONICAL_LICENSE_DIGESTS,
+  DOCUMENT_FONT_LICENSE_PATH,
   REQUIRED_RELEASE_LEGAL_PATHS,
   sha256,
 } from '../../../../release/policy/oss-release-policy.mjs';
@@ -89,6 +90,9 @@ export function validateLegalFiles(root, policy) {
   }
   const expectedLegalPaths = new Set([
     ...REQUIRED_RELEASE_LEGAL_PATHS,
+    ...(policy.bundledAssets.some((asset) => asset.id === 'golos-text')
+      ? [DOCUMENT_FONT_LICENSE_PATH]
+      : []),
     policy.dependencyLegal.manifestPath,
     ...dependencyArchivePaths,
   ]);
@@ -128,20 +132,23 @@ export function validateNoticeContents(root, policy) {
     if (marker && !notice.includes(marker))
       errors.push(`NOTICE is missing required marker: ${marker}`);
   }
-  const interfaceFont = policy.bundledAssets.find((asset) => asset.id === 'golos-ui');
-  for (const marker of [
-    interfaceFont?.copyright,
-    interfaceFont?.sourcePackage,
-    interfaceFont?.version,
-    interfaceFont?.license,
-  ]) {
-    if (marker && !notices.includes(marker)) {
-      errors.push(`third-party notice is missing required marker: ${marker}`);
+  for (const interfaceFont of policy.bundledAssets.filter((asset) =>
+    ['golos-ui', 'golos-text'].includes(asset.id)
+  )) {
+    for (const marker of [
+      interfaceFont?.copyright,
+      interfaceFont?.sourcePackage,
+      interfaceFont?.version,
+      interfaceFont?.license,
+    ]) {
+      if (marker && !notices.includes(marker)) {
+        errors.push(`third-party notice is missing required marker: ${marker}`);
+      }
     }
-  }
-  for (const artifact of interfaceFont?.artifacts ?? []) {
-    if (!notices.includes(artifact.path) || !notices.includes(artifact.sha256)) {
-      errors.push(`third-party notice is missing bundled artifact: ${artifact.path}`);
+    for (const artifact of interfaceFont?.artifacts ?? []) {
+      if (!notices.includes(artifact.path) || !notices.includes(artifact.sha256)) {
+        errors.push(`third-party notice is missing bundled artifact: ${artifact.path}`);
+      }
     }
   }
   return errors;

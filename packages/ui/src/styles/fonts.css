@@ -14,3 +14,11 @@
   font-weight: 400 700;
   src: url('./golos-ui/golos-ui-vf.woff2') format('woff2');
 }
+
+@font-face {
+  font-family: 'Sniptale Text';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('./golos-text/golos-text-vf.woff2') format('woff2');
+}

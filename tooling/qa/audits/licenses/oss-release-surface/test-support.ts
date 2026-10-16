@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const INTERFACE_FONT_SOURCE_PATH = 'packages/ui/src/styles/golos-ui/golos-ui-vf.woff2';
@@ -37,4 +37,26 @@ export function seedInterfaceFontConsumers(root: string) {
   write(root, 'apps/extension/build/layout.data.json', JSON.stringify({ required: [fontPath] }));
   write(root, 'apps/extension/vite.config.ts', `${fontPath}\n`);
   write(root, 'packages/ui/src/styles/fonts.css', `${fontPath}\n`);
+}
+
+export function seedDocumentFont(root: string) {
+  const policyPath = 'tooling/configs/qa/oss-release.data.json';
+  const repositoryPolicy = JSON.parse(readFileSync(path.resolve(policyPath), 'utf8'));
+  const asset = repositoryPolicy.bundledAssets.find(
+    (entry: { id: string }) => entry.id === 'golos-text'
+  );
+  for (const relativePath of [asset.licensePath, asset.artifacts[0].path]) {
+    write(root, relativePath, readFileSync(path.resolve(relativePath)));
+  }
+  const packageJson = JSON.parse(readFileSync(path.join(root, 'packages/ui/package.json'), 'utf8'));
+  packageJson.exports['./styles/document-font'] = './src/styles/golos-text/golos-text-vf.woff2';
+  packageJson.exports['./styles/document-font-license'] = './src/styles/golos-text/LICENSE.txt';
+  write(root, 'packages/ui/package.json', JSON.stringify(packageJson));
+  write(root, 'packages/ui/src/styles/fonts.css', 'golos-ui-vf.woff2 golos-text-vf.woff2');
+  write(
+    root,
+    'apps/extension/build/layout.data.json',
+    JSON.stringify({ required: ['assets/golos-ui-vf.woff2', 'assets/golos-text-vf.woff2'] })
+  );
+  return asset;
 }

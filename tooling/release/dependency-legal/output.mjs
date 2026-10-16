@@ -38,13 +38,13 @@ function validateInterfaceFont(interfaceFont) {
   };
 }
 
-function formatInterfaceFontSection(interfaceFont) {
+function formatInterfaceFontSection(interfaceFont, family = 'Golos UI') {
   const artifactRows = interfaceFont.artifacts
     .map(
       (artifact) => `| \`${artifact.path}\` | \`${artifact.sourcePath}\` | \`${artifact.sha256}\` |`
     )
     .join('\n');
-  return `## Golos UI bundled font
+  return `## ${family} bundled font
 
 - Source package: \`${interfaceFont.sourcePackage}\`
 - Font version: \`${interfaceFont.version}\`
@@ -97,8 +97,11 @@ function formatDependencySection(entry) {
 }
 
 /** Formats the deterministic notices document for the complete production dependency closure. */
-export function formatThirdPartyNotices({ entries, interfaceFont }) {
+export function formatThirdPartyNotices({ entries, interfaceFont, documentFont }) {
   const normalizedInterfaceFont = validateInterfaceFont(interfaceFont);
+  const documentSection = documentFont
+    ? `\n\n${formatInterfaceFontSection(validateInterfaceFont(documentFont), 'Golos Text')}`
+    : '';
   const dependencySections = [...entries]
     .sort(
       (left, right) =>
@@ -111,7 +114,7 @@ export function formatThirdPartyNotices({ entries, interfaceFont }) {
 
 This file is generated from the installed production dependency closure, package-lock, and reviewed pinned sources.
 
-${formatInterfaceFontSection(normalizedInterfaceFont)}
+${formatInterfaceFontSection(normalizedInterfaceFont)}${documentSection}
 
 ## Production dependency licenses
 
@@ -222,6 +225,7 @@ export async function writeDependencyLegalClosure({
   closure,
   manifestPath = 'THIRD_PARTY_DEPENDENCIES.json',
   interfaceFont,
+  documentFont,
   noticesPath = 'THIRD_PARTY_NOTICES.md',
   outputRoot,
 }) {
@@ -242,6 +246,6 @@ export async function writeDependencyLegalClosure({
   );
   await fs.writeFile(
     resolveOutputPath(outputRoot, noticesPath),
-    formatThirdPartyNotices({ entries: normalized.entries, interfaceFont })
+    formatThirdPartyNotices({ entries: normalized.entries, interfaceFont, documentFont })
   );
 }

@@ -42,6 +42,7 @@ function registerRichShapeDefaultTests() {
     });
     expect(DEFAULT_RICH_SHAPE_TEXT).toMatchObject({
       content: '',
+      fontFamily: 'Sniptale Text',
       horizontalAlign: 'center',
       verticalAlign: 'middle',
       autofit: 'none',
@@ -84,6 +85,18 @@ function registerRichShapeFamilyTests() {
 }
 
 function registerRichShapeSerializationTests() {
+  it.each(['Sniptale Interface', 'Sniptale Sans', 'Georgia', 'monospace', 'Custom Stored Face'])(
+    'preserves the explicit stored font %s during normalization',
+    (fontFamily) => {
+      const shape = createDefaultRichShapeObject({
+        id: 'stored-font',
+        text: { ...DEFAULT_RICH_SHAPE_TEXT, fontFamily },
+      });
+      expect(normalizeEditorRichShapeObject(shape).text.fontFamily).toBe(fontFamily);
+      expect(shape.text.fontFamily).toBe(fontFamily);
+    }
+  );
+
   it('round-trips rich shape documents through JSON serialization', () => {
     const shape = createDefaultRichShapeObject({
       id: 'shape-1',

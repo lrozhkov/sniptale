@@ -4,7 +4,7 @@
 
 ## Structure
 
-Use persistent secondary labels and primary editable values. A placeholder is an example, not a label. Use a single-line field for short text, multiline input for prose, and a search field for filtering. Editable text and color inputs have no surface or frame at rest. Hover or focus reveals a neutral surface and subtle boundary. Keep their input target usable at rest. Keep 32px default height, 4px label gap, and the shared typography. Let multiline content use its own scroll/resize owner.
+Use persistent secondary labels and primary editable values. A placeholder is an example, not a label. Hide it when the caret enters the input or textarea through a click or keyboard navigation. Pointer hover alone must not hide it. Restore it when the empty field loses focus. Keep field geometry stable. Use a single-line field for short text, multiline input for prose, and a search field for filtering. Editable text and color inputs have no surface or frame at rest. Hover or focus reveals a neutral surface and subtle boundary. Keep their input target usable at rest. Keep 32px default height, 4px label gap, and the shared typography. User-entered text uses the document font family. Labels and actions use the interface family. Let multiline content use its own scroll/resize owner.
 
 Read-only values remain selectable and copyable. Disabled values retain their actual content. Mixed values are explicit and are not a literal accepted string such as “Different values.”
 

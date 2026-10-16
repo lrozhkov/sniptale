@@ -86,3 +86,15 @@ it.each([
     ])
   );
 });
+
+it.each([
+  'golos-text-vf.woff2',
+  '@sniptale/ui/styles/document-font?inline',
+  '@sniptale/ui/styles/document-font-license?raw',
+])('discovers the document font consumer: %s', (reference) => {
+  const root = createTempRoot('oss-release-document-consumer-');
+  write(root, 'apps/extension/src/document.ts', reference);
+  expect(discoverOssReleaseConsumers(root)).toEqual([
+    expect.objectContaining({ path: 'apps/extension/src/document.ts', category: 'bundled-font' }),
+  ]);
+});

@@ -153,9 +153,9 @@ it('registers locally scoped property focus styles in the content bundle', () =>
   );
 });
 
-it('maps Golos UI VF to the existing emitted asset from supported source forms', () => {
-  const file = 'golos-ui-vf.woff2';
-  for (const prefix of ['/packages/ui/src/styles/golos-ui/', './golos-ui/', './']) {
+it.each(['ui', 'text'])('maps bundled Golos %s VF from supported source forms', (role) => {
+  const file = `golos-${role}-vf.woff2`;
+  for (const prefix of [`/packages/ui/src/styles/golos-${role}/`, `./golos-${role}/`, './']) {
     expect(resolveContentEntrypointStyleUrls(`src: url("${prefix}${file}")`)).toBe(
       `src: url("chrome-extension://sniptale/assets/${file}")`
     );

@@ -243,8 +243,13 @@
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "e6ca66f965946462a665812006ada94d234c363e12255b2fda8cf06d71587632",
+      "sha256": "041c5c97212fed3b49773dbaa17870d2a0cced2a071d3e9b9554d385fd87f2e2",
       "source": "THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "archivePath": "packages/ui/src/styles/golos-text/LICENSE.txt",
+      "sha256": "2c7e44f733787b9d9fe9ee3f857e24bed455523b14804ebf73480c125e4b6784",
+      "source": "packages/ui/src/styles/golos-text/LICENSE.txt"
     },
     {
       "archivePath": "packages/ui/src/styles/golos-ui/LICENSE.txt",
@@ -284,6 +289,21 @@
           "path": "packages/ui/src/styles/golos-ui/golos-ui-vf.woff2",
           "sha256": "ec7584959184bcbd5b6cf65c5aacc2ad3ca3afc42ec3b0976f0260c33d1900a1",
           "sourcePath": "packages/ui/src/styles/golos-ui/golos-ui-vf.woff2"
+        }
+      ]
+    },
+    {
+      "id": "golos-text",
+      "sourcePackage": "@sniptale/ui",
+      "version": "2.005",
+      "license": "OFL-1.1",
+      "licensePath": "packages/ui/src/styles/golos-text/LICENSE.txt",
+      "copyright": "Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name \"Golos Text\".",
+      "artifacts": [
+        {
+          "path": "packages/ui/src/styles/golos-text/golos-text-vf.woff2",
+          "sha256": "ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843",
+          "sourcePath": "packages/ui/src/styles/golos-text/golos-text-vf.woff2"
         }
       ]
     }

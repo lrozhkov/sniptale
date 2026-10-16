@@ -1,7 +1,7 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { resolveContentShadowRoot } from '../../platform/dom-host';
 
-const INTERFACE_FONT_FAMILY = 'Sniptale Interface';
+const BUNDLED_FONT_FAMILIES = new Set(['Sniptale Interface', 'Sniptale Text']);
 const installationByDocument = new WeakMap<
   Document,
   { root: ShadowRoot; promise: Promise<void>; installed: boolean }
@@ -56,7 +56,7 @@ function hasBundledSource(source: string): boolean {
   }
 }
 
-/** Registers only the bundled interface declarations from the attached content stylesheet. */
+/** Registers only the bundled UI and authored-text declarations from the attached content stylesheet. */
 export function installContentInterfaceFonts(
   root: ShadowRoot,
   dependencies: FontDependencies = defaultDependencies
@@ -73,7 +73,7 @@ export function installContentInterfaceFonts(
   const declarations = rules.flatMap((rule) => {
     const family = rule.style.getPropertyValue('font-family').replace(/^["']|["']$/gu, '');
     const source = rule.style.getPropertyValue('src').trim();
-    if (family !== INTERFACE_FONT_FAMILY || !hasBundledSource(source)) return [];
+    if (!BUNDLED_FONT_FAMILIES.has(family) || !hasBundledSource(source)) return [];
     return [
       {
         family,

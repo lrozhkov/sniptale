@@ -3,6 +3,9 @@ import { expect, it, vi } from 'vitest';
 import canonicalFaces from '@sniptale/ui/styles/fonts?raw';
 import canonicalTokens from '@sniptale/ui/styles/design-tokens?raw';
 import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
+import documentLicense from '@sniptale/ui/styles/document-font-license?raw';
+import interfaceFont from '@sniptale/ui/styles/interface-font?inline';
+import documentFont from '@sniptale/ui/styles/document-font?inline';
 import { createTourDocument } from '../project/factories';
 import { buildTourPlayerHtml, type TourPlayerLabels } from './document';
 const labels: TourPlayerLabels = {
@@ -30,7 +33,7 @@ function fixture() {
   return { tour: createTourDocument('fonts'), title: 'Fonts', labels, assets: [] };
 }
 
-it('embeds canonical Golos UI variable face, family and license without adding executable content', async () => {
+it('embeds bundled variable fonts, roles and licenses without executable content', async () => {
   expect(canonicalFaces).toContain('@font-face');
   const html = await buildTourPlayerHtml(fixture());
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -38,9 +41,12 @@ it('embeds canonical Golos UI variable face, family and license without adding e
   const faces = [...css.matchAll(/@font-face\s*\{[^}]*\}/gu)].map(([face]) => face);
   const canonical = [...canonicalFaces.matchAll(/@font-face\s*\{[^}]*\}/gu)]
     .map(([face]) => face)
-    .filter((face) => face.includes("font-family: 'Sniptale Interface'"));
-  expect(faces).toHaveLength(1);
+    .filter((face) => /font-family: 'Sniptale (?:Interface|Text)'/u.test(face));
+  expect(faces).toHaveLength(2);
   expect(faces[0]).toMatch(/font-weight:\s*400\s+700\s*;/u);
+  expect(faces[1]).toMatch(/font-weight:\s*400\s+900\s*;/u);
+  expect(faces[0]).toContain(interfaceFont);
+  expect(faces[1]).toContain(documentFont);
   expect(faces.every((face) => !face.includes('unicode-range'))).toBe(true);
   for (const [index, face] of faces.entries()) {
     expect(face.replace(/url\([^)]*\)/gu, 'url(embedded)')).toBe(
@@ -51,7 +57,17 @@ it('embeds canonical Golos UI variable face, family and license without adding e
   expect(css.match(/--sniptale-font-interface:\s*([^;]+);/u)?.[1]).toBe(
     canonicalTokens.match(/--sniptale-font-interface:\s*([^;]+);/u)![1]
   );
-  expect(css.match(/url\([^)]*\)/gu)).toHaveLength(1);
+  expect(css.match(/--sniptale-font-document-sans:\s*([^;]+);/u)?.[1]).toBe(
+    canonicalTokens.match(/--sniptale-font-document-sans:\s*([^;]+);/u)![1]
+  );
+  expect(css).toMatch(/body\s*\{[^}]*font-family: var\(--sniptale-font-interface\)/u);
+  for (const selector of ['tour-hint-text', 'tour-hint-action-title', 'tour-navigation-text']) {
+    expect(css).toContain(`.${selector} {\n  font-family: var(--sniptale-font-document-sans);`);
+  }
+  expect(css).toContain(
+    '.tour-navigation-content h1 {\n  font-family: var(--sniptale-font-document-sans);'
+  );
+  expect(css.match(/url\([^)]*\)/gu)).toHaveLength(2);
   expect(css).not.toContain('@fontsource');
   expect(css).not.toContain('Sniptale Sans');
   expect(doc.querySelector('[data-tour-interface-font-license]')?.textContent).toBe(
@@ -60,6 +76,10 @@ it('embeds canonical Golos UI variable face, family and license without adding e
   expect(doc.querySelector('[data-tour-interface-font-license]')?.hasAttribute('hidden')).toBe(
     true
   );
+  expect(doc.querySelector('[data-tour-document-font-license]')?.textContent).toBe(
+    documentLicense.replace(/\r\n?/gu, '\n')
+  );
+  expect(doc.querySelector('[data-tour-document-font-license]')?.hasAttribute('hidden')).toBe(true);
   expect(
     [...doc.querySelectorAll('script')].filter((node) => node.type !== 'application/json')
   ).toHaveLength(1);
@@ -68,25 +88,48 @@ it('embeds canonical Golos UI variable face, family and license without adding e
   );
 });
 
-it.each(['missing', 'duplicate', 'unexpected', 'wrong range'] as const)(
-  'refuses a %s canonical variable font before producing an artifact',
-  async (change) => {
-    const source =
-      change === 'missing'
-        ? canonicalFaces.replace(/@font-face\s*\{[^}]*\}/u, '')
-        : change === 'duplicate'
-          ? canonicalFaces.replace(/(@font-face\s*\{[^}]*\})/u, '$1\n$1')
-          : change === 'wrong range'
-            ? canonicalFaces.replace(/font-weight:\s*400\s+700\s*;/u, 'font-weight: 400;')
-            : canonicalFaces.replace('golos-ui-vf.woff2', 'unknown.woff2');
+const textFace = canonicalFaces.match(
+  /@font-face\s*\{[^}]*font-family: 'Sniptale Text'[^}]*\}/u
+)![0];
+it.each([
+  ['missing', canonicalFaces.replace(/@font-face\s*\{[^}]*\}/u, '')],
+  ['duplicate', canonicalFaces.replace(/(@font-face\s*\{[^}]*\})/u, '$1\n$1')],
+  ['unexpected', canonicalFaces.replace('golos-ui-vf.woff2', 'unknown.woff2')],
+  ['wrong range', canonicalFaces.replace(/font-weight:\s*400\s+700\s*;/u, 'font-weight: 400;')],
+  ['missing Text', canonicalFaces.replace(textFace, '')],
+  ['duplicate Text', canonicalFaces + textFace],
+  ['unexpected Text', canonicalFaces.replace('golos-text-vf.woff2', 'unknown.woff2')],
+  ['wrong Text range', canonicalFaces.replace('400 900', '400 700')],
+  ['wrong Text family', canonicalFaces.replace('Sniptale Text', 'Untrusted Face')],
+])('refuses a %s canonical variable font before producing an artifact', async (_change, source) => {
+  vi.resetModules();
+  vi.doMock('@sniptale/ui/styles/fonts?raw', () => ({ default: source }));
+  try {
+    const { buildTourPlayerHtml: build } = await import('./document');
+    await expect(build(fixture())).rejects.toThrow('Unexpected Tour interface font');
+  } finally {
+    vi.doUnmock('@sniptale/ui/styles/fonts?raw');
     vi.resetModules();
-    vi.doMock('@sniptale/ui/styles/fonts?raw', () => ({ default: source }));
-    try {
-      const { buildTourPlayerHtml: build } = await import('./document');
-      await expect(build(fixture())).rejects.toThrow('Unexpected Tour interface font');
-    } finally {
-      vi.doUnmock('@sniptale/ui/styles/fonts?raw');
-      vi.resetModules();
-    }
   }
-);
+});
+
+it('excludes unrelated authored faces from the standalone font projection', async () => {
+  vi.resetModules();
+  vi.doMock('@sniptale/ui/styles/fonts?raw', () => ({
+    default:
+      canonicalFaces +
+      "@font-face{font-family:'Untrusted Face';src:url('https://example.com/font.woff2');}",
+  }));
+  try {
+    const { buildTourPlayerHtml: build } = await import('./document');
+    const html = await build(fixture());
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const css = doc.querySelector('style')!.textContent!;
+    expect(css.match(/@font-face/gu)).toHaveLength(2);
+    expect(css).not.toContain('Untrusted Face');
+    expect(css).not.toContain('https://example.com/font.woff2');
+  } finally {
+    vi.doUnmock('@sniptale/ui/styles/fonts?raw');
+    vi.resetModules();
+  }
+});

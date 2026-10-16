@@ -18,9 +18,9 @@ import contentHostStyles from './host.css?inline';
 export { installContentInterfaceFonts } from './interface-fonts';
 
 const CONTENT_ENTRYPOINT_INTERFACE_FONT_URL_PATTERNS = [
-  /url\((['"]?)\/packages\/ui\/src\/styles\/golos-ui\/(golos-ui-vf\.woff2)\1\)/g,
-  /url\((['"]?)\.\/golos-ui\/(golos-ui-vf\.woff2)\1\)/g,
-  /url\((['"]?)\.\/(golos-ui-vf\.woff2)\1\)/g,
+  /url\((['"]?)\/packages\/ui\/src\/styles\/(?:golos-ui|golos-text)\/(golos-(?:ui|text)-vf\.woff2)\1\)/g,
+  /url\((['"]?)\.\/(?:golos-ui|golos-text)\/(golos-(?:ui|text)-vf\.woff2)\1\)/g,
+  /url\((['"]?)\.\/(golos-(?:ui|text)-vf\.woff2)\1\)/g,
 ] as const;
 
 const CONTENT_ENTRYPOINT_CALLOUT_FONT_URL_PATTERNS = [

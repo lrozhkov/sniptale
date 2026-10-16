@@ -158,3 +158,36 @@ it('rejects a missing or drifted canonical license before replacing generated fi
     })
   ).rejects.toThrow(`Canonical dependency license digest drift: ${canonicalPath}`);
 });
+
+it('adds Text font provenance without changing the UI section or dependency closure', () => {
+  const documentFont = {
+    ...TEST_INTERFACE_FONT,
+    version: '2.005',
+    licensePath: 'packages/ui/src/styles/golos-text/LICENSE.txt',
+    artifacts: [
+      {
+        path: 'packages/ui/src/styles/golos-text/golos-text-vf.woff2',
+        sourcePath: 'packages/ui/src/styles/golos-text/golos-text-vf.woff2',
+        sha256: 'ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843',
+      },
+    ],
+  };
+  const original = formatThirdPartyNotices({
+    entries: [ENTRY],
+    interfaceFont: TEST_INTERFACE_FONT,
+  });
+  const notices = formatThirdPartyNotices({
+    entries: [ENTRY],
+    interfaceFont: TEST_INTERFACE_FONT,
+    documentFont,
+  });
+  expect(notices).toContain('## Golos Text bundled font');
+  expect(notices).toContain('Font version: `2.005`');
+  expect(notices).toContain(documentFont.artifacts[0].sha256);
+  expect(notices.split('## Production dependency licenses')[1]).toBe(
+    original.split('## Production dependency licenses')[1]
+  );
+  expect(notices.split('## Golos Text')[0].trim()).toBe(
+    original.split('## Production dependency licenses')[0].trim()
+  );
+});

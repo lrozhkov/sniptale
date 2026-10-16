@@ -29,6 +29,7 @@
     {
       "resources": [
         "assets/golos-ui-vf.woff2",
+        "assets/golos-text-vf.woff2",
         "fonts/marck-script-cyrillic-400-normal.woff2",
         "fonts/marck-script-latin-400-normal.woff2"
       ],

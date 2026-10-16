@@ -237,6 +237,7 @@ function assertManifestWar(manifest) {
     for (const resource of entry.resources) {
       if (
         resource !== 'assets/golos-ui-vf.woff2' &&
+        resource !== 'assets/golos-text-vf.woff2' &&
         FORBIDDEN_WAR_PATTERNS.some((pattern) => pattern.test(resource))
       ) {
         throw new Error(`Release artifact exposes unsafe web-accessible resource: ${resource}`);

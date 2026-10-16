@@ -189,6 +189,7 @@
     "assets/contentRuntimeShim.js",
     "assets/styles.css",
     "assets/golos-ui-vf.woff2",
+    "assets/golos-text-vf.woff2",
     "apps/extension/src/popup/index.html",
     "apps/extension/src/editor/index.html",
     "apps/extension/src/scenario-editor/index.html",

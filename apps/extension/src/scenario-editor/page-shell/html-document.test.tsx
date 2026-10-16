@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { webcrypto } from 'node:crypto';
 import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
+import documentLicense from '@sniptale/ui/styles/document-font-license?raw';
+import interfaceFont from '@sniptale/ui/styles/interface-font?inline';
+import documentFont from '@sniptale/ui/styles/document-font?inline';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { expect, it, vi } from 'vitest';
 import {
@@ -69,12 +72,27 @@ it('serializes canonical content safely with local styles, fonts and private ima
   vi.unstubAllGlobals();
   const stylesheet = document.querySelector('style')?.textContent ?? '';
   expect(stylesheet).not.toContain('Manrope');
-  expect(stylesheet.match(/@font-face/g)).toHaveLength(1);
+  expect(stylesheet.match(/@font-face/g)).toHaveLength(2);
+  expect(stylesheet).toContain(`src:url("${interfaceFont}")`);
+  expect(stylesheet).toContain(`src:url("${documentFont}")`);
+  expect(stylesheet).toContain('font-family:"Sniptale Text";font-style:normal;font-weight:400 900');
+  expect(document.querySelector('[data-guide-document-font-license]')?.textContent).toBe(
+    documentLicense.replace(/\r\n?/gu, '\n')
+  );
+  expect(document.querySelector('[data-guide-document-font-license]')?.hasAttribute('hidden')).toBe(
+    true
+  );
   const license = document.querySelector('[data-guide-interface-font-license]');
   expect(license?.textContent).toBe(interfaceLicense.replace(/\r\n?/gu, '\n'));
   expect(license?.hasAttribute('hidden')).toBe(true);
   expect(stylesheet).toContain('font-family:"Sniptale Interface"');
-  expect(stylesheet).toContain('--sniptale-font-document-sans:var(--sniptale-font-interface)');
+  expect(stylesheet).toContain("--sniptale-font-document-sans: 'Sniptale Text'");
+  expect(stylesheet).toContain(
+    'body{margin:0;padding:24px;font-family:var(--sniptale-font-document-sans)'
+  );
+  expect(stylesheet).toContain(
+    '[data-guide-pagination],[data-guide-viewer] header,.guide-reading-nav{font-family:var(--sniptale-font-interface)}'
+  );
   expect(document.querySelector('article')?.style.getPropertyValue('--guide-font')).toBe(
     'var(--sniptale-font-document-sans, var(--sniptale-font-sans))'
   );
@@ -306,3 +324,24 @@ it.each(['en', 'ru'] as const)(
     }
   }
 );
+
+it('preserves authored serif selection without changing the project on export', async () => {
+  vi.stubGlobal('crypto', webcrypto);
+  try {
+    const project = createGuideProject('Serif guide');
+    project.style.font = 'serif';
+    project.items = [createGuideStep('Serif step')];
+    const saved = JSON.stringify(project);
+    const result = await buildGuideHtml(project, createTranslator('en'), 'light', {
+      rasters: [],
+      blocks: new Map(),
+    });
+    const doc = new DOMParser().parseFromString(result.html, 'text/html');
+    expect(doc.querySelector('article')?.style.getPropertyValue('--guide-font')).toBe(
+      'Georgia, "Times New Roman", serif'
+    );
+    expect(JSON.stringify(project)).toBe(saved);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

@@ -2,6 +2,8 @@ import interfaceFaces from '@sniptale/ui/styles/fonts?raw';
 import designTokens from '@sniptale/ui/styles/design-tokens?raw';
 import golosVariable from '@sniptale/ui/styles/interface-font?inline';
 import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
+import documentVariable from '@sniptale/ui/styles/document-font?inline';
+import documentLicense from '@sniptale/ui/styles/document-font-license?raw';
 import { getTourNarrationTargets } from '../project/tour-resources';
 import script from './runtime.js?tour-player-script';
 import styles from './player.css?raw';
@@ -73,28 +75,45 @@ function escape(value: string): string {
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!
   );
 }
-// Project the canonical interface declarations without importing application styles or authored faces.
-function interfaceFontStyles(): string {
-  const sources = new Map([['./golos-ui/golos-ui-vf.woff2', golosVariable]]);
+// Project only the two known bundled faces; authored font declarations cannot enter the artifact.
+function playerFontStyles(): string {
+  const sources = new Map([
+    [
+      './golos-ui/golos-ui-vf.woff2',
+      { family: 'Sniptale Interface', weight: '400 700', data: golosVariable },
+    ],
+    [
+      './golos-text/golos-text-vf.woff2',
+      { family: 'Sniptale Text', weight: '400 900', data: documentVariable },
+    ],
+  ]);
   const faces = [...interfaceFaces.matchAll(/@font-face\s*\{[^}]*\}/gu)]
     .map(([block]) => block)
-    .filter((block) => /font-family:\s*'Sniptale Interface'\s*;/u.test(block));
+    .filter((block) => /font-family:\s*'Sniptale (?:Interface|Text)'\s*;/u.test(block));
   if (faces.length !== sources.size) throw new Error('Unexpected Tour interface font weights.');
   const seen = new Set<string>();
   const embedded = faces.map((face) => {
-    if (!/font-weight:\s*400\s+700\s*;/u.test(face))
-      throw new Error('Unexpected Tour interface font weight range.');
     const urls = [...face.matchAll(/url\(\s*(['"])([^'"]+)\1\s*\)/gu)];
     const url = urls[0]?.[2];
-    const data = url ? sources.get(url) : undefined;
-    if (urls.length !== 1 || !url || !data || seen.has(url))
+    const source = url ? sources.get(url) : undefined;
+    if (urls.length !== 1 || !url || !source || seen.has(url))
       throw new Error('Unexpected Tour interface font source.');
+    if (
+      !face.includes(`font-family: '${source.family}';`) ||
+      !face.includes(`font-weight: ${source.weight};`)
+    )
+      throw new Error('Unexpected Tour interface font weight range.');
     seen.add(url);
-    return face.replace(url, data);
+    return face.replace(url, source.data);
   });
-  const families = [...designTokens.matchAll(/--sniptale-font-interface:\s*([^;]+);/gu)];
-  if (families.length !== 1) throw new Error('Unexpected Tour interface font family.');
-  return `${embedded.join('\n')}\n:root{--sniptale-font-interface:${families[0]![1]};}`;
+  const properties = ['interface', 'document-sans'].map((role) => {
+    const families = [
+      ...designTokens.matchAll(new RegExp(`--sniptale-font-${role}:\\s*([^;]+);`, 'gu')),
+    ];
+    if (families.length !== 1) throw new Error('Unexpected Tour interface font family.');
+    return `--sniptale-font-${role}:${families[0]![1]};`;
+  });
+  return `${embedded.join('\n')}\n:root{${properties.join('')}}`;
 }
 function imageProjection(image: TourImage | null) {
   if (!image) return null;
@@ -187,10 +206,11 @@ async function buildTourPlayerShell(args: {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${escape(policy)}">
 <title>${escape(args.title)}</title>
-<style>${interfaceFontStyles()}\n${styles}</style>
+<style>${playerFontStyles()}\n${styles}</style>
 </head>
 <body>
 <pre hidden data-tour-interface-font-license>${escape(interfaceLicense)}</pre>
+<pre hidden data-tour-document-font-license>${escape(documentLicense)}</pre>
 <main id="tour-player">
 <div class="tour-viewport" data-tour-viewport>
 <section class="tour-stage" data-tour-stage>

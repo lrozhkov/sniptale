@@ -9,6 +9,8 @@ import {
   normalizeCalloutSettings,
 } from './model';
 
+import { resolveFrameCalloutFontFamily } from './font-family';
+
 const legacy: LegacyCalloutSettings = {
   anchor: 'top-center',
   bgColor: '#222222',
@@ -25,6 +27,13 @@ const legacy: LegacyCalloutSettings = {
 };
 
 describe('callout model', () => {
+  it('uses authored Text for semantic sans and keeps other selectable families', () => {
+    expect(resolveFrameCalloutFontFamily('sans')).toMatch(/^"Sniptale Text",/);
+    expect(resolveFrameCalloutFontFamily('serif')).toContain('Georgia');
+    expect(resolveFrameCalloutFontFamily('mono')).toContain('ui-monospace');
+    expect(resolveFrameCalloutFontFamily('cursive')).toContain('Sniptale Handwritten');
+  });
+
   it('normalizes legacy bubbles into the nested wedge model', () => {
     const normalized = normalizeCalloutSettings(legacy);
     expect(normalized.content).toEqual({ bodyHtml: '<p>Body</p>', titleText: '' });

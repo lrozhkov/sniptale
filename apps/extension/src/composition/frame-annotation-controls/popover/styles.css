@@ -214,8 +214,8 @@
 
 .sniptale-content-appearance-surface .sniptale-content-annotation-preview {
   display: contents;
-  --sniptale-font-sans: var(--sniptale-font-document-sans);
-  font-family: var(--sniptale-font-document-sans);
+  --sniptale-font-sans: var(--sniptale-font-interface);
+  font-family: var(--sniptale-font-interface);
   font-weight: 400;
 }
 

@@ -52,3 +52,24 @@
 .theme[data-theme='dark'] {
   --text: var(--sniptale-color-text-interface, #dedee3);
 }
+
+@font-face {
+  font-family: 'Sniptale Text';
+  src: url('./golos-text-vf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+}
+:root {
+  --sniptale-font-document-sans: 'Sniptale Text', 'Segoe UI', sans-serif;
+}
+.theme
+  :is(input[type='text'], input[type='search'], input[type='url'], input:not([type]), textarea):not(
+    .font-mono
+  ) {
+  font-family: var(--sniptale-font-document-sans);
+}
+
+.theme :is(input, textarea):focus::placeholder {
+  opacity: 0;
+}

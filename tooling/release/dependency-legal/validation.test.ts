@@ -108,3 +108,32 @@ it('rejects a stale manifest and missing MPL corresponding-source URL', async ()
     ])
   );
 });
+
+it('requires Text provenance in generated notices when the policy declares Text', async () => {
+  const { closure, repoRoot } = await seedValidationFixture();
+  const policyPath = path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json');
+  const policy = JSON.parse(await fs.readFile(policyPath, 'utf8'));
+  const repositoryPolicy = JSON.parse(
+    await fs.readFile('tooling/configs/qa/oss-release.data.json', 'utf8')
+  );
+  const documentFont = repositoryPolicy.bundledAssets.find(
+    (entry: { id: string }) => entry.id === 'golos-text'
+  );
+  policy.bundledAssets.push(documentFont);
+  policy.legalFiles.push({
+    archivePath: documentFont.licensePath,
+    source: documentFont.licensePath,
+    sha256: 'a'.repeat(64),
+  });
+  await fs.writeFile(policyPath, JSON.stringify(policy));
+  expect(await validateDependencyLegalClosure(repoRoot)).toContain(
+    'THIRD_PARTY_NOTICES.md is incomplete or stale'
+  );
+  await writeDependencyLegalClosure({
+    closure,
+    interfaceFont: TEST_INTERFACE_FONT,
+    documentFont,
+    outputRoot: repoRoot,
+  });
+  expect(await validateDependencyLegalClosure(repoRoot)).toEqual([]);
+});

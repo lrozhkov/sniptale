@@ -16,6 +16,20 @@ This file is generated from the installed production dependency closure, package
 
 The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
 
+## Golos Text bundled font
+
+- Source package: `@sniptale/ui`
+- Font version: `2.005`
+- License: `OFL-1.1`
+- Copyright: Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos Text".
+- License text: [`packages/ui/src/styles/golos-text/LICENSE.txt`](packages/ui/src/styles/golos-text/LICENSE.txt)
+
+| Bundled file | Source file | SHA-256 |
+| --- | --- | --- |
+| `packages/ui/src/styles/golos-text/golos-text-vf.woff2` | `packages/ui/src/styles/golos-text/golos-text-vf.woff2` | `ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843` |
+
+The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
+
 ## Production dependency licenses
 
 ### `@fontsource/marck-script` 5.3.0

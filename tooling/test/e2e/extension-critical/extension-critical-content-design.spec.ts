@@ -164,7 +164,11 @@ async function geometry(page: Page) {
   });
 }
 
-async function platformFonts(context: BrowserContext, page: Page) {
+async function platformFonts(
+  context: BrowserContext,
+  page: Page,
+  role: 'interface' | 'authored' = 'interface'
+) {
   const session = await context.newCDPSession(page);
   try {
     await session.send('DOM.enable');
@@ -183,9 +187,15 @@ async function platformFonts(context: BrowserContext, page: Page) {
         const node = byId.get(nodeId);
         if (!node) return false;
         if (
-          node.attributes?.includes('content.toolbar.root') ||
-          node.attributes?.includes('native.font-probe') ||
-          node.attributes?.some((value) => value.includes('sniptale-frame-settings-popover'))
+          role === 'authored' &&
+          node.attributes?.some((value) => value.split(/\s+/u).includes('sniptale-callout'))
+        )
+          return true;
+        if (
+          role === 'interface' &&
+          (node.attributes?.includes('content.toolbar.root') ||
+            node.attributes?.includes('native.font-probe') ||
+            node.attributes?.some((value) => value.includes('sniptale-frame-settings-popover')))
         )
           return true;
         nodeId = node.parentId;
@@ -240,7 +250,10 @@ async function withHost(
   const pending: Promise<void>[] = [];
   const observe = (page: Page) =>
     page.on('response', (response) => {
-      if (page.url().startsWith(origin) && /\/golos-ui-vf\.woff2(?:$|\?)/u.test(response.url()))
+      if (
+        page.url().startsWith(origin) &&
+        /\/golos-(?:ui|text)-vf\.woff2(?:$|\?)/u.test(response.url())
+      )
         pending.push(
           response.body().then((bytes) => {
             fonts.push({ url: response.url(), status: response.status(), bytes: bytes.byteLength });
@@ -294,7 +307,13 @@ async function assertBundledFont(
     const cyrillic = await document.fonts.load('500 13px "Sniptale Interface"', 'Интерфейс');
     const latinRegular = await document.fonts.load('400 13px "Sniptale Interface"', 'Interface');
     const cyrillicRegular = await document.fonts.load('400 13px "Sniptale Interface"', 'Интерфейс');
+    const text = await document.fonts.load('400 16px "Sniptale Text"', 'Text Текст');
     return {
+      text: text.map((font) => ({
+        family: font.family.replace(/^["']|["']$/gu, ''),
+        status: font.status,
+        weight: font.weight,
+      })),
       registered: registered.map((font) => ({
         family: font.family,
         status: font.status,
@@ -310,10 +329,27 @@ async function assertBundledFont(
       cyrillic: cyrillic.map((font) => ({ family: font.family, status: font.status })),
     };
   });
+  expect
+    .soft(faces.text)
+    .toContainEqual({ family: 'Sniptale Text', status: 'loaded', weight: '400 900' });
   const painted = await platformFonts(context, page);
+  const authoredPainted = await platformFonts(context, page, 'authored');
+  expect.soft(authoredPainted.length).toBeGreaterThan(0);
+  expect
+    .soft(
+      authoredPainted.every((sample) =>
+        sample.fonts.some(
+          (font: { isCustomFont: boolean; familyName: string; glyphCount: number }) =>
+            font.isCustomFont &&
+            /^Golos Text(?: VF)?$/u.test(font.familyName) &&
+            font.glyphCount > 0
+        )
+      )
+    )
+    .toBe(true);
   await writeFile(
     info.outputPath('native-font-evidence.json'),
-    JSON.stringify({ faces, painted, fonts }, null, 2)
+    JSON.stringify({ faces, painted, authoredPainted, fonts }, null, 2)
   );
   expect.soft(faces.registered.length, 'Actual document FontFace registration is required').toBe(1);
   expect.soft(faces.registered.map((font) => font.weight)).toEqual(['400 700']);
@@ -587,6 +623,7 @@ for (const locale of ['ru', 'en'] as const)
             const hostBefore = await hostTypography(page);
             const comment = await createAuthoredCallout(page, locale);
             const authoredBefore = await authoredTypography(comment);
+            expect(authoredBefore.font).toContain('Sniptale Text');
             expect(authoredBefore.size).toBe('14px');
             expect(authoredBefore.weight).toBe('400');
             await screenshot(page, info, 'toolbar-and-authored');

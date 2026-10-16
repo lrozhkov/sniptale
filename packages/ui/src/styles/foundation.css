@@ -139,3 +139,23 @@
   opacity: 1;
   transform: translate3d(0, -2px, 0);
 }
+
+/* Text entry is document content; chrome retains the interface family. */
+.sniptale-extension-surface
+  :is(
+    input:not([type]),
+    input[type='text'],
+    input[type='search'],
+    input[type='url'],
+    input[type='email'],
+    input[type='password'],
+    textarea
+  ):not(.font-mono):not([inputmode='decimal']):not([inputmode='numeric']) {
+  font-family: var(--sniptale-font-document-sans);
+}
+
+/* Hide only after the caret enters the field, never on pointer hover. */
+input:focus::placeholder,
+textarea:focus::placeholder {
+  opacity: 0 !important;
+}

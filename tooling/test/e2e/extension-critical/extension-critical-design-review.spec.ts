@@ -514,3 +514,62 @@ test('web copy retains authored text drawings and frames after Library reopen', 
   await popup.close();
   await page.close();
 });
+
+for (const locale of ['en', 'ru'] as const)
+  for (const theme of ['light', 'dark'] as const)
+    for (const size of [
+      { width: 1280, height: 560 },
+      { width: 1920, height: 900 },
+    ]) {
+      test(`saved review prose uses Text ${locale} ${theme} ${size.width}`, async ({
+        context,
+        extensionId,
+        hostOrigin,
+      }, info) => {
+        const setup = await context.newPage();
+        await setup.setViewportSize(size);
+        await setup.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`);
+        await setup.evaluate(
+          async ({ locale, theme }) => {
+            await chrome.storage.local.set({
+              'sniptale-locale-preference': locale,
+              'sniptale-theme-preference': theme,
+            });
+          },
+          { locale, theme }
+        );
+        await setup.close();
+        const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+        const target = (await page.locator('#measurement-target').boundingBox())!;
+        await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+        const popover = page.locator('[data-ui="content.design-review.popover"]');
+        const comment = popover.getByRole('textbox', {
+          name: /Element comment|Комментарий к элементу/u,
+        });
+        await comment.fill('Author text: Комментарий 123');
+        await comment.press('Enter');
+        await expect(popover).toHaveCount(0);
+        await page.locator('[data-ui="content.toolbar.design-review-panel-button"]').click();
+        const summary = page.locator('[data-ui="content.design-review.feedback-summary"]').first();
+        await expect(summary).toHaveText('Author text: Комментарий 123');
+        await expect.soft(summary).toHaveCSS('font-family', /Sniptale Text/);
+        await page.locator('[data-ui="content.design-review.feedback-item"]').first().hover();
+        const preview = page.locator('[data-ui="content.design-review.feedback-preview"]');
+        await expect(preview).toBeVisible();
+        await expect
+          .soft(preview.locator('.sniptale-design-review-authored-text'))
+          .toHaveCSS('font-family', /Sniptale Text/);
+        await expect(
+          preview.getByText('Author text: Комментарий 123', { exact: true })
+        ).toBeVisible();
+        await expect(
+          page.locator('[data-ui="content.design-review.feedback-panel"] header strong')
+        ).toHaveCSS('font-family', /Sniptale Interface/);
+        await page.screenshot({
+          path: info.outputPath('saved-feedback-fonts.png'),
+          fullPage: false,
+        });
+        await popup.close();
+        await page.close();
+      });
+    }

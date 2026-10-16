@@ -169,7 +169,7 @@ export const DRAWING_TEXT_FONT_FAMILIES: readonly DrawingFontFamily[] = [
 export function resolveDrawingTextFontFamily(fontFamily: DrawingFontFamily = 'sans'): string {
   switch (fontFamily) {
     case 'sans':
-      return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      return '"Sniptale Text", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     case 'serif':
       return 'Georgia, Cambria, "Times New Roman", Times, serif';
     case 'mono':

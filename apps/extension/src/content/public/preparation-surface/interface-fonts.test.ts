@@ -235,3 +235,31 @@ it('uses the native full-range default for complete Golos UI faces', async () =>
   );
   expect(add).toHaveBeenCalledExactlyOnceWith(loaded);
 });
+
+it('registers both bundled roles without admitting another authored family', async () => {
+  const { root, add } = createRoot([
+    declaration(
+      'url("chrome-extension://owned/assets/golos-ui-vf.woff2")',
+      'Sniptale Interface',
+      '400 700',
+      ''
+    ),
+    declaration(
+      'url("chrome-extension://owned/assets/golos-text-vf.woff2")',
+      'Sniptale Text',
+      '400 900',
+      ''
+    ),
+    declaration('url("chrome-extension://owned/assets/other.woff2")', 'Other Authored Face'),
+  ]);
+  const createFace = vi.fn((_family: string, _source: string, _descriptors: FontFaceDescriptors) =>
+    face()
+  );
+  await installContentInterfaceFonts(root, { createFace });
+  expect(createFace).toHaveBeenCalledTimes(2);
+  expect(createFace.mock.calls.map(([family]) => family)).toEqual([
+    'Sniptale Interface',
+    'Sniptale Text',
+  ]);
+  expect(add).toHaveBeenCalledTimes(2);
+});

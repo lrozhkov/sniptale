@@ -889,3 +889,7 @@
   outline: 1px solid var(--sniptale-color-accent) !important;
   outline-offset: -1px;
 }
+
+.sniptale-compact-workspace .sniptale-text-value > :is(input, textarea):not(.font-mono) {
+  font-family: var(--sniptale-font-document-sans);
+}

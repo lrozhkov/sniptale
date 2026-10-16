@@ -77,3 +77,8 @@
 .sniptale-settings-workspace .sniptale-text-value > .sniptale-textarea {
   padding: 8px 32px 8px 8px;
 }
+
+.sniptale-settings-workspace.sniptale-compact-workspace
+  :is(.sniptale-input:not([type='number']), .sniptale-textarea):not(.font-mono) {
+  font-family: var(--sniptale-font-document-sans);
+}

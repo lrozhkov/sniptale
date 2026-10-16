@@ -853,3 +853,51 @@ test('voice header keeps text room at desktop minimum widths', async ({
     await page.screenshot({ path: info.outputPath(`header-${width}.png`), fullPage: false });
   }
 });
+
+for (const locale of SCENARIO_VISUAL_LOCALES)
+  for (const theme of ['light', 'dark'] as const)
+    for (const size of [
+      { width: 1280, height: 560 },
+      { width: 1920, height: 900 },
+    ]) {
+      test(`authored font and caret-only placeholder ${locale} ${theme} ${size.width}`, async ({
+        page,
+        hostOrigin,
+      }, info) => {
+        await openVisualHarness(page, hostOrigin, theme, locale, size);
+        const name = page.locator('.guide-project-name input');
+        const prose = page.locator('.guide-document textarea.guide-description').first();
+        await expect(name).toHaveCSS('font-family', /Sniptale Text/);
+        await expect(prose).toHaveCSS('font-family', /Sniptale Text/);
+        await expect(page.locator('.guide-outline a').first()).toHaveCSS(
+          'font-family',
+          /Sniptale Interface/
+        );
+        const faces = await page.evaluate(async () => {
+          const loaded = await document.fonts.load('400 16px "Sniptale Text"', 'Text Текст');
+          return loaded.map((face) => ({ family: face.family, status: face.status }));
+        });
+        expect(faces).toContainEqual({ family: 'Sniptale Text', status: 'loaded' });
+        await name.fill('');
+        await name.press('Tab');
+        await name.hover();
+        await expect(name).not.toBeFocused();
+        const before = (await name.boundingBox())!;
+        const hover = await name.evaluate(
+          (node) => getComputedStyle(node, '::placeholder').opacity
+        );
+        expect(Number(hover)).toBeGreaterThan(0);
+        await page.screenshot({ path: info.outputPath('placeholder-hover.png'), fullPage: false });
+        await name.click();
+        await expect(name).toBeFocused();
+        await expect
+          .poll(() => name.evaluate((node) => getComputedStyle(node, '::placeholder').opacity))
+          .toBe('0');
+        const after = (await name.boundingBox())!;
+        expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(1);
+        expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
+        await page.screenshot({ path: info.outputPath('placeholder-caret.png'), fullPage: false });
+        await name.fill(locale === 'ru' ? 'Проверка текста' : 'Authored text check');
+        await expect(name).toHaveValue(locale === 'ru' ? 'Проверка текста' : 'Authored text check');
+      });
+    }

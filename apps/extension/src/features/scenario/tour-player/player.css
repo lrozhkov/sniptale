@@ -9,7 +9,7 @@ body {
   overflow: hidden;
 }
 body {
-  font-family: system-ui, sans-serif;
+  font-family: var(--sniptale-font-interface);
   background: transparent;
   color: #fff;
 }
@@ -257,6 +257,7 @@ a:focus-visible {
   display: none;
 }
 .tour-hint-text {
+  font-family: var(--sniptale-font-document-sans);
   min-height: 0;
   flex: 1;
   overflow: hidden;
@@ -622,11 +623,13 @@ a:focus-visible {
   max-width: 100%;
 }
 .tour-navigation-content h1 {
+  font-family: var(--sniptale-font-document-sans);
   white-space: normal;
   overflow-wrap: anywhere;
   font-size: clamp(1rem, 3vw, 2rem);
 }
 .tour-navigation-text {
+  font-family: var(--sniptale-font-document-sans);
   margin: 0;
   overflow: hidden;
   overflow-wrap: anywhere;
@@ -676,6 +679,7 @@ a:focus-visible {
   opacity: 0.65;
 }
 .tour-hint-action-title {
+  font-family: var(--sniptale-font-document-sans);
   min-width: 0;
   margin-right: auto;
   overflow-wrap: anywhere;

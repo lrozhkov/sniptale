@@ -190,3 +190,10 @@
   font-size: 12px;
   color: var(--sniptale-danger);
 }
+
+.sniptale-textarea:not(.font-mono),
+.sniptale-input:not([type='number']):not([inputmode='decimal']):not([inputmode='numeric']):not(
+    .font-mono
+  ) {
+  font-family: var(--sniptale-font-document-sans);
+}

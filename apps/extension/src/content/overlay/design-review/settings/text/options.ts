@@ -6,6 +6,7 @@ export type TextSelectOption = {
 const FONT_FAMILY_VALUES = [
   'Arial, sans-serif',
   'Inter, sans-serif',
+  '"Sniptale Text", sans-serif',
   '"Sniptale Interface", sans-serif',
   'Georgia, serif',
   'Times New Roman, serif',

@@ -28,7 +28,7 @@ it('includes exactly the declared modified-source closure in both canonical lega
     writeFileSync(path.join(root, file), bytes);
     return { source: file, archivePath: file, sha256: sha256(bytes) };
   });
-  const policy = { dependencyLegal: { manifestPath }, legalFiles: files };
+  const policy = { bundledAssets: [], dependencyLegal: { manifestPath }, legalFiles: files };
   // Canonical license-byte checks are separate; this proof isolates exact inventory membership.
   const inventory = (value: typeof policy) =>
     validateLegalFiles(root, value).filter((error: string) =>

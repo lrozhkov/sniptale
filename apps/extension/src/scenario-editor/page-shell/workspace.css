@@ -2600,3 +2600,9 @@ html[data-guide-height-resizing] * {
   opacity: 1;
   pointer-events: auto;
 }
+
+.sniptale-scenario-workspace .guide-project-name input,
+.sniptale-scenario-workspace .guide-project-name-measure,
+.sniptale-scenario-workspace .guide-ai-prompt-input textarea {
+  font-family: var(--sniptale-font-document-sans);
+}

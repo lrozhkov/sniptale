@@ -102,6 +102,7 @@ export async function validateDependencyLegalClosure(root = process.cwd()) {
   const expectedNotices = formatThirdPartyNotices({
     entries: closure.entries,
     interfaceFont: interfaceFontMetadata(policy),
+    documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
   });
   const notices = await fs.readFile(path.resolve(root, 'THIRD_PARTY_NOTICES.md'), 'utf8');
   if (notices !== expectedNotices) errors.push('THIRD_PARTY_NOTICES.md is incomplete or stale');

@@ -68,7 +68,13 @@ describe('utils color parsing', () => {
   it('maps editor font families to CSS stacks', () => {
     expect(fontFamilyToCss('serif')).toContain('Georgia');
     expect(fontFamilyToCss('mono')).toContain('ui-monospace');
-    expect(fontFamilyToCss('sans')).toContain('system-ui');
+    expect(fontFamilyToCss('sans')).toMatch(/^"Sniptale Text",/);
+    expect(fontFamilyToCss('Sniptale Text')).toBe(fontFamilyToCss('sans'));
+    for (const family of ['Sniptale Interface', 'Sniptale Sans', 'unknown-family']) {
+      expect(fontFamilyToCss(family)).toBe(
+        'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      );
+    }
     expect(fontFamilyToCss('cursive')).toContain('cursive');
   });
 });

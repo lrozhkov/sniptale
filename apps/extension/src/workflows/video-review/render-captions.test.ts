@@ -44,6 +44,10 @@ it('loads the bundled font once, releases measurement pixels and never measures 
   const fixture = setup();
   const prepared = await prepareReviewCaptions(fixture.args);
   expect(fixture.load).toHaveBeenCalledOnce();
+  const pixels = fixture.args.output.height * settings.style.fontSize;
+  const font = `400 ${pixels}px "Sniptale Text", ui-sans-serif, system-ui, sans-serif`;
+  expect(fixture.load).toHaveBeenCalledWith(font, 'AaOneFirst\nSecond');
+  expect(fixture.measurement.font).toBe(font);
   expect(fixture.canvas.width).toBe(0);
   const measured = fixture.measurement.measureText.mock.calls.length;
   const target = {
@@ -55,6 +59,7 @@ it('loads the bundled font once, releases measurement pixels and never measures 
     fillText: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
   for (const time of [0, 1, 2, 3, 1, 9]) prepared.draw(target, time);
+  expect(target.font).toBe(font);
   expect(fixture.measurement.measureText).toHaveBeenCalledTimes(measured);
   const lines = vi.mocked(target.fillText).mock.calls;
   expect(lines.find((line) => line[0] === 'One')![2]).toBe(

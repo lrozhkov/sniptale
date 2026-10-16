@@ -197,11 +197,11 @@
   "contentScripts": [],
   "webAccessibleResources": [
     {
-      "name": "web_accessible_resources:{\"resources\":[\"assets/golos-ui-vf.woff2\",\"fonts/marck-script-cyrillic-400-normal.woff2\",\"fonts/marck-script-latin-400-normal.woff2\"],\"matches\":[\"file:///*\",\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
+      "name": "web_accessible_resources:{\"resources\":[\"assets/golos-text-vf.woff2\",\"assets/golos-ui-vf.woff2\",\"fonts/marck-script-cyrillic-400-normal.woff2\",\"fonts/marck-script-latin-400-normal.woff2\"],\"matches\":[\"file:///*\",\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
       "owner": "apps/extension/src/content/public/preparation-surface/styles.ts",
       "feature": "Content runtime UI and frame-annotation font rendering on HTTP and HTTPS pages",
-      "runtimeRoute": "content runtime shadow-DOM CSS and Interface FontFace registration loaded through chrome.runtime.getURL font URLs on granted HTTP, HTTPS, or local-file pages",
-      "capabilityPolicy": "Expose only the exact Golos UI and Marck Script font files required by extension-owned content UI; injected JavaScript bundles remain non-web-accessible.",
+      "runtimeRoute": "content runtime shadow-DOM CSS and bundled UI and Text FontFace registration loaded through chrome.runtime.getURL font URLs on granted HTTP, HTTPS, or local-file pages",
+      "capabilityPolicy": "Expose only the exact Golos UI, Golos Text, and Marck Script font files required by extension-owned content UI; injected JavaScript bundles remain non-web-accessible.",
       "failureBehavior": "Missing font assets fall back to system fonts without expanding web-accessible JavaScript exposure.",
       "justification": "Allows the injected content runtime to render the extension UI consistently after host-page injection.",
       "reviewNote": "Keep resources concrete, dynamic-url scoped, and avoid wildcard WAR entries for injected runtime bundles.",

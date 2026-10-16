@@ -38,11 +38,13 @@ export async function generateRepositoryDependencyLegal(repoRoot = process.cwd()
     closure,
     manifestPath: policy.dependencyLegal.manifestPath,
     interfaceFont: interfaceFontMetadata(policy),
+    documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
     outputRoot: repoRoot,
   });
   const legalPaths = [
     ...new Set([
       ...REQUIRED_RELEASE_LEGAL_PATHS,
+      ...policy.bundledAssets.flatMap((asset) => (asset.licensePath ? [asset.licensePath] : [])),
       policy.dependencyLegal.manifestPath,
       ...closure.entries.map((entry) => entry.archivePath),
       ...(closure.sourceFiles ?? []).map((file) => file.archivePath),

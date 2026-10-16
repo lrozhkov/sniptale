@@ -50,7 +50,7 @@ export const DEFAULT_RICH_SHAPE_EFFECTS: EditorRichShapeEffects = {
 
 export const DEFAULT_RICH_SHAPE_TEXT: EditorRichShapeTextState = {
   content: '',
-  fontFamily: 'Sniptale Interface',
+  fontFamily: 'Sniptale Text',
   fontSize: 16,
   fontWeight: 'normal',
   fontStyle: 'normal',

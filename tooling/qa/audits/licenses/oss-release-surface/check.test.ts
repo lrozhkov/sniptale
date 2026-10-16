@@ -4,13 +4,14 @@ import path from 'node:path';
 import { expect, it } from 'vitest';
 
 import { createTempRoot } from '../../../test-support/test-helpers';
-import { sha256 } from '../../../../release/policy/oss-release-policy.mjs';
+import { readOssReleasePolicy, sha256 } from '../../../../release/policy/oss-release-policy.mjs';
 import { formatThirdPartyNotices } from '../../../../release/dependency-legal/index.mjs';
 import { collectOssReleaseSurfaceErrors, runOssReleaseSurfaceCheck } from './check.mjs';
 import {
   INTERFACE_FONT_SOURCE_PATH,
   seedInterfaceFontConsumers,
   seedInterfaceFontSources,
+  seedDocumentFont,
 } from './test-support';
 
 function write(root: string, relativePath: string, contents: string | Buffer) {
@@ -293,4 +294,95 @@ it('rejects a missing canonical UI font license and export drift', async () => {
   packageJson.exports['./styles/interface-font-license'] = './src/styles/other-license.txt';
   writeFileSync(packagePath, JSON.stringify(packageJson));
   expect(collectOssReleaseSurfaceErrors(root)).toContain('Golos UI canonical asset export drift');
+});
+
+async function createDocumentFontFixture() {
+  const root = await createFixture();
+  const asset = seedDocumentFont(root);
+  const policyPath = 'tooling/configs/qa/oss-release.data.json';
+  const policy = JSON.parse(readFileSync(path.join(root, policyPath), 'utf8'));
+  policy.bundledAssets.push(asset);
+  const notices = formatThirdPartyNotices({
+    entries: [],
+    interfaceFont: policy.bundledAssets[0],
+    documentFont: asset,
+  });
+  write(root, 'THIRD_PARTY_NOTICES.md', notices);
+  policy.legalFiles.find(
+    (entry: { source: string }) => entry.source === 'THIRD_PARTY_NOTICES.md'
+  ).sha256 = sha256(notices);
+  policy.legalFiles.push({
+    archivePath: asset.licensePath,
+    source: asset.licensePath,
+    sha256: sha256(readFileSync(path.join(root, asset.licensePath))),
+  });
+  write(root, policyPath, JSON.stringify(policy));
+  return { root, asset, policy, policyPath };
+}
+
+it('accepts the exact document font asset and legal release surface', async () => {
+  const { root } = await createDocumentFontFixture();
+  expect(collectOssReleaseSurfaceErrors(root)).toEqual([]);
+});
+
+it.each([
+  ['version', '2.000'],
+  ['licensePath', 'packages/ui/src/styles/golos-ui/LICENSE.txt'],
+  ['sourcePackage', '@fontsource/golos-text'],
+])('rejects Text provenance drift for %s', async (key, value) => {
+  const { root, asset, policy, policyPath } = await createDocumentFontFixture();
+  asset[key] = value;
+  policy.bundledAssets[1] = asset;
+  write(root, policyPath, JSON.stringify(policy));
+  expect(collectOssReleaseSurfaceErrors(root)).toContain('Golos Text provenance metadata drift');
+});
+
+it('rejects changed Text bytes even when the policy digest is changed to match', async () => {
+  const { root, asset, policy, policyPath } = await createDocumentFontFixture();
+  write(root, asset.artifacts[0].path, 'changed font');
+  asset.artifacts[0].sha256 = sha256('changed font');
+  policy.bundledAssets[1] = asset;
+  write(root, policyPath, JSON.stringify(policy));
+  expect(collectOssReleaseSurfaceErrors(root)).toContain('Golos Text provenance metadata drift');
+});
+
+it('rejects Text source mapping, asset export, missing license, and layout drift', async () => {
+  const { root, asset, policy, policyPath } = await createDocumentFontFixture();
+  asset.artifacts[0].sourcePath = INTERFACE_FONT_SOURCE_PATH;
+  policy.bundledAssets[1] = asset;
+  write(root, policyPath, JSON.stringify(policy));
+  const packageJson = JSON.parse(readFileSync(path.join(root, 'packages/ui/package.json'), 'utf8'));
+  packageJson.exports['./styles/document-font'] = './src/styles/golos-ui/golos-ui-vf.woff2';
+  write(root, 'packages/ui/package.json', JSON.stringify(packageJson));
+  rmSync(path.join(root, asset.licensePath));
+  write(root, 'apps/extension/build/layout.data.json', '{}');
+  expect(collectOssReleaseSurfaceErrors(root)).toEqual(
+    expect.arrayContaining([
+      `bundled font installed source mapping drift: ${asset.artifacts[0].path}`,
+      'Golos Text canonical asset export drift',
+      'Golos Text license source is missing',
+      'bundled font consumer drift: golos-text-vf.woff2',
+    ])
+  );
+});
+
+it('requires Text license in the release payload and pins its canonical bytes', async () => {
+  const { root, asset, policy, policyPath } = await createDocumentFontFixture();
+  write(root, asset.licensePath, 'changed license');
+  policy.legalFiles.find((entry: { source: string }) => entry.source === asset.licensePath).sha256 =
+    sha256('changed license');
+  write(root, policyPath, JSON.stringify(policy));
+  expect(collectOssReleaseSurfaceErrors(root)).toEqual(
+    expect.arrayContaining([
+      `canonical license digest drift: ${asset.licensePath}`,
+      'Golos Text license digest drift',
+    ])
+  );
+  policy.legalFiles = policy.legalFiles.filter(
+    (entry: { source: string }) => entry.source !== asset.licensePath
+  );
+  write(root, policyPath, JSON.stringify(policy));
+  expect(() => readOssReleasePolicy(root)).toThrow(
+    `OSS release policy is missing canonical legal file: ${asset.licensePath}`
+  );
 });

@@ -15,8 +15,8 @@
   --sniptale-control-icon-stroke: 1.75;
   --sniptale-control-icon-stroke-hover: 1.875;
   --sniptale-control-icon-stroke-active: 2;
-  --sniptale-font-document-sans: var(--sniptale-font-interface);
-  --sniptale-font-sans: var(--sniptale-font-document-sans);
+  --sniptale-font-document-sans: 'Sniptale Text', 'Segoe UI', sans-serif;
+  --sniptale-font-sans: var(--sniptale-font-interface);
 
   --sniptale-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --sniptale-motion-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
