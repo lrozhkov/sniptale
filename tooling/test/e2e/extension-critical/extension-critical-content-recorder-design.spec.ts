@@ -468,16 +468,52 @@ async function menu(page: Page, id: string, info: TestInfo, name: string, expect
   await expect(title).toHaveCSS('letter-spacing', 'normal');
   const item = surface.locator('.sniptale-toolbar-menu-item').first();
   await expect(item).toHaveCSS('font-size', '13px');
+  await surface.evaluate(async (element) => {
+    await Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+        .map((animation) => animation.finished)
+    );
+  });
+  const metrics = await surface.evaluate((element) => ({
+    padding: getComputedStyle(element).padding,
+    gap: getComputedStyle(element.querySelector('.sniptale-toolbar-menu-list')!).gap,
+    rows: Array.from(element.querySelectorAll('.sniptale-toolbar-menu-item')).map((row) => ({
+      height: row.getBoundingClientRect().height,
+      minimum: getComputedStyle(row).minHeight,
+      padding: getComputedStyle(row).padding,
+      glyph: row.querySelector('svg')?.getBoundingClientRect().width,
+    })),
+  }));
+  const path = info.outputPath(`${name}-geometry.json`);
+  await writeFile(path, JSON.stringify(metrics, null, 2));
+  await info.attach(`${name}-geometry`, { path, contentType: 'application/json' });
+  expect.soft(metrics.padding).toBe('5px');
+  expect.soft(metrics.gap).toBe('2px');
+  for (const row of metrics.rows) {
+    expect.soft(row.minimum).toBe('32px');
+    expect.soft(row.padding).toBe('6px 8px');
+    if (row.glyph !== undefined) expect.soft(row.glyph).toBeCloseTo(16, 0);
+  }
   await capture(page, info, name);
   return surface;
 }
 
-async function recordingStart(page: Page, context: BrowserContext, extensionId: string) {
+async function recordingStart(
+  page: Page,
+  context: BrowserContext,
+  extensionId: string,
+  info: TestInfo
+) {
   await ui(page, 'content.toolbar.mode-selector-button').click();
   await ui(page, 'content.toolbar.mode-option.video-recording').click();
   await nativeAction(context, extensionId, page);
   await page.bringToFront();
   const start = ui(page, 'content.toolbar.video-recording.start');
+  await capture(page, info, 'recording-start-target');
+  await expect.soft(start).toHaveCSS('width', '32px');
+  await expect.soft(start).toHaveCSS('height', '32px');
   await movePointer(page, start);
   await page.mouse.down();
   await expect(start).toHaveAttribute('data-pressing', 'true');
@@ -627,7 +663,7 @@ async function recording(
   c: Composition,
   info: TestInfo
 ) {
-  await recordingStart(page, context, extensionId);
+  await recordingStart(page, context, extensionId, info);
   const status = ui(page, 'content.toolbar.video-recording.status');
   const initial = await status.innerText();
   await expect.poll(() => status.innerText()).not.toBe(initial);
@@ -641,9 +677,12 @@ async function recording(
   await page.setViewportSize(primarySizes[0]!);
   const pause = ui(page, 'content.toolbar.video-recording.pause');
   await canonicalCommand(pause);
+  await expect.soft(pause).toHaveCSS('width', '32px');
   await pause.click();
   const resume = ui(page, 'content.toolbar.video-recording.resume');
   await expect(resume).toBeVisible();
+  await expect.soft(resume).toHaveCSS('width', '32px');
+  await expect.soft(resume).toHaveCSS('height', '32px');
   expect(await resume.evaluate((node) => node.matches(':focus-visible'))).toBe(false);
   await tabTo(page, resume);
   await page.keyboard.press('Tab');

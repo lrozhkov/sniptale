@@ -224,6 +224,7 @@
   },
   "appDependencies": [
     "@fontsource/marck-script",
+    "@fontsource-variable/inter",
     "@fontsource-variable/manrope",
     "@iconify-icons/tabler",
     "@iconify/react",

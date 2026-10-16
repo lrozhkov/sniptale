@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import type { BrowserContext, Locator, Page, TestInfo, ViewportSize } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { translate, type TranslationKey } from '../../../../apps/extension/src/platform/i18n';
@@ -153,6 +154,128 @@ async function selectTarget(page: Page, id: string) {
   await expect(ui(page, 'content.design-review.popover')).toBeVisible();
 }
 
+async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
+  const observations = [];
+  for (const mode of [
+    'cursor',
+    'drawing',
+    'highlighter',
+    'quick-edit',
+    'design-review',
+    'video-recording',
+  ]) {
+    await ui(page, 'content.toolbar.mode-selector-button').click();
+    const menu = page.locator('.sniptale-content-menu-adopted.sniptale-toolbar-menu');
+    await expect(menu).toBeVisible();
+    await menu.evaluate(async (element) => {
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+          .map((animation) => animation.finished)
+      );
+    });
+    const menuMetrics = await menu.evaluate((element) => {
+      const css = getComputedStyle(element);
+      const title = element.querySelector('.sniptale-toolbar-menu-title');
+      const rows = Array.from(element.querySelectorAll('.sniptale-toolbar-menu-item'));
+      return {
+        padding: css.padding,
+        gap: getComputedStyle(element.querySelector('.sniptale-toolbar-menu-list')!).gap,
+        heading: title
+          ? { size: getComputedStyle(title).fontSize, line: getComputedStyle(title).lineHeight }
+          : null,
+        rows: rows.map((row) => ({
+          height: row.getBoundingClientRect().height,
+          minimum: getComputedStyle(row).minHeight,
+          padding: getComputedStyle(row).padding,
+          size: getComputedStyle(row).fontSize,
+          line: getComputedStyle(row).lineHeight,
+        })),
+      };
+    });
+    await capture(page, info, `parity-${suffix}-${mode}-menu`);
+    await ui(page, `content.toolbar.mode-option.${mode}`).click();
+    await expect(menu).toHaveCount(0);
+    const toolbar = ui(page, 'content.toolbar.root');
+    await capture(page, info, `parity-${suffix}-${mode}-toolbar`);
+    const buttons = await toolbar.locator('button.sniptale-btn').evaluateAll((elements) =>
+      elements
+        .filter((element) => element.getBoundingClientRect().width > 0)
+        .map((element) => {
+          const box = element.getBoundingClientRect();
+          const icon = element.querySelector('svg');
+          const glyph = icon?.getBoundingClientRect();
+          return {
+            id: element.getAttribute('data-ui'),
+            name: element.getAttribute('aria-label'),
+            classes: element.className,
+            specialized: element.closest('.sniptale-drawing-options-popover') !== null,
+            width: box.width,
+            height: box.height,
+            glyph: glyph ? { width: glyph.width, height: glyph.height } : null,
+          };
+        })
+    );
+    const targetSize = await toolbar.evaluate((element) =>
+      Number.parseFloat(
+        getComputedStyle(element).getPropertyValue('--sniptale-toolbar-button-size')
+      )
+    );
+    observations.push({
+      mode,
+      targetSize,
+      orientation: await toolbar.getAttribute('data-display-mode'),
+      menu: menuMetrics,
+      buttons,
+    });
+  }
+  const metricsPath = info.outputPath(`native-six-mode-parity-${suffix}.json`);
+  await writeFile(metricsPath, JSON.stringify(observations, null, 2));
+  await info.attach(`native-six-mode-parity-${suffix}`, {
+    path: metricsPath,
+    contentType: 'application/json',
+  });
+  for (const observation of observations) {
+    expect.soft(observation.menu.padding, `${observation.mode} menu shell inset`).toBe('5px');
+    expect.soft(observation.menu.gap, `${observation.mode} menu row gap`).toBe('2px');
+    expect.soft(observation.menu.heading).toEqual({ size: '12px', line: '16px' });
+    for (const row of observation.menu.rows) {
+      expect.soft(row.minimum, `${observation.mode} menu row minimum`).toBe('32px');
+      expect.soft(row.height).toBeGreaterThanOrEqual(31.9);
+      expect.soft(row.padding).toBe('6px 8px');
+      expect.soft([row.size, row.line]).toEqual(['13px', '18px']);
+    }
+    for (const button of observation.buttons) {
+      const label = `${suffix} ${observation.mode}: ${button.id ?? button.name}`;
+      if (button.specialized) {
+        expect.soft(button.width, label).toBeCloseTo(28, 0);
+        expect.soft(button.height, label).toBeCloseTo(28, 0);
+      } else if (button.classes.includes('sniptale-full-page-chevron')) {
+        expect
+          .soft([button.width, button.height], label)
+          .toEqual(
+            observation.orientation === 'vertical'
+              ? [observation.targetSize, 18]
+              : [18, observation.targetSize]
+          );
+        expect.soft(button.glyph, label).toEqual({ width: 12, height: 12 });
+      } else if (!button.classes.includes('sniptale-btn-outline')) {
+        expect
+          .soft([button.width, button.height], label)
+          .toEqual([observation.targetSize, observation.targetSize]);
+        if (
+          button.glyph &&
+          !/video-recording\.(start|pause|resume|stop|cancel)$/u.test(button.id ?? '')
+        )
+          expect.soft(button.glyph, label).toEqual({ width: 16, height: 16 });
+      }
+    }
+  }
+  await ui(page, 'content.toolbar.mode-selector-button').click();
+  await ui(page, 'content.toolbar.mode-option.design-review').click();
+}
+
 async function inspectDesignReview(page: Page, composition: Composition, info: TestInfo) {
   const target = page.locator('#review-target');
   const before = await target.evaluate((element) => {
@@ -299,7 +422,71 @@ async function inspectDesignReview(page: Page, composition: Composition, info: T
 async function inspectAutoBlur(page: Page, composition: Composition, info: TestInfo) {
   await ui(page, 'content.toolbar.mode-selector-button').click();
   await ui(page, 'content.toolbar.mode-option.highlighter').click();
+  await ui(page, 'content.toolbar.future-frame-style.menu').click();
+  const appearanceSurface = page.locator('.sniptale-content-appearance-surface');
+  await expect(appearanceSurface).toBeVisible();
+  await capture(page, info, 'parity-appearance-header');
+  const appearanceMetrics = await appearanceSurface.evaluate((element) => {
+    const title = getComputedStyle(element.querySelector('.sniptale-toolbar-menu-title')!);
+    return {
+      size: title.fontSize,
+      line: title.lineHeight,
+      weight: title.fontWeight,
+      transform: title.textTransform,
+      tracking: title.letterSpacing,
+      radius: getComputedStyle(element).borderRadius,
+    };
+  });
+  const appearancePath = info.outputPath('native-appearance-header.json');
+  await writeFile(appearancePath, JSON.stringify(appearanceMetrics, null, 2));
+  await info.attach('native-appearance-header', {
+    path: appearancePath,
+    contentType: 'application/json',
+  });
+  expect.soft(appearanceMetrics).toEqual({
+    size: '12px',
+    line: '16px',
+    weight: '500',
+    transform: 'none',
+    tracking: 'normal',
+    radius: '4px',
+  });
+  await page.keyboard.press('Escape');
   await ui(page, 'content.toolbar.auto-blur-button').click();
+  const menu = ui(page, 'content.toolbar.auto-blur-menu').locator('.sniptale-toolbar-menu');
+  await capture(page, info, 'parity-auto-blur-menu');
+  await menu.evaluate(async (element) => {
+    await Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+        .map((animation) => animation.finished)
+    );
+  });
+  const metrics = await menu.evaluate((element) => ({
+    padding: getComputedStyle(element).padding,
+    heading: getComputedStyle(element.querySelector('.sniptale-toolbar-menu-title')!).font,
+    rows: Array.from(element.querySelectorAll('.sniptale-toolbar-menu-item')).map((row) => ({
+      height: row.getBoundingClientRect().height,
+      minimum: getComputedStyle(row).minHeight,
+      padding: getComputedStyle(row).padding,
+      glyph: row.querySelector('svg')?.getBoundingClientRect().width,
+    })),
+  }));
+  const metricsPath = info.outputPath('native-auto-blur-parity.json');
+  await writeFile(metricsPath, JSON.stringify(metrics, null, 2));
+  await info.attach('native-auto-blur-parity', {
+    path: metricsPath,
+    contentType: 'application/json',
+  });
+  expect.soft(metrics.padding).toBe('5px');
+  await expect.soft(menu.locator('.sniptale-toolbar-menu-title')).toHaveCSS('font-size', '12px');
+  await expect.soft(menu.locator('.sniptale-toolbar-menu-title')).toHaveCSS('line-height', '16px');
+  for (const row of metrics.rows) {
+    expect.soft(row.minimum).toBe('32px');
+    expect.soft(row.padding).toBe('6px 8px');
+    expect.soft(row.glyph).toBeCloseTo(16, 0);
+  }
   await ui(page, 'content.toolbar.auto-blur-configure').click();
   const modal = page.locator('.sniptale-auto-blur-modal');
   await expect(modal.getByRole('treegrid')).toBeVisible();
@@ -405,6 +592,13 @@ async function inspectDrawing(page: Page, popup: Page, composition: Composition,
     await expect(toolTrigger).toHaveAttribute('aria-expanded', 'true');
     const panel = ui(page, `content.toolbar.drawing-options.${tool}`);
     await withinViewport(panel);
+    const preview = panel.locator('button.sniptale-btn:has(svg)').first();
+    if (await preview.count()) {
+      expect((await preview.boundingBox())!.width).toBeCloseTo(28, 0);
+      expect((await preview.boundingBox())!.height).toBeCloseTo(28, 0);
+      await expect(preview.locator('svg').first()).toHaveCSS('width', '18px');
+      await expect(preview.locator('svg').first()).toHaveCSS('height', '18px');
+    }
     if (tool === 'blur')
       await expect(panel.locator('[data-ui="shared.ui.color-selector"]')).toHaveCount(0);
     if (tool === 'pencil') {
@@ -485,6 +679,28 @@ for (const composition of compositions) {
     try {
       expect(await page.evaluate(() => isSecureContext)).toBe(true);
       expect(await page.evaluate(() => typeof navigator.locks?.request)).toBe('function');
+      await inspectModeParity(page, info, 'primary');
+      await page.setViewportSize({ width: 960, height: 560 });
+      await ui(page, 'content.toolbar.settings-button').click();
+      const free = page.getByRole('button', {
+        name: /Free toolbar placement|Свободное размещение панели/u,
+      });
+      if (
+        !(await free.evaluate((node) => node.classList.contains('sniptale-popover-item-selected')))
+      )
+        await free.click();
+      await page.getByRole('button', { name: /Vertical view|Вертикальный вид/u }).click();
+      await inspectModeParity(page, info, 'vertical-960');
+      await expect
+        .poll(async () => (await ui(page, 'content.toolbar.root').boundingBox())?.y ?? -Infinity)
+        .toBeGreaterThanOrEqual(-1);
+      await withinViewport(ui(page, 'content.toolbar.root'));
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      );
+      await ui(page, 'content.toolbar.settings-button').click();
+      await page.getByRole('button', { name: /Horizontal view|Горизонтальный вид/u }).click();
+      await page.setViewportSize(composition.viewport);
       await inspectDesignReview(page, composition, info);
       await inspectAutoBlur(page, composition, info);
       await inspectDrawing(page, popup, composition, info);

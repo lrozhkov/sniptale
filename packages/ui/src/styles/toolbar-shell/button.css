@@ -235,6 +235,19 @@
   border-radius: 4px;
   font: 500 13px / 18px var(--sniptale-font-interface);
 }
+/* Main icon commands follow the shell's fitted target size; ribbons and split arrows keep their own geometry. */
+.sniptale-content-toolbar-adopted
+  .sniptale-btn[data-command-press]:not(
+    .sniptale-full-page-chevron,
+    .sniptale-btn-outline,
+    .sniptale-btn-compact,
+    .sniptale-drawing-options-popover *
+  ) {
+  width: var(--sniptale-toolbar-button-size);
+  min-width: var(--sniptale-toolbar-button-size);
+  height: var(--sniptale-toolbar-button-size);
+  padding: 0;
+}
 .sniptale-content-toolbar-adopted .sniptale-btn[data-command-press] svg {
   width: 16px;
   height: 16px;
@@ -276,10 +289,10 @@
   gap: 2px;
 }
 .sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-toolbar-menu-item {
-  min-height: 36px;
+  min-height: 32px;
   gap: 6px;
   border-radius: 4px;
-  padding: 8px;
+  padding: 6px 8px;
   font: 500 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-content-menu-adopted.sniptale-toolbar-menu .sniptale-popover-item-selected {
@@ -307,6 +320,7 @@
   > .sniptale-toolbar-mode-icon {
   width: 16px;
   height: 16px;
+  flex: 0 0 16px;
 }
 /* Drag acquisition keeps its existing target while surrounding commands compact. */
 .sniptale-content-toolbar-adopted .sniptale-drag-handle {

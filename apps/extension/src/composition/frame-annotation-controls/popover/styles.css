@@ -130,7 +130,7 @@
 /* Embedded annotation chrome opts in without changing the rendered page annotation. */
 .sniptale-content-appearance-surface.sniptale-content-popover {
   padding: 8px;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 
 .sniptale-content-appearance-surface .sniptale-content-popover-body {
@@ -146,10 +146,16 @@
   padding-top: 0;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-section-label,
-.sniptale-content-appearance-surface .sniptale-toolbar-menu-title {
+.sniptale-content-appearance-surface .sniptale-content-popover-section-label {
   color: var(--sniptale-color-text-secondary);
   font: 500 13px / 18px var(--sniptale-font-interface);
+}
+
+.sniptale-content-appearance-surface .sniptale-toolbar-menu-title {
+  color: var(--sniptale-color-text-secondary);
+  font: 500 12px / 16px var(--sniptale-font-interface);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .sniptale-content-appearance-surface .sniptale-settings-popover-header {

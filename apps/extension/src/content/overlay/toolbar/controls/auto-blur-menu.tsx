@@ -173,6 +173,7 @@ function AutoBlurDropdown(props: DropdownProps) {
   return (
     <div ref={props.menuRef as React.Ref<HTMLDivElement>} data-ui="content.toolbar.auto-blur-menu">
       <ProductToolbarMenu
+        className="sniptale-content-menu-adopted"
         compact={props.compactMenus}
         title={translate('content.toolbar.autoBlur')}
         variant="capture"
