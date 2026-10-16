@@ -148,6 +148,147 @@
  		return this._connectedTrack!.output._muxer.addEncodedAudioPacket(this._connectedTrack!, packet, meta);
  	}
  }
+@@ -1974 +2013 @@
+-	async add(audioSample: AudioSample, shouldClose: boolean) {
++	async add(audioSample: AudioSample, shouldClose: boolean, previous?: Promise<void>) {
+@@ -1977,0 +2017,6 @@
++
++			if (previous) {
++				await previous;
++				if (this.closed) return;
++				this.checkForEncoderError();
++			}
+@@ -2734,0 +2780,18 @@
++	/** @internal */
++	private _resumeRequested = false;
++	/** @internal */
++	private _acceptingAudio = false;
++	/** @internal */
++	private _forceClosed = false;
++	/** @internal */
++	private _audioDrain: Promise<void> = Promise.resolve();
++	/** @internal */
++	private _admittedAudio = new Set<AudioSample>();
++	/** @internal */
++	private _nativeReader: ReadableStreamDefaultReader<AudioData> | null = null;
++	/** @internal */
++	private _nativePump: Promise<void> | null = null;
++	/** @internal */
++	private _nativeGeneration = 0;
++	/** @internal */
++	private _restartNativeCapture: (() => void) | null = null;
+@@ -2789,0 +2853 @@
++		this._acceptingAudio = true;
+@@ -2794,0 +2859,8 @@
++		let restarted = false;
++		const fail = (error: unknown) => {
++			if (errored || this._forceClosed) return;
++			errored = true;
++			this._abortController?.abort();
++			this._promiseWithResolvers.reject(error);
++			void this._audioContext?.suspend();
++		};
+@@ -2797 +2869 @@
+-			if (errored) {
++			if (errored || !this._acceptingAudio) {
+@@ -2804 +2876 @@
+-			if (this._paused) {
++			if (this._paused || this._resumeRequested) {
+@@ -2819,0 +2892,5 @@
++
++			if (restarted && lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
++				timestampOffset -= currentTimestamp - lastSampleTimestamp - audioSample.duration;
++			}
++			restarted = false;
+@@ -2845,2 +2922 @@
+-			if (this._encoder.getQueueSize() >= 8) {
+-				// Drop data if the encoder is overloaded
++			if (this._admittedAudio.size >= 128) {
+@@ -2847,0 +2924 @@
++				fail(new Error('Live audio buffer exceeded its bounded capacity.'));
+@@ -2853,8 +2930,4 @@
+-			void this._encoder.add(audioSample, true)
+-				.catch((error) => {
+-					errored = true;
+-
+-					this._abortController?.abort();
+-					this._promiseWithResolvers.reject(error);
+-					void this._audioContext?.suspend();
+-				});
++			this._admittedAudio.add(audioSample);
++			this._audioDrain = this._encoder.add(audioSample, true, this._audioDrain)
++				.finally(() => this._admittedAudio.delete(audioSample));
++			void this._audioDrain.catch(fail);
+@@ -2864,14 +2937,36 @@
+-			// Great, MediaStreamTrackProcessor is supported, this is the preferred way of doing things
+-			const processor = new MediaStreamTrackProcessor({ track: this._track });
+-			const consumer = new WritableStream<AudioData>({
+-				write: audioData => onAudioSample(new AudioSample(audioData)),
+-			});
+-
+-			processor.readable.pipeTo(consumer, {
+-				signal: this._abortController.signal,
+-			}).catch((error) => {
+-				// Handle AbortError silently
+-				if (error instanceof DOMException && error.name === 'AbortError') return;
+-
+-				this._promiseWithResolvers.reject(error);
+-			});
++			const signal = this._abortController.signal;
++			this._restartNativeCapture = () => {
++				this._resumeRequested = true;
++				this._nativeGeneration++;
++				void this._nativeReader?.cancel().catch(fail);
++			};
++			this._nativePump = (async () => {
++				try {
++					while (!signal.aborted && this._acceptingAudio) {
++						const generation = this._nativeGeneration;
++						// A fresh subscription excludes native frames buffered during the pause.
++						const processor = new MediaStreamTrackProcessor({ track: this._track, maxBufferSize: 128 });
++						const reader = processor.readable.getReader();
++						this._nativeReader = reader;
++						restarted = this._resumeRequested;
++						this._resumeRequested = false;
++						const cancel = () => { void reader.cancel().catch(fail); };
++						signal.addEventListener('abort', cancel, { once: true });
++						try {
++							while (!signal.aborted) {
++								const next = await reader.read();
++								if (next.done) break;
++								if (signal.aborted || !this._acceptingAudio) { next.value.close(); break; }
++								onAudioSample(new AudioSample(next.value));
++							}
++						} finally {
++							signal.removeEventListener('abort', cancel);
++							this._nativeReader = null;
++							reader.releaseLock();
++						}
++						if (generation === this._nativeGeneration) break;
++					}
++				} catch (error) {
++					if (!signal.aborted) fail(error);
++				}
++			})();
+@@ -2917,0 +3013 @@
++		this._resumeRequested = false;
+@@ -2921,0 +3018 @@
++		if (!this._paused) return;
+@@ -2922,0 +3020 @@
++		this._restartNativeCapture?.();
+@@ -2926,0 +3025,8 @@
++		this._acceptingAudio = false;
++		this._resumeRequested = false;
++		this._forceClosed = forceClose;
++		this._restartNativeCapture = null;
++		if (forceClose) {
++			for (const sample of this._admittedAudio) sample.close();
++			this._admittedAudio.clear();
++		}
+@@ -2931,0 +3038,3 @@
++
++			await this._nativePump;
++			if (!forceClose) await this._audioDrain;
 --- a/src/output.ts
 +++ b/src/output.ts
 @@ -19,8 +19,8 @@

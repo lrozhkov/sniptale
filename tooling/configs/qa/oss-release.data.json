@@ -128,22 +128,22 @@
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md",
-      "sha256": "847ce2b0f9f2f5ac2cd17fc14dfbadf4a0b2f75343f9000c9f58048189854447",
+      "sha256": "1b1ccd436594b1bbcf231e78d1f2b46f01b9d095579c0f6937a92e5fbc978b10",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json",
-      "sha256": "6f6f91fd786abf85cbc0281967836261e005d8fec6475f760a77ae2dd9294171",
+      "sha256": "f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz",
-      "sha256": "79ba17a912f532b34032e5f53319693d6f8720dec9f17934c2f6d278cd5a1076",
+      "sha256": "7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch",
-      "sha256": "37dca864f03e43540178c28155a49d40198038f8e7f1c2315e0684ef45c914b6",
+      "sha256": "9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch"
     },
     {
@@ -238,12 +238,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "fa6e6db03a03182f5dbfe597902239909d20898cfe7bf4771bbc75964b147788",
+      "sha256": "b9c983c82a6c58efd74e4bcdc78e054fc3f64b9e20e807365c4e7b22dacb763a",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "041c5c97212fed3b49773dbaa17870d2a0cced2a071d3e9b9554d385fd87f2e2",
+      "sha256": "cf33237720d1846ed5e2c65d13c906940ddbe3f44dc56e7bab245b81fe67ed40",
       "source": "THIRD_PARTY_NOTICES.md"
     },
     {

@@ -276,11 +276,11 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Repository/source: https://github.com/Vanilagy/mediabunny.git
 - MPL-2.0 corresponding source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
 - Supplied modifications (combine with upstream source above):
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz) (SHA-256: 79ba17a912f532b34032e5f53319693d6f8720dec9f17934c2f6d278cd5a1076)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json) (SHA-256: 6f6f91fd786abf85cbc0281967836261e005d8fec6475f760a77ae2dd9294171)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch](LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch) (SHA-256: 37dca864f03e43540178c28155a49d40198038f8e7f1c2315e0684ef45c914b6)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz) (SHA-256: 7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json) (SHA-256: f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch](LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch) (SHA-256: 9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00)
   - [LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE](LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE) (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/README.md](LICENSES/dependencies/mediabunny-1.61.3-modified/README.md) (SHA-256: 847ce2b0f9f2f5ac2cd17fc14dfbadf4a0b2f75343f9000c9f58048189854447)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/README.md](LICENSES/dependencies/mediabunny-1.61.3-modified/README.md) (SHA-256: 1b1ccd436594b1bbcf231e78d1f2b46f01b9d095579c0f6937a92e5fbc978b10)
 - Original package integrity: sha512-kUqLKVXQVwHR62GkOJxYosAmXERJbqnXBgJDTtRlxHEYviVkMg/Evhl9XN6kedqS5LP1tV4kFKyzY/V4a4ofow==
 
 ### `pako` 1.0.11
