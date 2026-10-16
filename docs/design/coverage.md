@@ -91,6 +91,14 @@ Saved document content retains its own fonts, selection and rendering geometry. 
 
 Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-web-snapshot-viewer-design.spec.ts`. It saves a real page package before opening the viewer. Existing package, extraction, export and iframe suites retain their separate behavioral role.
 
+## Camera recorder integration
+
+The camera recorder adopts shared commands and interface typography within its live and result screens. Video acquisition, selected devices, recording state and retained results keep their existing owners. The duration clock retains its specialized presentation. Inline discard confirmation keeps its local state and logical focus targets.
+
+The recorder has its own window contract. Check the actual recorder window separately from controlled CSS viewports. Do not impose the desktop editor minimum width on this surface.
+
+Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-camera-recorder-design.spec.ts`. It opens the recorder from the actual popup with synthetic media, device permission and registration. Existing recording lifecycle suites retain their separate engine and retention proof.
+
 ## Integration exclusions
 
 Preserve crop coordinates, media decoding/import, native file acquisition, recording lifecycle, device permissions, color/paint internals, persistence, and production Undo. Do not infer these engines from the bounded probes. A specimen can exercise local pending/error/recovery states without claiming native-engine parity. All ordinary reference requirements in this inventory have working examples.

@@ -17,6 +17,7 @@ vi.mock('../platform/runtime-messaging', async (importOriginal) => ({
   createRuntimeMessagingTransport: createRuntimeMessagingTransportMock,
 }));
 vi.mock('@sniptale/ui/styles', () => ({}));
+vi.mock('../ui/compact-inspector-controls/inspector-surface.css', () => ({}));
 vi.mock('./shell/app', () => ({
   CameraRecorderApp: () => null,
 }));
