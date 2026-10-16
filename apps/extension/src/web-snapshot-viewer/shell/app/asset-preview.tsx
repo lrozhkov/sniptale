@@ -1,5 +1,7 @@
 import { ArrowLeft, Download, ExternalLink, File, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate, type AppLocale } from '../../../platform/i18n';
 import type { LoadedWebSnapshotAsset } from '../../viewer/asset-objects';
 import type { ViewerPackageFile } from '../../viewer/package-files';
@@ -11,19 +13,20 @@ export type PreviewSelection =
   | { kind: 'package'; file: ViewerPackageFile };
 
 const previewActionClassName = [
-  'inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs',
+  'inline-flex h-8 min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[4px] px-2.5',
+  'text-[13px] leading-[18px] font-medium',
   'text-[var(--sniptale-color-text-primary)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
   'focus-visible:outline-none focus-visible:ring-2',
   'focus-visible:ring-[var(--sniptale-color-focus-ring)] disabled:opacity-50',
 ].join(' ');
 const previewBodyClassName = [
-  'min-h-64 overflow-auto rounded-xl border',
+  'min-h-64 overflow-auto rounded-[4px] border',
   'border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-muted)] p-4',
 ].join(' ');
 const previewMetadataClassName = [
-  'flex min-h-56 flex-col items-center justify-center gap-2',
+  'flex min-h-32 flex-col items-center justify-center gap-2',
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
@@ -38,27 +41,29 @@ function PreviewZoomControls(props: {
       className="flex items-center gap-1"
       role="group"
     >
-      <button
+      <ContentToolbarButton
+        tone="utility"
         aria-label={translate('webSnapshotViewer.app.zoomOut', props.locale)}
-        className={previewActionClassName}
+        className="h-8 w-8 cursor-pointer !p-0"
         disabled={props.zoom <= 1}
         onClick={() => props.onZoomChange(Math.max(1, props.zoom - 0.25))}
         type="button"
       >
         <ZoomOut aria-hidden="true" size={16} />
-      </button>
-      <span className="min-w-9 text-center text-xs text-[var(--sniptale-color-text-secondary)]">
+      </ContentToolbarButton>
+      <span className="min-w-9 text-center text-[13px] leading-[18px] font-medium tabular-nums">
         {Math.round(props.zoom * 100)}%
       </span>
-      <button
+      <ContentToolbarButton
+        tone="utility"
         aria-label={translate('webSnapshotViewer.app.zoomIn', props.locale)}
-        className={previewActionClassName}
+        className="h-8 w-8 cursor-pointer !p-0"
         disabled={props.zoom >= 1.5}
         onClick={() => props.onZoomChange(Math.min(1.5, props.zoom + 0.25))}
         type="button"
       >
         <ZoomIn aria-hidden="true" size={16} />
-      </button>
+      </ContentToolbarButton>
     </div>
   );
 }
@@ -90,7 +95,9 @@ function PreviewFileActions(props: {
   };
   return (
     <>
-      <button
+      <ProductActionButton
+        compact
+        tone="secondary"
         className={previewActionClassName}
         disabled={pending}
         onClick={() =>
@@ -102,31 +109,36 @@ function PreviewFileActions(props: {
         }
         type="button"
       >
-        <ExternalLink aria-hidden="true" size={15} />
+        <ExternalLink aria-hidden="true" size={16} />
         {translate('webSnapshotViewer.app.openAsset', props.locale)}
-      </button>
+      </ProductActionButton>
       {selectedFile ? (
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           className={previewActionClassName}
           disabled={pending}
           onClick={() => runAction('download', () => props.onDownloadPackageFile(selectedFile))}
           type="button"
         >
-          <Download aria-hidden="true" size={15} />
+          <Download aria-hidden="true" size={16} />
           {translate('webSnapshotViewer.app.downloadAsset', props.locale)}
-        </button>
+        </ProductActionButton>
       ) : resourceAsset?.downloadUrl ? (
         <a
           className={previewActionClassName}
           download={props.name}
           href={resourceAsset.downloadUrl}
         >
-          <Download aria-hidden="true" size={15} />
+          <Download aria-hidden="true" size={16} />
           {translate('webSnapshotViewer.app.downloadAsset', props.locale)}
         </a>
       ) : null}
       {errorKind ? (
-        <p className="basis-full text-xs text-[var(--sniptale-color-danger)]" role="status">
+        <p
+          className="basis-full select-text text-[14px] leading-5 font-normal text-[var(--sniptale-color-danger)]"
+          role="status"
+        >
           {translate(
             errorKind === 'open'
               ? 'webSnapshotViewer.app.assetOpenFailed'
@@ -204,17 +216,21 @@ export function WebSnapshotAssetPreview(props: {
       }}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          className={previewActionClassName}
+        <ContentToolbarButton
+          tone="utility"
+          className="h-8 cursor-pointer !w-auto !min-w-0 !gap-1.5 !px-2.5"
           onClick={props.onClose}
           ref={closeRef}
           type="button"
         >
           <ArrowLeft aria-hidden="true" size={16} />
           {translate('webSnapshotViewer.app.closeAssetPreview', props.locale)}
-        </button>
+        </ContentToolbarButton>
         <h2
-          className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]"
+          className={[
+            'min-w-0 flex-1 select-text truncate text-[14px] leading-5 font-semibold',
+            'text-[var(--sniptale-color-text-primary)]',
+          ].join(' ')}
           title={name}
         >
           {name}
@@ -240,18 +256,24 @@ export function WebSnapshotAssetPreview(props: {
             style={{ zoom }}
           />
         ) : previewError ? (
-          <p className="text-sm text-[var(--sniptale-color-danger)]" role="status">
+          <p
+            className="select-text text-[14px] leading-5 font-normal text-[var(--sniptale-color-danger)]"
+            role="status"
+          >
             {translate('webSnapshotViewer.app.packageFileDownloadFailed', props.locale)}
           </p>
         ) : isImage ? (
-          <p className="text-sm text-[var(--sniptale-color-text-muted)]" role="status">
+          <p
+            className="text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-secondary)]"
+            role="status"
+          >
             {translate('webSnapshotViewer.app.loading', props.locale)}
           </p>
         ) : (
           <div className={previewMetadataClassName}>
-            <File aria-hidden="true" size={36} />
-            <p className="text-sm">{name}</p>
-            <p className="text-xs">{mimeType}</p>
+            <File aria-hidden="true" size={16} />
+            <p className="select-text text-[13px] leading-[18px] font-medium">{name}</p>
+            <p className="select-text text-[12px] leading-4 font-normal">{mimeType}</p>
           </div>
         )}
       </div>

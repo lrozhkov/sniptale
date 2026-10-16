@@ -1,5 +1,7 @@
 import { Download, ExternalLink, Eye, File, FileCode2, Image, Type } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { LoadedWebSnapshotAsset } from '../../viewer/asset-objects';
 import type { ViewerPackageFile } from '../../viewer/package-files';
 import { translate, type AppLocale } from '../../../platform/i18n';
@@ -33,7 +35,7 @@ function groupAssetsByFormat(
 }
 
 const assetCardClassName = [
-  'min-w-0 overflow-hidden rounded-[12px] border',
+  'min-w-0 overflow-hidden rounded-[4px] border',
   'border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
@@ -42,23 +44,70 @@ const assetPreviewClassName = [
   'bg-[var(--sniptale-color-surface-muted)] p-2',
 ].join(' ');
 const assetGroupTitleClassName = [
-  'mb-2 flex items-center gap-2 text-xs font-semibold',
+  'mb-2 flex items-center gap-2 text-[14px] leading-5 font-semibold',
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 const assetActionClassName = [
-  'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded',
+  'inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[4px]',
   'text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
   'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 const assetFormatTitleClassName = [
-  'mb-2 text-[10px] font-semibold uppercase tracking-wide',
-  'text-[var(--sniptale-color-text-muted)]',
+  'mb-2 text-[12px] leading-4 font-normal',
+  'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 const catalogTabClassName = [
-  'h-8 rounded-md px-2.5 text-[11px] font-medium transition-colors',
+  'inline-flex h-8 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-[4px]',
+  'border-0 border-b-2 border-solid bg-transparent px-2.5 text-[13px] leading-[18px] font-medium',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
+
+function CatalogTab(props: {
+  section: CatalogSection;
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  const press = useCommandPress({ onClick: props.onClick });
+  return (
+    <button
+      {...press.props}
+      type="button"
+      role="tab"
+      id={`web-snapshot-catalog-${props.section}-tab`}
+      aria-controls={`web-snapshot-catalog-${props.section}-panel`}
+      aria-selected={props.selected}
+      tabIndex={props.selected ? 0 : -1}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
+      className={[
+        catalogTabClassName,
+        props.selected
+          ? 'border-[var(--sniptale-color-text-primary)] text-[var(--sniptale-color-text-primary)]'
+          : 'border-transparent text-[var(--sniptale-color-text-secondary)]',
+        'hover:text-[var(--sniptale-color-text-primary)]',
+      ].join(' ')}
+    >
+      <span className="sniptale-command-content">{props.label}</span>
+    </button>
+  );
+}
+
+function handleCatalogNavigation(event: KeyboardEvent<HTMLDivElement>) {
+  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  const current = event.target instanceof HTMLButtonElement ? tabs.indexOf(event.target) : -1;
+  if (current < 0) return;
+  let next: number;
+  if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = tabs.length - 1;
+  else if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+  else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+  else return;
+  event.preventDefault();
+  tabs[next]?.click();
+  tabs[next]?.focus();
+}
 
 function AssetCard(props: {
   asset: LoadedWebSnapshotAsset;
@@ -85,34 +134,48 @@ function AssetCard(props: {
             src={props.asset.url}
           />
         </div>
-      ) : (
-        <div className="flex h-20 items-center justify-center bg-[var(--sniptale-color-surface-muted)]">
-          <Icon aria-hidden className="size-7 text-[var(--sniptale-color-text-muted)]" />
-        </div>
-      )}
-      <div className="p-2.5">
-        <p
-          className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
-          title={props.asset.path}
-        >
-          {getCatalogFileName(props.asset.path)}
-        </p>
-        <div className="mt-1 flex items-center gap-1">
-          <p className="min-w-0 flex-1 truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
+      ) : null}
+      <div className={kind === 'image' ? 'p-2' : 'flex min-h-14 min-w-0 items-center gap-2 p-2'}>
+        {kind === 'image' ? null : (
+          <Icon
+            aria-hidden
+            className="size-4 shrink-0 text-[var(--sniptale-color-text-secondary)]"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p
+            className={[
+              'select-text truncate text-[13px] leading-[18px] font-medium',
+              'text-[var(--sniptale-color-text-primary)]',
+            ].join(' ')}
+            title={props.asset.path}
+          >
+            {getCatalogFileName(props.asset.path)}
+          </p>
+          <p
+            className={[
+              'select-text truncate text-[12px] leading-4 font-normal',
+              'text-[var(--sniptale-color-text-secondary)]',
+            ].join(' ')}
+          >
             {props.asset.mimeType} · {formatCatalogFileSize(props.asset.size)}
           </p>
-          <button
+        </div>
+        <div className={kind === 'image' ? 'mt-1 flex justify-end gap-2' : 'flex shrink-0 gap-2'}>
+          <ContentToolbarButton
+            tone="utility"
             aria-label={`${previewLabel}: ${assetName}`}
-            className={assetActionClassName}
+            className="h-8 w-8 cursor-pointer !p-0"
             onClick={(event) => props.onPreview(props.asset, event.currentTarget)}
             title={previewLabel}
             type="button"
           >
-            <Eye aria-hidden="true" size={13} />
-          </button>
-          <button
+            <Eye aria-hidden="true" size={16} />
+          </ContentToolbarButton>
+          <ContentToolbarButton
+            tone="utility"
             aria-label={`${openLabel}: ${assetName}`}
-            className={assetActionClassName}
+            className="h-8 w-8 cursor-pointer !p-0"
             onClick={() => {
               setOpenFailed(false);
               void props.onOpen(props.asset.url).catch(() => setOpenFailed(true));
@@ -120,8 +183,8 @@ function AssetCard(props: {
             title={openLabel}
             type="button"
           >
-            <ExternalLink aria-hidden="true" size={13} />
-          </button>
+            <ExternalLink aria-hidden="true" size={16} />
+          </ContentToolbarButton>
           {props.asset.downloadUrl ? (
             <a
               aria-label={`${downloadLabel}: ${assetName}`}
@@ -130,16 +193,19 @@ function AssetCard(props: {
               href={props.asset.downloadUrl}
               title={downloadLabel}
             >
-              <Download aria-hidden="true" size={13} />
+              <Download aria-hidden="true" size={16} />
             </a>
           ) : null}
         </div>
-        {openFailed ? (
-          <p className="mt-1 text-[10px] text-[var(--sniptale-color-danger)]" role="status">
-            {translate('webSnapshotViewer.app.assetOpenFailed', props.locale)}
-          </p>
-        ) : null}
       </div>
+      {openFailed ? (
+        <p
+          className="select-text px-2 pb-2 text-[14px] leading-5 font-normal text-[var(--sniptale-color-danger)]"
+          role="status"
+        >
+          {translate('webSnapshotViewer.app.assetOpenFailed', props.locale)}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -186,7 +252,13 @@ function ResourceAssetGroups(props: {
               <h4 className={assetFormatTitleClassName}>
                 {format} ({formatAssets.length})
               </h4>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+              <div
+                className={
+                  group.kind === 'image'
+                    ? 'grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3'
+                    : 'grid grid-cols-1 gap-1'
+                }
+              >
                 {formatAssets.map((asset) => (
                   <AssetCard
                     asset={asset}
@@ -248,65 +320,85 @@ export function WebSnapshotAssetCatalog(props: {
     : sections[0]?.id;
   if (sections.length === 0 || resolvedSection === undefined) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-sm text-[var(--sniptale-color-text-muted)]">
+      <div
+        className={[
+          'flex h-full items-center justify-center p-4 text-[14px] leading-5 font-normal',
+          'text-[var(--sniptale-color-text-secondary)]',
+        ].join(' ')}
+      >
         {translate('webSnapshotViewer.app.assetsEmpty', props.locale)}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-[1200px] space-y-6 p-5" data-testid="snapshot-asset-catalog">
-      <div hidden={selection !== null}>
+    <div className="mx-auto max-w-[1200px] space-y-4 p-4" data-testid="snapshot-asset-catalog">
+      <div className="space-y-4" hidden={selection !== null}>
         <div>
-          <h2 className="text-base font-semibold text-[var(--sniptale-color-text-primary)]">
+          <h2 className="text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('webSnapshotViewer.app.assetsTitle', props.locale)}
           </h2>
-          <p className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
+          <p className="mt-1 text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
             {translate('webSnapshotViewer.app.assetsDescription', props.locale)}
           </p>
         </div>
         <div
           aria-label={translate('webSnapshotViewer.app.assetsTitle', props.locale)}
-          className="flex flex-wrap gap-1"
-          role="group"
+          className="flex gap-1 overflow-x-auto"
+          role="tablist"
+          data-ui="web-snapshot-viewer.catalog-tabs"
+          onKeyDown={handleCatalogNavigation}
         >
           {sections.map((section) => {
             const selected = section.id === resolvedSection;
             return (
-              <button
-                type="button"
-                aria-pressed={selected}
-                className={`${catalogTabClassName} ${
-                  selected
-                    ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
-                    : 'text-[var(--sniptale-color-text-muted)] hover:text-[var(--sniptale-color-text-primary)]'
-                }`}
+              <CatalogTab
+                section={section.id}
+                selected={selected}
+                label={`${section.label} (${section.count})`}
                 key={section.id}
                 onClick={() => setSelectedSection(section.id)}
-              >
-                {section.label} ({section.count})
-              </button>
+              />
             );
           })}
         </div>
-        {resolvedSection === 'resources' ? (
-          <ResourceAssetGroups
-            assets={props.assets}
-            locale={props.locale}
-            onOpen={props.onOpenResourceAsset}
-            onPreview={(asset, trigger) => showPreview({ kind: 'resource', asset }, trigger)}
-          />
-        ) : (
-          <ViewerPackageFileList
-            files={resolvedSection === 'attachments' ? attachments : exportedImages}
-            locale={props.locale}
-            onDownloadPackageFile={props.onDownloadPackageFile}
-            onOpenPackageFile={props.onOpenPackageFile}
-            onPreviewPackageFile={(file, trigger) =>
-              showPreview({ kind: 'package', file }, trigger)
-            }
-          />
-        )}
+        <div
+          className="space-y-4"
+          role="tabpanel"
+          id={`web-snapshot-catalog-${resolvedSection}-panel`}
+          aria-labelledby={`web-snapshot-catalog-${resolvedSection}-tab`}
+          tabIndex={0}
+        >
+          {resolvedSection === 'resources' ? (
+            <ResourceAssetGroups
+              assets={props.assets}
+              locale={props.locale}
+              onOpen={props.onOpenResourceAsset}
+              onPreview={(asset, trigger) => showPreview({ kind: 'resource', asset }, trigger)}
+            />
+          ) : (
+            <ViewerPackageFileList
+              files={resolvedSection === 'attachments' ? attachments : exportedImages}
+              locale={props.locale}
+              onDownloadPackageFile={props.onDownloadPackageFile}
+              onOpenPackageFile={props.onOpenPackageFile}
+              onPreviewPackageFile={(file, trigger) =>
+                showPreview({ kind: 'package', file }, trigger)
+              }
+            />
+          )}
+        </div>
+        {sections
+          .filter((section) => section.id !== resolvedSection)
+          .map((section) => (
+            <div
+              key={section.id}
+              role="tabpanel"
+              id={`web-snapshot-catalog-${section.id}-panel`}
+              aria-labelledby={`web-snapshot-catalog-${section.id}-tab`}
+              hidden
+            />
+          ))}
       </div>
       {selection ? (
         <WebSnapshotAssetPreview

@@ -117,6 +117,30 @@ it('lists exported files from manifest metadata and extracts only the selected i
   expect(container.textContent).toContain('photo.png');
   expect(container.textContent).not.toContain('report.pdf');
 
+  const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1]);
+  for (const tab of tabs) {
+    expect(
+      document
+        .getElementById(tab.getAttribute('aria-controls') ?? '')
+        ?.getAttribute('aria-labelledby')
+    ).toBe(tab.id);
+  }
+  const first = tabs[0];
+  if (!first) throw new Error('Image category tab is required');
+  first.focus();
+  act(() => first.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
+  expect(document.activeElement).toBe(tabs[1]);
+  expect(tabs[1]?.getAttribute('aria-selected')).toBe('true');
+  act(() =>
+    tabs[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(document.activeElement).toBe(first);
+  act(() => first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
+  expect(document.activeElement).toBe(tabs[1]);
+  act(() => tabs[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+  expect(document.activeElement).toBe(first);
+
   const attachmentsButton = Array.from(container.querySelectorAll('button')).find(
     (button) => button.textContent === 'Attachments (1)'
   );

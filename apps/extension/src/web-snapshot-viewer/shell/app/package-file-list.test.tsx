@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ViewerPackageFileList } from './package-file-list';
 
-it('places the item download action beside its media icon', () => {
+it('keeps file identity before its trailing preview, open and download actions', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const container = document.createElement('div');
   const root = createRoot(container);
@@ -31,10 +31,10 @@ it('places the item download action beside its media icon', () => {
 
   const row = container.querySelector('article > div');
   expect(row?.children[0]?.matches('svg')).toBe(true);
-  expect(row?.children[1]?.matches('button[aria-label^="Preview"]')).toBe(true);
-  expect(row?.children[2]?.matches('button[aria-label^="Open in new tab"]')).toBe(true);
-  expect(row?.children[3]?.matches('button[aria-label^="Download original"]')).toBe(true);
-  expect(row?.children[4]?.textContent).toContain('capture.png');
+  expect(row?.children[1]?.textContent).toContain('capture.png');
+  expect(row?.children[2]?.matches('button[aria-label^="Preview"]')).toBe(true);
+  expect(row?.children[3]?.matches('button[aria-label^="Open in new tab"]')).toBe(true);
+  expect(row?.children[4]?.matches('button[aria-label^="Download original"]')).toBe(true);
 
   act(() => root.unmount());
   vi.unstubAllGlobals();

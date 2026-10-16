@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { translate, useAppLocale, type AppLocale } from '../../../platform/i18n';
 import { readSnapshotIdFromLocation } from './route';
 import { SnapshotPreparationHost } from '../../preparation/host';
@@ -10,7 +11,14 @@ import { loadWebSnapshotPackage, revokeWebSnapshotObjectUrls } from '../../viewe
 import { WebSnapshotFrame } from '../../viewer/iframe';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 import type { ViewerPackageFile } from '../../viewer/package-files';
-import { WebSnapshotVisualSurface, type WebSnapshotViewerMode } from './view-mode';
+import {
+  getViewerModeLabel,
+  getViewerModePanelId,
+  getViewerModeTabId,
+  InactiveViewerModePanels,
+  WebSnapshotVisualSurface,
+  type WebSnapshotViewerMode,
+} from './view-mode';
 import { WebSnapshotAssetCatalog } from './asset-catalog';
 import { useViewerAssetActions } from './asset-actions';
 import { useViewerZoom } from './viewport-zoom';
@@ -391,7 +399,8 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
 
   return (
     <main
-      className="flex h-screen w-full min-w-0 max-w-full flex-col overflow-hidden
+      data-ui="web-snapshot-viewer.workspace"
+      className="flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden
         bg-[var(--sniptale-color-surface-canvas)]"
     >
       {toolbarVisible ? (
@@ -410,8 +419,9 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       ) : null}
       {printState === 'error' ? (
         <div
-          className="fixed right-4 top-16 z-30 rounded-lg border border-[var(--sniptale-color-danger)]
-            bg-[var(--sniptale-color-surface-panel)] px-3 py-2 text-xs
+          className="fixed right-4 top-16 z-30 max-w-[min(40rem,calc(100vw-32px))] rounded-[4px] border
+            border-[var(--sniptale-color-danger)]
+            bg-[var(--sniptale-color-surface-panel)] px-3 py-2 text-[14px] leading-5 font-normal
             text-[var(--sniptale-color-danger)] shadow-lg"
           role="alert"
         >
@@ -420,6 +430,11 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       ) : null}
       <section
         ref={zoom.surfaceRef}
+        role="tabpanel"
+        id={getViewerModePanelId(mode)}
+        aria-labelledby={toolbarVisible ? getViewerModeTabId(mode) : undefined}
+        aria-label={toolbarVisible ? undefined : getViewerModeLabel(mode, props.locale)}
+        tabIndex={0}
         data-testid="snapshot-viewer-surface"
         className={`relative min-h-0 w-full min-w-0 max-w-full flex-1
           ${responsiveLayout ? 'overflow-y-hidden' : 'overflow-y-auto'}
@@ -456,12 +471,13 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
           zoom={zoom.zoom}
         />
       </section>
+      {toolbarVisible ? <InactiveViewerModePanels mode={mode} /> : null}
       {externalLinkPreview === null ? null : (
         <div
           className="pointer-events-none fixed bottom-0 left-0 z-30 max-w-[min(720px,calc(100vw-16px))]
-            truncate rounded-tr-md border border-b-0 border-l-0
+            select-text truncate rounded-tr-[4px] border border-b-0 border-l-0
             border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
-            px-2.5 py-1 text-[11px] text-[var(--sniptale-color-text-muted)] shadow-md"
+            px-2.5 py-1 text-[12px] leading-4 font-normal text-[var(--sniptale-color-text-secondary)] shadow-md"
           data-testid="snapshot-external-link-preview"
           title={externalLinkPreview}
         >
@@ -517,21 +533,33 @@ export function WebSnapshotViewerApp() {
   const { error, loaded } = useLoadedWebSnapshotPackage();
   const locale = useViewerDocumentTitle(loaded);
 
-  if (error) {
-    return (
-      <div className="p-6 text-sm text-[var(--sniptale-color-danger)]">
-        {getViewerErrorMessage(error, locale)}
-      </div>
-    );
-  }
+  const content = error ? (
+    <div
+      className="select-text p-4 text-[14px] leading-5 font-normal text-[var(--sniptale-color-danger)]"
+      role="alert"
+    >
+      {getViewerErrorMessage(error, locale)}
+    </div>
+  ) : !loaded ? (
+    <div
+      className="p-4 text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-secondary)]"
+      role="status"
+    >
+      {translate('webSnapshotViewer.app.loading', locale)}
+    </div>
+  ) : (
+    <WebSnapshotViewerSurface loaded={loaded} locale={locale} />
+  );
 
-  if (!loaded) {
-    return (
-      <div className="p-6 text-sm text-[var(--sniptale-color-text-muted)]">
-        {translate('webSnapshotViewer.app.loading', locale)}
+  return (
+    <CommandPressScope value={true}>
+      <div
+        className="sniptale-compact-workspace h-screen w-full overflow-x-auto overflow-y-hidden
+          [--sniptale-toolbar-button-size:32px] [&_.sniptale-btn_svg]:!size-4"
+        data-ui="web-snapshot-viewer.chrome"
+      >
+        <div className="h-full min-w-[1280px]">{content}</div>
       </div>
-    );
-  }
-
-  return <WebSnapshotViewerSurface loaded={loaded} locale={locale} />;
+    </CommandPressScope>
+  );
 }

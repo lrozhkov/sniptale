@@ -83,6 +83,14 @@ Content toolbars, annotation settings, Design Review and AutoBlur adopt shared c
 
 Native composition proof lives in `extension-critical-content-design.spec.ts` and `extension-critical-content-controls-design.spec.ts` under `tooling/test/e2e/extension-critical/`. These checks cover host isolation, actual browser zoom, constrained placement, drafts, Undo, nested layers and drawing preferences. Existing focus, drawing and snapshot export suites retain gesture and authored-content proof. Recording controls remain a separate migration area.
 
+## Saved-page viewer integration
+
+The saved-page viewer adopts interface typography and shared commands within its application chrome. View modes and populated catalog sections use connected tabs. Downloads retain native links. Nonvisual resources use compact rows. Inline previews retain their existing Back, Escape and focus restoration.
+
+Saved document content retains its own fonts, selection and rendering geometry. Interface tokens do not cross the saved iframe boundary. The desktop shell retains its minimum width and outer horizontal scroll path.
+
+Native composition proof lives in `tooling/test/e2e/extension-critical/extension-critical-web-snapshot-viewer-design.spec.ts`. It saves a real page package before opening the viewer. Existing package, extraction, export and iframe suites retain their separate behavioral role.
+
 ## Integration exclusions
 
 Preserve crop coordinates, media decoding/import, native file acquisition, recording lifecycle, device permissions, color/paint internals, persistence, and production Undo. Do not infer these engines from the bounded probes. A specimen can exercise local pending/error/recovery states without claiming native-engine parity. All ordinary reference requirements in this inventory have working examples.

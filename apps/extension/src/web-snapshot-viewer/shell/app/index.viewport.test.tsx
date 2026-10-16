@@ -102,7 +102,9 @@ async function renderViewer(): Promise<void> {
 async function loadSnapshotIframe(): Promise<void> {
   if (!container?.querySelector('iframe')) {
     act(() => {
-      container?.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')?.click();
+      container
+        ?.querySelector<HTMLButtonElement>('#web-snapshot-mode-static-document-tab')
+        ?.click();
     });
   }
   await act(async () => {
@@ -212,12 +214,15 @@ it('does not let grab navigation consume the collapsed toolbar button pointer ge
     (button) => button.querySelector('.lucide-panel-top-close') !== null
   );
   expect(collapseButton).toBeTruthy();
+  const modeLabel = container?.querySelector('[role="tab"][aria-selected="true"]')?.textContent;
   act(() => collapseButton?.click());
   const expandButton = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
     (button) => button.querySelector('.lucide-panel-top-open') !== null
   );
   expect(expandButton).toBeTruthy();
   const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
+  expect(surface?.getAttribute('aria-labelledby')).toBeNull();
+  expect(surface?.getAttribute('aria-label')).toBe(modeLabel);
   Object.defineProperties(surface!, {
     clientHeight: { configurable: true, value: 700 },
     clientWidth: { configurable: true, value: 1020 },
@@ -346,4 +351,51 @@ it('keeps the fluid viewer surface for legacy snapshots without viewport metadat
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.width).toBe('');
   expect(viewport?.style.height).toBe('');
+});
+
+it('keeps connected mode tabs lazy and retains the explicit document viewport through navigation', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
+  await renderViewer();
+  await loadSnapshotIframe();
+  act(() =>
+    container?.querySelector<HTMLButtonElement>('[data-testid="mock-viewport-change"]')?.click()
+  );
+  const tabs = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>(
+      '[data-ui="web-snapshot-viewer.mode-tabs"] [role="tab"]'
+    ) ?? []
+  );
+  expect(tabs).toHaveLength(3);
+  for (const tab of tabs) {
+    const panel = document.getElementById(tab.getAttribute('aria-controls') ?? '');
+    expect(panel?.getAttribute('role')).toBe('tabpanel');
+    expect(panel?.getAttribute('aria-labelledby')).toBe(tab.id);
+  }
+  const first = tabs[0];
+  if (!first) throw new Error('Static document tab is required');
+  first.focus();
+  const key = (value: string) => {
+    const event = new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true });
+    act(() => document.activeElement?.dispatchEvent(event));
+    return event;
+  };
+  key('ArrowRight');
+  expect(document.activeElement).toBe(tabs[1]);
+  expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, 0, -1]);
+  expect(container?.querySelector('iframe')).toBeNull();
+  key('End');
+  expect(document.activeElement).toBe(tabs[2]);
+  expect(container?.querySelector('[data-testid="snapshot-visual-image"]')).not.toBeNull();
+  key('ArrowRight');
+  expect(document.activeElement).toBe(first);
+  expect(container?.querySelector('iframe')).not.toBeNull();
+  key('ArrowLeft');
+  expect(document.activeElement).toBe(tabs[2]);
+  key('Home');
+  expect(document.activeElement).toBe(first);
+  expect(key('Tab').defaultPrevented).toBe(false);
+  expect(mocks.loadWebSnapshotPackage).toHaveBeenCalledTimes(1);
+  const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
+  expect(viewport?.style.width).toBe('390px');
+  expect(viewport?.style.height).toBe('844px');
 });
