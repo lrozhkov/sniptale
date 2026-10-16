@@ -478,10 +478,19 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
     name: tr(c, 'aiModal.searchDataLabel'),
     exact: true,
   });
+  const placeholderColor = () =>
+    search.evaluate((node) => getComputedStyle(node, '::placeholder').color);
+  await search.hover();
+  await expect(search).not.toBeFocused();
+  const idlePlaceholder = await placeholderColor();
+  expect(idlePlaceholder).not.toBe('rgba(0, 0, 0, 0)');
+  await search.click();
+  expect.soft(await placeholderColor()).toBe('rgba(0, 0, 0, 0)');
   await search.fill('Apples');
   await expect(search).toHaveCSS('font-size', '13px');
   await expect(search).toHaveCSS('line-height', '18px');
-  await expect(search).toHaveCSS('font-weight', '500');
+  await expect.soft(search).toHaveCSS('font-weight', '400', { timeout: 500 });
+  await expect.soft(search).toHaveCSS('font-family', /Sniptale Text/, { timeout: 500 });
   const clear = named(modal, c, 'aiModal.clearSearchLabel');
   await expect(clear).toHaveCSS('height', '24px');
   await expect(clear.locator('svg')).toHaveCSS('width', '13px');
@@ -489,9 +498,12 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   await named(modal, c, 'aiModal.clearSearchLabel').click();
   await expect(search).toHaveValue('');
   await expect(search).toBeFocused();
+  expect.soft(await placeholderColor()).toBe('rgba(0, 0, 0, 0)');
   const selectedOnly = modal.locator('.sniptale-ai-data-selected-filter');
   await selectedOnly.click();
   await expect(selectedOnly).toHaveAttribute('aria-pressed', 'true');
+  await expect(search).not.toBeFocused();
+  expect(await placeholderColor()).toBe(idlePlaceholder);
   await selectedOnly.click();
   await expect(selectedOnly).toHaveAttribute('aria-pressed', 'false');
   const expand = modal.getByRole('button', { name: tr(c, 'aiModal.expandAllButton'), exact: true });

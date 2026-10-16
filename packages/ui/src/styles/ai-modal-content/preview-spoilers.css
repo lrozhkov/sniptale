@@ -175,15 +175,18 @@
 }
 
 .sniptale-ai-modal-adopted .sniptale-ai-data-search input {
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-document-sans);
   user-select: text;
 }
 
-.sniptale-ai-modal-adopted .sniptale-ai-data-search input::placeholder,
-.sniptale-ai-modal-adopted .sniptale-ai-data-search input:focus::placeholder {
+.sniptale-ai-modal-adopted .sniptale-ai-data-search input::placeholder {
   color: var(--sniptale-color-text-secondary);
   font: inherit;
   opacity: 1;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search input:focus::placeholder {
+  color: transparent;
 }
 
 .sniptale-ai-modal-adopted .sniptale-ai-data-search:focus-within {
