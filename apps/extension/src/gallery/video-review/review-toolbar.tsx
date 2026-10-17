@@ -312,7 +312,7 @@ export function ReviewTrackControls(props: {
         </>
       ) : null}
       {props.density ? (
-        <div className="ml-auto flex shrink-0 items-center">
+        <div className="ml-auto flex w-7 shrink-0 items-center justify-center">
           <ReviewTrackHeightButton {...props.density} />
         </div>
       ) : null}

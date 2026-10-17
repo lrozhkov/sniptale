@@ -160,30 +160,42 @@ export function WatermarkTextFields(
             aria-label={translate('gallery.videoReview.watermarkBold')}
             title={translate('gallery.videoReview.watermarkBold')}
             aria-pressed={text.weight === 'bold'}
-            className="!border-0 !bg-transparent aria-pressed:!text-[var(--sniptale-color-accent)]"
+            className="!border-0 !bg-transparent"
             onClick={() => onChange(patch({ weight: text.weight === 'bold' ? 'normal' : 'bold' }))}
           >
-            <Bold size={15} aria-hidden="true" />
+            <Bold
+              size={15}
+              aria-hidden="true"
+              style={{ color: text.weight === 'bold' ? 'var(--sniptale-color-accent)' : undefined }}
+            />
           </ContentToolbarButton>
           <ContentToolbarButton
             tone="utility"
             aria-label={translate('gallery.videoReview.watermarkItalic')}
             title={translate('gallery.videoReview.watermarkItalic')}
             aria-pressed={text.italic === true}
-            className="!border-0 !bg-transparent aria-pressed:!text-[var(--sniptale-color-accent)]"
+            className="!border-0 !bg-transparent"
             onClick={() => onChange(patch({ italic: !text.italic }))}
           >
-            <Italic size={15} aria-hidden="true" />
+            <Italic
+              size={15}
+              aria-hidden="true"
+              style={{ color: text.italic ? 'var(--sniptale-color-accent)' : undefined }}
+            />
           </ContentToolbarButton>
           <ContentToolbarButton
             tone="utility"
             aria-label={translate('gallery.videoReview.watermarkStrike')}
             title={translate('gallery.videoReview.watermarkStrike')}
             aria-pressed={text.strike === true}
-            className="!border-0 !bg-transparent aria-pressed:!text-[var(--sniptale-color-accent)]"
+            className="!border-0 !bg-transparent"
             onClick={() => onChange(patch({ strike: !text.strike }))}
           >
-            <Strikethrough size={15} aria-hidden="true" />
+            <Strikethrough
+              size={15}
+              aria-hidden="true"
+              style={{ color: text.strike ? 'var(--sniptale-color-accent)' : undefined }}
+            />
           </ContentToolbarButton>
         </div>
         <div className="min-w-0 flex-1">

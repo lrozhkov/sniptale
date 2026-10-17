@@ -461,6 +461,11 @@
     font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans) !important;
     white-space: nowrap;
   }
+  .sniptale-compact-workspace .sniptale-property-segments[data-icon-only='true'] > button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   .sniptale-compact-workspace .sniptale-property-segments > button[aria-pressed='true'] {
     background: color-mix(
       in srgb,

@@ -9,7 +9,9 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 type Message = Parameters<typeof translate>[0];
 const variants = [
   { width: 1280, height: 560, locale: 'ru', theme: 'dark' },
+  { width: 1280, height: 560, locale: 'ru', theme: 'light' },
   { width: 1920, height: 900, locale: 'en', theme: 'light' },
+  { width: 1920, height: 900, locale: 'ru', theme: 'dark' },
   { width: 960, height: 560, locale: 'en', theme: 'dark' },
 ] as const;
 
@@ -163,7 +165,11 @@ async function proveInspectorBreakpoints(
       });
       const first = sections.locator('section[data-section="canvas"]');
       const next = sections.locator('section[data-section="window-header"]');
-      const other = sections.locator('section[data-section="presentation"]');
+      const other = sections
+        .locator('.review-inspector-section-column')
+        .nth(1)
+        .locator('section[data-section]')
+        .first();
       const before = await next.boundingBox();
       const otherBefore = await other.boundingBox();
       await first.locator('summary').first().click();
@@ -188,7 +194,7 @@ async function proveInspectorBreakpoints(
 }
 
 for (const variant of variants) {
-  test(`scene watermark authoring and private logo lifecycle ${variant.width}`, async ({
+  test(`scene watermark authoring and private logo lifecycle ${variant.width} ${variant.theme}`, async ({
     page,
   }, info) => {
     test.setTimeout(120_000);
@@ -209,8 +215,18 @@ for (const variant of variants) {
       await seedEditedLibraryLogo(page);
       await page.reload();
       const open = async () => {
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await page
+          .locator(
+            `[data-gallery-keyboard-id="recording:${betaV1Fixture.records.recordings[0].id}"]`
+          )
+          .getByRole('button', { name: 'beta-v1.webm', exact: true })
+          .first()
+          .click();
+        const enter = page.locator('[data-ui="gallery.videoReview.enter"]');
+        await expect(
+          page.locator('[data-ui="gallery.videoReview.dialog"]').or(enter)
+        ).toBeVisible();
+        if (await enter.isVisible()) await enter.click();
       };
       await open();
       const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
@@ -222,19 +238,20 @@ for (const variant of variants) {
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
       const fields = inspector.locator('[data-ui="gallery.videoReview.watermarkInspector"]');
-      await expect(inspector.locator('.review-inspector-section')).toHaveCount(7);
+      await expect(inspector.locator('.review-inspector-section')).toHaveCount(8);
       expect(
         await inspector
           .locator('.review-inspector-section')
           .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-section')))
       ).toEqual([
-        'captions',
         'canvas',
         'window-header',
         'background',
         'presentation',
         'watermark',
+        'captions',
         'audio',
+        'cursor-path',
       ]);
       await button('gallery.videoReview.backgroundSolid').click();
       await inspector
@@ -248,9 +265,17 @@ for (const variant of variants) {
         exact: true,
       });
       await padding.scrollIntoViewIfNeeded();
-      // Let the initial mode change settle before testing one held gesture.
-      await page.waitForTimeout(350);
+      await expect(review.locator('[data-ui="autosave-control"] button').first()).toHaveAttribute(
+        'aria-label',
+        `${label('editor.documentActions.autosaveTitle')}: ${label('common.states.saved')}`
+      );
       const beforeBackground = (await persistedWatermark(page)).cursor;
+      await inspector
+        .getByRole('textbox', {
+          name: label('gallery.videoReview.backgroundPadding'),
+          exact: true,
+        })
+        .hover();
       const rangeBox = (await padding.boundingBox())!;
       await page.mouse.move(rangeBox.x + rangeBox.width * 0.6, rangeBox.y + rangeBox.height / 2);
       await page.mouse.down();
@@ -325,6 +350,24 @@ for (const variant of variants) {
       await mode('gallery.videoReview.watermarkText').click();
       await expect(text).toHaveValue(authored);
       await mode('gallery.videoReview.watermarkFontMono').click();
+      for (const key of [
+        'gallery.videoReview.watermarkAlignLeft',
+        'gallery.videoReview.watermarkAlignCenter',
+        'gallery.videoReview.watermarkAlignRight',
+      ] as const) {
+        const control = fields
+          .getByRole('group', { name: label('gallery.videoReview.watermarkAlign'), exact: true })
+          .getByRole('button', { name: label(key), exact: true });
+        await control.scrollIntoViewIfNeeded();
+        const box = (await control.boundingBox())!;
+        const glyph = (await control.locator('svg').boundingBox())!;
+        expect
+          .soft(Math.abs(box.x + box.width / 2 - glyph.x - glyph.width / 2))
+          .toBeLessThanOrEqual(1);
+        expect
+          .soft(Math.abs(box.y + box.height / 2 - glyph.y - glyph.height / 2))
+          .toBeLessThanOrEqual(1);
+      }
       await mode('gallery.videoReview.watermarkBold').click();
       await mode('gallery.videoReview.watermarkItalic').click();
       await expect(mode('gallery.videoReview.watermarkItalic')).toHaveAttribute(
@@ -335,6 +378,28 @@ for (const variant of variants) {
       await expect
         .poll(async () => (await persistedWatermark(page)).watermark?.text.strike)
         .toBe(true);
+      for (const key of [
+        'gallery.videoReview.watermarkBold',
+        'gallery.videoReview.watermarkItalic',
+        'gallery.videoReview.watermarkStrike',
+      ] as const) {
+        const control = mode(key);
+        await expect(control).toHaveAttribute('aria-pressed', 'true');
+        const colors = await control.locator('svg').evaluate((svg) => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--sniptale-color-accent)';
+          svg.parentElement!.append(probe);
+          const accent = getComputedStyle(probe).color;
+          probe.remove();
+          return { stroke: getComputedStyle(svg).stroke, accent };
+        });
+        expect.soft(colors.stroke).toBe(colors.accent);
+        await expect(control).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      }
+      await page.screenshot({
+        path: info.outputPath('watermark-format-icons.png'),
+        fullPage: false,
+      });
       const size = fields.getByRole('textbox', {
         name: label('gallery.videoReview.watermarkSize'),
         exact: true,
