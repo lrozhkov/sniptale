@@ -194,7 +194,7 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
   const control = useRecordingMediaControl(props);
   const Icon = props.active ? props.activeIcon : props.inactiveIcon;
   return (
-    <div className="sniptale-split-action sniptale-full-page-wrapper">
+    <div className="sniptale-split-action sniptale-full-page-wrapper sniptale-recording-media-control">
       <ContentToolbarButton
         type="button"
         tone="property"

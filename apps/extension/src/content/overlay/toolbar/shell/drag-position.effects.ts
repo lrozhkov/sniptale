@@ -158,7 +158,7 @@ function fitVerticalToolbar(toolbar: HTMLElement, uiScale: number): void {
   const availableHeight = window.innerHeight / uiScale - 16;
   if (toolbar.offsetHeight <= availableHeight) return;
   const buttons = [...toolbar.querySelectorAll('.sniptale-btn')].filter(
-    (button) => !button.closest('.sniptale-popover-menu')
+    (button) => !button.closest('.sniptale-popover-menu, .sniptale-drawing-options-popover')
   );
   if (!buttons.length) return;
   const defaultSize = Number.parseFloat(getComputedStyle(toolbar).getPropertyValue(sizeProperty));
@@ -169,6 +169,7 @@ function fitVerticalToolbar(toolbar: HTMLElement, uiScale: number): void {
   );
   toolbar.style.setProperty(sizeProperty, `${fittedSize}px`);
   if (toolbar.offsetHeight > availableHeight) toolbar.style.setProperty(gapProperty, '2px');
+  if (toolbar.offsetHeight > availableHeight) toolbar.style.setProperty(gapProperty, '1px');
 }
 
 export function useToolbarViewportClamping(params: {

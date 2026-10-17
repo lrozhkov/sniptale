@@ -636,6 +636,17 @@ async function recordingAdaptation(
   if (!(await free.evaluate((node) => node.classList.contains('sniptale-popover-item-selected'))))
     await free.click();
   await page.getByRole('button', { name: /Vertical view|Вертикальный вид/u }).click();
+  await inside(ui(page, 'content.toolbar.root'), page);
+  for (const kind of ['microphone', 'camera']) {
+    const toggle = ui(page, `content.toolbar.video-recording.${kind}.toggle`);
+    const menuTrigger = ui(page, `content.toolbar.video-recording.${kind}.menu`);
+    await inside(toggle, page);
+    await inside(menuTrigger, page);
+    const toggleBounds = (await toggle.boundingBox())!;
+    const menuBounds = (await menuTrigger.boundingBox())!;
+    expect(Math.abs(toggleBounds.y - menuBounds.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(toggleBounds.x + toggleBounds.width - menuBounds.x)).toBeLessThanOrEqual(1);
+  }
   await ui(page, 'content.toolbar.video-recording.microphone.menu').click();
   await menu(
     page,
@@ -643,6 +654,15 @@ async function recordingAdaptation(
     info,
     'recording-vertical-media',
     tr(c, 'content.toolbar.videoRecordingMicrophone')
+  );
+  await page.keyboard.press('Escape');
+  await ui(page, 'content.toolbar.video-recording.camera.menu').click();
+  await menu(
+    page,
+    'content.toolbar.video-recording.camera.dropdown',
+    info,
+    'recording-vertical-camera',
+    tr(c, 'content.toolbar.videoRecordingCamera')
   );
   await page.keyboard.press('Escape');
   await ui(page, 'content.toolbar.video-recording.auto-hide').click();

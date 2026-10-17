@@ -34,6 +34,7 @@ let addEventListenerSpy: ReturnType<typeof vi.spyOn> | null = null;
 function DragHarness(props: {
   currentViewport: { width: number; height: number } | null;
   fullToolbar?: boolean;
+  openDrawingMenu?: boolean;
 }) {
   const state = useToolbarDragPosition(props.currentViewport);
 
@@ -46,6 +47,13 @@ function DragHarness(props: {
       {props.fullToolbar
         ? Array.from({ length: 20 }, (_, index) => <button key={index} className="sniptale-btn" />)
         : null}
+      {props.openDrawingMenu ? (
+        <div className="sniptale-drawing-options-popover">
+          {Array.from({ length: 8 }, (_, index) => (
+            <button key={index} className="sniptale-btn" />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -365,34 +373,39 @@ it('restores a saved dock and keeps its orientation when free placement is enabl
   expect(getDragState().displayMode).toBe('vertical');
 });
 
-it('fits vertical controls and restores normal density when height returns', async () => {
-  storageMocks.loadSettings.mockResolvedValue({ contentToolbar: { dockEdge: 'left' } });
-  vi.stubGlobal('innerHeight', 720);
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-    configurable: true,
-    get() {
-      return (
-        (Number.parseFloat(this.style.getPropertyValue('--sniptale-toolbar-button-size')) || 36) *
-          20 +
-        100
-      );
-    },
-  });
-  const originalGetComputedStyle = window.getComputedStyle;
-  vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
-    const style = originalGetComputedStyle(element);
-    vi.spyOn(style, 'getPropertyValue').mockReturnValue('36px');
-    return style;
-  });
-  await renderElement(<DragHarness currentViewport={null} fullToolbar />);
-  const toolbar = getDragState().toolbarRef.current!;
-  expect(toolbar.offsetHeight).toBeLessThanOrEqual(704);
-  expect(
-    Number.parseFloat(toolbar.style.getPropertyValue('--sniptale-toolbar-button-size'))
-  ).toBeGreaterThanOrEqual(24);
-  expect(getDragState().position.y).toBeGreaterThanOrEqual(8);
-  vi.stubGlobal('innerHeight', 1000);
-  act(() => window.dispatchEvent(new Event('resize')));
-  expect(toolbar.style.getPropertyValue('--sniptale-toolbar-button-size')).toBe('');
-  expect(getDragState().position.y).toBe(90);
-});
+it.each([false, true])(
+  'fits vertical controls with drawing menu %s and restores density when height returns',
+  async (openDrawingMenu) => {
+    storageMocks.loadSettings.mockResolvedValue({ contentToolbar: { dockEdge: 'left' } });
+    vi.stubGlobal('innerHeight', 720);
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get() {
+        return (
+          (Number.parseFloat(this.style.getPropertyValue('--sniptale-toolbar-button-size')) || 36) *
+            20 +
+          100
+        );
+      },
+    });
+    const originalGetComputedStyle = window.getComputedStyle;
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      const style = originalGetComputedStyle(element);
+      vi.spyOn(style, 'getPropertyValue').mockReturnValue('36px');
+      return style;
+    });
+    await renderElement(
+      <DragHarness currentViewport={null} fullToolbar openDrawingMenu={openDrawingMenu} />
+    );
+    const toolbar = getDragState().toolbarRef.current!;
+    expect(toolbar.offsetHeight).toBeLessThanOrEqual(704);
+    expect(
+      Number.parseFloat(toolbar.style.getPropertyValue('--sniptale-toolbar-button-size'))
+    ).toBeGreaterThanOrEqual(24);
+    expect(getDragState().position.y).toBeGreaterThanOrEqual(8);
+    vi.stubGlobal('innerHeight', 1000);
+    act(() => window.dispatchEvent(new Event('resize')));
+    expect(toolbar.style.getPropertyValue('--sniptale-toolbar-button-size')).toBe('');
+    expect(getDragState().position.y).toBe(90);
+  }
+);

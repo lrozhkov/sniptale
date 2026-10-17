@@ -33,6 +33,8 @@ Measure fit using the active locale and loaded font. Retain values, labels, disa
 
 Measure settled geometry. Do not animate the geometry that a fit calculation changes. Repeated resize feedback must reach a stable layout.
 
+Density calculations include only controls in the layout flow. Exclude floating menus and popovers from these calculations. Recheck toolbar fit after mode and lifecycle changes. Reflow compound controls when their minimum targets would otherwise overflow. Keep each action and its menu independently reachable.
+
 ## Source-backed local patterns
 
 | Existing owner | Pattern to preserve |

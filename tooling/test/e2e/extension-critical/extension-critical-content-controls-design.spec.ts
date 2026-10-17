@@ -16,11 +16,23 @@ async function capture(page: Page, info: TestInfo, name: string) {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     );
   });
-  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath(`${name}.png`),
+    fullPage: false,
+    animations: 'disabled',
+  });
 }
 
 async function withinViewport(root: Locator) {
   await expect(root).toBeVisible();
+  await root.evaluate(async (element) => {
+    await Promise.allSettled(
+      element
+        .getAnimations({ subtree: true })
+        .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+        .map((animation) => animation.finished)
+    );
+  });
   const bounds = await root.evaluate((node) => {
     const rect = node.getBoundingClientRect();
     return {
@@ -205,6 +217,7 @@ async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
     await expect(menu).toHaveCount(0);
     const toolbar = ui(page, 'content.toolbar.root');
     await capture(page, info, `parity-${suffix}-${mode}-toolbar`);
+    await withinViewport(toolbar);
     const buttons = await toolbar.locator('button.sniptale-btn').evaluateAll((elements) =>
       elements
         .filter((element) => element.getBoundingClientRect().width > 0)
@@ -217,6 +230,9 @@ async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
             name: element.getAttribute('aria-label'),
             classes: element.className,
             specialized: element.closest('.sniptale-drawing-options-popover') !== null,
+            splitDirection: element.closest('.sniptale-split-action')
+              ? getComputedStyle(element.closest('.sniptale-split-action')!).flexDirection
+              : null,
             width: box.width,
             height: box.height,
             glyph: glyph ? { width: glyph.width, height: glyph.height } : null,
@@ -263,7 +279,7 @@ async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
         expect
           .soft([button.width, button.height], label)
           .toEqual(
-            observation.orientation === 'vertical'
+            button.splitDirection === 'column'
               ? [observation.targetSize, 18]
               : [18, observation.targetSize]
           );
