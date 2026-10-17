@@ -1,4 +1,3 @@
-import { useId } from 'react';
 import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
@@ -399,9 +398,6 @@ function ReviewAnnotationToolControl(props: {
 }) {
   const { tool, busy, admit } = props;
   const hint = annotationTypeHint(tool);
-  const requiredId = useId();
-  const required =
-    tool.phase === 'ready' && !tool.pending && !tool.value && tool.options.length > 0;
   return (
     <ReviewToolGroup
       active={tool.active}
@@ -427,18 +423,9 @@ function ReviewAnnotationToolControl(props: {
       </ReviewButton>
       {tool.active ? (
         <>
-          {required ? (
-            <span id={requiredId} className="text-[var(--sniptale-color-danger)]">
-              <span aria-hidden="true">*</span>
-              <span className="sr-only">
-                {translate('gallery.videoReview.annotationEffectsRequired')}
-              </span>
-            </span>
-          ) : null}
           <ProductSelect
             menuClassName="sniptale-parameter-menu"
             aria-label={translate('gallery.videoReview.annotationEffectsChoose')}
-            aria-describedby={required ? requiredId : undefined}
             dataUi="gallery.videoReview.annotationType"
             controlSize="sm"
             className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}

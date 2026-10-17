@@ -198,7 +198,7 @@ it('keeps large-grid cards compact with the canonical row gap', () => {
   expect(secondRowTop - firstHeight).toBe(GRID_GAP);
   expect(cards?.[0]?.className).toContain('flex flex-col');
   expect(details?.className).toContain('h-[72px]');
-  expect(details?.className).toContain('grid-rows-[20px_16px]');
+  expect(details?.className).toContain('justify-between');
   expect(details?.className).not.toContain('minmax(0,1fr)');
   expect(details?.className).toContain('shrink-0');
   expect(metadata?.className).not.toContain('mt-auto');

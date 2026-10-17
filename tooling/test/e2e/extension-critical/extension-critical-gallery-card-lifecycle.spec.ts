@@ -136,6 +136,15 @@ for (const viewport of [
             exact: true,
           });
           const mark = selection.locator('[data-ui="gallery.selection.mark"]');
+          const visibleMark = (await mark.boundingBox())!;
+          const leftInset = visibleMark.x - bounds.x;
+          const bottomInset = bounds.y + bounds.height - visibleMark.y - visibleMark.height;
+          expect(Math.abs(leftInset - bottomInset)).toBeLessThanOrEqual(1);
+          expect(leftInset).toBeLessThanOrEqual(10);
+          const dateText = created.locator(':scope > span').first();
+          expect(await dateText.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(
+            true
+          );
           if ((await selection.getAttribute('aria-pressed')) === 'true') await selection.click();
           await page
             .getByRole('button', { name: label(`gallery.app.${mode}`), exact: true })

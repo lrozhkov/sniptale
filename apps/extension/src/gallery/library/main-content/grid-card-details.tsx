@@ -243,9 +243,9 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
       className={
         props.compact
           ? `group/gallery-caption relative h-10 w-full shrink-0 border-t border-[var(--sniptale-color-border-soft)]
-            flex items-center px-3 py-2 text-left`
-          : `group/gallery-caption relative grid h-[72px] w-full shrink-0 grid-rows-[20px_16px] gap-2
-            border-t border-[var(--sniptale-color-border-soft)] px-4 py-3.5 text-left`
+            flex items-center px-2 py-2 text-left`
+          : `group/gallery-caption relative flex h-[72px] w-full shrink-0 flex-col justify-between
+            border-t border-[var(--sniptale-color-border-soft)] px-2 py-3 text-left`
       }
       data-ui={props.compact ? 'gallery.compact.details' : 'gallery.large.details'}
     >
@@ -269,10 +269,11 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
       )}
       <div
         data-ui={props.compact ? 'gallery.compact.metadata' : 'gallery.large.metadata'}
-        className={`pointer-events-none flex min-w-0 w-full items-center justify-between gap-2 whitespace-nowrap text-xs
+        className={`pointer-events-none flex min-w-0 w-full items-center justify-between gap-2 pl-9
+          whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]`}
       >
-        <span className="pointer-events-auto relative z-10 flex h-4 w-8 shrink-0 items-center justify-center">
+        <span className="pointer-events-auto absolute bottom-1 left-1 z-10 flex h-8 w-8 items-center justify-center">
           {props.leading}
         </span>
         <GalleryGridCardDate items={[props.item]} />

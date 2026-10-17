@@ -928,10 +928,22 @@
 }
 
 /* Inline color editing uses the same neutral surface as numeric and text values. */
+.sniptale-compact-workspace [data-ui='shared.ui.color-selector.value-trigger'] {
+  transition: none;
+}
+.sniptale-compact-workspace
+  [data-ui='shared.ui.color-selector.value-trigger']:is(:focus, :focus-visible, :active) {
+  border-color: var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-input);
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: -1px;
+  box-shadow: none;
+}
 .sniptale-compact-workspace [data-ui='shared.ui.color-selector.trigger'] span:has(> input) {
   border: 1px solid var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-input);
   border-radius: 4px;
+  transition: none;
 }
 .sniptale-compact-workspace [data-ui='shared.ui.color-selector.trigger'] span:has(> input) > input {
   background: transparent;

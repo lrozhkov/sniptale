@@ -6,7 +6,12 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
 const gallery = '/apps/extension/src/gallery/index.html';
 
-async function openReview(page: Page, extensionId: string, theme: 'light' | 'dark') {
+async function openReview(
+  page: Page,
+  extensionId: string,
+  theme: 'light' | 'dark',
+  configureMode = true
+) {
   await page.goto(`chrome-extension://${extensionId}${gallery}`);
   await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
   await expect
@@ -42,7 +47,7 @@ async function openReview(page: Page, extensionId: string, theme: 'light' | 'dar
     name: label('gallery.videoReview.advancedEditing'),
     exact: true,
   });
-  if ((await mode.getAttribute('aria-pressed')) !== 'true') await mode.click();
+  if (configureMode && (await mode.getAttribute('aria-pressed')) !== 'true') await mode.click();
   await page.evaluate(() => document.fonts.ready);
   return review;
 }
@@ -778,6 +783,39 @@ for (const size of [
         ).toBeVisible();
         await page.screenshot({
           path: info.outputPath('new-text-inline-recording-paused.png'),
+          fullPage: false,
+        });
+      } finally {
+        await closeExtensionBrowser(launched);
+      }
+    });
+  }
+
+for (const size of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+])
+  for (const theme of ['light', 'dark'] as const) {
+    test(`native review container focus ${size.width} ${theme}`, async ({}, info) => {
+      const launched = await launchExtensionBrowser({ viewport: size });
+      const page = await launched.context.newPage();
+      try {
+        const review = await openReview(page, launched.extensionId, theme, false);
+        await page.keyboard.press('Tab');
+        await review.focus();
+        await expect(review).toBeFocused();
+        await expect(review).toHaveCSS('outline-style', 'none');
+        await page.keyboard.press('Tab');
+        const active = review.locator(':focus');
+        await expect(active).toHaveCount(1);
+        expect(await active.evaluate((node) => node !== node.closest('dialog'))).toBe(true);
+        const focus = await active.evaluate((node) => {
+          const css = getComputedStyle(node);
+          return css.outlineStyle !== 'none' || css.boxShadow !== 'none';
+        });
+        expect(focus).toBe(true);
+        await page.screenshot({
+          path: info.outputPath('review-keyboard-focus.png'),
           fullPage: false,
         });
       } finally {

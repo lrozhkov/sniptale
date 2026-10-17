@@ -151,6 +151,7 @@ export function reviewClickSections(props: {
         ),
       }
     );
+  if (props.extraSections) sections.push(...props.extraSections);
   sections.push(
     reviewInspectorActions(
       <>
@@ -165,7 +166,6 @@ export function reviewClickSections(props: {
       </>
     )
   );
-  if (props.extraSections) sections.push(...props.extraSections);
   return props.gesture
     ? sections.filter((section) => section.id !== 'timing' && section.id !== 'position')
     : sections;

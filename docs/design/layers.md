@@ -23,7 +23,7 @@ Dialog headers and bodies use 16px horizontal and 12px vertical insets. Footers 
 
 Compact popover headers use Interface 12px / 16px, weight 500, and secondary foreground. Use normal case and normal letter spacing. Do not apply the structural dialog heading role. Omit a header that repeats the trigger or first parameter name.
 
-At short heights, content scrolls while actions remain reachable through their actual owner. Modal focus stays within the dialog. Destructive confirmation initially focuses Cancel.
+At short heights, content scrolls while actions remain reachable through their actual owner. Modal focus stays within the dialog. A dialog container can receive programmatic focus without a frame around the whole surface. Keep visible keyboard focus on its interactive controls. Destructive confirmation initially focuses Cancel.
 
 ## Drafts and color
 

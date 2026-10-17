@@ -411,7 +411,19 @@ async function numericControls(
   await color.locator('.sniptale-parameter-name').click();
   await expect(color.locator('input')).toHaveCount(0);
   await expect(value).toBeVisible();
-  await value.click();
+  await value.hover();
+  const valueBounds = (await value.boundingBox())!;
+  await page.mouse.move(
+    valueBounds.x + valueBounds.width / 2,
+    valueBounds.y + valueBounds.height / 2
+  );
+  await page.mouse.down();
+  expect(await editAppearance(value)).toEqual(numericAppearance);
+  await page.screenshot({
+    path: info.outputPath(`color-activation-${suffix}.png`),
+    fullPage: false,
+  });
+  await page.mouse.up();
   const colorInput = color.locator('input');
   await expect(colorInput).toBeFocused();
   const colorEntry = colorInput.locator('..');

@@ -537,9 +537,17 @@ for (const variant of [
         const toggle = button('gallery.videoReview.annotationEffectsAdd');
         if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
         const selector = button('gallery.videoReview.annotationEffectsChoose');
-        await expect(selector).toHaveAttribute('aria-describedby', /.+/);
+        await expect(selector).not.toHaveAttribute('aria-describedby');
+        await expect(selector).not.toHaveText(label('gallery.videoReview.annotationEffectsChoose'));
         await expect(lane).toBeInViewport();
-        await expect(dialog.locator('[data-active-tool-lane="annotation"]')).toHaveCount(1);
+        await expect(dialog.locator('[data-ui="gallery.videoReview.timeline"]')).toHaveAttribute(
+          'data-active-tool-lane',
+          'annotation'
+        );
+        await expect(dialog.locator('[data-ui="gallery.videoReview.timePlane"]')).toHaveAttribute(
+          'data-active-tool-lane',
+          'annotation'
+        );
         const before = (await workspace())!.cursor;
         await selector.click();
         const choice = page.getByRole('option', { name: template[variant.locale], exact: true });
@@ -567,7 +575,9 @@ for (const variant of [
           );
           expect((await workspace())!.cursor).toBe(before);
           await toggle.click();
-          await expect(selector).toHaveText(label('gallery.videoReview.annotationEffectsChoose'));
+          await expect(selector).not.toHaveText(
+            label('gallery.videoReview.annotationEffectsChoose')
+          );
           await selector.click();
           await page.getByRole('option', { name: template[variant.locale], exact: true }).click();
         }
@@ -659,9 +669,20 @@ for (const variant of [
           await resizeInspector(page, dialog, width);
           await name.scrollIntoViewIfNeeded();
           await expect(name).toBeInViewport();
+          const scrollOwner = dialog.locator('.review-inspector-scroll');
           await expect
-            .poll(() => inspector.evaluate((node) => node.scrollWidth <= node.clientWidth))
+            .poll(() => scrollOwner.evaluate((node) => node.scrollWidth <= node.clientWidth))
             .toBe(true);
+          const viewportBounds = (await scrollOwner.boundingBox())!;
+          const steppers = await inspector
+            .locator('[data-ui="shared.ui.compact-inspector.numeric-stepper"]')
+            .all();
+          for (const stepper of steppers) {
+            const bounds = (await stepper.boundingBox())!;
+            expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+              viewportBounds.x + viewportBounds.width
+            );
+          }
           await page.screenshot({
             path: info.outputPath(`annotation-inspector-${width}.png`),
             fullPage: false,

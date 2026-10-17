@@ -251,11 +251,12 @@ it('retains a refused choice, completes one placement and ignores an old activat
       dialog.querySelector('[data-ui="gallery.videoReview.annotationEffectsPicker"]')
     ).toBeNull();
     expect(selector()).not.toBeNull();
+    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
     expect(
       host
         .querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')
         ?.getAttribute('tabindex')
-    ).toBeNull();
+    ).toBe('0');
     expect(add).not.toHaveBeenCalled();
     await act(async () => selector().click());
     const choice = [...dialog.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
@@ -382,9 +383,7 @@ it('retains a refused choice, completes one placement and ignores an old activat
     );
     expect(add).toHaveBeenCalledTimes(4);
     await act(async () => trigger().click());
-    expect(selector().textContent).toContain(
-      translate('gallery.videoReview.annotationEffectsChoose')
-    );
+    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
     await act(async () => selector().click());
     await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
     const oldHash = catalogFixture.sourceSha256;
@@ -400,14 +399,12 @@ it('retains a refused choice, completes one placement and ignores an old activat
         />
       )
     );
-    expect(selector().textContent).toContain(
-      translate('gallery.videoReview.annotationEffectsChoose')
-    );
+    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
     expect(
       host
         .querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')
         ?.getAttribute('tabindex')
-    ).toBeNull();
+    ).toBe('0');
     catalogFixture.sourceSha256 = oldHash;
     await act(async () =>
       root.render(

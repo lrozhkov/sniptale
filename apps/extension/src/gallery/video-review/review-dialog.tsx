@@ -86,7 +86,7 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
         }}
         className="sniptale-compact-workspace fixed inset-0 m-auto h-[calc(100dvh-24px)] max-h-none
           w-[calc(100vw-24px)] max-w-none
-          overflow-hidden rounded-[var(--sniptale-radius-lg)] border
+          overflow-hidden rounded-[var(--sniptale-radius-lg)] border outline-none
         border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
         p-0 text-[var(--sniptale-color-text-primary)] backdrop:bg-black/60"
       >

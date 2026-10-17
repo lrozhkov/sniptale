@@ -138,6 +138,7 @@ export function reviewKeySections(props: {
         ),
       }
     );
+  if (props.extraSections) sections.push(...props.extraSections);
   sections.push(
     reviewInspectorActions(
       <>
@@ -152,7 +153,6 @@ export function reviewKeySections(props: {
       </>
     )
   );
-  if (props.extraSections) sections.push(...props.extraSections);
   return sections;
 }
 /** Display enablement stays distinct from the preserved keyboard appearance and timing. */

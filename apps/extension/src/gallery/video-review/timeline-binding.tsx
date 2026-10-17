@@ -452,8 +452,8 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
     if (!advanced || props.editing.mode || props.audio.originalTool || props.zoom.drawing) clear();
   }, [advanced, props.editing.mode, props.audio.originalTool, props.zoom.drawing, clear]);
   useEffect(() => {
-    if (catalog.phase === 'ready' && selected && !choice) setSelected('');
-  }, [catalog.phase, selected, choice]);
+    if (active && catalog.phase === 'ready' && !choice) setSelected(choices[0]?.value ?? '');
+  }, [active, catalog.phase, choice, choices]);
   useEffect(() => {
     if (!active) return;
     const escape = (event: KeyboardEvent) => {

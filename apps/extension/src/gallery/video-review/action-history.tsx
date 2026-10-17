@@ -347,7 +347,12 @@ function HistoryAnimationFields(props: {
             : 'gallery.videoReview.historyAudioFields'
       }
     >
-      <ReviewInspectorSections sections={sections} />
+      <ReviewInspectorSections
+        sections={[
+          ...sections.filter((section) => !section.id.endsWith(':actions')),
+          ...sections.filter((section) => section.id.endsWith(':actions')),
+        ]}
+      />
     </div>
   );
 }

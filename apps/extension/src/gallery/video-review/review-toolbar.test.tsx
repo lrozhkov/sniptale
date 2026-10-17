@@ -99,16 +99,10 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
       )!;
     tool.value = '';
     await render('advanced');
-    const description = selector().getAttribute('aria-describedby');
-    expect(description).not.toBeNull();
-    expect(document.getElementById(description!)?.textContent).toContain(
+    expect(selector().getAttribute('aria-describedby')).toBeNull();
+    expect(host.textContent).not.toContain(
       translate('gallery.videoReview.annotationEffectsRequired')
     );
-    expect(selector().hasAttribute('aria-required')).toBe(false);
-    expect(
-      document.getElementById(description!)!.compareDocumentPosition(selector()) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
     tool.phase = 'loading';
     tool.options = [];
     await render('advanced');

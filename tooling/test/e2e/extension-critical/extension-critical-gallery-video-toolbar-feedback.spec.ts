@@ -102,12 +102,10 @@ for (const width of [1280, 1920])
         if (width === 1280 && theme === 'light') {
           await button('gallery.videoReview.annotationEffectsAdd').click();
           const selector = button('gallery.videoReview.annotationEffectsChoose');
-          const description = await selector.getAttribute('aria-describedby');
-          expect(description).not.toBeNull();
-          const marker = page.locator(`[id="${description}"]`);
-          const markerBox = (await marker.boundingBox())!;
-          const selectorBox = (await selector.boundingBox())!;
-          expect(markerBox.x + markerBox.width).toBeLessThanOrEqual(selectorBox.x);
+          await expect(selector).not.toHaveAttribute('aria-describedby');
+          await expect(selector).not.toHaveText(
+            label('gallery.videoReview.annotationEffectsChoose')
+          );
           await selector.click();
           await page.getByRole('option', { name: 'Главная мысль', exact: true }).click();
           await expect(selector).toHaveText('Главная мысль');

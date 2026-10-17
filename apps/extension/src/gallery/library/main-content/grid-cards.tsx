@@ -347,10 +347,11 @@ function GalleryRecordingGroupDetails(props: {
     <div
       className={
         isCompact
-          ? `group/gallery-caption h-10 shrink-0 border-t border-[var(--sniptale-color-border-soft)]
-            px-3 py-3`
-          : `group/gallery-caption flex h-[72px] shrink-0 flex-col justify-between
-            border-t border-[var(--sniptale-color-border-soft)] px-4 py-2`
+          ? `group/gallery-caption relative flex h-10 shrink-0 items-center border-t
+            border-[var(--sniptale-color-border-soft)]
+            px-2 py-2`
+          : `group/gallery-caption relative flex h-[72px] shrink-0 flex-col justify-between
+            border-t border-[var(--sniptale-color-border-soft)] px-2 py-3`
       }
       data-ui={isCompact ? 'gallery.compact.group-details' : 'gallery.large.group-details'}
     >
@@ -371,10 +372,10 @@ function GalleryRecordingGroupDetails(props: {
       ) : null}
       <div
         data-ui={isCompact ? 'gallery.compact.group-metadata' : 'gallery.large.group-metadata'}
-        className="flex items-center justify-between gap-2 whitespace-nowrap text-xs
+        className="flex min-w-0 w-full items-center justify-between gap-2 pl-9 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]"
       >
-        <span className="relative flex h-4 w-8 shrink-0 items-center justify-center">
+        <span className="absolute bottom-1 left-1 flex h-8 w-8 items-center justify-center">
           {props.leading}
         </span>
         <GalleryGridCardDate items={props.items} />

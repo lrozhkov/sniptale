@@ -30,6 +30,25 @@ vi.mock('../../ui/compact-inspector-controls', async (original) => ({
       ))}
     </select>
   ),
+  CompactSelect: (p: {
+    'aria-label': string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange(value: string): void;
+  }) => (
+    <select
+      aria-label={p['aria-label']}
+      value={p.value}
+      onChange={(event) => p.onChange(event.currentTarget.value)}
+    >
+      <option value="" />
+      {p.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
   NumericRow: (p: {
     label: string;
     value: number | null;
@@ -65,6 +84,9 @@ it('scopes family selectors to typed targets and patches only the edited common 
         <ReviewActionAudioFields targets={targets} settings={[]} busy={false} onChange={onChange} />
       )
     );
+    expect(
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.actionAudioEnabled')}"]`)
+    ).toBeNull();
     const selectors = host.querySelectorAll('select');
     expect(selectors).toHaveLength(3);
     act(() => {
@@ -169,6 +191,48 @@ it('paired phases and recorded repeats target their own families and stop auditi
     );
     expect(stop).toHaveBeenCalledOnce();
     expect(host.textContent).toBe('');
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('shows None for a persisted disabled preset and keeps audition beside its selector', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const target: ReviewActionAudioTarget = { ref: { kind: 'action', id: 'mouse' }, family: 'mouse' };
+  const audition = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionAudioFields
+          targets={[target]}
+          settings={[
+            {
+              ...REVIEW_ACTION_AUDIO_DEFAULT,
+              ref: target.ref,
+              presetId: 'mouse-soft-v1',
+              enabled: false,
+            },
+          ]}
+          busy={false}
+          onChange={vi.fn()}
+          onAudition={audition}
+        />
+      )
+    );
+    const select = host.querySelector('select')!;
+    expect(select.value).toBe('none');
+    const listen = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.actionAudioListen')}"]`
+    )!;
+    expect(listen.disabled).toBe(true);
+    expect(
+      select.closest('[data-family]')?.querySelector('[data-audio-choice-row]')?.contains(listen)
+    ).toBe(true);
+    act(() => listen.click());
+    expect(audition).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

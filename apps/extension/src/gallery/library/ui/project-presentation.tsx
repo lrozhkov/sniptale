@@ -101,13 +101,17 @@ export function GalleryProjectDetails(props: {
         isList
           ? 'min-w-0'
           : isCompact
-            ? `group/gallery-caption flex h-10 shrink-0 items-center gap-1 border-t
-              border-[var(--sniptale-color-border-soft)] px-3 py-[3px]`
-            : `group/gallery-caption flex h-[72px] shrink-0 items-end gap-1 border-t
-              border-[var(--sniptale-color-border-soft)] px-4 py-2`
+            ? `group/gallery-caption relative flex h-10 shrink-0 items-center gap-1 border-t
+              border-[var(--sniptale-color-border-soft)] pl-11 pr-2 py-[3px]`
+            : `group/gallery-caption relative flex h-[72px] shrink-0 items-end gap-1 border-t
+              border-[var(--sniptale-color-border-soft)] pl-11 pr-2 py-3`
       }
     >
-      {!isList ? props.leading : null}
+      {!isList ? (
+        <span className="absolute bottom-1 left-1 flex h-8 w-8 items-center justify-center">
+          {props.leading}
+        </span>
+      ) : null}
       {!isList ? (
         <div className={`flex min-w-0 flex-1 flex-col ${isCompact ? 'gap-0.5' : 'gap-1'}`}>
           <button
