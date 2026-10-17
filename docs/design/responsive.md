@@ -14,6 +14,8 @@
 
 Keep the title, current selection, primary command, blocking status, and recovery reachable at the surface minimum. Constrain every scroll region through its layout owner. Avoid accidental page overflow caused by a child that cannot shrink. Preserve intentional timeline zoom scrolling and the desktop minimum-width scroll path.
 
+Bound text and action lists to a readable content column. Do not stretch a short description and its action across the entire workspace. Keep wide tables and specialized workspaces under their existing layout owners.
+
 ## Compaction order
 
 1. Measure available space after rails, padding, dividers, and trailing actions.

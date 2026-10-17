@@ -38,6 +38,8 @@ Keep the small neutral glow: near white in dark theme, dark in light theme. Do n
 
 Name the scope of Select all. Keep parent state synchronized with available children.
 
+When dependencies require a selected entry, show it checked and disabled. Derive this state from the existing selection owner. Include required descendants and restore activation when the dependency ends. Keep branch navigation available. Apply disabled dimming once. Do not multiply row and control opacity.
+
 ## Acceptance and recovery
 
 A switch without separate confirmation can wait for asynchronous persistence. While pending, prevent duplicate changes and expose progress. Failure retains the accepted state and offers retry. Do not steal focus if the user moved elsewhere. Checkbox form drafts remain separate from accepted values. Radio groups keep one selection and a coherent keyboard route through available options.

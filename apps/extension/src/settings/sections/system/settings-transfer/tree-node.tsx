@@ -4,12 +4,19 @@ import type { SettingsTransferTreeNode } from '../../../../contracts/settings-tr
 import { translate } from '../../../../platform/i18n';
 import { flattenTransferTreeNodes, getTransferNodeDisplayName } from './tree-model';
 
-const requiredBadgeClassName =
-  'rounded-full bg-[var(--sniptale-color-accent-soft)] px-2 py-0.5 text-[10px] ' +
-  'text-[var(--sniptale-color-accent)]';
+const requiredBadgeClassName = 'text-[11px] text-[var(--sniptale-color-text-secondary)]';
+const treeRowClassName = [
+  'flex min-h-8 items-center gap-1 rounded-[4px] px-1',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
+].join(' ');
+const treeLabelTextClassName = [
+  'min-w-0 flex-1 truncate text-[13px] font-normal leading-[18px]',
+  'text-[var(--sniptale-color-text-primary)]',
+].join(' ');
 
 type SettingsTransferTreeNodeProps = {
   node: SettingsTransferTreeNode;
+  required?: boolean;
   level: number;
   selected: ReadonlySet<string>;
   onToggle: (node: SettingsTransferTreeNode, checked: boolean) => void;
@@ -25,6 +32,10 @@ export function SettingsTransferTreeNodeItem(props: SettingsTransferTreeNodeProp
   const checkboxRef = useRef<HTMLInputElement>(null);
   const descendants = flattenTransferTreeNodes(props.node.children);
   const checked = props.selected.has(props.node.id);
+  const required =
+    checked && (props.required || props.node.requiredBy.some((id) => props.selected.has(id)));
+  const disabled = !props.node.selectable || required;
+  const name = getTransferNodeDisplayName(props.node);
   const selectedDescendants = descendants.filter((node) => props.selected.has(node.id)).length;
   const indeterminate = !checked && selectedDescendants > 0;
   const expandable = props.node.children.length > 0;
@@ -45,7 +56,7 @@ export function SettingsTransferTreeNodeItem(props: SettingsTransferTreeNodeProp
       }}
       className="outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]"
     >
-      <div className="flex min-h-10 items-center gap-1 rounded-lg px-1 hover:bg-[var(--sniptale-color-surface-hover)]">
+      <div className={treeRowClassName}>
         {expandable ? (
           <button
             type="button"
@@ -67,9 +78,15 @@ export function SettingsTransferTreeNodeItem(props: SettingsTransferTreeNodeProp
         ) : (
           <span className="size-7 shrink-0" />
         )}
-        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1">
+        <label
+          className={[
+            'flex min-w-0 flex-1 items-center gap-2 py-1',
+            disabled ? 'cursor-default opacity-50' : 'cursor-pointer',
+          ].join(' ')}
+        >
           <input
-            className="sniptale-checkbox"
+            className="sniptale-parameter-check m-0! shrink-0 disabled:opacity-100!"
+            disabled={disabled}
             ref={(element) => {
               checkboxRef.current = element;
               props.registerCheckbox(props.node.id, element);
@@ -79,15 +96,10 @@ export function SettingsTransferTreeNodeItem(props: SettingsTransferTreeNodeProp
             tabIndex={-1}
             onChange={(event) => props.onToggle(props.node, event.currentTarget.checked)}
           />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-              {getTransferNodeDisplayName(props.node)}
-            </span>
-            <span className="block truncate font-mono text-[10px] text-[var(--sniptale-color-text-dim)]">
-              {props.node.id}
-            </span>
+          <span className={treeLabelTextClassName} title={`${name} (${props.node.id})`}>
+            {name}
           </span>
-          {props.node.requiredBy.length > 0 ? (
+          {required ? (
             <span className={requiredBadgeClassName}>
               {translate('settings.settingsTransfer.required')}
             </span>
@@ -101,6 +113,7 @@ export function SettingsTransferTreeNodeItem(props: SettingsTransferTreeNodeProp
               key={child.id}
               {...props}
               node={child}
+              required={required}
               level={props.level + 1}
             />
           ))}

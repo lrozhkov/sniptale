@@ -1,10 +1,7 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { AlertCircle, Check } from 'lucide-react';
-import {
-  getControlPrimaryButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 
 import { translate } from '../../../../../platform/i18n';
 import { settingsSectionClassName, SettingsSubpageTabs } from '../../../../section-surface';
@@ -13,23 +10,22 @@ import { RequiredManifestPermissionDisclosureList } from './required-disclosure-
 import { DISABLED_PERMISSION_BORDER_CLASS_NAME } from './content.constants.ts';
 
 const requestButtonClassName = [
-  getControlPrimaryButtonClassName({ density: 'compact' }),
-  'min-w-[104px]',
+  getControlSecondaryButtonClassName({ density: 'compact' }),
   DISABLED_PERMISSION_BORDER_CLASS_NAME,
 ].join(' ');
 
 const permissionCardClassName = [
-  'flex items-center justify-between gap-4 border-b px-4 py-3 transition-colors last:border-b-0',
+  'flex flex-wrap items-center justify-between gap-3 border-b px-3 py-2 transition-colors last:border-b-0',
   'border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
-const revokeButtonClassName = [
-  getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' }),
-  'min-w-[104px]',
-].join(' ');
+const revokeButtonClassName = getControlSecondaryButtonClassName({
+  density: 'compact',
+  tone: 'danger',
+});
 
 const permissionIconClassName = [
-  'flex h-8 w-8 flex-shrink-0 items-center justify-center',
+  'flex h-7 w-7 flex-shrink-0 items-center justify-center',
   'text-[var(--sniptale-color-success)]',
 ].join(' ');
 
@@ -58,6 +54,7 @@ function StatusBadge({ state }: { state: PermissionState }) {
 function RequestButton(props: { children?: string; disabled?: boolean; onClick: () => void }) {
   return (
     <ProductActionButton
+      compact
       tone="secondary"
       onClick={props.onClick}
       disabled={props.disabled}
@@ -136,7 +133,8 @@ function OptionalPermissionControl(props: {
       <div className="flex items-center gap-2">
         <StatusBadge state={props.state} />
         <ProductActionButton
-          tone="secondary"
+          compact
+          tone="danger"
           type="button"
           className={revokeButtonClassName}
           onClick={props.onRevoke}
@@ -164,9 +162,9 @@ function PermissionCard(props: {
 
   return (
     <div className={permissionCardClassName}>
-      <div className="flex min-w-0 flex-1 items-center gap-4">
+      <div className="flex min-w-[min(100%,20rem)] flex-1 items-center gap-3">
         <div className={permissionIconClassName}>
-          <PermissionIcon size={20} />
+          <PermissionIcon size={16} />
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="mb-0.5 text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-primary)]">
@@ -214,7 +212,7 @@ function PermissionStatusChecks(props: {
       <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
         {translate('settings.permissions.statusChecksDescription')}
       </p>
-      <div className="overflow-hidden rounded-[12px] border border-[var(--sniptale-color-border-soft)]">
+      <div className="overflow-hidden rounded-[8px] border border-[var(--sniptale-color-border-soft)]">
         {props.permissions.map((permission) => (
           <PermissionCard
             key={permission.id}
@@ -230,8 +228,9 @@ function PermissionStatusChecks(props: {
 
 function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
   return (
-    <div className="mt-6 flex justify-end">
+    <div className="mt-3 flex justify-end">
       <ProductActionButton
+        compact
         tone="secondary"
         onClick={props.onRefresh}
         className={
@@ -255,7 +254,7 @@ export function PermissionsSectionContent(props: {
 }) {
   const view = props.view ?? 'optional';
   return (
-    <div className={settingsSectionClassName}>
+    <div className={`${settingsSectionClassName} max-w-4xl`}>
       <SettingsSubpageTabs
         placement="inline"
         activeId={view}

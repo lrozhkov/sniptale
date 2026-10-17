@@ -34,6 +34,8 @@ Defer a related-object lookup when only the collapsed group consumes its result.
 
 ## Copyable values
 
+Diagnostic journals and other records for manual copying use an explicit selectable-content region. Permit native browser selection throughout that region, including descendant text elements. Keep surrounding commands outside it. Do not require export or a Copy command for ordinary text selection.
+
 Interface labels and hints remain outside mouse text selection. An explicit Copy command provides the full technical value without introducing a text caret across the row. Copy actions use the utility icon treatment: brighten the icon on hover, without a new filled surface or frame. Give the action a specific accessible name, such as Copy source identifier.
 
 Keep its target at least 24px. Keep focus on the command after copying. Report success without changing the property text or accessible action name. A clipboard failure retains the value and provides a visible retry instruction. A genuinely editable or intentionally selectable text field follows its own input contract.

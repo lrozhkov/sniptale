@@ -19,6 +19,7 @@ import {
 import { formatDateTime, translate, useAppLocale } from '../../../../platform/i18n';
 
 const buttonClass = getControlSecondaryButtonClassName({ density: 'compact' });
+const journalRowsClassName = 'min-h-0 flex-1 overflow-auto !p-0 select-text! [&_*]:select-text!';
 
 /** Mounted only while the user opens the journal; observes this small key without polling. */
 export function EventsLogsSection() {
@@ -43,7 +44,7 @@ export function EventsLogsSection() {
         onChange={setFilters}
         sources={runtimeEntries.map((entry) => entry.source)}
       />
-      <div data-ui="events.logs.rows" className="min-h-0 flex-1 overflow-auto !p-0">
+      <div data-ui="events.logs.rows" className={journalRowsClassName}>
         {status !== 'ready' ? (
           <p className="p-4 text-sm" role={status === 'error' ? 'alert' : 'status'}>
             {translate(
