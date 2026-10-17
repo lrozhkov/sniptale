@@ -96,12 +96,15 @@ export function GalleryProjectDetails(props: {
       : summary;
   return (
     <div
+      data-ui={isList ? undefined : 'gallery.project.details'}
       className={
         isList
           ? 'min-w-0'
           : isCompact
-            ? 'flex h-10 shrink-0 items-center gap-1 border-t border-[var(--sniptale-color-border-soft)] px-3 py-[3px]'
-            : 'flex h-[72px] shrink-0 items-end gap-1 border-t border-[var(--sniptale-color-border-soft)] px-4 py-2'
+            ? `group/gallery-caption flex h-10 shrink-0 items-center gap-1 border-t
+              border-[var(--sniptale-color-border-soft)] px-3 py-[3px]`
+            : `group/gallery-caption flex h-[72px] shrink-0 items-end gap-1 border-t
+              border-[var(--sniptale-color-border-soft)] px-4 py-2`
       }
     >
       {!isList ? props.leading : null}

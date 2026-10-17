@@ -239,22 +239,26 @@ export function GalleryListDetails(
 
 export function GalleryGridDetails(props: GalleryCardDetailsProps) {
   return (
-    <button
-      type="button"
-      onClick={() => props.onPreviewOpen(props.item)}
+    <div
       className={
         props.compact
-          ? `h-10 w-full shrink-0 border-t border-[var(--sniptale-color-border-soft)]
+          ? `group/gallery-caption relative h-10 w-full shrink-0 border-t border-[var(--sniptale-color-border-soft)]
             flex items-center px-3 py-2 text-left`
-          : `grid h-[72px] w-full shrink-0 grid-rows-[20px_16px] gap-2
+          : `group/gallery-caption relative grid h-[72px] w-full shrink-0 grid-rows-[20px_16px] gap-2
             border-t border-[var(--sniptale-color-border-soft)] px-4 py-3.5 text-left`
       }
       data-ui={props.compact ? 'gallery.compact.details' : 'gallery.large.details'}
-      title={props.item.filename}
-      aria-label={props.item.filename}
     >
+      <button
+        type="button"
+        onClick={() => props.onPreviewOpen(props.item)}
+        className="absolute inset-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[-2px]
+          focus-visible:outline-[var(--sniptale-color-focus-ring)]"
+        title={props.item.filename}
+        aria-label={props.item.filename}
+      />
       {props.compact ? null : (
-        <div className="min-w-0">
+        <div className="pointer-events-none min-w-0">
           <div
             className="flex h-5 min-w-0 items-center text-[13px] leading-[18px] font-medium
               text-[var(--sniptale-color-text-primary)]"
@@ -265,10 +269,12 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
       )}
       <div
         data-ui={props.compact ? 'gallery.compact.metadata' : 'gallery.large.metadata'}
-        className={`flex min-w-0 w-full items-center justify-between gap-2 whitespace-nowrap text-xs
+        className={`pointer-events-none flex min-w-0 w-full items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]`}
       >
-        {props.leading}
+        <span className="pointer-events-auto relative z-10 flex h-4 w-8 shrink-0 items-center justify-center">
+          {props.leading}
+        </span>
         <GalleryGridCardDate items={[props.item]} />
         <span className="shrink-0">
           {props.item.size > 0
@@ -278,6 +284,6 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
             : '—'}
         </span>
       </div>
-    </button>
+    </div>
   );
 }

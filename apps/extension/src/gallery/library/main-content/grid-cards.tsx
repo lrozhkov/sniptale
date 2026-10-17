@@ -25,7 +25,7 @@ import {
 import type { GalleryMainContentProps } from './types';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { GalleryListHeader, GALLERY_LIST_LAYOUT_STYLE } from './list-header';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import { useCardActions } from './use-card-actions';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { GallerySelectionButton } from './selection-button';
@@ -82,9 +82,13 @@ function getGalleryGridCardClassName(
   );
 }
 
-function GalleryGridCardMedia(props: GalleryGridCardProps) {
+function GalleryGridCardMedia(
+  props: Pick<
+    GalleryGridCardProps,
+    'viewMode' | 'item' | 'onPreviewOpen' | 'onProjectOpen' | 'previewRecoveryAllowed'
+  >
+) {
   const isList = props.viewMode === 'list';
-  const canSelect = isGallerySelectableItem(props.item);
 
   return (
     <div
@@ -136,40 +140,24 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
         </div>
       ) : null}
       {!isList ? <GalleryCardExpiration items={[props.item]} /> : null}
-      <GalleryGridCardSelectionControl
-        canSelect={canSelect}
-        isList={isList}
-        itemId={props.item.id}
-        onToggleSelection={props.onToggleSelection}
-        selected={props.selected}
-      />
     </div>
   );
 }
 
 function GalleryGridCardSelectionControl(props: {
-  canSelect: boolean;
-  isList: boolean;
-  itemId: string;
+  item: GalleryItem;
   onToggleSelection: GalleryMainContentProps['onToggleSelection'];
   selected: boolean;
 }) {
-  if (!props.canSelect || props.isList) {
-    return null;
-  }
-
+  const icon = <GalleryGridCardKindBadge kind={props.item.kind} />;
+  if (!isGallerySelectableItem(props.item)) return icon;
   return (
-    <div className="absolute left-3 top-3 z-10">
-      <GallerySelectionButton
-        selected={props.selected}
-        label={translate('gallery.app.selectItem')}
-        onClick={(event) =>
-          props.onToggleSelection(props.itemId, {
-            shiftKey: event.shiftKey,
-          })
-        }
-      />
-    </div>
+    <GallerySelectionButton
+      selected={props.selected}
+      idleIcon={icon}
+      label={translate('gallery.app.selectItem')}
+      onClick={(event) => props.onToggleSelection(props.item.id, { shiftKey: event.shiftKey })}
+    />
   );
 }
 
@@ -207,14 +195,19 @@ const GalleryGridCard = memo(
   function GalleryGridCard(props: GalleryGridCardProps) {
     useAppLocale();
     const isList = props.viewMode === 'list';
+    const leading = (
+      <GalleryGridCardSelectionControl
+        item={props.item}
+        selected={props.selected}
+        onToggleSelection={props.onToggleSelection}
+      />
+    );
     const media = (
       <GalleryGridCardMedia
         item={props.item}
         onPreviewOpen={props.onPreviewOpen}
         {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
         previewRecoveryAllowed={props.previewRecoveryAllowed}
-        onToggleSelection={props.onToggleSelection}
-        selected={props.selected}
         viewMode={props.viewMode}
       />
     );
@@ -281,7 +274,7 @@ const GalleryGridCard = memo(
             props.item.type !== 'video-project' &&
             props.item.type !== 'quick-edit-project' ? (
               <GalleryGridDetails
-                leading={<GalleryGridCardKindBadge kind={props.item.kind} />}
+                leading={leading}
                 compact={props.viewMode === 'compact-grid'}
                 item={props.item}
                 onPreviewOpen={props.onPreviewOpen}
@@ -291,7 +284,7 @@ const GalleryGridCard = memo(
         )}
         {!isList ? (
           <GalleryProjectDetails
-            leading={<GalleryGridCardKindBadge kind={props.item.kind} />}
+            leading={leading}
             item={props.item}
             viewMode={props.viewMode}
             onPreviewOpen={props.onPreviewOpen}
@@ -335,6 +328,7 @@ function GalleryRecordingGroupOpenCommand(props: { onOpen: () => void }) {
 }
 
 function GalleryRecordingGroupDetails(props: {
+  leading: ReactNode;
   items: GalleryItem[];
   onRecordingGroupOpen?: (item: GalleryItem) => void;
   viewMode: GalleryGridCardProps['viewMode'];
@@ -353,9 +347,9 @@ function GalleryRecordingGroupDetails(props: {
     <div
       className={
         isCompact
-          ? `h-10 shrink-0 border-t border-[var(--sniptale-color-border-soft)]
+          ? `group/gallery-caption h-10 shrink-0 border-t border-[var(--sniptale-color-border-soft)]
             px-3 py-3`
-          : `flex h-[72px] shrink-0 flex-col justify-between
+          : `group/gallery-caption flex h-[72px] shrink-0 flex-col justify-between
             border-t border-[var(--sniptale-color-border-soft)] px-4 py-2`
       }
       data-ui={isCompact ? 'gallery.compact.group-details' : 'gallery.large.group-details'}
@@ -380,6 +374,9 @@ function GalleryRecordingGroupDetails(props: {
         className="flex items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]"
       >
+        <span className="relative flex h-4 w-8 shrink-0 items-center justify-center">
+          {props.leading}
+        </span>
         <GalleryGridCardDate items={props.items} />
         <span className="shrink-0">
           {totalSize > 0
@@ -481,9 +478,12 @@ const GalleryRecordingGroupGridCard = memo(
             );
           })}
           <GalleryCardExpiration items={props.items} />
-          <div className="absolute left-3 top-3 z-10">
+        </div>
+        <GalleryRecordingGroupDetails
+          leading={
             <GallerySelectionButton
               selected={allSelected}
+              idleIcon={<GalleryGridCardKindBadge kind={firstItem.kind} />}
               label={translate('gallery.app.selectRecordingGroup')}
               onClick={(event) => {
                 selectableItems.forEach((item) => {
@@ -494,9 +494,7 @@ const GalleryRecordingGroupGridCard = memo(
                 });
               }}
             />
-          </div>
-        </div>
-        <GalleryRecordingGroupDetails
+          }
           items={props.items}
           {...(props.onRecordingGroupOpen
             ? { onRecordingGroupOpen: props.onRecordingGroupOpen }

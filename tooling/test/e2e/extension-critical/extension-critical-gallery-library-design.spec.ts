@@ -239,7 +239,7 @@ for (const locale of ['ru', 'en'] as const) {
           await card(name).hover();
           const mark = card(name)
             .getByRole('button', { name: label('gallery.app.selectItem'), exact: true })
-            .locator('span[aria-hidden]');
+            .locator('[data-ui="gallery.selection.mark"]');
           const markBox = (await mark.boundingBox())!;
           expect(markBox.width).toBe(24);
           expect(markBox.height).toBe(24);
@@ -427,7 +427,7 @@ for (const locale of ['ru', 'en'] as const) {
           await card(name).hover();
           const mark = card(name)
             .getByRole('button', { name: label('gallery.app.selectItem'), exact: true })
-            .locator('span[aria-hidden]');
+            .locator('[data-ui="gallery.selection.mark"]');
           const markBox = (await mark.boundingBox())!;
           expect(
             await mark.evaluate((node) => parseFloat(getComputedStyle(node).borderRadius))

@@ -109,6 +109,13 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
     throw new Error('Expected compact grid controls');
   }
 
+  expect(selectionButtons[0]?.closest('[data-ui="gallery.compact.details"]')).not.toBeNull();
+  expect(container?.querySelector('button button')).toBeNull();
+  expect(
+    previewButton
+      .closest('[data-ui="gallery.grid.thumbnail-viewport"]')
+      ?.querySelector('[aria-pressed]')
+  ).toBeNull();
   act(() => {
     selectionButtons[0]?.click();
     previewButton.click();
@@ -224,7 +231,9 @@ it('keeps the distinguishing filename tail and extension visible in constrained 
 
   const label = container?.querySelector<HTMLElement>('[data-ui="gallery.filename"]');
   const segments = Array.from(label?.querySelectorAll('span') ?? []);
-  const previewButton = label?.closest('button');
+  const previewButton = label
+    ?.closest('[data-ui="gallery.large.details"]')
+    ?.querySelector('button');
 
   expect(label?.textContent).toBe(filename);
   expect(label?.getAttribute('aria-hidden')).toBe('true');
@@ -434,7 +443,8 @@ it.each(['compact-grid', 'large-grid'] as const)(
     expect(
       container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
     ).toBe(`${translate('gallery.app.draftExpires')} date:99`);
-    expect(metadata?.querySelector('svg')).toBeNull();
+    expect(metadata?.querySelector('svg.lucide-trash-2')).toBeNull();
+    expect(metadata?.querySelector('[data-ui="gallery.card.kind"]')).not.toBeNull();
   }
 );
 

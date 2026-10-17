@@ -5,7 +5,10 @@ import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
-for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
+for (const viewport of [
+  ...PRIMARY_BROWSER_VIEWPORTS,
+  { name: '1024x560', size: { width: 1024, height: 560 } },
+])
   for (const theme of ['light', 'dark'] as const) {
     test(`library card lifecycle ru ${theme} ${viewport.name}`, async ({
       page,
@@ -86,6 +89,14 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
         await expect(created).toBeVisible();
         if (mode === 'viewModeList') {
           await expect(created).toContainText(label('gallery.app.draftExpires'));
+          if (viewport.size.width < 1280) {
+            await expect
+              .poll(() => surface.evaluate((node) => node.scrollWidth > node.clientWidth))
+              .toBe(true);
+            await surface.hover();
+            await page.mouse.wheel(500, 0);
+            await expect.poll(() => surface.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+          }
         } else {
           await expect(created).not.toContainText(label('gallery.app.draftExpires'));
           const badge = card.locator('[data-ui="gallery.card.expiration"]');
@@ -93,17 +104,85 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
             'title',
             new RegExp(label('gallery.app.draftExpires'))
           );
+          const warning = await badge.evaluate((node) => {
+            const probe = document.createElement('span');
+            probe.style.color = 'var(--sniptale-color-warning)';
+            node.appendChild(probe);
+            const color = getComputedStyle(probe).color;
+            probe.remove();
+            return color;
+          });
+          await expect(badge).toHaveCSS('color', warning);
+          const backing = await badge.evaluate((node) => {
+            const probe = document.createElement('span');
+            probe.style.backgroundColor =
+              'color-mix(in srgb, var(--sniptale-color-surface-panel) 80%, transparent)';
+            node.appendChild(probe);
+            const color = getComputedStyle(probe).backgroundColor;
+            probe.remove();
+            return color;
+          });
+          await expect(badge).toHaveCSS('background-color', backing);
+          await expect(badge).toHaveCSS('border-radius', '4px');
+          await expect(badge.locator('svg')).toHaveCSS('width', '16px');
           const bounds = (await card.boundingBox())!;
           const icon = (await badge.boundingBox())!;
           expect(bounds.x + bounds.width - icon.x - icon.width).toBeCloseTo(13, 0);
-          await card.hover();
+          const caption = card.locator(
+            '[data-ui="gallery.compact.details"], [data-ui="gallery.large.details"], [data-ui="gallery.project.details"]'
+          );
           const selection = card.getByRole('button', {
             name: label('gallery.app.selectItem'),
             exact: true,
           });
-          await expect(selection.locator('span')).toHaveCSS('width', '24px');
+          const mark = selection.locator('[data-ui="gallery.selection.mark"]');
+          if ((await selection.getAttribute('aria-pressed')) === 'true') await selection.click();
+          await page
+            .getByRole('button', { name: label(`gallery.app.${mode}`), exact: true })
+            .focus();
+          await card.locator('[data-ui="gallery.grid.thumbnail-viewport"]').hover();
+          await expect(mark).toHaveCSS('opacity', '0');
+          await expect(selection.locator('[data-ui="gallery.selection.idle"]')).toHaveCSS(
+            'opacity',
+            '1'
+          );
+          await page.screenshot({ path: info.outputPath(`${mode}-idle.png`), fullPage: false });
+          await caption.hover();
+          await expect(mark).toHaveCSS('opacity', '1');
+          await expect(selection.locator('[data-ui="gallery.selection.idle"]')).toHaveCSS(
+            'opacity',
+            '0'
+          );
+          await expect(selection).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+          await expect(selection.locator('[data-ui="gallery.selection.mark"]')).toHaveCSS(
+            'width',
+            '24px'
+          );
+          await expect(selection.locator('[data-ui="gallery.selection.mark"]')).not.toHaveCSS(
+            'background-color',
+            'rgba(0, 0, 0, 0)'
+          );
+          const selectedDisc = (await selection
+            .locator('[data-ui="gallery.selection.mark"]')
+            .boundingBox())!;
+          expect(selectedDisc.y).toBeGreaterThan(
+            (await card.locator('[data-ui="gallery.grid.thumbnail-viewport"]').boundingBox())!.y
+          );
+          expect((await selection.boundingBox())!.y).toBeGreaterThanOrEqual(
+            (await caption.boundingBox())!.y
+          );
           if ((await selection.getAttribute('aria-pressed')) !== 'true') await selection.click();
           await expect(selection).toHaveAttribute('aria-pressed', 'true');
+          await expect(selection.locator('[data-ui="gallery.selection.idle"]')).toHaveCount(0);
+          await card.locator('[data-ui="gallery.grid.thumbnail-viewport"]').hover();
+          await expect(mark).toHaveCSS('opacity', '1');
+          await selection.focus();
+          await page.keyboard.press('Space');
+          await expect(selection).toHaveAttribute('aria-pressed', 'false');
+          await expect(mark).toHaveCSS('opacity', '1');
+          await page.keyboard.press('Space');
+          await expect(selection).toHaveAttribute('aria-pressed', 'true');
+          await expect(card.locator('button button')).toHaveCount(0);
           await expect(page.locator('[data-ui="gallery.preview.inspector"]')).toHaveCount(0);
         }
         await page.screenshot({

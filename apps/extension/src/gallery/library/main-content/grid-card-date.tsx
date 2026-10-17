@@ -40,7 +40,7 @@ export function GalleryGridCardDate({
       <span className="truncate">{created}</span>
       {presentation === 'list' && expiry ? (
         <span
-          className="mt-0.5 flex min-w-0 items-center gap-1 text-[var(--sniptale-color-text-secondary)]"
+          className="mt-0.5 flex min-w-0 items-center gap-1 text-[var(--sniptale-color-warning)]"
           title={expiry.hint}
         >
           <Trash2 size={12} className="shrink-0" aria-hidden="true" />
@@ -54,7 +54,7 @@ export function GalleryGridCardDate({
   );
 }
 
-/** Opaque badge stays legible on arbitrary captured pixels and uses the native hint. */
+/** The warning icon uses a quiet backing over captured pixels and a native deadline hint. */
 export function GalleryCardExpiration({ items }: { items: GalleryItem[] }) {
   const expiry = expirationHint(items);
   if (!expiry) return null;
@@ -66,7 +66,8 @@ export function GalleryCardExpiration({ items }: { items: GalleryItem[] }) {
       aria-label={hint}
       role="img"
       className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[4px]
-        bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-secondary)]"
+        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_80%,transparent)]
+        text-[var(--sniptale-color-warning)]"
     >
       <Trash2 size={16} aria-hidden="true" />
     </span>

@@ -1,10 +1,10 @@
-import type { MouseEventHandler } from 'react';
+import type { MouseEventHandler, ReactNode } from 'react';
 import { Check } from 'lucide-react';
 
 function getGallerySelectionButtonClassName(selected: boolean, alwaysVisible = false) {
   return [
-    'flex h-8 w-8 cursor-pointer items-center justify-center rounded-[4px]',
-    'border border-transparent bg-[var(--sniptale-color-surface-panel)]',
+    'relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full',
+    'border border-transparent bg-transparent',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
     selected || alwaysVisible
       ? 'opacity-100'
@@ -29,6 +29,7 @@ function getGallerySelectionMarkClassName(selected: boolean) {
 export function GallerySelectionButton(props: {
   selected: boolean;
   alwaysVisible?: boolean;
+  idleIcon?: ReactNode;
   label: string;
   onClick: MouseEventHandler<HTMLButtonElement>;
 }) {
@@ -38,9 +39,31 @@ export function GallerySelectionButton(props: {
       aria-label={props.label}
       aria-pressed={props.selected}
       onClick={props.onClick}
-      className={getGallerySelectionButtonClassName(props.selected, props.alwaysVisible)}
+      className={getGallerySelectionButtonClassName(
+        props.selected,
+        props.alwaysVisible || !!props.idleIcon
+      )}
     >
-      <span className={getGallerySelectionMarkClassName(props.selected)} aria-hidden="true">
+      {props.idleIcon && !props.selected ? (
+        <span
+          data-ui="gallery.selection.idle"
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center
+            group-hover/gallery-caption:opacity-0 group-focus-within/gallery-caption:opacity-0"
+        >
+          {props.idleIcon}
+        </span>
+      ) : null}
+      <span
+        data-ui="gallery.selection.mark"
+        className={[
+          getGallerySelectionMarkClassName(props.selected),
+          props.idleIcon && !props.selected
+            ? 'opacity-0 group-hover/gallery-caption:opacity-100 group-focus-within/gallery-caption:opacity-100'
+            : 'opacity-100',
+        ].join(' ')}
+        aria-hidden="true"
+      >
         {props.selected ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : null}
       </span>
     </button>
