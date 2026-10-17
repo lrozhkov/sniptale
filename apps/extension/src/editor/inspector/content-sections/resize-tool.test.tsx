@@ -164,6 +164,14 @@ it('starts an editable full-canvas guide when expanding and restores bounded cro
   expect(controller.clearCropSelection).toHaveBeenCalledTimes(2);
 });
 
+it.each(['image', 'canvas'] as const)('uses distinct dimension parameters in %s mode', (mode) => {
+  renderResizeTool(createController(), { mode });
+  const dimensions = container!.querySelector('[data-size-panel-dimensions]')!;
+  const rows = dimensions.querySelectorAll('.sniptale-parameter-row');
+  expect(rows).toHaveLength(2);
+  for (const row of rows) expect(row.textContent).toContain('px');
+});
+
 it('keeps image resize free of mouse selection preview and applies a flattened image resize action', () => {
   const controller = createController();
   renderResizeTool(controller, { imageSizeDraft: { height: 900, width: 900 }, mode: 'image' });
@@ -305,8 +313,8 @@ it('leaves crop mode from the secondary cancel action', () => {
   renderResizeTool(controller);
 
   const cancel = getButton(translate('common.actions.cancel'));
-  expect(cancel.parentElement?.className).toContain('grid-cols-[auto_minmax(0,1fr)]');
-  expect(cancel.className).toContain('!w-auto');
+  expect(cancel.parentElement?.className).toContain('flex-wrap');
+  expect(cancel.className).toContain('border-none');
 
   act(() => {
     cancel.click();
