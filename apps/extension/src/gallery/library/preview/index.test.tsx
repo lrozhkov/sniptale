@@ -230,6 +230,11 @@ it('renders source link when available and fallback copy when missing', () => {
 
   const sourceLink = container?.querySelector('a[href="https://example.test/source"]');
   expect(sourceLink?.textContent).toBe('https://example.test/source');
+  const properties = sourceLink?.closest('details');
+  expect(properties?.querySelector('summary')?.textContent).toContain('gallery.preview.properties');
+  expect(
+    sourceLink?.closest('[data-ui="gallery.preview.source"]')?.querySelector('summary')
+  ).toBeNull();
 
   render(createProps());
 

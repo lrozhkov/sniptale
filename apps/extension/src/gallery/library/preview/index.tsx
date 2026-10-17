@@ -82,7 +82,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
         </div>
         {isDraft && !props.trashMode ? (
           <div
-            className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2
+            className="mt-1 grid grid-cols-[minmax(0,max-content)_auto] items-center justify-start gap-x-2
               text-xs font-medium text-[var(--sniptale-color-warning)]"
           >
             <span className="min-w-0 break-words">
@@ -206,10 +206,10 @@ function PreviewPanelSidebar(
           </summary>
           <div className="gallery-preview-disclosure-body">
             <PreviewMetadataCards item={props.item} />
+            <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
           </div>
         </details>
         <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
-        <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
         <PreviewTagEditor
           {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
           item={props.item}

@@ -310,6 +310,10 @@ for (const locale of ['ru', 'en'] as const) {
           await expect(property).toHaveCSS('font-weight', '400');
           await expect(property).toHaveCSS('line-height', '18px');
         }
+        await expect(inspector.locator('.gallery-preview-property').first()).toHaveCSS(
+          'min-height',
+          '28px'
+        );
         await screenshot(page, info, 'preview-metadata');
         const nextItem = page
           .getByRole('button', { name: label('gallery.preview.next'), exact: true })
@@ -340,8 +344,10 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(filename).not.toBeFocused();
         await expect(filenameName).toHaveCSS('font-weight', '400');
         await expect(filenameFace).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(filename).toHaveCSS('padding-right', '8px');
         await screenshot(page, info, 'filename-idle');
         await filename.hover();
+        await expect(filename).toHaveCSS('padding-right', '32px');
         await expect(filenameFace).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         await filename.click();
         await expect(filename).toBeFocused();
@@ -632,7 +638,8 @@ for (const locale of ['ru', 'en'] as const) {
         );
         await screenshot(page, info, `related-long-${viewport.name}`);
         const source = inspector.locator('[data-ui="gallery.preview.source"]');
-        await source.locator('summary').click();
+        await expect(source.locator('summary')).toHaveCount(0);
+        await expect(source.locator('xpath=ancestor::details')).toHaveCount(1);
         const link = inspector.getByRole('link', { name: sourceUrl, exact: true });
         await link.scrollIntoViewIfNeeded();
         await expect(link).toBeInViewport({ ratio: 1 });

@@ -16,7 +16,7 @@ A static property is not a disabled input. Do not draw an input surface, caret, 
 
 ## Geometry and text
 
-Use 32px minimum rows with 4px separation. Keep a consistent trailing value column within the group. Align single-line text baselines. Align wrapped names and values to their first lines. Use 8px between name and value. Do not add a border around each property. Short dimensions, durations, sizes, and dates align to the trailing edge.
+Use 28px minimum read-only rows with 4px separation. Interactive parameter rows retain their separate control and target geometry. Keep a consistent trailing value column within the group. Align single-line text baselines. Align wrapped names and values to their first lines. Use 8px between name and value. Do not add a border around each property. Short dimensions, durations, sizes, and dates align to the trailing edge.
 
 Long descriptions wrap. Identifiers can break at safe character boundaries when necessary. Use tabular numerals for comparable numbers. Format dates, units, and numbers through locale owners. Do not use monospace for ordinary names, dates, or sizes.
 
@@ -28,7 +28,7 @@ For filename editing, keep the immutable extension outside the editable stem. Pa
 
 ## Supplemental groups
 
-Put optional provenance and related-object lists in compact information disclosures. Start them closed for each selected object. Keep padding and a trailing chevron on the summary. A small neutral icon identifies informational content. Follow [Navigation](navigation.md) for disclosure geometry.
+Keep provenance inside the existing Properties disclosure when it describes the same object. Do not add a second Source disclosure for those properties. Put separate related-object lists in compact information disclosures. Start them closed for each selected object. Keep padding and a trailing chevron on the summary. A small neutral icon identifies informational content. Follow [Navigation](navigation.md) for disclosure geometry.
 
 Defer a related-object lookup when only the collapsed group consumes its result. Closing the group or changing objects must prevent stale results. Preserve the existing invalidation, retry, and navigation owners. Keep loading, error, and empty content inside the body. These states must not resize the summary. Do not defer data required by another visible consumer.
 

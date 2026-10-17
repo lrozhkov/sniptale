@@ -4,7 +4,7 @@
 
 ## Clear action
 
-Editable nonempty text fields have a trailing 24px clear target inside the field. Use the shared cross icon. Give clear an accessible name identifying its field. Dispatch the normal input event so preview and search consumers update. Hover brightens the icon without a fill or boundary. Reserve text padding so the value does not overlap the clear action.
+Editable nonempty text fields have a trailing 24px clear target inside the field. Use the shared cross icon. Give clear an accessible name identifying its field. Dispatch the normal input event so preview and search consumers update. Hover brightens the icon without a fill or boundary. Reserve text padding while Clear is visible so the value does not overlap its target. A single-line inline field reclaims that padding while Clear is hidden. Keep multiline text padding stable to prevent hover from changing line breaks.
 
 Clear changes the draft and returns focus to the input. It does not submit a form or silently change its accepted value. Keep existing Enter, blur, Escape, Save, and Cancel contracts.
 
@@ -21,7 +21,7 @@ Fields with trailing actions use one compound row: a shrinking flexible field an
 Reserve usable text space separately from Clear, voice, and submit targets in compound fields. Adding an action must not consume the query or value area. Use an explicit text budget for the editing role and let translated action labels keep their natural width. Measure the remaining text area after padding and reserved targets. The outer field width alone does not prove usability.
 
 
-For a field with Clear and dictation, reserve each target independently of its visibility. Removing an empty-field Clear must not move the microphone or change text wrapping. Keep a usable text budget before collapsing other header commands. A multiline AI prompt can retain separate upper Clear and lower dictation actions. Preserve that composition instead of forcing both actions onto one line.
+For a field with Clear and dictation, keep their target positions stable while either action is visible. A single-line title can reclaim hidden accessory space at rest. Removing an empty-field Clear must not move the microphone or change text wrapping. Keep a usable text budget before collapsing other header commands. A multiline AI prompt can retain separate upper Clear and lower dictation actions. Preserve that composition instead of forcing both actions onto one line.
 
 Idle dictation uses a quiet icon that brightens on hover. Keep active, stopping, and error feedback visible outside hover and focus. Derive document editing icons from the local paper and ink, including Clear hover. Do not use a dark shell's bright foreground on light document content. Clearing a dictated draft stops its insertion owner before accepting the empty value. Reject late speech for that cleared placement while preserving a new deliberate recording.
 

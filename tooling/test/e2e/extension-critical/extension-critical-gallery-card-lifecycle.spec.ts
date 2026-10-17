@@ -112,5 +112,23 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
           animations: 'disabled',
         });
       }
+      const item = surface.getByRole('button', { name: 'beta-v1.webm', exact: true }).first();
+      await item.click();
+      const inspector = page.locator('[data-ui="gallery.preview.inspector"]');
+      const header = inspector.locator('[data-ui="gallery.preview.inspectorHeader"]');
+      const promote = header.getByRole('button', {
+        name: label('gallery.preview.saveToLibrary'),
+        exact: true,
+      });
+      const expiry = header.getByText(label('gallery.app.draftExpires'), { exact: false });
+      await expect(promote).toBeVisible();
+      const commandBounds = (await promote.boundingBox())!;
+      const expiryBounds = (await expiry.boundingBox())!;
+      expect(commandBounds.x - expiryBounds.x - expiryBounds.width).toBeCloseTo(8, 0);
+      await page.screenshot({
+        path: info.outputPath('preview-draft-promotion.png'),
+        fullPage: false,
+        animations: 'disabled',
+      });
     });
   }

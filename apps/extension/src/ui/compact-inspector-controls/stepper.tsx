@@ -28,7 +28,8 @@ export function NumericStepper({ disabled, label, onStep }: NumericStepperProps)
         disabled={disabled}
         className={cx(
           'flex h-3.5 w-5 items-center justify-center rounded-[4px]',
-          'hover:bg-[color:var(--sniptale-color-surface-hover)]'
+          'bg-transparent text-[color:var(--sniptale-color-text-secondary)]',
+          'hover:text-[color:var(--sniptale-color-text-primary)]'
         )}
         {...getStepperButtonHandlers({ disabled, direction: 1, repeat, onStep })}
       >
@@ -40,7 +41,8 @@ export function NumericStepper({ disabled, label, onStep }: NumericStepperProps)
         disabled={disabled}
         className={cx(
           'flex h-3.5 w-5 items-center justify-center rounded-[4px]',
-          'hover:bg-[color:var(--sniptale-color-surface-hover)]'
+          'bg-transparent text-[color:var(--sniptale-color-text-secondary)]',
+          'hover:text-[color:var(--sniptale-color-text-primary)]'
         )}
         {...getStepperButtonHandlers({ disabled, direction: -1, repeat, onStep })}
       >

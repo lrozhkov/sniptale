@@ -195,7 +195,7 @@ input.number-range::-moz-range-thumb {
   padding: 0;
 }
 .number-stepper button:hover {
-  background: var(--surface-hover);
+  background: transparent;
   color: var(--text);
 }
 .number-stepper svg {
@@ -259,7 +259,7 @@ input.number-range::-moz-range-thumb {
   }
 }
 .number-range:focus-visible {
-  outline: 1px solid var(--focus);
+  outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: 2px;
 }
 .number-value-shell:focus-within {
@@ -267,7 +267,7 @@ input.number-range::-moz-range-thumb {
   border-color: var(--divider);
 }
 html[data-input-mode='keyboard'] .number-value-shell:focus-within {
-  outline: 1px solid var(--focus);
+  outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: 2px;
 }
 html[data-input-mode='pointer'] .number-range:focus-visible {

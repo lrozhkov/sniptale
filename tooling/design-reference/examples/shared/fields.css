@@ -44,7 +44,7 @@ textarea.text-input {
   outline: none;
 }
 html[data-input-mode='keyboard'] .text-input:focus-visible {
-  outline: 1px solid var(--focus);
+  outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: 2px;
 }
 .text-input[aria-invalid='true'] {
@@ -135,7 +135,7 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
 .text-field.text-field--clearable > .text-input {
   grid-column: 1;
   grid-row: 2;
-  padding-inline-end: 36px;
+  padding-inline-end: var(--control-padding-inline);
 }
 .text-field.text-field--clearable > .text-clear {
   grid-column: 1;
@@ -218,4 +218,9 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
 .text-field.text-field--clearable:focus-within > .text-clear {
   visibility: visible;
   pointer-events: auto;
+}
+
+.text-field.text-field--clearable:has(> input:is(:hover, :focus), > .text-clear:is(:hover, :focus))
+  > input {
+  padding-inline-end: 36px;
 }

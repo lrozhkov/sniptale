@@ -310,6 +310,10 @@ async function numericControls(
   expect(Math.abs(bounds.x + bounds.width - idleEdge - 16)).toBeLessThanOrEqual(2);
   const entry = field.locator('.sniptale-numeric-entry');
   expect((await entry.boundingBox())!.width).toBeLessThanOrEqual(96);
+  const increase = stepper.getByRole('button').first();
+  await entry.hover();
+  await increase.hover();
+  await expect(increase).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const stepperBounds = (await stepper.boundingBox())!;
   expect(stepperBounds.x - idleEdge).toBeGreaterThanOrEqual(2);
   expect(stepperBounds.x - idleEdge).toBeLessThanOrEqual(6);
@@ -619,7 +623,10 @@ async function clearControl(
   await expect(input).toHaveCSS('font-weight', '400');
   await expect(input).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(input).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+  await expect(input).toHaveCSS('padding-right', '8px');
   await input.hover();
+  await expect(input).toHaveCSS('padding-right', '28px');
+  await expect(clear).toHaveCSS('cursor', 'pointer');
   await expect(input).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(input).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
   expect(await editAppearance(input)).toEqual(numericAppearance);
@@ -631,6 +638,15 @@ async function clearControl(
   await page.keyboard.press('Shift+Tab');
   await expect(input).toBeFocused();
   await expect(input).toHaveCSS('outline-width', '1px');
+  const focusPaint = await input.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-border-strong)';
+    node.parentElement!.appendChild(probe);
+    const neutral = getComputedStyle(probe).color;
+    probe.remove();
+    return { actual: getComputedStyle(node).outlineColor, neutral };
+  });
+  expect(focusPaint.actual).toBe(focusPaint.neutral);
   await page.keyboard.press('Tab');
   await expect(clear).toBeFocused();
   await page.keyboard.press('Enter');

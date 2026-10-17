@@ -42,7 +42,7 @@ In narrow inspectors, move text editors below their labels before reducing the e
 
 The explicit compact inspector uses a 32px input in the first band of a 40px parameter row. Preserve the 8px lower strip across equivalent inline controls. Stacked label/control constructions omit this dormant strip. Their 32px name band, 4px gap, and 32px control occupy 68px. General forms retain their 32px control height. Stack long editors below their names before narrowing the editable text.
 
-Inline text, numeric, and HEX editors share a quiet idle state and a light neutral 1px boundary with a subtle surface during editing. Keep keyboard focus distinct with a 1px accent frame. Numeric units remain visible outside the editable value. See [Numeric controls](numbers.md) for expansion and alignment.
+Inline text, numeric, and HEX editors share a quiet idle state and a light neutral 1px boundary with a subtle surface during editing. Keep keyboard focus distinct with a neutral strong 1px frame. Do not use the action accent for this inline editing frame. Numeric units remain visible outside the editable value. See [Numeric controls](numbers.md) for expansion and alignment.
 
 Empty editable fields keep an explicit placeholder. Preserve a useful caller example. Otherwise reuse the translated field name. Keep placeholders distinct from accepted text and readable in both themes. Do not use placeholder text as the accessible label.
 

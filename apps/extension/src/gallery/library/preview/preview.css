@@ -14,8 +14,8 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: baseline;
   gap: 8px;
-  min-height: 32px;
-  padding-block: 7px;
+  min-height: 28px;
+  padding-block: 5px;
 }
 
 .gallery-preview-property dt {
@@ -108,11 +108,19 @@
 
 .gallery-preview-filename-input input {
   min-height: 32px;
-  padding: 6px 32px 6px 8px;
+  padding: 6px 8px;
+}
+
+.gallery-preview-filename-input:has(.sniptale-field-clear):has(
+    input:is(:hover, :focus),
+    .sniptale-field-clear:is(:hover, :focus)
+  )
+  input {
+  padding-inline-end: 32px;
 }
 
 .gallery-preview-filename-input:has(input:focus-visible) {
-  border-color: var(--sniptale-color-border-accent-strong);
+  border-color: var(--sniptale-color-border-strong);
 }
 
 .gallery-preview-filename-input .sniptale-field-clear {

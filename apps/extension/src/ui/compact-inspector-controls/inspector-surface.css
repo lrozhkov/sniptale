@@ -390,12 +390,20 @@
 .sniptale-compact-workspace .sniptale-text-value > input {
   min-height: var(--sniptale-parameter-control-height);
   height: var(--sniptale-parameter-control-height);
-  padding: 2px 28px 2px 8px;
+  padding: 2px 8px;
   border: 1px solid transparent;
   background: transparent;
   border-radius: 4px;
   font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   text-align: start;
+}
+.sniptale-compact-workspace
+  .sniptale-text-value:has(> .sniptale-field-clear):has(
+    > input:is(:hover, :focus),
+    > .sniptale-field-clear:is(:hover, :focus)
+  )
+  > input {
+  padding-inline-end: 28px;
 }
 .sniptale-compact-workspace .sniptale-text-value > input:is(:hover, :focus) {
   border-color: var(--sniptale-color-border-soft);
@@ -414,6 +422,7 @@
   border: 0;
   background: transparent;
   color: var(--sniptale-color-text-secondary);
+  cursor: pointer;
 }
 .sniptale-compact-workspace .sniptale-field-clear:hover {
   background: transparent;
@@ -847,7 +856,7 @@
 }
 .sniptale-compact-workspace
   .sniptale-numeric-entry:has(> input:focus-visible:not([data-pointer-focus])) {
-  outline: 1px solid var(--sniptale-color-accent);
+  outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: -1px;
 }
 
@@ -927,7 +936,7 @@
   [data-ui='shared.ui.color-selector.trigger']
   span:has(> input:focus-visible),
 .sniptale-compact-workspace .sniptale-text-value > input:focus-visible {
-  outline: 1px solid var(--sniptale-color-accent) !important;
+  outline: 1px solid var(--sniptale-color-border-strong) !important;
   outline-offset: -1px;
 }
 

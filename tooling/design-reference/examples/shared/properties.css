@@ -7,9 +7,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   gap: 8px;
-  min-height: 32px;
+  min-height: 28px;
   align-items: baseline;
-  padding-block: 7px;
+  padding-block: 5px;
   font: 400 13px/18px var(--font-ui);
 }
 .display-property dt {
