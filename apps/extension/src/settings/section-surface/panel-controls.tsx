@@ -56,6 +56,7 @@ export function SettingsControlRow(props: {
   label: ReactNode;
   valueClassName?: string;
   valueMinimum?: number;
+  keepInline?: boolean;
 }) {
   const control = (
     <div
@@ -71,7 +72,11 @@ export function SettingsControlRow(props: {
       className={['w-full max-w-[720px]', props.className ?? ''].join(' ')}
     >
       {typeof props.label === 'string' ? (
-        <InspectorParameterRow label={props.label} valueMinimum={props.valueMinimum ?? 220}>
+        <InspectorParameterRow
+          label={props.label}
+          valueMinimum={props.valueMinimum ?? 220}
+          keepInline={props.keepInline ?? false}
+        >
           {control}
         </InspectorParameterRow>
       ) : (

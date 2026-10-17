@@ -1,3 +1,4 @@
+import { InformationDisclosure } from '../../../../ui/compact-inspector-controls/disclosure';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -88,9 +89,7 @@ function NewItemsSection(
   return (
     <section className={sectionClassName}>
       <SectionLabel>{translate('settings.storageDrafts.newItemsTitle')}</SectionLabel>
-      <p className="max-w-[720px] text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-        {translate('settings.storageDrafts.newItemsDescription')}
-      </p>
+
       {categories.map(({ key, label, value }) => (
         <SettingsControlRow key={key} label={label}>
           <ProductSelect<LocalStorageDestination>
@@ -102,9 +101,10 @@ function NewItemsSection(
           />
         </SettingsControlRow>
       ))}
-      <p className="max-w-[720px] text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-        {translate('settings.storageDrafts.destinationDescription')}
-      </p>
+      <InformationDisclosure label={translate('common.actions.details')}>
+        <p>{translate('settings.storageDrafts.newItemsDescription')}</p>
+        <p>{translate('settings.storageDrafts.destinationDescription')}</p>
+      </InformationDisclosure>
     </section>
   );
 }
@@ -118,7 +118,9 @@ function RetentionSection(
       <SettingsControlRow
         label={translate('settings.storageDrafts.cleanupEnabled')}
         description={translate('settings.storageDrafts.cleanupEnabledDescription')}
-        valueClassName="flex justify-start sm:justify-end"
+        keepInline
+        valueMinimum={32}
+        valueClassName="flex justify-end"
       >
         <SettingsSwitch
           aria-label={translate('settings.storageDrafts.cleanupEnabled')}
@@ -166,7 +168,9 @@ function TrashRetentionSection(
       <SettingsControlRow
         label={translate('settings.storageDrafts.trashCleanupEnabled')}
         description={translate('settings.storageDrafts.trashCleanupDescription')}
-        valueClassName="flex justify-start sm:justify-end"
+        keepInline
+        valueMinimum={32}
+        valueClassName="flex justify-end"
       >
         <SettingsSwitch
           aria-label={translate('settings.storageDrafts.trashCleanupEnabled')}
