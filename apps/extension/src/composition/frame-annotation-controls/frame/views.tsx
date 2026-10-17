@@ -64,6 +64,18 @@ function getFrameEffectTitle(effectMode: EffectMode) {
   return translate('content.interactiveFrame.effectFocus');
 }
 
+type FrameManualBorderEditor = {
+  cssDraft: string;
+  cssError: string | null;
+  isSaving: boolean;
+  onCssDraftChange: (value: string) => void;
+  save: (input: {
+    name?: string;
+    overwrite?: BorderPreset;
+    tagIds?: readonly string[];
+  }) => Promise<boolean>;
+};
+
 interface FrameSettingsPopoverContentProps {
   acceptAction?: (event: Event) => boolean;
   compact?: boolean;
@@ -92,17 +104,7 @@ interface FrameSettingsPopoverContentProps {
   onFloatingInteractionChange?: (open: boolean) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
-  manual: {
-    cssDraft: string;
-    cssError: string | null;
-    isSaving: boolean;
-    onCssDraftChange: (value: string) => void;
-    save: (input: {
-      name?: string;
-      overwrite?: BorderPreset;
-      tagIds?: readonly string[];
-    }) => Promise<boolean>;
-  };
+  manual: FrameManualBorderEditor;
 }
 
 function FrameEffectParameterGroup(props: { children: ReactNode }) {
@@ -253,17 +255,7 @@ function FrameBorderSection(props: {
   selectedPresetId?: string;
   localBorderSettings: AppliedBorderSettings;
   linkedTemplateOptions: LinkedAnnotationTemplateOptions;
-  manual: {
-    cssDraft: string;
-    cssError: string | null;
-    isSaving: boolean;
-    onCssDraftChange: (value: string) => void;
-    save: (input: {
-      name?: string;
-      overwrite?: BorderPreset;
-      tagIds?: readonly string[];
-    }) => Promise<boolean>;
-  };
+  manual: FrameManualBorderEditor;
   manualStatus?: string;
   onCreated: () => void;
   onUseForNewFrames?: () => void;
@@ -478,17 +470,7 @@ function FrameManualMode(props: {
   handleManualBorderChange: (patch: BorderVisualStylePatch) => void;
   localBorderSettings: AppliedBorderSettings;
   linkedTemplateOptions: LinkedAnnotationTemplateOptions;
-  manual: {
-    cssDraft: string;
-    cssError: string | null;
-    isSaving: boolean;
-    onCssDraftChange: (value: string) => void;
-    save: (input: {
-      name?: string;
-      overwrite?: BorderPreset;
-      tagIds?: readonly string[];
-    }) => Promise<boolean>;
-  };
+  manual: FrameManualBorderEditor;
   manualStatus?: string;
   onCreated: () => void;
   onUseForNewFrames?: () => void;

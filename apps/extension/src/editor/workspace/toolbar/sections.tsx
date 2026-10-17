@@ -3,7 +3,7 @@ import { Grid2x2, Magnet, Map, Menu, Palette, ZoomIn, ZoomOut } from 'lucide-rea
 import type { EditorTool } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
-import { RASTER_TOOL_ORDER, TOOL_ICONS, getToolLabel } from '../../chrome/tool-icons';
+import { RASTER_TOOL_ORDER, TOOL_ICONS } from '../../chrome/tool-icons';
 import { EditorIconButton } from '../../chrome/ui';
 import type { ToolbarInspector } from './types';
 import {
@@ -71,17 +71,12 @@ export function EditorToolbarRasterSection(props: {
 }) {
   return (
     <div className={toolbarSectionClassName}>
-      {RASTER_TOOL_ORDER.map((tool) => (
-        <EditorIconButton
-          key={tool}
-          title={getDocumentRequiredTitle(getToolLabel(tool), props.hasImage)}
-          onClick={() => props.onActivateTool(tool)}
-          active={props.isToolButtonActive(tool)}
-          disabled={!props.hasImage}
-        >
-          {TOOL_ICONS[tool]}
-        </EditorIconButton>
-      ))}
+      <EditorToolbarToolButtons
+        tools={RASTER_TOOL_ORDER}
+        hasImage={props.hasImage}
+        isToolButtonActive={props.isToolButtonActive}
+        onActivateTool={props.onActivateTool}
+      />
     </div>
   );
 }

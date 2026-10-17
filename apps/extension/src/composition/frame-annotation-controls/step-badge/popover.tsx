@@ -23,7 +23,11 @@ import {
   createStepBadgeTemplateFromSettings,
 } from '../../../features/highlighter/step-badge-presets/catalog';
 import { getLinkedStepBadgeDiameter } from '../../../features/highlighter/step-badge-presets/style';
-import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
+import {
+  resolvePopoverPortalTarget,
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../popover/surface';
 import { usePopoverInteractionDismissal } from '../popover/interaction-dismissal';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
@@ -174,14 +178,4 @@ export function FutureStepBadgeSettingsPopover(props: {
       />
     </ContentPopoverAdapter>
   );
-}
-
-function resolvePopoverPortalTarget(
-  target: Element | DocumentFragment | undefined
-): HTMLElement | ShadowRoot | DocumentFragment {
-  return target instanceof HTMLElement ||
-    target instanceof ShadowRoot ||
-    target instanceof DocumentFragment
-    ? target
-    : document.body;
 }

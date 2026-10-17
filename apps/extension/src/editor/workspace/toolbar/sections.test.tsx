@@ -53,6 +53,7 @@ vi.mock('../../chrome/ui', async (importOriginal) => ({
   ),
 }));
 
+import { RASTER_TOOL_ORDER, TOOL_ORDER, getToolLabel } from '../../chrome/tool-icons';
 import {
   EditorToolbarCanvasSection,
   EditorToolbarPrimarySection,
@@ -105,8 +106,49 @@ function registerPrimarySectionTest() {
 
     expect(onActivateTool).toHaveBeenCalledWith('text');
     expect(onToggleInspector).not.toHaveBeenCalled();
+    for (const label of ['frame', 'browserFrame', 'meta', 'resize']) {
+      clickButton(`[title="editor.toolbar.${label}"]`);
+    }
+    expect(onToggleInspector.mock.calls.map(([inspector]) => inspector)).toEqual([
+      'frame',
+      'browser-frame',
+      'meta',
+      'canvas-size',
+    ]);
   });
 }
+
+it('preserves tool order and activation for primary and raster sections', () => {
+  const activate = vi.fn();
+  render(
+    <>
+      <EditorToolbarPrimarySection
+        activeInspector="tool"
+        activeTool="text"
+        hasImage={true}
+        isToolButtonActive={(tool) => tool === 'text'}
+        onActivateTool={activate}
+        onToggleInspector={vi.fn()}
+      />
+      <EditorToolbarRasterSection
+        hasImage={true}
+        isToolButtonActive={(tool) => tool === 'pencil'}
+        onActivateTool={activate}
+      />
+    </>
+  );
+  const sections = container!.children;
+  const primary = Array.from(sections[0]!.querySelectorAll('button'));
+  expect(primary.slice(1, 1 + TOOL_ORDER.length).map((button) => button.title)).toEqual(
+    TOOL_ORDER.map(getToolLabel)
+  );
+  const raster = Array.from(sections[1]!.querySelectorAll('button'));
+  expect(raster.map((button) => button.title)).toEqual(RASTER_TOOL_ORDER.map(getToolLabel));
+  for (const button of [...primary.slice(1, 1 + TOOL_ORDER.length), ...raster]) {
+    act(() => button.click());
+  }
+  expect(activate.mock.calls.map(([tool]) => tool)).toEqual([...TOOL_ORDER, ...RASTER_TOOL_ORDER]);
+});
 
 function registerSurfaceRoutingTest() {
   it('routes canvas, workspace, and zoom sections through their dedicated actions', () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { WebSnapshotViewport } from '@sniptale/runtime-contracts/web-snapshot';
 import type { PagePackageScreenshotCoverage } from '@sniptale/runtime-contracts/page-package';
@@ -55,6 +55,22 @@ const partialNoticeStyle = {
   ].join(' '),
 } as const;
 
+/** Activate and focus adjacent tabs within the current viewer tablist. */
+export function handleViewerTabNavigation(event: KeyboardEvent<HTMLDivElement>) {
+  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  const current = event.target instanceof HTMLButtonElement ? tabs.indexOf(event.target) : -1;
+  if (current < 0) return;
+  let next: number;
+  if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = tabs.length - 1;
+  else if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+  else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+  else return;
+  event.preventDefault();
+  tabs[next]?.click();
+  tabs[next]?.focus();
+}
+
 export function WebSnapshotViewerModeSwitch(props: {
   locale: AppLocale;
   mode: WebSnapshotViewerMode;
@@ -66,22 +82,7 @@ export function WebSnapshotViewerModeSwitch(props: {
       aria-label={translate('webSnapshotViewer.app.modeLabel', props.locale)}
       data-ui="web-snapshot-viewer.mode-tabs"
       className="ml-auto flex min-w-0 max-w-full gap-1 overflow-x-auto"
-      onKeyDown={(event) => {
-        const tabs = Array.from(
-          event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-        );
-        const current = event.target instanceof HTMLButtonElement ? tabs.indexOf(event.target) : -1;
-        if (current < 0) return;
-        let next: number;
-        if (event.key === 'Home') next = 0;
-        else if (event.key === 'End') next = tabs.length - 1;
-        else if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
-        else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
-        else return;
-        event.preventDefault();
-        tabs[next]?.click();
-        tabs[next]?.focus();
-      }}
+      onKeyDown={handleViewerTabNavigation}
     >
       <ModeButton
         active={props.mode === 'static-document'}

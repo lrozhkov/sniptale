@@ -1,5 +1,5 @@
 import { Download, ExternalLink, Eye, File, FileCode2, Image, Type } from 'lucide-react';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { LoadedWebSnapshotAsset } from '../../viewer/asset-objects';
@@ -10,6 +10,7 @@ import {
   getCatalogFileFormat,
   getCatalogFileName,
 } from './file-presentation';
+import { handleViewerTabNavigation } from './view-mode';
 import { ViewerPackageFileList } from './package-file-list';
 import { WebSnapshotAssetPreview, type PreviewSelection } from './asset-preview';
 
@@ -92,21 +93,6 @@ function CatalogTab(props: {
       <span className="sniptale-command-content">{props.label}</span>
     </button>
   );
-}
-
-function handleCatalogNavigation(event: KeyboardEvent<HTMLDivElement>) {
-  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-  const current = event.target instanceof HTMLButtonElement ? tabs.indexOf(event.target) : -1;
-  if (current < 0) return;
-  let next: number;
-  if (event.key === 'Home') next = 0;
-  else if (event.key === 'End') next = tabs.length - 1;
-  else if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
-  else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
-  else return;
-  event.preventDefault();
-  tabs[next]?.click();
-  tabs[next]?.focus();
 }
 
 function AssetCard(props: {
@@ -350,7 +336,7 @@ export function WebSnapshotAssetCatalog(props: {
           className="flex gap-1 overflow-x-auto"
           role="tablist"
           data-ui="web-snapshot-viewer.catalog-tabs"
-          onKeyDown={handleCatalogNavigation}
+          onKeyDown={handleViewerTabNavigation}
         >
           {sections.map((section) => {
             const selected = section.id === resolvedSection;
