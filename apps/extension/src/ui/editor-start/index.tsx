@@ -207,7 +207,13 @@ function EditorStartRecent(
   return (
     <section aria-label={props.recentLabel} className="mt-8">
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className={scoped ? 'text-sm leading-5 font-semibold' : 'text-lg font-semibold'}>
+        <h2
+          className={
+            scoped
+              ? 'text-sm leading-5 font-[var(--sniptale-font-weight-interface-heading)]'
+              : 'text-lg font-semibold'
+          }
+        >
           {props.recentLabel}
         </h2>
         {props.browse ? (

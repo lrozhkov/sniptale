@@ -51,7 +51,9 @@ test('authored canvas text is independent from interface family', async ({
     pixels: node.toDataURL(),
   }));
   const title = ui(page, 'video-editor.floating.document-bar').getByRole('textbox');
-  const initialFont = await title.evaluate((node) => getComputedStyle(node).fontFamily);
+  const titleFont = await title.evaluate((node) => getComputedStyle(node).fontFamily);
+  const command = ui(page, 'video-editor.floating.document-bar').getByRole('button').first();
+  const initialFont = await command.evaluate((node) => getComputedStyle(node).fontFamily);
   await page
     .locator('.sniptale-extension-surface')
     .first()
@@ -59,7 +61,8 @@ test('authored canvas text is independent from interface family', async ({
       node.style.setProperty('--sniptale-font-sans', 'monospace');
       node.style.setProperty('--sniptale-font-interface', 'monospace');
     });
-  await expect(title).not.toHaveCSS('font-family', initialFont);
+  await expect(command).not.toHaveCSS('font-family', initialFont);
+  await expect(title).toHaveCSS('font-family', titleFont);
   await page.evaluate(async () => {
     await document.fonts.ready;
     await new Promise<void>((resolve) =>
