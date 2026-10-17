@@ -206,10 +206,11 @@ async function inspectBrowserAndSizes(page: Page, locale: Locale, info: TestInfo
 async function inspectLayers(page: Page, locale: Locale, info: TestInfo) {
   const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   await chooseMode(page, 'layers');
-  await page
-    .getByRole('button', { name: label('editor.toolbar.unlockLayer'), exact: true })
-    .first()
-    .click();
+  const unlock = page.getByRole('button', {
+    name: label('editor.toolbar.unlockLayer'),
+    exact: true,
+  });
+  if (await unlock.count()) await unlock.first().click();
   const sourceName = 'Image design proof.png';
   const source = ui(page, 'editor.layers.panel-frame').getByRole('button', {
     name: sourceName,
@@ -605,6 +606,83 @@ for (const theme of ['light', 'dark'] as const) {
         }
         await screenshot(page, info, `color-sample-${tool}`);
       }
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`image layer miniature commands ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openImage(page, extensionId, 'ru', theme);
+      const list = ui(page, 'editor.layers.list-viewport');
+      const insets = await list.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        const row = node.querySelector(':scope > div > div')!.getBoundingClientRect();
+        return {
+          left: row.left - box.left,
+          right: box.right - row.right,
+          scrollbar: node.offsetWidth - node.clientWidth,
+          css: getComputedStyle(node).scrollbarWidth,
+        };
+      });
+      expect
+        .soft(Math.abs(insets.left - insets.right), JSON.stringify(insets))
+        .toBeLessThanOrEqual(1);
+      await page
+        .getByRole('button', { name: translate('editor.toolbar.unlockLayer', 'ru'), exact: true })
+        .first()
+        .click();
+      const layer = list.getByRole('button', { name: 'Image design proof.png', exact: true });
+      await layer.hover();
+      const actions = ui(page, 'editor.layers.expanded-actions').filter({ visible: true });
+      for (const command of await actions.getByRole('button').all()) {
+        if (await command.isEnabled()) {
+          await command.hover();
+          await expect.soft(command).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await expect.soft(command).toHaveCSS('box-shadow', 'none');
+        }
+      }
+      const navigate = ui(page, 'editor.layers.auto-navigate');
+      await navigate.hover();
+      await expect.soft(navigate).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await layer.hover();
+      await screenshot(page, info, 'layer-miniature-commands');
+      const rowWidth = await list
+        .locator(':scope > div')
+        .first()
+        .evaluate((node) => node.clientWidth);
+      await inspectLayers(page, 'ru', info);
+      for (let index = 0; index < 8; index += 1) {
+        await list.locator(':scope > div').last().hover();
+        await list
+          .locator(':scope > div')
+          .last()
+          .getByRole('button', {
+            name: translate('editor.toolbar.duplicateLayer', 'ru'),
+            exact: true,
+          })
+          .click();
+      }
+      const scrolling = await list.evaluate((node) => {
+        node.scrollTop = node.scrollHeight;
+        return { top: node.scrollTop, height: node.clientHeight, total: node.scrollHeight };
+      });
+      expect(scrolling.total).toBeGreaterThan(scrolling.height);
+      expect(scrolling.top).toBeGreaterThan(0);
+      expect(
+        Math.abs(
+          (await list
+            .locator(':scope > div')
+            .first()
+            .evaluate((node) => node.clientWidth)) - rowWidth
+        )
+      ).toBeLessThanOrEqual(1);
+      await expect(list.locator(':scope > div').last()).toBeInViewport();
+      await screenshot(page, info, 'layer-list-scrolled');
     });
   }
 }

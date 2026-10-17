@@ -6,7 +6,7 @@ import { getLayerIcon } from '../../chrome/tool-icons';
 import { EditorIconButton, cx } from '../../chrome/ui';
 import { LayerRow } from './row';
 import { LayerInsertImageControl } from './file-input';
-import { ACTIVE_LAYER_NAVIGATION_BORDER_CLASS_NAME } from './header.constants';
+import { ACTIVE_LAYER_NAVIGATION_ICON_CLASS_NAME } from './header.constants';
 import {
   EMPTY_STATE_CLASS_NAME,
   PANEL_ICON_CLASS_NAME,
@@ -22,12 +22,6 @@ const HEADER_TOGGLE_BUTTON_CLASS_NAME =
   'text-[color:var(--sniptale-color-text-muted)] transition ' +
   'hover:bg-[color:var(--sniptale-color-surface-hover)] focus:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-[color:var(--sniptale-color-focus-ring)]';
-const HEADER_NAVIGATION_BUTTON_CLASS_NAME =
-  HEADER_TOGGLE_BUTTON_CLASS_NAME +
-  ' data-[active=true]:border' +
-  ` ${ACTIVE_LAYER_NAVIGATION_BORDER_CLASS_NAME}` +
-  ' data-[active=true]:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_8%,transparent)]' +
-  ' data-[active=true]:text-[color:var(--sniptale-color-accent-emphasis)]';
 const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-1 pb-3 pt-2';
 
 type EditorInspectorLayersListProps = {
@@ -47,7 +41,15 @@ function getListViewportClassName(args: { reserveScrollbarGutter: boolean; scrol
   return cx(
     LIST_VIEWPORT_BASE_CLASS_NAME,
     args.scrollable ? 'overflow-y-auto' : 'overflow-y-hidden',
-    args.reserveScrollbarGutter ? 'pl-2 pr-0.5 [scrollbar-gutter:stable]' : 'px-2'
+    args.reserveScrollbarGutter
+      ? [
+          'pl-2 pr-0.5 [scrollbar-gutter:stable] ![scrollbar-width:auto] ![scrollbar-color:auto]',
+          '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
+          '[&::-webkit-scrollbar-track]:bg-transparent',
+          '[&::-webkit-scrollbar-thumb]:rounded-[3px]',
+          '[&::-webkit-scrollbar-thumb]:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-muted)_28%,transparent)]',
+        ].join(' ')
+      : 'px-2'
   );
 }
 
@@ -90,15 +92,23 @@ function EditorInspectorLayersHeaderActions(props: {
     >
       <LayerInsertImageControl withLabel />
       <EditorIconButton
+        variant="utility"
         title={translate('editor.toolbar.layerAutoNavigate')}
         aria-label={translate('editor.toolbar.layerAutoNavigate')}
         aria-pressed={props.autoNavigateSelectedLayer}
         active={props.autoNavigateSelectedLayer}
         data-ui="editor.layers.auto-navigate"
         onClick={props.onToggleAutoNavigateSelectedLayer}
-        className={HEADER_NAVIGATION_BUTTON_CLASS_NAME}
+        className={HEADER_TOGGLE_BUTTON_CLASS_NAME}
       >
-        <SquareMousePointer size={16} className="text-current" />
+        <SquareMousePointer
+          size={16}
+          className={
+            props.autoNavigateSelectedLayer
+              ? ACTIVE_LAYER_NAVIGATION_ICON_CLASS_NAME
+              : 'text-current'
+          }
+        />
       </EditorIconButton>
       {props.streamlined ? null : (
         <>
