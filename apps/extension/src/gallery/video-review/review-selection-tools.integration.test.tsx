@@ -144,7 +144,7 @@ async function waitForContentCommit(
 }
 
 it('creates a source-audio mute from a range, opens properties and restores it through undo/redo', async () => {
-  const fixture = createEditorFixture(integration);
+  const fixture = createEditorFixture(integration, { inspectorWidth: 0 });
   integration.index.mockResolvedValue({
     duration: 4,
     boundaries: [0, 1, 2, 3, 4],

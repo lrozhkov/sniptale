@@ -110,7 +110,7 @@ async function dragRange(
 }
 
 it('deletes the unified selection: cut stays when audio is selected, undo restores it', async () => {
-  const fixture = createEditorFixture(integration);
+  const fixture = createEditorFixture(integration, { inspectorWidth: 0 });
   const { host, root, click, back } = fixture;
   const musicFile = new File(['audio'], 'track.mp3', { type: 'audio/mpeg' });
   const dragEvent = (type: string) => {
