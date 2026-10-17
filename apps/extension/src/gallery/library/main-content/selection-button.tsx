@@ -14,7 +14,7 @@ function getGallerySelectionButtonClassName(selected: boolean, alwaysVisible = f
 /** Neutral selection mark inside a stable 32px collection hit target. */
 function getGallerySelectionMarkClassName(selected: boolean) {
   return [
-    'flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border transition-colors',
+    'flex h-5 w-5 items-center justify-center rounded-full border transition-colors',
     selected
       ? [
           'border-[var(--sniptale-color-text-primary)] bg-[var(--sniptale-color-text-primary)]',

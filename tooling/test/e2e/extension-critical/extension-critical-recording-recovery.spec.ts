@@ -225,6 +225,12 @@ test('Gallery exposes only interrupted video, retains downloads, and removes com
     await page.reload();
     const panel = page.locator('[data-ui="gallery.recording-recovery"]');
     await expect(panel).toBeVisible();
+    const summary = panel.locator('summary');
+    await summary.click();
+    await expect(
+      panel.getByRole('button', { name: /Recover to library|Восстановить в библиотеку/ })
+    ).toBeHidden();
+    await summary.press('Enter');
     await expect(panel.getByText('Recovery webm.webm', { exact: true })).toBeVisible();
     const viewport = page.viewportSize();
     await page.setViewportSize({ width: 1000, height: 560 });

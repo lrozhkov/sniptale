@@ -201,9 +201,7 @@ for (const locale of ['ru', 'en'] as const) {
             name: label('gallery.app.viewModeLabel'),
             exact: true,
           });
-          await expect
-            .soft(modeGroup)
-            .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+          await expect.soft(modeGroup).toHaveCSS('border-top-style', 'solid');
           await expect
             .soft(modeGroup.locator('button[aria-pressed="true"]'))
             .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
@@ -239,6 +237,13 @@ for (const locale of ['ru', 'en'] as const) {
           .click();
         for (const name of names) {
           await card(name).hover();
+          const mark = card(name)
+            .getByRole('button', { name: label('gallery.app.selectItem'), exact: true })
+            .locator('span[aria-hidden]');
+          const markBox = (await mark.boundingBox())!;
+          expect(
+            await mark.evaluate((node) => parseFloat(getComputedStyle(node).borderRadius))
+          ).toBeGreaterThanOrEqual(markBox.width / 2);
           await card(name)
             .getByRole('button', { name: label('gallery.app.selectItem'), exact: true })
             .click();
@@ -412,6 +417,13 @@ for (const locale of ['ru', 'en'] as const) {
 
         for (const name of names) {
           await card(name).hover();
+          const mark = card(name)
+            .getByRole('button', { name: label('gallery.app.selectItem'), exact: true })
+            .locator('span[aria-hidden]');
+          const markBox = (await mark.boundingBox())!;
+          expect(
+            await mark.evaluate((node) => parseFloat(getComputedStyle(node).borderRadius))
+          ).toBeGreaterThanOrEqual(markBox.width / 2);
           await card(name)
             .getByRole('button', { name: label('gallery.app.selectItem'), exact: true })
             .click();

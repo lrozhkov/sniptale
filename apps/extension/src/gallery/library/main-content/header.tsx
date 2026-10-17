@@ -402,7 +402,8 @@ function GalleryViewModeToggle(props: {
       aria-label={translate('gallery.app.viewModeLabel')}
       role="group"
       data-ui="gallery.header.view-mode"
-      className="flex h-8 shrink-0 items-center gap-1"
+      className="flex h-8 shrink-0 items-center gap-0.5 rounded-[4px] border
+        border-[var(--sniptale-color-border-soft)] px-0.5"
     >
       <GalleryViewModeButton
         active={props.viewMode === 'list'}

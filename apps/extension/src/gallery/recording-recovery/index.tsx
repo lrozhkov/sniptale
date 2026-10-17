@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { translate, useAppLocale, formatDateTime } from '../../platform/i18n';
@@ -18,12 +19,12 @@ function RecoveryRow({ entry, locked, onAction, onDelete }: RecoveryRowProps) {
   return (
     <li
       className={[
-        'flex min-h-14 min-w-0 flex-wrap items-center justify-between gap-2 py-2',
+        'flex min-h-14 min-w-0 flex-wrap items-center gap-x-4 gap-y-2 py-2',
         'border-t border-[var(--sniptale-color-border-soft)]',
       ].join(' ')}
     >
-      <div className="min-w-0 flex-1 basis-52">
-        <div className="break-all text-[13px] leading-[18px]" title={entry.filename}>
+      <div className="min-w-0 flex-1 basis-64">
+        <div className="truncate text-[13px] leading-[18px]" title={entry.filename}>
           {entry.filename}
         </div>
         <div className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
@@ -107,11 +108,7 @@ function RecoveryContents({
   const actions = { locked, onAction: state.run, onDelete };
   return (
     <>
-      <h2 className="text-sm leading-5 font-medium">
-        {translate('gallery.recordingRecovery.title')}
-        {state.entries.length ? ` (${state.entries.length})` : ''}
-      </h2>
-      <p className="mt-2 text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
+      <p className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.recordingRecovery.description')}
       </p>
       <RecoveryStatus state={state} />
@@ -134,6 +131,7 @@ function RecoveryContents({
 
 export function GalleryRecordingRecovery({ disabled = false }: { disabled?: boolean }) {
   const state = useRecordingRecovery(disabled);
+  const [open, setOpen] = useState(true);
   const [deleting, setDeleting] = useState<RecoveryRecording | null>(null);
   const locked = disabled || state.busy;
   if (!state.message && !state.entries.length) return null;
@@ -142,11 +140,35 @@ export function GalleryRecordingRecovery({ disabled = false }: { disabled?: bool
       data-ui="gallery.recording-recovery"
       aria-label={translate('gallery.recordingRecovery.title')}
       className={[
-        'shrink-0 overflow-y-auto rounded-[4px] px-3 py-2 max-h-[40vh]',
+        'shrink-0 overflow-y-auto rounded-[4px] px-2 py-1 max-h-[40vh]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
     >
-      <RecoveryContents state={state} locked={locked} onDelete={setDeleting} />
+      <details
+        className="group/recovery"
+        open={open}
+        onToggle={(event) => setOpen(event.currentTarget.open)}
+      >
+        <summary
+          className="flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[4px] px-2
+            text-[13px] leading-[18px] font-medium hover:bg-[var(--sniptale-color-surface-hover)]
+            focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-focus-ring)]
+            [&::-webkit-details-marker]:hidden"
+        >
+          <span className="min-w-0 flex-1">
+            {translate('gallery.recordingRecovery.title')}
+            {state.entries.length ? ` (${state.entries.length})` : ''}
+          </span>
+          <ChevronDown
+            size={14}
+            aria-hidden="true"
+            className="shrink-0 text-[var(--sniptale-color-text-secondary)] group-open/recovery:rotate-180"
+          />
+        </summary>
+        <div className="max-w-[960px] px-2 pb-2 pt-2">
+          <RecoveryContents state={state} locked={locked} onDelete={setDeleting} />
+        </div>
+      </details>
       <ProductConfirmDialog
         dialogClassName="sniptale-compact-workspace"
         isOpen={Boolean(deleting)}

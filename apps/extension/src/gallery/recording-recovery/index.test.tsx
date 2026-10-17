@@ -223,3 +223,20 @@ it('releases a late download snapshot after unmount', async () => {
   expect(mocks.launch).not.toHaveBeenCalled();
   root = createRoot(container);
 });
+
+it('keeps recovery actions in a collapsible section without changing accepted entries', async () => {
+  await mount();
+  const details = container.querySelector('details');
+  expect(details).not.toBeNull();
+  expect(details!.open).toBe(true);
+  const summary = details!.querySelector('summary')!;
+  expect(summary.textContent).toContain(translate('gallery.recordingRecovery.title'));
+  await act(async () => summary.click());
+  expect(details!.open).toBe(false);
+  expect(mocks.recover).not.toHaveBeenCalled();
+  expect(mocks.remove).not.toHaveBeenCalled();
+  await act(async () => summary.click());
+  expect(details!.open).toBe(true);
+  await click(translate('gallery.recordingRecovery.recover'));
+  expect(mocks.recover).toHaveBeenCalledWith(entry);
+});
