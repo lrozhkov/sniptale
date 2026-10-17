@@ -27,6 +27,7 @@ function ZoomPercentButton(props: { hasImage: boolean; zoomPercent: number }) {
 
   return (
     <ContentToolbarButton
+      tone="utility"
       title={title}
       disabled={!props.hasImage}
       onClick={handleClick}
@@ -45,6 +46,7 @@ export function ViewZoomControls(props: { hasImage: boolean; zoomPercent: number
   return (
     <ContentToolbarGroup className="gap-1.5" dataUi="editor.floating.view-controls.zoom-group">
       <ContentToolbarButton
+        tone="utility"
         title={getDocumentRequiredTitle(translate('editor.toolbar.zoomOut'), props.hasImage)}
         disabled={!props.hasImage}
         onClick={() => controller.zoomOut()}
@@ -54,6 +56,7 @@ export function ViewZoomControls(props: { hasImage: boolean; zoomPercent: number
       </ContentToolbarButton>
       <ZoomPercentButton hasImage={props.hasImage} zoomPercent={props.zoomPercent} />
       <ContentToolbarButton
+        tone="utility"
         title={getDocumentRequiredTitle(translate('editor.toolbar.zoomIn'), props.hasImage)}
         disabled={!props.hasImage}
         onClick={() => controller.zoomIn()}

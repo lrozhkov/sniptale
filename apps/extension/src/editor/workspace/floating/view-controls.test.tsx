@@ -204,7 +204,10 @@ it('places the outside-shapes toggle before magnet with the same active treatmen
     '[data-ui="editor.floating.view-controls.show-outside-canvas"]'
   );
   expect(enabled?.getAttribute('aria-pressed')).toBe('true');
-  expect(enabled?.className).toContain('sniptale-glass-toolbar-button--active');
+  expect(enabled?.className).not.toContain('sniptale-glass-toolbar-button--active');
+  expect(enabled?.querySelector('svg')?.classList.toString()).toContain(
+    'text-[var(--sniptale-color-accent)]'
+  );
   click('editor.floating.view-controls.show-outside-canvas');
   expect(mocks.setShowOutsideCanvas).toHaveBeenLastCalledWith(false);
 });

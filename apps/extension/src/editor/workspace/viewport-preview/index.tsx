@@ -19,7 +19,7 @@ interface EditorViewportPreviewProps {
 }
 
 const viewportPreviewSurfaceClassName =
-  'relative overflow-hidden rounded-[14px] border border-[var(--sniptale-color-border-soft)] ' +
+  'relative overflow-hidden rounded-none border border-[var(--sniptale-color-border-soft)] ' +
   'bg-[var(--sniptale-color-surface-panel)] ' +
   'shadow-[inset_0_1px_0_color-mix(in_srgb,var(--sniptale-color-text-primary)_4%,transparent)] ' +
   'outline-none touch-none focus-visible:ring-2 ' +

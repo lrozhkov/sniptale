@@ -21,10 +21,11 @@ const VIEW_MAP_POPOVER_CLASS_NAME = floatingChromeClassNames(
 
 export type ViewPopoverId = 'workspace' | 'map';
 
-function OutsideCanvasIcon() {
+function OutsideCanvasIcon({ active }: { active: boolean }) {
   return (
     <svg
       aria-hidden="true"
+      className={active ? 'text-[var(--sniptale-color-accent)]' : undefined}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -148,6 +149,7 @@ export function ViewSettingsControls(props: {
     <ContentToolbarGroup className="gap-1.5" dataUi="editor.floating.view-controls.settings-group">
       <WorkspacePopoverButton {...props} />
       <ContentToolbarButton
+        tone="utility"
         title={getDocumentRequiredTitle(
           translate('editor.toolbar.showOutsideCanvas'),
           props.hasImage
@@ -158,9 +160,10 @@ export function ViewSettingsControls(props: {
         onClick={props.onToggleShowOutsideCanvas}
         dataUi="editor.floating.view-controls.show-outside-canvas"
       >
-        <OutsideCanvasIcon />
+        <OutsideCanvasIcon active={props.showOutsideCanvas} />
       </ContentToolbarButton>
       <ContentToolbarButton
+        tone="utility"
         title={getDocumentRequiredTitle(translate('editor.toolbar.magnetMode'), props.hasImage)}
         active={props.magnetEnabled}
         aria-pressed={props.magnetEnabled}
@@ -168,7 +171,11 @@ export function ViewSettingsControls(props: {
         onClick={props.onToggleMagnet}
         dataUi="editor.floating.view-controls.magnet"
       >
-        <Magnet size={15} strokeWidth={2} />
+        <Magnet
+          size={15}
+          strokeWidth={2}
+          className={props.magnetEnabled ? 'text-[var(--sniptale-color-accent)]' : undefined}
+        />
       </ContentToolbarButton>
       <MapPopoverButton {...props} />
     </ContentToolbarGroup>

@@ -515,3 +515,28 @@ for (const theme of ['light', 'dark'] as const) {
     });
   }
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`image navigation chrome ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openImage(page, extensionId, 'ru', theme);
+      const magnet = ui(page, 'editor.floating.view-controls.magnet');
+      await magnet.click();
+      await expect(magnet).toHaveAttribute('aria-pressed', 'true');
+      for (const name of ['magnet', 'show-outside-canvas', 'zoom', 'zoom-in', 'zoom-out']) {
+        const command = ui(page, `editor.floating.view-controls.${name}`);
+        await command.hover();
+        await expect(command).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+        await expect(command).toHaveCSS('box-shadow', 'none');
+      }
+      await ui(page, 'editor.floating.view-controls.map').click();
+      await expect(ui(page, 'editor.viewport-preview.surface')).toHaveCSS('border-radius', '0px');
+      await expect(ui(page, 'editor.viewport-preview.frame')).toHaveCSS('border-radius', '0px');
+      await screenshot(page, info, 'image-navigation-chrome');
+    });
+  }
+}
