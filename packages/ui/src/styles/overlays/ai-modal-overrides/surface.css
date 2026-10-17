@@ -469,6 +469,7 @@
 }
 
 .sniptale-ai-template-menu-adopted .sniptale-select-option-description {
+  color: var(--sniptale-color-text-secondary);
   font: 400 12px/16px var(--sniptale-font-interface);
   white-space: normal;
   overflow-wrap: anywhere;

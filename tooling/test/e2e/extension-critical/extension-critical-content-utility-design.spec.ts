@@ -267,6 +267,8 @@ async function saveComposition(page: Page, c: Composition, info: TestInfo) {
     name: tr(c, 'content.saveDialog.rememberPreset'),
     exact: true,
   });
+  await expect.soft(remember).toHaveCSS('appearance', 'none', { timeout: 500 });
+  await expect.soft(remember).toHaveClass(/sniptale-checkbox/u);
   await remember.check();
   await expect(remember).toBeChecked();
   const rememberLabel = remember.locator('..');

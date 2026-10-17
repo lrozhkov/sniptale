@@ -151,6 +151,18 @@
   user-select: text;
 }
 
+.sniptale-ai-modal-adopted .sniptale-json-key {
+  color: color-mix(in srgb, var(--sniptale-color-info) 60%, var(--sniptale-color-text-primary) 40%);
+}
+
+.sniptale-ai-modal-adopted .sniptale-json-string {
+  color: color-mix(
+    in srgb,
+    var(--sniptale-color-success) 60%,
+    var(--sniptale-color-text-primary) 40%
+  );
+}
+
 .sniptale-ai-modal-adopted .sniptale-checkbox {
   width: 16px;
   height: 16px;

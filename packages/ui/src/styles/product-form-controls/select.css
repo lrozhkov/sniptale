@@ -159,11 +159,20 @@
   overscroll-behavior: contain;
   border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 94%, transparent);
   border-radius: 14px;
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-panel) 92%,
-    var(--sniptale-color-surface-canvas) 8%
-  );
+  background:
+    linear-gradient(
+      color-mix(
+        in srgb,
+        var(--sniptale-color-surface-panel) 92%,
+        var(--sniptale-color-surface-canvas) 8%
+      ),
+      color-mix(
+        in srgb,
+        var(--sniptale-color-surface-panel) 92%,
+        var(--sniptale-color-surface-canvas) 8%
+      )
+    ),
+    var(--sniptale-color-surface-canvas);
   box-shadow:
     0 18px 32px color-mix(in srgb, var(--sniptale-color-overlay) 18%, transparent),
     inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-border-subtle) 30%, transparent);

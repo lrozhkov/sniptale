@@ -51,7 +51,11 @@ async function capture(page: Page, info: TestInfo, name: string) {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     );
   });
-  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath(`${name}.png`),
+    fullPage: false,
+    animations: 'disabled',
+  });
 }
 
 async function configure(context: BrowserContext, extensionId: string, c: Composition) {
@@ -318,6 +322,44 @@ async function templates(page: Page, c: Composition, info: TestInfo) {
     'line-height',
     '16px'
   );
+  const material = await menu.evaluate((node) => {
+    const css = getComputedStyle(node);
+    const description = node.querySelector('.sniptale-select-option-description');
+    if (!description) throw new Error('Template description is unavailable');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('2d')!;
+    const color = (value: string) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = value;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data];
+    };
+    const luminance = (channels: number[]) =>
+      channels
+        .slice(0, 3)
+        .map((channel) => {
+          const value = channel / 255;
+          return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        })
+        .reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i]!, 0);
+    const foreground = luminance(color(getComputedStyle(description).color));
+    const panel = color(css.getPropertyValue('--sniptale-color-surface-panel'));
+    const base = color(css.getPropertyValue('--sniptale-color-surface-canvas'));
+    const backdrop = luminance(
+      panel
+        .slice(0, 3)
+        .map((value, i) => (value * panel[3]!) / 255 + base[i]! * (1 - panel[3]! / 255))
+    );
+    return {
+      backingAlpha: color(css.backgroundColor)[3],
+      contrast: (Math.max(foreground, backdrop) + 0.05) / (Math.min(foreground, backdrop) + 0.05),
+    };
+  });
+  expect.soft(material.backingAlpha, 'Menu backing must hide text underneath').toBe(255);
+  expect
+    .soft(material.contrast, 'Template descriptions must remain readable')
+    .toBeGreaterThanOrEqual(4.5);
   await capture(page, info, 'template-menu');
   await page.keyboard.press('Escape');
   await expect(options).toHaveCount(0);
@@ -520,6 +562,53 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   await expect(json).toHaveCSS('user-select', 'text');
   const original = await json.innerText();
   expect(original).toContain('Selected reference paragraph');
+  const tokenContrasts = await json.evaluate((node) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('2d')!;
+    const parse = (value: string) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = value;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data];
+    };
+    const luminance = (channels: number[]) =>
+      channels
+        .slice(0, 3)
+        .map((channel) => {
+          const value = channel / 255;
+          return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        })
+        .reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i]!, 0);
+    let background = parse(
+      getComputedStyle(node).getPropertyValue('--sniptale-color-surface-canvas')
+    );
+    const ancestors: Element[] = [];
+    for (let ancestor: Element | null = node; ancestor; ancestor = ancestor.parentElement)
+      ancestors.unshift(ancestor);
+    for (const ancestor of ancestors) {
+      const next = parse(getComputedStyle(ancestor).backgroundColor);
+      background = next
+        .slice(0, 3)
+        .map((value, i) => (value * next[3]!) / 255 + background[i]! * (1 - next[3]! / 255));
+    }
+    const backdrop = luminance(background);
+    return [
+      ...new Set([...node.querySelectorAll('span')].map((token) => getComputedStyle(token).color)),
+    ].map((color) => {
+      const foreground = luminance(parse(color));
+      return {
+        color,
+        ratio: (Math.max(foreground, backdrop) + 0.05) / (Math.min(foreground, backdrop) + 0.05),
+      };
+    });
+  });
+  expect
+    .soft(
+      tokenContrasts.filter(({ ratio }) => ratio < 4.5),
+      'JSON preview text contrast'
+    )
+    .toEqual([]);
   await named(modal, c, 'aiModal.copyButton').click();
   await expect(named(modal, c, 'aiModal.copied')).toBeVisible();
   const grip = json.locator('..').locator(':scope > .sniptale-resizer');
@@ -584,6 +673,7 @@ async function waitingAndRecovery(
     await page.screenshot({
       path: info.outputPath(`provider-error-${attempt}.png`),
       fullPage: false,
+      animations: 'disabled',
     });
     await expect(page.locator('.sniptale-toast-error')).toHaveCount(0);
   }
@@ -662,7 +752,11 @@ for (const locale of ['ru', 'en'] as const) {
         ).toEqual(authored);
       } catch (error) {
         if (page && !page.isClosed()) {
-          await page.screenshot({ path: info.outputPath('failure-ui.png'), fullPage: false });
+          await page.screenshot({
+            path: info.outputPath('failure-ui.png'),
+            fullPage: false,
+            animations: 'disabled',
+          });
           await writeFile(
             info.outputPath('visible-state.json'),
             JSON.stringify(
