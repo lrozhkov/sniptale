@@ -1,3 +1,5 @@
+import './command-parity.css';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { ArrowLeft, Download, ExternalLink, File, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -16,7 +18,6 @@ const previewActionClassName = [
   'inline-flex h-8 min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[4px] px-2.5',
   'text-[13px] leading-[18px] font-normal',
   'text-[var(--sniptale-color-text-primary)]',
-  'hover:bg-[var(--sniptale-color-surface-hover)]',
   'focus-visible:outline-none focus-visible:ring-2',
   'focus-visible:ring-[var(--sniptale-color-focus-ring)] disabled:opacity-50',
 ].join(' ');
@@ -126,7 +127,7 @@ function PreviewFileActions(props: {
         </ProductActionButton>
       ) : resourceAsset?.downloadUrl ? (
         <a
-          className={previewActionClassName}
+          className={`snapshot-download-command ${getControlSecondaryButtonClassName({ density: 'compact' })} ${previewActionClassName}`}
           download={props.name}
           href={resourceAsset.downloadUrl}
         >

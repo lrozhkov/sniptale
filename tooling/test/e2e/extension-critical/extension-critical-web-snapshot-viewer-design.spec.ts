@@ -53,7 +53,10 @@ async function chromeGeometry(page: Page, info: TestInfo) {
   await expect(toolbar).toBeVisible();
   for (const control of await toolbar.locator('button,a[download]').all()) {
     await expect(control).toHaveCSS('height', '32px');
-    await expect(control).toHaveCSS('border-radius', '4px');
+    await expect(control).toHaveCSS(
+      'border-radius',
+      (await control.getAttribute('role')) === 'tab' ? '0px' : '4px'
+    );
     await expect(control).toHaveCSS('font-size', '13px');
     await expect(control).toHaveCSS('line-height', '18px');
     await expect.soft(control).toHaveCSS('font-weight', '400');
@@ -308,7 +311,7 @@ async function keyboardTabPaint(tab: Locator) {
     node.append(probe);
     probe.style.color = 'var(--sniptale-color-accent)';
     const focus = getComputedStyle(probe).color;
-    probe.style.color = 'var(--sniptale-color-text-primary)';
+    probe.style.color = 'var(--sniptale-color-accent)';
     const selected = getComputedStyle(probe).color;
     probe.remove();
     return { focus, selected };

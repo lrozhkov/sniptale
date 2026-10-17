@@ -1,3 +1,5 @@
+import './command-parity.css';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import {
   Download,
   FileDown,
@@ -19,7 +21,6 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 const toolbarButtonClassName = [
   'inline-flex h-8 min-h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[4px]',
   'text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-secondary)] transition-colors',
-  'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
   'disabled:cursor-wait disabled:opacity-60',
 ].join(' ');
@@ -101,7 +102,7 @@ function ViewerToolbarActions(props: {
     >
       <a
         aria-label={downloadLabel}
-        className={`${toolbarButtonClassName} px-2.5`}
+        className={`snapshot-download-command ${getControlSecondaryButtonClassName({ density: 'compact' })} ${toolbarButtonClassName} px-2.5`}
         download={showsScreenshot ? props.loaded.screenshotFilename : props.loaded.archiveFilename}
         href={showsScreenshot ? props.loaded.screenshotUrl : props.loaded.archiveUrl}
         title={downloadLabel}

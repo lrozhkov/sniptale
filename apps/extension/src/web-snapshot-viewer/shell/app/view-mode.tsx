@@ -126,10 +126,11 @@ function ModeButton(props: {
       data-pressing={press.pressed ? 'true' : undefined}
       className={[
         'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap',
-        'rounded-[4px] border-0 border-b-2 border-solid px-2.5 text-[13px] leading-[18px] font-medium',
-        'bg-transparent focus-visible:outline-none',
+        'rounded-none border-0 border-b-2 border-solid px-2.5 text-[13px] leading-[18px] font-medium',
+        'bg-transparent focus-visible:outline-none focus-visible:ring-2',
+        'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
         props.active
-          ? 'border-[var(--sniptale-color-text-primary)] text-[var(--sniptale-color-text-primary)]'
+          ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-text-primary)]'
           : 'border-transparent text-[var(--sniptale-color-text-secondary)]',
         'hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}

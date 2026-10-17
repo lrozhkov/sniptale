@@ -1,0 +1,40 @@
+/* Native downloads retain link semantics while matching neighboring command buttons. */
+@layer utilities {
+  a.snapshot-download-command {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 8px !important;
+    border: 1px solid transparent !important;
+    border-radius: var(--sniptale-radius-sm, 4px);
+    font: var(--sniptale-control-font-weight) 13px / 18px var(--sniptale-font-interface) !important;
+    color: var(--sniptale-color-text-primary) !important;
+    background: transparent !important;
+  }
+  a.snapshot-download-command:hover {
+    font-weight: var(--sniptale-control-font-weight-hover) !important;
+    background: color-mix(
+      in srgb,
+      var(--sniptale-color-text-secondary) 18%,
+      var(--sniptale-color-surface-panel)
+    ) !important;
+  }
+  a.snapshot-download-command svg.lucide {
+    stroke-width: var(--sniptale-control-icon-stroke) !important;
+  }
+  a.snapshot-download-command:is(:hover, :focus-visible) svg.lucide {
+    stroke-width: var(--sniptale-control-icon-stroke-hover) !important;
+  }
+  a.snapshot-download-command:focus-visible {
+    font-weight: var(--sniptale-control-font-weight-hover) !important;
+  }
+  .snapshot-file-action.snapshot-file-action {
+    width: 32px !important;
+    min-width: 32px;
+    padding: 0 !important;
+  }
+  .snapshot-file-action svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+  }
+}

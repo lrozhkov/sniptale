@@ -1,6 +1,8 @@
+import './command-parity.css';
 import { Download, ExternalLink, Eye, File, FileCode2, Image, Type } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { LoadedWebSnapshotAsset } from '../../viewer/asset-objects';
 import type { ViewerPackageFile } from '../../viewer/package-files';
@@ -49,9 +51,9 @@ const assetGroupTitleClassName = [
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 const assetActionClassName = [
-  'inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[4px]',
-  'text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]',
-  'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
+  'snapshot-file-action inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[4px]',
+  'text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-primary)]',
+  'focus-visible:outline-none',
   'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 const assetFormatTitleClassName = [
@@ -59,7 +61,7 @@ const assetFormatTitleClassName = [
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 const catalogTabClassName = [
-  'inline-flex h-8 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-[4px]',
+  'inline-flex h-8 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-none',
   'border-0 border-b-2 border-solid bg-transparent px-2.5 text-[13px] leading-[18px] font-medium',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
@@ -85,7 +87,7 @@ function CatalogTab(props: {
       className={[
         catalogTabClassName,
         props.selected
-          ? 'border-[var(--sniptale-color-text-primary)] text-[var(--sniptale-color-text-primary)]'
+          ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-text-primary)]'
           : 'border-transparent text-[var(--sniptale-color-text-secondary)]',
         'hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
@@ -148,20 +150,22 @@ function AssetCard(props: {
           </p>
         </div>
         <div className={kind === 'image' ? 'mt-1 flex justify-end gap-2' : 'flex shrink-0 gap-2'}>
-          <ContentToolbarButton
-            tone="utility"
+          <ProductActionButton
+            compact
+            tone="secondary"
             aria-label={`${previewLabel}: ${assetName}`}
-            className="h-8 w-8 cursor-pointer !p-0"
+            className={assetActionClassName}
             onClick={(event) => props.onPreview(props.asset, event.currentTarget)}
             title={previewLabel}
             type="button"
           >
             <Eye aria-hidden="true" size={16} />
-          </ContentToolbarButton>
-          <ContentToolbarButton
-            tone="utility"
+          </ProductActionButton>
+          <ProductActionButton
+            compact
+            tone="secondary"
             aria-label={`${openLabel}: ${assetName}`}
-            className="h-8 w-8 cursor-pointer !p-0"
+            className={assetActionClassName}
             onClick={() => {
               setOpenFailed(false);
               void props.onOpen(props.asset.url).catch(() => setOpenFailed(true));
@@ -170,11 +174,11 @@ function AssetCard(props: {
             type="button"
           >
             <ExternalLink aria-hidden="true" size={16} />
-          </ContentToolbarButton>
+          </ProductActionButton>
           {props.asset.downloadUrl ? (
             <a
               aria-label={`${downloadLabel}: ${assetName}`}
-              className={assetActionClassName}
+              className={`snapshot-download-command ${getControlSecondaryButtonClassName({ density: 'compact' })} ${assetActionClassName}`}
               download={assetName}
               href={props.asset.downloadUrl}
               title={downloadLabel}
