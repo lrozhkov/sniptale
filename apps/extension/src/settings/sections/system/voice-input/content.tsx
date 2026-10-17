@@ -26,8 +26,9 @@ const secondaryButtonClassName = [
   'hover:border-[var(--sniptale-color-border-strong)] hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 const textareaClassName = [
-  'w-full rounded-[14px] border border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-canvas)] px-3 py-2 text-sm',
+  'w-full rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
+  'bg-[var(--sniptale-color-surface-panel)] px-3 py-2 text-sm font-normal',
+  'placeholder:text-[var(--sniptale-color-text-muted)] placeholder:opacity-100',
   'text-[var(--sniptale-color-text-primary)] focus-visible:outline-none focus-visible:ring-2',
   'focus-visible:ring-[var(--sniptale-color-accent)] disabled:cursor-not-allowed disabled:opacity-60',
 ].join(' ');
@@ -98,7 +99,7 @@ function StatusCard(props: {
 }) {
   return (
     <div className="min-w-0 py-2.5">
-      <p className="text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-muted)]">
+      <p className="text-[13px] font-normal leading-[18px] text-[var(--sniptale-color-text-muted)]">
         {props.label}
       </p>
       <div className="mt-1 flex items-center gap-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
@@ -534,17 +535,23 @@ function VoiceInputTestPanel({
   return (
     <div className={`${settingsCompactWorkbenchClassName} space-y-4`}>
       <div>
-        <h2 className="text-base font-semibold text-[var(--sniptale-color-text-primary-strong)]">
+        <h2
+          className="text-[14px] leading-5 font-[var(--sniptale-font-weight-interface-heading)]
+            text-[var(--sniptale-color-text-secondary)]"
+        >
           {translate('settings.voiceInput.testTitle')}
         </h2>
         <p className="mt-1 text-sm text-[var(--sniptale-color-text-secondary)]">
           {translate('settings.voiceInput.testDescription')}
         </p>
       </div>
-      <label className="block space-y-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+      <label
+        className="block space-y-1 text-[13px] leading-[18px] font-normal
+          text-[var(--sniptale-color-text-secondary)]"
+      >
         <span>{translate('settings.voiceInput.textareaLabel')}</span>
         <textarea
-          className={`${textareaClassName} min-h-36 resize-y leading-6`}
+          className={`${textareaClassName} min-h-36 resize-y leading-5`}
           placeholder={translate('settings.voiceInput.textareaPlaceholder')}
           readOnly={active}
           value={transcript}

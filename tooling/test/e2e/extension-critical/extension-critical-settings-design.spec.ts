@@ -462,7 +462,7 @@ async function authoredPreviewBoundary(page: Page, extensionId: string, info: Te
       };
     });
   const before = await read();
-  expect(before.family).toContain('Sniptale Interface');
+  expect(before.family).toContain('Sniptale Text');
   await expect(preview).toHaveText(/\S/);
   const shell = ui(page, 'settings.page.root');
   const interfaceNode = ui(page, 'settings.sidebar').getByRole('button').first();
@@ -477,6 +477,64 @@ async function authoredPreviewBoundary(page: Page, extensionId: string, info: Te
   );
   await screenshot(page, info, 'authored-numbering-preview');
 }
+
+async function voiceTestField(page: Page, locale: Locale, info: TestInfo) {
+  const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const heading = page.getByRole('heading', {
+    name: t('settings.voiceInput.testTitle'),
+    exact: true,
+  });
+  const field = page.getByRole('textbox', {
+    name: t('settings.voiceInput.textareaLabel'),
+    exact: true,
+  });
+  await field.scrollIntoViewIfNeeded();
+  await expect.soft(heading).toHaveCSS('font-size', '14px', { timeout: 100 });
+  await expect.soft(heading).toHaveCSS('font-weight', '500', { timeout: 100 });
+  const label = page.getByText(t('settings.voiceInput.textareaLabel'), { exact: true });
+  await expect.soft(label).toHaveCSS('font-size', '13px', { timeout: 100 });
+  await expect.soft(label).toHaveCSS('font-weight', '400', { timeout: 100 });
+  await expect.soft(field).toHaveCSS('border-radius', '4px', { timeout: 100 });
+  await expect.soft(field).toHaveCSS('line-height', '20px', { timeout: 100 });
+  await expect.soft(field).toHaveCSS('font-weight', '400', { timeout: 100 });
+  await expect(field).toHaveCSS('font-family', /Sniptale Text/);
+  const placeholder = () =>
+    field.evaluate((node) => {
+      const style = getComputedStyle(node, '::placeholder');
+      return { color: style.color, opacity: style.opacity };
+    });
+  const color = await field.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-text-muted)';
+    node.parentElement!.append(probe);
+    const result = getComputedStyle(probe).color;
+    probe.remove();
+    return result;
+  });
+  await field.hover();
+  expect.soft(await placeholder()).toEqual({ color, opacity: '1' });
+  await field.click();
+  expect((await placeholder()).opacity).toBe('0');
+  await field.fill('Текст проверки микрофона');
+  await expect(field).toHaveValue('Текст проверки микрофона');
+  await field.fill('');
+  await field.blur();
+  expect.soft(await placeholder()).toEqual({ color, opacity: '1' });
+  await screenshot(page, info, 'voice-test-field');
+}
+
+for (const theme of ['light', 'dark'] as const)
+  for (const size of [
+    { width: 1280, height: 560 },
+    { width: 1920, height: 900 },
+  ]) {
+    test(`native voice test field ${theme} ${size.width}`, async ({ page, extensionId }, info) => {
+      await page.setViewportSize(size);
+      await configure(page, extensionId, 'ru', theme);
+      await route(page, extensionId, 'voice-input');
+      await voiceTestField(page, 'ru', info);
+    });
+  }
 
 for (const locale of ['ru', 'en'] as const)
   for (const theme of ['light', 'dark'] as const)
@@ -658,7 +716,7 @@ async function transferChoices(page: Page, extensionId: string, info: TestInfo) 
   await expect(complete).toHaveAttribute('aria-pressed', 'true');
   await expect(complete).toHaveCSS('font-size', '13px');
   await expect(complete).toHaveCSS('line-height', '18px');
-  await expect(complete).toHaveCSS('font-weight', '500');
+  await expect(complete).toHaveCSS('font-weight', '400');
   await expect(complete).toHaveCSS('box-shadow', 'none');
   await expect(complete).toHaveCSS('border-top-width', '0px');
   await selective.click();
@@ -701,7 +759,7 @@ async function cancelPreset(page: Page, info: TestInfo, name: string) {
     await expect(label).toHaveCSS('font-family', /Sniptale Interface/);
     await expect(label).toHaveCSS('font-size', '13px');
     await expect(label).toHaveCSS('line-height', '18px');
-    await expect(label).toHaveCSS('font-weight', '500');
+    await expect(label).toHaveCSS('font-weight', '400');
   }
   const cancel = dialog.getByRole('button', {
     name: translate('common.actions.cancel', 'en'),
