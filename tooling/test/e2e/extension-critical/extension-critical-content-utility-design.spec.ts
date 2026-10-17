@@ -52,7 +52,11 @@ async function capture(page: Page, info: TestInfo, name: string) {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     );
   });
-  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+  await page.screenshot({
+    path: info.outputPath(`${name}.png`),
+    fullPage: false,
+    animations: 'disabled',
+  });
 }
 
 async function inViewport(page: Page, target: Locator) {
@@ -93,6 +97,17 @@ async function configure(context: BrowserContext, extensionId: string, c: Compos
       await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
     }, c.theme);
     await settings.goto(`${path}?section=saving&view=templates`);
+    await expect(settings.locator('html')).toHaveAttribute('lang', c.locale);
+    await expect
+      .poll(() =>
+        settings.evaluate(
+          async () =>
+            (await chrome.storage.local.get('sniptale-locale-preference'))[
+              'sniptale-locale-preference'
+            ]
+        )
+      )
+      .toBe(c.locale);
     await button(settings, c, 'savePresets.section.addButton').click();
     const editor = settings.getByRole('dialog');
     await editor
@@ -361,7 +376,11 @@ for (const locale of ['ru', 'en'] as const) {
         }
       } catch (error) {
         if (page && !page.isClosed())
-          await page.screenshot({ path: info.outputPath('failure-ui.png'), fullPage: false });
+          await page.screenshot({
+            path: info.outputPath('failure-ui.png'),
+            fullPage: false,
+            animations: 'disabled',
+          });
         throw error;
       } finally {
         if (launched) await closeExtensionBrowser(launched, { removeUserDataDir: true });

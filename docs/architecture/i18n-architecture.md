@@ -1,6 +1,6 @@
 # i18n architecture
 
-Sniptale ships Russian and English. `packages/platform/src/i18n/config.ts` owns locale identifiers, Intl tags, display names, and the fallback locale. On first installation, the background install owner stores English. On update, it preserves the stored locale.
+Sniptale ships Russian and English. `packages/platform/src/i18n/config.ts` owns locale identifiers, Intl tags, display names, and the fallback locale. On first installation, the background install owner stores English only if no preference exists. It checks and writes under the existing exclusive persistence permit. A delayed install callback must preserve a user choice or restored preference. The initializer releases the permit before hydration. On update, it preserves the stored locale.
 
 ## Owners
 

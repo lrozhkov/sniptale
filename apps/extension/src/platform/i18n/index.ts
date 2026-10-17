@@ -19,6 +19,7 @@ export { compareStrings, formatDateTime, formatNumber } from '@sniptale/platform
 export { usePageLocaleMetadata } from './page-metadata';
 export {
   ensureLocaleHydrated,
+  initializeLocalePreference,
   getStoredLocalePreference,
   setLocalePreference,
   subscribeToLocaleChanges,
