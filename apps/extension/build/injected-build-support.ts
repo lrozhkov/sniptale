@@ -7,23 +7,29 @@ import type { Plugin as EsbuildPlugin } from 'esbuild';
 import postcss from 'postcss';
 import type { Plugin } from 'vite';
 
-const ZOD_COMPILER_PATH = /\/node_modules\/zod\/v4\/core\/compile\.js$/;
+const ZOD_COMPILER_PATH = /\/node_modules\/zod\/v4\/core\/(?:compile|doc)\.js$/;
 const ZOD_COMPILER_SHA256 = '53fcf24821f50ecf42492ab7101abe8a50ead8286a53567d71648fe5ca346b99';
+const ZOD_DOCUMENT_SHA256 = 'be4c1b1a1ad247cc70f360a572060edd7e0cea24252c3a319f33d247899c5643';
 
 /** Keep Zod's typed runtime fallback without retaining an executable AOT constructor. */
 export function transformZodCompiler(source: string, id: string): string | null {
   if (!ZOD_COMPILER_PATH.test(id.replaceAll('\\', '/'))) return null;
+  const isDocument = id.replaceAll('\\', '/').endsWith('/doc.js');
   const declaration = 'const F = Function;';
   if (
-    createHash('sha256').update(source).digest('hex') !== ZOD_COMPILER_SHA256 ||
+    createHash('sha256').update(source).digest('hex') !==
+      (isDocument ? ZOD_DOCUMENT_SHA256 : ZOD_COMPILER_SHA256) ||
     source.split(declaration).length !== 2
   ) {
     throw new Error('Zod compiler source changed; review the extension runtime fallback.');
   }
   return source.replace(
     declaration,
-    'const F = class { constructor() { ' +
-      'throw new ZodCompileUnsupportedError("dynamic compilation in the extension"); } };'
+    isDocument
+      ? 'const F = class { constructor() { ' +
+          'throw new Error("The extension does not compile Zod documents."); } };'
+      : 'const F = class { constructor() { ' +
+          'throw new ZodCompileUnsupportedError("dynamic compilation in the extension"); } };'
   );
 }
 
@@ -50,10 +56,13 @@ export function createReleaseSafeDependencyAliasPlugin(repositoryRoot: string): 
   return {
     name: 'sniptale:release-safe-dependency-aliases',
     setup(build) {
-      build.onLoad({ filter: /[\\/]zod[\\/]v4[\\/]core[\\/]compile\.js$/ }, async (args) => ({
-        contents: transformZodCompiler(await readFile(args.path, 'utf8'), args.path) ?? undefined,
-        loader: 'js',
-      }));
+      build.onLoad(
+        { filter: /[\\/]zod[\\/]v4[\\/]core[\\/](?:compile|doc)\.js$/ },
+        async (args) => ({
+          contents: transformZodCompiler(await readFile(args.path, 'utf8'), args.path) ?? undefined,
+          loader: 'js',
+        })
+      );
       build.onResolve({ filter: /^(jszip|readable-stream|setimmediate|zod)$/ }, (args) => ({
         path: aliases.get(args.path) ?? args.path,
       }));
