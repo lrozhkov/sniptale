@@ -472,6 +472,7 @@ async function menu(page: Page, id: string, info: TestInfo, name: string, expect
   await expect(title).toHaveCSS('letter-spacing', 'normal');
   const item = surface.locator('.sniptale-toolbar-menu-item').first();
   await expect(item).toHaveCSS('font-size', '13px');
+  await expect.soft(item).toHaveCSS('font-weight', '400', { timeout: 500 });
   await surface.evaluate(async (element) => {
     await Promise.all(
       element

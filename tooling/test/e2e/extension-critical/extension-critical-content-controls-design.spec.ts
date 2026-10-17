@@ -181,9 +181,14 @@ async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
       const rows = Array.from(element.querySelectorAll('.sniptale-toolbar-menu-item'));
       return {
         padding: css.padding,
+        weight: css.fontWeight,
         gap: getComputedStyle(element.querySelector('.sniptale-toolbar-menu-list')!).gap,
         heading: title
-          ? { size: getComputedStyle(title).fontSize, line: getComputedStyle(title).lineHeight }
+          ? {
+              size: getComputedStyle(title).fontSize,
+              line: getComputedStyle(title).lineHeight,
+              weight: getComputedStyle(title).fontWeight,
+            }
           : null,
         rows: rows.map((row) => ({
           height: row.getBoundingClientRect().height,
@@ -191,6 +196,7 @@ async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
           padding: getComputedStyle(row).padding,
           size: getComputedStyle(row).fontSize,
           line: getComputedStyle(row).lineHeight,
+          weight: getComputedStyle(row).fontWeight,
         })),
       };
     });
@@ -239,12 +245,14 @@ async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
   for (const observation of observations) {
     expect.soft(observation.menu.padding, `${observation.mode} menu shell inset`).toBe('5px');
     expect.soft(observation.menu.gap, `${observation.mode} menu row gap`).toBe('2px');
-    expect.soft(observation.menu.heading).toEqual({ size: '12px', line: '16px' });
+    expect.soft(observation.menu.weight).toBe('400');
+    expect.soft(observation.menu.heading).toEqual({ size: '12px', line: '16px', weight: '500' });
     for (const row of observation.menu.rows) {
       expect.soft(row.minimum, `${observation.mode} menu row minimum`).toBe('32px');
       expect.soft(row.height).toBeGreaterThanOrEqual(31.9);
       expect.soft(row.padding).toBe('6px 8px');
       expect.soft([row.size, row.line]).toEqual(['13px', '18px']);
+      expect.soft(row.weight, `${observation.mode} ordinary and selected options`).toBe('400');
     }
     for (const button of observation.buttons) {
       const label = `${suffix} ${observation.mode}: ${button.id ?? button.name}`;

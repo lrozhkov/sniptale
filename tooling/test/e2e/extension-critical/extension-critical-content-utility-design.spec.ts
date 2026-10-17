@@ -186,6 +186,7 @@ async function viewportMenu(page: Page, c: Composition, info: TestInfo, suffix: 
   await inViewport(page, menu);
   const native = button(menu, c, 'content.toolbar.viewportNativeLabel');
   await expect(native).toBeVisible();
+  await expect.soft(native).toHaveCSS('font-weight', '400', { timeout: 500 });
   const last = button(menu, c, 'content.toolbar.viewportContinuously');
   await last.scrollIntoViewIfNeeded();
   await inViewport(page, last);
