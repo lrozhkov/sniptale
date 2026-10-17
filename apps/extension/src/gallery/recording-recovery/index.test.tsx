@@ -159,20 +159,27 @@ it('rejects duplicate actions while a recovery is pending', async () => {
   await click(translate('gallery.recordingRecovery.recover'));
   expect(mocks.recover).toHaveBeenCalledTimes(1);
   await act(async () => complete?.());
-  expect(container.textContent).toContain(translate('gallery.recordingRecovery.recovered'));
-  expect(container.textContent).toContain(entry.filename);
-  expect(container.textContent).toContain(translate('gallery.recordingRecovery.copies'));
-  expect(container.textContent).not.toContain(translate('gallery.recordingRecovery.interrupted'));
+  expect(container.querySelector('[data-ui="gallery.recording-recovery"]')).toBeNull();
+  expect(container.textContent).not.toContain(entry.filename);
 });
-it('keeps safety copies collapsed and exposes interrupted recordings', async () => {
-  mocks.list.mockResolvedValue([
-    entry,
-    { ...entry, id: 'copy', filename: 'complete.webm', complete: true, published: true },
-  ]);
+it('shows an unavailable published recording supplied by discovery as recoverable', async () => {
+  mocks.list.mockResolvedValue([{ ...entry, complete: true, published: true }]);
   await mount();
-  const details = container.querySelectorAll('details');
-  expect(details[0]?.open).toBe(true);
-  expect(details[1]?.open).toBe(false);
+  expect(container.textContent).toContain(entry.filename);
+  expect(button(translate('gallery.recordingRecovery.recover')).disabled).toBe(false);
+});
+it('does not flash a recovery panel while checking a healthy library', async () => {
+  let finish: ((entries: RecoveryRecording[]) => void) | undefined;
+  mocks.list.mockImplementationOnce(
+    () =>
+      new Promise<RecoveryRecording[]>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await mount();
+  expect(container.textContent).toBe('');
+  await act(async () => finish?.([]));
+  expect(container.textContent).toBe('');
 });
 it('transfers download lifetime and retains entries after interrupted downloads', async () => {
   const resource = {

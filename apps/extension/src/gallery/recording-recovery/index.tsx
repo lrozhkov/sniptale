@@ -82,10 +82,7 @@ function RecoveryStatus({ state }: { state: ReturnType<typeof useRecordingRecove
         </p>
       ) : null}
       {state.message ? (
-        <p
-          role={state.message === 'recovered' ? 'status' : 'alert'}
-          className="mt-2 select-text text-sm leading-5"
-        >
+        <p role="alert" className="mt-2 select-text text-sm leading-5">
           {translate(`gallery.recordingRecovery.${state.message}`)}
         </p>
       ) : null}
@@ -107,43 +104,18 @@ function RecoveryContents({
   locked: boolean;
   onDelete(entry: RecoveryRecording): void;
 }) {
-  const interrupted = state.entries.filter((entry) => !entry.published);
-  const copies = state.entries.filter((entry) => entry.published);
   const actions = { locked, onAction: state.run, onDelete };
   return (
-    <details open={interrupted.length > 0 || Boolean(state.message) || state.loading}>
-      <summary
-        className={[
-          'cursor-pointer text-sm leading-5 font-medium',
-          'focus-visible:outline-2 focus-visible:outline-offset-2',
-        ].join(' ')}
-      >
+    <>
+      <h2 className="text-sm leading-5 font-medium">
         {translate('gallery.recordingRecovery.title')}
         {state.entries.length ? ` (${state.entries.length})` : ''}
-      </summary>
+      </h2>
       <p className="mt-2 text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.recordingRecovery.description')}
       </p>
       <RecoveryStatus state={state} />
-      {interrupted.length ? (
-        <>
-          <h2 className="mt-3 text-sm font-medium">
-            {translate('gallery.recordingRecovery.interrupted')}
-          </h2>
-          <RecoveryEntries entries={interrupted} {...actions} />
-        </>
-      ) : null}
-      {copies.length ? (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-[13px] leading-[18px]">
-            {translate('gallery.recordingRecovery.copies')} ({copies.length})
-          </summary>
-          <p className="my-2 text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
-            {translate('gallery.recordingRecovery.copiesDescription')}
-          </p>
-          <RecoveryEntries entries={copies} {...actions} />
-        </details>
-      ) : null}
+      <RecoveryEntries entries={state.entries} {...actions} />
       <p className="mt-2 text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.recordingRecovery.rawHint')}
       </p>
@@ -156,7 +128,7 @@ function RecoveryContents({
       >
         {translate('gallery.recordingRecovery.retry')}
       </ProductActionButton>
-    </details>
+    </>
   );
 }
 
@@ -164,7 +136,7 @@ export function GalleryRecordingRecovery({ disabled = false }: { disabled?: bool
   const state = useRecordingRecovery(disabled);
   const [deleting, setDeleting] = useState<RecoveryRecording | null>(null);
   const locked = disabled || state.busy;
-  if (!state.loading && !state.message && !state.entries.length) return null;
+  if (!state.message && !state.entries.length) return null;
   return (
     <section
       data-ui="gallery.recording-recovery"

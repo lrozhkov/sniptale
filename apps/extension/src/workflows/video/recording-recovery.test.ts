@@ -5,6 +5,7 @@ import {
   isActivePersistenceMutationTransitionPermit,
 } from '../../composition/persistence/infrastructure/mutation-barrier';
 const mocks = vi.hoisted(() => ({
+  list: vi.fn(),
   read: vi.fn(),
   lock: vi.fn(),
   get: vi.fn(),
@@ -15,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   releaseProtection: vi.fn(),
 }));
 vi.mock('../../composition/persistence/recordings/recovery', () => ({
-  listRecoverableRecordings: vi.fn(),
+  listRecoverableRecordings: mocks.list,
   deleteRecoveryRecording: vi.fn(),
   readRecoveryRecording: mocks.read,
   withRecoveryRecording: mocks.lock,
@@ -26,7 +27,11 @@ vi.mock('./recording-recovery-remux', () => ({ remuxRecoveryRecording: mocks.rem
 vi.mock('../../composition/persistence/assets', () => ({
   releaseAssetReadyProtection: mocks.releaseProtection,
 }));
-import { recoverRecording, prepareOriginalRecordingDownload } from './recording-recovery';
+import {
+  recoverRecording,
+  prepareOriginalRecordingDownload,
+  listRecoverableRecordings,
+} from './recording-recovery';
 const entry: RecoveryRecording = {
   id: 'original',
   recoveryId: 'recovered',
@@ -50,6 +55,7 @@ beforeEach(() => {
       return operation();
     },
   });
+  mocks.list.mockResolvedValue([]);
   mocks.get.mockResolvedValue(undefined);
   mocks.lock.mockImplementation(
     async (
@@ -127,4 +133,35 @@ it('hands the raw snapshot release to the download owner and never deletes sourc
   expect(mocks.releaseOriginal).not.toHaveBeenCalled();
   expect(mocks.remux).not.toHaveBeenCalled();
   expect(mocks.publish).not.toHaveBeenCalled();
+});
+
+// Discovery must distinguish a saved video from a failed publication or lost canonical bytes.
+it.each(['original', 'recovered'])(
+  'hides internally retained blocks when published %s is readable',
+  async (id) => {
+    mocks.list.mockResolvedValue([{ ...entry, published: true }]);
+    mocks.get.mockImplementation(async (candidate: string) =>
+      candidate === id ? { id, file: recovered } : undefined
+    );
+    expect(await listRecoverableRecordings()).toEqual([]);
+    expect(mocks.publish).not.toHaveBeenCalled();
+    expect(mocks.read).not.toHaveBeenCalled();
+  }
+);
+it('exposes retained blocks when both published targets are unavailable', async () => {
+  const saved = { ...entry, complete: true, published: true };
+  mocks.list.mockResolvedValue([saved]);
+  expect(await listRecoverableRecordings()).toEqual([saved]);
+  expect(mocks.get.mock.calls).toEqual([['original'], ['recovered']]);
+});
+it('keeps failed publication visible even when encoding completed', async () => {
+  const failed = { ...entry, complete: true };
+  mocks.list.mockResolvedValue([failed]);
+  expect(await listRecoverableRecordings()).toEqual([failed]);
+  expect(mocks.get).not.toHaveBeenCalled();
+});
+it('does not report a failed canonical availability check as empty recovery', async () => {
+  mocks.list.mockResolvedValue([{ ...entry, published: true }]);
+  mocks.get.mockRejectedValue(new Error('database unavailable'));
+  await expect(listRecoverableRecordings()).rejects.toThrow('database unavailable');
 });

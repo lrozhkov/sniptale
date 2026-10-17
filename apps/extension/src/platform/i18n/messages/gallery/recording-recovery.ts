@@ -1,16 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const galleryRecordingRecoveryMessages = defineMessageSource({
-  title: { ru: 'Сохранённые части записи', en: 'Saved recording data' },
+  title: { ru: 'Восстановление записи', en: 'Recording recovery' },
   description: {
-    ru: 'После сбоя можно восстановить доступное видео. Исходные данные сохранятся.',
-    en: 'After an interruption, recover the available video. Original data will be kept.',
-  },
-  interrupted: { ru: 'Прерванные записи', en: 'Interrupted recordings' },
-  copies: { ru: 'Страховочные копии', en: 'Safety copies' },
-  copiesDescription: {
-    ru: 'Копии сохранённых записей занимают дополнительное место до удаления.',
-    en: 'Copies of saved recordings use additional storage until deleted.',
+    ru: 'Запись не удалось сохранить полностью. Восстановите доступное видео или скачайте исходные данные.',
+    en: 'The recording could not be saved completely. Recover the available video or download the original data.',
   },
   recover: { ru: 'Восстановить в библиотеку', en: 'Recover to library' },
   download: { ru: 'Скачать исходные данные', en: 'Download original data' },
@@ -18,11 +12,11 @@ export const galleryRecordingRecoveryMessages = defineMessageSource({
     ru: 'Исходный файл может быть неполным и не воспроизводиться.',
     en: 'The original file may be incomplete and may not play.',
   },
-  delete: { ru: 'Удалить копию', en: 'Delete copy' },
+  delete: { ru: 'Удалить запись', en: 'Delete recording' },
   deleteTitle: { ru: 'Удалить сохранённые данные записи?', en: 'Delete saved recording data?' },
   deleteBody: {
-    ru: 'Эта копия будет удалена без возможности восстановления. Видео в библиотеке останется.',
-    en: 'This copy will be permanently deleted. Video in the library will be kept.',
+    ru: 'Исходные данные этой записи будут удалены без возможности восстановления. Видео в библиотеке останутся.',
+    en: 'The original data for this recording will be permanently deleted. Saved videos in the library will be kept.',
   },
   loadFailed: {
     ru: 'Не удалось проверить сохранённые записи. Повторите проверку.',
@@ -35,10 +29,6 @@ export const galleryRecordingRecoveryMessages = defineMessageSource({
   downloadFailed: {
     ru: 'Скачивание прервано или не подтверждено. Исходные данные сохранены. Повторите скачивание.',
     en: 'The download was interrupted or could not be confirmed. Original data is retained. Retry the download.',
-  },
-  recovered: {
-    ru: 'Восстановленное видео доступно в библиотеке. Исходные данные сохранены.',
-    en: 'Recovered video is available in the library. Original data is retained.',
   },
   busy: { ru: 'Обрабатываем сохранённые данные…', en: 'Processing saved data…' },
   loading: { ru: 'Проверяем сохранённые записи…', en: 'Checking saved recordings…' },

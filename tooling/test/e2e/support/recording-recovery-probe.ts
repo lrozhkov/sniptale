@@ -1,10 +1,7 @@
 import { createRecordingStagingCoordinator } from '../../../../apps/extension/src/composition/persistence/recordings/staging';
 import { createLiveRecordingArtifactSession } from '../../../../apps/extension/src/offscreen/recording/encoding/live-artifact-session';
 import { createRecordingArtifactSession } from '../../../../apps/extension/src/offscreen/recording/encoding/artifact-session';
-import {
-  listRecoverableRecordings,
-  readRecoveryRecording,
-} from '../../../../apps/extension/src/composition/persistence/recordings/recovery';
+import { readRecoveryRecording } from '../../../../apps/extension/src/composition/persistence/recordings/recovery';
 import {
   initDB,
   RECORDING_RECOVERY_SESSIONS_STORE,
@@ -19,8 +16,16 @@ import {
 } from '../../../../apps/extension/src/composition/persistence/recordings/recovery/storage';
 import { runWithPersistentDataErasureBarrier } from '../../../../apps/extension/src/composition/persistence/infrastructure/mutation-barrier';
 import { eraseSniptaleDatabaseForPrivacyErasure } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core';
-import { recoverRecording } from '../../../../apps/extension/src/workflows/video/recording-recovery';
-import { getRecording } from '../../../../apps/extension/src/composition/persistence/recordings';
+import {
+  recoverRecording,
+  listRecoverableRecordings,
+} from '../../../../apps/extension/src/workflows/video/recording-recovery';
+import {
+  getRecording,
+  saveRecordingsBatch,
+  deleteRecording,
+} from '../../../../apps/extension/src/composition/persistence/recordings';
+import { ASSET_ROOT_DIRECTORY_NAME } from '../../../../apps/extension/src/composition/persistence/assets/opfs-store';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from 'mediabunny';
 
 let active: {
@@ -125,6 +130,64 @@ export async function failRecording() {
   await active.coordinator.abort();
   active.stream.getTracks().forEach((track) => track.stop());
   active = null;
+}
+
+/** Complete native encoding and publish with the same staged asset and guard as recording finalization. */
+export async function saveActiveRecording() {
+  if (!active) throw new Error('No recording is active.');
+  const current = active;
+  const artifact = await current.session.stop();
+  try {
+    await saveRecordingsBatch([
+      {
+        id: current.id,
+        filename: artifact.filename,
+        mimeType: artifact.mimeType,
+        preparedAsset: artifact.asset,
+        recoverySource: artifact.recoverySource,
+      },
+    ]);
+  } finally {
+    clearInterval(current.timer);
+    current.stream.getTracks().forEach((track) => track.stop());
+    await current.coordinator.delete();
+    active = null;
+  }
+  const recording = await getRecording(current.id);
+  if (!recording || recording.file.size === 0) throw new Error('Saved recording is unavailable.');
+  return { id: current.id, size: recording.file.size };
+}
+
+/** Damage only the owned fixture's canonical file, leaving strict recovery blocks intact. */
+export async function damageCanonicalRecording(id: string, fault: 'missing' | 'truncated') {
+  const recording = await getRecording(id);
+  if (!recording) throw new Error('Canonical recording is unavailable before the fault.');
+  const root = await navigator.storage.getDirectory();
+  const assets = await root.getDirectoryHandle(ASSET_ROOT_DIRECTORY_NAME);
+  const objects = await assets.getDirectoryHandle('objects');
+  if (fault === 'missing') {
+    await objects.removeEntry(recording.assetId);
+  } else {
+    const handle = await objects.getFileHandle(recording.assetId);
+    const writer = await handle.createWritable({ keepExistingData: true });
+    await writer.truncate(Math.max(0, recording.size - 1));
+    await writer.close();
+  }
+  return (await getRecording(id)) === undefined;
+}
+
+/** Exercise admitted canonical deletion instead of manipulating recovery stores directly. */
+export async function deleteSavedRecording(id: string) {
+  await deleteRecording(id);
+  const db = await initDB();
+  return {
+    canonicalMissing: (await getRecording(id)) === undefined,
+    headerMissing: (await db.get(RECORDING_RECOVERY_SESSIONS_STORE, id)) === undefined,
+    remainingBlocks: await db.count(
+      RECORDING_RECOVERY_BLOCKS_STORE,
+      IDBKeyRange.bound([id, 0], [id, Number.MAX_SAFE_INTEGER])
+    ),
+  };
 }
 
 export async function rawDigest(id: string) {

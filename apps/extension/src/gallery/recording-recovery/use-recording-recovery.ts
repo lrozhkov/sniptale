@@ -9,7 +9,7 @@ import {
 import { downloadGalleryBlob } from '../shared/download';
 
 type RecoveryAction = 'recover' | 'download' | 'delete';
-type RecoveryMessage = 'loadFailed' | 'actionFailed' | 'downloadFailed' | 'recovered' | null;
+type RecoveryMessage = 'loadFailed' | 'actionFailed' | 'downloadFailed' | null;
 interface RecoveryState {
   entries: RecoveryRecording[];
   loading: boolean;
@@ -55,17 +55,13 @@ function completedRecoveryAction(
   entry: RecoveryRecording,
   action: RecoveryAction
 ): RecoveryState {
-  if (action === 'delete')
-    return { ...state, entries: state.entries.filter((item) => item.id !== entry.id) };
-  if (action !== 'recover') return state;
+  if (action === 'download') return state;
   return {
     ...state,
-    entries: state.entries.map((item) =>
-      item.id === entry.id && item.incarnation === entry.incarnation
-        ? { ...item, published: true }
-        : item
+    entries: state.entries.filter(
+      (item) => item.id !== entry.id || item.incarnation !== entry.incarnation
     ),
-    message: 'recovered',
+    message: null,
   };
 }
 

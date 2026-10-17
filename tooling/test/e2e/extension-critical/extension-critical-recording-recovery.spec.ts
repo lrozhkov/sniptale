@@ -197,7 +197,7 @@ for (const container of ['mp4', 'webm'] as const) {
   });
 }
 
-test('Gallery exposes interrupted video, retains it after download, and confirms deletion', async ({}, info) => {
+test('Gallery exposes only interrupted video, retains downloads, and removes completed recovery', async ({}, info) => {
   test.setTimeout(90000);
   const launched = await launchExtensionBrowser({ viewport: resolveBrowserViewport() });
   try {
@@ -238,18 +238,7 @@ test('Gallery exposes interrupted video, retains it after download, and confirms
     const downloaded = await download;
     expect(await downloaded.failure()).toBeNull();
     await expect(panel.getByText('Recovery webm.webm', { exact: true })).toBeVisible();
-    await panel
-      .getByRole('button', { name: /Recover to library|Восстановить в библиотеку/ })
-      .click();
-    await expect(panel.getByRole('status')).toContainText(
-      /Recovered video is available|Восстановленное видео доступно/
-    );
-    await expect(page.getByRole('main')).not.toContainText('Your Library is empty');
-    await panel
-      .locator('summary')
-      .filter({ hasText: /Safety copies|Страховочные копии/ })
-      .click();
-    await panel.getByRole('button', { name: /^Delete copy$|^Удалить копию$/ }).click();
+    await panel.getByRole('button', { name: /^Delete recording$|^Удалить запись$/ }).click();
     const dialog = page.getByRole('alertdialog');
     await expect(dialog).toBeVisible();
     await dialog.evaluate(async (element) => {
@@ -260,9 +249,138 @@ test('Gallery exposes interrupted video, retains it after download, and confirms
     await page.screenshot({ path: info.outputPath('delete-confirmation.png'), fullPage: false });
     await dialog.getByRole('button', { name: /^Cancel$|^Отмена$/ }).click();
     await expect(panel.getByText('Recovery webm.webm', { exact: true })).toBeVisible();
-    await panel.getByRole('button', { name: /^Delete copy$|^Удалить копию$/ }).click();
-    await dialog.getByRole('button', { name: /^Delete copy$|^Удалить копию$/ }).click();
-    await expect(panel.getByText('Recovery webm.webm', { exact: true })).toHaveCount(0);
+    await panel
+      .getByRole('button', { name: /Recover to library|Восстановить в библиотеку/ })
+      .click();
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByRole('main')).not.toContainText('Your Library is empty');
+    await page.reload();
+    await expect(
+      page.getByRole('main').getByRole('group', { name: 'Recovery webm.webm', exact: true })
+    ).toBeVisible();
+    await expect(panel).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath('completed-recovery.png'), fullPage: false });
+    await attachProbe(page, await bundleProbe());
+    await recordNativeVideo(page);
+    await page.evaluate(async () => (window as ProbeWindow).recordingRecoveryProbe.failRecording());
+    await page.reload();
+    await expect(panel).toBeVisible();
+    await panel.getByRole('button', { name: /^Delete recording$|^Удалить запись$/ }).click();
+    await dialog.getByRole('button', { name: /^Delete recording$|^Удалить запись$/ }).click();
+    await expect(panel).toHaveCount(0);
+  } finally {
+    await closeExtensionBrowser(launched, { removeUserDataDir: true });
+  }
+});
+
+async function recordNativeVideo(page: Page) {
+  const id = await page.evaluate(async () =>
+    (window as ProbeWindow).recordingRecoveryProbe.startRecording('webm', 'media-recorder')
+  );
+  await expect
+    .poll(
+      async () =>
+        (
+          await page.evaluate(
+            async (id) => (window as ProbeWindow).recordingRecoveryProbe.progress(id),
+            id
+          )
+        ).count,
+      { timeout: 20000 }
+    )
+    .toBeGreaterThanOrEqual(2);
+  return id;
+}
+
+for (const fault of ['missing', 'truncated'] as const) {
+  test(`successful recording needs no cleanup and survives a ${fault} canonical file`, async ({}, info) => {
+    test.setTimeout(90000);
+    const launched = await launchExtensionBrowser({ viewport: resolveBrowserViewport() });
+    try {
+      const page = await launched.context.newPage();
+      await page.goto(
+        `chrome-extension://${launched.extensionId}/apps/extension/src/gallery/index.html`
+      );
+      const code = await bundleProbe();
+      await attachProbe(page, code);
+      const id = await recordNativeVideo(page);
+      await page.evaluate(async () =>
+        (window as ProbeWindow).recordingRecoveryProbe.saveActiveRecording()
+      );
+      const before = await page.evaluate(
+        async (id) => (window as ProbeWindow).recordingRecoveryProbe.rawDigest(id),
+        id
+      );
+      expect(before.size).toBeGreaterThan(0);
+      expect(
+        await page.evaluate(() =>
+          (window as ProbeWindow).recordingRecoveryProbe.listRecoverableRecordings()
+        )
+      ).toEqual([]);
+      await page.reload();
+      const panel = page.locator('[data-ui="gallery.recording-recovery"]');
+      await expect(
+        page.getByRole('main').getByRole('group', { name: 'Recovery webm.webm', exact: true })
+      ).toBeVisible();
+      await expect(page.getByRole('main')).not.toContainText('Your Library is empty');
+      await expect(panel).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath('successful-recording.png'), fullPage: false });
+      await attachProbe(page, code);
+      expect(
+        await page.evaluate(
+          async (id) => (window as ProbeWindow).recordingRecoveryProbe.rawDigest(id),
+          id
+        )
+      ).toEqual(before);
+      expect(
+        await page.evaluate(
+          async ({ id, fault }) =>
+            (window as ProbeWindow).recordingRecoveryProbe.damageCanonicalRecording(id, fault),
+          { id, fault }
+        )
+      ).toBe(true);
+      await page.reload();
+      await expect(panel).toBeVisible();
+      await attachProbe(page, code);
+      const recovered = await page.evaluate(
+        async (id) => (window as ProbeWindow).recordingRecoveryProbe.restoreAndDecode(id),
+        id
+      );
+      expect(recovered.frames).toBeGreaterThan(10);
+      expect(
+        await page.evaluate(
+          async (id) => (window as ProbeWindow).recordingRecoveryProbe.rawDigest(id),
+          id
+        )
+      ).toEqual(before);
+      await page.reload();
+      await expect(panel).toHaveCount(0);
+    } finally {
+      await closeExtensionBrowser(launched, { removeUserDataDir: true });
+    }
+  });
+}
+
+test('ordinary saved recording deletion removes its internal safety bytes without extra cleanup', async () => {
+  const launched = await launchExtensionBrowser({ viewport: resolveBrowserViewport() });
+  try {
+    const page = await launched.context.newPage();
+    await page.goto(
+      `chrome-extension://${launched.extensionId}/apps/extension/src/gallery/index.html`
+    );
+    await attachProbe(page, await bundleProbe());
+    const id = await recordNativeVideo(page);
+    await page.evaluate(async () =>
+      (window as ProbeWindow).recordingRecoveryProbe.saveActiveRecording()
+    );
+    expect(
+      await page.evaluate(
+        async (id) => (window as ProbeWindow).recordingRecoveryProbe.deleteSavedRecording(id),
+        id
+      )
+    ).toEqual({ canonicalMissing: true, headerMissing: true, remainingBlocks: 0 });
+    await page.reload();
+    await expect(page.locator('[data-ui="gallery.recording-recovery"]')).toHaveCount(0);
   } finally {
     await closeExtensionBrowser(launched, { removeUserDataDir: true });
   }

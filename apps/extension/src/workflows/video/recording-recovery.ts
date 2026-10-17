@@ -1,5 +1,5 @@
 import {
-  listRecoverableRecordings,
+  listRecoverableRecordings as listStoredRecoveryRecordings,
   readRecoveryRecording,
   deleteRecoveryRecording,
   withRecoveryRecording,
@@ -12,7 +12,21 @@ import { runWithPersistenceMutationTransition } from '../../composition/persiste
 import { releaseAssetReadyProtection } from '../../composition/persistence/assets';
 
 export type { RecoveryRecording };
-export { listRecoverableRecordings, deleteRecoveryRecording };
+export { deleteRecoveryRecording };
+
+/** Show inactive sources only when publication failed or both saved targets are unavailable. */
+export async function listRecoverableRecordings(): Promise<RecoveryRecording[]> {
+  const entries = await listStoredRecoveryRecordings();
+  const interrupted: RecoveryRecording[] = [];
+  for (const entry of entries) {
+    if (
+      !entry.published ||
+      (!(await getRecording(entry.id)) && !(await getRecording(entry.recoveryId)))
+    )
+      interrupted.push(entry);
+  }
+  return interrupted;
+}
 
 /** Materializes an immutable download snapshot. The download consumer owns release. */
 export function prepareOriginalRecordingDownload(entry: RecoveryRecording) {

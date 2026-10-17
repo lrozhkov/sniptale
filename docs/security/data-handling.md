@@ -184,6 +184,8 @@ Final observation handoff uses the existing content-to-background runtime transp
 
 ## Recording recovery retention
 
+Gallery displays interrupted sources and published sources whose canonical files are unavailable. Readable saved videos keep internal protection without a separate copy or cleanup action. Existing canonical deletion controls the lifetime of their protection. Discovery only reads existing data.
+
 Recording recovery retains encoded user media in the canonical IndexedDB database. The recordings owner controls both recovery stores. Session metadata and ordered immutable blocks are authoritative user data. They are not temporary jobs, staging objects, or caches. A strict-durability transaction commits each block and its session boundary before acknowledgement. This requests a disk flush under IndexedDB semantics.
 
 The operating system and hardware must honor durability requests. Volatile encoder frames and pending in-memory blocks cannot survive process termination or power loss.
@@ -194,4 +196,4 @@ A refused canonical deletion retains its recovery copy. Complete local-data eras
 
 Recovery preserves original blocks, including any suffix outside the playable prefix. Explicit raw download exports the original bytes in order. Failed recovery or download retains the source for another attempt. Recovery does not send media to a network service. Exclude recovery data from sync, diagnostics, traces, and automatic export.
 
-Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI provides their explicit export path. A destructive migration requires complete backup coverage of recovery data first. This feature requires no new extension permissions.
+Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI exports interrupted sources. Ordinary Library download exports successfully saved videos. A destructive migration requires complete backup coverage of recovery data first. This feature requires no new extension permissions.

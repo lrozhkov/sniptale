@@ -36,11 +36,13 @@ Database admission completes before an identity lock. Code must not hold a mutat
 
 Failure stops affected producers and retains committed blocks. Finalization, publication, recovery, and download failures do not delete these blocks. Successful publication also retains the original safety copy. The original session receives its `published` flag inside the same transaction as canonical publication. Encoded output completion alone does not establish a saved Library recording.
 
+Saved blocks are internal protection for the canonical recording. Gallery displays no separate safety-copy row or cleanup action when either published target has a readable canonical file. If both targets become unavailable, Gallery exposes the retained source for recovery. Discovery does not write or delete data.
+
 Automatic expiry, Trash cleanup, and orphan cleanup cannot delete an unreferenced safety copy. Explicit discard, admitted canonical deletion, and complete local-data erasure can delete recovery data. Canonical deletion must first admit all source dependencies. Refused deletion retains the safety copy.
 
 Recovery uses a stable separate target identity and refuses replacement of an existing target. Playable-prefix recovery preserves every original block, including an incomplete suffix. Raw download retains the original bytes and order. A failed recovery leaves the source available for retry or raw download. Readers do not substitute original bytes into an unrelated canonical asset.
 
-Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI provides their explicit export path. Do not classify these stores as temporary staging or rebuildable caches. Do not admit a destructive migration of recovery data until the backup contract covers the complete recovery inventory. Verified local-data erasure deletes both stores, including the epoch header. This feature requires no extension permission changes.
+Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI exports interrupted sources. Ordinary Library download exports successfully saved videos. Do not classify these stores as temporary staging or rebuildable caches. Do not admit a destructive migration of recovery data until the backup contract covers the complete recovery inventory. Verified local-data erasure deletes both stores, including the epoch header. This feature requires no extension permission changes.
 
 ## Admission and migration
 
