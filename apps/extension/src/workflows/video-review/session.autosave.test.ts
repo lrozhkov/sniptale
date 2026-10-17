@@ -557,19 +557,13 @@ it('retains a crop after save refusal and retries one durable content change', a
   await session.dispose();
 });
 
-it('refuses a late annotation before lease transfer after its lane is locked', async () => {
-  const { session, deps, resource, args } = await annotationFixture();
-  await session.setTrackControl('annotationEffects', { locked: true });
-  deps.saveVideoWorkspaceSnapshot.mockClear();
-  await expect(session.applyAnnotationEffect(args)).rejects.toThrow('annotationEffects');
-  expect(session.ownsAnnotationResource(resource)).toBe(false);
-  expect(resource.publish).not.toHaveBeenCalled();
-  expect(resource.release).not.toHaveBeenCalled();
-  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
-  expect(session.getSnapshot()).toMatchObject({ error: null, pending: 0 });
-  await session.setTrackControl('annotationEffects', { locked: false });
+it('keeps annotation admission usable while its lane master is off', async () => {
+  const { session, resource, args } = await annotationFixture();
+  await session.setTrackControl('annotationEffects', { enabled: false });
   await session.applyAnnotationEffect(args);
+  expect(resource.publish).toHaveBeenCalledOnce();
   expect(session.getSnapshot().document.advancedContent.annotationEffects?.instances).toHaveLength(
     1
   );
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.annotationEffects).toBe(false);
 });

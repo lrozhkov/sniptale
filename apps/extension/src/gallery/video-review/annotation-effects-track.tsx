@@ -1,9 +1,5 @@
-import {
-  reviewTrackMetrics,
-  reviewTrackGestureLocked,
-  ReviewTrackCuts,
-  ReviewTrackRow,
-} from './track-row';
+import { ReviewTrackVisibilityButton } from './track-row';
+import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Sticker } from 'lucide-react';
@@ -15,7 +11,6 @@ import type {
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
 import {
-  ReviewButton,
   reviewTimeLabel,
   reviewTimelineItemTone,
   reviewTimelineResizeHandleClassName,
@@ -200,7 +195,8 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
       label={translate('gallery.videoReview.annotationEffects')}
       icon={<Sticker size={14} aria-hidden />}
       controls={
-        <ReviewButton
+        <ReviewTrackVisibilityButton
+          track={'annotationEffects'}
           label={translate('gallery.videoReview.annotationEffectsEnabled')}
           aria-pressed={props.enabled}
           disabled={props.busy}
@@ -208,7 +204,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
           onClick={() => props.onEnabled(!props.enabled)}
         >
           {props.enabled ? <Eye size={14} aria-hidden /> : <EyeOff size={14} aria-hidden />}
-        </ReviewButton>
+        </ReviewTrackVisibilityButton>
       }
     >
       <div
@@ -242,14 +238,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
           (props.beforeAction ?? ((action) => action()))(() => props.onPlace?.({ start }, node));
         }}
         onPointerDown={(event) => {
-          if (
-            !props.drawing ||
-            props.busy ||
-            event.button !== 0 ||
-            drag.current ||
-            reviewTrackGestureLocked(event.currentTarget)
-          )
-            return;
+          if (!props.drawing || props.busy || event.button !== 0 || drag.current) return;
           event.preventDefault();
           event.stopPropagation();
           const bounds = event.currentTarget.getBoundingClientRect();
@@ -419,10 +408,6 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               onPointerDown={(event) => {
                 event.stopPropagation();
                 if (props.busy || event.button !== 0 || drag.current) return;
-                if (reviewTrackGestureLocked(event.currentTarget)) {
-                  props.onSelect(instance.id);
-                  return;
-                }
                 const edge =
                   event.target instanceof Element
                     ? event.target

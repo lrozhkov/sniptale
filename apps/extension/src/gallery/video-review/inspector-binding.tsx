@@ -529,7 +529,6 @@ function ReviewScenePropertiesBinding({
       background={state.advanced.background}
       canvas={state.advanced.canvas}
       captions={state.advanced.captions}
-      captionsLocked={!!state.advanced.ui.lockedTracks?.text}
       onCaptions={state.setCaptions}
       source={source}
       onCanvas={state.setCanvas}

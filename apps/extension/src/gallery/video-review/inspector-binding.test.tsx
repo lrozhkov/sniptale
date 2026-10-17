@@ -97,7 +97,7 @@ async function checkCaptionLockAdmission(
       />
     )
   );
-  expect(sceneProbe.captionsLocked).toBe(true);
+  expect(sceneProbe.captionsLocked).toBe(false);
   await act(async () => root.render(<ReviewInspectorBinding {...sceneProps} />));
   expect(sceneProbe.captionsLocked).toBe(false);
 }

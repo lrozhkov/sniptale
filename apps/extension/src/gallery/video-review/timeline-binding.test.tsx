@@ -51,7 +51,9 @@ vi.mock('./timeline', () => ({
       {props.tools}
       {props.annotationEffectsTrack}
       {props.zoomTrack}
-      {props.audioTrack}
+      {Object.entries(props.audioTracks ?? {}).map(([key, lane]) => (
+        <div key={key}>{lane}</div>
+      ))}
     </>
   ),
 }));

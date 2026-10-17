@@ -144,7 +144,6 @@ export function useReviewAdvanced(session: Session) {
     ...reviewAdvancedUiCommands(stage, () => currentRef.current, contentState.commands),
     setTrackVisibility: (track: Exclude<QuickEditTrack, 'source'> | 'audio', enabled: boolean) =>
       controls.change(track, { enabled }),
-    setTrackLocked: (track: QuickEditTrack, locked: boolean) => controls.change(track, { locked }),
     flush: async () => {
       await controls.drain();
       contentState.endTyping();

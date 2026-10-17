@@ -1,9 +1,5 @@
-import {
-  reviewTrackMetrics,
-  reviewTrackGestureLocked,
-  ReviewTrackRow,
-  ReviewTrackCuts,
-} from './track-row';
+import { ReviewTrackVisibilityButton } from './track-row';
+import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import {
   packQuickEditFocusRows,
@@ -28,7 +24,7 @@ import {
   getSnapCandidates,
   snapTimelineTime,
 } from '../../features/video/review/snap';
-import { reviewTrackStatusButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
+import { reviewTrackStatusButtonClassName, reviewTimeLabel } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
 import { useReviewDragEscape } from './timeline-drag';
 
@@ -248,14 +244,15 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       controls={
         <>
           {props.onToggleEnabled ? (
-            <ReviewButton
+            <ReviewTrackVisibilityButton
+              track={'zoom'}
               label={translate('gallery.videoReview.zoomEnabled')}
               aria-pressed={props.enabled !== false}
               onClick={props.onToggleEnabled}
               className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
             >
               {props.enabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
-            </ReviewButton>
+            </ReviewTrackVisibilityButton>
           ) : null}
         </>
       }
@@ -539,10 +536,6 @@ function ReviewZoomRegionBlock(
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
-    if (reviewTrackGestureLocked(event.currentTarget)) {
-      props.onSelect(region.id);
-      return;
-    }
     const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(region.id));
     const target = event.target;
     const edge =

@@ -1,9 +1,5 @@
-import {
-  reviewTrackMetrics,
-  reviewTrackGestureLocked,
-  ReviewTrackRow,
-  ReviewTrackCuts,
-} from './track-row';
+import { ReviewTrackVisibilityButton } from './track-row';
+import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
@@ -113,6 +109,7 @@ type ReviewAudioClipLaneProps = ReviewAudioTimelineProps & {
 };
 
 type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
+  lane?: 'originalAudio' | 'voiceover' | 'music' | undefined;
   onOpenSpeech?: (() => void) | undefined;
   originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
   selectedEditId?: string | undefined;
@@ -130,6 +127,7 @@ type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
 };
 
 type ReviewClipLanesProps = ReviewAudioTimelineProps & {
+  lane?: 'voiceover' | 'music' | undefined;
   audio: QuickEditAudioState;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
@@ -398,10 +396,6 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
     onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0 || props.busy) return;
       event.stopPropagation();
-      if (reviewTrackGestureLocked(event.currentTarget)) {
-        props.onSelect(clip.id);
-        return;
-      }
       const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(clip.id));
       const edge =
         event.target instanceof Element
@@ -531,33 +525,34 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           picker.current = null;
         }}
       />
-      {props.hasOriginalAudio !== false ? (
-        <ReviewOriginalAudioTrack
-          compact={props.compact}
-          beforeAction={props.beforeAction}
-          onOpenSpeech={props.onOpenSpeech}
-          duration={props.duration}
-          editor={props.originalEditor}
-          selectedEditId={props.selectedEditId}
-          edits={props.edits}
-          onRange={props.onOriginalRange}
-          onSelectSpeed={props.onSelectSpeed}
-          waveform={props.waveforms?.get('original')}
-          original={props.audio.original}
-          projection={props.projection}
-          busy={props.busy}
-          onOriginal={props.onOriginal}
-        />
-      ) : (
-        <ReviewTrackRow
-          placeholder
-          track="originalAudio"
-          label={translate('gallery.videoReview.audioOriginal')}
-        >
-          <div style={{ height: reviewTrackMetrics(props.compact).step }} />
-        </ReviewTrackRow>
-      )}
-      {props.showAddedAudio !== false ? (
+      {(!props.lane || props.lane === 'originalAudio') &&
+        (props.hasOriginalAudio !== false ? (
+          <ReviewOriginalAudioTrack
+            compact={props.compact}
+            beforeAction={props.beforeAction}
+            onOpenSpeech={props.onOpenSpeech}
+            duration={props.duration}
+            editor={props.originalEditor}
+            selectedEditId={props.selectedEditId}
+            edits={props.edits}
+            onRange={props.onOriginalRange}
+            onSelectSpeed={props.onSelectSpeed}
+            waveform={props.waveforms?.get('original')}
+            original={props.audio.original}
+            projection={props.projection}
+            busy={props.busy}
+            onOriginal={props.onOriginal}
+          />
+        ) : (
+          <ReviewTrackRow
+            placeholder
+            track="originalAudio"
+            label={translate('gallery.videoReview.audioOriginal')}
+          >
+            <div style={{ height: reviewTrackMetrics(props.compact).step }} />
+          </ReviewTrackRow>
+        ))}
+      {props.lane !== 'originalAudio' && props.showAddedAudio !== false ? (
         <ReviewClipLanes
           compact={props.compact}
           beforeAction={props.beforeAction}
@@ -578,6 +573,7 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           onOpenMusic={props.onOpenMusic}
           pickerLane={picker}
           pickerInput={input}
+          lane={props.lane}
         />
       ) : null}
     </div>
@@ -587,100 +583,105 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
 function ReviewClipLanes(props: ReviewClipLanesProps) {
   return (
     <>
-      {LANES.map((lane) => (
-        <ReviewAudioClipLane
-          compact={props.compact}
-          key={lane.key}
-          lane={lane.key}
-          label={translate(lane.label)}
-          clips={props.audio[lane.key]}
-          voiceoverSegments={lane.key === 'voiceover' ? props.audio.voiceoverSegments : undefined}
-          assets={props.assets}
-          waveforms={props.waveforms}
-          projection={
-            lane.key === 'voiceover' && props.audio.voiceoverSegments ? undefined : props.projection
-          }
-          cutsProjection={props.projection}
-          snapTimes={
-            lane.key === 'voiceover' && props.audio.voiceoverSegments
-              ? props.snapTimes?.map((time) => props.projection?.source(time) ?? time)
-              : props.snapTimes
-          }
-          duration={
-            lane.key === 'voiceover' && props.audio.voiceoverSegments
-              ? props.audio.voiceoverSegments.at(-1)!.sourceEnd
-              : props.duration
-          }
-          beforeAction={props.beforeAction}
-          selectedId={props.selectedId}
-          busy={props.busy}
-          onSelect={props.onSelect}
-          onMoveClip={props.onMoveClip}
-          onTrimClip={props.onTrimClip}
-          onDropFile={(file: File, timelineTime: number) =>
-            props.onImportFile(file, lane.key, timelineTime)
-          }
-          trailing={
-            <>
-              {lane.key === 'voiceover' && (
+      {LANES.map((lane) =>
+        props.lane && props.lane !== lane.key ? null : (
+          <ReviewAudioClipLane
+            compact={props.compact}
+            key={lane.key}
+            lane={lane.key}
+            label={translate(lane.label)}
+            clips={props.audio[lane.key]}
+            voiceoverSegments={lane.key === 'voiceover' ? props.audio.voiceoverSegments : undefined}
+            assets={props.assets}
+            waveforms={props.waveforms}
+            projection={
+              lane.key === 'voiceover' && props.audio.voiceoverSegments
+                ? undefined
+                : props.projection
+            }
+            cutsProjection={props.projection}
+            snapTimes={
+              lane.key === 'voiceover' && props.audio.voiceoverSegments
+                ? props.snapTimes?.map((time) => props.projection?.source(time) ?? time)
+                : props.snapTimes
+            }
+            duration={
+              lane.key === 'voiceover' && props.audio.voiceoverSegments
+                ? props.audio.voiceoverSegments.at(-1)!.sourceEnd
+                : props.duration
+            }
+            beforeAction={props.beforeAction}
+            selectedId={props.selectedId}
+            busy={props.busy}
+            onSelect={props.onSelect}
+            onMoveClip={props.onMoveClip}
+            onTrimClip={props.onTrimClip}
+            onDropFile={(file: File, timelineTime: number) =>
+              props.onImportFile(file, lane.key, timelineTime)
+            }
+            trailing={
+              <>
+                {lane.key === 'voiceover' && (
+                  <ReviewButton
+                    label={translate('gallery.videoReview.recordVoiceover')}
+                    disabled={props.busy}
+                    className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+                    onClick={props.onRecordVoiceover}
+                  >
+                    <Mic size={14} />
+                  </ReviewButton>
+                )}
                 <ReviewButton
-                  label={translate('gallery.videoReview.recordVoiceover')}
+                  label={translate(
+                    lane.key === 'music' && props.onOpenMusic
+                      ? 'gallery.videoReview.musicLibrary'
+                      : 'gallery.videoReview.audioImport'
+                  )}
                   disabled={props.busy}
                   className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                  onClick={props.onRecordVoiceover}
+                  onClick={(event) => {
+                    if (props.onOpenMusic) {
+                      const trigger = event.currentTarget;
+                      (props.beforeAction ?? ((action) => action()))(() =>
+                        props.onOpenMusic?.(trigger, lane.key)
+                      );
+                      return;
+                    }
+                    props.pickerLane.current = lane.key;
+                    props.pickerInput.current?.click();
+                  }}
                 >
-                  <Mic size={14} />
+                  <Plus size={14} />
                 </ReviewButton>
-              )}
-              <ReviewButton
-                label={translate(
-                  lane.key === 'music' && props.onOpenMusic
-                    ? 'gallery.videoReview.musicLibrary'
-                    : 'gallery.videoReview.audioImport'
-                )}
-                disabled={props.busy}
-                className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                onClick={(event) => {
-                  if (props.onOpenMusic) {
-                    const trigger = event.currentTarget;
-                    (props.beforeAction ?? ((action) => action()))(() =>
-                      props.onOpenMusic?.(trigger, lane.key)
-                    );
-                    return;
-                  }
-                  props.pickerLane.current = lane.key;
-                  props.pickerInput.current?.click();
-                }}
-              >
-                <Plus size={14} />
-              </ReviewButton>
-              {props.onMuteLane ? (
-                <ReviewButton
-                  label={translate('gallery.videoReview.audioEnabled')}
-                  aria-pressed={
-                    props.audio[lane.key].length > 0 &&
-                    props.audio[lane.key].some((clip) => !clip.muted)
-                  }
-                  disabled={props.busy || !props.audio[lane.key].length}
-                  className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                  onClick={() =>
-                    (props.beforeAction ?? ((action) => action()))(() =>
-                      props.onMuteLane?.(lane.key)
-                    )
-                  }
-                >
-                  {props.audio[lane.key].length > 0 &&
-                  props.audio[lane.key].every((clip) => clip.muted) ? (
-                    <VolumeX size={14} />
-                  ) : (
-                    <Volume2 size={14} />
-                  )}
-                </ReviewButton>
-              ) : null}
-            </>
-          }
-        />
-      ))}
+                {props.onMuteLane ? (
+                  <ReviewTrackVisibilityButton
+                    track={lane.key}
+                    label={translate('gallery.videoReview.audioEnabled')}
+                    aria-pressed={
+                      props.audio[lane.key].length > 0 &&
+                      props.audio[lane.key].some((clip) => !clip.muted)
+                    }
+                    disabled={props.busy || !props.audio[lane.key].length}
+                    className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+                    onClick={() =>
+                      (props.beforeAction ?? ((action) => action()))(() =>
+                        props.onMuteLane?.(lane.key)
+                      )
+                    }
+                  >
+                    {props.audio[lane.key].length > 0 &&
+                    props.audio[lane.key].every((clip) => clip.muted) ? (
+                      <VolumeX size={14} />
+                    ) : (
+                      <Volume2 size={14} />
+                    )}
+                  </ReviewTrackVisibilityButton>
+                ) : null}
+              </>
+            }
+          />
+        )
+      )}
     </>
   );
 }

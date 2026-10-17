@@ -1,12 +1,13 @@
 import { createPortal } from 'react-dom';
 import { useReviewTrackHeader } from './timeline-panes';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode, type ComponentProps } from 'react';
 import type { QuickEditTrack, QuickEditUiState } from '../../features/video/review/advanced/types';
 import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
-import { ChevronsDownUp, ChevronsUpDown, Lock, Unlock } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, GripVertical } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { ReviewButton, reviewCompactTrackButtonClassName } from './controls';
+import type { useReviewTrackOrder } from './track-order';
 import './track-row.css';
 
 /** Interval lanes share symmetric insets and row pitch in each density. */
@@ -21,16 +22,24 @@ type ReviewTrackControlsState = {
   busy: boolean;
   unavailable: Partial<Record<QuickEditTrack, boolean>>;
   setEnabled(track: Exclude<QuickEditTrack, 'source'>, enabled: boolean): void;
-  setLocked(track: QuickEditTrack, locked: boolean): void;
+  order?: ReturnType<typeof useReviewTrackOrder>;
 };
 const TrackControlsContext = createContext<ReviewTrackControlsState | null>(null);
 
 /** Shares lane chrome without owning persisted state or edit admission. */
 export const ReviewTrackControlsProvider = TrackControlsContext.Provider;
 
-/** UI affordance only; session admission remains authoritative for every mutation. */
-export function reviewTrackGestureLocked(node: Element) {
-  return node.closest('[data-review-track-locked="true"]') !== null;
+/** Visibility actions cannot bypass an off lane master; independent actions remain usable. */
+export function ReviewTrackVisibilityButton({
+  track,
+  ...props
+}: ComponentProps<typeof ReviewButton> & {
+  track: QuickEditTrack;
+}) {
+  const controls = useContext(TrackControlsContext);
+  const unavailable =
+    controls && (!reviewTrackEnabled(controls.ui, track) || controls.unavailable[track]);
+  return <ReviewButton {...props} disabled={props.disabled || !!unavailable} />;
 }
 
 type TrackRowProps = {
@@ -54,7 +63,6 @@ export function ReviewTrackRow(props: TrackRowProps) {
     !!(track && controls && reviewTrackEnabled(controls.ui, track)) &&
     !unavailable &&
     !props.placeholder;
-  const locked = !!(track && controls?.ui.lockedTracks?.[track]);
   const muted = !!props.muted || !!(track && controls && !enabled);
   const visible =
     !(props.placeholder && !controls?.configuring) &&
@@ -66,7 +74,6 @@ export function ReviewTrackRow(props: TrackRowProps) {
       row={{ ...props, muted }}
       controls={controls}
       enabled={enabled}
-      locked={locked}
       unavailable={unavailable}
     />
   );
@@ -74,7 +81,6 @@ export function ReviewTrackRow(props: TrackRowProps) {
     <div
       ref={placement.body}
       data-review-track={track}
-      data-review-track-locked={locked}
       data-review-track-muted={muted ? 'true' : 'false'}
       className={[
         placement.header
@@ -96,13 +102,11 @@ function ReviewTrackHeader({
   row: props,
   controls,
   enabled,
-  locked,
   unavailable,
 }: {
   row: Pick<TrackRowProps, 'track' | 'muted' | 'label' | 'icon' | 'controls' | 'ruler'>;
   controls: ReviewTrackControlsState | null;
   enabled: boolean;
-  locked: boolean;
   unavailable: boolean;
 }) {
   const track = props.track;
@@ -115,16 +119,28 @@ function ReviewTrackHeader({
           border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] px-2"
       onPointerDown={(event) => event.stopPropagation()}
     >
-      {track && track !== 'source' && controls?.configuring ? (
+      {track && controls?.configuring && controls.order ? (
+        <ReviewButton
+          label={`${translate('gallery.videoReview.trackReorder')}: ${props.label}`}
+          disabled={controls.busy}
+          className={`${reviewCompactTrackButtonClassName} review-track-reorder !h-6 !min-h-6 !w-5 !px-0`}
+          {...controls.order.interaction(track)}
+        >
+          <GripVertical size={12} aria-hidden />
+        </ReviewButton>
+      ) : null}
+      {track && controls?.configuring ? (
         <ProductGlassSwitch
-          className="sniptale-compact-switch shrink-0"
+          className="sniptale-compact-switch review-track-switch shrink-0"
           role="switch"
           aria-checked={enabled}
           on={enabled}
-          disabled={unavailable || controls.busy}
+          disabled={track === 'source' || unavailable || controls.busy}
           aria-label={`${translate('gallery.videoReview.trackEnabled')}: ${props.label}`}
           title={unavailable ? translate('gallery.videoReview.trackUnavailable') : undefined}
-          onClick={() => controls.setEnabled(track, !enabled)}
+          onClick={() => {
+            if (track !== 'source') controls.setEnabled(track, !enabled);
+          }}
         />
       ) : null}
       {props.icon}
@@ -137,19 +153,6 @@ function ReviewTrackHeader({
           </span>
           <div data-track-controls className="flex shrink-0 items-center">
             {props.controls}
-            {track && controls ? (
-              <ReviewButton
-                label={`${translate(
-                  locked ? 'gallery.videoReview.trackUnlock' : 'gallery.videoReview.trackLock'
-                )}: ${props.label}`}
-                aria-pressed={locked}
-                disabled={controls.busy || unavailable}
-                className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
-                onClick={() => controls.setLocked(track, !locked)}
-              >
-                {locked ? <Lock size={14} aria-hidden /> : <Unlock size={14} aria-hidden />}
-              </ReviewButton>
-            ) : null}
           </div>
         </>
       ) : null}

@@ -181,3 +181,135 @@ for (const size of [
       }
     });
   }
+
+for (const size of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+])
+  for (const theme of ['light', 'dark'] as const) {
+    test(`native track settings and reorder ${size.width} ${theme}`, async ({}, info) => {
+      test.setTimeout(90_000);
+      const launched = await launchExtensionBrowser({ viewport: size });
+      const page = await launched.context.newPage();
+      page.setDefaultTimeout(10_000);
+      try {
+        const review = await openReview(page, launched.extensionId, theme);
+        await review.locator('[data-ui="gallery.videoReview.resizeTimeline"]').press('End');
+        await review
+          .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
+          .click();
+        const list = review.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+        const headers = list.locator('[data-review-header-track]');
+        const order = () =>
+          headers.evaluateAll((nodes) =>
+            nodes.map((node) => node.getAttribute('data-review-header-track'))
+          );
+        const expected = [
+          'actions',
+          'source',
+          'webcam',
+          'zoom',
+          'originalAudio',
+          'annotationEffects',
+          'text',
+          'voiceover',
+          'music',
+        ];
+        await expect.poll(order).toEqual(expected);
+        const row = (track: string) => list.locator(`[data-review-header-track="${track}"]`);
+        const source = row('source').getByRole('switch');
+        await expect(source).toBeDisabled();
+        await expect(source).toHaveAttribute('aria-checked', 'true');
+        await expect(review.locator('.lucide-lock,.lucide-unlock')).toHaveCount(0);
+        for (const toggle of await headers.getByRole('switch').all()) {
+          const geometry = await toggle.evaluate((node) => {
+            const box = node.getBoundingClientRect();
+            const thumb = node
+              .querySelector('.sniptale-glass-switch-thumb')!
+              .getBoundingClientRect();
+            return {
+              width: box.width,
+              height: box.height,
+              thumb: thumb.width,
+              center: Math.abs(box.y + box.height / 2 - thumb.y - thumb.height / 2),
+            };
+          });
+          expect(geometry.width).toBeLessThanOrEqual(28);
+          expect(geometry.height).toBe(24);
+          expect(geometry.thumb).toBe(12);
+          expect(geometry.center).toBeLessThanOrEqual(0.5);
+        }
+        for (const track of expected) {
+          const handle = row(track).locator('.review-track-reorder');
+          await expect(handle).toBeEnabled();
+          const handleBox = (await handle.boundingBox())!;
+          const switchBox = (await row(track).getByRole('switch').boundingBox())!;
+          expect(handleBox.x + handleBox.width).toBeLessThanOrEqual(switchBox.x);
+        }
+        const sourceHandle = row('source').locator('.review-track-reorder');
+        await sourceHandle.press('ArrowDown');
+        await expect.poll(order).toEqual(['actions', 'webcam', 'source', ...expected.slice(3)]);
+        await sourceHandle.press('ArrowUp');
+        await expect.poll(order).toEqual(expected);
+        await sourceHandle.scrollIntoViewIfNeeded();
+        const start = (await sourceHandle.boundingBox())!;
+        const target = (await row('actions').boundingBox())!;
+        const drag = async () => {
+          await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(start.x + start.width / 2, target.y + target.height / 2, {
+            steps: 4,
+          });
+        };
+        await drag();
+        await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
+        await page.keyboard.press('Escape');
+        await page.mouse.up();
+        await expect.poll(order).toEqual(expected);
+        await drag();
+        await page.mouse.up();
+        await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
+        const bodies = review.locator('[data-review-track]');
+        await expect
+          .poll(() =>
+            bodies.evaluateAll((nodes) =>
+              nodes.map((node) => node.getAttribute('data-review-track'))
+            )
+          )
+          .toEqual(['source', 'actions', ...expected.slice(2)]);
+        const zoom = row('zoom');
+        await zoom.getByRole('switch').click();
+        await expect(zoom.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+        await expect(
+          zoom.getByRole('button', { name: label('gallery.videoReview.zoomEnabled'), exact: true })
+        ).toBeDisabled();
+        const zoomHandle = zoom.locator('.review-track-reorder');
+        await expect(zoomHandle).toBeEnabled();
+        const offStart = (await zoomHandle.boundingBox())!;
+        const offTarget = (await row('webcam').boundingBox())!;
+        await page.mouse.move(offStart.x + offStart.width / 2, offStart.y + offStart.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(offStart.x + offStart.width / 2, offTarget.y + offTarget.height / 2, {
+          steps: 4,
+        });
+        await page.mouse.up();
+        await expect
+          .poll(order)
+          .toEqual(['source', 'actions', 'zoom', 'webcam', ...expected.slice(4)]);
+        await expect(zoom.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+        await zoomHandle.press('ArrowDown');
+        await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
+        await zoom.getByRole('switch').click();
+        await expect(
+          zoom.getByRole('button', { name: label('gallery.videoReview.zoomEnabled'), exact: true })
+        ).toBeEnabled();
+        await sourceHandle.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: info.outputPath('compact-track-settings-reordered.png'),
+          fullPage: false,
+        });
+      } finally {
+        await closeExtensionBrowser(launched);
+      }
+    });
+  }

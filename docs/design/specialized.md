@@ -47,3 +47,5 @@ A property editor can accept expressions, keywords, and units. Keep complete tex
 ## Product references
 
 Preserve existing crop, timeline, media, and inspector owners rather than copying the probes into product state. The complete color/paint selector remains authoritative in apps/extension/src/ui/color-selector/index.tsx and its existing shared packages. Read about the sample color transaction in [Layers](layers.md). Review [Coverage](coverage.md) before using these examples as a complete screen implementation reference.
+
+Timeline lane settings use mini switches beside mini actions. Keep an enabled, unavailable source switch in the same column. A disabled lane master disables its visibility action, but not independent import or recording actions. Lane reordering changes view order only. Preserve composition, authored timing, media, and history. Move label and body together. Escape or cancellation restores the previous order.

@@ -108,3 +108,43 @@
     var(--sniptale-color-surface-panel)
   );
 }
+
+/* Lane switches share mini-action pitch, independent from inspector parameter switches. */
+.sniptale-compact-workspace [data-ui='gallery.videoReview.trackHeader'] button.review-track-switch {
+  width: 28px;
+  height: 24px;
+  min-height: 24px;
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.trackHeader']
+  button.review-track-switch::before {
+  inset-inline: 8px;
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.trackHeader']
+  button.review-track-switch
+  .sniptale-glass-switch-thumb {
+  top: calc(50% - 6px);
+  inset-inline-start: 2px;
+  width: 12px;
+  height: 12px;
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.trackHeader']
+  button.review-track-switch.sniptale-glass-switch--on
+  .sniptale-glass-switch-thumb {
+  transform: translateX(12px);
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.trackHeader']
+  button.review-track-switch:enabled:hover
+  .sniptale-glass-switch-thumb {
+  border-color: var(--sniptale-color-text-primary);
+}
+.review-track-reorder {
+  touch-action: none;
+  cursor: grab;
+}
+.review-track-reorder:active {
+  cursor: grabbing;
+}

@@ -57,6 +57,7 @@ export function ReviewZoomLane(props: {
 
 /** Audio lane on the result-time scale with bounded clip mutations. */
 export function ReviewAudioLane(props: {
+  lane?: 'originalAudio' | 'voiceover' | 'music';
   compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   edits: readonly ReviewEdit[];
@@ -79,6 +80,7 @@ export function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      lane={props.lane}
       compact={props.compact}
       beforeAction={props.beforeAction}
       onOpenSpeech={props.onOpenSpeech}

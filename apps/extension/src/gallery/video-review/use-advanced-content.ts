@@ -1,4 +1,3 @@
-import { ReviewTrackLockedError } from '../../features/video/review/advanced/track-controls';
 import { authoredCursorFocusPath } from '../../features/video/project/cursor-focus-path/authoring';
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
@@ -111,12 +110,6 @@ export function useReviewAdvancedContent(
       const base = previous?.value ?? session.getSnapshot().document.advancedContent;
       const value = mutate(base);
       if (JSON.stringify(value) === JSON.stringify(base)) return;
-      try {
-        session.assertContentEditable(base, value);
-      } catch (error) {
-        if (error instanceof ReviewTrackLockedError) return;
-        throw error;
-      }
       if (!target) action.current = null;
       else if (!action.current || action.current.target.fragmentId !== target.fragmentId)
         action.current = { id: crypto.randomUUID(), target, continuation: false };

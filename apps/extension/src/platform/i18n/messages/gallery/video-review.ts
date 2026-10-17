@@ -17,6 +17,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   ...galleryVideoReviewTimelineMessages,
   trackSettings: { ru: 'Настройка дорожек', en: 'Track settings' },
   trackEnabled: { ru: 'Включено', en: 'Enabled' },
+  trackReorder: { ru: 'Порядок дорожки (↑/↓)', en: 'Track order (↑/↓)' },
   trackLock: { ru: 'Заблокировать', en: 'Lock' },
   trackUnlock: { ru: 'Разблокировать', en: 'Unlock' },
   trackUnavailable: { ru: 'Исходный поток отсутствует', en: 'Source stream is unavailable' },

@@ -212,7 +212,9 @@ it('previews the boundary that basic cut drawing will select', () => {
 });
 
 it('keeps the seek cursor during plane capture from an audio lane', () => {
-  const { host } = renderTimeline({ audioTrack: <div data-ui="gallery.videoReview.audioLane" /> });
+  const { host } = renderTimeline({
+    audioTracks: { originalAudio: <div data-ui="gallery.videoReview.audioLane" /> },
+  });
   const plane = planeWithMetrics(host);
   const audio = host.querySelector('[data-ui="gallery.videoReview.audioLane"]')!;
   act(() => audio.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100 })));

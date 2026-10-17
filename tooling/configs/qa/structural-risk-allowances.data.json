@@ -50,10 +50,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline.tsx",
       "symbol": "ReviewTimeline",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The existing timeline composition restores its keyboard target when a committed inert row loses native focus. It retains the same pane, gesture and navigation owner. It adds no state, effect, persistence or resource owner. Cohesion remains 0.80. Main and an independent reader inspected the exact transition and diff. Fresh complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: The existing timeline receiver maps keyed semantic lane nodes in one view-only order. Ruler, playhead, selection, scrolling and projection stay in their established owners. The178-line JSX body has8 statements, no effect/state/resource authority and score1 delta0. A forwarding-only JSX split would distribute the same visual receiver. Main inspected the exact changed body. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-16",
-      "astHash": "72e933d453ec1778466dfeebfc41e2d6913a9067ca2bc613a1543f788a5dd9b6",
+      "reviewDate": "2026-10-17",
+      "astHash": "37aa6bed5900c300f282fa31ce8686b4bd8d830c9eed3ba6ec84aa17017e0d5c",
       "signatureHash": "99bc8f53332cdb91cb2856b5f298ed8492021b86e698d8380c534924bc6d9bdc"
     },
     {
@@ -94,11 +94,11 @@
       "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:platform",
-      "reason": "tool-noise: One static RU/EN backup failure message extends the existing typed catalog. The file has no effects, state authorities or runtime branches; score 2, delta 0, cohesion 1. Main inspected this exact data-only change. Fresh independent architecture review must validate the classification.",
+      "reason": "tool-noise: One typed RU/EN track-order label extends the existing static message catalog. The catalog has no runtime authority, effects, or state; score2 delta0 and cohesion1. Splitting a label would fragment its existing semantic catalog. Main inspected the exact changed body. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess new behavior, state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-15",
-      "astHash": "7ee7b27da682abbf08d881a26dcc0e93ac5f11b17514d29990020e6fda9ec6d1",
-      "signatureHash": "8eadb2acc969b6433bcd1d7c34b623e67e962a2a739520d7c469a7dc86dd7989"
+      "reviewDate": "2026-10-17",
+      "astHash": "5488899ed9193c7f18dec85cf063665df86504ab590b41e8cb2b26357aa8d894",
+      "signatureHash": "401666a2c5baa7b93761dc388924bab5516dc4c098271f424f4811eccf1344ef"
     },
     {
       "rule": "structural-function-risk",
@@ -127,10 +127,10 @@
       "file": "apps/extension/src/gallery/video-review/review.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The candidate adapts choice and switch assertions in the existing editor integration fixture. Mocks, cleanup, receivers and fixture lifecycle remain unchanged. Cohesion remains 1. Splitting these cases would duplicate the same mounted receiver. Main and an independent reader inspected the exact diff. Fresh complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: The existing mounted editor fixture now checks aligned source switches, absence of lock commands, and retained Notes. The same fixture, mocks, cleanup and state receivers remain. File score4 delta0 and cohesion1 do not establish a new independent lifecycle. Main inspected the exact changed body. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess a new fixture lifecycle, independent authority or mixed recovery. Remove when the analyzer recognizes cohesive tests sharing one integration fixture. Independent architecture review must inspect the classification.",
-      "reviewDate": "2026-10-16",
-      "astHash": "575984e38b68a0383f97058589208b8ff668e1e34f602fc53cddd886410e9d41",
+      "reviewDate": "2026-10-17",
+      "astHash": "cbb2ec265de92e6f1ddc15ca551302bede4f9bc0b1ca22e0337ba1724291a41f",
       "signatureHash": "a411df1f8a4dd05950d634461348210539321a3a0a91a54138e7774cc24654d9"
     },
     {
@@ -370,9 +370,9 @@
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification.",
-      "astHash": "7834c4fc4a94d4cb9f8eba4af57c7a6c48280a5402ab97ba68c379358ef37e00",
-      "signatureHash": "418e85bf5dc567bc2a34e4a84bd51169a0d66dc2fffd55e97beb75697efecb0c",
-      "reason": "tool-noise: The existing gallery timeline binding derives disposable loop-edge candidates and forwards them to its existing source/result lane receivers. It adds no state, effect, resource, persistence writer, or recovery authority. File score 6 and binding score 5 have delta 0; extracting a forwarding-only JSX adapter would distribute the same gesture wiring. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "597c241cbf9d6f3a96110a64aa868c220fcfadeff5a5f73c4d5ba5999ac40f75",
+      "signatureHash": "7346c30b64985a66d19928dbbe396ca17d7c0360e4059bc036d30fa30f20adc9",
+      "reason": "tool-noise: One disposable track-order hook joins the existing timeline binding. The same session owns enabled commands and media; keyed lane nodes expose existing source/result projections. The binding cancels transient gestures before a master transition. No new writer, media resource, or recovery authority is introduced. File score6 delta0; state count decreases from20 to19. Main inspected the exact changed body. Fresh complete-candidate architecture review must validate this classification.",
       "reviewDate": "2026-10-17"
     },
     {
@@ -803,6 +803,17 @@
       "reviewDate": "2026-10-17",
       "astHash": "4fd4766248b4ac310d0be4e3b27da4feba97bbeb939d83e08f85a93698e56707",
       "signatureHash": "8a3a42de9d9ab9b71b07626524e2944f97b9415573f6fb606068ec598b89d156"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/audio-track.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "astHash": "6c4289bb9378a3f83ace25af93da09adbe8069adf1a691596e88fc6df27f05ca",
+      "signatureHash": "4747810fe17d07a734b248bff725a108c59d91293a3805069e38e36b42579288",
+      "reviewDate": "2026-10-17",
+      "reason": "tool-noise: This existing audio timeline owner adds a lane selector so the same original/voiceover/music views can occupy keyed visual slots. Existing clip gestures, source/result projection, file-picker refs and injected callbacks retain their owners. No media controller, resource, durable writer, or recovery lifecycle is added. File score7 delta0, cohesion0.90 and unchanged state/effect counts do not establish mixed authority. Main inspected the exact body. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture, media controller, writer, resource or recovery authority. Remove when the analyzer models this cohesive timeline receiver. Fresh independent architecture review must inspect this classification."
     }
   ]
 }

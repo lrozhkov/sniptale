@@ -229,7 +229,9 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
     expect(fixture.snapshot.draft).toBeNull();
-    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');
+    await act(async () =>
+      vi.waitFor(() => expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation'))
+    );
     expect(host.textContent).toContain('Keep this text');
   } finally {
     await fixture.cleanup();
@@ -856,7 +858,7 @@ it.each(['basic', 'advanced'] as const)(
   }
 );
 
-it('lists every lane in settings, retains unavailable streams off, and preserves Notes under source lock', async () => {
+it('lists every lane with aligned settings, retains unavailable streams off, and preserves Notes', async () => {
   const fixture = createEditorFixture(integration);
   try {
     await act(async () =>
@@ -882,19 +884,18 @@ it('lists every lane in settings, retains unavailable streams off, and preserves
     const webcam = row('webcam')!.querySelector<HTMLButtonElement>('[role="switch"]')!;
     expect(webcam.disabled).toBe(true);
     expect(webcam.getAttribute('aria-checked')).toBe('false');
-    expect(row('source')!.querySelector('[role="switch"]')).toBeNull();
-    const sourceLock = row('source')!.querySelector<HTMLButtonElement>(
-      '[aria-label^="gallery.videoReview.trackLock:"]'
-    )!;
-    await act(async () => sourceLock.click());
-    expect(fixture.snapshot.workspace.advanced.ui.lockedTracks?.source).toBe(true);
+    const source = row('source')!.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(source.disabled).toBe(true);
+    expect(source.getAttribute('aria-checked')).toBe('true');
+    expect(fixture.host.querySelector('[aria-label^="gallery.videoReview.trackLock:"]')).toBeNull();
     await fixture.click('trackSettings');
     expect(row('webcam')).toBeNull();
     await fixture.click('addComment');
-    await fixture.fill('Note on a locked source');
+    await fixture.fill('Note after track configuration');
     await fixture.click('save');
-    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');
-    expect(fixture.snapshot.workspace.advanced.ui.lockedTracks?.source).toBe(true);
+    await act(async () =>
+      vi.waitFor(() => expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation'))
+    );
   } finally {
     await fixture.cleanup();
   }

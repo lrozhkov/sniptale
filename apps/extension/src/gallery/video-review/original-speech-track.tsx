@@ -1,10 +1,5 @@
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
-import {
-  reviewTrackMetrics,
-  reviewTrackGestureLocked,
-  ReviewTrackRow,
-  ReviewTrackCuts,
-} from './track-row';
+import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { Captions, List, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -183,10 +178,6 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
   const start = (event: React.PointerEvent<HTMLDivElement>, fragment: ReviewTextFragment) => {
     if (props.busy || event.button !== 0) return;
     event.stopPropagation();
-    if (reviewTrackGestureLocked(event.currentTarget)) {
-      props.onSelect(fragment.id);
-      return;
-    }
     const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
     if (!bounds || bounds.width <= 0) return;
     const edge =

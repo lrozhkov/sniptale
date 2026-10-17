@@ -1,4 +1,3 @@
-import { reviewTrackGestureLocked } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
@@ -141,10 +140,6 @@ function ReviewEditBlock(
       onPointerDown={(event) => {
         if (props.rangeEnabled === false || event.button !== 0 || committing.current) return;
         event.stopPropagation();
-        if (reviewTrackGestureLocked(event.currentTarget)) {
-          props.onEdit?.(edit);
-          return;
-        }
         const target = event.target;
         const edge =
           target instanceof Element

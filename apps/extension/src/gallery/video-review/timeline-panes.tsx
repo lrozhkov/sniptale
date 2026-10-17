@@ -179,11 +179,13 @@ function observeReviewPaneLayout(
       const label = row.header.querySelector<HTMLElement>('[data-track-label]');
       const actions = row.header.querySelector<HTMLElement>('[data-track-controls]');
       const toggle = row.header.querySelector<HTMLElement>('[role="switch"]');
+      const reorder = row.header.querySelector<HTMLElement>('.review-track-reorder');
       natural = Math.max(
         natural,
         (label?.scrollWidth ?? 0) +
           (actions?.scrollWidth ?? 0) +
           (toggle ? toggle.offsetWidth + 4 : 0) +
+          (reorder ? reorder.offsetWidth + 4 : 0) +
           44
       );
     }
@@ -214,6 +216,7 @@ function observeReviewPaneLayout(
   const mutation = new MutationObserver(observe);
   for (const node of [fixed, list])
     mutation.observe(node, { childList: true, subtree: true, characterData: true });
+  mutation.observe(plane, { childList: true, subtree: true });
   observe();
   return {
     refresh: observe,

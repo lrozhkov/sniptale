@@ -625,8 +625,10 @@ it('keeps effective content identity through transport-only rerenders and invali
   expect(advanced.advanced).toBe(authored);
 });
 
-it('drains accepted edits before a control, retries atomically, and rejects stale chrome control values', async () => {
-  const { session, deps } = setup();
+it('drains accepted edits before a control, retries atomically, and ignores retained legacy locks', async () => {
+  const initial = createQuickEditAdvancedState();
+  initial.ui.lockedTracks = { actions: true };
+  const { session, deps } = setup(initial);
   act(() => advanced.setMode('advanced'));
   await act(async () => advanced.flush());
   const stale = structuredClone(session.getSnapshot().snapshot.workspace.advanced);
@@ -645,15 +647,15 @@ it('drains accepted edits before a control, retries atomically, and rejects stal
   expect(advanced.saveFailed).toBe(false);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(historyLength);
   expect(advanced.advanced.ui.tracks.actions).toBe(false);
-  await act(async () => advanced.setTrackLocked('actions', true));
   await act(async () => session.saveAdvanced(stale));
   expect(advanced.advanced.ui).toMatchObject({
     tracks: { actions: false },
     lockedTracks: { actions: true },
   });
   act(() => advanced.setClickAnimations(() => []));
-  expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(1);
-  expect(advanced.pending).toBe(false);
+  expect(advanced.advanced.clickAnimations).toHaveLength(0);
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(0);
 });
 
 it('discards a failed control on Reload and permits flush without replaying it', async () => {
