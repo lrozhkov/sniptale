@@ -20,6 +20,7 @@ export function ReviewZoomLane(props: {
   resultDuration: number;
   outputTime: number | null;
   edits: readonly ReviewEdit[];
+  snapTimes?: readonly number[] | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   sourceSelection?: ReviewAnchor | undefined;
   toOutputTime(source: number): number | null;
@@ -38,6 +39,7 @@ export function ReviewZoomLane(props: {
       time={props.outputTime}
       regions={props.advanced.zoom.regions}
       edits={props.edits}
+      snapTimes={props.snapTimes}
       toOutputTime={props.toOutputTime}
       selectedId={props.zoom.selection}
       onSelect={props.zoom.setSelection}

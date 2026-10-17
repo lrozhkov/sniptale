@@ -596,7 +596,7 @@
   content: '';
   position: absolute;
   inset-inline: 12px;
-  top: 13px;
+  top: calc(50% - 1px);
   height: 2px;
   border-radius: 1px;
   background: var(--sniptale-color-text-dim);
@@ -612,7 +612,7 @@
   :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch)
   .sniptale-glass-switch-thumb {
   position: absolute;
-  top: 6px;
+  top: calc(50% - 8px);
   inset-inline-start: 4px;
   width: 16px;
   height: 16px;
@@ -878,10 +878,10 @@
   min-height: var(--sniptale-parameter-control-height);
 }
 .sniptale-compact-workspace .sniptale-parameter-row .sniptale-glass-switch::before {
-  top: 15px;
+  top: calc(50% - 1px);
 }
 .sniptale-compact-workspace .sniptale-parameter-row .sniptale-glass-switch-thumb {
-  top: 8px;
+  top: calc(50% - 8px);
 }
 
 .sniptale-compact-workspace .sniptale-parameter-row.sniptale-boolean-parameter {

@@ -67,6 +67,22 @@ async function openImage(page: Page, extensionId: string, locale: Locale, theme:
 }
 
 async function screenshot(page: Page, info: TestInfo, name: string) {
+  const switches = await page.locator('.sniptale-glass-switch:visible').evaluateAll((nodes) =>
+    nodes.flatMap((node) => {
+      const thumb = node.querySelector('.sniptale-glass-switch-thumb');
+      if (!thumb) return [];
+      const target = node.getBoundingClientRect(),
+        dot = thumb.getBoundingClientRect();
+      return [
+        {
+          label: node.getAttribute('aria-label'),
+          delta: Math.abs(target.y + target.height / 2 - dot.y - dot.height / 2),
+        },
+      ];
+    })
+  );
+  for (const item of switches)
+    expect(item.delta, `${name}: ${item.label} thumb center`).toBeLessThanOrEqual(0.5);
   await page.screenshot({
     path: info.outputPath(`${name}.png`),
     fullPage: false,

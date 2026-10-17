@@ -43,6 +43,11 @@ it('shows current defaults and actual raster, commits local settings and offers 
   try {
     render();
     expect(host.textContent).toContain('405 × 720');
+    const actual = host.querySelector('[aria-label="gallery.videoReview.previewActualRaster"]')!;
+    expect(actual.closest('.sniptale-parameter-row')?.textContent).toContain(
+      'gallery.videoReview.previewActualRaster'
+    );
+    expect(actual.closest('.sniptale-parameter-row')?.querySelector('[aria-haspopup]')).toBeNull();
     expect(host.textContent?.match(/gallery.videoReview.previewCurrent/g)).toHaveLength(2);
     const select = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
     act(() => select.click());

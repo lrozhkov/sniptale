@@ -871,3 +871,21 @@ it('cancels brief preview preparation and restarts the delay for the next operat
     vi.useRealTimers();
   }
 });
+
+it('retains the decoded native header across detailed pause and playback handoffs', () => {
+  const windowHeader = { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Browser' };
+  const header = vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
+    joinColor: '#fff',
+    url: 'data:image/svg+xml,header',
+    image: { width: 800, height: 86, close: vi.fn() },
+    failed: false,
+    retry: vi.fn(),
+  });
+  const props = { scene: { background: disabled, camera: identity, windowHeader } };
+  for (const manual of [false, true, false, true]) {
+    presentation.active = manual;
+    presentation.ready = true;
+    renderStage(props);
+    expect(header.mock.lastCall![0]).toEqual(windowHeader);
+  }
+});

@@ -240,6 +240,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           (features.mode === 'advanced' && configuring) || features.actionsTrackVisible
         }
         sourceId={props.annotationSourceId}
+        snapTimes={reviewLoopSnapTimes(props)}
         annotationTool={annotation.tool.active}
         annotationDrawing={annotation.drawing}
         annotationEffectsTrack={
@@ -255,7 +256,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
               compact={compact}
               projection={projection}
               selectedId={props.selectedAnnotationEffectId ?? null}
-              snapTimes={props.edits.flatMap((edit) => [edit.start, edit.end])}
+              snapTimes={[
+                ...props.edits.flatMap((edit) => [edit.start, edit.end]),
+                ...reviewLoopSnapTimes(props),
+              ]}
               beforeAction={props.beforeAction}
               drawing={annotation.drawing}
               onPlace={annotation.place}
@@ -347,6 +351,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                   resultDuration={props.resultDuration}
                   outputTime={props.outputTime}
                   edits={props.edits}
+                  snapTimes={reviewLoopSnapTimes(props)}
                   zoom={props.zoom}
                   toOutputTime={props.toOutputTime}
                 />
@@ -666,12 +671,24 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
   };
 }
 
+/** Disposable playback boundaries stay in source time until a lane projects them. */
+function reviewLoopSnapTimes(props: Pick<TimelineBindingProps, 'playbackRange'>): number[] {
+  return props.playbackRange ? [props.playbackRange.start, props.playbackRange.end] : [];
+}
+
 /** Projects the existing audio lane snap targets onto its result clock. */
 export function reviewAudioSnapTimes(
-  props: Pick<TimelineBindingProps, 'outputTime' | 'edits' | 'toOutputTime' | 'advanced'>
+  props: Pick<
+    TimelineBindingProps,
+    'outputTime' | 'edits' | 'toOutputTime' | 'advanced' | 'playbackRange'
+  >
 ) {
   return [
     ...(props.outputTime === null ? [] : [props.outputTime]),
+    ...reviewLoopSnapTimes(props).flatMap((time) => {
+      const output = props.toOutputTime(time);
+      return output === null ? [] : [output];
+    }),
     ...props.edits
       .flatMap((edit) => [props.toOutputTime(edit.start), props.toOutputTime(edit.end)])
       .filter((time): time is number => time !== null),

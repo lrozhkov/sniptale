@@ -15,6 +15,7 @@ export function snapReviewEditDrag(args: {
   bypass: boolean;
   edits: readonly ReviewEdit[] | undefined;
   boundaries: readonly number[] | undefined;
+  snapTimes?: readonly number[] | undefined;
   playhead: number;
   current: ReviewEdit;
   keyframeMove: boolean;
@@ -38,7 +39,7 @@ export function snapReviewEditDrag(args: {
   const candidates = getSnapCandidates({
     edits: args.edits.filter((edit) => edit.id !== args.current.id),
     playhead: args.playhead,
-    ...(args.boundaries ? { boundaries: args.boundaries } : {}),
+    boundaries: [...(args.boundaries ?? []), ...(args.snapTimes ?? [])],
   });
   let guide: number | null = null;
   let { start, end } = free;

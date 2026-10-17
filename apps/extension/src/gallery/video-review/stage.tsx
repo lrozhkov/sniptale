@@ -131,8 +131,7 @@ type ReviewStageProps = {
 /** Keep native header geometry and pointer inversion aligned with the authored scene. */
 function useStageInteractionGeometry(
   props: Pick<ReviewStageProps, 'source' | 'scene' | 'drawing' | 'region' | 'onRegion' | 'video'>,
-  geometry: Pick<ReturnType<typeof useReviewStageGeometry>, 'sceneLayout' | 'content'>,
-  manual: boolean
+  geometry: Pick<ReturnType<typeof useReviewStageGeometry>, 'sceneLayout' | 'content'>
 ) {
   const { sceneLayout, content } = geometry;
   // Match the SVG viewport to the fitted header allocation, including its rounded toolbar rows.
@@ -146,7 +145,7 @@ function useStageInteractionGeometry(
       ) / 1e6
     : undefined;
   const header = useReviewWindowHeader(
-    manual ? undefined : props.scene?.windowHeader,
+    props.scene?.windowHeader,
     props.source.width,
     props.source.height,
     headerDisplayHeight
@@ -209,11 +208,10 @@ export function ReviewStage(props: ReviewStageProps) {
     size
   );
   const manual = presentation.active && presentation.status.actualRaster !== null;
-  const { header, motion, projection, plane, projected } = useStageInteractionGeometry(
-    props,
-    { sceneLayout, content },
-    manual
-  );
+  const { header, motion, projection, plane, projected } = useStageInteractionGeometry(props, {
+    sceneLayout,
+    content,
+  });
   return (
     <div
       ref={host}

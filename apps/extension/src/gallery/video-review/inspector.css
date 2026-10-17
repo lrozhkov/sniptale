@@ -257,8 +257,10 @@
   background: transparent;
 }
 
-[data-ui='gallery.videoReview.inspector'] {
-  container: review-inspector / inline-size;
+/* Keep both query contracts when shared surface CSS loads after this owner. */
+[data-ui='gallery.videoReview.inspector'].sniptale-inspector-surface {
+  container-name: review-inspector inspector-surface;
+  container-type: inline-size;
 }
 
 /* Whole semantic groups flow in DOM order; nested groups fall back to one column. */

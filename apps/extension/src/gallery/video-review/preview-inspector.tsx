@@ -55,15 +55,16 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
               props.onChange({ rasterPreset })
             }
           />
-          <p
-            className="text-right text-xs tabular-nums text-[var(--sniptale-color-text-muted)]"
-            aria-label={translate('gallery.videoReview.previewActualRaster')}
-          >
-            {props.actualRaster
-              ? `${props.actualRaster.width} × ${props.actualRaster.height}`
-              : '—'}
-          </p>
         </div>
+      </InspectorParameterRow>
+      <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
+        <output
+          className="block w-full px-2 text-right text-[12px] tabular-nums
+          text-[var(--sniptale-color-text-secondary)]"
+          aria-label={translate('gallery.videoReview.previewActualRaster')}
+        >
+          {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
+        </output>
       </InspectorParameterRow>
       <div title={translate('gallery.videoReview.previewFrameRateLimit')}>
         <SelectField

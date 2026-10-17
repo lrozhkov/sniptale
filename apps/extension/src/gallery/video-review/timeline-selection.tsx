@@ -26,6 +26,7 @@ type SelectionProps = {
   edits?: readonly ReviewEdit[];
   selectedEditId?: string | undefined;
   boundaries?: readonly number[];
+  snapTimes?: readonly number[] | undefined;
   snapToKeyframes?: boolean;
   onEdit?(edit: ReviewEdit): void;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
@@ -174,6 +175,7 @@ function ReviewEditBlock(
           bypass: event.altKey,
           edits: props.edits,
           boundaries: props.boundaries,
+          snapTimes: props.snapTimes,
           playhead: props.time,
           current: edit,
           keyframeMove: !!props.snapToKeyframes,

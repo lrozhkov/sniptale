@@ -802,3 +802,15 @@ it('opens the shared audio picker for the captured lane after note admission', a
   expect(pickFile).not.toHaveBeenCalled();
   expect(fileInput.accept).toBe('audio/*');
 });
+
+it('projects loop magnets to the audio axis and excludes a removed source boundary', () => {
+  const advanced = createQuickEditAdvancedState();
+  const snap = reviewAudioSnapTimes({
+    advanced,
+    outputTime: null,
+    edits: [],
+    playbackRange: { start: 3, end: 8 },
+    toOutputTime: (time) => (time === 3 ? null : time / 2),
+  });
+  expect(snap).toEqual([4]);
+});

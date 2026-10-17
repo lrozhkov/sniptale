@@ -69,6 +69,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   textTrack?: ReactNode;
   annotationEffectsTrack?: ReactNode;
   boundaries?: readonly number[];
+  snapTimes?: readonly number[] | undefined;
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
   onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;

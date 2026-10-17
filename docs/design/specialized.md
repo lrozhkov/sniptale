@@ -32,6 +32,8 @@ Keep accepted state separate from a live preview. A valid release commits once. 
 
 Preserve independent gesture surfaces and actual scroll owners. Avoid changes that swallow page scrolling. Physical touch and operating-system interruption require integration proof beyond synthetic events.
 
+The active playback range supplies two temporary snap targets. Project these targets into each lane's time axis. Keep codec-valid source boundaries separate from ordinary magnets. Preserve Alt bypass for ordinary magnets. Keep the time readout outside the pointer drawing and inside the visible timeline.
+
 ## Numeric variants
 
 Some properties allow a wider typed domain than their contextual scrub range. Declare typed bounds and scrub bounds separately. A valid typed value outside scrub bounds remains accepted. Show an explicit out-of-range indication instead of silently clamping the typed value or implying an exact thumb position. The next deliberate range edit can choose a value within the scrub domain.

@@ -12,7 +12,14 @@ import { reviewTimeLabel } from './controls';
 import { planeTime, reviewPlaneLane } from './timeline-drag';
 
 type HoverLane = 'annotation' | 'source' | 'focus' | 'original' | 'seek' | 'ruler';
-type Hover = { time: number; x: number; snapped: boolean; lane: HoverLane };
+type Hover = {
+  time: number;
+  x: number;
+  snapped: boolean;
+  lane: HoverLane;
+  pointerX?: number;
+  pointerY?: number;
+};
 export type ReviewPlacementHints = Partial<
   Record<'source' | 'focus' | 'original', string | undefined>
 >;
@@ -96,6 +103,8 @@ export function useReviewTimelineHover(options: HoverOptions) {
         : pointerTime;
     setHover({
       time,
+      pointerX: x,
+      pointerY: event.clientY - bounds.top,
       x:
         time === pointerTime
           ? x
@@ -134,10 +143,15 @@ export function ReviewTimelineHoverGuide(props: {
   const active = hover !== null;
   const label = useRef<HTMLSpanElement>(null);
   const [labelWidth, setLabelWidth] = useState(70);
+  const [labelHeight, setLabelHeight] = useState(18);
   useLayoutEffect(() => {
     const node = label.current;
     if (!node) return;
-    const measure = () => setLabelWidth(node.getBoundingClientRect().width);
+    const measure = () => {
+      const bounds = node.getBoundingClientRect();
+      setLabelWidth(bounds.width);
+      setLabelHeight(bounds.height);
+    };
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(node);
@@ -150,7 +164,23 @@ export function ReviewTimelineHoverGuide(props: {
   if (hover.x < (props.viewport.current?.scrollLeft ?? 0) + props.gutter || hover.x > viewportRight)
     return null;
   const leftLimit = (props.viewport.current?.scrollLeft ?? 0) + props.gutter - hover.x;
-  const labelOffset = Math.max(leftLimit, Math.min(4, viewportRight - hover.x - labelWidth));
+  const rightLimit = viewportRight - hover.x - labelWidth;
+  const clamp = (offset: number) => Math.max(leftLimit, Math.min(offset, rightLimit));
+  let labelOffset = clamp(4);
+  const pointerX = (hover.pointerX ?? hover.x) - hover.x;
+  const pointerY =
+    hover.pointerY === undefined
+      ? Infinity
+      : hover.pointerY - (props.viewport.current?.scrollTop ?? 0);
+  if (
+    pointerY >= -16 &&
+    pointerY < labelHeight + 16 &&
+    pointerX + 28 > labelOffset &&
+    pointerX - 4 < labelOffset + labelWidth
+  ) {
+    const left = clamp(-labelWidth - 8);
+    labelOffset = left + labelWidth <= pointerX - 8 ? left : clamp(pointerX + 32);
+  }
   return (
     <div
       data-ui="gallery.videoReview.hoverTime"

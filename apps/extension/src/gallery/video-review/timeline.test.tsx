@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewAnchor } from '../../features/video/review/types';
+import { ReviewTimelineHoverGuide } from './timeline-hover';
 import { ReviewTimeline } from './timeline';
 import { useReviewTimelineGeometry } from './timeline-geometry';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -761,4 +762,29 @@ it('retains timeline keyboard focus when a committed row becomes inert', () => {
     external.remove();
     host.remove();
   }
+});
+
+it('moves the time label away from the cursor while retaining the visible ruler bounds', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 70, 18)
+  );
+  const viewport = document.createElement('div');
+  const render = (x: number, pointerY: number) =>
+    act(() =>
+      environment.root!.render(
+        <ReviewTimelineHoverGuide
+          viewport={{ current: viewport }}
+          gutter={100}
+          width={700}
+          hover={{ x, time: 2, snapped: false, lane: 'ruler', pointerX: x, pointerY }}
+        />
+      )
+    );
+  const offset = () => environment.host!.querySelector('span')!.style.transform;
+  render(300, 12);
+  expect(offset()).toBe('translateX(-78px)');
+  render(300, 80);
+  expect(offset()).toBe('translateX(4px)');
+  render(101, 12);
+  expect(offset()).toBe('translateX(32px)');
 });

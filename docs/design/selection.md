@@ -32,6 +32,8 @@ Use Checkbox layout=parameter for deferred parameter rows. Do not make the name 
 
 The default prototype uses an 18px disc, the shared orange vector check, and an optically centered radio dot. The 16px and 20px specimens demonstrate density variants, not alternative defaults. Consumers must not redraw checks or radio dots. Keep aspect ratios, centers, and stroke widths stable. A switch uses a pale thumb, thin track, and position plus accent to indicate its enabled state.
 
+Center the switch thumb and track within the actual target height. Do not retain fixed vertical offsets when density changes.
+
 Keep the small neutral glow: near white in dark theme, dark in light theme. Do not restore orange glow. The 28px checkbox target and switch target are independent of drawing size. Preserve disabled checked values. Unavailable does not mean off. Use empty/check/dash for the parent selection scope. Individual items show only their own selection.
 
 Name the scope of Select all. Keep parent state synchronized with available children.

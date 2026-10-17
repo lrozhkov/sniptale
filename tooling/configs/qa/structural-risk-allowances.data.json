@@ -369,11 +369,11 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, gesture, persistence writer, resource or recovery lifetime. Remove when the analyzer models this cohesive UI binding. Fresh independent architecture review must validate this classification.",
-      "astHash": "dfd41102b017da7bfc721a3cb4b600f17147f8b75da991b64a60e570499318f5",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification.",
+      "astHash": "7834c4fc4a94d4cb9f8eba4af57c7a6c48280a5402ab97ba68c379358ef37e00",
       "signatureHash": "418e85bf5dc567bc2a34e4a84bd51169a0d66dc2fffd55e97beb75697efecb0c",
-      "reason": "tool-noise: This diff adds two typed cursor navigation and commit callbacks to the existing timeline binding and forwards them to its history receiver. It adds no state, effect, writer, resource or recovery authority. File score 6 has delta 0 and cohesion 0.96. Main inspected the exact diff. Extracting another adapter would add a forwarding layer. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-15"
+      "reason": "tool-noise: The existing gallery timeline binding derives disposable loop-edge candidates and forwards them to its existing source/result lane receivers. It adds no state, effect, resource, persistence writer, or recovery authority. File score 6 and binding score 5 have delta 0; extracting a forwarding-only JSX adapter would distribute the same gesture wiring. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-17"
     },
     {
       "rule": "structural-file-risk",
@@ -721,10 +721,10 @@
       "file": "apps/extension/src/gallery/video-review/audio-track.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One audio-track fixture adds the real guide provider and accepted-edge assertions. File score is unchanged and cohesion is 1.00; the candidate adds no independent fixture lifecycle. Independently inspected by resize_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent gesture receiver, persistence writer, resource lifetime, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-15",
-      "astHash": "2b04ee8072f7a7341adcd63a91cbdf798e401395266b7b9f272e6e5b675c916f",
+      "reason": "tool-noise: One existing audio-track fixture adds a source-to-output loop-edge projection assertion. It adds no fixture lifecycle, writer, or runtime authority; cohesion remains 1 and score 2 has delta 0. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-17",
+      "astHash": "7e2d2b794ecd3c7e3c8bde9a45a85abe69f0c2f4d3cb04d47302ea07425807d1",
       "signatureHash": "5db2d10abfe2d70bcd3e2a3e835001c5484a5f1995470afc8acd983f1e7ca443"
     },
     {
@@ -765,22 +765,22 @@
       "file": "apps/extension/src/gallery/video-review/stage.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "astHash": "05f6d0ecef9b7ea2aaa3b3194ac2c99994c6ebeafcebd40cf8644e4e0d6ee37b",
+      "astHash": "a7ac671b88b3a3a2a969306a0563be20f55ef237aecbe532dfba77f64bce7743",
       "signatureHash": "fa9a1eb2ee8933c59a173a489946fabc2ccb58ed9a34265eea2092d931366c44",
-      "reviewDate": "2026-10-16",
-      "reason": "tool-noise: Four pointer-admission cases use the existing mounted stage fixture and lifecycle. They add no state authority or independent resource owner. Cohesion remains 1. Main and an independent reader inspected the exact fixture and diff. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource or fixture lifetime. Remove when the analyzer models this cohesive stage fixture. Fresh complete-candidate architecture review must validate this classification."
+      "reviewDate": "2026-10-17",
+      "reason": "tool-noise: One existing mounted stage fixture adds header-hook identity assertions through manual/native handoff. It adds no fixture lifecycle, resource owner, or writer; cohesion remains 1 and score 2 has delta 0. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification."
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "ReviewTimelineBinding",
       "owner": "extension:gallery:video-review",
-      "astHash": "5a173f08eb78fbcaf2404862356da87819ff9ccda15e3d57c5c6027d36499117",
+      "astHash": "26804249b5224179070ff6ace555ccb3b3219eef13efe93383491cbb8a45849f",
       "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
-      "reviewDate": "2026-10-15",
-      "reason": "tool-noise: The existing editor/timeline binding forwards only navigationRevision from the playback owner. Score 5 has no increase. This change adds no branch, state authority, gesture, resource or persistence owner. Extracting another JSX adapter would only forward the same transport values. Main inspected the exact diff. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, gesture, persistence writer, resource or recovery lifetime. Remove when the analyzer models this cohesive UI binding. Fresh independent architecture review must validate this classification."
+      "reviewDate": "2026-10-17",
+      "reason": "tool-noise: The existing gallery timeline binding derives disposable loop-edge candidates and forwards them to its existing source/result lane receivers. It adds no state, effect, resource, persistence writer, or recovery authority. File score 6 and binding score 5 have delta 0; extracting a forwarding-only JSX adapter would distribute the same gesture wiring. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification."
     },
     {
       "rule": "structural-function-risk",
@@ -792,6 +792,17 @@
       "reviewDate": "2026-10-15",
       "reason": "tool-noise: The removal identity attribute changes only plate markup. The existing plate interaction keeps its gesture admission, preview, commit and cancellation owners. Animation and cleanup belong to observeReviewRemovalMotion in the timeline pane. Read-only removal_motion_diagnosis confirmed no added state, writer, effect or recovery authority in this body. Final complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when the exact body or signature changes. Reassess any independent gesture receiver, writer, recovery policy or lifecycle authority. Remove when analysis models this cohesive plate interaction."
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/zoom-track.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One existing zoom-track fixture adds trim-to-loop-edge proof through its existing source/result projection and pointer capture. It adds no independent fixture lifecycle or production authority; cohesion remains 1 and score 2 has delta 0. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-17",
+      "astHash": "4fd4766248b4ac310d0be4e3b27da4feba97bbeb939d83e08f85a93698e56707",
+      "signatureHash": "8a3a42de9d9ab9b71b07626524e2944f97b9415573f6fb606068ec598b89d156"
     }
   ]
 }
