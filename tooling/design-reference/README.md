@@ -17,3 +17,5 @@ Open [the reference catalog](http://127.0.0.1:8780/tooling/design-reference/). U
 The examples establish visual and interaction references. They do not replace product state owners or specialized engines. The existing application component catalog demonstrates actual product components as migration proceeds. The external scene exercise and historical trials remain outside this tool. Agent-tooling packaging is a separate task.
 
 Use the group catalog and its Rules tab. [Verification](../../docs/design/verification.md) defines visual and interaction proof.
+
+The [font owner](../../docs/design/fonts.md) defines the bundled families. The tool includes exact copies of their fonts and licenses: [Golos UI](assets/golos-ui-LICENSE.txt) and [Golos Text](assets/golos-text-LICENSE.txt).

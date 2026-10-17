@@ -18,6 +18,25 @@ function checkReference(file: string, reference: string) {
 }
 
 describe('canonical design reference links', () => {
+  it('loads shared disclosure styles in each registered disclosure consumer', () => {
+    for (const group of ['navigation', 'properties', 'compositions']) {
+      const html = readFileSync(resolve(tool, `examples/${group}/index.html`), 'utf8');
+      expect(html, group).toContain('href="../shared/navigation.css"');
+    }
+  });
+
+  it('keeps bundled font files and licenses equal to their canonical owners', () => {
+    for (const family of ['ui', 'text']) {
+      const owner = resolve(root, `packages/ui/src/styles/golos-${family}`);
+      expect(readFileSync(resolve(tool, `assets/golos-${family}-vf.woff2`))).toEqual(
+        readFileSync(resolve(owner, `golos-${family}-vf.woff2`))
+      );
+      expect(readFileSync(resolve(tool, `assets/golos-${family}-LICENSE.txt`))).toEqual(
+        readFileSync(resolve(owner, 'LICENSE.txt'))
+      );
+    }
+  });
+
   it('resolves documents, browser assets, styles, and static module imports', () => {
     const files = globSync(['docs/design/*.md', 'tooling/design-reference/**/*.{md,html,css,js}'], {
       cwd: root,

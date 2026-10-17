@@ -7,7 +7,7 @@ body {
   margin: 0;
   background: var(--sniptale-color-surface-canvas);
   color: var(--sniptale-color-text-primary);
-  font: 500 13px/18px var(--font-ui);
+  font: var(--font-control-weight) 13px/18px var(--font-ui);
   user-select: none;
 }
 header,

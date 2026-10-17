@@ -1,6 +1,7 @@
 @import url('./button-press.css');
 @import url('../../assets/range.css');
 .ref-number {
+  font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
   position: relative;
   margin-bottom: var(--space-related);
   --numeric-fill: var(--sniptale-color-accent);
@@ -235,7 +236,6 @@ input.number-range::-moz-range-thumb {
     transition: none;
   }
 }
-.number-value-shell,
 .ref-number[data-stepper='true'] .number-value-shell {
   width: 156px;
 }

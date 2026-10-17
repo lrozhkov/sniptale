@@ -16,9 +16,9 @@
   gap: 8px;
 }
 .inspector-controls .number-value-shell {
-  width: 104px;
+  width: fit-content;
   min-height: var(--inspector-control);
-  padding-inline: 0 8px;
+  padding-inline: 8px;
 }
 .inspector-controls .number-value-shell input {
   height: 32px;
@@ -130,7 +130,7 @@
   padding-block: 0;
 }
 .inspector-controls .number-value-shell input {
-  padding-inline: 0 8px;
+  padding-inline: 0;
 }
 .inspector-controls .number-stepper {
   width: 20px;
