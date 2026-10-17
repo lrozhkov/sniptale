@@ -10,7 +10,14 @@ import {
 } from '../../../apps/extension/build/injected-build-support';
 import { verifyDynamicCodeUsage } from '../../release/artifact-security/artifact-security-dynamic.mjs';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+
+// These dependency-shim proofs do not compile CSS; the production build checks that compiler.
+vi.mock('@tailwindcss/postcss', () => ({
+  default() {
+    throw new Error('Dependency-shim proof must not compile CSS.');
+  },
+}));
 
 const RELEASE_BUILD_SHIMS = [
   'tooling/build/shims/readable-stream-browser-empty.cjs',

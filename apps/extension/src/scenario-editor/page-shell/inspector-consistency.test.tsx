@@ -242,7 +242,7 @@ it('remembers disclosure choices by element type after another selection', async
   expect(toggle().getAttribute('aria-expanded')).toBe('false');
 });
 
-it('retains commit-only integer editing when canonical name activation ends the draft', () => {
+it('retains commit-only integer editing through the field and leaves its name passive', () => {
   const change = vi.fn();
   act(() =>
     root.render(
@@ -261,13 +261,15 @@ it('retains commit-only integer editing when canonical name activation ends the 
   const name = host.querySelector<HTMLElement>('.sniptale-parameter-name')!;
   const input = host.querySelector<HTMLInputElement>('input')!;
   act(() => name.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => input.focus());
   expect(document.activeElement).toBe(input);
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '7');
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   expect(change).not.toHaveBeenCalled();
-  act(() => name.click());
+  act(() => input.blur());
   expect(change).toHaveBeenCalledExactlyOnceWith(7);
   expect(host.querySelector('input[type="range"]')).toBeNull();
 });

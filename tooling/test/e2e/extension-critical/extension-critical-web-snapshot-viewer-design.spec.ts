@@ -11,7 +11,7 @@ import {
   type Composition,
   type FontRequest,
   type SavedViewer,
-} from './web-snapshot-viewer-design.fixture';
+} from './web-snapshot-viewer-design.spec.fixture';
 
 const interfaceBackingFace = 'Golos UI';
 const ui = (page: Page, id: string) => page.locator(`[data-ui="${id}"]`);

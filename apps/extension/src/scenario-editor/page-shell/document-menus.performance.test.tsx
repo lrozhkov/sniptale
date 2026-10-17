@@ -82,7 +82,9 @@ async function renderDocument(props: ComponentProps<typeof GuideDocument>) {
 function menuButton(text: string) {
   const button = [
     ...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button'),
-  ].find((element) => element.textContent?.includes(text));
+  ].find(
+    (element) => element.textContent?.includes(text) || element.getAttribute('title') === text
+  );
   if (!button) throw new Error(`Missing menu command ${text}`);
   return button;
 }

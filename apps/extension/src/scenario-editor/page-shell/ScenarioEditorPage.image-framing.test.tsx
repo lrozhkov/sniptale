@@ -222,9 +222,18 @@ it('keeps one framing draft bound to its inspector and discards it on selection 
   expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
   await click('Description', inspector.querySelector('nav')!);
+  const caption = inspector.querySelector<HTMLInputElement>('.guide-image-description input')!;
+  await act(async () => caption.focus());
+  await act(async () =>
+    caption.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.activeElement).not.toBe(caption);
+  expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
   await act(async () =>
     inspector
-      .querySelector('.guide-image-description input')!
+      .querySelector('.guide-image-inspector')!
       .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
   expect(inspector.querySelector('.guide-image-controls')).toBeNull();
@@ -473,8 +482,8 @@ it('switches representations directly from the header and keeps only the active 
     Array.from(container.querySelectorAll<HTMLButtonElement>('.tour-representation-switch button'));
   expect(choices()).toHaveLength(2);
   expect(choices().map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
-  expect(choices()[0]?.querySelector('span')).not.toBeNull();
-  expect(choices()[1]?.querySelector('span')).toBeNull();
+  expect(choices()[0]?.textContent?.trim()).not.toBe('');
+  expect(choices()[1]?.textContent?.trim()).toBe('');
   expect(container.querySelector('.guide-page-header')?.firstElementChild?.className).toBe(
     'tour-representation-switch'
   );
@@ -482,8 +491,8 @@ it('switches representations directly from the header and keeps only the active 
   expect(choices()[0]?.getAttribute('aria-pressed')).toBe('true');
   await act(async () => choices()[1]?.click());
   expect(choices().map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
-  expect(choices()[0]?.querySelector('span')).toBeNull();
-  expect(choices()[1]?.querySelector('span')).not.toBeNull();
+  expect(choices()[0]?.textContent?.trim()).toBe('');
+  expect(choices()[1]?.textContent?.trim()).not.toBe('');
   await act(async () => choices()[0]?.click());
   expect(choices()[0]?.getAttribute('aria-pressed')).toBe('true');
   expect(container.querySelector('.guide-document-scroll')).not.toBeNull();

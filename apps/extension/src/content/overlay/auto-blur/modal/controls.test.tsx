@@ -108,7 +108,7 @@ describe('auto-blur-modal/controls', () => {
     });
   });
 
-  it('activates the existing choice and switch through their parameter names once', async () => {
+  it('keeps choice names passive and activates the switch name once', async () => {
     const update = await renderControls();
     const names = [...container!.querySelectorAll<HTMLElement>('.sniptale-parameter-name')];
     const switchName = names.find((name) => name.textContent === 'content.autoBlur.showBorder')!;
@@ -117,6 +117,12 @@ describe('auto-blur-modal/controls', () => {
     expect(update).toHaveBeenCalledWith({ amount: 12, blurType: 'distortion', showBorder: true });
     const typeName = names.find((name) => name.textContent === 'content.autoBlur.blurType')!;
     act(() => typeName.click());
+    expect(document.body.querySelector('[role="option"]')).toBeNull();
+    const choice = typeName
+      .closest('.sniptale-parameter-row')!
+      .querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]')!;
+    expect(choice).not.toBeNull();
+    act(() => choice.click());
     expect(document.body.querySelector('[role="option"]')).not.toBeNull();
     expect(update).toHaveBeenCalledTimes(1);
   });
