@@ -141,10 +141,12 @@ test('preview quality never changes the encoded project output', async ({ page }
       'gallery.videoReview.previewPaused',
       label('gallery.videoReview.previewPausedDetailed')
     );
-    await choose(
-      'gallery.videoReview.previewShowFrameRate',
-      label('gallery.videoReview.previewOn')
-    );
+    const showFrameRate = panel.getByRole('switch', {
+      name: label('gallery.videoReview.previewShowFrameRate'),
+      exact: true,
+    });
+    await showFrameRate.click();
+    await expect(showFrameRate).toBeChecked();
     await expect(
       review.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
     ).toBeVisible();
@@ -313,7 +315,11 @@ for (const viewport of [
       await expect.poll(async () => !!(await readWebcamWorkspace(page))).toBe(true);
       await seedCutZooms(page);
       await page.reload();
-      await open();
+      // The mediaId/mode route restores the editor; the gallery is behind its dialog.
+      await expect(review).toBeVisible();
+      await expect(
+        review.getByRole('heading', { name: 'beta-v1.webm', exact: true })
+      ).toBeVisible();
       const saved = await readWebcamWorkspace(page);
       if (!saved) throw new Error('Missing cut zoom workspace');
       const authored = replayReviewHistory(
