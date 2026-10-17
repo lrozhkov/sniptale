@@ -652,3 +652,53 @@ it('opens the track document in the third context and closes it on selection or 
     vi.unstubAllGlobals();
   }
 });
+
+it('keeps the recorder mounted in a temporary third tab below the filename', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ReviewInspector
+          filename="clip.webm"
+          annotations={[]}
+          selectedId={null}
+          busy={false}
+          message={null}
+          settingsAvailable
+          scene={<span>scene parameters</span>}
+          recording={<input aria-label="retained take" defaultValue="draft" />}
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={vi.fn()}
+          onEdit={vi.fn()}
+          onHover={vi.fn()}
+          onDelete={vi.fn()}
+          onReport={vi.fn()}
+        >
+          {null}
+        </ReviewInspector>
+      )
+    );
+    const tabs = host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')!;
+    expect(tabs.textContent).toContain('gallery.videoReview.recordVoiceover');
+    expect(host.querySelector('header h2')?.textContent).toBe('clip.webm');
+    const take = host.querySelector<HTMLInputElement>('[aria-label="retained take"]')!;
+    act(() =>
+      Array.from(tabs.querySelectorAll('button'))
+        .find((b) => b.textContent === 'gallery.videoReview.scene')!
+        .click()
+    );
+    expect(take.closest('[hidden]')).not.toBeNull();
+    act(() =>
+      Array.from(tabs.querySelectorAll('button'))
+        .find((b) => b.textContent === 'gallery.videoReview.recordVoiceover')!
+        .click()
+    );
+    expect(host.querySelector('[aria-label="retained take"]')).toBe(take);
+    expect(take.closest('[hidden]')).toBeNull();
+  } finally {
+    act(() => root.unmount());
+  }
+});

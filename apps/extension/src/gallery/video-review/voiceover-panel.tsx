@@ -1,11 +1,9 @@
 import { RecordingDiscardConfirmation } from '../../composition/audio-recording/dialog/dismissal';
-import { useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
-import { ProductModal } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useAudioRecordingDialogSession } from '../../composition/audio-recording/dialog/controller';
-import { useAudioRecordingFocus } from '../../composition/audio-recording/dialog-focus';
 import {
   AudioRecordingDeviceSelect,
   AudioRecordingDownloadButton,
@@ -22,6 +20,7 @@ import { formatDurationLabel } from '../../composition/audio-recording/format';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 import { translate } from '../../platform/i18n';
 import type { useReviewVoiceoverRecording } from './voiceover-recording';
+import './voiceover-inspector.css';
 
 type RecordingSession = ReturnType<typeof useAudioRecordingDialogSession>;
 
@@ -33,6 +32,7 @@ export function ReviewVoiceoverLayer(props: {
   return (
     <ReviewVoiceoverRecording
       isOpen={voiceover.recording}
+      opener={voiceover.opener}
       playhead={voiceover.takeStart ?? 0}
       onClose={voiceover.close}
       onSyncStart={voiceover.syncStart}
@@ -45,10 +45,11 @@ export function ReviewVoiceoverLayer(props: {
 }
 
 /**
- * Gallery-owned lower strip over the shared capture controller; placement and playback stay local.
+ * Gallery-owned inspector over the shared capture controller; placement and playback stay local.
  */
 export function ReviewVoiceoverRecording(props: {
   isOpen: boolean;
+  opener?: import('react').RefObject<HTMLElement | null>;
   playhead: number;
   onClose(): void;
   onSyncStart(playVideo: boolean): Promise<void>;
@@ -81,41 +82,70 @@ export function ReviewVoiceoverRecording(props: {
     },
     captureLimitSeconds: durationLimit.seconds,
   });
-  const { titleId, handleKeyDown } = useAudioRecordingFocus(
-    props.isOpen,
-    session.confirmation.open
-  );
+  const titleId = useId();
+  const panel = useRef<HTMLElement>(null);
+  const returnFocus = useRef<Element | null>(null);
+  useLayoutEffect(() => {
+    if (!props.isOpen) return;
+    returnFocus.current = props.opener?.current ?? document.activeElement;
+    panel.current?.focus({ preventScroll: true });
+  }, [props.isOpen, props.opener]);
+  useEffect(() => {
+    if (!props.isOpen) return;
+    const opener = returnFocus.current;
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected)
+        opener.focus({ preventScroll: true });
+    };
+  }, [props.isOpen, props.opener]);
+  useLayoutEffect(() => {
+    const node = panel.current;
+    if (!node || session.confirmation.open) return;
+    const active = document.activeElement;
+    if (
+      !active ||
+      active === document.body ||
+      (node.contains(active) && active.matches(':disabled'))
+    )
+      (node.querySelector<HTMLElement>('button:not(:disabled)') ?? node).focus({
+        preventScroll: true,
+      });
+  });
   const { controller, starting, isSaving, saveError } = session;
   const { transport, trim } = controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
   if (!props.isOpen) return null;
   return (
     <>
-      <ProductModal
+      <section
+        ref={panel}
+        tabIndex={-1}
+        aria-labelledby={titleId}
+        data-ui="gallery.videoReview.voiceoverInspector"
+        className="review-voiceover-inspector sniptale-inspector-surface
+          sniptale-compact-switches min-w-0 outline-none"
+        onFocusCapture={(event) => {
+          if (event.target instanceof HTMLInputElement && event.target.type === 'number')
+            event.target.select();
+        }}
         onKeyDown={(event) => {
-          handleKeyDown(event);
           if (event.key === 'Escape' && !event.defaultPrevented && !session.confirmation.open) {
             event.preventDefault();
             session.requestClose();
           }
           event.stopPropagation();
         }}
-        onClose={session.requestClose}
-        closeOnBackdrop={false}
-        labelledBy={titleId}
-        backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_18%,transparent)]"
-        dialogClassName="sniptale-compact-workspace !top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg"
-        width="min(800px, calc(100vw - 32px))"
-        maxHeight="calc(100vh - 24px)"
-        scrollable
       >
-        <div className="grid min-w-0 gap-3 p-4" data-ui="gallery.videoReview.voiceoverStrip">
-          <header className="flex min-h-9 items-center gap-3">
-            <span id={titleId} className="mr-auto min-w-0 text-sm font-medium">
+        <div className="grid min-w-0 content-start gap-3">
+          <header
+            className="sticky top-0 z-10 flex min-h-9 items-center gap-2
+            bg-[var(--sniptale-color-surface-panel)]"
+          >
+            <span id={titleId} className="sr-only">
               {translate('gallery.videoReview.recordVoiceover')}
-              <span className="ml-2 inline-block text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-                {formatDurationLabel(props.playhead)}
-              </span>
+            </span>
+            <span className="mr-auto text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+              {formatDurationLabel(props.playhead)}
             </span>
             <ContentToolbarButton
               tone="close"
@@ -155,7 +185,7 @@ export function ReviewVoiceoverRecording(props: {
             </p>
           ) : null}
         </div>
-      </ProductModal>
+      </section>
       <RecordingDiscardConfirmation
         dialogClassName="sniptale-compact-workspace"
         value={session.confirmation}

@@ -313,3 +313,154 @@ for (const size of [
       }
     });
   }
+
+for (const size of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+])
+  for (const theme of ['light', 'dark'] as const) {
+    test(`native voiceover inspector ${size.width} ${theme}`, async ({}, info) => {
+      test.setTimeout(90_000);
+      const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
+      const page = await launched.context.newPage();
+      page.setDefaultTimeout(10_000);
+      try {
+        const review = await openReview(page, launched.extensionId, theme);
+        const normalInspector = await review
+          .locator('[data-ui="gallery.videoReview.inspector"]')
+          .elementHandle();
+        const entry = review.getByRole('button', {
+          name: label('gallery.videoReview.recordVoiceover'),
+          exact: true,
+        });
+        await entry.scrollIntoViewIfNeeded();
+        await entry.click();
+        const panel = review.locator('[data-ui="gallery.videoReview.voiceoverInspector"]');
+        await expect(panel).toBeVisible();
+        await expect(
+          review.locator('[data-ui="gallery.videoReview.workspace"]')
+        ).not.toHaveAttribute('inert');
+        await expect(review.locator('[inert]')).toHaveCount(5);
+        const workspace = (await review
+          .locator('[data-ui="gallery.videoReview.workspace"]')
+          .boundingBox())!;
+        const inspector = review.locator('[data-ui="gallery.videoReview.inspector"]');
+        const inspectorBox = (await inspector.boundingBox())!;
+        expect(inspectorBox.x + inspectorBox.width).toBeCloseTo(workspace.x + workspace.width, 0);
+        expect(inspectorBox.height).toBeCloseTo(workspace.height, 0);
+        await expect(inspector.locator('header h2')).toBeVisible();
+        const navigation = inspector.locator('[data-ui="gallery.videoReview.inspectorNavigation"]');
+        await expect(
+          navigation.getByRole('button', {
+            name: label('gallery.videoReview.comments'),
+            exact: true,
+          })
+        ).toBeVisible();
+        await navigation
+          .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+          .click();
+        await expect(panel).toBeHidden();
+        await navigation
+          .getByRole('button', { name: label('gallery.videoReview.recordVoiceover'), exact: true })
+          .click();
+        await expect(panel).toBeVisible();
+        expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        const limit = panel.getByRole('spinbutton', {
+          name: label('gallery.videoReview.voiceoverDurationLimit'),
+          exact: true,
+        });
+        const numericBox = (await limit.boundingBox())!;
+        const unitBox = (await limit.locator('xpath=following-sibling::span').boundingBox())!;
+        expect(unitBox.x).toBeGreaterThanOrEqual(numericBox.x + numericBox.width + 4);
+        await limit.fill('');
+        const start = panel.getByRole('button', {
+          name: label('videoEditor.app.recordAudioStart'),
+          exact: true,
+        });
+        await expect(start).toBeDisabled();
+        await limit.fill('60');
+        await panel.locator('[data-ui="audio-recording.play-video"]').click();
+        await start.click();
+        const pause = panel.getByRole('button', {
+          name: label('videoEditor.app.recordAudioPause'),
+          exact: true,
+        });
+        await expect(pause).toBeVisible();
+        const closeRecording = panel.getByRole('button', {
+          name: label('common.actions.close'),
+          exact: true,
+        });
+        const recordingTab = navigation.getByRole('button', {
+          name: label('gallery.videoReview.recordVoiceover'),
+          exact: true,
+        });
+        await closeRecording.focus();
+        await page.keyboard.press('Shift+Tab');
+        await expect(recordingTab).toBeFocused();
+        const captureText = await panel.textContent();
+        await expect.poll(() => panel.textContent()).not.toBe(captureText);
+        await expect(recordingTab).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.press('Enter');
+        await expect(panel).toBeHidden();
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Enter');
+        await expect(pause).toBeVisible();
+        await expect
+          .poll(() => panel.getByRole('meter').getAttribute('aria-valuenow'))
+          .not.toBe('0');
+        await page.screenshot({
+          path: info.outputPath('voiceover-inspector-recording.png'),
+          fullPage: false,
+        });
+        await pause.click();
+        await panel
+          .getByRole('button', { name: label('videoEditor.app.recordAudioResume'), exact: true })
+          .click();
+        await panel
+          .getByRole('button', { name: label('videoEditor.app.recordAudioStop'), exact: true })
+          .click();
+        const save = panel.getByRole('button', {
+          name: label('videoEditor.app.recordAudioSave'),
+          exact: true,
+        });
+        await expect(save).toBeVisible();
+        await navigation
+          .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+          .click();
+        await expect(panel).toBeHidden();
+        await navigation
+          .getByRole('button', { name: label('gallery.videoReview.recordVoiceover'), exact: true })
+          .click();
+        await expect(save).toBeVisible();
+        await panel.press('Escape');
+        const confirmation = review.getByRole('alertdialog');
+        await expect(confirmation).toBeVisible();
+        await confirmation
+          .getByRole('button', { name: label('videoEditor.app.recordAudioKeep'), exact: true })
+          .click();
+        await expect(save).toBeVisible();
+        await save.scrollIntoViewIfNeeded();
+        await expect(save).toBeInViewport({ ratio: 1 });
+        expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await page.screenshot({
+          path: info.outputPath('voiceover-inspector-take.png'),
+          fullPage: false,
+        });
+        await save.click();
+        await expect(panel).toHaveCount(0);
+        await expect(review.locator('[inert]')).toHaveCount(0);
+        await expect(review.locator('[data-audio-lane="voiceover"] [data-audio-id]')).toHaveCount(
+          1
+        );
+        await expect(entry).toBeFocused();
+        expect(
+          await review
+            .locator('[data-ui="gallery.videoReview.inspector"]')
+            .evaluate((node, previous) => node === previous, normalInspector)
+        ).toBe(true);
+      } finally {
+        await closeExtensionBrowser(launched);
+      }
+    });
+  }

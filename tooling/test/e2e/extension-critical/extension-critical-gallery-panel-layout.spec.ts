@@ -160,13 +160,14 @@ for (const variant of [
           .locator('.review-inspector-section')
           .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-section')));
         expect(sectionIds).toEqual([
-          'captions',
           'canvas',
           'window-header',
           'background',
           'presentation',
           'watermark',
+          'captions',
           'audio',
+          'cursor-path',
         ]);
         const resizeContent = async (target: typeof sections, size: number) => {
           const current = (await target.boundingBox())!.width;
@@ -200,7 +201,7 @@ for (const variant of [
             .getByRole('button', { name: label('gallery.videoReview.canvas'), exact: true })
             .click();
           const canvas = inspector.locator('[data-section="canvas"] .review-inspector-columns');
-          for (const size of [523, 524, 525]) {
+          for (const size of [515, 516, 517]) {
             await resizeContent(canvas, size);
             await expect
               .poll(() =>
@@ -208,10 +209,10 @@ for (const variant of [
                   (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
                 )
               )
-              .toBe(size < 524 ? 1 : 2);
+              .toBe(size < 516 ? 1 : 2);
           }
           await button('scenario.editor.inspectorShowAll').click();
-          await expect(sections.locator('.review-inspector-section')).toHaveCount(7);
+          await expect(sections.locator('.review-inspector-section')).toHaveCount(8);
         }
         await width.press('End');
         const sectionNodes = sections.locator('.review-inspector-section');
@@ -300,7 +301,7 @@ for (const variant of [
         expect(
           await transport.evaluate((node) => node.scrollWidth - node.clientWidth)
         ).toBeLessThanOrEqual(1);
-        const clock = transport.locator('span').first();
+        const clock = transport.locator('.review-playback-clock-value');
         expect(
           await clock.evaluate((node) => {
             const box = node.getBoundingClientRect();
@@ -371,7 +372,7 @@ for (const variant of [
         await page.keyboard.press('Escape');
         await page.screenshot({ path: info.outputPath('bounded-export.png'), fullPage: false });
         await button('gallery.videoReview.recordVoiceover').click();
-        const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverStrip"]');
+        const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverInspector"]');
         await expect(strip).toBeVisible();
         await strip
           .getByRole('button', { name: label('videoEditor.app.recordAudioStart'), exact: true })

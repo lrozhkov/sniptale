@@ -44,11 +44,12 @@ const renderRecording = (isOpen: boolean) => {
   return { onClose, onSave };
 };
 
-it('shows a bottom strip with an optional visible duration cap', () => {
+it('shows a non-modal inspector with an optional visible duration cap', () => {
   renderRecording(true);
-  const modal = host.querySelector('[role="dialog"]');
+  const modal = host.querySelector('[data-ui="gallery.videoReview.voiceoverInspector"]');
   expect(modal).not.toBeNull();
-  expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).not.toBeNull();
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).toBeNull();
   expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
   expect(modal!.textContent).toContain('videoEditor.app.recordAudioStart');
   expect(modal!.textContent).toContain('gallery.videoReview.voiceoverDurationLimit');
@@ -80,7 +81,7 @@ it('stays closed when isOpen is false', () => {
   expect(host.querySelector('[role="dialog"]')).toBeNull();
 });
 
-it('shows recording, pause, resume and take review with the same lower panel', async () => {
+it('shows recording, pause, resume and take review with the same inspector', async () => {
   class Recorder extends EventTarget {
     static isTypeSupported = () => true;
     state = 'inactive';
@@ -235,5 +236,42 @@ it.each([false, true])('uses only the optional capture limit (enabled=%s)', asyn
     }
   } finally {
     vi.useRealTimers();
+  }
+});
+
+it('uses ordinary Tab navigation, requests close on Escape, and restores the opener', async () => {
+  const opener = document.createElement('button');
+  document.body.append(opener);
+  opener.focus();
+  const { onClose } = renderRecording(true);
+  const panel = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.voiceoverInspector"]'
+  )!;
+  expect(document.activeElement).toBe(panel);
+  const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+  act(() => panel.dispatchEvent(tab));
+  expect(tab.defaultPrevented).toBe(false);
+  act(() =>
+    panel.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+  await act(async () => renderRecording(false));
+  expect(document.activeElement).toBe(opener);
+  opener.remove();
+});
+
+it('preserves focus on shared navigation when capture renders again', () => {
+  renderRecording(true);
+  const navigation = document.createElement('button');
+  navigation.textContent = 'Scene';
+  document.body.append(navigation);
+  try {
+    navigation.focus();
+    renderRecording(true);
+    expect(document.activeElement).toBe(navigation);
+  } finally {
+    navigation.remove();
   }
 });

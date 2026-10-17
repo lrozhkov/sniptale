@@ -730,17 +730,20 @@ it('imports a file dropped on the music lane at the drop point', async () => {
   }
 });
 
-it('isolates quick-review controls while the lower voiceover strip is open and restores them on close', async () => {
+it('isolates editing controls while the voiceover tab is open and restores them on close', async () => {
   const fixture = createEditorFixture(integration);
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('advancedEditing');
     await click('recordVoiceover');
-    const modal = host.querySelector('[role="dialog"]');
+    const modal = host.querySelector('[data-ui="gallery.videoReview.voiceoverInspector"]');
     expect(modal).not.toBeNull();
     expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
-    expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).not.toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).toBeNull();
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')?.textContent
+    ).toContain('gallery.videoReview.recordVoiceover');
     expect(host.querySelector('[inert]')).not.toBeNull();
     await act(async () =>
       modal!.querySelector<HTMLButtonElement>('[aria-label="common.actions.close"]')!.click()

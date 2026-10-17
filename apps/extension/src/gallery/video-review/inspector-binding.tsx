@@ -143,7 +143,9 @@ export function ReviewInspectorBinding({
   resizeHandle,
   preview,
   onJoinPreview,
+  recording,
 }: {
+  recording?: ReactNode;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   preview?: ReactNode;
   resizeHandle?: ReactNode;
@@ -163,6 +165,7 @@ export function ReviewInspectorBinding({
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
+        recording={recording}
         textDocument={reviewInspectorTextDocument(state, canvasComments)}
         speech={
           <ReviewSourceSpeechBinding

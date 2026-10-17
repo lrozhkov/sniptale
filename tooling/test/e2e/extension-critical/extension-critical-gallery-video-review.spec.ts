@@ -2713,7 +2713,7 @@ for (const variant of [
   { locale: 'en' as const, theme: 'dark' as const },
 ]) {
   const testName =
-    `quick editor voiceover strip supports pause and optional cap at desktop sizes ` +
+    `quick editor voiceover inspector supports pause and optional cap at desktop sizes ` +
     `in ${variant.locale}/${variant.theme}`;
   test(testName, async ({ page }, testInfo) => {
     const host = await startHostServer();
@@ -2740,7 +2740,7 @@ for (const variant of [
       await button('gallery.videoReview.pointerTool').click();
       await timelineGesture(page, 3);
       await button('gallery.videoReview.recordVoiceover').click();
-      const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverStrip"]');
+      const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverInspector"]');
       await expect(strip).toBeVisible();
       await expect(
         strip.getByRole('switch', {
@@ -2798,7 +2798,7 @@ for (const variant of [
       await expect(startCapture).toBeEnabled();
       await expect(numericLimit).toBeInViewport();
       await expect(startCapture).toBeInViewport();
-      await expect(dialog.locator('[inert]')).toHaveCount(1);
+      await expect(dialog.locator('[inert]')).toHaveCount(5);
       await page.screenshot({
         fullPage: false,
         path: testInfo.outputPath(`voiceover-ready-${variant.locale}-${variant.theme}.png`),
@@ -2866,7 +2866,11 @@ for (const variant of [
             .evaluate((video) => video.muted)
         )
         .toBe(true);
-      const playback = dialog.locator('[data-toolbar-transport] button[aria-pressed]');
+      const playback = dialog
+        .locator('[data-toolbar-transport]')
+        .locator(
+          `button[aria-label=${JSON.stringify(translate('gallery.videoReview.play', variant.locale))}], button[aria-label=${JSON.stringify(translate('gallery.videoReview.pause', variant.locale))}]`
+        );
       await expect(playback).toHaveAttribute(
         'aria-label',
         translate(
@@ -2875,7 +2879,7 @@ for (const variant of [
         )
       );
       await expect(
-        playback.locator(variant.locale === 'ru' ? 'svg.lucide-pause' : 'svg.lucide-play')
+        playback.locator(variant.locale === 'ru' ? 'svg:has(rect)' : 'svg.lucide-play')
       ).toHaveCount(1);
       await expect(playback.locator('[data-review-toolbar-label]')).toHaveCount(0);
       await page.screenshot({

@@ -202,7 +202,11 @@
   border-color: var(--sniptale-color-accent);
   box-shadow: none;
 }
-:is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch):disabled {
+:is(
+  .sniptale-inspector-surface .sniptale-glass-switch,
+  .sniptale-compact-switch,
+  .sniptale-compact-switches .sniptale-product-toggle
+):disabled {
   opacity: 0.4;
 }
 .sniptale-inspector-surface
@@ -579,7 +583,11 @@
 }
 
 .sniptale-compact-workspace
-  :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch) {
+  :is(
+    .sniptale-inspector-surface .sniptale-glass-switch,
+    .sniptale-compact-switch,
+    .sniptale-compact-switches .sniptale-product-toggle
+  ) {
   position: relative;
   display: block;
   width: 40px;
@@ -592,7 +600,11 @@
   transform: none;
 }
 .sniptale-compact-workspace
-  :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch)::before {
+  :is(
+    .sniptale-inspector-surface .sniptale-glass-switch,
+    .sniptale-compact-switch,
+    .sniptale-compact-switches .sniptale-product-toggle
+  )::before {
   content: '';
   position: absolute;
   inset-inline: 12px;
@@ -604,13 +616,18 @@
 .sniptale-compact-workspace
   :is(
     .sniptale-inspector-surface .sniptale-glass-switch--on,
-    .sniptale-compact-switch.sniptale-glass-switch--on
+    .sniptale-compact-switch.sniptale-glass-switch--on,
+    .sniptale-compact-switches .sniptale-product-toggle-checked
   )::before {
   background: var(--sniptale-color-accent);
 }
 .sniptale-compact-workspace
-  :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch)
-  .sniptale-glass-switch-thumb {
+  :is(
+    .sniptale-inspector-surface .sniptale-glass-switch,
+    .sniptale-compact-switch,
+    .sniptale-compact-switches .sniptale-product-toggle
+  )
+  :is(.sniptale-glass-switch-thumb, .sniptale-product-toggle-thumb) {
   position: absolute;
   top: calc(50% - 8px);
   inset-inline-start: 4px;
@@ -626,15 +643,20 @@
 .sniptale-compact-workspace
   :is(
     .sniptale-inspector-surface .sniptale-glass-switch--on,
-    .sniptale-compact-switch.sniptale-glass-switch--on
+    .sniptale-compact-switch.sniptale-glass-switch--on,
+    .sniptale-compact-switches .sniptale-product-toggle-checked
   )
-  .sniptale-glass-switch-thumb {
+  :is(.sniptale-glass-switch-thumb, .sniptale-product-toggle-thumb) {
   transform: translateX(16px);
 }
 @media (prefers-reduced-motion: reduce) {
   .sniptale-compact-workspace
-    :is(.sniptale-inspector-surface .sniptale-glass-switch, .sniptale-compact-switch)
-    .sniptale-glass-switch-thumb {
+    :is(
+      .sniptale-inspector-surface .sniptale-glass-switch,
+      .sniptale-compact-switch,
+      .sniptale-compact-switches .sniptale-product-toggle
+    )
+    :is(.sniptale-glass-switch-thumb, .sniptale-product-toggle-thumb) {
     transition: none;
   }
 }

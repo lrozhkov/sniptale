@@ -19,7 +19,7 @@ import {
   FileDown,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
@@ -38,7 +38,8 @@ type InspectorSection =
   | 'history'
   | 'preview'
   | 'speech'
-  | 'text';
+  | 'text'
+  | 'recording';
 
 function inspectorNavigationOptions(args: {
   shown: InspectorSection;
@@ -47,11 +48,17 @@ function inspectorNavigationOptions(args: {
   selectionLabel: string | undefined;
   actionHistory: boolean;
   actions: boolean;
+  recording?: boolean;
 }): { id: InspectorSection; label: string }[] {
   const options: { id: InspectorSection; label: string }[] = [];
   options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
   if (args.settingsAvailable)
     options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
+  if (args.recording)
+    return [
+      ...options,
+      { id: 'recording', label: translate('gallery.videoReview.recordVoiceover') },
+    ];
   if (args.shown === 'preview') {
     options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
     return options;
@@ -71,6 +78,7 @@ function inspectorNavigationOptions(args: {
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
+  recording?: ReactNode;
   beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
   annotations: readonly ReviewAnnotation[];
@@ -110,6 +118,12 @@ export function ReviewInspector(props: {
 }) {
   const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
   const previewHost = useRef<HTMLDivElement>(null);
+  const [recordingTab, setRecordingTab] = useState(true);
+  const recordingAvailable = !!props.recording;
+  const recordingShown = recordingAvailable && recordingTab;
+  useEffect(() => {
+    if (!recordingAvailable) setRecordingTab(true);
+  }, [recordingAvailable]);
   useEffect(() => {
     if (shown === 'preview') previewHost.current?.focus({ preventScroll: true });
   }, [shown]);
@@ -130,30 +144,33 @@ export function ReviewInspector(props: {
         }`}
       >
         {props.resizeHandle}
-        <ReviewInspectorHeader
-          {...props}
-          onBack={props.onBack}
-          presentation={presentation}
-          section={shown}
-          onTogglePresentation={() =>
-            (props.beforeAction ?? ((action) => action()))(() =>
-              setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
-            )
-          }
-        />
-        <ReviewInspectorStatus {...props} />
+        <div inert={!!props.recording}>
+          <ReviewInspectorHeader
+            {...props}
+            onBack={props.onBack}
+            presentation={presentation}
+            section={shown}
+            onTogglePresentation={() =>
+              (props.beforeAction ?? ((action) => action()))(() =>
+                setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
+              )
+            }
+          />
+          <ReviewInspectorStatus {...props} />
+        </div>
         {props.settingsAvailable ||
         props.selectionLabel ||
         props.actions ||
         shown === 'preview' ||
-        shown === 'speech' ? (
+        shown === 'speech' ||
+        props.recording ? (
           <div
             className="review-inspector-navigation shrink-0"
             data-ui="gallery.videoReview.inspectorNavigation"
           >
             <SegmentedSwitch<InspectorSection>
               density="compact"
-              activeId={shown}
+              activeId={recordingShown ? 'recording' : shown}
               ariaLabel={translate('gallery.videoReview.inspector')}
               options={inspectorNavigationOptions({
                 shown,
@@ -162,18 +179,27 @@ export function ReviewInspector(props: {
                 selectionLabel: props.selectionLabel,
                 actionHistory: !!props.actionHistory,
                 actions: !!props.actions,
+                recording: !!props.recording,
               })}
-              onChange={setSection}
+              onChange={(section) => {
+                if (props.recording) setRecordingTab(section === 'recording');
+                if (section !== 'recording') setSection(section);
+              }}
             />
           </div>
         ) : null}
-        <div hidden={shown !== 'history'} className="review-history-host min-h-0 flex-1">
+        <div
+          inert={!!props.recording}
+          hidden={recordingShown || shown !== 'history'}
+          className="review-history-host min-h-0 flex-1"
+        >
           <ReviewInspectorPresentation value={presentation} section="history">
             {props.actionHistory}
           </ReviewInspectorPresentation>
         </div>
         <div
-          hidden={shown === 'history'}
+          inert={!!props.recording}
+          hidden={recordingShown || shown === 'history'}
           ref={scroll}
           className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
         >
@@ -209,7 +235,17 @@ export function ReviewInspector(props: {
             )}
           </ReviewInspectorPresentation>
         </div>
-        <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
+        {props.recording ? (
+          <div
+            hidden={!recordingShown}
+            className="min-h-0 flex-1 overflow-y-auto"
+            data-ui="gallery.videoReview.recordingTab"
+          >
+            {props.recording}
+          </div>
+        ) : (
+          <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
+        )}
       </aside>
     </InspectorLayout>
   );
