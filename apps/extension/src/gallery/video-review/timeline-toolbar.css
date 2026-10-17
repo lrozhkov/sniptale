@@ -109,17 +109,6 @@
 }
 
 @layer utilities {
-  .sniptale-compact-workspace button.review-command[data-command-chrome='true'],
-  .sniptale-compact-workspace
-    button.review-command[data-command-chrome='true']:is(:hover, :active, :focus-visible) {
-    border-color: transparent !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    color: var(--sniptale-color-text-secondary) !important;
-  }
-  .sniptale-compact-workspace button.review-command[data-command-chrome='true']:enabled:hover {
-    color: var(--sniptale-color-text-primary) !important;
-  }
   .sniptale-compact-workspace button.review-command:focus-visible {
     outline: 2px solid var(--sniptale-color-accent) !important;
     outline-offset: -2px;
