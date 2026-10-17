@@ -200,3 +200,87 @@ describe('ExportSelectionSectionShell', () => {
     expect(document.activeElement).toBe(back);
   });
 });
+
+it.each([
+  ['selection', 'back'],
+  ['selection', 'Escape'],
+  ['settings', 'back'],
+  ['settings', 'Escape'],
+])('restores the remounted %s opener after %s', async (origin, method) => {
+  const props = await renderShell({ onOpenSettings: vi.fn(), settingsAriaLabel: 'Settings' });
+  const selector = `[data-ui="popup.export.selection-${origin === 'settings' ? 'settings' : 'trigger'}"]`;
+  const opener = container?.querySelector<HTMLButtonElement>(selector);
+  await act(async () => {
+    opener?.focus();
+    opener?.click();
+  });
+  await act(async () => {
+    root?.render(<ExportSelectionSectionShell {...props} isOpen />);
+  });
+  expect(opener?.isConnected).toBe(false);
+  await act(async () => {
+    if (method === 'Escape')
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    else
+      container
+        ?.querySelector<HTMLButtonElement>('[data-ui="popup.inline-curtain.header"] button')
+        ?.click();
+  });
+  expect(props.onClose).toHaveBeenCalledOnce();
+  await act(async () => {
+    root?.render(<ExportSelectionSectionShell {...props} isOpen={false} />);
+  });
+  expect(document.activeElement).toBe(container?.querySelector(selector));
+});
+
+it.each([false, true])(
+  'keeps export open when Escape dismisses its nested listbox (empty: %s)',
+  async (empty) => {
+    const onChange = vi.fn();
+    const props = await renderShell({
+      isOpen: true,
+      children: (
+        <PopupSelect
+          aria-label="Nested policy"
+          options={empty ? [] : [{ label: 'First', value: 'first' }]}
+          value="first"
+          onChange={onChange}
+        />
+      ),
+    });
+    const nested = container?.querySelector<HTMLButtonElement>('[aria-label="Nested policy"]');
+    await act(async () => nested?.click());
+    expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
+    const target = document.body.querySelector('[role="option"]') ?? nested;
+    await act(async () =>
+      target?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(nested);
+    await act(async () =>
+      nested?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(props.onClose).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps editing focus while refreshing the open drawer callbacks', async () => {
+  const props = await renderShell({
+    isOpen: true,
+    children: <input aria-label="Draft" defaultValue="Editing" />,
+  });
+  const input = container?.querySelector<HTMLInputElement>('[aria-label="Draft"]');
+  await act(async () => input?.focus());
+  const nextClose = vi.fn();
+  await act(async () => {
+    root?.render(<ExportSelectionSectionShell {...props} onClose={nextClose} />);
+  });
+  expect(document.activeElement).toBe(input);
+  await act(async () =>
+    input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(nextClose).toHaveBeenCalledOnce();
+  expect(props.onClose).not.toHaveBeenCalled();
+});

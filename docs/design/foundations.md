@@ -53,6 +53,8 @@ Noneditable labels do not use text cursors. Disabled controls cannot react as av
 
 Use semantic foreground, surface, boundary, focus, and accent roles in both themes. Quiet inspector controls reveal neutral hover surfaces/boundaries. Persistent borders require a task reason. Dropdowns use light glass with opaque text and state marks. Provide solid fallbacks without blur, under reduced transparency, and in forced colors.
 
+A fill or boundary accent does not automatically provide a readable small-text color. Use a text foreground role for labels that need a different shade, including selected and hovered states.
+
 Check rendered backdrops: ordinary text needs 4.5:1, large text 3:1. Essential boundaries, state indicators, and focus markers need applicable 3:1 contrast. Add structural/textual state indications beyond hue. The rejected heavy slider track is not a contrast fix. Record unresolved contrast decisions.
 
 Inspector content uses panel material. Canvas material belongs to the underlying workspace. Similar dark colors do not make these surfaces interchangeable.

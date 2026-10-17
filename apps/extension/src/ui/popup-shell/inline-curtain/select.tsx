@@ -268,15 +268,31 @@ function useInlineCurtainLifecycle({
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const wasOpenRef = useRef(false);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!openPanel) {
-      if (wasOpenRef.current) triggerRef.current?.focus();
+      if (wasOpenRef.current) {
+        const opener = openerRef.current;
+        (opener?.isConnected && !opener.disabled ? opener : triggerRef.current)?.focus();
+      }
+      openerRef.current = null;
       wasOpenRef.current = false;
       return;
+    }
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLButtonElement &&
+      rootRef.current?.contains(active) &&
+      active.getAttribute('aria-controls') === panelId
+    ) {
+      openerRef.current = active;
+    } else if (!wasOpenRef.current) {
+      openerRef.current = triggerRef.current;
     }
     wasOpenRef.current = true;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (rootRef.current?.querySelector('[aria-haspopup="listbox"][aria-expanded="true"]')) return;
       event.preventDefault();
       event.stopPropagation();
       setOpenPanel(null);

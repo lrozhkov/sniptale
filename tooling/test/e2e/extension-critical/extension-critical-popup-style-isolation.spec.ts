@@ -1,13 +1,25 @@
-import { expect, test, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import {
+  translate,
+  type AppLocale,
+  type TranslationKey,
+} from '../../../../apps/extension/src/platform/i18n';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 
 const viewport = { width: 392, height: 560 };
 const routes = ['menu', 'screenshots', 'video', 'tools', 'export'] as const;
 
-async function inspectPopupTypography(page: Page) {
-  const layout = await page.evaluate(() => {
-    const root = document.querySelector('[data-ui="popup.app.root"]');
+async function inspectPopupTypography(
+  page: Page,
+  mode: 'root' | 'scrolling-panel' | 'floating-menu' = 'root'
+) {
+  const layout = await page.evaluate((surface) => {
+    const root =
+      surface === 'root'
+        ? document.querySelector('[data-ui="popup.app.root"]')
+        : surface === 'scrolling-panel'
+          ? document.querySelector('[data-ui="popup.inline-curtain.header"]')?.parentElement
+          : document.querySelector('[role="listbox"][data-floating-ui-root="true"]');
     if (!(root instanceof HTMLElement)) throw new Error('Popup root is unavailable');
     const bounds = root.getBoundingClientRect();
     const clipped: string[] = [];
@@ -101,7 +113,18 @@ async function inspectPopupTypography(page: Page) {
       horizontalOverflow: document.documentElement.scrollWidth > bounds.width + 1,
       family: getComputedStyle(root).fontFamily,
     };
-  });
+  }, mode);
+  expect(
+    layout.contrast.filter(({ ratio }) => ratio < 4.5),
+    'Enabled text contrast'
+  ).toEqual([]);
+  expect(layout.family).toContain('Sniptale Interface');
+  if (mode !== 'root') {
+    await page.locator('[data-popup-font-proof]').evaluateAll((elements) => {
+      elements.forEach((element) => element.removeAttribute('data-popup-font-proof'));
+    });
+    return layout;
+  }
   const session = await page.context().newCDPSession(page);
   try {
     await session.send('DOM.enable');
@@ -128,11 +151,6 @@ async function inspectPopupTypography(page: Page) {
       ).toBe(true);
       expect(fonts.some((font) => /Manrope/u.test(font.familyName))).toBe(false);
     }
-    expect(
-      layout.contrast.filter(({ ratio }) => ratio < 4.5),
-      'Enabled text contrast'
-    ).toEqual([]);
-    expect(layout.family).toContain('Sniptale Interface');
     expect(layout.clipped, 'Visible labels and controls must fit the popup').toEqual([]);
     expect(layout.horizontalOverflow).toBe(false);
     return { ...layout, painted };
@@ -144,11 +162,151 @@ async function inspectPopupTypography(page: Page) {
   }
 }
 
+async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, info: TestInfo) {
+  async function inspect(key: TranslationKey) {
+    const trigger = page.getByRole('button', { name: translate(key, locale), exact: true });
+    await expect(trigger).toBeEnabled();
+    await trigger.click();
+    const header = page.locator('[data-ui="popup.inline-curtain.header"]');
+    await expect(header).toBeVisible();
+    const panel = header.locator('..');
+    await panel.evaluate(async (node) => {
+      await Promise.allSettled(
+        node
+          .getAnimations({ subtree: true })
+          .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+          .map((animation) => animation.finished)
+      );
+    });
+    const layout = await inspectPopupTypography(page, 'scrolling-panel');
+    const geometry = await panel.evaluate((node) => ({
+      width: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+      height: node.clientHeight,
+      scrollHeight: node.scrollHeight,
+    }));
+    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.width + 1);
+    await page.screenshot({
+      path: info.outputPath(`${key}.png`),
+      fullPage: false,
+      animations: 'disabled',
+    });
+    if (geometry.scrollHeight > geometry.height + 1) {
+      const last = panel.locator('button:enabled, input:enabled, select:enabled').last();
+      await last.scrollIntoViewIfNeeded();
+      const end = (await last.boundingBox())!;
+      const bounds = (await panel.boundingBox())!;
+      expect(end.y + end.height).toBeLessThanOrEqual(bounds.y + bounds.height + 1);
+      await page.screenshot({
+        path: info.outputPath(`${key}-bottom.png`),
+        fullPage: false,
+        animations: 'disabled',
+      });
+    }
+    await info.attach(`${key}-readability`, {
+      body: JSON.stringify({ layout, geometry }),
+      contentType: 'application/json',
+    });
+    await header.getByRole('button').click();
+    await expect(header).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
+  if (route === 'video') {
+    for (const key of [
+      'popup.video.presetRowAria',
+      'popup.video.qualityAria',
+      'popup.video.outputSettingsActionAria',
+      'popup.video.countdownLabel',
+    ] as const)
+      await inspect(key);
+    for (const key of [
+      'popup.video.microphoneToggleLabel',
+      'popup.video.webcamToggleLabel',
+    ] as const) {
+      const toggle = page
+        .locator('[data-ui="popup.icon-state-button"]')
+        .and(page.getByRole('button', { name: translate(key, locale), exact: true }));
+      if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    }
+    for (const key of [
+      'popup.video.microphoneAria',
+      'popup.video.microphoneSettingsActionAria',
+      'popup.video.webcamAria',
+      'popup.video.webcamSettingsActionAria',
+    ] as const)
+      await inspect(key);
+  }
+  if (route === 'export') {
+    for (const label of ['Настройки снимка', 'Настройки захвата страниц']) {
+      const trigger = page.getByRole('button', { name: label, exact: true });
+      await trigger.click();
+      const header = page.locator('[data-ui="popup.inline-curtain.header"]');
+      await expect(header).toBeVisible();
+      await inspectPopupTypography(page, 'scrolling-panel');
+      const checkbox = header.locator('..').getByRole('checkbox').first();
+      if (await checkbox.count()) {
+        const accepted = await checkbox.isChecked();
+        await checkbox.click();
+        await expect(checkbox).toBeChecked({ checked: !accepted });
+        await expect(checkbox).toBeFocused();
+        await checkbox.click();
+        await expect(checkbox).toBeChecked({ checked: accepted });
+        await expect(checkbox).toBeFocused();
+      }
+      const selects = header.locator('..').locator('[aria-haspopup="listbox"]');
+      for (let index = 0; index < (await selects.count()); index += 1) {
+        const select = selects.nth(index);
+        const accepted = await select.innerText();
+        await select.click();
+        const menu = page.getByRole('listbox');
+        await expect(menu).toBeVisible();
+        await inspectPopupTypography(page, 'floating-menu');
+        const bounds = (await menu.boundingBox())!;
+        expect(bounds.x).toBeGreaterThanOrEqual(-1);
+        expect(bounds.y).toBeGreaterThanOrEqual(-1);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 1);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height + 1);
+        await page.screenshot({
+          path: info.outputPath(`${label}-menu-${index}.png`),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await page.keyboard.press('Escape');
+        await expect(menu).toHaveCount(0);
+        await expect(header).toBeVisible();
+        await expect(select).toBeFocused();
+        await expect(select).toHaveText(accepted);
+        if (index === 0) {
+          await select.click();
+          const next = menu
+            .locator('[role="option"][aria-selected="false"]:not(:disabled)')
+            .first();
+          const nextLabel = await next.locator('.sniptale-select-value-label-menu').innerText();
+          await next.click();
+          await expect(menu).toHaveCount(0);
+          await expect(header).toBeVisible();
+          await expect(select).toBeFocused();
+          await expect(select).toContainText(nextLabel);
+        }
+      }
+      await page.screenshot({
+        path: info.outputPath(`${label}.png`),
+        fullPage: false,
+        animations: 'disabled',
+      });
+      await header.getByRole('button').click();
+      await expect(header).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    }
+  }
+}
+
 for (const locale of ['ru', 'en'] as const) {
   for (const theme of ['light', 'dark'] as const) {
     test(`popup stylesheet isolation ${locale} ${theme}`, async ({}, info) => {
       test.setTimeout(60_000);
-      const launched = await launchExtensionBrowser({ viewport });
+      const launched = await launchExtensionBrowser({ viewport, fakeMediaDevices: true });
       try {
         const settings = await launched.context.newPage();
         await settings.setViewportSize({ width: 1280, height: 560 });
@@ -188,7 +346,11 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(root).toBeVisible();
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         for (const route of routes) {
-          await page.locator(`[data-ui="popup.app.tabs"] button[data-page="${route}"]`).click();
+          const navigation = page.locator(
+            `[data-ui="popup.app.tabs"] button[data-page="${route}"]`
+          );
+          await navigation.click();
+          await expect(navigation).toHaveAttribute('data-active', 'true');
           await expect(page.locator('[data-ui="popup.app.content"]')).not.toHaveAttribute(
             'aria-busy',
             'true'
@@ -241,7 +403,12 @@ for (const locale of ['ru', 'en'] as const) {
             body: JSON.stringify(typography, null, 2),
             contentType: 'application/json',
           });
-          await page.screenshot({ path: info.outputPath(`popup-${route}.png`), fullPage: false });
+          await page.screenshot({
+            path: info.outputPath(`popup-${route}.png`),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          if (locale === 'ru') await inspectPopupPanels(page, locale, route, info);
         }
       } finally {
         await closeExtensionBrowser(launched, { removeUserDataDir: true });

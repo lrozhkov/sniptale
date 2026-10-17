@@ -1,5 +1,5 @@
 import type { ReactNode, RefObject } from 'react';
-import { useEffect, useId, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n/popup';
@@ -44,15 +44,16 @@ function useInlineDrawerDismiss(
   isOpen: boolean,
   onClose: () => void,
   rootRef: RefObject<HTMLDivElement | null>,
-  triggerRef: RefObject<HTMLButtonElement | null>
+  restoreFocus: () => void
 ) {
   const wasOpenRef = useRef(false);
   useEffect(() => {
     if (!isOpen) {
-      if (wasOpenRef.current) triggerRef.current?.focus();
+      if (wasOpenRef.current) restoreFocus();
       wasOpenRef.current = false;
       return;
     }
+    const justOpened = !wasOpenRef.current;
     wasOpenRef.current = true;
 
     function handlePointerDown(event: PointerEvent) {
@@ -67,6 +68,8 @@ function useInlineDrawerDismiss(
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        if (rootRef.current?.querySelector('[aria-haspopup="listbox"][aria-expanded="true"]'))
+          return;
         event.preventDefault();
         event.stopPropagation();
         onClose();
@@ -92,12 +95,14 @@ function useInlineDrawerDismiss(
 
     document.addEventListener('pointerdown', handlePointerDown, true);
     document.addEventListener('keydown', handleKeyDown, true);
-    queueMicrotask(() => rootRef.current?.querySelector<HTMLElement>('button')?.focus());
+    if (justOpened) {
+      queueMicrotask(() => rootRef.current?.querySelector<HTMLElement>('button')?.focus());
+    }
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown, true);
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [isOpen, onClose, rootRef, triggerRef]);
+  }, [isOpen, onClose, rootRef, restoreFocus]);
 }
 
 export function ExportSelectionSectionShell({
@@ -116,9 +121,15 @@ export function ExportSelectionSectionShell({
 }: ExportSelectionSectionShellProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const openerRef = useRef<'selection' | 'settings'>('selection');
   const drawerId = useId();
+  const restoreFocus = useCallback(() => {
+    const target = openerRef.current === 'settings' ? settingsTriggerRef.current : null;
+    (target ?? triggerRef.current)?.focus();
+  }, []);
 
-  useInlineDrawerDismiss(isOpen, onClose, rootRef, triggerRef);
+  useInlineDrawerDismiss(isOpen, onClose, rootRef, restoreFocus);
 
   if (isOpen) {
     return (
@@ -170,7 +181,10 @@ export function ExportSelectionSectionShell({
           aria-expanded={isOpen}
           className={triggerClassName}
           data-ui="popup.export.selection-trigger"
-          onClick={onOpen}
+          onClick={() => {
+            openerRef.current = 'selection';
+            onOpen();
+          }}
         >
           <span
             className={[
@@ -200,7 +214,11 @@ export function ExportSelectionSectionShell({
               'hover:text-[var(--sniptale-color-text-primary)]',
             ].join(' ')}
             data-ui="popup.export.selection-settings"
-            onClick={onOpenSettings}
+            ref={settingsTriggerRef}
+            onClick={() => {
+              openerRef.current = 'settings';
+              onOpenSettings();
+            }}
           >
             {translate('popup.export.settingsAction')}
           </button>

@@ -57,6 +57,9 @@ body {
 }
 
 .popup-react-shell {
+  --sniptale-color-text-muted: #92929b;
+  --sniptale-color-text-dim: var(--sniptale-color-text-muted);
+  --sniptale-popup-color-text-accent: var(--sniptale-color-accent);
   --sniptale-popup-font-weight-label: 450;
   --sniptale-popup-font-weight-heading: 500;
   --sniptale-popup-font-weight-emphasis: 550;
@@ -78,6 +81,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+:root[data-theme='light'] .popup-react-shell {
+  --sniptale-color-text-muted: #5f6673;
+  --sniptale-popup-color-text-accent: #b13e0d;
 }
 
 .popup-react-shell
