@@ -246,7 +246,14 @@ async function geometry(page: Page) {
   const heading = main.getByRole('heading', { level: 1 });
   await expect(heading).toHaveCSS('font-size', '14px');
   await expect(heading).toHaveCSS('line-height', '20px');
-  await expect(heading).toHaveCSS('font-weight', '600');
+  await expect.soft(heading).toHaveCSS('font-weight', '500', { timeout: 500 });
+  if ((await heading.getAttribute('id')) === 'camera-recorder-title') {
+    const devices = main.locator('div.select-text[title]');
+    await expect(devices).toHaveCount(2);
+    for (const device of await devices.all()) {
+      await expect.soft(device).toHaveCSS('font-weight', '400', { timeout: 500 });
+    }
+  }
   expect(await main.locator('button[data-command-press]').count()).toBeGreaterThanOrEqual(4);
   for (const button of await main.locator('button[data-command-press]').all()) {
     await expect(button).toHaveCSS('height', '32px');

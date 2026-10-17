@@ -54,7 +54,7 @@ export function CameraPostRecordPanel({
     <main className={POST_RECORD_MAIN_CLASS} data-ui="camera-recorder.result">
       <section className={POST_RECORD_PANEL_CLASS} aria-labelledby="camera-recorder-result-title">
         <div className="text-center">
-          <h1 id="camera-recorder-result-title" className="m-0 text-[14px] leading-5 font-semibold">
+          <h1 id="camera-recorder-result-title" className="m-0 text-[14px] leading-5 font-medium">
             {translate('popup.video.postRecordTitle')}
           </h1>
           <div className="mt-1 text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-muted-strong)]">

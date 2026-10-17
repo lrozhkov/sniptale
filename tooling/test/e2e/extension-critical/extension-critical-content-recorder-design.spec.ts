@@ -187,11 +187,15 @@ async function interfaceFont(root: Locator) {
 }
 
 async function canonicalCommand(target: Locator) {
+  await target.page().mouse.move(0, 0);
   await expect(target).toHaveCSS('height', '32px');
   await expect(target).toHaveCSS('border-radius', '4px');
   await expect(target).toHaveCSS('font-size', '13px');
   await expect(target).toHaveCSS('line-height', '18px');
-  await expect(target).toHaveCSS('font-weight', '500');
+  await expect(target).toHaveCSS(
+    'font-weight',
+    (await target.getAttribute('data-command-active')) === 'true' ? '500' : '400'
+  );
 }
 
 async function keyboardPaint(target: Locator) {
@@ -289,7 +293,7 @@ async function scenarioOverlays(page: Page, c: Composition, info: TestInfo) {
   const value = metadata.locator('dd').first();
   await expect(name).toHaveCSS('font-size', '13px');
   await expect(name).toHaveCSS('line-height', '18px');
-  await expect(name).toHaveCSS('font-weight', '500');
+  await expect.soft(name).toHaveCSS('font-weight', '400', { timeout: 500 });
   await expect(name).toHaveCSS('user-select', 'none');
   await expect(value).toHaveCSS('user-select', 'text');
   const valueTextPoint = await value.evaluate((node) => {
@@ -381,7 +385,7 @@ async function sidebarGeometry(page: Page) {
   const name = ui(page, 'content.scenario.sidebar.capture-mode').locator('legend');
   await expect(name).toHaveCSS('font-size', '13px');
   await expect(name).toHaveCSS('line-height', '18px');
-  await expect(name).toHaveCSS('font-weight', '500');
+  await expect.soft(name).toHaveCSS('font-weight', '400', { timeout: 500 });
   await inside(ui(page, 'content.scenario.sidebar.finish'), page);
 }
 

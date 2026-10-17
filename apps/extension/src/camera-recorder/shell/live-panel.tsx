@@ -64,7 +64,7 @@ function CameraLiveDetails(props: {
     <div className={LIVE_DETAILS_CLASS}>
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 id="camera-recorder-title" className="m-0 text-[14px] leading-5 font-semibold">
+          <h1 id="camera-recorder-title" className="m-0 text-[14px] leading-5 font-medium">
             {translate('popup.video.cameraWindowTitle')}
           </h1>
           <div className="mt-0.5 text-[12px] leading-4 font-normal text-[var(--sniptale-color-text-muted-strong)]">
@@ -115,7 +115,7 @@ function CameraNameBlock({ webcamLabel }: { webcamLabel: string }) {
         {translate('popup.video.activeWebcamLabel')}
       </div>
       <div
-        className="mt-0.5 max-w-[680px] select-text truncate text-[13px] leading-[18px] font-medium"
+        className="mt-0.5 max-w-[680px] select-text truncate text-[13px] leading-[18px] font-normal"
         title={webcamLabel}
       >
         {webcamLabel}
@@ -155,7 +155,7 @@ function MicrophoneBlock(props: {
           {translate('popup.video.activeMicrophoneLabel')}
         </div>
         <div
-          className="select-text truncate text-[13px] leading-[18px] font-medium"
+          className="select-text truncate text-[13px] leading-[18px] font-normal"
           title={props.media.microphoneLabel}
         >
           {props.media.microphoneLabel}

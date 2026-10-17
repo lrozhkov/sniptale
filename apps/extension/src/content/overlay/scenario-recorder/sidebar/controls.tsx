@@ -17,7 +17,7 @@ export type ScenarioSidebarControlsProps = {
 export function ScenarioSidebarCaptureMode(props: ScenarioSidebarControlsProps) {
   return (
     <fieldset className="grid min-w-0 gap-1.5" data-ui="content.scenario.sidebar.capture-mode">
-      <legend className="mb-1 text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
+      <legend className="mb-1 text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-muted-strong)]">
         {translate('scenario.content.captureMode')}
       </legend>
       <div className="grid grid-cols-2 gap-1">
