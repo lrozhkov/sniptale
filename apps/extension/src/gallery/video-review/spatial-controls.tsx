@@ -1,6 +1,7 @@
 import { createContext, useLayoutEffect, useState, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { Focus, Move, RotateCw, Scan } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -26,6 +27,7 @@ const toolIcons = { position: Move, tilt: Scan, rotation: RotateCw, focus: Focus
 export const ReviewSpatialToolContext = createContext<{
   tool: SpatialTool;
   onTool(tool: SpatialTool): void;
+  resetTarget: HTMLElement | null;
 } | null>(null);
 
 /** Navigation stays outside the canvas capture scope and never mutates the selected target. */
@@ -36,8 +38,29 @@ export function ReviewSpatialToolbar(props: {
   onTool(tool: SpatialTool): void;
   onAxis(axis: SpatialAxis): void;
   onReset(): void;
+  /** Undefined retains standalone placement; null waits for the inspector destination. */
+  resetTarget?: HTMLElement | null | undefined;
   children?: ReactNode;
 }) {
+  const reset = (
+    <div className="review-spatial-reset">
+      <ReviewButton
+        type="button"
+        className={reviewTextButtonClassName}
+        label={translate(
+          props.tool === 'position'
+            ? 'gallery.videoReview.spatialResetPosition'
+            : props.tool === 'tilt'
+              ? 'gallery.videoReview.spatialResetTilt'
+              : props.tool === 'rotation'
+                ? 'gallery.videoReview.spatialResetRotation'
+                : 'gallery.videoReview.spatialResetFocus'
+        )}
+        disabled={props.disabled}
+        onClick={props.onReset}
+      />
+    </div>
+  );
   return (
     <div className="review-spatial-toolbar" data-ui="gallery.videoReview.spatialTools">
       <div
@@ -48,11 +71,12 @@ export function ReviewSpatialToolbar(props: {
         {(['position', 'tilt', 'rotation', 'focus'] as const).map((tool) => {
           const Icon = toolIcons[tool];
           return (
-            <ContentToolbarButton
+            <ProductActionButton
               type="button"
               key={tool}
-              size="compact"
-              tone="utility"
+              compact
+              tone="toggle"
+              active={props.tool === tool}
               className={`review-spatial-tool ${props.tool === tool ? 'review-spatial-tool-active' : ''}`}
               aria-label={translate(toolLabels[tool])}
               aria-pressed={props.tool === tool}
@@ -64,7 +88,7 @@ export function ReviewSpatialToolbar(props: {
               <span aria-hidden="true" className="review-spatial-tool-label">
                 {translate(toolLabels[tool])}
               </span>
-            </ContentToolbarButton>
+            </ProductActionButton>
           );
         })}
       </div>
@@ -88,23 +112,11 @@ export function ReviewSpatialToolbar(props: {
           props.children
         )}
       </div>
-      <div className="review-spatial-reset">
-        <ReviewButton
-          type="button"
-          className={reviewTextButtonClassName}
-          label={translate(
-            props.tool === 'position'
-              ? 'gallery.videoReview.spatialResetPosition'
-              : props.tool === 'tilt'
-                ? 'gallery.videoReview.spatialResetTilt'
-                : props.tool === 'rotation'
-                  ? 'gallery.videoReview.spatialResetRotation'
-                  : 'gallery.videoReview.spatialResetFocus'
-          )}
-          disabled={props.disabled}
-          onClick={props.onReset}
-        />
-      </div>
+      {props.resetTarget === undefined
+        ? reset
+        : props.resetTarget
+          ? createPortal(reset, props.resetTarget)
+          : null}
     </div>
   );
 }

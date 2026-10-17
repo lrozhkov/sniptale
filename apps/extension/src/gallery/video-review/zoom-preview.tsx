@@ -151,7 +151,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const image = useReviewBackgroundImage(props.background);
   const header = useReviewWindowHeader(props.windowHeader, props.source.width, props.source.height);
   const controls = usePreviewToolSelection(props);
-  const { tool, axis, overlay, view } = controls;
+  const { tool, overlay, view } = controls;
   const bounds = useRef<HTMLDivElement>(null);
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
   const playback = props.playback;
@@ -199,20 +199,11 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
         <ZoomPreviewHeading region={region} controls={controls} />
       ) : null}
       {!overlay && props.spatialEdit ? (
-        <ReviewSpatialToolbar
-          tool={tool}
-          axis={axis}
-          disabled={!spatialInteractive}
-          onTool={controls.setTool}
-          onAxis={controls.setAxis}
-          onReset={() => resetPreviewTool(props.spatialEdit, tool, spatialInteractive)}
-        >
-          <ZoomPreviewContext
-            controls={controls}
-            edit={props.spatialEdit}
-            disabled={!spatialInteractive}
-          />
-        </ReviewSpatialToolbar>
+        <ZoomPreviewTools
+          controls={controls}
+          edit={props.spatialEdit}
+          interactive={spatialInteractive}
+        />
       ) : null}
       <div
         ref={bounds}
@@ -300,6 +291,31 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
   );
 }
 
+/** Compose tool navigation and reset admission without changing the canvas lifecycle. */
+function ZoomPreviewTools({
+  controls,
+  edit,
+  interactive,
+}: {
+  controls: ReturnType<typeof usePreviewToolSelection>;
+  edit: NonNullable<ZoomPreviewProps['spatialEdit']>;
+  interactive: boolean;
+}) {
+  return (
+    <ReviewSpatialToolbar
+      tool={controls.tool}
+      axis={controls.axis}
+      disabled={!interactive}
+      onTool={controls.setTool}
+      onAxis={controls.setAxis}
+      onReset={() => resetPreviewTool(edit, controls.tool, interactive)}
+      resetTarget={controls.resetTarget}
+    >
+      <ZoomPreviewContext controls={controls} edit={edit} disabled={!interactive} />
+    </ReviewSpatialToolbar>
+  );
+}
+
 /** Owns temporary tool/view choices without changing the authored target or transport. */
 function usePreviewToolSelection(props: ZoomPreviewProps) {
   const [zoomView, setView] = useState<'area' | 'result'>('area');
@@ -313,7 +329,7 @@ function usePreviewToolSelection(props: ZoomPreviewProps) {
   const unavailable = !props.spatialEdit || overlay;
   const tool = unavailable ? 'position' : selectedTool;
   const view = overlay ? 'area' : tool === 'position' ? zoomView : 'result';
-  return { tool, axis, overlay, view, setTool, setAxis, setView };
+  return { tool, axis, overlay, view, setTool, setAxis, setView, resetTarget: shared?.resetTarget };
 }
 
 /** Binds the authored edit to its rendered plane and cancels capture when the scene changes. */

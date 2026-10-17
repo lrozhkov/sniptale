@@ -345,7 +345,7 @@
 /* Mixed parameter families share one rhythm within the migrated workspace. */
 .sniptale-compact-workspace .review-inspector-section-body,
 .sniptale-compact-workspace .review-inspector-columns {
-  gap: 4px;
+  row-gap: 4px;
 }
 .sniptale-compact-workspace [data-ui='gallery.videoReview.inspector'] {
   background: var(--sniptale-color-surface-panel);

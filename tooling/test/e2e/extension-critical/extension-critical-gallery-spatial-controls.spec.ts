@@ -126,7 +126,9 @@ async function proveWidths(page: Page, preview: Locator, info: TestInfo) {
 
 for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'dark' },
+  { width: 1280, height: 560, locale: 'ru', theme: 'light' },
   { width: 1920, height: 900, locale: 'en', theme: 'light' },
+  { width: 1920, height: 900, locale: 'ru', theme: 'dark' },
   { width: 960, height: 560, locale: 'en', theme: 'dark' },
 ] as const) {
   test(`spatial handles commit once and recover ${variant.width} ${variant.locale} ${variant.theme}`, async ({
@@ -198,7 +200,7 @@ for (const variant of [
           canvasHeight,
           1
         );
-        expect(await offset()).toBeCloseTo(canvasOffset, 1);
+        expect.soft(await offset()).toBeCloseTo(canvasOffset, 1);
         const contextBottom = await tools
           .locator('.review-spatial-context')
           .evaluate((node) =>
@@ -211,6 +213,25 @@ for (const variant of [
           );
         expect(contextBottom).toBeLessThan((await preview.locator('canvas').boundingBox())!.y);
       }
+      const precisePosition = dialog.getByText(label('gallery.videoReview.precisePosition'), {
+        exact: true,
+      });
+      await precisePosition.click();
+      const resetPosition = button('gallery.videoReview.spatialResetPosition');
+      const lastPositionField = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomFocusY'),
+        exact: true,
+      });
+      const parameterBox = (await lastPositionField.boundingBox())!;
+      const resetBox = (await resetPosition.boundingBox())!;
+      expect(resetBox.y).toBeGreaterThanOrEqual(parameterBox.y + parameterBox.height);
+      expect(resetBox.height).toBeLessThanOrEqual(32);
+      await resetPosition.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('spatial-reset-after-fields.png'),
+        fullPage: false,
+      });
+      await precisePosition.click();
       expect(await historyCursor(page)).toBe(cursor);
       expect(await persistedFocus(page)).toEqual(initial);
       const scaleRange = dialog.locator(
@@ -358,12 +379,28 @@ for (const variant of [
         exact: true,
       });
       await entrance.scrollIntoViewIfNeeded();
-      await expect(
-        entrance.getByRole('button', {
-          name: label('gallery.videoReview.transitionLinear'),
+      if (variant.width === 1920 && variant.locale === 'ru') {
+        const curve = entrance.getByRole('button', {
+          name: label('gallery.videoReview.zoomTransitionType'),
           exact: true,
-        })
-      ).toBeVisible();
+        });
+        await curve.click();
+        await expect(
+          page.getByRole('option', {
+            name: label('gallery.videoReview.transitionLinear'),
+            exact: true,
+          })
+        ).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(curve).toBeFocused();
+      } else {
+        await expect(
+          entrance.getByRole('button', {
+            name: label('gallery.videoReview.transitionLinear'),
+            exact: true,
+          })
+        ).toBeVisible();
+      }
       await expect(
         entrance.getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
       ).toHaveAttribute('aria-checked', 'false');
@@ -404,6 +441,15 @@ for (const variant of [
         .click();
       expect(await persistedFocus(page)).toEqual(saved);
       await expect(preview).toHaveAttribute('data-status', 'ready');
+      await button('gallery.videoReview.play').click();
+      await expect(button('gallery.videoReview.spatialResetPosition')).toHaveCount(0);
+      await button('gallery.videoReview.pause').click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first()
+        .click();
+      await expect(button('gallery.videoReview.spatialResetPosition')).toBeEnabled();
+      expect(await persistedFocus(page)).toEqual(saved);
       expect(errors).toEqual([]);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));

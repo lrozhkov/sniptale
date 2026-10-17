@@ -11,9 +11,7 @@
 }
 .review-spatial-context {
   min-width: 0;
-}
-.review-spatial-context:empty {
-  display: none;
+  min-height: var(--sniptale-parameter-row-height, 40px);
 }
 .review-spatial-reset {
   display: flex;
@@ -36,7 +34,6 @@
   flex: 1 1 116px;
   gap: 6px;
   padding-inline: 8px;
-  background: var(--sniptale-color-surface-input) !important;
 }
 .review-spatial-tool svg {
   flex-shrink: 0;

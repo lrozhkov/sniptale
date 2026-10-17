@@ -118,10 +118,11 @@ export function ReviewZoomInspector(props: {
 }) {
   const { region, onChange } = props;
   const [tool, onTool] = useState<SpatialTool>('position');
+  const [resetTarget, setResetTarget] = useState<HTMLDivElement | null>(null);
   const map = useContext(ReviewIntervalMap);
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
   return (
-    <ReviewSpatialToolContext.Provider value={{ tool, onTool }}>
+    <ReviewSpatialToolContext.Provider value={{ tool, onTool, resetTarget }}>
       <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
         <ReviewInterval
           start={sourceRange?.start ?? region.start}
@@ -187,6 +188,9 @@ export function ReviewZoomInspector(props: {
                         onChange={(cameraFollow) => onChange({ cameraFollow })}
                         onReset={() => onChange({ cameraFollow: null })}
                       />
+                    ) : null}
+                    {props.preview && !region.border && !region.spotlight ? (
+                      <div ref={setResetTarget} />
                     ) : null}
                   </div>
                 </ReviewInspectorColumns>
