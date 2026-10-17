@@ -171,6 +171,29 @@ afterEach(() => {
 const button = (label: string) =>
   host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!;
 
+it('keeps document commands beside search', () => {
+  act(() => root.render(<Fixture count={3} voice={voiceAccess()} />));
+  const searchRow = host.querySelector('input[type="search"]')!.parentElement!.parentElement!;
+  expect(searchRow.contains(button('subtitlesTitle'))).toBe(true);
+  expect(searchRow.contains(button('textRewriteAll'))).toBe(true);
+  expect(searchRow.contains(button('textFragmentAdd'))).toBe(true);
+});
+
+it('keeps jump metadata independent from expansion', () => {
+  act(() => root.render(<Fixture count={3} />));
+  const card = host.querySelector('[data-text-id="text-1"]')!;
+  const jump = card.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.speechJump"]'
+  )!;
+  expect(jump.textContent).toContain('2');
+  expect(jump.textContent).toContain('00:04.00–00:07.00');
+  expect(jump.getAttribute('aria-description')).toBe('2 · 00:04.00–00:07.00');
+  expect(card.querySelector('button[aria-expanded]')!.textContent).toBe('Phrase 1');
+  act(() => jump.click());
+  expect(seek).toHaveBeenCalledWith(4, false);
+  expect(host.querySelectorAll('textarea')).toHaveLength(0);
+});
+
 it('opens exclusive local subtitles without configured voice access and returns focus to scope trigger', () => {
   act(() => root.render(<Fixture count={3} />));
   act(() => button('subtitlesTitle').click());

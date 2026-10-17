@@ -43,15 +43,12 @@ function PhraseSummary({
   playing: boolean;
   disabled: boolean;
 }) {
+  const interval = `${formatSpeechTime(phrase.start)}–${formatSpeechTime(phrase.end)}`;
+  const jumpDescription = `${index === undefined ? '' : `${index + 1} · `}${interval}`;
   const content = (
     <>
       {onToggle ? (
         <ChevronDown size={14} className={`shrink-0 ${expanded ? '' : '-rotate-90'}`} />
-      ) : null}
-      {index !== undefined ? (
-        <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
-          {index + 1}
-        </span>
       ) : null}
       {playing && (
         <span
@@ -64,9 +61,18 @@ function PhraseSummary({
           {phrase.text || translate('gallery.videoReview.speechText')}
         </span>
       )}
-      <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
-        {formatSpeechTime(phrase.start)}–{formatSpeechTime(phrase.end)}
-      </span>
+      {!onJump && (
+        <>
+          {index !== undefined ? (
+            <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+              {index + 1}
+            </span>
+          ) : null}
+          <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+            {interval}
+          </span>
+        </>
+      )}
     </>
   );
   return (
@@ -107,11 +113,20 @@ function PhraseSummary({
       {onJump && (
         <ReviewButton
           label={translate('gallery.videoReview.speechJump')}
-          className={`${reviewTextButtonClassName} !w-8 !px-0`}
+          aria-description={jumpDescription}
+          className={`${reviewTextButtonClassName} shrink-0 gap-1 !px-1`}
           onClick={onJump}
           disabled={resultInterval === null}
         >
-          <LocateFixed size={14} />
+          {index !== undefined ? (
+            <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+              {index + 1}
+            </span>
+          ) : null}
+          <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+            {interval}
+          </span>
+          <LocateFixed size={14} aria-hidden="true" />
         </ReviewButton>
       )}
     </div>

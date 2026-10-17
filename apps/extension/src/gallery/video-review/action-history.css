@@ -177,8 +177,9 @@
 .review-history-row[data-selected]:focus-within {
   background: color-mix(in srgb, var(--sniptale-color-surface-hover) 65%, transparent);
 }
-.review-history-row[data-active] .review-history-target {
-  color: var(--sniptale-color-accent);
+.review-history-row[data-active] {
+  background: var(--sniptale-color-surface-hover);
+  border-color: var(--sniptale-color-border-strong);
 }
 @layer utilities {
   [data-ui='gallery.videoReview.inspector']

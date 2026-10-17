@@ -85,16 +85,6 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
       className="min-w-0 space-y-2"
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <TextDocumentCommands
-        props={props}
-        mode={voiceMode}
-        fragments={fragments}
-        found={query.found.length}
-        onAdd={() => {
-          setFilters(emptyTextFilters);
-          props.editor.add(false);
-        }}
-      />
       <div className="flex min-w-0 items-center gap-1">
         <HistorySearch
           query={filters.query}
@@ -119,7 +109,21 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
           <SlidersHorizontal size={16} aria-hidden="true" />
           {filtered ? <span className="review-history-filter-dot" aria-hidden="true" /> : null}
         </ContentToolbarButton>
+        <TextDocumentCommands
+          props={props}
+          mode={voiceMode}
+          fragments={fragments}
+          onAdd={() => {
+            setFilters(emptyTextFilters);
+            props.editor.add(false);
+          }}
+        />
       </div>
+      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+        {translate('gallery.videoReview.textFragmentCount')
+          .replace('{found}', String(query.found.length))
+          .replace('{total}', String(fragments.length))}
+      </p>
       {showFilters && <TextDocumentFilters filters={filters} onChange={setFilters} />}
       <TextDocumentBatchActions
         batch={batch}
@@ -487,22 +491,15 @@ function TextDocumentCommands({
   props,
   mode,
   fragments,
-  found,
   onAdd,
 }: {
   props: TextDocumentPanelProps;
   mode: ReturnType<typeof useReviewTextFormMode>;
   fragments: import('../../features/video/review/text-document').ReviewTextFragment[];
-  found: number;
   onAdd(): void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate('gallery.videoReview.textFragmentCount')
-          .replace('{found}', String(found))
-          .replace('{total}', String(fragments.length))}
-      </span>
+    <div className="flex shrink-0 items-center gap-1">
       <ReviewButton
         data-text-voice-trigger="subtitles:all"
         label={translate('gallery.videoReview.subtitlesTitle')}

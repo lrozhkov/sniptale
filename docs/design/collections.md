@@ -13,6 +13,8 @@
 | Reorder | Existing drag and keyboard reorder owner |
 | Change current visibility | Existing visibility action, separate from export inclusion |
 
+Keep navigation metadata, such as an item number and time interval, inside its jump action. Keep expansion separate from this action.
+
 A checkbox click must not also open the item. Do not infer batch selection from a gallery card's appearance. Single-selection notes or comments do not acquire checkboxes merely to match a collection specimen. Preserve their selected row, hover preview, inline composer, and selected-only commands.
 
 The inline composer owns its draft until Save or Cancel. The specimen locks row switching while editing. Do not discard a draft silently when adapting the actual product selection contract.

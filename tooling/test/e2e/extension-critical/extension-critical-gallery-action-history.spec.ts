@@ -761,7 +761,17 @@ for (const variant of [
         .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
         .click();
       await expect(row).toHaveAttribute('data-active', 'true');
-      expect(await target.evaluate((node) => getComputedStyle(node).color)).not.toBe(normalColor);
+      expect(await target.evaluate((node) => getComputedStyle(node).color)).toBe(normalColor);
+      await page.mouse.move(5, 5);
+      const activeSurface = await row.evaluate((node) => {
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = 'var(--sniptale-color-surface-hover)';
+        node.append(probe);
+        const expected = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return { expected, actual: getComputedStyle(node).backgroundColor };
+      });
+      expect(activeSurface.actual).toBe(activeSurface.expected);
       await expect(row.getByRole('checkbox')).not.toBeChecked();
       await expect.poll(() => results.evaluate((node) => node.scrollTop)).toBe(top);
       await page.screenshot({

@@ -641,6 +641,21 @@ async function inspectTextSearch(
 ) {
   const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   const search = document.getByRole('searchbox');
+  const commands = [
+    'gallery.videoReview.subtitlesTitle',
+    'gallery.videoReview.textRewriteAll',
+    'gallery.videoReview.textFragmentAdd',
+  ] as const;
+  const searchBox = (await search.boundingBox())!;
+  for (const key of commands) {
+    const command = document.getByRole('button', { name: label(key), exact: true });
+    const box = (await command.boundingBox())!;
+    expect(
+      Math.abs(box.y + box.height / 2 - searchBox.y - searchBox.height / 2)
+    ).toBeLessThanOrEqual(1);
+    expect(box.x).toBeGreaterThan(searchBox.x + searchBox.width);
+    await expect(command).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+  }
   await expect(search).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(search).toHaveCSS('border-top-width', '0px');
   const geometry = await search.evaluate((node) => {
@@ -704,8 +719,13 @@ async function inspectTextSearch(
 for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'light' },
   { width: 1920, height: 900, locale: 'en', theme: 'dark' },
+  { width: 1280, height: 560, locale: 'ru', theme: 'dark' },
+  { width: 1920, height: 900, locale: 'en', theme: 'light' },
+  { width: 960, height: 560, locale: 'ru', theme: 'dark' },
 ] as const) {
-  test(`text search filters ${variant.width} ${variant.locale}`, async ({ page }, info) => {
+  test(`text search filters ${variant.width} ${variant.locale} ${variant.theme}`, async ({
+    page,
+  }, info) => {
     await page.setViewportSize({ width: variant.width, height: variant.height });
     const host = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
@@ -736,6 +756,51 @@ for (const variant of [
         variant.locale,
         info.outputPath('text-search-filters.png')
       );
+      const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
+      for (const text of ['Первая фраза', 'Вторая фраза с длинным названием']) {
+        await document
+          .getByRole('button', {
+            name: label('gallery.videoReview.textFragmentAdd'),
+            exact: true,
+          })
+          .click();
+        const field = document.getByRole('textbox', {
+          name: label('gallery.videoReview.speechText'),
+          exact: true,
+        });
+        await field.fill(text);
+        await field.press('Tab');
+      }
+      const cards = document.locator('[data-ui="gallery.videoReview.textPhrase"]');
+      const second = cards.nth(1);
+      const expand = second.locator('button[aria-expanded]');
+      await expand.click();
+      await expect(expand).toHaveAttribute('aria-expanded', 'false');
+      const jump = second.getByRole('button', {
+        name: label('gallery.videoReview.speechJump'),
+        exact: true,
+      });
+      await expect(jump).toContainText('2');
+      await expect(jump).toHaveAttribute('aria-description', /^2 · \d{2}:/);
+      await expect(jump).toContainText(/\d{2}:\d{2}\.\d{2}–\d{2}:\d{2}\.\d{2}/);
+      await jump.click();
+      await expect(expand).toHaveAttribute('aria-expanded', 'false');
+      const inspector = dialog.locator('.review-inspector-scroll');
+      const initialWidth = await inspector.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).width)
+      );
+      for (const width of [initialWidth, 523, 524, 525]) {
+        if (variant.width !== 1920 && width !== initialWidth) continue;
+        if (width !== initialWidth) await resizeInspectorContent(page, dialog, width);
+        await jump.scrollIntoViewIfNeeded();
+        const bounds = (await inspector.boundingBox())!;
+        for (const control of [jump, expand]) {
+          const box = (await control.boundingBox())!;
+          expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+          expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+        }
+      }
+      await page.screenshot({ path: info.outputPath('text-list-jump.png'), fullPage: false });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
