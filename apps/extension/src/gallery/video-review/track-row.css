@@ -148,3 +148,8 @@
 .review-track-reorder:active {
   cursor: grabbing;
 }
+
+.review-track-reordering,
+.review-track-reordering * {
+  cursor: grabbing !important;
+}

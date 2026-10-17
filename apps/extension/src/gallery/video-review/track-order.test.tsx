@@ -9,15 +9,17 @@ let host: HTMLDivElement;
 function Harness({ active = true }: { active?: boolean }) {
   const order = useReviewTrackOrder(active);
   return (
-    <div data-ui="gallery.videoReview.trackListViewport">
-      {order.order.map((track) => (
-        <div key={track} data-review-header-track={track}>
-          <button type="button" {...order.interaction(track)}>
-            {track}
-          </button>
-        </div>
-      ))}
-    </div>
+    <section data-ui="gallery.videoReview.dialog">
+      <div data-ui="gallery.videoReview.trackListViewport">
+        {order.order.map((track) => (
+          <div key={track} data-review-header-track={track}>
+            <button type="button" {...order.interaction(track)}>
+              {track}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 beforeEach(async () => {
@@ -68,6 +70,7 @@ it.each(['Escape', 'blur', 'pointercancel'])(
       '[data-review-header-track="source"] button'
     )!;
     await act(async () => pointer(node, 'pointerdown', 48));
+    expect(host.querySelector('.review-track-reordering')).not.toBeNull();
     await act(async () => pointer(node, 'pointermove', 112));
     expect(order().slice(0, 4)).toEqual(['actions', 'webcam', 'zoom', 'source']);
     await act(async () => {
@@ -77,6 +80,7 @@ it.each(['Escape', 'blur', 'pointercancel'])(
       else pointer(node, 'pointercancel', 112);
     });
     expect(order()).toEqual(REVIEW_TRACK_ORDER);
+    expect(host.querySelector('.review-track-reordering')).toBeNull();
   }
 );
 it('retains accepted pointer order after release and ignores later lost capture', async () => {
@@ -97,4 +101,13 @@ it('keeps the pointer gesture through a portal DOM move and cancels when setting
   expect(order()[0]).toBe('source');
   await act(async () => root.render(<Harness active={false} />));
   expect(order()).toEqual(REVIEW_TRACK_ORDER);
+});
+
+it('clears the cursor owner when an active reorder unmounts', async () => {
+  const node = host.querySelector<HTMLButtonElement>('[data-review-header-track="source"] button')!;
+  await act(async () => pointer(node, 'pointerdown', 48));
+  const surface = node.closest('[data-ui="gallery.videoReview.dialog"]')!;
+  expect(surface.classList.contains('review-track-reordering')).toBe(true);
+  await act(async () => root.render(null));
+  expect(surface.classList.contains('review-track-reordering')).toBe(false);
 });

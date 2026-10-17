@@ -40,6 +40,15 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
       className="min-w-0 sniptale-parameter-stack"
       title={translate('gallery.videoReview.previewOnly')}
     >
+      <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
+        <output
+          className="block w-full whitespace-nowrap px-2 text-right text-[13px] font-normal tabular-nums
+          text-[var(--sniptale-color-text-primary)]"
+          aria-label={translate('gallery.videoReview.previewActualRaster')}
+        >
+          {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
+        </output>
+      </InspectorParameterRow>
       <InspectorParameterRow label={label('previewResolution')}>
         <div className="min-w-0 w-full">
           <CompactSelect
@@ -57,15 +66,7 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           />
         </div>
       </InspectorParameterRow>
-      <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
-        <output
-          className="block w-full px-2 text-right text-[12px] tabular-nums
-          text-[var(--sniptale-color-text-secondary)]"
-          aria-label={translate('gallery.videoReview.previewActualRaster')}
-        >
-          {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
-        </output>
-      </InspectorParameterRow>
+
       <div title={translate('gallery.videoReview.previewFrameRateLimit')}>
         <SelectField
           className={reviewSelectFieldClassName}

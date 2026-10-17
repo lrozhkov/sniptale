@@ -125,15 +125,15 @@ export function ReviewLoadStatus({
             )}
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <ReviewButton label={translate('gallery.videoReview.back')} onClick={onBack}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            {translate('gallery.videoReview.back')}
-          </ReviewButton>
-          {failure ? (
+        {failure ? (
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <ReviewButton label={translate('gallery.videoReview.back')} onClick={onBack}>
+              <ArrowLeft size={16} aria-hidden="true" />
+              {translate('gallery.videoReview.back')}
+            </ReviewButton>
             <ReviewButton label={translate('gallery.videoReview.retry')} onClick={onRetry} />
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

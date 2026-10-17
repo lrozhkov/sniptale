@@ -289,8 +289,6 @@ export function ReviewToolbar(props: {
         <ReviewZoomSlider value={props.zoom} onChange={props.onZoom} />
         <ReviewButton
           label={translate('gallery.videoReview.fit')}
-          toolbarPriority={0}
-          toolbarLabel={translate('gallery.videoReview.fit')}
           className={plain}
           onClick={() => props.onZoom(1)}
         >

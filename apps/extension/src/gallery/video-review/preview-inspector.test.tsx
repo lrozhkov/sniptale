@@ -44,6 +44,9 @@ it('shows current defaults and actual raster, commits local settings and offers 
     render();
     expect(host.textContent).toContain('405 × 720');
     const actual = host.querySelector('[aria-label="gallery.videoReview.previewActualRaster"]')!;
+    expect(host.querySelector('.sniptale-parameter-row')).toBe(
+      actual.closest('.sniptale-parameter-row')
+    );
     expect(actual.closest('.sniptale-parameter-row')?.textContent).toContain(
       'gallery.videoReview.previewActualRaster'
     );

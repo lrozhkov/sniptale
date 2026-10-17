@@ -24,6 +24,7 @@ type Drag = {
   track: QuickEditTrack;
   before: readonly QuickEditTrack[];
   node: HTMLButtonElement;
+  surface: HTMLElement | null;
   pointerId: number;
 };
 
@@ -41,6 +42,7 @@ export function useReviewTrackOrder(active: boolean) {
       const pending = drag.current;
       drag.current = null;
       if (!pending) return;
+      pending.surface?.classList.remove('review-track-reordering');
       if (cancel) update(pending.before);
     },
     [update]
@@ -89,6 +91,7 @@ export function useReviewTrackOrder(active: boolean) {
     window.addEventListener('blur', cancel);
     window.addEventListener('keydown', escape, true);
     return () => {
+      drag.current?.surface?.classList.remove('review-track-reordering');
       drag.current = null;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
@@ -98,11 +101,16 @@ export function useReviewTrackOrder(active: boolean) {
     };
   }, [finish, move]);
   const start = (event: PointerEvent<HTMLButtonElement>, track: QuickEditTrack) => {
-    if (!active || event.button !== 0) return;
+    if (!active || event.button !== 0 || drag.current) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.focus();
+    const surface = event.currentTarget.closest<HTMLElement>(
+      '[data-ui="gallery.videoReview.dialog"]'
+    );
+    surface?.classList.add('review-track-reordering');
     drag.current = {
+      surface,
       track,
       before: current.current,
       node: event.currentTarget,

@@ -47,14 +47,12 @@ const iconButtonBase =
   'enabled:hover:!text-[var(--sniptale-color-text-primary)] ' +
   'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
 
-const iconHoverBorder =
-  ' enabled:hover:!border-[color-mix(in_srgb,var(--sniptale-color-text-secondary)_28%,transparent)] ';
 const iconSelection =
   ' aria-pressed:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-pressed:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 
-/** Selected tools use an accent icon; only hover draws a border. */
-export const reviewIconButtonClassName = iconButtonBase + iconHoverBorder + iconSelection;
+/** Selected tools use an accent icon; hover brightens ordinary commands without a frame. */
+export const reviewIconButtonClassName = iconButtonBase + iconSelection;
 
 /** Compact lane toggles brighten their icon while retaining a quiet border. */
 export const reviewCompactTrackButtonClassName =
@@ -64,7 +62,6 @@ export const reviewCompactTrackButtonClassName =
 export const reviewTrackStatusButtonClassName =
   'review-track-status ' +
   iconButtonBase +
-  iconHoverBorder +
   ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 

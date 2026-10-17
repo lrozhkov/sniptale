@@ -71,6 +71,14 @@ for (const size of [
         const review = await openReview(page, launched.extensionId, theme);
         const command = (key: Parameters<typeof translate>[0]) =>
           review.getByRole('button', { name: label(key), exact: true });
+        const fit = command('gallery.videoReview.fit');
+        await expect(fit).toHaveAttribute('title', label('gallery.videoReview.fit'));
+        await expect(fit.locator('[data-review-toolbar-label]')).toHaveCount(0);
+        await command('gallery.videoReview.speedMode').hover();
+        await expect(command('gallery.videoReview.speedMode')).toHaveCSS(
+          'border-top-color',
+          'rgba(0, 0, 0, 0)'
+        );
         const source = review.locator('[data-ui="gallery.videoReview.sourceLane"]');
         const ruler = review.locator('[data-ui="gallery.videoReview.ruler"]');
         await command('gallery.videoReview.speedMode').click();
@@ -127,6 +135,19 @@ for (const size of [
         const panel = review.locator('[data-ui="gallery.videoReview.previewInspector"]');
         const actual = panel.locator('output[aria-label]');
         await expect(actual).toBeVisible();
+        await expect(actual).toHaveCSS('white-space', 'nowrap');
+        await expect(actual).toHaveCSS('font-size', '13px');
+        expect(
+          await panel
+            .locator('.sniptale-parameter-row')
+            .first()
+            .evaluate((node) => !!node.querySelector('output'))
+        ).toBe(true);
+        await page.screenshot({
+          path: info.outputPath('preview-raster-first.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
         const actualRow = actual.locator('..').locator('..');
         await expect(actualRow.locator('[aria-haspopup]')).toHaveCount(0);
         const toggle = panel.getByRole('switch', {
@@ -260,14 +281,31 @@ for (const size of [
           await page.mouse.move(start.x + start.width / 2, target.y + target.height / 2, {
             steps: 4,
           });
+          expect(
+            await page.evaluate(
+              ({ x, y }) => {
+                const node = document.elementFromPoint(x, y);
+                return node ? getComputedStyle(node).cursor : null;
+              },
+              { x: start.x + start.width / 2, y: target.y + target.height / 2 }
+            )
+          ).toBe('grabbing');
         };
         await drag();
         await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
+        const movedBody = review.locator('[data-review-track="source"]');
+        await expect
+          .poll(async () =>
+            Math.abs((await row('source').boundingBox())!.y - (await movedBody.boundingBox())!.y)
+          )
+          .toBeLessThanOrEqual(1);
         await page.keyboard.press('Escape');
+        await expect(review).not.toHaveClass(/review-track-reordering/);
         await page.mouse.up();
         await expect.poll(order).toEqual(expected);
         await drag();
         await page.mouse.up();
+        await expect(review).not.toHaveClass(/review-track-reordering/);
         await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
         const bodies = review.locator('[data-review-track]');
         await expect
