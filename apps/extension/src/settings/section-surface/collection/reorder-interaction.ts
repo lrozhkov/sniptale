@@ -50,18 +50,16 @@ export function useSettingsCollectionReorder(
     onMove,
     resetKeyboardPreview: () => setKeyboardPreview(null),
   });
-  const pointerIntent = pointer.preview
-    ? getKeyboardPreviewIntent(groups, pointer.preview, 'drag')
-    : null;
 
+  const pointerPreview = pointer.preview?.itemIds.some(
+    (id, index) => id !== pointer.preview?.baselineItemIds[index]
+  )
+    ? pointer.preview
+    : null;
   return {
     a11y: { announcement, dragInstructionsId, keyboardItemId: keyboardPreview?.itemId ?? null },
-    dragOffsetY: pointer.dragOffsetY,
     draggingItemId: pointer.preview?.itemId ?? null,
-    groups: resolveKeyboardPreviewGroups(groups, keyboardPreview),
-    pointerDropTarget: pointerIntent
-      ? { beforeItemId: pointerIntent.beforeItemId, groupId: pointerIntent.groupId }
-      : null,
+    groups: resolveKeyboardPreviewGroups(groups, pointerPreview ?? keyboardPreview),
     row: {
       onPointerStart(
         itemId: string,

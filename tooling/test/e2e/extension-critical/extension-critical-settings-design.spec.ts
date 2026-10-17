@@ -480,6 +480,61 @@ async function authoredPreviewBoundary(page: Page, extensionId: string, info: Te
   await screenshot(page, info, 'authored-numbering-preview');
 }
 
+async function settingsRailMarker(page: Page) {
+  const marker = ui(page, 'settings.sidebar.active-marker');
+  const current = ui(page, 'settings.sidebar.nav-list').locator('[aria-current="page"]');
+  await settle(page);
+  await expect(marker).toBeVisible();
+  expect(await marker.evaluate((node) => node.closest('.sniptale-command-content'))).toBeNull();
+  const before = (await marker.boundingBox())!;
+  const target = (await current.boundingBox())!;
+  expect(Math.abs(before.y + before.height / 2 - target.y - target.height / 2)).toBeLessThanOrEqual(
+    0.5
+  );
+  await current.hover();
+  await page.mouse.down();
+  const pressed = (await marker.boundingBox())!;
+  expect(pressed).toEqual(before);
+  await page.mouse.up();
+}
+
+async function settingsReorderPreview(page: Page, locale: Locale, info: TestInfo) {
+  const root = page.locator('[data-settings-collection-root]').first();
+  const rows = root.locator('[data-settings-collection-item]');
+  const ids = () =>
+    rows.evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('data-settings-collection-item'))
+    );
+  const before = await ids();
+  expect(before.length).toBeGreaterThan(2);
+  const handle = rows.first().getByRole('button', {
+    name: translate('settings.collection.dragHandle', locale),
+    exact: true,
+  });
+  await handle.scrollIntoViewIfNeeded();
+  const origin = (await handle.boundingBox())!;
+  const destination = (await rows.nth(1).boundingBox())!;
+  await page.mouse.move(origin.x + origin.width / 2, origin.y + origin.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(origin.x + origin.width / 2, destination.y + destination.height - 4, {
+    steps: 5,
+  });
+  await expect.poll(ids).toEqual([before[1], before[0], ...before.slice(2)]);
+  await settle(page);
+  const boxes = await rows.evaluateAll((nodes) =>
+    nodes.slice(0, 3).map((node) => {
+      const r = node.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom };
+    })
+  );
+  for (let index = 1; index < boxes.length; index++)
+    expect(boxes[index]!.top).toBeGreaterThanOrEqual(boxes[index - 1]!.bottom - 0.5);
+  await screenshot(page, info, 'collection-live-reorder');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect.poll(ids).toEqual(before);
+}
+
 async function voiceTestField(page: Page, locale: Locale, info: TestInfo) {
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   const heading = page.getByRole('heading', {
@@ -507,21 +562,29 @@ async function voiceTestField(page: Page, locale: Locale, info: TestInfo) {
     });
   const color = await field.evaluate((node) => {
     const probe = document.createElement('span');
-    probe.style.color = 'var(--sniptale-color-text-muted)';
+    probe.style.color = 'var(--sniptale-color-text-dim)';
     node.parentElement!.append(probe);
     const result = getComputedStyle(probe).color;
     probe.remove();
     return result;
   });
   await field.hover();
-  expect.soft(await placeholder()).toEqual({ color, opacity: '1' });
+  expect.soft(await placeholder()).toEqual({ color, opacity: '0.72' });
   await field.click();
   expect((await placeholder()).opacity).toBe('0');
   await field.fill('Текст проверки микрофона');
   await expect(field).toHaveValue('Текст проверки микрофона');
+  const diagnostics = page
+    .locator('summary')
+    .filter({ hasText: t('settings.voiceInput.diagnosticsTitle') });
+  await diagnostics.click();
+  await expect(page.getByText(t('settings.voiceInput.apiStatus'), { exact: true })).toBeVisible();
+  await expect(field).toHaveValue('Текст проверки микрофона');
+  await screenshot(page, info, 'voice-diagnostics');
+  await diagnostics.click();
   await field.fill('');
   await field.blur();
-  expect.soft(await placeholder()).toEqual({ color, opacity: '1' });
+  expect.soft(await placeholder()).toEqual({ color, opacity: '0.72' });
   await screenshot(page, info, 'voice-test-field');
 }
 
@@ -568,6 +631,16 @@ for (const locale of ['ru', 'en'] as const)
           await expect(button).toHaveAttribute('aria-current', 'page');
           await expect(page).toHaveURL((url) => url.searchParams.get('section') === section);
           await contentReady(page);
+          await settingsRailMarker(page);
+          const collection = ui(page, 'settings.page.content-scroll')
+            .locator('section')
+            .filter({
+              has: page.locator('[data-settings-collection-root]'),
+            })
+            .last();
+          if (await collection.count())
+            expect((await collection.boundingBox())!.width).toBeLessThanOrEqual(960.5);
+          if (section === 'quick-actions') await settingsReorderPreview(page, locale, info);
           await assertFit(page);
           await screenshot(page, info, `route-${section}`);
         }
@@ -588,6 +661,9 @@ test('native settings subpages retain content scroll and browser navigation', as
     const views = SETTINGS_SECTION_VIEWS[section];
     if (!views.length) continue;
     await route(page, extensionId, section, views[0]);
+    const railMarker = ui(page, 'settings.sidebar.active-marker');
+    await expect(railMarker).toBeVisible();
+    expect(await railMarker.evaluate((node) => node.closest('button'))).toBeNull();
     const tabs = ui(page, 'settings.subpage-tabs').first();
     if (section === 'native-app' && (await tabs.count()) === 0) {
       const enable = page.getByRole('button', {

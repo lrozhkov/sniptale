@@ -29,7 +29,7 @@ export function SettingsCollection(props: SettingsCollectionProps) {
   );
   const reorder = useSettingsCollectionReorder(groups, props.onMove);
   return (
-    <section aria-label={props.ariaLabel} className="space-y-3">
+    <section aria-label={props.ariaLabel} className="w-full max-w-[960px] space-y-3">
       <SettingsCollectionHeader {...props} />
       <p id={reorder.a11y.dragInstructionsId} className="sr-only">
         {translate('settings.collection.dragInstructions')}

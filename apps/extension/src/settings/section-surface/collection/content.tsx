@@ -64,20 +64,12 @@ export function SettingsCollectionContent(props: {
               )}
             </div>
           )}
-          {group.items.map((item, index) => {
-            const dropTarget = reorder.pointerDropTarget;
-            const isTargetGroup = dropTarget?.groupId === group.id;
-            const dropBefore = isTargetGroup && dropTarget.beforeItemId === item.id;
-            const dropAfter =
-              isTargetGroup && dropTarget.beforeItemId === null && index === group.items.length - 1;
+          {group.items.map((item) => {
             return (
               <SettingsCollectionRow
                 key={item.id}
                 item={item}
                 dragging={reorder.draggingItemId === item.id}
-                dragOffsetY={reorder.dragOffsetY}
-                dropAfter={dropAfter}
-                dropBefore={dropBefore}
                 pointerDragging={pointerDragging}
                 reorderingEnabled={collection.onMove !== undefined}
                 dragInstructionsId={reorder.a11y.dragInstructionsId}

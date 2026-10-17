@@ -27,6 +27,10 @@ Diagnostic tables use their own compact geometry. The 56px object-row minimum do
 
 Wrap long diagnostic values inside their columns. Horizontal scrolling must belong to the table region when its minimum width exceeds the available space. Preserve complete readable values and export data.
 
+Ordinary settings collections use a maximum width of 960px. Wide diagnostic tables retain their own scroll region. Keep titles, metadata, and actions close enough to read as one row.
+
+During pointer reorder, show the pending slot before release. Move adjacent rows to make space. Do not draw the dragged text over another row or a position line. Keep the row surface opaque during motion. Release commits once. Escape, pointer cancellation, or window blur restores the original order without a persistence command.
+
 ## Selection and batch scope
 
 Name Select all scope: filtered results, page, or project. Parent empty/check/dash states describe that scope. Individual checkboxes describe only their own item. Keep ordering and expansion separate from selection. The specimen selects available filtered items. Hidden selected items remain selected and participate in batch actions. Its summary exposes total and filtered selection counts. Batch action counts must agree.

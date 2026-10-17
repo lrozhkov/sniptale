@@ -96,10 +96,9 @@ describe('SettingsSidebar', () => {
     expect(activeButton?.hasAttribute('data-command-press')).toBe(true);
     expect(activeButton?.getAttribute('aria-pressed')).toBeNull();
     expect(activeButton?.className).not.toContain('color-accent');
-    const activeMarker = activeButton?.querySelector('div');
-    expect(activeMarker?.className).toContain('left-1');
-    expect(activeMarker?.className).toContain('translate-x-0');
-    expect(activeMarker?.className).not.toContain('left-3');
+    const activeMarker = container?.querySelector('[data-ui="settings.sidebar.active-marker"]');
+    expect(activeMarker).not.toBeNull();
+    expect(activeMarker?.closest('button')).toBeNull();
     expect(container?.querySelector('[data-ui="settings.sidebar.header"]')?.className).toContain(
       'border-solid'
     );

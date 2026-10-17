@@ -299,17 +299,16 @@ describe('SettingsCollection', () => {
       [...container.querySelectorAll('[data-settings-collection-item]')].map((row) =>
         row.getAttribute('data-settings-collection-item')
       )
-    ).toEqual(['first', 'second']);
+    ).toEqual(['second', 'first']);
+    expect(onMove).not.toHaveBeenCalled();
     expect(
       container
         .querySelector('[data-settings-collection-dragging="true"]')
         ?.getAttribute('data-settings-collection-item')
     ).toBe('first');
     expect(
-      container
-        .querySelector('[data-settings-collection-item="second"]')
-        ?.getAttribute('data-settings-collection-drop-after')
-    ).toBe('true');
+      container.querySelector('[data-settings-collection-dragging]')?.getAttribute('style')
+    ).toBeNull();
     expect(container.querySelector('[draggable]')).toBeNull();
     act(() => dispatchPointer(handles[0] ?? null, 'pointerup', { clientY: 90 }));
     expect(onMove).toHaveBeenCalledWith({

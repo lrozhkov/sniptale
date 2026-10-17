@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../platform/i18n';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
@@ -25,10 +26,6 @@ const SETTINGS_ITEM_IDLE_HOVER_CLASS_NAME = [
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_78%,transparent)]',
   'hover:text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
-
-const SETTINGS_ACTIVE_MARKER_CLASS_NAME =
-  'absolute left-1 top-1/2 h-5 w-[2px] translate-x-0 -translate-y-1/2 rounded-full ' +
-  'bg-[var(--sniptale-color-text-secondary)]';
 
 function getSettingsSidebarFooterLabel() {
   const brand = translate('settings.navigation.footerBrand');
@@ -72,7 +69,6 @@ function SettingsSidebarItem(props: {
         }
       `}
     >
-      {isActive && <div className={SETTINGS_ACTIVE_MARKER_CLASS_NAME} />}
       <span className="flex-none text-[var(--sniptale-color-text-secondary)]">
         <Icon size={16} />
       </span>
@@ -84,6 +80,24 @@ function SettingsSidebarItem(props: {
 }
 
 export function SettingsSidebar({ activeTab, disabled, onTabChange }: SettingsSidebarProps) {
+  const list = useRef<HTMLDivElement>(null);
+  const [markerTop, setMarkerTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const node = list.current;
+    const selected = node?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!node || !selected) return;
+    const measure = () => {
+      const target = selected.getBoundingClientRect();
+      setMarkerTop(
+        target.top - node.getBoundingClientRect().top + node.scrollTop + (target.height - 20) / 2
+      );
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(node);
+    observer?.observe(selected);
+    return () => observer?.disconnect();
+  }, [activeTab]);
   return (
     <nav
       data-ui="settings.sidebar"
@@ -99,9 +113,17 @@ export function SettingsSidebar({ activeTab, disabled, onTabChange }: SettingsSi
       </div>
 
       <div
+        ref={list}
         data-ui="settings.sidebar.nav-list"
-        className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-2"
+        className="relative min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-2"
       >
+        <span
+          aria-hidden="true"
+          data-ui="settings.sidebar.active-marker"
+          className="pointer-events-none absolute left-3 h-5 w-[2px] rounded-full
+            bg-[var(--sniptale-color-accent)] transition-[top] duration-150 motion-reduce:transition-none"
+          style={{ top: markerTop ?? 0, visibility: markerTop === null ? 'hidden' : undefined }}
+        />
         {SETTINGS_NAV_GROUPS.map((group) => (
           <section key={group.id} aria-labelledby={`settings-nav-group-${group.id}`}>
             <h2
