@@ -145,12 +145,13 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
     await click('advancedEditing');
     await click('cutMode');
     await dragRange(host);
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
     expect(cutCount()).toBe(1);
     const music = host.querySelector('[data-audio-lane="music"]')!;
-    music.dispatchEvent(dragEvent('dragenter'));
-    music.dispatchEvent(dragEvent('drop'));
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    await act(async () => {
+      music.dispatchEvent(dragEvent('dragenter'));
+      music.dispatchEvent(dragEvent('drop'));
+      await vi.waitFor(() => expect(musicCount()).toBe(1));
+    });
     expect(musicCount()).toBe(1);
     const clip = host.querySelector<HTMLElement>('[aria-label^="gallery.videoReview.audioMusic"]')!;
     Object.assign(clip, { setPointerCapture: vi.fn() });
@@ -164,10 +165,8 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
       });
     });
     await click('undo');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
     expect([musicCount(), cutCount()]).toEqual([1, 1]);
     await click('redo');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
     expect([musicCount(), cutCount()]).toEqual([0, 1]);
   } finally {
     await fixture.cleanup();

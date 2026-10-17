@@ -251,7 +251,13 @@ it.each(['symlink', 'directory', 'invalid bytes'])(
     else if (kind === 'directory') fs.mkdirSync(source);
     else fs.writeFileSync(source, 'unknown source');
     const open = fs.openSync.bind(fs);
+    const close = fs.closeSync.bind(fs);
+    const closed: number[] = [];
     let descriptor: number | undefined;
+    const closeSpy = vi.spyOn(fs, 'closeSync').mockImplementation((fd) => {
+      close(fd);
+      if (fd === descriptor) closed.push(fd);
+    });
     const spy = vi.spyOn(fs, 'openSync').mockImplementation((...args) => {
       const result = open(...args);
       if (args[0] === source) descriptor = result;
@@ -262,9 +268,11 @@ it.each(['symlink', 'directory', 'invalid bytes'])(
       expect(fs.readFileSync(outside, 'utf8')).toBe('untouched');
       expect(fs.existsSync(path.join(npmRoot, 'node_modules/brace-expansion'))).toBe(true);
       if (kind === 'invalid bytes') expect(descriptor).toBeDefined();
-      if (descriptor !== undefined) expect(() => fs.fstatSync(descriptor!)).toThrow();
+      // Other worker threads can reuse the descriptor number after its successful close.
+      if (descriptor !== undefined) expect(closed).toContain(descriptor);
     } finally {
       spy.mockRestore();
+      closeSpy.mockRestore();
     }
   }
 );
