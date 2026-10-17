@@ -20,7 +20,7 @@ export function AnnotationTemplateTagAssignment(props: {
   const empty = tagState.state.tags.length === 0;
   return (
     <fieldset className="grid gap-1.5" data-ui="shared.annotation-template-tag-assignment">
-      <legend className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+      <legend className="text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-secondary)]">
         {translate('highlighter.templateTags.assignmentLabel')}
       </legend>
       <div className="relative" data-floating-ui-owner-id={floating.ownerId} ref={floating.rootRef}>
@@ -29,8 +29,8 @@ export function AnnotationTemplateTagAssignment(props: {
           aria-haspopup="menu"
           aria-label={translate('highlighter.templateTags.assignmentLabel')}
           className={[
-            'flex h-9 w-full items-center justify-between gap-2 border-0 bg-transparent p-0',
-            'text-left text-xs text-[var(--sniptale-color-text-primary)]',
+            'flex h-8 w-full items-center justify-between gap-2 border-0 bg-transparent p-0',
+            'text-left text-[13px] leading-[18px] text-[var(--sniptale-color-text-primary)]',
             'focus-visible:outline-none focus-visible:ring-2',
             'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
             empty ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',

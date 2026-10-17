@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { HighlighterPresetEditorFooter } from '../footer';
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -15,7 +16,7 @@ import { CalloutPresetPreview } from './thumbnail';
 import { useCalloutPresetEditorDraft } from './draft';
 import { usePresetEditorModalLifecycle } from '../modal-lifecycle';
 import { Eye } from 'lucide-react';
-import { editorInputClassName, editorPreviewFrameClassName } from '../constants';
+import { editorPreviewFrameClassName } from '../constants';
 import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
 import { clonePaint } from '@sniptale/foundation/paint';
 import { useInspectorLayout } from '../../compact-inspector-controls/layout';
@@ -89,13 +90,10 @@ function PresetEditorBody(props: {
   const nameRef = useRef<HTMLInputElement>(null);
   const inspector = useInspectorLayout();
   const nameInput = (
-    <input
+    <ProductInput
       ref={nameRef}
-      {...(inspector ? { 'aria-label': translate('highlighter.calloutPresets.editor.name') } : {})}
-      className={[
-        editorInputClassName,
-        'cursor-text placeholder:text-[var(--sniptale-color-text-dim)]',
-      ].join(' ')}
+      aria-label={translate('highlighter.calloutPresets.editor.name')}
+      placeholder={translate('highlighter.calloutPresets.editor.name')}
       maxLength={64}
       onChange={(event) => props.setName(event.target.value)}
       type="text"
@@ -108,7 +106,7 @@ function PresetEditorBody(props: {
         <label
           className={
             inspector
-              ? 'mb-1 block text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]'
+              ? 'mb-1 block text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-secondary)]'
               : 'mb-1.5 block text-xs text-[var(--sniptale-color-text-secondary)]'
           }
         >

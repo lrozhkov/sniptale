@@ -219,9 +219,8 @@ function PresetEditorBody(props: {
   const nameInput = (
     <ProductInput
       ref={nameRef}
-      {...(inspector
-        ? { 'aria-label': translate('highlighter.stepBadgePresets.editor.name') }
-        : {})}
+      aria-label={translate('highlighter.stepBadgePresets.editor.name')}
+      placeholder={translate('highlighter.stepBadgePresets.editor.name')}
       className="cursor-text"
       maxLength={64}
       style={{ cursor: 'text' }}

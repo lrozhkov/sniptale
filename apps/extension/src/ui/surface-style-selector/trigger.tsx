@@ -3,6 +3,7 @@ import type { SurfaceStyle } from '@sniptale/runtime-contracts/highlighter/surfa
 import { ChevronDown } from 'lucide-react';
 import type { RefObject } from 'react';
 import { projectCanonicalSurfaceCss } from '../../features/highlighter/surface-style/surface-css';
+import { useInspectorLayout } from '../compact-inspector-controls/layout';
 import { translate } from '../../platform/i18n';
 import {
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
@@ -25,6 +26,7 @@ export function SurfaceStyleTrigger(props: {
   value: SurfaceStyle;
 }) {
   const title = translate('content.callout.surfaceStyle.title');
+  const inspector = useInspectorLayout();
   return (
     <button
       ref={props.buttonRef}
@@ -60,7 +62,12 @@ export function SurfaceStyleTrigger(props: {
           }}
         />
       </span>
-      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
+      <span
+        className={[
+          'min-w-0 flex-1 truncate text-[var(--sniptale-color-text-primary)]',
+          inspector ? 'text-[13px] leading-[18px] font-normal' : 'text-xs font-semibold',
+        ].join(' ')}
+      >
         {props.activeName}
       </span>
       <ChevronDown

@@ -1,4 +1,5 @@
 import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
+import { InspectorParameterRow, useInspectorLayout } from '../compact-inspector-controls/layout';
 import { translate } from '../../platform/i18n';
 import { useSurfaceStyleSelectorController } from './controller';
 import { SurfaceStyleManagementPanel } from './management-panel';
@@ -14,6 +15,7 @@ const FIELD_ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[7.5rem_minmax(0,1fr)] item
 
 export function SurfaceStyleSelector(props: SurfaceStyleSelectorProps) {
   const controller = useSurfaceStyleSelectorController(props);
+  const inspector = useInspectorLayout();
   const management = props.presentation !== 'selection';
 
   return (
@@ -23,7 +25,11 @@ export function SurfaceStyleSelector(props: SurfaceStyleSelectorProps) {
       className="min-w-0"
       data-ui="shared.ui.surface-style-selector"
     >
-      {props.fieldLabel ? (
+      {props.fieldLabel && inspector ? (
+        <InspectorParameterRow label={props.fieldLabel} valueMinimum={160}>
+          <SurfaceStyleSelectorTrigger selector={props} controller={controller} />
+        </InspectorParameterRow>
+      ) : props.fieldLabel ? (
         <div className={FIELD_ROW_CLASS_NAME}>
           <span className={FIELD_LABEL_CLASS_NAME}>{props.fieldLabel}</span>
           <div className="min-w-0">

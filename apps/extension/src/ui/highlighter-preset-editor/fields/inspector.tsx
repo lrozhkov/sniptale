@@ -13,6 +13,7 @@ import {
   Settings2,
   Square,
 } from 'lucide-react';
+import { ProductTextarea } from '@sniptale/ui/product-form-controls';
 import type { MouseEvent, ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../color-selector';
@@ -21,11 +22,7 @@ import { HighlighterPresetPropertyField as PropertyField } from '../inspector-fi
 import { EditorCompactRangeField } from './sections/compact-range-field';
 import { CompactSelect, NumericValueField, ToggleField } from '../../compact-inspector-controls';
 import { useInspectorLayout } from '../../compact-inspector-controls/layout';
-import {
-  editorNativeResizableTextareaClassName,
-  editorResizeHandleClassName,
-  editorTextareaClassName,
-} from '../constants';
+import { editorResizeHandleClassName } from '../constants';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { AVAILABLE_HIGHLIGHTER_BLUR_TYPES } from '../../../features/highlighter/blur-types';
 import {
@@ -160,6 +157,7 @@ function BorderGeometrySection(props: BorderStyleInspectorProps) {
         value={props.style.radius}
       />
       <ProductGlassLinkedPaddingFields
+        fieldLayout={inspector ? 'full-row' : 'inline'}
         labels={{
           padding: translate('highlighter.editor.paddingLabel'),
           top: translate('highlighter.editor.paddingTop'),
@@ -174,7 +172,8 @@ function BorderGeometrySection(props: BorderStyleInspectorProps) {
         renderValueField={({ compact, label, onChange, side, value }) => (
           <div className="min-w-0" data-padding-side={side}>
             <NumericValueField
-              className={compact ? '!h-7 !w-[4.75rem] !px-1' : '!w-full'}
+              className={inspector ? '!w-full' : compact ? '!h-7 !w-[4.75rem] !px-1' : '!w-full'}
+              unit={inspector ? 'px' : ''}
               label={label}
               max={50}
               min={0}
@@ -389,12 +388,15 @@ function BorderCssSection(props: BorderStyleInspectorProps) {
   return (
     <div className="grid gap-2">
       <div className="relative">
-        <textarea
+        <ProductTextarea
+          aria-label={translate('highlighter.editor.customCssLabel')}
+          title={translate('highlighter.editor.customCssHint')}
+          invalid={Boolean(props.cssError)}
           aria-invalid={props.cssError ? 'true' : undefined}
           className={
             props.onCssResizeStart
-              ? editorTextareaClassName
-              : editorNativeResizableTextareaClassName
+              ? 'resize-none font-mono'
+              : 'min-h-20 max-h-[300px] resize-y font-mono'
           }
           onChange={(event) => props.onCssDraftChange(event.currentTarget.value)}
           placeholder={translate('highlighter.editor.customCssPlaceholder')}
@@ -414,11 +416,12 @@ function BorderCssSection(props: BorderStyleInspectorProps) {
           />
         ) : null}
       </div>
-      <div className="text-[10px] text-[var(--sniptale-color-text-dim)]">
-        {translate('highlighter.editor.customCssHint')}
-      </div>
+      <div className="sr-only">{translate('highlighter.editor.customCssHint')}</div>
       {props.cssError ? (
-        <div className="text-[10px] text-[var(--sniptale-color-danger)]" role="alert">
+        <div
+          className="text-[13px] leading-[18px] text-[var(--sniptale-color-danger)]"
+          role="alert"
+        >
           {props.cssError}
         </div>
       ) : null}

@@ -2,7 +2,7 @@ import { useRef, type ReactNode } from 'react';
 import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import { InspectorFieldClear } from '../../compact-inspector-controls/text-field';
 import { translate } from '../../../platform/i18n';
-import { editorInputClassName } from '../constants';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import type { EditorState } from './types';
 import { EditorPreview } from './sections/sample';
 import { BorderStyleInspector } from './inspector';
@@ -37,18 +37,13 @@ export function BorderPresetEditorFields({
   const nameRef = useRef<HTMLInputElement>(null);
   const inspector = useInspectorLayout();
   const nameInput = (
-    <input
+    <ProductInput
       ref={nameRef}
-      {...(inspector ? { 'aria-label': translate('highlighter.editor.nameLabel') } : {})}
+      aria-label={translate('highlighter.editor.nameLabel')}
       type="text"
       value={state.name}
       onChange={(event) => state.setName(event.target.value)}
       placeholder={translate('highlighter.editor.namePlaceholder')}
-      className={[
-        editorInputClassName,
-        'placeholder:text-[var(--sniptale-color-text-dim)]',
-        'focus:ring-1 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
-      ].join(' ')}
     />
   );
   return (
@@ -57,7 +52,7 @@ export function BorderPresetEditorFields({
         <label
           className={
             inspector
-              ? 'mb-1 block text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]'
+              ? 'mb-1 block text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-secondary)]'
               : 'mb-1.5 block text-xs text-[var(--sniptale-color-text-secondary)]'
           }
         >
