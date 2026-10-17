@@ -525,7 +525,8 @@ html[data-input-mode='pointer'] .choice-field :is(.control, .search):focus-visib
 .theme[data-theme='dark'] .property-options[data-presentation='tools'] .property-face {
   --tool-accent: #fb923c;
 }
-.property-options[data-presentation='tools'] .property-face > svg {
+.property-options[data-presentation='tools'] .property-face > svg,
+.property-options[data-presentation='labeled-tools'] .property-face > svg {
   width: 16px;
   height: 16px;
   flex: 0 0 16px;
@@ -607,16 +608,7 @@ html[data-input-mode='pointer'] .choice-field :is(.control, .search):focus-visib
     background-color 120ms,
     color 120ms;
 }
-.property-options[data-presentation='labeled-tools'] .property-face > svg {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
+
 .property-options[data-presentation='labeled-tools'] input:checked + .property-face {
   background: var(--selected);
   color: var(--text);

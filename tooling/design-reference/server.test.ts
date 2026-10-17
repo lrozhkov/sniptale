@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -61,6 +61,43 @@ describe('design reference server boundary', () => {
     expect(head.status).toBe(200);
     expect(head.body).toBe('');
     expect((await get(port, '/docs/design/index.md', 'POST')).status).toBe(405);
+  });
+
+  it('serves only the two canonical UI styles and reflects source changes', async () => {
+    const { root, port } = await fixture();
+    for (const resource of [
+      '/packages/ui/src/styles/design-tokens.css',
+      '/packages/ui/src/styles/product-form-controls/range.css',
+    ]) {
+      const source = join(root, resource.slice(1));
+      await mkdir(dirname(source), { recursive: true });
+      const css = ':root { --reference-proof: 1; }';
+      await writeFile(source, css);
+      const response = await get(port, resource);
+      expect(response.status, resource).toBe(200);
+      expect(response.body).toBe(css);
+      expect(response.headers['content-type']).toBe('text/css; charset=utf-8');
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.headers['x-content-type-options']).toBe('nosniff');
+      const head = await get(port, resource, 'HEAD');
+      expect(head.status).toBe(200);
+      expect(head.body).toBe('');
+      expect(head.headers['content-length']).toBe(String(Buffer.byteLength(css)));
+      await writeFile(source, ':root { --reference-proof: 2; }');
+      expect((await get(port, resource)).body).toContain('--reference-proof: 2');
+    }
+  });
+
+  it('rejects package siblings and canonical style symlinks to private files', async () => {
+    const { root, port } = await fixture();
+    const directory = join(root, 'packages/ui/src/styles');
+    await mkdir(directory, { recursive: true });
+    for (const name of ['private.css', 'private.ts']) {
+      await writeFile(join(directory, name), 'not a public resource');
+      expect((await get(port, `/packages/ui/src/styles/${name}`)).status).toBe(404);
+    }
+    await symlink(join(root, 'secret.txt'), join(directory, 'design-tokens.css'));
+    expect((await get(port, '/packages/ui/src/styles/design-tokens.css')).status).toBe(404);
   });
 
   it('rejects unrelated files, encoded traversal, invalid paths, and symlink escapes', async () => {

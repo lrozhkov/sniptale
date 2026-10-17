@@ -22,9 +22,14 @@ async function resolveFile(root, pathname) {
   const tool = resolve(root, 'tooling/design-reference');
   const docs = resolve(root, 'docs/design');
   const entry = resolve(root, 'DESIGN.md');
+  const styles = [
+    resolve(root, 'packages/ui/src/styles/design-tokens.css'),
+    resolve(root, 'packages/ui/src/styles/product-form-controls/range.css'),
+  ];
   let candidate = resolve(root, '.' + pathname);
   if (
     candidate !== entry &&
+    !styles.includes(candidate) &&
     candidate !== tool &&
     !isWithin(candidate, tool) &&
     !isWithin(candidate, docs)
@@ -34,7 +39,12 @@ async function resolveFile(root, pathname) {
   if ((await stat(candidate)).isDirectory()) candidate = resolve(candidate, 'index.html');
   if (!contentTypes.has(extname(candidate))) return null;
   const canonical = await realpath(candidate);
-  if (canonical !== entry && !isWithin(canonical, tool) && !isWithin(canonical, docs)) {
+  if (
+    canonical !== entry &&
+    !styles.includes(canonical) &&
+    !isWithin(canonical, tool) &&
+    !isWithin(canonical, docs)
+  ) {
     return null;
   }
   return (await stat(canonical)).isFile() ? canonical : null;

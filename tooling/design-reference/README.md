@@ -10,7 +10,7 @@ From the repository root, run:
 npm run design:reference
 ```
 
-Open [the reference catalog](http://127.0.0.1:8780/tooling/design-reference/). Use `npm run design:reference -- --port 8781` to select another port. The server binds to 127.0.0.1. It serves only this tool, canonical design documents, and the local design entry. Development responses disable caching. Module loading and rule requests require HTTP.
+Open [the reference catalog](http://127.0.0.1:8780/tooling/design-reference/). Use `npm run design:reference -- --port 8781` to select another port. The server binds to 127.0.0.1. It serves only this tool, canonical design documents, the local design entry, and two canonical CSS files: `packages/ui/src/styles/design-tokens.css` and `packages/ui/src/styles/product-form-controls/range.css`. Other package files are not served. Development responses disable caching. Module loading and rule requests require HTTP.
 
 ## Boundaries
 

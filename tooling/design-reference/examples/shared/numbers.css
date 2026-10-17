@@ -1,5 +1,5 @@
 @import url('./button-press.css');
-@import url('../../assets/range.css');
+@import url('/packages/ui/src/styles/product-form-controls/range.css');
 .ref-number {
   font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
   position: relative;

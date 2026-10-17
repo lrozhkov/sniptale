@@ -9,8 +9,10 @@ const tool = resolve(root, 'tooling/design-reference');
 
 function checkReference(file: string, reference: string) {
   const target = reference.trim().replace(/^<|>$/g, '').split(/[?#]/)[0];
-  if (!target || /^(?:[a-z]+:|\/)/i.test(target)) return;
-  const destination = resolve(dirname(resolve(root, file)), target);
+  if (!target || /^(?:[a-z]+:|\/\/)/i.test(target)) return;
+  const destination = target.startsWith('/')
+    ? resolve(root, '.' + target)
+    : resolve(dirname(resolve(root, file)), target);
   expect(existsSync(destination), `${file} -> ${reference}`).toBe(true);
   if (statSync(destination).isDirectory()) {
     expect(existsSync(resolve(destination, 'index.html')), `${file} -> ${reference}`).toBe(true);
@@ -18,6 +20,27 @@ function checkReference(file: string, reference: string) {
 }
 
 describe('canonical design reference links', () => {
+  it('uses canonical token and range implementations without local copies', () => {
+    expect(existsSync(resolve(tool, 'assets/tokens.css'))).toBe(false);
+    expect(existsSync(resolve(tool, 'assets/range.css'))).toBe(false);
+    const pages = globSync('tooling/design-reference/**/index.html', { cwd: root });
+    expect(pages).toHaveLength(13);
+    for (const file of pages) {
+      expect(readFileSync(resolve(root, file), 'utf8'), file).toContain(
+        'href="/packages/ui/src/styles/design-tokens.css"'
+      );
+    }
+    expect(readFileSync(resolve(tool, 'examples/shared/numbers.css'), 'utf8')).toContain(
+      "@import url('/packages/ui/src/styles/product-form-controls/range.css');"
+    );
+    for (const source of [
+      'packages/ui/src/styles/design-tokens.css',
+      'packages/ui/src/styles/product-form-controls/range.css',
+    ]) {
+      expect(readFileSync(resolve(root, source), 'utf8'), source).not.toMatch(/@import|url\(/u);
+    }
+  });
+
   it('loads shared disclosure styles in each registered disclosure consumer', () => {
     for (const group of ['navigation', 'properties', 'compositions']) {
       const html = readFileSync(resolve(tool, `examples/${group}/index.html`), 'utf8');
