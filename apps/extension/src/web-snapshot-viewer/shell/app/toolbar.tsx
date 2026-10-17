@@ -18,7 +18,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 
 const toolbarButtonClassName = [
   'inline-flex h-8 min-h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[4px]',
-  'text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)] transition-colors',
+  'text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-secondary)] transition-colors',
   'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
   'disabled:cursor-wait disabled:opacity-60',
@@ -187,7 +187,9 @@ export function SnapshotViewerToolbar(props: {
     >
       <div className="min-w-0 basis-64 flex-1">
         <div
-          className="select-text truncate text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]"
+          className="select-text truncate text-[14px] leading-5
+            font-[var(--sniptale-font-weight-interface-heading)]
+            text-[var(--sniptale-color-text-primary)]"
           title={getHeaderTitle(props.loaded, props.locale)}
         >
           {getHeaderTitle(props.loaded, props.locale)}

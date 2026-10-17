@@ -14,7 +14,7 @@ export type PreviewSelection =
 
 const previewActionClassName = [
   'inline-flex h-8 min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[4px] px-2.5',
-  'text-[13px] leading-[18px] font-medium',
+  'text-[13px] leading-[18px] font-normal',
   'text-[var(--sniptale-color-text-primary)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
   'focus-visible:outline-none focus-visible:ring-2',
@@ -51,7 +51,7 @@ function PreviewZoomControls(props: {
       >
         <ZoomOut aria-hidden="true" size={16} />
       </ContentToolbarButton>
-      <span className="min-w-9 text-center text-[13px] leading-[18px] font-medium tabular-nums">
+      <span className="min-w-9 text-center text-[13px] leading-[18px] font-normal tabular-nums">
         {Math.round(props.zoom * 100)}%
       </span>
       <ContentToolbarButton
@@ -228,7 +228,8 @@ export function WebSnapshotAssetPreview(props: {
         </ContentToolbarButton>
         <h2
           className={[
-            'min-w-0 flex-1 select-text truncate text-[14px] leading-5 font-semibold',
+            'min-w-0 flex-1 select-text truncate text-[14px] leading-5',
+            'font-[var(--sniptale-font-weight-interface-heading)]',
             'text-[var(--sniptale-color-text-primary)]',
           ].join(' ')}
           title={name}
@@ -272,7 +273,7 @@ export function WebSnapshotAssetPreview(props: {
         ) : (
           <div className={previewMetadataClassName}>
             <File aria-hidden="true" size={16} />
-            <p className="select-text text-[13px] leading-[18px] font-medium">{name}</p>
+            <p className="select-text text-[13px] leading-[18px] font-normal">{name}</p>
             <p className="select-text text-[12px] leading-4 font-normal">{mimeType}</p>
           </div>
         )}

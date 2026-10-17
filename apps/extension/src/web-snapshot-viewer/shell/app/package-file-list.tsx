@@ -59,7 +59,7 @@ export function ViewerPackageFileList(props: {
               <div className="min-w-0 flex-1">
                 <p
                   className={[
-                    'select-text truncate text-[13px] leading-[18px] font-medium',
+                    'select-text truncate text-[13px] leading-[18px] font-normal',
                     'text-[var(--sniptale-color-text-primary)]',
                   ].join(' ')}
                   title={file.path}

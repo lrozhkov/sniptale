@@ -56,15 +56,12 @@ async function chromeGeometry(page: Page, info: TestInfo) {
     await expect(control).toHaveCSS('border-radius', '4px');
     await expect(control).toHaveCSS('font-size', '13px');
     await expect(control).toHaveCSS('line-height', '18px');
-    await expect(control).toHaveCSS(
-      'font-weight',
-      (await control.getAttribute('data-command-press')) !== null ? '400' : '500'
-    );
+    await expect.soft(control).toHaveCSS('font-weight', '400');
   }
   const heading = toolbar.getByText(title, { exact: true });
   await expect(heading).toHaveCSS('font-size', '14px');
   await expect(heading).toHaveCSS('line-height', '20px');
-  await expect(heading).toHaveCSS('font-weight', '600');
+  await expect.soft(heading).toHaveCSS('font-weight', '500');
   if (await heading.evaluate((node) => node.scrollWidth > node.clientWidth))
     await expect(heading).toHaveAttribute('title', title);
   const metadata = page.getByTestId('snapshot-metadata');
@@ -212,6 +209,10 @@ async function catalogComposition(state: SavedViewer, composition: Composition, 
   for (const key of ['exportedImages', 'downloadedAttachments', 'pageResources'] as const) {
     await catalogSection(page, composition, key);
     families.push({ family: key, text: await catalog.innerText() });
+    for (const heading of await catalog.locator('h2,h3').all())
+      await expect.soft(heading).toHaveCSS('font-weight', '500');
+    for (const name of await catalog.locator('article p:first-child').all())
+      await expect.soft(name).toHaveCSS('font-weight', '400');
     await capture(page, info, `files-${key}`);
     if (key !== 'pageResources') {
       const row = catalog.locator('article').first();
@@ -265,6 +266,9 @@ async function catalogComposition(state: SavedViewer, composition: Composition, 
     await trigger.click();
     const preview = page.getByTestId('snapshot-asset-preview');
     await expect(preview).toBeVisible();
+    await expect.soft(preview.getByRole('heading')).toHaveCSS('font-weight', '500');
+    if (kind === 'image')
+      await expect.soft(preview.getByText('100%', { exact: true })).toHaveCSS('font-weight', '400');
     const back = preview.getByRole('button', {
       name: tr(composition, 'webSnapshotViewer.app.closeAssetPreview'),
       exact: true,

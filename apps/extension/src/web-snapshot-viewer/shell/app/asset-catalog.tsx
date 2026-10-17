@@ -44,7 +44,7 @@ const assetPreviewClassName = [
   'bg-[var(--sniptale-color-surface-muted)] p-2',
 ].join(' ');
 const assetGroupTitleClassName = [
-  'mb-2 flex items-center gap-2 text-[14px] leading-5 font-semibold',
+  'mb-2 flex items-center gap-2 text-[14px] leading-5 font-[var(--sniptale-font-weight-interface-heading)]',
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 const assetActionClassName = [
@@ -145,7 +145,7 @@ function AssetCard(props: {
         <div className="min-w-0 flex-1">
           <p
             className={[
-              'select-text truncate text-[13px] leading-[18px] font-medium',
+              'select-text truncate text-[13px] leading-[18px] font-normal',
               'text-[var(--sniptale-color-text-primary)]',
             ].join(' ')}
             title={props.asset.path}
@@ -335,7 +335,10 @@ export function WebSnapshotAssetCatalog(props: {
     <div className="mx-auto max-w-[1200px] space-y-4 p-4" data-testid="snapshot-asset-catalog">
       <div className="space-y-4" hidden={selection !== null}>
         <div>
-          <h2 className="text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]">
+          <h2
+            className="text-[14px] leading-5 font-[var(--sniptale-font-weight-interface-heading)]
+            text-[var(--sniptale-color-text-primary)]"
+          >
             {translate('webSnapshotViewer.app.assetsTitle', props.locale)}
           </h2>
           <p className="mt-1 text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
