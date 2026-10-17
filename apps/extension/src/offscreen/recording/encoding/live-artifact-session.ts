@@ -12,6 +12,8 @@ interface CreateLiveRecordingArtifactSessionInput {
   coordinator: RecordingStagingCoordinator;
   encoding: LiveRecordingEncodingConfig;
   filename: string;
+  groupId?: string;
+  role?: string;
   frameTransform?: LiveVideoFrameTransform | undefined;
   onVideoFrameGeometry?: (frame: VideoFrame) => void;
   frameClockObserver?: RecordingFrameClockObserver;
@@ -31,6 +33,8 @@ export async function createLiveRecordingArtifactSession(
   const writer = await input.coordinator.openArtifact({
     artifactId: input.artifactId,
     filename: input.filename,
+    ...(input.groupId ? { groupId: input.groupId } : {}),
+    ...(input.role ? { role: input.role } : {}),
     mimeType: input.mimeType,
   });
   const ownerInput = {

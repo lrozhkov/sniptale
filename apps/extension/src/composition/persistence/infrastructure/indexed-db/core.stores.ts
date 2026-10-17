@@ -1,13 +1,15 @@
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 32;
+export const DB_VERSION = 33;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
 export const DATABASE_BACKUP_RECEIPT_KEY = 'sniptale.persistence.backup-receipt.v1';
 
 export const STORE_NAME = 'recordings';
+export const RECORDING_RECOVERY_SESSIONS_STORE = 'recording_recovery_sessions';
+export const RECORDING_RECOVERY_BLOCKS_STORE = 'recording_recovery_blocks';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
 export const DIAGNOSTICS_META_STORE = 'diagnostics_meta';
 export const DIAGNOSTICS_EVENTS_STORE = 'diagnostics_events';
@@ -44,6 +46,8 @@ export const SCHEMA_CONTRACTS_STORE = 'schema_contracts';
 export const EXPECTED_STORES = [
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
   DIAGNOSTICS_META_STORE,
   DIAGNOSTICS_EVENTS_STORE,
   VIDEO_PROJECTS_STORE,
@@ -80,6 +84,8 @@ export const EXPECTED_STORES = [
 export const EXPECTED_INDEXES = {
   [STORE_NAME]: ['createdAt'],
   [RECORDING_TELEMETRY_STORE]: ['updatedAt'],
+  [RECORDING_RECOVERY_SESSIONS_STORE]: ['createdAt'],
+  [RECORDING_RECOVERY_BLOCKS_STORE]: ['id'],
   [DIAGNOSTICS_META_STORE]: [],
   [DIAGNOSTICS_EVENTS_STORE]: ['recordingId'],
   [VIDEO_PROJECTS_STORE]: ['updatedAt', 'usageReferenceKeys'],

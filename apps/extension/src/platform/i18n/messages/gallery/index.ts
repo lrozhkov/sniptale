@@ -7,6 +7,7 @@ import { galleryImportModalMessages } from './import-modal';
 import { galleryPreviewMessages } from './preview';
 import { galleryRecoveryMessages } from './recovery';
 import { galleryStorageErrorMessages } from './storage-errors';
+import { galleryRecordingRecoveryMessages } from './recording-recovery';
 
 export const galleryMessages = defineMessageSource({
   app: galleryAppMessages,
@@ -15,6 +16,7 @@ export const galleryMessages = defineMessageSource({
   preview: galleryPreviewMessages,
   videoReview: galleryVideoReviewMessages,
   recovery: galleryRecoveryMessages,
+  recordingRecovery: galleryRecordingRecoveryMessages,
   storageErrors: galleryStorageErrorMessages,
   importModal: galleryImportModalMessages,
 });

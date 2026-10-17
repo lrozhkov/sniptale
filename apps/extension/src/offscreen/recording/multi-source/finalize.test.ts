@@ -184,6 +184,22 @@ describe('multi-source finalization', () => {
     }
   );
 
+  it('forwards every durable source incarnation to atomic publication', async () => {
+    const session = createSession('multi-recovery-source');
+    for (const source of session.recorders) {
+      source.artifact!.recoverySource = {
+        id: source.recordingId,
+        incarnation: `writer-${source.sourceIndex}`,
+        epoch: 'storage',
+      };
+    }
+    await finalizeSession(session);
+    const inputs = saveBatchMock.mock.lastCall![0];
+    expect(inputs.map((input: { recoverySource?: unknown }) => input.recoverySource)).toEqual(
+      session.recorders.map((source) => source.artifact!.recoverySource)
+    );
+  });
+
   it('publishes projectId null when optional project creation fails after media commit', async () => {
     const session = createSession('multi-project-failure');
     commitProjectMock.mockRejectedValueOnce(new Error('project failed'));

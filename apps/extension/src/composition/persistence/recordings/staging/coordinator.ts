@@ -3,12 +3,11 @@
 import {
   RECORDING_STAGING_PENDING_BYTES_LIMIT,
   type RecordingStagingCoordinator,
+  type RecordingStagingArtifactInput,
 } from './contracts';
-import {
-  assertAssetWriteAdmission,
-  createAssetObjectWriter,
-  type AssetObjectWriter,
-} from '../../assets';
+import { assertAssetWriteAdmission, type AssetObjectWriter } from '../../assets';
+import { initializeRecoveryEpoch } from '../recovery/storage';
+import { createDurableRecordingWriter } from './durable-writer';
 import { initDB } from '../../infrastructure/indexed-db/core';
 import {
   createRecordingStagingArtifactOwner,
@@ -24,12 +23,12 @@ export interface CreateRecordingStagingCoordinatorOptions {
 }
 
 let stagingGeneration = 0;
-const activeCoordinators = new Set<RecordingStagingCoordinator>();
+const activeCoordinators = new Map<RecordingStagingCoordinator, () => Promise<void>>();
 
 export async function invalidateAndAbortActiveRecordingStaging(): Promise<void> {
   stagingGeneration += 1;
   const results = await Promise.allSettled(
-    [...activeCoordinators].map((coordinator) => coordinator.abort())
+    [...activeCoordinators.values()].map((invalidate) => invalidate())
   );
   const failures = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : []
@@ -45,8 +44,68 @@ function requireNonEmpty(value: string, fieldName: string): void {
   }
 }
 
-function createPendingBytesOverflowError(limit: number): Error {
-  return new Error(`Recording staging pending-byte limit exceeded (${limit} bytes).`);
+function createRecordingPendingByteBudget(
+  limit: number,
+  requireHealthy: () => void,
+  recordFailure: (error: unknown) => void
+) {
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
+    throw new Error('Recording staging pending-byte limit must be a positive safe integer.');
+  }
+  let pendingBytes = 0;
+  return {
+    getPendingBytes: () => pendingBytes,
+    reserve(size: number) {
+      requireHealthy();
+      if (pendingBytes + size > limit) {
+        const error = new Error(`Recording staging pending-byte limit exceeded (${limit} bytes).`);
+        recordFailure(error);
+        throw error;
+      }
+      pendingBytes += size;
+    },
+    release(size: number) {
+      pendingBytes -= size;
+    },
+  };
+}
+
+async function settleArtifactCleanup(
+  artifacts: Iterable<RecordingStagingArtifactOwner>,
+  action: 'abort' | 'release' | 'invalidate',
+  message: string
+): Promise<void> {
+  const results = await Promise.allSettled([...artifacts].map((artifact) => artifact[action]()));
+  const failures = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+  if (failures.length) throw new AggregateError(failures, message);
+}
+
+async function acquireArtifactStorage(
+  input: RecordingStagingArtifactInput,
+  epoch: string | null,
+  createWriter: CreateRecordingStagingCoordinatorOptions['createWriter'],
+  requireHealthy: () => void
+): Promise<AssetObjectWriter> {
+  const storage = createWriter
+    ? await createWriter({ mimeType: input.mimeType })
+    : await createDurableRecordingWriter(input, epoch!);
+  try {
+    requireHealthy();
+    return storage;
+  } catch (error) {
+    try {
+      await storage.abort();
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        'Recording staging became unavailable while an artifact was opening.',
+        { cause: cleanupError }
+      );
+    }
+    throw error;
+  }
 }
 
 export async function createRecordingStagingCoordinator(
@@ -57,24 +116,29 @@ export async function createRecordingStagingCoordinator(
   // can deadlock against this context's own leases.
   await initDB();
   const generation = stagingGeneration;
-  const createWriter = options.createWriter ?? createAssetObjectWriter;
+  const createWriter = options.createWriter;
   const admitBytes = options.admitBytes ?? assertAssetWriteAdmission;
-  const pendingBytesLimit = options.pendingBytesLimit ?? RECORDING_STAGING_PENDING_BYTES_LIMIT;
-  if (!Number.isSafeInteger(pendingBytesLimit) || pendingBytesLimit <= 0) {
-    throw new Error('Recording staging pending-byte limit must be a positive safe integer.');
-  }
+  const budget = createRecordingPendingByteBudget(
+    options.pendingBytesLimit ?? RECORDING_STAGING_PENDING_BYTES_LIMIT,
+    () => requireHealthy(),
+    (error) => recordFailure(error)
+  );
+  const epoch = options.createWriter ? null : await initializeRecoveryEpoch();
 
   const artifacts = new Map<string, RecordingStagingArtifactOwner>();
-  let pendingBytes = 0;
   let failure: unknown = null;
   let phase: CoordinatorPhase = 'active';
   let abortPromise: Promise<void> | null = null;
   let deletePromise: Promise<void> | null = null;
 
-  const requireHealthy = () => {
+  const requireGeneration = () => {
     if (generation !== stagingGeneration) {
       throw new Error('Recording staging coordinator generation is stale.');
     }
+  };
+
+  const requireHealthy = () => {
+    requireGeneration();
     if (failure !== null) throw failure;
     if (phase !== 'active') throw new Error(`Recording staging coordinator is ${phase}.`);
   };
@@ -83,22 +147,8 @@ export async function createRecordingStagingCoordinator(
     failure ??= error;
   };
 
-  const reservePendingBytes = (size: number) => {
-    requireHealthy();
-    if (pendingBytes + size > pendingBytesLimit) {
-      const error = createPendingBytesOverflowError(pendingBytesLimit);
-      recordFailure(error);
-      throw error;
-    }
-    pendingBytes += size;
-  };
-
-  const releasePendingBytes = (size: number) => {
-    pendingBytes -= size;
-  };
-
   const coordinator: RecordingStagingCoordinator = {
-    getPendingBytes: () => pendingBytes,
+    getPendingBytes: budget.getPendingBytes,
     async openArtifact(input) {
       requireHealthy();
       requireNonEmpty(input.artifactId, 'artifact ID');
@@ -110,28 +160,20 @@ export async function createRecordingStagingCoordinator(
 
       try {
         await admitBytes(0);
-        const artifactStorage = await createWriter({ mimeType: input.mimeType });
-        try {
-          requireHealthy();
-        } catch (error) {
-          try {
-            await artifactStorage.abort();
-          } catch (cleanupError) {
-            throw new AggregateError(
-              [error, cleanupError],
-              'Recording staging became unavailable while an artifact was opening.',
-              { cause: cleanupError }
-            );
-          }
-          throw error;
-        }
+        const artifactStorage = await acquireArtifactStorage(
+          input,
+          epoch,
+          createWriter,
+          requireHealthy
+        );
         const owner = createRecordingStagingArtifactOwner({
           admitBytes,
           assertCoordinatorHealthy: requireHealthy,
+          assertCoordinatorGeneration: requireGeneration,
           input,
           recordFailure,
-          releasePendingBytes,
-          reservePendingBytes,
+          releasePendingBytes: budget.release,
+          reservePendingBytes: budget.reserve,
           storage: artifactStorage,
         });
         artifacts.set(input.artifactId, owner);
@@ -141,20 +183,23 @@ export async function createRecordingStagingCoordinator(
         throw error;
       }
     },
+    async discard() {
+      await coordinator.abort();
+      await Promise.all([...artifacts.values()].map((artifact) => artifact.discard()));
+    },
     abort() {
       abortPromise ??= (async () => {
         if (phase === 'aborted' || phase === 'deleted') return;
         phase = 'aborting';
-        const cleanupResults = await Promise.allSettled(
-          [...artifacts.values()].map((artifact) => artifact.abort())
-        );
-        const cleanupErrors = cleanupResults.flatMap((result) =>
-          result.status === 'rejected' ? [result.reason as unknown] : []
-        );
-        phase = 'aborted';
-        activeCoordinators.delete(coordinator);
-        if (cleanupErrors.length > 0) {
-          throw new AggregateError(cleanupErrors, 'Failed to abort recording staging.');
+        try {
+          await settleArtifactCleanup(
+            artifacts.values(),
+            'abort',
+            'Failed to abort recording staging.'
+          );
+        } finally {
+          phase = 'aborted';
+          activeCoordinators.delete(coordinator);
         }
       })();
       return abortPromise;
@@ -169,21 +214,28 @@ export async function createRecordingStagingCoordinator(
           throw new Error('Cannot delete recording staging before all artifacts are finalized.');
         }
         phase = 'deleting';
-        const releases = await Promise.allSettled(
-          [...artifacts.values()].map((artifact) => artifact.release())
-        );
-        phase = 'deleted';
-        activeCoordinators.delete(coordinator);
-        const failures = releases.flatMap((result) =>
-          result.status === 'rejected' ? [result.reason as unknown] : []
-        );
-        if (failures.length > 0) {
-          throw new AggregateError(failures, 'Failed to release recording staging.');
+        try {
+          await settleArtifactCleanup(
+            artifacts.values(),
+            'release',
+            'Failed to release recording staging.'
+          );
+        } finally {
+          phase = 'deleted';
+          activeCoordinators.delete(coordinator);
         }
       })();
       return deletePromise;
     },
   };
-  activeCoordinators.add(coordinator);
+  activeCoordinators.set(coordinator, async () => {
+    phase = 'aborted';
+    activeCoordinators.delete(coordinator);
+    await settleArtifactCleanup(
+      artifacts.values(),
+      'invalidate',
+      'Failed to release invalidated recording staging.'
+    );
+  });
   return coordinator;
 }

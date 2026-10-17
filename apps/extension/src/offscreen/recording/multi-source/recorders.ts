@@ -80,6 +80,8 @@ async function createMediaRecorderSource(params: {
   );
   const artifactSession = await createRecordingArtifactSession({
     artifactId: recordingId,
+    groupId: params.baseRecordingId,
+    role: hasVideo ? 'display' : 'microphone',
     coordinator: params.coordinator,
     filename,
     mimeType: artifact.mimeType,

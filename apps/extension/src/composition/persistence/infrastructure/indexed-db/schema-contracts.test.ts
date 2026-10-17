@@ -113,6 +113,8 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
     ['scenario_project_history', { keyPath: ['projectId', 'revision'] }],
     ['scenario_project_units', { keyPath: ['projectId', 'unitId', 'revision'] }],
+    ['recording_recovery_sessions', { keyPath: 'id' }],
+    ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -184,6 +186,8 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
     ['scenario_project_history', { keyPath: ['projectId', 'revision'] }],
     ['scenario_project_units', { keyPath: ['projectId', 'unitId', 'revision'] }],
+    ['recording_recovery_sessions', { keyPath: 'id' }],
+    ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual([
@@ -250,6 +254,11 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('scenario_project_units', {
         keyPath: ['projectId', 'unitId', 'revision'],
       });
+    else if (migration.fromDatabaseVersion === 32)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['recording_recovery_sessions', { keyPath: 'id' }],
+        ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
+      ]);
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -286,6 +295,8 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
     ['scenario_project_history', { keyPath: ['projectId', 'revision'] }],
     ['scenario_project_units', { keyPath: ['projectId', 'unitId', 'revision'] }],
+    ['recording_recovery_sessions', { keyPath: 'id' }],
+    ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -299,7 +310,7 @@ it('admits compact source gain without workspace migration and refuses incompati
   expect(buildDatabaseMigrationPlan(DB_VERSION, 16)).toBeNull();
 });
 
-it('annotation admission is metadata-only and aborts before publishing contracts on missing storage', async () => {
+it('annotation admission preserves rows and aborts before publishing contracts on missing storage', async () => {
   const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
     (fixture) => fixture.databaseVersion === 20
   )!;
@@ -316,7 +327,10 @@ it('annotation admission is metadata-only and aborts before publishing contracts
   };
   const db = {
     objectStoreNames: { contains: (name: string) => names.has(name) },
-    createObjectStore: vi.fn(),
+    createObjectStore: vi.fn((name: string) => {
+      names.add(name);
+      return { createIndex: vi.fn(), put };
+    }),
     deleteObjectStore: vi.fn(),
   };
   const plan = buildDatabaseMigrationPlan(20, DB_VERSION)!;
@@ -329,7 +343,10 @@ it('annotation admission is metadata-only and aborts before publishing contracts
   });
   await expect(plan[0]!.estimateAdditionalBytes()).resolves.toBe(65536);
   handleDatabaseUpgrade(db, 20, DB_VERSION, tx);
-  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.createObjectStore.mock.calls).toEqual([
+    ['recording_recovery_sessions', { keyPath: 'id' }],
+    ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
+  ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);

@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -30,11 +32,15 @@ it('adds only empty indexed history stores and publishes the current contracts a
     [VIDEO_WORKSPACE_HISTORY_STORE, { keyPath: ['aggregateId', 'ordinal'] }],
     [SCENARIO_PROJECT_HISTORY_STORE, { keyPath: ['projectId', 'revision'] }],
     [SCENARIO_PROJECT_UNITS_STORE, { keyPath: ['projectId', 'unitId', 'revision'] }],
+    [RECORDING_RECOVERY_SESSIONS_STORE, { keyPath: 'id' }],
+    [RECORDING_RECOVERY_BLOCKS_STORE, { keyPath: ['id', 'index'] }],
   ]);
   expect(indexes.mock.calls).toEqual([
     ['aggregateId', 'aggregateId'],
     ['projectId', 'projectId'],
     ['projectId', 'projectId'],
+    ['createdAt', 'createdAt'],
+    ['id', 'id'],
   ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
   expect(puts.mock.calls.map(([contract]) => contract)).toEqual(CURRENT_SCHEMA_CONTRACTS);

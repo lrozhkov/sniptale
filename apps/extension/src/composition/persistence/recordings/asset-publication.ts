@@ -1,3 +1,10 @@
+import { createStrictRecordingTransaction } from './recovery/transaction';
+import {
+  markRecordingRecoveryPublished,
+  assertRecordingRecoveryPublication,
+  parseRecordingRecoverySource,
+  type RecordingRecoverySource,
+} from './recovery/publication';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
@@ -9,6 +16,7 @@ import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   PROJECT_ASSETS_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -47,6 +55,7 @@ export interface RecordingPublicationPayload {
   completion: VideoPostRecordResult | null;
   entries: StoredRecordingEntry[];
   expectedAssetIds?: Record<string, string | null>;
+  recoverySources?: Record<string, RecordingRecoverySource>;
 }
 
 function parseCompletion(value: unknown): VideoPostRecordResult | null | undefined {
@@ -87,7 +96,18 @@ function parsePayload(value: unknown): RecordingPublicationPayload | null {
     entries.some((entry) => !entry || !Object.hasOwn(expectedAssetIds, entry.id))
   )
     return null;
+  const recoverySources: Record<string, RecordingRecoverySource> = {};
+  const rawSources = record['recoverySources'];
+  if (rawSources !== undefined) {
+    if (!isRecord(rawSources)) return null;
+    for (const [id, raw] of Object.entries(rawSources)) {
+      const source = parseRecordingRecoverySource(raw);
+      if (!source || !entries.some((entry) => entry?.id === id)) return null;
+      recoverySources[id] = source;
+    }
+  }
   return {
+    ...(rawSources === undefined ? {} : { recoverySources }),
     completion,
     entries: entries as StoredRecordingEntry[],
     ...(expected === undefined ? {} : { expectedAssetIds }),
@@ -142,12 +162,16 @@ export async function publishRecordingAssetJournal(
           VIDEO_WORKSPACE_HISTORY_STORE,
           PROJECT_ASSETS_STORE,
         ] as const);
-    const tx = db.transaction(storeNames, 'readwrite');
+    const tx = payload.recoverySources
+      ? createStrictRecordingTransaction(db, [...storeNames, RECORDING_RECOVERY_SESSIONS_STORE])
+      : db.transaction(storeNames, 'readwrite');
     try {
       const recordingStore = tx.objectStore(STORE_NAME);
       const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
       let replayOnly = true;
       for (const entry of payload.entries) {
+        const recoverySource = payload.recoverySources?.[entry.id];
+        if (recoverySource) await assertRecordingRecoveryPublication(tx, recoverySource, entry.id);
         const rawPrevious: unknown = await recordingStore.get(entry.id);
         const previous = parseRecordingEntry(rawPrevious);
         if (rawPrevious !== undefined && (!previous || previous.id !== entry.id))
@@ -177,6 +201,7 @@ export async function publishRecordingAssetJournal(
           role: RECORDING_ASSET_ROLE,
         });
         await recordingStore.put(entry);
+        if (recoverySource) await markRecordingRecoveryPublished(tx, recoverySource, entry.id);
         const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
         const media = buildRecordingMediaEntry(entry);
         const currentMedia = parseMediaLibraryEntry(await mediaStore.get(media.id));

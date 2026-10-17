@@ -15,6 +15,17 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it('includes retained Scenario consumers in canonical media deletion proof', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence/media-library';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/delete-cascade.ts`)).toEqual([
+    `${root}/delete-cascade.scenario.test.ts`,
+    `${root}/delete-cascade.sources.test.ts`,
+    `${root}/delete-cascade.test.ts`,
+    `${root}/dependencies.test.ts`,
+  ]);
+});
+
 it('keeps offscreen lifecycle recovery and saved-result proof despite the runtime export mapping', async () => {
   const module = await importOwnerMap();
   const root = 'apps/extension/src/background/media/video/runtime/handlers/state';

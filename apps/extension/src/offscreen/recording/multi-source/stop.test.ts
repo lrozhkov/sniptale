@@ -285,3 +285,16 @@ it('retains starting cleanup failure through the controller after the active ses
   expect(session.recorders[0]!.artifactSession.abort).toHaveBeenCalledOnce();
   expect(sendRuntimeMessage).not.toHaveBeenCalled();
 });
+
+it('honors explicit discard even if an encoder fails while stopping', async () => {
+  const session = createSession();
+  const discard = vi.fn().mockResolvedValue(undefined);
+  session.staging.discard = discard;
+  const failure = new Error('encoder failed during discard');
+  vi.mocked(session.recorders[0]!.artifactSession.stop).mockRejectedValue(failure);
+  setActiveMultiSourceSession(session);
+  await expect(
+    stopMultiSourceSession({ discard: true, finalizeSession: vi.fn(), session })
+  ).rejects.toBe(failure);
+  expect(discard).toHaveBeenCalledOnce();
+});

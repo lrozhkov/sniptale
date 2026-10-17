@@ -132,3 +132,50 @@ it('keeps the exact source-ended finalization failure after real shared cleanup'
   expect(staging.abort).toHaveBeenCalledOnce();
   expect(recordingContext.lifecycleState).toBe('idle');
 });
+
+it('honors explicit discard during encoder failure through real shared cleanup', async () => {
+  const stream = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
+  const staging = createRecordingStagingCoordinatorTestDouble();
+  const discard = vi.fn().mockResolvedValue(undefined);
+  staging.discard = discard;
+  recordingContext.beginRecordingSession('recording-failure');
+  recordingContext.sourceStream = stream;
+  recordingContext.videoStream = stream;
+  recordingContext.bindStagingCoordinator(staging);
+  await finalizeRecordingBootstrap({
+    durationTracker: recordingContext.durationTracker,
+    resolvedRecordingId: 'recording-failure',
+    settings: DEFAULT_VIDEO_SETTINGS,
+    trackSettings: { frameRate: 30, height: 720, width: 1280 },
+  });
+  const session = recordingContext.artifactSession!;
+  const callbacks = vi.mocked(session.setLifecycleCallbacks).mock.lastCall![0];
+  recordingContext.beginStopRequest({ discard: true, reject: vi.fn(), resolve: vi.fn() });
+  callbacks.onFailure?.(new Error('encoder failed while discarding'));
+  await vi.waitFor(() => expect(discard).toHaveBeenCalledOnce());
+  expect(recordingContext.lifecycleState).toBe('idle');
+});
+
+it('releases resources and settles stop if both finalization and explicit discard fail', async () => {
+  finalizeRecordingMock.mockRejectedValueOnce(new Error('publication failed'));
+  const stream = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
+  const staging = createRecordingStagingCoordinatorTestDouble();
+  staging.discard = vi.fn().mockRejectedValue(new Error('discard failed'));
+  recordingContext.beginRecordingSession('recording-failure');
+  recordingContext.sourceStream = stream;
+  recordingContext.videoStream = stream;
+  recordingContext.bindStagingCoordinator(staging);
+  await finalizeRecordingBootstrap({
+    durationTracker: recordingContext.durationTracker,
+    resolvedRecordingId: 'recording-failure',
+    settings: DEFAULT_VIDEO_SETTINGS,
+    trackSettings: { frameRate: 30, height: 720, width: 1280 },
+  });
+  const session = recordingContext.artifactSession!;
+  const resolve = vi.fn();
+  recordingContext.beginStopRequest({ discard: true, reject: vi.fn(), resolve });
+  await expect(session.stop()).rejects.toThrow('finalization and explicit discard failed');
+  expect(resolve).toHaveBeenCalledWith(expect.objectContaining({ result: 'terminal-failure' }));
+  expect(recordingContext.lifecycleState).toBe('idle');
+  expect(stream.track.stop).toHaveBeenCalled();
+});

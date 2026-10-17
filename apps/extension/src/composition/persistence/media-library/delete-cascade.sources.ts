@@ -1,3 +1,4 @@
+import { deleteRecoveryInTransaction } from '../recordings/recovery/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
@@ -83,6 +84,7 @@ export async function releaseMediaSource(
         parse: parseRecordingEntry,
       });
       await tx.objectStore(RECORDING_TELEMETRY_STORE).delete!(media.source.recordingId);
+      await deleteRecoveryInTransaction(tx, media.source.recordingId);
       return;
     case 'project-asset':
       return releaseBodyRecord({

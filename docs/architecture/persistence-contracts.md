@@ -22,6 +22,26 @@ Restore retains root-local OPFS staging and existing per-root claims. Thus, fail
 
 Keep one database because recording publication commits recording metadata, media, assets, and the completion outbox atomically.
 
+## Recording recovery
+
+The recordings domain owns `recording_recovery_sessions` and `recording_recovery_blocks` in the canonical database. Both stores contain authoritative user data. Database version 33 adds these stores and changes the recordings contract from 2 to 3. The migration preserves all earlier rows and immutable media.
+
+Each session has an identity and an incarnation. Ordered immutable blocks contain the encoded media bytes. A strict-durability transaction commits each block and its acknowledged session boundary together. Acknowledgement follows transaction completion.
+
+IndexedDB strict durability requests a disk flush before completion. This guarantee assumes that the operating system and hardware honor durability requests. Frames in the encoder and pending blocks in memory remain vulnerable to termination or power loss.
+
+A random epoch header in the sessions store fences delayed opening operations across local-data erasure. Only initialization creates this header. Opening captures the epoch before waiting for an identity lock and checks it again before writing. An absent or changed epoch refuses the old operation. An absent or changed incarnation refuses a delayed append.
+
+Database admission completes before an identity lock. Code must not hold a mutation permit while waiting for this lock. A live cross-context lock distinguishes an active writer from an interrupted writer.
+
+Failure stops affected producers and retains committed blocks. Finalization, publication, recovery, and download failures do not delete these blocks. Successful publication also retains the original safety copy. The original session receives its `published` flag inside the same transaction as canonical publication. Encoded output completion alone does not establish a saved Library recording.
+
+Automatic expiry, Trash cleanup, and orphan cleanup cannot delete an unreferenced safety copy. Explicit discard, admitted canonical deletion, and complete local-data erasure can delete recovery data. Canonical deletion must first admit all source dependencies. Refused deletion retains the safety copy.
+
+Recovery uses a stable separate target identity and refuses replacement of an existing target. Playable-prefix recovery preserves every original block, including an incomplete suffix. Raw download retains the original bytes and order. A failed recovery leaves the source available for retry or raw download. Readers do not substitute original bytes into an unrelated canonical asset.
+
+Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI provides their explicit export path. Do not classify these stores as temporary staging or rebuildable caches. Do not admit a destructive migration of recovery data until the backup contract covers the complete recovery inventory. Verified local-data erasure deletes both stores, including the epoch header. This feature requires no extension permission changes.
+
 ## Admission and migration
 
 Quick-edit logical formats 3 and 4 require project names and permanent lifecycles, including independent Trash admission times. Format 3 uses the legacy advanced baseline. Format 4 retains the complete document baseline. Physical formats 4 and 5 store these logical formats.

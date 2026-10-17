@@ -566,3 +566,166 @@ it('confirmed image-origin purge strips active and remembered logos from the ret
   expect(rows.get('project_assets')!.has('private-logo')).toBe(false);
   expect(rows.get('asset_refs')!.has('logo-body')).toBe(false);
 });
+
+it.each(['recording-1', 'restored'])(
+  'deletes safety bytes atomically with admitted canonical deletion of %s',
+  async (target) => {
+    const source = { kind: 'recording' as const, recordingId: target };
+    installSource(source);
+    rows.get('video_projects')!.clear();
+    rows.set(
+      'recording_recovery_sessions',
+      new Map([
+        [
+          'recording-1',
+          {
+            id: 'recording-1',
+            recoveryId: 'restored',
+            incarnation: 'one',
+            epoch: 'epoch',
+            filename: 'clip.webm',
+            mimeType: 'video/webm',
+            createdAt: 1,
+            size: 3,
+            blockCount: 1,
+            complete: false,
+            published: false,
+          },
+        ],
+      ])
+    );
+    rows.set(
+      'recording_recovery_blocks',
+      new Map([
+        [
+          JSON.stringify(['recording-1', 0]),
+          {
+            id: 'recording-1',
+            index: 0,
+            incarnation: 'one',
+            bytes: new Uint8Array([1, 2, 3]).buffer,
+          },
+        ],
+      ])
+    );
+    await deleteMediaAssetWithProjectCascade(mediaId, []);
+    expect(rows.get('recording_recovery_sessions')?.size).toBe(0);
+    expect(rows.get('recording_recovery_blocks')?.size).toBe(0);
+  }
+);
+
+it('preserves safety bytes when canonical deletion admission is refused', async () => {
+  installSource({ kind: 'recording', recordingId: 'recording-1' });
+  rows.set('recording_recovery_sessions', new Map([['recording-1', { id: 'recording-1' }]]));
+  rows.set(
+    'recording_recovery_blocks',
+    new Map([['block', { id: 'recording-1', index: 0, bytes: new Uint8Array([1, 2, 3]).buffer }]])
+  );
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toBeInstanceOf(
+    StaleMediaAssetDeletePreviewError
+  );
+  expect(rows.get('recording_recovery_sessions')?.size).toBe(1);
+  expect(rows.get('recording_recovery_blocks')?.size).toBe(1);
+});
+
+it('preserves the coordination epoch and unrelated recovery when deleting canonical recording @epoch', async () => {
+  installSource({ kind: 'recording', recordingId: '@epoch' });
+  rows.get('video_projects')!.clear();
+  const epoch = { id: '@epoch', token: 'coordination-generation' };
+  const unrelated = {
+    id: 'unrelated',
+    recoveryId: 'restored-unrelated',
+    incarnation: 'one',
+    epoch: 'coordination-generation',
+    filename: 'clip.webm',
+    mimeType: 'video/webm',
+    createdAt: 1,
+    size: 3,
+    blockCount: 1,
+    complete: false,
+    published: false,
+  };
+  rows.set(
+    'recording_recovery_sessions',
+    new Map<string, unknown>([
+      ['@epoch', epoch],
+      ['unrelated', unrelated],
+    ])
+  );
+  rows.set(
+    'recording_recovery_blocks',
+    new Map([
+      [
+        JSON.stringify(['unrelated', 0]),
+        { id: 'unrelated', index: 0, incarnation: 'one', bytes: new Uint8Array([1, 2, 3]).buffer },
+      ],
+    ])
+  );
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('recording_recovery_sessions')?.get('@epoch')).toEqual(epoch);
+  expect(rows.get('recording_recovery_sessions')?.get('unrelated')).toEqual(unrelated);
+  expect(rows.get('recording_recovery_blocks')?.size).toBe(1);
+});
+
+it('keeps the original canonical recording when deleting its restored copy and safety data', async () => {
+  installSource({ kind: 'recording', recordingId: 'restored' });
+  rows.get('video_projects')!.clear();
+  const original = {
+    id: 'original',
+    assetId: 'original-asset',
+    filename: 'original.webm',
+    mimeType: 'video/webm',
+    createdAt: 1,
+    size: 3,
+  };
+  rows.get('recordings')!.set(original.id, original);
+  rows.get('media_library')!.set('recording:original', {
+    ...mediaEntry(),
+    id: 'recording:original',
+    source: { kind: 'recording', recordingId: 'original' },
+  });
+  rows.get('asset_owners')!.set(JSON.stringify(['recording', 'original', 'body']), {
+    ownerKind: 'recording',
+    ownerId: 'original',
+    assetId: 'original-asset',
+    role: 'body',
+  });
+  rows.set(
+    'recording_recovery_sessions',
+    new Map([
+      [
+        'original',
+        {
+          id: 'original',
+          recoveryId: 'restored',
+          incarnation: 'one',
+          epoch: 'epoch',
+          filename: 'original.webm',
+          mimeType: 'video/webm',
+          createdAt: 1,
+          size: 3,
+          blockCount: 1,
+          complete: false,
+          published: true,
+        },
+      ],
+    ])
+  );
+  rows.set(
+    'recording_recovery_blocks',
+    new Map([
+      [
+        JSON.stringify(['original', 0]),
+        { id: 'original', index: 0, incarnation: 'one', bytes: new Uint8Array([1, 2, 3]).buffer },
+      ],
+    ])
+  );
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('recordings')?.get('original')).toEqual(original);
+  expect(rows.get('media_library')?.has('recording:original')).toBe(true);
+  expect(rows.get('asset_owners')?.has(JSON.stringify(['recording', 'original', 'body']))).toBe(
+    true
+  );
+  expect(rows.get('recording_recovery_sessions')?.size).toBe(0);
+  expect(rows.get('recording_recovery_blocks')?.size).toBe(0);
+});

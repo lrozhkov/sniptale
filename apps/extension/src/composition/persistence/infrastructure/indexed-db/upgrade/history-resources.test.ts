@@ -1,7 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { betaV24Fixture } from '../fixtures/beta-v24';
-import { DB_VERSION } from '../core.stores';
-import { handleDatabaseUpgrade } from './core';
+import { DATABASE_MIGRATIONS } from '../schema-contracts';
 
 it('advances private source and known-source journal contracts without rewriting authority', () => {
   const put = vi.fn();
@@ -16,10 +15,17 @@ it('advances private source and known-source journal contracts without rewriting
     createObjectStore: vi.fn(),
     deleteObjectStore: vi.fn(),
   };
-  handleDatabaseUpgrade(db, 24, DB_VERSION, tx);
-  expect(put).toHaveBeenCalledWith({ domainId: 'assetGraph', schemaVersion: 3 });
+  for (const source of [24, 25]) {
+    const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === source)!;
+    expect(migration.migrate(db, tx)).toBeUndefined();
+    expect(migration.validate(db, tx)).toBeUndefined();
+    expect(migration.domainVersions).toEqual([
+      { domainId: 'assetGraph', from: source - 23, to: source - 22 },
+    ]);
+  }
   expect(db.createObjectStore).not.toHaveBeenCalled();
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
-  expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
+  expect(tx.objectStore).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
 });

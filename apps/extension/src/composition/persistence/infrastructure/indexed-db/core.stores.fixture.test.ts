@@ -241,3 +241,18 @@ it('admits permanent review project metadata without rewriting legacy heads, ope
   expect(target.indexes).toEqual(source.indexes);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 24 });
 });
+
+it('retains every version 32 row and OPFS byte when admitting recording recovery', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 32
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 33
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => !name.startsWith('recording_recovery_'))).toEqual(
+    source.stores
+  );
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, recordings: 3 });
+});

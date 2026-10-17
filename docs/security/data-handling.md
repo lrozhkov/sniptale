@@ -27,7 +27,8 @@ Temporary material expiry moves eligible roots to Trash without releasing bytes.
 Accepted project mutations retain primary Library sources and recording mirrors permanently in the same transaction. Accepted current, historical and recovery resources retain their Library origins. Rejected attachments do not promote sources. Source Trash and project Trash remain separate metadata.
 
 - Retain page content or user media only for an explicit product feature and an owner registered in the storage inventory.
-- Keep durable media bytes in immutable OPFS objects. Keep identity, ownership, lifecycle, and publication state in IndexedDB.
+- Keep published media bytes in immutable OPFS objects. Recording recovery retains immutable encoded blocks in IndexedDB.
+- Keep identity, ownership, lifecycle, and publication state in IndexedDB.
 - Publish an OPFS object and its IndexedDB graph atomically through the persistence-transition owner.
 - Treat previews, thumbnails, caches, staging objects, and temporary jobs as non-authoritative. Timeline WebP thumbnails use the existing local preview-cache IndexedDB database, bounded to 32 MiB, 2048 frames, and 14 days. Reads do not renew retention. Project deletion and local-data erasure remove them and invalidate pending writes.
 - Exclude local media, temporary payloads, and caches from sync, automatic export, diagnostics, and traces.
@@ -179,4 +180,18 @@ Original event/cursor observations and document/phase clock descriptors remain l
 
 Timing confidence never authorizes recording and never destroys observations. Existing generation/source binding and primary command authorization remain mandatory.
 
-Final observation handoff uses the existing content-to-background runtime transport. Its receiving boundary checks the complete telemetry DTO, browser provenance, observation domain, current recording UUID, source tab, top frame, extension sender and active/outgoing document identity. Repeated final snapshots merge by stable identities into the same session owner, without a new persistence writer or diagnostics sink. Pause and stop always release input observers, including exceptional finalization paths. 
+Final observation handoff uses the existing content-to-background runtime transport. Its receiving boundary checks the complete telemetry DTO, browser provenance, observation domain, current recording UUID, source tab, top frame, extension sender and active/outgoing document identity. Repeated final snapshots merge by stable identities into the same session owner, without a new persistence writer or diagnostics sink. Pause and stop always release input observers, including exceptional finalization paths.
+
+## Recording recovery retention
+
+Recording recovery retains encoded user media in the canonical IndexedDB database. The recordings owner controls both recovery stores. Session metadata and ordered immutable blocks are authoritative user data. They are not temporary jobs, staging objects, or caches. A strict-durability transaction commits each block and its session boundary before acknowledgement. This requests a disk flush under IndexedDB semantics.
+
+The operating system and hardware must honor durability requests. Volatile encoder frames and pending in-memory blocks cannot survive process termination or power loss.
+
+Errors and successful publication retain the recovery copy. The `published` flag records canonical commit in the same transaction. Encoded output completion alone does not set this flag. Automatic expiry, Trash cleanup, and orphan cleanup cannot delete an unreferenced recovery copy. Only explicit discard, admitted canonical deletion, or complete local-data erasure deletes these bytes.
+
+A refused canonical deletion retains its recovery copy. Complete local-data erasure deletes both recovery stores and their epoch header. Delayed operations must not recreate deleted records.
+
+Recovery preserves original blocks, including any suffix outside the playable prefix. Explicit raw download exports the original bytes in order. Failed recovery or download retains the source for another attempt. Recovery does not send media to a network service. Exclude recovery data from sync, diagnostics, traces, and automatic export.
+
+Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI provides their explicit export path. A destructive migration requires complete backup coverage of recovery data first. This feature requires no new extension permissions.

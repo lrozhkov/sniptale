@@ -1,3 +1,4 @@
+import type { RecordingRecoverySource } from '../recovery/publication';
 import type {
   FinalizedRecordingStagingArtifact,
   RecordingStagingArtifactInput,
@@ -16,16 +17,24 @@ export interface RecordingStagingArtifactOwner {
   readonly writer: RecordingStagingArtifactWriter;
   abort(): Promise<void>;
   release(): Promise<void>;
+  discard(): Promise<void>;
+  invalidate(): Promise<void>;
 }
 
 interface CreateRecordingStagingArtifactOwnerInput {
   admitBytes(size: number): Promise<void>;
   assertCoordinatorHealthy(): void;
+  assertCoordinatorGeneration(): void;
   input: RecordingStagingArtifactInput;
   recordFailure(error: unknown): void;
   releasePendingBytes(size: number): void;
   reservePendingBytes(size: number): void;
-  storage: AssetObjectWriter;
+  storage: AssetObjectWriter & {
+    recoverySource?: RecordingRecoverySource;
+    release?(): Promise<void>;
+    invalidate?(): Promise<void>;
+    discard?(): Promise<void>;
+  };
 }
 
 export function createRecordingStagingArtifactOwner(
@@ -39,7 +48,10 @@ export function createRecordingStagingArtifactOwner(
   const abort = () => {
     abortPromise ??= (async () => {
       if (phase === 'aborted') return;
-      if (phase === 'finalized' && isAssetReadyProtected(input.storage.assetId)) return;
+      if (phase === 'finalized' && isAssetReadyProtected(input.storage.assetId)) {
+        await input.storage.release?.();
+        return;
+      }
       phase = 'aborted';
       await tail.catch(() => undefined);
       await input.storage.abort();
@@ -60,6 +72,7 @@ export function createRecordingStagingArtifactOwner(
 
       const operation = tail.then(async () => {
         await input.admitBytes(chunk.size);
+        input.assertCoordinatorGeneration();
         await input.storage.append(chunk);
       });
       tail = operation.then(
@@ -86,6 +99,9 @@ export function createRecordingStagingArtifactOwner(
           const prepared = await input.storage.finalize();
           phase = 'finalized';
           return {
+            ...(input.storage.recoverySource
+              ? { recoverySource: input.storage.recoverySource }
+              : {}),
             artifactId: input.input.artifactId,
             asset: prepared,
             filename: input.input.filename,
@@ -107,6 +123,19 @@ export function createRecordingStagingArtifactOwner(
     },
     writer,
     abort,
-    release: () => releaseAssetReadyProtection([input.storage.assetId]),
+    async release() {
+      try {
+        await releaseAssetReadyProtection([input.storage.assetId]);
+      } finally {
+        await input.storage.release?.();
+      }
+    },
+    async discard() {
+      await input.storage.discard?.();
+    },
+    async invalidate() {
+      phase = 'aborted';
+      await (input.storage.invalidate?.() ?? input.storage.abort());
+    },
   };
 }

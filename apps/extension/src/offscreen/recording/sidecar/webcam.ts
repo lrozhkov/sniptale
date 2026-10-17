@@ -39,6 +39,8 @@ async function createWebcamMediaRecorder(params: {
     const recordingId = buildWebcamRecordingId(params.baseRecordingId);
     const artifactSession = await createRecordingArtifactSession({
       artifactId: recordingId,
+      groupId: params.baseRecordingId,
+      role: 'webcam',
       coordinator: params.coordinator,
       filename: await createOutputFilename(
         {

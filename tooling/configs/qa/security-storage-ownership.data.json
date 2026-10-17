@@ -383,6 +383,52 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/recordings/recovery/storage.ts",
+      "owner": "recording-recovery",
+      "justification": "Owns authoritative local encoded media blocks and session metadata for interrupted recordings and retained safety copies.",
+      "reviewNote": "Strict IndexedDB transactions commit immutable blocks and their session boundary before acknowledgement. Operating system and hardware durability remain assumptions. Failures and successful publication retain originals. Automatic expiry, Trash cleanup, and orphan cleanup cannot delete unreferenced copies. Explicit discard, admitted canonical deletion, and verified local-data erasure delete them. Epoch and incarnation checks refuse delayed writers. Prefix recovery preserves every original suffix byte. No sync, network, diagnostics, or traces. Media backup v6 excludes pending recordings and safety copies. Explicit recovery export remains available. Destructive migration requires complete backup coverage first.",
+      "storageWrites": [
+        {
+          "sink": "tx.objectStore(SESSIONS).add",
+          "keys": [
+            "SESSIONS"
+          ]
+        },
+        {
+          "sink": "tx.objectStore(BLOCKS).add",
+          "keys": [
+            "BLOCKS"
+          ]
+        },
+        {
+          "sink": "sessions.put",
+          "keys": [
+            "SESSIONS"
+          ]
+        },
+        {
+          "sink": "tx.objectStore(SESSIONS).put",
+          "keys": [
+            "SESSIONS"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/recordings/recovery/publication.ts",
+      "owner": "recording-recovery",
+      "justification": "Marks the original recovery session as published inside its admitted canonical publication transaction.",
+      "reviewNote": "The published flag records actual canonical commit. Completion of encoded output alone does not set it. Publication retains every original recovery block. The caller revalidates the epoch, source incarnation, and target before publication effects. No sync, network, diagnostics, or traces. Explicit discard, admitted canonical deletion, and verified local-data erasure remain the deletion authorities.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "SESSIONS"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [
