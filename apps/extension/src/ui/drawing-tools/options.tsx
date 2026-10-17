@@ -26,10 +26,14 @@ const DRAWING_COLOR_PICKER_CLASS = [
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!border",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!gap-0",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!rounded-md",
-  "[&_[data-ui='shared.ui.color-selector.trigger']]:!px-[5px]",
+  "[&_[data-ui='shared.ui.color-selector.trigger']]:!px-0",
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!justify-center",
   "[&_[data-ui='shared.ui.color-selector.value-trigger']]:hidden",
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!w-full",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!h-7",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:!h-5",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:!w-5",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:shrink-0",
 ].join(' ');
 
 function QuickOptionButton(props: {

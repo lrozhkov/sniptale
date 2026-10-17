@@ -572,3 +572,39 @@ for (const theme of ['light', 'dark'] as const) {
     });
   }
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`drawing current-color samples ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openImage(page, extensionId, 'ru', theme);
+      for (const tool of ['pencil', 'marker', 'text', 'shape', 'arrow']) {
+        await ui(page, `editor.floating.tool-rail.${tool}`).click();
+        const samples = page.locator(
+          '[data-ui="shared.ui.color-selector.picker-trigger"]:visible > span'
+        );
+        await expect(samples.first()).toBeVisible();
+        for (const sample of await samples.all()) {
+          const geometry = await sample.evaluate((node) => {
+            const box = node.getBoundingClientRect();
+            return {
+              width: box.width,
+              height: box.height,
+              parent: node.parentElement!.getBoundingClientRect().toJSON(),
+            };
+          });
+          expect
+            .soft(
+              Math.abs(geometry.width - geometry.height),
+              `${tool}: ${JSON.stringify(geometry)}`
+            )
+            .toBeLessThanOrEqual(1);
+        }
+        await screenshot(page, info, `color-sample-${tool}`);
+      }
+    });
+  }
+}
