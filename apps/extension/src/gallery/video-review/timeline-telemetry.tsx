@@ -33,7 +33,17 @@ const HISTORY_EVENT_BACKGROUND = [
   'var(--sniptale-color-surface-canvas)',
 ].join(',');
 
-type TelemetryStripProps = {
+/** Cursor interactions forwarded unchanged from the review timeline to its telemetry strip. */
+export type ReviewCursorTimelineInteractions = {
+  cursorFocusKeys?: readonly CursorFocusTimelineKey[];
+  selectedCursorFocusId?: string;
+  onCursorFocusKey?(key: CursorFocusTimelineKey): void;
+  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
+  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
+  onAddCursorFocusKey?(time: number): void;
+};
+
+type TelemetryStripProps = ReviewCursorTimelineInteractions & {
   captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
   animatedIds?: ReadonlySet<string>;
   markers: readonly ReviewTelemetryMarker[];
@@ -43,12 +53,7 @@ type TelemetryStripProps = {
   width: number;
   zoom: number;
   selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
-  cursorFocusKeys?: readonly CursorFocusTimelineKey[];
-  selectedCursorFocusId?: string;
-  onCursorFocusKey?(key: CursorFocusTimelineKey): void;
-  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
-  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
-  onAddCursorFocusKey?(time: number): void;
+
   onMarker(marker: ReviewTelemetryMarker): void;
 };
 

@@ -159,10 +159,14 @@ function findFirstCssCodeIndex(styles: string): number | null {
   return null;
 }
 
-function findCssDeclarationColon(styles: string): number | null {
+function findCssTopLevelDelimiter(
+  styles: string,
+  start: number,
+  delimiters: string
+): number | null {
   let parenthesesDepth = 0;
   let bracketsDepth = 0;
-  let cursor = 0;
+  let cursor = start;
   while (cursor < styles.length) {
     if (styles.startsWith('/*', cursor)) {
       cursor = findCssCommentEnd(styles, cursor);
@@ -181,7 +185,8 @@ function findCssDeclarationColon(styles: string): number | null {
     if (character === ')') parenthesesDepth = Math.max(0, parenthesesDepth - 1);
     if (character === '[') bracketsDepth += 1;
     if (character === ']') bracketsDepth = Math.max(0, bracketsDepth - 1);
-    if (character === ':' && parenthesesDepth === 0 && bracketsDepth === 0) return cursor;
+    if (parenthesesDepth === 0 && bracketsDepth === 0 && delimiters.includes(character))
+      return cursor;
     cursor += 1;
   }
   return null;
@@ -192,7 +197,7 @@ function normalizeCssStatement(styles: string): string {
   if (firstCodeIndex === null) return styles;
   if (styles[firstCodeIndex] === '@') return normalizeCssRemUnitsPreservingLiterals(styles);
 
-  const colonIndex = findCssDeclarationColon(styles);
+  const colonIndex = findCssTopLevelDelimiter(styles, 0, ':');
   if (colonIndex === null) return styles;
   return `${styles.slice(0, colonIndex + 1)}${normalizeCssRemUnitsPreservingLiterals(
     styles.slice(colonIndex + 1)
@@ -214,30 +219,12 @@ function normalizeCssScope(
   const normalized: string[] = [];
   let segmentStart = start;
   let cursor = start;
-  let parenthesesDepth = 0;
-  let bracketsDepth = 0;
-
   while (cursor < styles.length) {
-    if (styles.startsWith('/*', cursor)) {
-      cursor = findCssCommentEnd(styles, cursor);
-      continue;
-    }
+    const delimiter = findCssTopLevelDelimiter(styles, cursor, '{;}');
+    if (delimiter === null) break;
+    cursor = delimiter;
     const character = styles[cursor]!;
-    if (character === '"' || character === "'") {
-      cursor = findCssStringEnd(styles, cursor, character);
-      continue;
-    }
-    if (character === '\\') {
-      cursor += 2;
-      continue;
-    }
-    if (character === '(') parenthesesDepth += 1;
-    if (character === ')') parenthesesDepth = Math.max(0, parenthesesDepth - 1);
-    if (character === '[') bracketsDepth += 1;
-    if (character === ']') bracketsDepth = Math.max(0, bracketsDepth - 1);
-
-    const isStructural = parenthesesDepth === 0 && bracketsDepth === 0;
-    if (isStructural && character === '{') {
+    if (character === '{') {
       normalized.push(normalizeCssRulePrelude(styles.slice(segmentStart, cursor)), '{');
       const child = normalizeCssScope(styles, cursor + 1, true);
       normalized.push(child.styles);
@@ -246,13 +233,13 @@ function normalizeCssScope(
       segmentStart = cursor;
       continue;
     }
-    if (isStructural && character === ';') {
+    if (character === ';') {
       normalized.push(normalizeCssStatement(styles.slice(segmentStart, cursor)), ';');
       cursor += 1;
       segmentStart = cursor;
       continue;
     }
-    if (isStructural && character === '}' && stopAtClosingBrace) {
+    if (character === '}' && stopAtClosingBrace) {
       normalized.push(normalizeCssStatement(styles.slice(segmentStart, cursor)));
       return { end: cursor, styles: normalized.join('') };
     }

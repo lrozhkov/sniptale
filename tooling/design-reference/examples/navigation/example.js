@@ -1,20 +1,10 @@
-import { el, exampleCase, paramRow } from '../shared/dom.js';
+import { el, addCaseStage, paramRow } from '../shared/dom.js';
 import { Tabs, Disclosure, CategoryNavigation } from '../shared/navigation.js';
 import { TextField } from '../shared/fields.js';
 import { ActionButton } from '../shared/buttons.js';
 export function render(root, { manifest, theme }) {
-  const add = (key) => {
-    const stage = el('div', { class: 'case-stage' });
-    root.append(
-      exampleCase(
-        manifest.cases.find((c) => c.id === 'navigation.' + key),
-        [stage]
-      )
-    );
-    return stage;
-  };
   const name = TextField({ label: 'Черновик названия', value: 'Вступление' });
-  add('automatic').append(
+  addCaseStage(root, manifest, 'navigation.automatic').append(
     Tabs({
       label: 'Разделы инспектора',
       items: [
@@ -28,7 +18,7 @@ export function render(root, { manifest, theme }) {
       ],
     }).element
   );
-  add('manual').append(
+  addCaseStage(root, manifest, 'navigation.manual').append(
     Tabs({
       label: 'Предпросмотр материала',
       activation: 'manual',
@@ -50,7 +40,7 @@ export function render(root, { manifest, theme }) {
     }).element,
     el('p', { text: 'Стрелки перемещают фокус. Enter или Space активирует раздел.' })
   );
-  add('categories').append(
+  addCaseStage(root, manifest, 'navigation.categories').append(
     CategoryNavigation({
       label: 'Категории параметров',
       items: [
@@ -60,7 +50,7 @@ export function render(root, { manifest, theme }) {
       ],
     }).element
   );
-  const disclosureStage = add('disclosure'),
+  const disclosureStage = addCaseStage(root, manifest, 'navigation.disclosure'),
     mount = el('div');
   let section;
   function build() {
@@ -89,7 +79,7 @@ export function render(root, { manifest, theme }) {
       text: 'Раскрытие хранится для стабильной группы. Значение параметра от раскрытия не меняется.',
     })
   );
-  const destinations = add('destinations'),
+  const destinations = addCaseStage(root, manifest, 'navigation.destinations'),
     nav = el('nav', { class: 'destination-nav', 'aria-label': 'Разделы справки' });
   for (const [id, label] of [
     ['general', 'Общие'],
@@ -120,5 +110,5 @@ export function render(root, { manifest, theme }) {
         content: paramRow('Значение', 'Сохранено'),
       }).element
     );
-  add('scroll').append(scroll);
+  addCaseStage(root, manifest, 'navigation.scroll').append(scroll);
 }

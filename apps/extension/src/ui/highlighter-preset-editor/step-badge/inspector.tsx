@@ -10,7 +10,16 @@ import {
   ProductGlassChip,
   ProductGlassRow,
 } from '@sniptale/ui/product-glass-controls';
-import { Circle, PaintBucket, Palette, Square } from 'lucide-react';
+import {
+  Braces,
+  Circle,
+  Hash,
+  MapPin,
+  Maximize2,
+  PaintBucket,
+  Palette,
+  Square,
+} from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../color-selector';
 import { NumericRow } from '../../compact-inspector-controls';
@@ -236,4 +245,15 @@ export function StepBadgeAppearanceSection(props: StepBadgeAppearanceProps) {
       <StepBadgeColorSection {...props} embedded />
     </ContentPopoverSection>
   );
+}
+
+/** Read current localized section names when the inspector renders. */
+export function getStepBadgeInspectorSections() {
+  return [
+    { icon: Hash, id: 'numbering', label: translate('content.stepBadge.numberingSection') },
+    { icon: MapPin, id: 'position', label: translate('content.stepBadge.positionSection') },
+    { icon: Maximize2, id: 'size', label: translate('content.stepBadge.sizeSection') },
+    { icon: Palette, id: 'colors', label: translate('content.stepBadge.colorsSection') },
+    { icon: Braces, id: 'css', label: translate('content.stepBadge.cssSection') },
+  ] as const;
 }

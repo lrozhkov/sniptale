@@ -206,6 +206,17 @@ const GalleryGridCard = memo(
   function GalleryGridCard(props: GalleryGridCardProps) {
     useAppLocale();
     const isList = props.viewMode === 'list';
+    const media = (
+      <GalleryGridCardMedia
+        item={props.item}
+        onPreviewOpen={props.onPreviewOpen}
+        {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+        previewRecoveryAllowed={props.previewRecoveryAllowed}
+        onToggleSelection={props.onToggleSelection}
+        selected={props.selected}
+        viewMode={props.viewMode}
+      />
+    );
 
     return (
       <article
@@ -249,15 +260,7 @@ const GalleryGridCard = memo(
               )}
             </div>
             <GalleryListKindCell item={props.item} />
-            <GalleryGridCardMedia
-              item={props.item}
-              onPreviewOpen={props.onPreviewOpen}
-              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-              previewRecoveryAllowed={props.previewRecoveryAllowed}
-              onToggleSelection={props.onToggleSelection}
-              selected={props.selected}
-              viewMode={props.viewMode}
-            />
+            {media}
             <GalleryListDetails
               item={props.item}
               onPreviewOpen={props.onPreviewOpen}
@@ -272,15 +275,7 @@ const GalleryGridCard = memo(
           </>
         ) : (
           <>
-            <GalleryGridCardMedia
-              item={props.item}
-              onPreviewOpen={props.onPreviewOpen}
-              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-              previewRecoveryAllowed={props.previewRecoveryAllowed}
-              onToggleSelection={props.onToggleSelection}
-              selected={props.selected}
-              viewMode={props.viewMode}
-            />
+            {media}
             {props.item.type !== 'scenario' &&
             props.item.type !== 'video-project' &&
             props.item.type !== 'quick-edit-project' ? (

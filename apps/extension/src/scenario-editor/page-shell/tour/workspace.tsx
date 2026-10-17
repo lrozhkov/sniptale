@@ -6,8 +6,8 @@ import { useState } from 'react';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { X, Settings2, List, PanelLeft, SquarePen, Image } from 'lucide-react';
-import { ScenarioWorkspaceFrame } from '../workspace';
+import { X, Settings2, SquarePen, Image } from 'lucide-react';
+import { GuideInspectorPresentationToggle, ScenarioWorkspaceFrame } from '../workspace';
 import { GuideResourceDrawer, useGuideResourceRequest } from '../resource-drawer';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourViewControls, useTourViewMode } from './view-controls';
@@ -151,22 +151,11 @@ function TourSettingsPanel({
         <Settings2 size={16} />
         <h2 title={inspectorTitle}>{inspectorTitle}</h2>
         {grouped && (
-          <ContentToolbarButton
-            tone="utility"
-            size="compact"
-            title={t(
-              panels.presentation === 'all'
-                ? 'scenario.editor.inspectorShowSections'
-                : 'scenario.editor.inspectorShowAll'
-            )}
-            onClick={panels.togglePresentation}
-          >
-            {panels.presentation === 'all' ? (
-              <List size={16} aria-hidden="true" />
-            ) : (
-              <PanelLeft size={16} aria-hidden="true" />
-            )}
-          </ContentToolbarButton>
+          <GuideInspectorPresentationToggle
+            presentation={panels.presentation}
+            onToggle={panels.togglePresentation}
+            t={t}
+          />
         )}
         <ContentToolbarButton
           tone="close"

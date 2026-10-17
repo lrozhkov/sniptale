@@ -136,7 +136,7 @@ function renderDisplayModeItems(props: {
   );
 }
 
-function renderToolbarSettingsUtilityItems(props: {
+type ToolbarSettingsUtilityItemsProps = {
   compactMenus: boolean;
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
@@ -153,7 +153,9 @@ function renderToolbarSettingsUtilityItems(props: {
   screenshotMode: boolean;
   showPinItem?: boolean;
   showHideItem?: boolean;
-}) {
+};
+
+function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsProps) {
   return (
     <>
       <ProductToolbarMenuDivider />
@@ -288,29 +290,13 @@ function ToolbarSettingsDropdownContent(
   );
 }
 
-type ToolbarSettingsDropdownProps = {
-  compactMenus: boolean;
+type ToolbarSettingsDropdownProps = ToolbarSettingsUtilityItemsProps & {
   displayMode: ContentToolbarDisplayMode;
   freePlacement?: boolean;
   onFreePlacementChange?: ((value: boolean) => void) | undefined;
   menuRef: React.RefObject<HTMLDivElement | null>;
   menuStyle?: React.CSSProperties;
-  onClose: () => void;
-  onCompactMenusChange: (compactMenus: boolean) => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
-  onDisableScreenshotMode: (activationEvent?: Event) => void;
-  onHide: () => void;
-  onPinToTabChange: (
-    value: boolean,
-    contentIntentSource?: ContentPrivilegedActionIntentSource
-  ) => void;
-  pinToTab: boolean;
-  pinToTabAvailable: boolean;
-  pinToTabLocked: boolean;
-  autoBlurEnabled?: boolean;
-  screenshotMode: boolean;
-  showPinItem?: boolean;
-  showHideItem?: boolean;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   viewportRightInset?: number;
 };

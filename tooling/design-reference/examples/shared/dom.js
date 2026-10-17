@@ -24,3 +24,14 @@ export function exampleCase(meta, children) {
     ...children,
   ]);
 }
+
+export function addCaseStage(root, manifest, caseId) {
+  const stage = el('div', { class: 'case-stage' });
+  root.append(
+    exampleCase(
+      manifest.cases.find((item) => item.id === caseId),
+      [stage]
+    )
+  );
+  return stage;
+}

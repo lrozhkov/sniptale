@@ -1,7 +1,9 @@
+import {
+  CameraFollowMovementChoice,
+  CameraFollowZoneChoice,
+} from '../../ui/camera-follow-segment-controls';
 import type { ReactNode } from 'react';
 import {
-  applyCameraFollowPreset,
-  cameraFollowPreset,
   resolveCameraFollowPolicy,
   type CameraFollowSettings,
 } from '../../features/video/project/camera/cursor-policy';
@@ -411,32 +413,17 @@ export function ReviewCameraFollowSettings(props: {
   );
   return (
     <fieldset className="sniptale-parameter-stack m-0 border-0 p-0" data-ui="cameraFollow.settings">
-      <SegmentedRow
-        label={label('videoEditor.sidebar.cameraZoneSize')}
-        ariaLabel={label('videoEditor.sidebar.cameraZoneSize')}
-        value={String(settings.zoneSize)}
-        options={[
-          { value: '0.3', label: label('videoEditor.sidebar.cameraZoneSmall') },
-          { value: '0.55', label: label('videoEditor.sidebar.cameraZoneMedium') },
-          { value: '0.8', label: label('videoEditor.sidebar.cameraZoneLarge') },
-        ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
-        onChange={(value) =>
-          update({ zoneSize: value === '0.3' ? 0.3 : value === '0.55' ? 0.55 : 0.8 })
-        }
+      <CameraFollowZoneChoice
+        settings={settings}
+        disabled={props.disabled}
+        onChange={props.onChange}
+        showLabel
       />
-      <SegmentedRow
-        label={label('videoEditor.sidebar.cameraMovement')}
-        ariaLabel={label('videoEditor.sidebar.cameraMovement')}
-        value={cameraFollowPreset(settings)}
-        options={[
-          { value: 'calm', label: label('videoEditor.sidebar.cameraCalm') },
-          { value: 'balanced', label: label('videoEditor.sidebar.cameraBalanced') },
-          { value: 'fast', label: label('videoEditor.sidebar.cameraFast') },
-        ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
-        onChange={(preset) => {
-          if (preset === 'calm' || preset === 'balanced' || preset === 'fast')
-            props.onChange(applyCameraFollowPreset(settings, preset));
-        }}
+      <CameraFollowMovementChoice
+        settings={settings}
+        disabled={props.disabled}
+        onChange={props.onChange}
+        showLabel
       />
       <ReviewDetails
         label={label('videoEditor.sidebar.framingFineTune')}

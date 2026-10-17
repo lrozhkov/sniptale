@@ -1,19 +1,9 @@
-import { el, exampleCase } from '../shared/dom.js';
+import { el, addCaseStage } from '../shared/dom.js';
 import { ObjectCollection, InlineNotes, ResourceField } from '../shared/collections.js';
 import { Checkbox } from '../shared/selection.js';
 import { Disclosure } from '../shared/navigation.js';
 import { ActionButton } from '../shared/buttons.js';
 export function render(root, { manifest, theme }) {
-  const add = (key) => {
-    const stage = el('div', { class: 'case-stage' });
-    root.append(
-      exampleCase(
-        manifest.cases.find((c) => c.id === 'collections.' + key),
-        [stage]
-      )
-    );
-    return stage;
-  };
   const items = [
     { id: 'intro', title: 'Вступление', meta: 'Видео · 00:12', color: '#cfac94' },
     { id: 'demo', title: 'Демонстрация', meta: 'Видео · 01:40', color: '#678598' },
@@ -26,8 +16,8 @@ export function render(root, { manifest, theme }) {
       color: '#777',
     },
   ];
-  add('rows').append(ObjectCollection({ items }).element);
-  add('cards').append(
+  addCaseStage(root, manifest, 'collections.rows').append(ObjectCollection({ items }).element);
+  addCaseStage(root, manifest, 'collections.cards').append(
     ObjectCollection({ items: items.slice(0, 3), presentation: 'cards' }).element
   );
   const parent = Checkbox({ label: 'Включить доступные сцены в экспорт' }),
@@ -40,7 +30,7 @@ export function render(root, { manifest, theme }) {
     children.forEach((c) => c.setState({ checked: parent.value }));
     update();
   });
-  add('hierarchy').append(
+  addCaseStage(root, manifest, 'collections.hierarchy').append(
     parent.element,
     Disclosure({
       label: 'Сцены проекта',
@@ -49,7 +39,7 @@ export function render(root, { manifest, theme }) {
       content: children.map((c) => c.element),
     }).element
   );
-  add('long').append(
+  addCaseStage(root, manifest, 'collections.long').append(
     ObjectCollection({
       items: [
         {
@@ -61,7 +51,7 @@ export function render(root, { manifest, theme }) {
       ],
     }).element
   );
-  const empty = add('empty'),
+  const empty = addCaseStage(root, manifest, 'collections.empty'),
     emptyStatus = el('p', { role: 'status', text: 'Библиотека пока пуста' }),
     mount = el('div');
   empty.append(
@@ -75,7 +65,7 @@ export function render(root, { manifest, theme }) {
     }),
     mount
   );
-  const loading = add('recovery'),
+  const loading = addCaseStage(root, manifest, 'collections.recovery'),
     status = el('p', { role: 'status', text: 'Загрузка материалов…' }),
     retry = ActionButton({ label: 'Повторить загрузку' });
   retry.hidden = true;
@@ -91,7 +81,7 @@ export function render(root, { manifest, theme }) {
     loading.replaceChildren(collection.element);
     if (focus) collection.filter.input.focus();
   });
-  add('inline-notes').append(
+  addCaseStage(root, manifest, 'collections.inline-notes').append(
     InlineNotes({
       items: [
         { id: 'one', text: 'Сделать переход короче' },
@@ -100,5 +90,8 @@ export function render(root, { manifest, theme }) {
     }).element
   );
 
-  ResourceField({ parent: add('resource'), label: 'Фоновое изображение' });
+  ResourceField({
+    parent: addCaseStage(root, manifest, 'collections.resource'),
+    label: 'Фоновое изображение',
+  });
 }

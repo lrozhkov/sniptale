@@ -1,5 +1,4 @@
-import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { ResourcePresetNameField } from '../preset-name-field';
 import { useEffect, useRef, useState } from 'react';
 import {
   ProductModal,
@@ -78,30 +77,12 @@ export function GradientPresetEditor(props: {
       />
       <ProductModalBody compact>
         <div className="grid gap-3">
-          <label
-            className={[
-              'grid gap-1 text-[13px] leading-[18px] font-medium',
-              'text-[var(--sniptale-color-text-secondary)]',
-            ].join(' ')}
-          >
-            {translate('settings.editor.presetName')}
-            <div className="sniptale-text-value">
-              <ProductInput
-                ref={nameRef}
-                aria-label={translate('settings.editor.presetName')}
-                disabled={saving}
-                maxLength={80}
-                onChange={(event) => setName(event.target.value)}
-                value={name}
-              />
-              {!saving && name.length > 0 ? (
-                <InspectorFieldClear
-                  label={translate('settings.editor.presetName')}
-                  target={nameRef}
-                />
-              ) : null}
-            </div>
-          </label>
+          <ResourcePresetNameField
+            inputRef={nameRef}
+            value={name}
+            disabled={saving}
+            onChange={setName}
+          />
           <CompactPaintSelector
             disabled={saving}
             label={translate('settings.editor.gradients.paint')}

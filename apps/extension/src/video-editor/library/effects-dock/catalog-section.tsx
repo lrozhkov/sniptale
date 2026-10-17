@@ -225,6 +225,20 @@ function CatalogDocument(
   const drag = useEffectDocumentDrag();
   const target = resolveDocumentTarget(props.document.kind, props);
   const metadata = describeCatalogDocument(props.document, getCurrentLocale());
+  const applyDocument = (startTime: number, trackId?: string | null) =>
+    target &&
+    void props.run('apply', () =>
+      props.onApplyEffect({
+        catalog: props.catalog,
+        documentId: props.document.id,
+        ...(props.document.previewPresetId
+          ? { controlPresetId: props.document.previewPresetId }
+          : {}),
+        startTime,
+        ...(trackId ? { trackId } : {}),
+        target,
+      })
+    );
   return (
     <div
       className={DOCUMENT_CARD_CLASS_NAME}
@@ -277,20 +291,9 @@ function CatalogDocument(
             aria-label={getDocumentActionLabel(props.document.kind, target)}
             disabled={props.disabled || !target}
             onClick={() =>
-              target &&
-              void props.run('apply', () =>
-                props.onApplyEffect({
-                  catalog: props.catalog,
-                  documentId: props.document.id,
-                  ...(props.document.previewPresetId
-                    ? { controlPresetId: props.document.previewPresetId }
-                    : {}),
-                  startTime: props.currentTime,
-                  ...(props.document.kind === 'standalone' && props.selectedTrackId
-                    ? { trackId: props.selectedTrackId }
-                    : {}),
-                  target,
-                })
+              applyDocument(
+                props.currentTime,
+                props.document.kind === 'standalone' ? props.selectedTrackId : undefined
               )
             }
           >
@@ -305,21 +308,7 @@ function CatalogDocument(
               className="!h-6 !w-6 !min-w-6"
               title={translate('videoEditor.app.materialsAppend')}
               disabled={props.disabled || !target}
-              onClick={() =>
-                target &&
-                void props.run('apply', () =>
-                  props.onApplyEffect({
-                    catalog: props.catalog,
-                    documentId: props.document.id,
-                    ...(props.document.previewPresetId
-                      ? { controlPresetId: props.document.previewPresetId }
-                      : {}),
-                    startTime: props.appendTime!,
-                    ...(props.selectedTrackId ? { trackId: props.selectedTrackId } : {}),
-                    target,
-                  })
-                )
-              }
+              onClick={() => applyDocument(props.appendTime!, props.selectedTrackId)}
             >
               <ArrowRightToLine size={14} aria-hidden="true" />
             </EditorIconButton>

@@ -1,8 +1,10 @@
+import {
+  CameraFollowMovementChoice,
+  CameraFollowZoneChoice,
+} from '../../../../../ui/camera-follow-segment-controls';
 import { SegmentedRow } from '../../../../../ui/compact-inspector-controls';
 import type { ReactNode } from 'react';
 import {
-  applyCameraFollowPreset,
-  cameraFollowPreset,
   resolveCameraFollowPolicy,
   type CameraFollowSettings,
 } from '../../../../../features/video/project/camera/cursor-policy';
@@ -469,35 +471,20 @@ export function InspectCameraFollowSettings(props: {
         <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
           {label('videoEditor.sidebar.cameraZoneSize')}
         </span>
-        <SegmentedRow
-          ariaLabel={label('videoEditor.sidebar.cameraZoneSize')}
-          value={String(settings.zoneSize)}
-          options={[
-            { value: '0.3', label: label('videoEditor.sidebar.cameraZoneSmall') },
-            { value: '0.55', label: label('videoEditor.sidebar.cameraZoneMedium') },
-            { value: '0.8', label: label('videoEditor.sidebar.cameraZoneLarge') },
-          ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
-          onChange={(value) =>
-            update({ zoneSize: value === '0.3' ? 0.3 : value === '0.55' ? 0.55 : 0.8 })
-          }
+        <CameraFollowZoneChoice
+          settings={settings}
+          disabled={props.disabled}
+          onChange={props.onChange}
         />
       </div>
       <div className="sniptale-parameter-stack min-w-0 space-y-1.5">
         <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
           {label('videoEditor.sidebar.cameraMovement')}
         </span>
-        <SegmentedRow
-          ariaLabel={label('videoEditor.sidebar.cameraMovement')}
-          value={cameraFollowPreset(settings)}
-          options={[
-            { value: 'calm', label: label('videoEditor.sidebar.cameraCalm') },
-            { value: 'balanced', label: label('videoEditor.sidebar.cameraBalanced') },
-            { value: 'fast', label: label('videoEditor.sidebar.cameraFast') },
-          ].map((option) => ({ ...option, disabled: props.disabled ?? false }))}
-          onChange={(preset) => {
-            if (preset === 'calm' || preset === 'balanced' || preset === 'fast')
-              props.onChange(applyCameraFollowPreset(settings, preset));
-          }}
+        <CameraFollowMovementChoice
+          settings={settings}
+          disabled={props.disabled}
+          onChange={props.onChange}
         />
       </div>
       <InspectorDetails

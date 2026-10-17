@@ -1,3 +1,4 @@
+import { HighlighterPresetEditorFooter } from '../footer';
 import { useEffect, useRef, useState } from 'react';
 import type {
   CalloutAnchor,
@@ -6,13 +7,7 @@ import type {
   CalloutSettingsPatch,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import {
-  ProductModal,
-  ProductModalBody,
-  ProductModalFooter,
-  ProductModalHeader,
-} from '@sniptale/ui/product-modal';
+import { ProductModal, ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { CalloutManualSettings } from './inspector';
 import { CalloutSettingsPositionGrid } from './position-grid';
@@ -182,39 +177,6 @@ function PresetEditorBody(props: {
   );
 }
 
-function PresetEditorFooter(props: {
-  canReset: boolean;
-  isSaving: boolean;
-  name: string;
-  onClose: () => void;
-  onReset?: (() => void | Promise<void>) | undefined;
-  onSave: () => void;
-}) {
-  return (
-    <ProductModalFooter compact>
-      {props.canReset && props.onReset ? (
-        <ProductActionButton
-          tone="secondary"
-          disabled={props.isSaving}
-          onClick={() => void props.onReset?.()}
-        >
-          {translate('highlighter.calloutPresets.reset')}
-        </ProductActionButton>
-      ) : null}
-      <ProductActionButton tone="secondary" onClick={props.onClose}>
-        {translate('common.actions.cancel')}
-      </ProductActionButton>
-      <ProductActionButton
-        tone="primary"
-        disabled={!props.name.trim() || props.isSaving}
-        onClick={props.onSave}
-      >
-        {translate('common.actions.save')}
-      </ProductActionButton>
-    </ProductModalFooter>
-  );
-}
-
 export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
   const locale = useAppLocale();
   const modalRootRef = useRef<HTMLDivElement>(null);
@@ -263,12 +225,14 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
           style={draft.style}
           tagIds={tagIds}
         />
-        <PresetEditorFooter
-          canReset={source.origin === 'system' && source.customized === true}
+        <HighlighterPresetEditorFooter
+          resetLabel={translate('highlighter.calloutPresets.reset')}
           isSaving={props.isSaving}
           name={draft.name}
           onClose={props.onClose}
-          {...(props.onReset ? { onReset: props.onReset } : {})}
+          {...(source.origin === 'system' && source.customized === true && props.onReset
+            ? { onReset: props.onReset }
+            : {})}
           onSave={() => void props.onSave({ ...preset, tagIds })}
         />
       </ProductModal>

@@ -1,6 +1,5 @@
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
-import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
 import { useState } from 'react';
 import {
@@ -20,7 +19,7 @@ import type { ReactNode, CSSProperties } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import { ReviewTelemetryStrip } from './timeline-telemetry';
+import { ReviewTelemetryStrip, type ReviewCursorTimelineInteractions } from './timeline-telemetry';
 import { useReviewTimelinePlaneDrag } from './timeline-drag';
 import { useReviewTimelineHover, type ReviewPlacementHints } from './timeline-hover';
 import {
@@ -31,7 +30,7 @@ import {
 import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
-type TimelineProps = {
+type TimelineProps = ReviewCursorTimelineInteractions & {
   sourceId?: string | undefined;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
@@ -86,12 +85,7 @@ type TimelineProps = {
   onPlay(): void;
   onOpenExport?: (() => void) | undefined;
   exportActive?: boolean | undefined;
-  cursorFocusKeys?: readonly CursorFocusTimelineKey[];
-  selectedCursorFocusId?: string;
-  onCursorFocusKey?(key: CursorFocusTimelineKey): void;
-  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
-  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
-  onAddCursorFocusKey?(time: number): void;
+
   actionsTrackVisible?: boolean;
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;

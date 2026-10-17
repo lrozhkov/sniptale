@@ -122,6 +122,38 @@ describe('content entrypoint styles', () => {
     );
   });
 
+  it.each([
+    [
+      '.x { content: "a:b;{1rem}"; width: calc(1rem + var(--x, 2rem)); }',
+      '.x { content: "a:b;{1rem}"; width: calc(16px + var(--x, 32px)); }',
+    ],
+    ['.x[data-label=":;{1rem}"] { margin: 1rem; }', '.x[data-label=":;{1rem}"] { margin: 16px; }'],
+    [
+      String.raw`.x { escaped\:name: 1rem; --literal: a\;b; }`,
+      String.raw`.x { escaped\:name: 16px; --literal: a\;b; }`,
+    ],
+    [
+      '/* :;{ 2rem */ .x { width: 1rem; /* :;{ 3rem */ }',
+      '/* :;{ 2rem */ .x { width: 16px; /* :;{ 3rem */ }',
+    ],
+    [
+      String.raw`.x { content: "a\";1rem"; width: 2rem; }`,
+      String.raw`.x { content: "a\";1rem"; width: 32px; }`,
+    ],
+    [
+      '@media (min-width: 10rem) { .x { width: 1rem; } }',
+      '@media (min-width: 160px) { .x { width: 16px; } }',
+    ],
+    ['.x { content: "1rem; width: 2rem; }', '.x { content: "1rem; width: 2rem; }'],
+    ['.x { width: 1rem; /* 2rem', '.x { width: 16px; /* 2rem'],
+    [
+      '.x { width: calc(1rem + 2rem; padding: 3rem; }',
+      '.x { width: calc(16px + 32px; padding: 48px; }',
+    ],
+  ])('preserves CSS lexical boundaries while normalizing %s', (input, expected) => {
+    expect(normalizeContentEntrypointRemUnits(input)).toBe(expected);
+  });
+
   it('resolves callout font URLs through extension runtime URLs', () => {
     const styles = resolveContentEntrypointStyleUrls(
       "src: url('@fontsource/marck-script/files/marck-script-cyrillic-400-normal.woff2') format('woff2');"

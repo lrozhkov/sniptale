@@ -13,6 +13,25 @@ type CommonProps = {
   onRememberRecentColor?: ((color: string) => Promise<void>) | undefined;
 };
 
+function ActionOpacityField(props: {
+  value: number;
+  disabled: boolean;
+  onChange: (opacity: number) => void;
+}) {
+  return (
+    <SliderField
+      label={translate('videoEditor.sidebar.actionOpacity')}
+      value={props.value}
+      min={0}
+      max={1}
+      step={0.05}
+      disabled={props.disabled}
+      formatValue={(value) => `${Math.round(value * 100)}%`}
+      onChange={props.onChange}
+    />
+  );
+}
+
 export function ActionClickStyleFields(
   props: CommonProps & {
     value: VideoActionClickStyle;
@@ -41,14 +60,9 @@ export function ActionClickStyleFields(
         disabled={props.disabled}
         onChange={(size) => change({ size })}
       />
-      <SliderField
-        label={translate('videoEditor.sidebar.actionOpacity')}
+      <ActionOpacityField
         value={props.value.opacity}
-        min={0}
-        max={1}
-        step={0.05}
         disabled={props.disabled}
-        formatValue={(v) => `${Math.round(v * 100)}%`}
         onChange={(opacity) => change({ opacity })}
       />
       <InspectorDetails
@@ -146,14 +160,9 @@ export function ActionKeyStyleFields(
         preferenceId="action-key:more"
         label={translate('videoEditor.sidebar.inspectorMoreDetails')}
       >
-        <SliderField
-          label={translate('videoEditor.sidebar.actionOpacity')}
+        <ActionOpacityField
           value={props.value.opacity}
-          min={0}
-          max={1}
-          step={0.05}
           disabled={props.disabled}
-          formatValue={(v) => `${Math.round(v * 100)}%`}
           onChange={(opacity) => change({ opacity })}
         />
         <SliderField
