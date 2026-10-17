@@ -690,6 +690,22 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(kinds.getByRole('button')).toHaveCount(3);
       const trigger = panel.locator('[data-ui="shared.ui.paint-selector.trigger"]').first();
       const popup = ui(page, 'shared.ui.paint-selector.popup');
+      const colors = ui(page, 'editor.frame.quick-colors');
+      const gradients = ui(page, 'editor.frame.gradient-presets');
+      await expect(colors).toBeVisible();
+      await expect(gradients).toBeVisible();
+      await gradients.getByRole('button').first().click();
+      await expect(gradients.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(colors.locator('[aria-pressed="true"]')).toHaveCount(0);
+      await colors.getByRole('button').first().click();
+      await expect(colors.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(gradients.locator('[aria-pressed="true"]')).toHaveCount(0);
+      await expect(trigger).toBeInViewport();
+      await expect(colors).toBeInViewport();
+      await expect(gradients).toBeInViewport();
+      await expect(colors.getByRole('button')).toHaveCount(5);
+      await expect(gradients.getByRole('button')).toHaveCount(5);
+      await screenshot(page, info, 'scene-immediate-palette');
       for (const accept of [false, true]) {
         await trigger.click();
         await popup
@@ -707,7 +723,7 @@ for (const theme of ['light', 'dark'] as const) {
             exact: true,
           })
           .click();
-        await expect(ui(page, 'editor.frame.gradient-presets')).toHaveCount(accept ? 1 : 0);
+        await expect(trigger).toHaveAttribute('title', accept ? /Линейный/ : /^#/);
       }
       await chooseProperty(page, kinds, translate('editor.compact.frameBackgroundModeImage', 'ru'));
       await expect(ui(page, 'background.image.picker')).toBeVisible();
