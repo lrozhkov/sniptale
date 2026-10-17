@@ -27,6 +27,18 @@ export interface ReviewTextFilters {
   visibility: 'all' | 'shown' | 'hidden';
 }
 
+/** Display duration uses the live editor buffer; explicit Start still joins and validates the session basis. */
+export function reviewTextRecordingMaximum(
+  editor: Pick<ReturnType<typeof useReviewText>, 'document' | 'projection'>,
+  id: string | undefined
+) {
+  const fragment = editor.document.fragments.find((entry) => entry.id === id);
+  if (!fragment) return 0;
+  const start =
+    fragment.timeDomain === 'source' ? editor.projection.output(fragment.start) : fragment.start;
+  return Math.max(0, editor.projection.resultDuration - start);
+}
+
 /** Queries the whole document; paging limits rendering, never the operation scope. */
 export function queryReviewText(
   fragments: readonly ReviewTextFragment[],

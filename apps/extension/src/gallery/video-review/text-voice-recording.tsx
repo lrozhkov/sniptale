@@ -28,6 +28,7 @@ type Cache = WeakMap<Blob, Map<string, ReviewLocalTextVoicePreview>>;
 type Props = {
   access: ReviewTextVoiceAccess;
   fragmentId: string;
+  maximum?: number | undefined;
   operation: Operation;
   disabled?: boolean | undefined;
 };
@@ -83,7 +84,7 @@ function useTextRecordingTake(
     const basis = captureReviewTextTakeBasis(props.access.session, props.fragmentId);
     maximum = Math.max(0, basis.resultDuration - basis.resultStart);
   } catch {
-    /* Invalid placement is refused by Start without acquiring a microphone. */
+    /* Pending editor fields have a display cap; Start joins them before basis validation and acquisition. */
   }
   const playback = useVoiceoverPlayback(context.video, () => {
     const current = owner.current;
@@ -111,7 +112,7 @@ function useTextRecordingTake(
     }
   };
   return {
-    maximum,
+    maximum: props.maximum ?? maximum,
     stop,
     discard,
     prepare: () => {

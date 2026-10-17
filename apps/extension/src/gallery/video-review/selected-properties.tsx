@@ -4,7 +4,7 @@ import { ReviewTextVoiceForm } from './text-voice-panel';
 import { ReviewTextRewriteForm } from './text-rewrite-panel';
 import { useReviewTextFormMode } from './text-voice-focus';
 import type { ReviewTextVoiceAccess } from './use-text-voice';
-import type { useReviewText } from './use-review-text';
+import { reviewTextRecordingMaximum, type useReviewText } from './use-review-text';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import { ReviewSpeechPanel } from './speech-panel';
@@ -556,6 +556,7 @@ export function ReviewSelectedTextProperties(props: {
       <ReviewTextVoiceForm
         access={props.voice}
         ids={voiceMode.ids}
+        recordingMaximum={reviewTextRecordingMaximum(props.editor, props.id)}
         disabled={props.busy}
         onClose={voiceMode.close}
       />

@@ -8,7 +8,12 @@ import type { ReviewTextVoiceAccess } from './use-text-voice';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { HistorySearch } from './action-history-filters';
-import { queryReviewText, type ReviewTextFilters, type useReviewText } from './use-review-text';
+import {
+  reviewTextRecordingMaximum,
+  queryReviewText,
+  type ReviewTextFilters,
+  type useReviewText,
+} from './use-review-text';
 import type { ReviewVoiceTextSnapshot } from '../../features/video/review/text-document';
 import { ReviewTextPhrase } from './speech-phrase';
 import {
@@ -221,6 +226,7 @@ function reviewTextDocumentForm(
     <ReviewTextVoiceForm
       access={props.voice}
       ids={mode.ids}
+      recordingMaximum={reviewTextRecordingMaximum(props.editor, mode.ids[0])}
       disabled={props.busy}
       onClose={mode.close}
     />

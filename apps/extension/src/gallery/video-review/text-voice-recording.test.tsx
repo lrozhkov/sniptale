@@ -12,6 +12,7 @@ import {
   addReviewTextFragment,
   createReviewTextDocument,
 } from '../../features/video/review/text-document';
+import { createReviewAdvancedContentOperation } from '../../features/video/review/document';
 import { parseReviewOperation } from '../../features/video/review/validation';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 
@@ -27,7 +28,10 @@ let root: Root;
 let created: number;
 let stopped: ReturnType<typeof vi.fn>;
 
-function fixture(beforeRequest = vi.fn(async () => undefined)) {
+function fixture(
+  beforeRequest = vi.fn(async () => undefined),
+  options?: { maximum: number; pendingText: boolean }
+) {
   const advanced = createQuickEditAdvancedState();
   const added = addReviewTextFragment(createReviewTextDocument(), {
     id: 'text',
@@ -37,7 +41,7 @@ function fixture(beforeRequest = vi.fn(async () => undefined)) {
     timeDomain: 'result',
   });
   if (!added.ok) throw new Error('fixture');
-  advanced.text = added.document;
+  advanced.text = options?.pendingText ? createReviewTextDocument() : added.document;
   let saved: VideoWorkspaceSnapshot = {
     workspace: {
       aggregateId: 'video',
@@ -95,7 +99,22 @@ function fixture(beforeRequest = vi.fn(async () => undefined)) {
   const silent = vi.fn();
   const access: ReviewTextVoiceAccess = {
     session,
-    beforeRequest,
+    beforeRequest: async () => {
+      await beforeRequest();
+      if (
+        options?.pendingText &&
+        !session.getSnapshot().document.advancedContent.text?.fragments.length
+      ) {
+        const before = session.getSnapshot().document.advancedContent;
+        const change = createReviewAdvancedContentOperation({
+          id: crypto.randomUUID(),
+          at: 1,
+          before,
+          after: { ...before, text: added.document },
+        });
+        if (change) await session.commit(change);
+      }
+    },
     context: {
       video,
       registerPending: guard.register,
@@ -107,7 +126,14 @@ function fixture(beforeRequest = vi.fn(async () => undefined)) {
   };
   const Harness = () => {
     const operation = useReviewTextVoiceOperation({ access, ids: ['text'] });
-    return <ReviewTextVoiceRecording access={access} fragmentId="text" operation={operation} />;
+    return (
+      <ReviewTextVoiceRecording
+        access={access}
+        fragmentId="text"
+        operation={operation}
+        maximum={options?.maximum}
+      />
+    );
   };
   return { session, commit, guard, failure, video, silent, beforeRequest, Harness };
 }
@@ -370,4 +396,44 @@ it('shows denied permission and keeps setup available for an explicit retry', as
   expect(host.textContent).toContain('videoEditor.app.recordAudioPermissionDenied');
   await click('videoEditor.app.recordAudioStart');
   expect(created).toBe(1);
+});
+
+it('shows the pending editor cap without saving and joins the new fragment only after Start', async () => {
+  let resolve!: () => void;
+  const beforeRequest = vi.fn(
+    () =>
+      new Promise<void>((done) => {
+        resolve = done;
+      })
+  );
+  const candidate = fixture(beforeRequest, { maximum: 9, pendingText: true });
+  await render(candidate);
+  const start = [...host.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('videoEditor.app.recordAudioStart')
+  )!;
+  expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.max).toBe('9');
+  expect(start.disabled).toBe(false);
+  expect(beforeRequest).not.toHaveBeenCalled();
+  expect(candidate.commit).not.toHaveBeenCalled();
+  expect(io.acquire).not.toHaveBeenCalled();
+  await click('videoEditor.app.recordAudioStart');
+  expect(beforeRequest).toHaveBeenCalledOnce();
+  expect(io.acquire).not.toHaveBeenCalled();
+  await act(async () => resolve());
+  expect(candidate.commit).toHaveBeenCalledOnce();
+  expect(candidate.session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe(
+    'Human narration'
+  );
+  expect(io.acquire).toHaveBeenCalledOnce();
+});
+
+it('keeps pending text unsaved and refuses capture when its explicit join fails', async () => {
+  const beforeRequest = vi.fn().mockRejectedValue(new Error('storage'));
+  const candidate = fixture(beforeRequest, { maximum: 9, pendingText: true });
+  await render(candidate);
+  await click('videoEditor.app.recordAudioStart');
+  expect(beforeRequest).toHaveBeenCalledOnce();
+  expect(candidate.commit).not.toHaveBeenCalled();
+  expect(io.acquire).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
 });

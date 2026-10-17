@@ -13,6 +13,7 @@ import { formatNumber, translate, useAppLocale } from '../../platform/i18n';
 type Props = {
   access: ReviewTextVoiceAccess;
   ids: readonly string[];
+  recordingMaximum?: number | undefined;
   onClose(): void;
   disabled?: boolean | undefined;
 };
@@ -118,6 +119,7 @@ export function ReviewTextVoiceForm(props: Props) {
           access={props.access}
           fragmentId={props.ids[0]!}
           operation={operation}
+          maximum={props.recordingMaximum}
           disabled={props.disabled}
         />
       )}

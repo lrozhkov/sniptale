@@ -40,8 +40,12 @@ vi.mock('./text-rewrite-panel', () => ({
   ),
 }));
 vi.mock('./text-voice-panel', () => ({
-  ReviewTextVoiceForm: (props: { ids: readonly string[]; onClose(): void }) => (
-    <section data-form="voice" data-ids={props.ids.join(',')}>
+  ReviewTextVoiceForm: (props: {
+    ids: readonly string[];
+    recordingMaximum?: number;
+    onClose(): void;
+  }) => (
+    <section data-form="voice" data-ids={props.ids.join(',')} data-maximum={props.recordingMaximum}>
       <button onClick={props.onClose}>Back</button>
     </section>
   ),
@@ -82,14 +86,19 @@ function Fixture({
   count = 120,
   voice,
   selectedId,
+  sourceClock = false,
 }: {
   count?: number;
   voice?: ReviewTextVoiceAccess;
   selectedId?: string;
+  sourceClock?: boolean;
 }) {
   const document = useRef<ReviewTextDocument>({
     version: 1,
-    fragments: Array.from({ length: count }, (_, index) => phrase(index)),
+    fragments: Array.from({ length: count }, (_, index) => ({
+      ...phrase(index),
+      ...(sourceClock ? { timeDomain: 'source' as const } : {}),
+    })),
   });
   const [, refresh] = useState(0);
   current = document.current;
@@ -353,4 +362,27 @@ it('keeps a selected text detail distinct from an expandable numbered list row',
       .closest('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')
       ?.querySelector('.sniptale-numeric-entry > span')?.textContent
   ).toBeTruthy();
+});
+
+it('passes the current source-clock fragment cap into the selected voice form without joining the session', () => {
+  const voice = voiceAccess();
+  act(() => root.render(<Fixture count={2} voice={voice} selectedId="text-1" sourceClock />));
+  act(() => host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="selected"]')!.click());
+  expect(host.querySelector('[data-form="voice"]')?.getAttribute('data-maximum')).toBe('596');
+  expect(voice.beforeRequest).not.toHaveBeenCalled();
+  expect(voice.session.getSnapshot().document.advancedContent.text?.fragments ?? []).toEqual([]);
+});
+
+it('keeps voice unavailable for a newly created blank fragment until the user enters text', () => {
+  const voice = voiceAccess();
+  act(() => root.render(<Fixture count={1} voice={voice} />));
+  act(() => button('textFragmentAdd').click());
+  const id = current.fragments[1]!.id;
+  act(() => root.render(<Fixture count={1} voice={voice} selectedId={id} />));
+  const start = host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="selected"]')!;
+  expect(start.disabled).toBe(true);
+  act(() => start.click());
+  expect(host.querySelector('[data-form="voice"]')).toBeNull();
+  expect(voice.beforeRequest).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(host.querySelector('textarea'));
 });

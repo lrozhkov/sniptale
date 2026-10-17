@@ -745,6 +745,41 @@ for (const size of [
           fullPage: false,
         });
         expect(overflow).toEqual([]);
+        const start = command('videoEditor.app.recordAudioStart');
+        await expect(start).toBeEnabled();
+        await expect(recording.getByRole('alert')).toHaveCount(0);
+        await page.evaluate(() => {
+          Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+            configurable: true,
+            value: async () => {
+              const context = new AudioContext();
+              const oscillator = context.createOscillator();
+              const destination = context.createMediaStreamDestination();
+              oscillator.connect(destination);
+              oscillator.start();
+              return destination.stream;
+            },
+          });
+        });
+        await start.click();
+        await expect(recording.getByRole('meter')).toBeVisible();
+        await page.screenshot({
+          path: info.outputPath('new-text-inline-recording-started.png'),
+          fullPage: false,
+        });
+        await recording
+          .getByRole('button', { name: label('videoEditor.app.recordAudioPause'), exact: true })
+          .click();
+        await expect(
+          recording.getByRole('button', {
+            name: label('videoEditor.app.recordAudioResume'),
+            exact: true,
+          })
+        ).toBeVisible();
+        await page.screenshot({
+          path: info.outputPath('new-text-inline-recording-paused.png'),
+          fullPage: false,
+        });
       } finally {
         await closeExtensionBrowser(launched);
       }
