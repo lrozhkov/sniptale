@@ -332,6 +332,14 @@ async function checkTextRewrite(
     .click();
   const form = dialog.locator('[data-ui="gallery.videoReview.textRewrite"]');
   await expect(form).toBeVisible();
+  await expect(form).not.toContainText(
+    label('gallery.videoReview.textRewriteSelectedScope').replace('{count}', '1')
+  );
+  await expect(form).toContainText(label('gallery.videoReview.textRewriteDisclosure'));
+  await expect(
+    form.getByText(label('gallery.videoReview.textRewriteDisclosure'), { exact: true })
+  ).toContainText(/В истории AI|AI history/);
+  await expect(form.locator('pre')).toHaveCount(0);
   await expect(dialog.locator('[data-ui="gallery.videoReview.textVoice"]')).toHaveCount(0);
   await expect(
     form.getByRole('switch', { name: label('gallery.videoReview.textRewriteTiming'), exact: true })
@@ -880,7 +888,7 @@ for (const variant of [
       await page.screenshot({ path: info.outputPath('text-voice-form.png'), fullPage: false });
       await voice
         .getByRole('button', {
-          name: label('gallery.videoReview.speechGenerateSelected'),
+          name: label('gallery.videoReview.speechGenerate'),
           exact: true,
         })
         .click();
@@ -1064,8 +1072,8 @@ for (const variant of [
       }
       // Reload exercises the actual advanced writer and persisted history, not a test-only text state.
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      // The retained route restores review directly; do not click the gallery behind its dialog.
+      await expect(dialog).toBeVisible();
       await button('gallery.videoReview.textTrackOpen').click();
       await expect(cards).toHaveCount(2);
       await expect(cards.nth(0)).toContainText('Первая фраза');

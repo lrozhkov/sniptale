@@ -29,6 +29,7 @@ export function useReviewTextRewrite(props: {
   const snapshot = useSyncExternalStore(access.session.subscribe, access.session.getSnapshot);
   const [catalog, setCatalog] = useState<AIModelSelectionBootstrapPayload | null>(null);
   const [catalogRevision, setCatalogRevision] = useState(0);
+  const catalogInitialized = useRef(false);
   const [modelId, setModelId] = useState('');
   const [options, setOptions] = useState<ReviewTextRewriteOptions>({
     prompt: '',
@@ -73,11 +74,16 @@ export function useReviewTextRewrite(props: {
           providers.some((provider) => provider.id === entry.providerId)
         );
         setCatalog({ ...data, models, providers });
-        setModelId(
-          models.some((entry) => entry.id === data.defaultModelId)
-            ? data.defaultModelId!
-            : (models[0]?.id ?? '')
-        );
+        if (!catalogInitialized.current) {
+          catalogInitialized.current = true;
+          setModelId(
+            (current) =>
+              current ||
+              (models.some((entry) => entry.id === data.defaultModelId)
+                ? data.defaultModelId!
+                : (models[0]?.id ?? ''))
+          );
+        }
       })
       .catch(() => {
         if (current) setState((value) => ({ ...value, error: 'model-unavailable' }));
@@ -121,15 +127,9 @@ export function useReviewTextRewrite(props: {
     disclosure,
     disclosureError,
     reloadModels: () => {
-      setCatalog(null);
       setState((value) => ({ ...value, error: null }));
       setCatalogRevision((value) => value + 1);
     },
-    providerName:
-      catalog?.providers.find(
-        (provider) =>
-          provider.id === catalog.models.find((model) => model.id === modelId)?.providerId
-      )?.name ?? '',
     resultDuration:
       buildReviewTimeMap(snapshot.snapshot.workspace.source.duration, snapshot.document.edits).at(
         -1

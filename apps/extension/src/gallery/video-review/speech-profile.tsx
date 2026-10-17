@@ -11,7 +11,9 @@ type Controller = ReturnType<typeof useReviewSpeech>;
 /** The same configured transcription selector serves original and recorded audio. */
 export function SpeechTranscriptionModelField({
   speech,
+  onOpenModels,
 }: {
+  onOpenModels?: (() => void) | undefined;
   speech: Pick<Controller, 'catalogs' | 'modelId' | 'setModelId'>;
 }) {
   return (
@@ -23,6 +25,7 @@ export function SpeechTranscriptionModelField({
         <AIModelSelector
           models={speech.catalogs.transcription.models}
           providers={speech.catalogs.transcription.providers}
+          onOpen={onOpenModels}
           selectedModelId={speech.modelId || null}
           onSelect={(id) => speech.setModelId(id ?? '')}
         />
@@ -35,9 +38,11 @@ export function SpeechTranscriptionModelField({
 export function SpeechProfileFields({
   speech,
   operation = 'all',
+  onOpenModels,
 }: {
   speech: Pick<Controller, 'profile' | 'changeProfile' | 'catalogs' | 'modelId' | 'setModelId'>;
   operation?: 'transcription' | 'speech' | 'all';
+  onOpenModels?: (() => void) | undefined;
 }) {
   const profile = speech.profile;
   const change = (patch: Partial<ReviewSpeechProfile>) => {
@@ -45,7 +50,9 @@ export function SpeechProfileFields({
   };
   return (
     <>
-      {operation !== 'speech' && <SpeechTranscriptionModelField speech={speech} />}
+      {operation !== 'speech' && (
+        <SpeechTranscriptionModelField speech={speech} onOpenModels={onOpenModels} />
+      )}
       {operation !== 'transcription' && (
         <>
           <InspectorParameterRow
@@ -56,6 +63,7 @@ export function SpeechProfileFields({
               <AIModelSelector
                 models={speech.catalogs.speech.models}
                 providers={speech.catalogs.speech.providers}
+                onOpen={onOpenModels}
                 selectedModelId={profile?.modelId ?? null}
                 onSelect={(id) => {
                   const model = speech.catalogs?.speech.models.find((entry) => entry.id === id);

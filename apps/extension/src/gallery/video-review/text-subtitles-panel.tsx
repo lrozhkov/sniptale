@@ -1,7 +1,7 @@
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Download } from 'lucide-react';
-import { CheckboxField, SelectField } from '../../ui/compact-inspector-controls';
+import { ToggleField, SelectField } from '../../ui/compact-inspector-controls';
 import { exportReviewSubtitles } from '../../features/video/review/subtitle-export';
 import type { ReviewTextDocument } from '../../features/video/review/text-types';
 import { downloadGalleryBlob } from '../shared/download';
@@ -125,22 +125,23 @@ export function ReviewTextSubtitlesForm(props: SubtitlesProps) {
           {translate('gallery.videoReview.subtitlesTitle')}
         </span>
       </div>
-      <InspectorParameterRow stacked label={translate('gallery.videoReview.subtitlesScope')}>
-        <span className="text-xs">
-          {translate(
-            props.wholeDocument
-              ? 'gallery.videoReview.textRewriteAllScope'
-              : 'gallery.videoReview.textRewriteSelectedScope'
-          ).replace('{count}', String(ids.length))}
-        </span>
-      </InspectorParameterRow>
+      {props.wholeDocument || ids.length > 1 ? (
+        <InspectorParameterRow stacked label={translate('gallery.videoReview.subtitlesScope')}>
+          <span className="text-xs">
+            {translate(
+              props.wholeDocument
+                ? 'gallery.videoReview.textRewriteAllScope'
+                : 'gallery.videoReview.textRewriteSelectedScope'
+            ).replace('{count}', String(ids.length))}
+          </span>
+        </InspectorParameterRow>
+      ) : null}
       <fieldset
         disabled={props.disabled || download === 'started'}
         className="min-w-0 sniptale-parameter-stack"
       >
         <SubtitleFileSettings file={file} />
       </fieldset>
-      <p className="text-xs">{translate('gallery.videoReview.subtitlesClock')}</p>
       <SubtitleFilePreview result={result} format={file.format} />
       {download === 'failed' && (
         <p role="alert" className="text-xs">
@@ -199,7 +200,7 @@ function SubtitleFileSettings({ file }: { file: ReturnType<typeof useReviewSubti
           file.setDownload('idle');
         }}
       />
-      <CheckboxField
+      <ToggleField
         label={translate('gallery.videoReview.subtitlesOnlyShown')}
         value={file.onlyShown}
         onChange={() => {
@@ -209,7 +210,7 @@ function SubtitleFileSettings({ file }: { file: ReturnType<typeof useReviewSubti
       />
       {file.format === 'srt' &&
         (file.normalizeOverlaps || (file.result?.ok && file.result.overlaps)) && (
-          <CheckboxField
+          <ToggleField
             label={translate('gallery.videoReview.subtitlesNormalize')}
             value={file.normalizeOverlaps}
             onChange={() => {
@@ -267,6 +268,7 @@ function SubtitleFilePreview({
             preferenceId="text-subtitles-preview"
             label={translate('gallery.videoReview.subtitlesPreview')}
           >
+            <p className="text-xs">{translate('gallery.videoReview.subtitlesClock')}</p>
             <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs">
               {result.text.slice(0, 4000)}
             </pre>

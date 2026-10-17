@@ -52,3 +52,5 @@ Segment motion must not delay acceptance. Initial layout and resize do not anima
 [WAI combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
 
 Compact inspector segments use 32px height and 6px horizontal padding per option. General controls retain their existing height.
+
+Configured provider/model pickers refresh their catalog when opened. Keep the open menu, search and current choice while the read completes. A failed read retains the last known catalog and exposes retry. Refresh does not select a different provider or model. Keep a removed choice unresolved until the user replaces it. Initial configured defaults remain with their existing owner.

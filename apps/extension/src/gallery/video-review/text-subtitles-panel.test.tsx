@@ -166,7 +166,7 @@ it('exports whole current document including hidden text without Save or project
 it('limits selected scope and applies only-shown solely to disposable file cues', () => {
   render({ whole: false, ids: ['hidden'] });
   expect(button('subtitlesDownload').disabled).toBe(false);
-  act(() => host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click());
+  act(() => host.querySelector<HTMLButtonElement>('[role=switch]')!.click());
   expect(button('subtitlesDownload').disabled).toBe(true);
   expect(documentText.fragments[0]?.showInVideo).toBe(false);
 });

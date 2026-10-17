@@ -60,10 +60,12 @@ vi.mock('../../features/ai/model-selector', () => ({
   AIModelSelector: (props: {
     selectedModelId: string | null;
     onSelect(id: string | null): void;
+    onOpen?: () => void;
   }) => (
     <select
       aria-label="configured model"
       value={props.selectedModelId ?? ''}
+      onMouseDown={props.onOpen}
       onChange={(event) => props.onSelect(event.target.value)}
     >
       <option value="model">Model</option>
@@ -458,7 +460,11 @@ it('requests distinct approval for saved instructions after an audio-only approv
   await recognize();
   await click(translate('gallery.videoReview.recognitionDiscard'));
   mocks.multimodal = true;
-  await click(translate('gallery.videoReview.speechReloadModels'));
+  await act(async () => {
+    host
+      .querySelector('select[aria-label="configured model"]')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
   await click(translate('gallery.videoReview.recognitionStart'));
   expect(mocks.prepare).toHaveBeenCalledTimes(1);
   expect(button(translate('gallery.videoReview.speechConsentContinue'))).toBeDefined();

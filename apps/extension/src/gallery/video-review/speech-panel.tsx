@@ -206,7 +206,10 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
   return (
     <div className="space-y-2">
       <fieldset disabled={disabled} className="min-w-0 sniptale-parameter-stack">
-        <SpeechTranscriptionModelField speech={recognition} />
+        <SpeechTranscriptionModelField
+          speech={recognition}
+          onOpenModels={recognition.reloadModels}
+        />
         {!recognition.multimodal && (
           <SelectField
             label={translate('gallery.videoReview.recognitionGrouping')}
@@ -253,16 +256,18 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
           >
             {label}
           </ReviewButton>
-          <ReviewButton
-            label={translate('gallery.videoReview.speechReloadModels')}
-            className={buttonClass}
-            onClick={() => {
-              recognition.clearError();
-              recognition.reloadModels();
-            }}
-          >
-            {translate('gallery.videoReview.speechReloadModels')}
-          </ReviewButton>
+          {!recognition.catalogs?.transcription.models.length ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.speechReloadModels')}
+              className={buttonClass}
+              onClick={() => {
+                recognition.clearError();
+                recognition.reloadModels();
+              }}
+            >
+              {translate('gallery.videoReview.speechReloadModels')}
+            </ReviewButton>
+          ) : null}
         </div>
       </fieldset>
       {consenting && provider && (

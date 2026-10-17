@@ -212,3 +212,31 @@ describe('inline text rewrite operation lifetime', () => {
     expect(operation.preview).toBeNull();
   });
 });
+
+it('keeps its known catalog and choice through delayed refresh and a discovery failure', async () => {
+  await mount();
+  const previous = operation.catalog!;
+  const waiting = deferred<typeof previous>();
+  mocks.catalog.mockReturnValueOnce(waiting.promise);
+  await act(async () => operation.reloadModels());
+  expect(operation.catalog).toBe(previous);
+  expect(operation.modelId).toBe('model');
+  const refreshed = {
+    ...previous,
+    defaultModelId: 'new-default',
+    models: [
+      ...previous.models,
+      { ...previous.models[0]!, id: 'new-default', displayName: 'New default' },
+    ],
+  };
+  await act(async () => waiting.resolve(refreshed));
+  expect(operation.catalog?.models).toHaveLength(2);
+  expect(operation.modelId).toBe('model');
+  const known = operation.catalog;
+  mocks.catalog.mockRejectedValueOnce(new Error('unavailable'));
+  await act(async () => operation.reloadModels());
+  expect(operation.catalog).toBe(known);
+  expect(operation.modelId).toBe('model');
+  expect(operation.error).toBe('model-unavailable');
+  expect(mocks.generate).not.toHaveBeenCalled();
+});

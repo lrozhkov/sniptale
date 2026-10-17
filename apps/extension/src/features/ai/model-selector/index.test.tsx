@@ -384,3 +384,37 @@ it.each([true, false])('selects a focused model by keyboard with compact=%s', as
   expect(onSelect).toHaveBeenCalledExactlyOnceWith('model-2');
   expect(document.activeElement).toBe(getButtons()[0]);
 });
+
+it('notifies only opening and retains the open search and selection when refreshed models arrive', async () => {
+  const onOpen = vi.fn();
+  const onSelect = vi.fn();
+  const render = (models: AIModel[], disabled = false) =>
+    renderUi(
+      <AIModelSelector
+        models={models}
+        providers={PROVIDERS}
+        selectedModelId="model-1"
+        onSelect={onSelect}
+        onOpen={onOpen}
+        disabled={disabled}
+      />
+    );
+  await render(MODELS);
+  const trigger = getButtons()[0]!;
+  await act(async () => trigger.click());
+  expect(onOpen).toHaveBeenCalledOnce();
+  const search = container!.querySelector('input')!;
+  await act(async () => setInputValue(search, 'GPT'));
+  await render([...MODELS, { ...MODELS[0]!, id: 'new', displayName: 'GPT refreshed' }]);
+  expect(container!.querySelector('input')).toBe(search);
+  expect(search.value).toBe('GPT');
+  expect(document.activeElement).toBe(search);
+  expect(container?.textContent).toContain('GPT refreshed');
+  expect(trigger.textContent).toContain('OpenAI / GPT 4.1');
+  expect(onSelect).not.toHaveBeenCalled();
+  await act(async () => trigger.click());
+  expect(onOpen).toHaveBeenCalledOnce();
+  await render(MODELS, true);
+  await act(async () => trigger.click());
+  expect(onOpen).toHaveBeenCalledOnce();
+});

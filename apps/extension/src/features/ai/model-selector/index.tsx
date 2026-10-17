@@ -24,6 +24,8 @@ export interface AIModelSelectorProps {
   isEventWithinElement?: EventWithinElementResolver;
   models: AIModel[];
   onSelect: (modelId: string | null) => void;
+  /** Notifies an explicit menu opening without changing the accepted model. */
+  onOpen?: (() => void) | undefined;
   providers: AIModelSelectorProvider[];
   selectedModelId: string | null;
 }
@@ -101,7 +103,10 @@ export function AIModelSelector(props: AIModelSelectorProps) {
       <Trigger
         disabled={props.disabled ?? false}
         isOpen={isOpen}
-        onToggle={() => setIsOpen((current) => !current)}
+        onToggle={() => {
+          if (!isOpen) props.onOpen?.();
+          setIsOpen((current) => !current);
+        }}
         selectedLabel={viewState.selectedLabel}
       />
       {renderAIModelSelectorDropdown({

@@ -281,11 +281,11 @@ export function useReviewSpeechCatalog(
     speech: AIModelSelectionBootstrapPayload;
   } | null>(null);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
+  const initialized = useRef(false);
   const latestError = useRef(onError);
   latestError.current = onError;
   useEffect(() => {
     let active = true;
-    setCatalogs(null);
     void Promise.all([
       requestAIModelSelectionBootstrap('transcription'),
       requestAIModelSelectionBootstrap('speech'),
@@ -293,7 +293,10 @@ export function useReviewSpeechCatalog(
       .then(([transcription, speech]) => {
         if (!active) return;
         setCatalogs({ transcription, speech });
-        setModelId((current) => current || transcription.defaultModelId || '');
+        if (!initialized.current) {
+          initialized.current = true;
+          setModelId((current) => current || transcription.defaultModelId || '');
+        }
       })
       .catch(() => {
         if (active) latestError.current();

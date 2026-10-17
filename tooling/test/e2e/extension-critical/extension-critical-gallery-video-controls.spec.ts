@@ -648,3 +648,105 @@ for (const size of [
       }
     });
   }
+
+for (const size of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+])
+  for (const theme of ['light', 'dark'] as const) {
+    test(`native text voice form ${size.width} ${theme}`, async ({}, info) => {
+      test.setTimeout(90_000);
+      const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
+      const page = await launched.context.newPage();
+      page.setDefaultTimeout(10_000);
+      try {
+        const review = await openReview(page, launched.extensionId, theme);
+        const command = (key: Parameters<typeof translate>[0]) =>
+          review.getByRole('button', { name: label(key), exact: true });
+        const ruler = review.locator('[data-ui="gallery.videoReview.ruler"]');
+        await ruler.click({ position: { x: 24, y: 10 } });
+        await command('gallery.videoReview.textTrackOpen').click();
+        const document = review.locator('[data-ui="gallery.videoReview.textDocument"]');
+        await document
+          .getByRole('button', {
+            name: label('gallery.videoReview.textFragmentAdd'),
+            exact: true,
+          })
+          .click();
+        await document
+          .getByRole('textbox', {
+            name: label('gallery.videoReview.speechText'),
+            exact: true,
+          })
+          .fill('Проверка записи одного фрагмента');
+        await review
+          .locator('[data-ui="gallery.videoReview.textTrack"] [data-text-id]')
+          .first()
+          .click();
+        await command('gallery.videoReview.speechGenerate').click();
+        const voice = review.locator('[data-ui="gallery.videoReview.textVoice"]');
+        await expect(voice).toBeVisible();
+        await expect(
+          voice.getByRole('switch', {
+            name: label('gallery.videoReview.textVoiceMuteSource'),
+            exact: true,
+          })
+        ).toBeVisible();
+        await expect(voice).not.toContainText(
+          label('gallery.videoReview.textVoiceScope').replace('{count}', '1')
+        );
+        const back = voice.getByRole('button', {
+          name: label('gallery.videoReview.textVoiceBack'),
+          exact: true,
+        });
+        await back.hover();
+        await expect(back).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        const modes = voice.getByRole('group', {
+          name: label('gallery.videoReview.textVoiceSource'),
+          exact: true,
+        });
+        const options = await modes.getByRole('button').all();
+        expect(options).toHaveLength(3);
+        const boxes = await Promise.all(options.map((option) => option.boundingBox()));
+        for (const box of boxes) {
+          expect(box!.height).toBe(32);
+          expect(Math.abs(box!.y - boxes[0]!.y)).toBeLessThanOrEqual(1);
+        }
+        await command('gallery.videoReview.textVoiceMicrophone').click();
+        const recording = voice.locator('[data-ui="gallery.videoReview.textVoiceRecording"]');
+        await expect(recording).toBeVisible();
+        await expect(recording.locator('dialog')).toHaveCount(0);
+        const caption = recording.locator('span[id$="-label"]').filter({
+          hasText: label('videoEditor.app.recordAudioDevice'),
+        });
+        await caption.click();
+        await expect(page.getByRole('listbox')).toHaveCount(0);
+        await recording
+          .getByRole('button', {
+            name: label('videoEditor.app.recordAudioDevice'),
+            exact: true,
+          })
+          .click();
+        await expect(page.getByRole('listbox')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await command('videoEditor.app.recordAudioStart').scrollIntoViewIfNeeded();
+        const overflow = await voice.evaluate((node) => {
+          const right = node.getBoundingClientRect().right;
+          return [...node.querySelectorAll('*')]
+            .filter((child) => child.getBoundingClientRect().right > right + 1)
+            .map((child) => ({
+              tag: child.tagName,
+              class: child.className,
+              text: child.textContent?.slice(0, 80),
+            }));
+        });
+        await page.screenshot({
+          path: info.outputPath('text-voice-inline-options.png'),
+          fullPage: false,
+        });
+        expect(overflow).toEqual([]);
+      } finally {
+        await closeExtensionBrowser(launched);
+      }
+    });
+  }

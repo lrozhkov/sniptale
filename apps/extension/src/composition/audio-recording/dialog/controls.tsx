@@ -214,16 +214,16 @@ export function AudioRecordingDeviceSelect(props: {
   }, []);
   return (
     <div className="grid min-w-0 gap-1.5">
-      <label
-        htmlFor={labelId}
+      <span
+        id={`${labelId}-label`}
         className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]"
       >
         {translate('videoEditor.app.recordAudioDevice')}
-      </label>
+      </span>
       <ProductSelect
         id={labelId}
         {...props}
-        aria-label={translate('videoEditor.app.recordAudioDevice')}
+        aria-labelledby={`${labelId}-label`}
         options={[
           { value: '', label: translate('videoEditor.app.recordAudioDefaultDevice') },
           ...devices.map((device, index) => ({

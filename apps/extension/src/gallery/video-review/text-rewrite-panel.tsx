@@ -1,8 +1,8 @@
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
-import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
+import { ToggleField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
 import { AIModelSelector } from '../../features/ai/model-selector';
-import { ReviewButton, ReviewDetails, reviewTextButtonClassName } from './controls';
+import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 import { useReviewTextRewrite } from './use-text-rewrite';
 import { ReviewTextRewritePreview } from './text-rewrite-preview';
@@ -30,7 +30,6 @@ export function ReviewTextRewriteForm(props: {
   const operation = useReviewTextRewrite(props);
   const { preview } = operation;
   const error = operation.error ?? operation.disclosureError;
-  const context = preview?.context ?? operation.disclosure?.context;
   const label = (key: keyof typeof errors) => translate(errors[key]);
   return (
     <section
@@ -52,30 +51,24 @@ export function ReviewTextRewriteForm(props: {
           {translate('gallery.videoReview.textRewriteTitle')}
         </span>
       </div>
-      <p className="text-xs">
-        {translate(
-          props.wholeDocument
-            ? 'gallery.videoReview.textRewriteAllScope'
-            : 'gallery.videoReview.textRewriteSelectedScope'
-        ).replace('{count}', String(props.ids.length))}
-      </p>
+      {props.wholeDocument || props.ids.length > 1 ? (
+        <p className="text-xs">
+          {translate(
+            props.wholeDocument
+              ? 'gallery.videoReview.textRewriteAllScope'
+              : 'gallery.videoReview.textRewriteSelectedScope'
+          ).replace('{count}', String(props.ids.length))}
+        </p>
+      ) : null}
       <RewriteSettings
         operation={operation}
         disabled={props.disabled}
         wholeDocument={props.wholeDocument}
       />
       <p className="text-xs">{translate('gallery.videoReview.textRewriteDisclosure')}</p>
-      <p className="text-xs">{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
-      {context && (
-        <ReviewDetails
-          label={translate('gallery.videoReview.textRewriteOutbound')}
-          preferenceId="text-rewrite-disclosure"
-        >
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs">
-            {JSON.stringify(context, null, 2)}
-          </pre>
-        </ReviewDetails>
-      )}
+      {!props.access.session.getSnapshot().autosaveEnabled ? (
+        <p className="text-xs">{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
+      ) : null}
       {error && (
         <p role="alert" className="text-xs">
           {label(error in errors ? (error as keyof typeof errors) : 'failed')}
@@ -138,6 +131,7 @@ function RewriteSettings({
           <AIModelSelector
             models={operation.catalog.models}
             providers={operation.catalog.providers}
+            onOpen={operation.reloadModels}
             selectedModelId={operation.modelId || null}
             onSelect={(id) => operation.setModelId(id ?? '')}
             disabled={locked}
@@ -151,15 +145,7 @@ function RewriteSettings({
           )
         )}
       </InspectorParameterRow>
-      {!!operation.providerName && (
-        <p className="text-xs">
-          {translate('gallery.videoReview.textRewriteDestination').replace(
-            '{provider}',
-            operation.providerName
-          )}
-        </p>
-      )}
-      {!operation.catalog && operation.error && (
+      {((!operation.catalog && operation.error) || operation.catalog?.models.length === 0) && (
         <ReviewButton
           label={translate('gallery.videoReview.speechReloadModels')}
           className={buttonClass}
@@ -184,7 +170,7 @@ function RewriteSettings({
         ]}
         onChange={(mode: 'phrases' | 'script') => patch({ mode, resegment: false })}
       />
-      <CheckboxField
+      <ToggleField
         label={translate('gallery.videoReview.textRewriteTiming')}
         value={options.changeIntervals}
         onChange={(changeIntervals) => patch({ changeIntervals, resegment: false })}
@@ -213,7 +199,7 @@ function RewriteSettings({
         </>
       )}
       {wholeDocument && options.mode === 'script' && options.changeIntervals && (
-        <CheckboxField
+        <ToggleField
           label={translate('gallery.videoReview.textRewriteStructure')}
           value={options.resegment}
           onChange={(resegment) => patch({ resegment })}

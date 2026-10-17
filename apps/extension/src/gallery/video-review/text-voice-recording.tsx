@@ -348,7 +348,11 @@ function TextVoiceRecordingBody(
   const { transport, trim } = session.controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
   return (
-    <div className="min-w-0 space-y-2" data-ui="gallery.videoReview.textVoiceRecording">
+    <div
+      className="review-voiceover-inspector sniptale-inspector-surface
+        sniptale-compact-switches min-w-0 space-y-2"
+      data-ui="gallery.videoReview.textVoiceRecording"
+    >
       {trim ? (
         <VoiceoverTakeReview
           session={session}

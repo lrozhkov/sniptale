@@ -318,17 +318,17 @@ it('keeps source attenuation off and unavailable for silent/unknown media, and c
   const mutedLabel = 'gallery.videoReview.textVoiceMuteSource';
   await render();
   expect(
-    host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${mutedLabel}"]`)
+    host.querySelector<HTMLButtonElement>(`button[role=switch][aria-label="${mutedLabel}"]`)
       ?.disabled
   ).toBe(true);
   expect(host.textContent).toContain('gallery.videoReview.textVoiceMuteUnavailable');
   const { beforeRequest } = await render(['first'], undefined, () => true);
-  const toggle = host.querySelector<HTMLInputElement>(
-    `input[type=checkbox][aria-label="${mutedLabel}"]`
+  const toggle = host.querySelector<HTMLButtonElement>(
+    `button[role=switch][aria-label="${mutedLabel}"]`
   )!;
-  expect(toggle.checked).toBe(false);
+  expect(toggle.getAttribute('aria-checked')).toBe('false');
   await click(mutedLabel);
-  expect(toggle.checked).toBe(true);
+  expect(toggle.getAttribute('aria-checked')).toBe('true');
   expect(beforeRequest).not.toHaveBeenCalled();
   expect(mocks.apply).not.toHaveBeenCalled();
   await start();
@@ -631,4 +631,16 @@ it('keeps batch local modes unavailable and routes Back and mode changes through
   expect(props.onClose).not.toHaveBeenCalled();
   await act(async () => beforeAction.mock.calls[1]![0]());
   expect(props.onClose).toHaveBeenCalledOnce();
+});
+
+it('presents one selected phrase as parameters without a redundant count or a permanent refresh action', async () => {
+  const { session, props } = await render();
+  expect(
+    host.querySelector('[role="switch"][aria-label="gallery.videoReview.textVoiceMuteSource"]')
+  ).not.toBeNull();
+  expect(host.textContent).not.toContain('gallery.videoReview.textVoiceScope');
+  expect(host.querySelector('[aria-label="gallery.videoReview.speechReloadModels"]')).toBeNull();
+  await act(async () => session.setAutosaveEnabled(true));
+  await act(async () => root.render(<ReviewTextVoiceForm {...props} />));
+  expect(host.querySelector('[aria-label="gallery.videoReview.speechGenerate"]')).not.toBeNull();
 });
