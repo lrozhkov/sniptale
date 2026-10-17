@@ -411,3 +411,13 @@ it.each(['document-settings.tsx', 'mask-settings.tsx'])(
     ]);
   }
 );
+
+it('executes real tour library and workspace proof when the page test substitutes tour UI', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/scenario-editor/page-shell';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/tour/library.tsx`)).toEqual([
+    `${root}/ScenarioEditorPage.test.tsx`,
+    `${root}/tour/library.test.tsx`,
+    `${root}/tour/workspace.test.tsx`,
+  ]);
+});

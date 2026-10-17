@@ -377,6 +377,7 @@ function ScenarioHeader({
               <ContentToolbarButton
                 key={value}
                 className="guide-section-tab"
+                tone="outline"
                 title={label}
                 aria-label={label}
                 aria-pressed={representation === value}

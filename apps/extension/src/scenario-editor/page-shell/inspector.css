@@ -469,9 +469,9 @@
   [data-ui='scenario-editor.inspector-categories']
   > nav
   button[aria-pressed='true'] {
-  color: var(--sniptale-color-accent);
+  color: var(--sniptale-color-text-primary);
   box-shadow: none;
-  background: var(--sniptale-color-accent-soft);
+  background: var(--sniptale-color-surface-hover);
 }
 .guide-inspector-panel .guide-style-accent {
   display: grid;
@@ -541,8 +541,8 @@
   [data-ui='scenario-editor.inspector-categories']
   > nav
   button[aria-pressed='true']:hover {
-  color: var(--sniptale-color-accent-emphasis);
-  background: var(--sniptale-color-accent-soft);
+  color: var(--sniptale-color-text-primary-strong);
+  background: var(--sniptale-color-surface-hover);
 }
 .guide-inspector-panel [data-ui='scenario-editor.inspector-categories'] > nav button {
   transition: color 120ms ease;

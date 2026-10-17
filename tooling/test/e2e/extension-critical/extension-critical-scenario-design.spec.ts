@@ -257,6 +257,22 @@ async function readSaved(page: Page) {
 
 async function canonicalInspector(page: Page) {
   const panel = page.locator('#guide-inspector-panel');
+  for (const selected of await panel
+    .locator('[data-ui="scenario-editor.inspector-categories"] > nav button[aria-pressed="true"]')
+    .all()) {
+    await page.mouse.move(0, 550);
+    const neutral = await selected.evaluate((node) => {
+      const probe = document.createElement('span');
+      probe.style.background = 'var(--sniptale-color-surface-hover)';
+      node.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+    await expect(selected).toHaveCSS('background-color', neutral);
+    await selected.hover();
+    await expect(selected).toHaveCSS('background-color', neutral);
+  }
   const names = panel.locator('.sniptale-parameter-name:visible');
   expect(await names.count()).toBeGreaterThan(0);
   for (const name of await names.all()) {
@@ -293,6 +309,74 @@ async function canonicalInspector(page: Page) {
   );
 }
 
+async function chromeFeedback(page: Page, info: TestInfo) {
+  const field = page.locator('.guide-project-name .guide-voice-field');
+  const input = field.locator('input');
+  const clear = field.locator(':scope > .sniptale-field-clear');
+  const voice = field.locator('.guide-voice-control');
+  await page.mouse.move(0, 550);
+  await input.blur();
+  await expect(clear).toHaveCSS('opacity', '0');
+  await expect(voice).toHaveCSS('opacity', '0');
+  await recordRoles(page, info, 'guide-chrome-idle');
+  expect(
+    await input.evaluate((node) => parseFloat(getComputedStyle(node).paddingInlineEnd))
+  ).toBeLessThanOrEqual(8);
+  const idleWidth = (await input.boundingBox())!.width;
+  await input.hover();
+  expect((await input.boundingBox())!.width).toBeCloseTo(idleWidth, 0);
+  const budget = await input.evaluate((node) => {
+    const css = getComputedStyle(node);
+    const canvas = document.createElement('canvas').getContext('2d')!;
+    canvas.font = css.font;
+    return {
+      available:
+        node.clientWidth - parseFloat(css.paddingInlineStart) - parseFloat(css.paddingInlineEnd),
+      required: canvas.measureText('12345678').width,
+    };
+  });
+  expect(budget.available).toBeGreaterThanOrEqual(budget.required - 1);
+  await expect(clear).toHaveCSS('opacity', '1');
+  await expect(voice).toHaveCSS('opacity', '1');
+  await expect(clear).toHaveCSS('cursor', 'pointer');
+  expect(
+    await input.evaluate((node) => parseFloat(getComputedStyle(node).paddingInlineEnd))
+  ).toBeGreaterThanOrEqual(64);
+  const clearBox = await clear.boundingBox();
+  const voiceBox = await voice.boundingBox();
+  expect(
+    Math.abs(clearBox!.y + clearBox!.height / 2 - voiceBox!.y - voiceBox!.height / 2)
+  ).toBeLessThanOrEqual(1);
+  await recordRoles(page, info, 'guide-chrome-accessories');
+  await input.focus();
+  await page.mouse.move(0, 550);
+  await expect(clear).toHaveCSS('opacity', '1');
+  await input.blur();
+  const multiline = page.locator('article#first textarea.guide-description');
+  const padding = await multiline.evaluate((node) => getComputedStyle(node).paddingInlineEnd);
+  await multiline.hover();
+  await expect(multiline).toHaveCSS('padding-inline-end', padding);
+  const left = page.locator('.guide-left-navigation button[aria-pressed="true"]');
+  await expect(left).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await left.hover();
+  await expect(left).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const active = page.locator('.tour-representation-switch button[aria-pressed="true"]');
+  await expect(active).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const marker = () =>
+    active.evaluate((node) => {
+      const css = getComputedStyle(node, '::before');
+      return { height: css.height, transform: css.transform, bottom: css.bottom };
+    });
+  await expect.poll(marker).toMatchObject({ height: '2px', bottom: '0px' });
+  await active.hover();
+  const before = await marker();
+  await page.mouse.down();
+  expect(await marker()).toEqual(before);
+  await page.mouse.move(0, 550);
+  await page.mouse.up();
+  await recordRoles(page, info, 'guide-chrome-navigation');
+}
+
 async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   const title = page.getByRole('textbox', { name: t('scenario.editor.projectLabel'), exact: true });
@@ -303,6 +387,7 @@ async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
   expect(authoredBefore.lineHeight).toBe('26.4px');
   expect(authoredBefore.weight).toBe('400');
   await assertAuthoredFontIndependent(page);
+  await chromeFeedback(page, info);
   await recordRoles(page, info, 'guide-workspace');
   await title.fill('Edited scenario composition');
   await text.click();

@@ -109,7 +109,7 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
               key={id}
               title={label}
               aria-pressed={props.panels.leftSection === id}
-              tone="property"
+              tone="outline"
               className="guide-section-tab"
               onClick={() => props.panels.openLeft(id)}
             >

@@ -1570,15 +1570,20 @@ html[data-guide-reordering] .guide-block-grip {
 }
 
 .guide-voice-field {
+  --guide-voice-accessory-space: 8px;
+  --guide-voice-active-space: 36px;
   position: relative;
   display: block;
   flex: 1;
   width: 100%;
   min-width: 0;
 }
-.guide-page .guide-voice-field > input,
+.guide-page .guide-voice-field > input {
+  padding-inline-end: var(--guide-voice-accessory-space, 8px);
+  min-height: 2rem;
+}
 .guide-page .guide-inspector-panel .guide-voice-field > textarea {
-  padding-right: 4.25rem;
+  padding-inline-end: 68px;
   min-height: 2rem;
 }
 .guide-voice-control {
@@ -1618,7 +1623,7 @@ html[data-guide-reordering] .guide-block-grip {
 }
 .guide-project-name .guide-voice-field > input,
 .guide-project-name-measure {
-  padding-right: 2rem;
+  padding-inline-end: 8px;
 }
 @media (hover: none) {
   .guide-voice-control {
@@ -2106,11 +2111,7 @@ html[data-guide-height-resizing] * {
 .guide-page .guide-left-navigation .guide-section-tab:hover:not(:disabled) {
   border-color: transparent;
   color: var(--sniptale-color-text-primary-strong);
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-text-primary) 10%,
-    var(--sniptale-color-surface-canvas)
-  ) !important;
+  background: transparent !important;
 }
 .guide-page .guide-voice-control > .guide-text-clear {
   border-color: transparent;
@@ -2174,8 +2175,10 @@ html[data-guide-height-resizing] * {
   font-weight: 400;
 }
 .guide-page .guide-left-navigation .guide-section-tab[aria-pressed='true'] {
+  --sniptale-control-font-weight: 500;
+  --sniptale-control-font-weight-hover: 500;
   color: var(--sniptale-color-text-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 .guide-page .guide-left-navigation .guide-section-tab svg {
   color: inherit;
@@ -2573,7 +2576,10 @@ html[data-guide-height-resizing] * {
 .sniptale-scenario-workspace .guide-voice-field[data-clearable] .guide-voice-control {
   right: 40px;
 }
-.sniptale-scenario-workspace .guide-voice-field[data-clearable] > :is(input, textarea) {
+.sniptale-scenario-workspace .guide-voice-field[data-clearable] > input {
+  padding-inline-end: var(--guide-voice-accessory-space, 8px);
+}
+.sniptale-scenario-workspace .guide-voice-field[data-clearable] > textarea {
   padding-inline-end: 68px;
 }
 @container guide-nav (max-width: 180px) {
@@ -2586,7 +2592,7 @@ html[data-guide-height-resizing] * {
   min-width: calc(8ch + 70px);
 }
 .sniptale-scenario-workspace .guide-project-name-measure {
-  padding-inline-end: 68px;
+  padding-inline-end: 8px;
 }
 
 .guide-document .guide-voice-field {
@@ -2605,4 +2611,28 @@ html[data-guide-height-resizing] * {
 .sniptale-scenario-workspace .guide-project-name-measure,
 .sniptale-scenario-workspace .guide-ai-prompt-input textarea {
   font-family: var(--sniptale-font-document-sans);
+}
+
+/* Hidden field accessories do not reserve editable text width. */
+.sniptale-scenario-workspace .guide-voice-field[data-clearable] {
+  --guide-voice-active-space: 68px;
+}
+.sniptale-scenario-workspace .guide-voice-field:is(:hover, :focus-within, [data-voice-visible]) {
+  --guide-voice-accessory-space: var(--guide-voice-active-space);
+}
+.sniptale-scenario-workspace .guide-voice-field[data-voice-visible] > .sniptale-field-clear {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sniptale-scenario-workspace .guide-voice-field > .guide-voice-control,
+.sniptale-scenario-workspace .guide-voice-field > .sniptale-field-clear {
+  transition: none;
+}
+.sniptale-scenario-workspace .guide-voice-field > .sniptale-field-clear {
+  cursor: pointer;
+}
+@media (hover: none) {
+  .sniptale-scenario-workspace .guide-voice-field {
+    --guide-voice-accessory-space: var(--guide-voice-active-space);
+  }
 }
