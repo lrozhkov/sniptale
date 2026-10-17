@@ -170,7 +170,7 @@ for (const variant of [
         await expect
           .soft(card.locator('.line-clamp-2'))
           .toHaveCSS('font-weight', '400', { timeout: 100 });
-        await expect(card).toHaveAttribute('title', new RegExp(title));
+        await expect.poll(() => card.getAttribute('title')).toContain(title);
       }
       if (editor === 'editor') await expect(start.locator('section img').first()).toBeVisible();
       await page.screenshot({ path: info.outputPath(`${editor}-projects.png`) });

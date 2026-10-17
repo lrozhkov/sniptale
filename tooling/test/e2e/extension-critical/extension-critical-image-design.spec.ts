@@ -414,7 +414,11 @@ for (const theme of ['light', 'dark'] as const) {
     const previous = await hex.inputValue();
     const replacement = previous.toLowerCase().includes('123456') ? '#654321' : '#123456';
     await hex.fill(replacement);
-    await expect(hex).toHaveValue(new RegExp(`^${replacement}(?:ff)?$`, 'i'));
+    await expect
+      .poll(async () =>
+        [replacement, `${replacement}ff`].includes((await hex.inputValue()).toLowerCase())
+      )
+      .toBe(true);
     await expect(trigger).not.toHaveAttribute('title', accepted ?? '');
     await screenshot(page, info, `paint-portal-${theme}`);
     await popup

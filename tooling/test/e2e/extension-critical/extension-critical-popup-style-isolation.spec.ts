@@ -153,7 +153,8 @@ for (const locale of ['ru', 'en'] as const) {
         const settings = await launched.context.newPage();
         await settings.setViewportSize({ width: 1280, height: 560 });
         await settings.goto(
-          `chrome-extension://${launched.extensionId}/apps/extension/src/settings/index.html?section=interface-browser&view=interface`
+          `chrome-extension://${launched.extensionId}/apps/extension/src/settings/index.html` +
+            '?section=interface-browser&view=interface'
         );
         const language = settings.locator('#settings-interface-language');
         await expect(language).toBeEnabled();

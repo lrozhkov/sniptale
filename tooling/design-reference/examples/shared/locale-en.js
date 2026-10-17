@@ -23,12 +23,20 @@ export default {
   'Не удалось скопировать. Повторите попытку.': 'Could not copy. Try again.',
   '60 кадров/с': '60 fps',
   Адрес: 'Address',
-  'Адрес и асинхронные действия над иконкой относятся к браузерной шапке. Смена типа сохраняет адрес. Это пример соседства контролов, не новый владелец получения favicon.':
-    'The address and asynchronous icon actions belong to the browser header. Changing the type retains the address. This is a control composition, not a new favicon retrieval owner.',
+  ['Адрес и асинхронные действия над иконкой относятся к браузерной шапке. Смена ' +
+  'типа сохраняет адрес. Это пример соседства контролов, не новый владелец ' +
+  'получения favicon.']:
+    'The address and asynchronous icon actions belong to the browser header. ' +
+    'Changing the type retains the address. This is a control composition, not a ' +
+    'new favicon retrieval owner.',
   'Браузерная шапка: адрес и действия': 'Browser header: address and actions',
   'В режиме камеры источник обязателен.': 'Camera mode requires the source.',
-  'Вложенная медиа-ветка сохраняет принятый ресурс и переход при скрытии. Синхронизация с роликом, реальный playback и доменные ограничения времени не заменяются пробой.':
-    'The nested media branch retains the accepted resource and transition when hidden. This probe does not replace clip synchronization, actual playback, or domain timing constraints.',
+  ['Вложенная медиа-ветка сохраняет принятый ресурс и переход при скрытии. ' +
+  'Синхронизация с роликом, реальный playback и доменные ограничения времени не ' +
+  'заменяются пробой.']:
+    'The nested media branch retains the accepted resource and transition when ' +
+    'hidden. This probe does not replace clip synchronization, actual playback, ' +
+    'or domain timing constraints.',
   'Все разделы': 'All sections',
   'Вся вкладка': 'Entire tab',
   'Выбранный VP9 недоступен для MP4. Выберите другой кодек.':
@@ -52,22 +60,36 @@ export default {
   'Медиа и зависимые параметры': 'Media and dependent parameters',
   'Не поддерживается текущим источником': 'Unsupported by the current source',
   'Недоступен для MP4': 'Unavailable for MP4',
-  'Нейтральная примерка для фильтров: серый контур в покое, инверсная поверхность с галочкой при выборе. Подпись фильтра усиливается; название параметра в инспекторе остаётся приглушённым.':
-    'Neutral filter trial: a gray border at rest and an inverted surface with a checkmark when selected. Filter labels gain emphasis; inspector parameter labels stay muted.',
+  ['Нейтральная примерка для фильтров: серый контур в покое, инверсная ' +
+  'поверхность с галочкой при выборе. Подпись фильтра усиливается; название ' +
+  'параметра в инспекторе остаётся приглушённым.']:
+    'Neutral filter trial: a gray border at rest and an inverted surface with a ' +
+    'checkmark when selected. Filter labels gain emphasis; inspector parameter ' +
+    'labels stay muted.',
   'Нейтральные фильтры библиотеки': 'Neutral library filters',
   Несколько: 'Multiple',
   'Область вкладки': 'Tab area',
   'Обновить иконку сайта': 'Refresh site icon',
   Один: 'One',
-  'Один медиаресурс, замена и параметры его отображения. Ошибка импорта и скрытие группы сохраняют принятый материал; декодирование и хранение приложения остаются у прежних владельцев.':
-    'One media resource, replacement, and display parameters. Import failure and hiding the group retain the accepted resource; decoding and storage remain with their existing application owners.',
-  'Одни и те же контролы перемещаются между категориями и общим видом. Значения и раскрытие сохраняются; две колонки появляются по доступной ширине содержимого.':
-    'The same controls move between categories and the combined view. Values and expansion are retained; two columns appear when the content width permits.',
+  ['Один медиаресурс, замена и параметры его отображения. Ошибка импорта и ' +
+  'скрытие группы сохраняют принятый материал; декодирование и хранение ' +
+  'приложения остаются у прежних владельцев.']:
+    'One media resource, replacement, and display parameters. Import failure and ' +
+    'hiding the group retain the accepted resource; decoding and storage remain ' +
+    'with their existing application owners.',
+  ['Одни и те же контролы перемещаются между категориями и общим видом. Значения ' +
+  'и раскрытие сохраняются; две колонки появляются по доступной ширине ' +
+  'содержимого.']:
+    'The same controls move between categories and the combined view. Values and ' +
+    'expansion are retained; two columns appear when the content width permits.',
   Оформление: 'Appearance',
   'Переход к ролику': 'Transition to clip',
   'По разделам': 'By section',
-  'Поведенческая проба зависимостей popup. Реальные размеры и оформление popup сохраняют его собственные паттерны; общие desktop-правила не переносятся автоматически.':
-    'Popup dependency probe. The actual popup keeps its own size and appearance patterns; general desktop rules do not apply automatically.',
+  ['Поведенческая проба зависимостей popup. Реальные размеры и оформление popup ' +
+  'сохраняют его собственные паттерны; общие desktop-правила не переносятся ' +
+  'автоматически.']:
+    'Popup dependency probe. The actual popup keeps its own size and appearance ' +
+    'patterns; general desktop rules do not apply automatically.',
   Приложение: 'Application',
   'Размер записи': 'Recording dimensions',
   'Режим записи': 'Recording mode',
@@ -110,10 +132,16 @@ export default {
     'Astra Low: Inter 13/18, text hierarchy, and control geometry verified',
   'Astra Low: жизненный цикл tooltip исправлен, повторное ревью пройдено; предыдущее ревью геометрии — reference-2':
     'Astra Low: tooltip lifecycle fixed and follow-up review passed; previous geometry review: reference-2',
-  'Astra Low: исправлены Tab и завершение предпросмотра, повторное ревью пройдено; предыдущее ревью геометрии — reference-2; Astra Low: исправления согласованности reference-4 проверены':
-    'Astra Low: Tab and preview completion fixed; follow-up review passed; previous geometry review: reference-2; Astra Low: reference-4 consistency fixes verified',
-  'Astra Low: независимое ревью пройдено; предыдущее ревью геометрии — reference-2; Astra Low: исправления согласованности reference-4 проверены':
-    'Astra Low: independent review passed; previous geometry review: reference-2; Astra Low: reference-4 consistency fixes verified',
+  ['Astra Low: исправлены Tab и завершение предпросмотра, повторное ревью ' +
+  'пройдено; предыдущее ревью геометрии — reference-2; Astra Low: исправления ' +
+  'согласованности reference-4 проверены']:
+    'Astra Low: Tab and preview completion fixed; follow-up review passed; ' +
+    'previous geometry review: reference-2; Astra Low: reference-4 consistency ' +
+    'fixes verified',
+  ['Astra Low: независимое ревью пройдено; предыдущее ревью геометрии — ' +
+  'reference-2; Astra Low: исправления согласованности reference-4 проверены']:
+    'Astra Low: independent review passed; previous geometry review: reference-2; ' +
+    'Astra Low: reference-4 consistency fixes verified',
   'Astra Low: общий крестик очистки, черновики, фокус, поиск и HEX-исключение проверены':
     'Astra Low: shared clear icon, drafts, focus, search, and HEX exception verified',
   'Astra Low: параметры с контролом справа, семантика и черновики проверены':
@@ -172,8 +200,12 @@ export default {
   '3 с': '3 s',
   '30 кадров/с': '30 fps',
   '9:16 · Вертикальный': '9:16 · Portrait',
-  'Checkbox задаёт состав следующей операции. Активная запись — статус и команды начала/остановки. Первая попытка намеренно показывает отказ, конфигурация сохраняется.':
-    'Checkboxes configure the next operation. Recording uses status and Start/Stop commands. The first attempt deliberately fails; configuration is retained.',
+  ['Checkbox задаёт состав следующей операции. Активная запись — статус и ' +
+  'команды начала/остановки. Первая попытка намеренно показывает отказ, ' +
+  'конфигурация сохраняется.']:
+    'Checkboxes configure the next operation. Recording uses status and ' +
+    'Start/Stop commands. The first attempt deliberately fails; configuration is ' +
+    'retained.',
   'Enter добавляет строку. Blur принимает текст. Escape возвращает принятое значение.':
     'Enter adds a line. Leaving the field accepts the text. Escape restores the accepted value.',
   'Glass на фоне сцены': 'Glass over a scene',
@@ -219,8 +251,10 @@ export default {
   'Введите название.': 'Enter a name.',
   'Введите число от ': 'Enter a number from ',
   'Ввод шире диапазона слайдера': 'Input beyond the slider range',
-  'Ввод: 0–4096 px. Слайдер: 0–200 px. Принятое значение вне шкалы сохраняется; вход и выход из слайдера его не меняет.':
-    'Input: 0–4096 px. Slider: 0–200 px. An accepted value outside the scale is retained; entering or leaving the slider does not change it.',
+  ['Ввод: 0–4096 px. Слайдер: 0–200 px. Принятое значение вне шкалы сохраняется; ' +
+  'вход и выход из слайдера его не меняет.']:
+    'Input: 0–4096 px. Slider: 0–200 px. An accepted value outside the scale is ' +
+    'retained; entering or leaving the slider does not change it.',
   Видео: 'Video',
   'Видео MP4': 'MP4 video',
   'Видео · 00:08': 'Video · 00:08',
@@ -237,8 +271,12 @@ export default {
   'Вложенная отмена': 'Nested cancellation',
   'Вложенные поверхности: 4 px': 'Nested surfaces: 4 px',
   'Вне шкалы слайдера: ': 'Outside the slider scale: ',
-  'Вниз — меню под кнопкой; вправо — боковое раскрытие или подменю. Подменю: → открывает, ← и Escape возвращают к родителю. У края окна боковое меню меняет сторону.':
-    'Down opens a menu below the button; right opens a side panel or submenu. In submenus, → opens, while ← and Escape return to the parent. Side menus flip at the window edge.',
+  ['Вниз — меню под кнопкой; вправо — боковое раскрытие или подменю. Подменю: → ' +
+  'открывает, ← и Escape возвращают к родителю. У края окна боковое меню меняет ' +
+  'сторону.']:
+    'Down opens a menu below the button; right opens a side panel or submenu. In ' +
+    'submenus, → opens, while ← and Escape return to the parent. Side menus flip ' +
+    'at the window edge.',
   'Внутренний Escape': 'Inner Escape',
   'Внутренний редактор': 'Inner editor',
   'Внутренняя поверхность · 4 px': 'Inner surface · 4 px',
@@ -332,15 +370,19 @@ export default {
     'Consistent placement, scrolling, Escape, and focus return',
   'Ещё действия': 'More actions',
   Завершение: 'Ending',
-  'Зависимые группы сохраняют значения. Пикер — только проба транзакции, текущий ColorSelector приложения остаётся образцом.':
-    'Dependent groups retain their values. The picker is only a transaction probe; the existing application ColorSelector remains the reference.',
+  ['Зависимые группы сохраняют значения. Пикер — только проба транзакции, ' +
+  'текущий ColorSelector приложения остаётся образцом.']:
+    'Dependent groups retain their values. The picker is only a transaction ' +
+    'probe; the existing application ColorSelector remains the reference.',
   'Загрузка и повтор': 'Loading and retry',
   'Загрузка каталога…': 'Loading catalog…',
   'Загрузка материалов…': 'Loading items…',
   'Загрузка…': 'Loading…',
   'Закрепить панель': 'Pin panel',
-  'Закрытие и очистка усиливают иконку без подложки и рамки. Tab сохраняет отдельный фокус. Очистка возвращает фокус в поле.':
-    'Close and Clear brighten the icon without a surface or border. Tab retains a separate focus indicator. Clear returns focus to the field.',
+  ['Закрытие и очистка усиливают иконку без подложки и рамки. Tab сохраняет ' +
+  'отдельный фокус. Очистка возвращает фокус в поле.']:
+    'Close and Clear brighten the icon without a surface or border. Tab retains a ' +
+    'separate focus indicator. Clear returns focus to the field.',
   'Закрыть ': 'Close ',
   'Закрыть панель': 'Close panel',
   'Запись не запущена': 'Recording has not started',
@@ -373,12 +415,22 @@ export default {
   'Изменить кадрирование': 'Edit crop',
   'Изменить подпись': 'Edit caption',
   Изображение: 'Image',
-  'Иконка помогает распознать команду. Для очевидного «Применить» она не обязательна. Icon-only получает доступное имя.':
-    'An icon helps identify a command. An obvious Apply action needs no icon. Icon-only commands have accessible names.',
-  'Иконка с текстом: выбранный вариант получает нейтральную подложку и основной цвет текста. Без оранжевого текста, рамки и галочки. Шрифт Golos UI 13 px / 400, иконка 16 px.':
-    'Icon with text: the selected option uses a neutral surface and primary text. No orange text, border, or checkmark. Golos UI 13 px / 400, with a 16 px icon.',
-  'Иконки тулбара: прозрачный фон, тонкая рамка активного режима сохраняется и усиливается при наведении. Галочек нет. Стрелка появляется только у раскрывающихся кнопок.':
-    'Toolbar icons have transparent backgrounds. The active mode keeps a thin border that strengthens on hover. No checkmarks. Only disclosure buttons have arrows.',
+  ['Иконка помогает распознать команду. Для очевидного «Применить» она не ' +
+  'обязательна. Icon-only получает доступное имя.']:
+    'An icon helps identify a command. An obvious Apply action needs no icon. ' +
+    'Icon-only commands have accessible names.',
+  ['Иконка с текстом: выбранный вариант получает нейтральную подложку и основной ' +
+  'цвет текста. Без оранжевого текста, рамки и галочки. Шрифт Golos UI 13 px / ' +
+  '400, иконка 16 px.']:
+    'Icon with text: the selected option uses a neutral surface and primary text. ' +
+    'No orange text, border, or checkmark. Golos UI 13 px / 400, with a 16 px ' +
+    'icon.',
+  ['Иконки тулбара: прозрачный фон, тонкая рамка активного режима сохраняется и ' +
+  'усиливается при наведении. Галочек нет. Стрелка появляется только у ' +
+  'раскрывающихся кнопок.']:
+    'Toolbar icons have transparent backgrounds. The active mode keeps a thin ' +
+    'border that strengthens on hover. No checkmarks. Only disclosure buttons ' +
+    'have arrows.',
   'Импортировать файл': 'Import file',
   'Имя файла': 'Filename',
   'Инструменты · только иконки': 'Tools · icons only',
@@ -403,7 +455,8 @@ export default {
   Качество: 'Quality',
   'Кнопка отправки формы': 'Form submit button',
   'Кнопка раскрывает команды, а не выбирает значение параметра. Для «Добавить» достаточно плюса без второго шеврона.':
-    'The button opens commands rather than choosing a parameter value. Add only needs a plus icon, without an extra chevron.',
+    'The button opens commands rather than choosing a parameter value. Add only ' +
+    'needs a plus icon, without an extra chevron.',
   'Кнопки и команды': 'Buttons and commands',
   Команда: 'Command',
   'Команда не выбрана': 'No command selected',
@@ -425,8 +478,12 @@ export default {
   'Локальная демонстрация: первая попытка завершается ошибкой, повтор — успешно.':
     'Local demo: the first attempt fails; retry succeeds.',
   'Лёгкий glass': 'Light glass',
-  'Маленький треугольник вниз в правом нижнем углу означает раскрытие дополнительных инструментов. Повторный клик и Escape закрывают панель; треугольник не обозначает активный режим.':
-    'The small downward triangle at the lower right opens additional tools. Click again or press Escape to close the panel. The triangle does not indicate an active mode.',
+  ['Маленький треугольник вниз в правом нижнем углу означает раскрытие ' +
+  'дополнительных инструментов. Повторный клик и Escape закрывают панель; ' +
+  'треугольник не обозначает активный режим.']:
+    'The small downward triangle at the lower right opens additional tools. Click ' +
+    'again or press Escape to close the panel. The triangle does not indicate an ' +
+    'active mode.',
   Масштаб: 'Zoom',
   'Масштаб холста 100%': 'Canvas zoom 100%',
   'Масштаб холста 200%': 'Canvas zoom 200%',
@@ -442,10 +499,16 @@ export default {
   'Многострочная подпись': 'Multiline label',
   'Многострочный ввод': 'Multiline input',
   'Модификации плотности': 'Density variants',
-  'Мышь и Space выполняют команду при отпускании. Enter сохраняет стандартную активацию при нажатии. Уход наружу, Escape и отмена указателя снимают удержание.':
-    'Mouse and Space activate on release. Enter keeps native activation on keydown. Leaving the target, Escape, and pointer cancellation release the pressed state.',
-  'Наведите на строку или перейдите к slider клавишей Tab. Во время ввода числа slider скрывается. Escape отменяет черновик.':
-    'Hover over the row or use Tab to focus the slider. The slider hides during numeric typing. Escape cancels the draft.',
+  ['Мышь и Space выполняют команду при отпускании. Enter сохраняет стандартную ' +
+  'активацию при нажатии. Уход наружу, Escape и отмена указателя снимают ' +
+  'удержание.']:
+    'Mouse and Space activate on release. Enter keeps native activation on ' +
+    'keydown. Leaving the target, Escape, and pointer cancellation release the ' +
+    'pressed state.',
+  ['Наведите на строку или перейдите к slider клавишей Tab. Во время ввода числа ' +
+  'slider скрывается. Escape отменяет черновик.']:
+    'Hover over the row or use Tab to focus the slider. The slider hides during ' +
+    'numeric typing. Escape cancels the draft.',
   'Навигация и разделы': 'Navigation and sections',
   Назад: 'Back',
   Название: 'Name',
@@ -529,8 +592,12 @@ export default {
   'Обычная дорожка остаётся видимой. Точное поле и slider используют одно значение и один акцент темы.':
     'The ordinary track stays visible. The exact input and slider share one value and one theme accent.',
   'Обычный слайдер': 'Ordinary slider',
-  'Ограниченная примерка: 20 секунд, равномерная сетка 30 fps. Линейка меняет позицию; края диапазона поддерживают стрелки и Shift. Ctrl+wheel меняет масштаб по исходной логарифмической формуле.':
-    'Bounded probe: 20 seconds on a uniform 30 fps grid. The ruler changes position; range edges support arrows and Shift. Ctrl+wheel changes zoom using the existing logarithmic formula.',
+  ['Ограниченная примерка: 20 секунд, равномерная сетка 30 fps. Линейка меняет ' +
+  'позицию; края диапазона поддерживают стрелки и Shift. Ctrl+wheel меняет ' +
+  'масштаб по исходной логарифмической формуле.']:
+    'Bounded probe: 20 seconds on a uniform 30 fps grid. The ruler changes ' +
+    'position; range edges support arrows and Shift. Ctrl+wheel changes zoom ' +
+    'using the existing logarithmic formula.',
   'Один инструмент · иконка с текстом': 'One tool · icon and text',
   'Один инструмент · только иконки': 'One tool · icons only',
   'Один параметр; поиск; radio-плитки; меню по границам узкой колонки.':
@@ -587,8 +654,10 @@ export default {
   'Параметр ': 'Parameter ',
   Параметры: 'Parameters',
   'Параметры не изменены': 'Parameters unchanged',
-  'Параметры предстоящей записи: название слева приглушено, checkbox справа. Выбор объектов и условий сохраняет checkbox слева.':
-    'Next-recording parameters: muted label on the left, checkbox on the right. Object and condition selection keeps the checkbox on the left.',
+  ['Параметры предстоящей записи: название слева приглушено, checkbox справа. ' +
+  'Выбор объектов и условий сохраняет checkbox слева.']:
+    'Next-recording parameters: muted label on the left, checkbox on the right. ' +
+    'Object and condition selection keeps the checkbox on the left.',
   'Параметры применены': 'Parameters applied',
   'Параметры сцены': 'Scene parameters',
   'Параметры экспорта': 'Export settings',
@@ -608,13 +677,17 @@ export default {
     'Navigation remains a link, even beside commands.',
   'Переход по ссылке': 'Link navigation',
   'Пикер здесь — проба транзакции; точный образец существующего CompactColorSelector ещё не воспроизведён':
-    'This picker is a transaction probe; the existing CompactColorSelector has not yet been reproduced as an exact reference',
+    'This picker is a transaction probe; the existing CompactColorSelector has ' +
+    'not yet been reproduced as an exact reference',
   'Пипетка недоступна в этом браузере.': 'The eyedropper is unavailable in this browser.',
   'Пипетка отменена. Цвет сохранён.': 'Eyedropper canceled. Color retained.',
   'Плавная смена кадра': 'Smooth frame transition',
   'Плотность и недоступность': 'Density and unavailable states',
-  'По умолчанию 32 px: поле, закрытый список и кнопка одной высоты. 40 и 48 px — явные варианты плотности. Подпись отстоит на 4 px, соседние действия — на 8 px.':
-    'Default height: 32 px for fields, closed selects, and buttons. 40 and 48 px are explicit density variants. Label gap: 4 px; adjacent action gap: 8 px.',
+  ['По умолчанию 32 px: поле, закрытый список и кнопка одной высоты. 40 и 48 px ' +
+  '— явные варианты плотности. Подпись отстоит на 4 px, соседние действия — на ' +
+  '8 px.']:
+    'Default height: 32 px for fields, closed selects, and buttons. 40 and 48 px ' +
+    'are explicit density variants. Label gap: 4 px; adjacent action gap: 8 px.',
   Поверхность: 'Surface',
   'Поверхность и граница': 'Surface and border',
   'Поверхность меню': 'Menu surface',
@@ -624,8 +697,11 @@ export default {
   'Подпись трёх объектов': 'Caption for three objects',
   Подсветка: 'Highlight',
   'Подсказка дополняет понятное имя команды.': 'The tooltip supplements a clear command name.',
-  'Подсказки меняются сразу. Профиль — отдельный черновик с сохранением и отменой. Первая валидная попытка сохранения намеренно завершается ошибкой для проверки восстановления.':
-    'Hints change immediately. The profile is a separate draft with Save and Cancel. The first valid save deliberately fails to test recovery.',
+  ['Подсказки меняются сразу. Профиль — отдельный черновик с сохранением и ' +
+  'отменой. Первая валидная попытка сохранения намеренно завершается ошибкой ' +
+  'для проверки восстановления.']:
+    'Hints change immediately. The profile is a separate draft with Save and ' +
+    'Cancel. The first valid save deliberately fails to test recovery.',
   Подтвердить: 'Confirm',
   Позиция: 'Position',
   'Позиция: ': 'Position: ',
@@ -643,8 +719,10 @@ export default {
   'Полный цикл нажатия': 'Complete press cycle',
   'Положение и исчезающий якорь': 'Positioning and disappearing anchors',
   'Поля и формы': 'Fields and forms',
-  'Попробуйте значение вне диапазона или текст. Ошибка не уничтожает ввод. Исправление принимает корректное число; Escape возвращает принятое.':
-    'Try an out-of-range value or text. Errors retain your input. A correction accepts a valid number; Escape restores the accepted value.',
+  ['Попробуйте значение вне диапазона или текст. Ошибка не уничтожает ввод. ' +
+  'Исправление принимает корректное число; Escape возвращает принятое.']:
+    'Try an out-of-range value or text. Errors retain your input. A correction ' +
+    'accepts a valid number; Escape restores the accepted value.',
   'Последнее выбранное устройство': 'Last selected device',
   'Последний визуальный вариант ждёт финальной проверки пользователем':
     'The latest visual variant awaits final user review',
@@ -675,9 +753,12 @@ export default {
   'Принято: ': 'Accepted: ',
   'Принято: X ': 'Accepted: X ',
   'Принятый текст': 'Accepted text',
-  'Проба координат: холст 100×100 условных единиц, объект 20×20. Масштаб и прокрутка не меняют координаты. Числовые поля дают точный ввод.':
-    'Coordinate probe: a 100×100-unit canvas and a 20×20 object. Zoom and scrolling do not change coordinates. Numeric fields provide exact input.',
-  'Проба оболочки: сворачивание сохраняет значения. Прокрутка принадлежит содержимому, действия остаются доступны при малой высоте.':
+  ['Проба координат: холст 100×100 условных единиц, объект 20×20. Масштаб и ' +
+  'прокрутка не меняют координаты. Числовые поля дают точный ввод.']:
+    'Coordinate probe: a 100×100-unit canvas and a 20×20 object. Zoom and ' +
+    'scrolling do not change coordinates. Numeric fields provide exact input.',
+  ['Проба оболочки: сворачивание сохраняет значения. Прокрутка принадлежит ' +
+  'содержимому, действия остаются доступны при малой высоте.']:
     'Shell probe: collapsing retains values. The content owns scrolling; actions stay reachable at short heights.',
   'Проба поведения шторки. Геометрия настоящего popup сохраняет собственные паттерны.':
     'Curtain behavior probe. The actual popup retains its own geometry patterns.',
@@ -688,8 +769,12 @@ export default {
   'Проверить общий фокус': 'Check shared focus',
   'Проверить плотность, скролл и разные ширины': 'Check density, scrolling, and different widths',
   'Проверить реальные оболочки и категории': 'Check actual shells and categories',
-  'Проверка жеста: Escape, pointercancel, потеря захвата и уход из окна отменяют предпросмотр. Второй указатель не перехватывает активный жест. Это не воспроизведение всего редактора.':
-    'Gesture check: Escape, pointercancel, capture loss, and leaving the window cancel preview. A second pointer cannot take over the active gesture. This is not a complete editor reproduction.',
+  ['Проверка жеста: Escape, pointercancel, потеря захвата и уход из окна ' +
+  'отменяют предпросмотр. Второй указатель не перехватывает активный жест. Это ' +
+  'не воспроизведение всего редактора.']:
+    'Gesture check: Escape, pointercancel, capture loss, and leaving the window ' +
+    'cancel preview. A second pointer cannot take over the active gesture. This ' +
+    'is not a complete editor reproduction.',
   'Проверка составных экранов': 'Composition review',
   'Проверка якоря': 'Anchor check',
   Проект: 'Project',
@@ -734,8 +819,10 @@ export default {
   'Раскрыть инструменты аннотаций': 'Expand annotation tools',
   'Редактирование подписи': 'Caption editing',
   Режим: 'Mode',
-  'Режим и его параметр — два разных действия. Выбранный тип сохраняется после выключения режима. Это не split-button с двумя командами.':
-    'The mode and its parameter are separate actions. The selected type is retained when the mode is off. This is not a split button with two commands.',
+  ['Режим и его параметр — два разных действия. Выбранный тип сохраняется после ' +
+  'выключения режима. Это не split-button с двумя командами.']:
+    'The mode and its parameter are separate actions. The selected type is ' +
+    'retained when the mode is off. This is not a split button with two commands.',
   'Режим и контекстный выбор': 'Mode and contextual choice',
   'Режим фокуса': 'Focus mode',
   'Режим фокуса ': 'Focus mode ',
@@ -807,14 +894,17 @@ export default {
   'Стиль поверхности': 'Surface style',
   'Стиль с визуальным сравнением': 'Style with visual comparison',
   'Стрелки · команды и боковое раскрытие': 'Arrows · commands and side disclosure',
-  'Стрелки меняют значение на 5. Удержание повторяет шаг. Увеличенные цели stepper — вариант для проверки, не утверждённый размер.':
+  ['Стрелки меняют значение на 5. Удержание повторяет шаг. Увеличенные цели ' +
+  'stepper — вариант для проверки, не утверждённый размер.']:
     'Arrows change the value by 5. Holding repeats the step. Larger stepper targets are a trial, not an approved size.',
   'Стрелки перемещают фокус. Enter или Space активирует раздел.':
     'Arrows move focus. Enter or Space activates the section.',
   'Строки, деревья, множественный выбор и групповые операции.':
     'Rows, trees, multiple selection, and batch operations.',
-  'Структурные панели — 4 px, превью — 4 px, контролы и меню — 4 px, диалоги — 8 px. Размер окна не увеличивает радиус.':
-    'Structural panels: 4 px; previews: 4 px; controls and menus: 4 px; dialogs: 8 px. Window size does not increase the radius.',
+  ['Структурные панели — 4 px, превью — 4 px, контролы и меню — 4 px, диалоги — ' +
+  '8 px. Размер окна не увеличивает радиус.']:
+    'Structural panels: 4 px; previews: 4 px; controls and menus: 4 px; dialogs: ' +
+    '8 px. Window size does not increase the radius.',
   'Суффикс экспорта': 'Export suffix',
   Сцена: 'Scene',
   'Сцена ': 'Scene ',
@@ -839,18 +929,27 @@ export default {
   'Тип фона': 'Background type',
   'Тихая команда': 'Quiet command',
   'Тихие служебные действия': 'Quiet utility actions',
-  'Только иконки: активный инструмент сохраняет тонкую рамку и оранжевую иконку. При наведении рамка усиливается. Это тот же одиночный выбор, в компактном представлении.':
-    'Icons only: the active tool keeps a thin border and orange icon. Hover strengthens the border. This is the same exclusive choice in a compact presentation.',
-  'Только специализированный stepper повторяет действие при удержании: существующие 220 ms до повтора и 70 ms между шагами. Обычные команды не повторяются.':
-    'Only the specialized stepper repeats while held: the existing 220 ms delay and 70 ms interval. Ordinary commands do not repeat.',
+  ['Только иконки: активный инструмент сохраняет тонкую рамку и оранжевую ' +
+  'иконку. При наведении рамка усиливается. Это тот же одиночный выбор, в ' +
+  'компактном представлении.']:
+    'Icons only: the active tool keeps a thin border and orange icon. Hover ' +
+    'strengthens the border. This is the same exclusive choice in a compact ' +
+    'presentation.',
+  ['Только специализированный stepper повторяет действие при удержании: ' +
+  'существующие 220 ms до повтора и 70 ms между шагами. Обычные команды не ' +
+  'повторяются.']:
+    'Only the specialized stepper repeats while held: the existing 220 ms delay ' +
+    'and 70 ms interval. Ordinary commands do not repeat.',
   'Только чтение, недоступность и mixed': 'Read-only, unavailable, and mixed',
   'Только чтение. Значение можно выделить и скопировать.':
     'Read-only. You can select and copy the value.',
   'Тонкая граница нужна здесь для команды поверх изображения. На обычной панели у тихой команды границы нет.':
     'A thin border supports this command over an image. On an ordinary panel, a quiet command has no border.',
   'Точность и единицы': 'Precision and units',
-  'Точный ввод допускает десятичную точку или запятую. Шаг применяется к стрелкам и перетаскиванию; точное значение может находиться между шагами.':
-    'Exact input accepts a decimal point or comma. Arrows and dragging use the step; exact values may fall between steps.',
+  ['Точный ввод допускает десятичную точку или запятую. Шаг применяется к ' +
+  'стрелкам и перетаскиванию; точное значение может находиться между шагами.']:
+    'Exact input accepts a decimal point or comma. Arrows and dragging use the ' +
+    'step; exact values may fall between steps.',
   Трекинг: 'Tracking',
   'Трекинг камеры': 'Camera tracking',
   'Третье условие': 'Third condition',
@@ -934,8 +1033,12 @@ export default {
   'Эталон: числовые поля и слайдеры': 'Reference: numeric fields and sliders',
   'Это размеры примерки, а не новые утверждённые токены. Геометрия определяется общим компонентом.':
     'These are trial sizes, not newly approved tokens. The shared component owns geometry.',
-  'Это сохраняемая настройка без отдельного Save. Ошибка применения к тестовому потоку сохраняет подтверждённое состояние; повтор доступен. Не путать с включением источника в следующую запись.':
-    'This setting is saved without a separate Save command. A test-stream application failure retains the confirmed state and allows retry. It is distinct from including a source in the next recording.',
+  ['Это сохраняемая настройка без отдельного Save. Ошибка применения к тестовому ' +
+  'потоку сохраняет подтверждённое состояние; повтор доступен. Не путать с ' +
+  'включением источника в следующую запись.']:
+    'This setting is saved without a separate Save command. A test-stream ' +
+    'application failure retains the confirmed state and allows retry. It is ' +
+    'distinct from including a source in the next recording.',
   Эффект: 'Effect',
   включены: 'on',
   включён: 'on',

@@ -4,7 +4,7 @@ export const SCENARIO_STAGE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/document-settings.tsx',
     exclusive: true,
     reason:
-      'Tour inspector tests exercise stage image fit, mask inheritance, and animation defaults through the real settings controls.',
+      'Tour tests use real inspector controls for stage image fit, mask inheritance and animation defaults.',
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
@@ -15,7 +15,7 @@ export const SCENARIO_STAGE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/mask-settings.tsx',
     exclusive: true,
     reason:
-      'Tour inspector tests exercise stage image fit, mask inheritance, and animation defaults through the real settings controls.',
+      'Tour tests use real inspector controls for stage image fit, mask inheritance and animation defaults.',
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',

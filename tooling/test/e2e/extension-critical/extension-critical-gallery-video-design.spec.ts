@@ -162,18 +162,20 @@ for (const viewport of [
               })
               .click();
           }
-          const ordinary = background.locator('.sniptale-parameter-name').filter({
-            hasText: new RegExp(
-              [
-                label('gallery.videoReview.backgroundPadding'),
-                label('gallery.videoReview.backgroundCornerRadius'),
-                label('gallery.videoReview.backgroundShadow'),
-                label('gallery.videoReview.backgroundShadowColor'),
-              ]
-                .map((text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-                .join('|')
-            ),
-          });
+          const backgroundNames = background.locator('.sniptale-parameter-name');
+          const ordinary = backgroundNames
+            .filter({ hasText: label('gallery.videoReview.backgroundPadding') })
+            .or(
+              backgroundNames.filter({
+                hasText: label('gallery.videoReview.backgroundCornerRadius'),
+              })
+            )
+            .or(backgroundNames.filter({ hasText: label('gallery.videoReview.backgroundShadow') }))
+            .or(
+              backgroundNames.filter({
+                hasText: label('gallery.videoReview.backgroundShadowColor'),
+              })
+            );
           await expect(ordinary).toHaveCount(4);
           const tops = await ordinary.evaluateAll((nodes) =>
             nodes.map((node) => {

@@ -558,9 +558,10 @@ for (const { container, gaps } of [
           expect(report).toContain('"videoReencoded": false');
           await button('common.actions.close').click();
           await page.keyboard.press('Escape');
-          const exportedName = new RegExp(
-            `^Sniptale_video-review_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}-\\d{3}_edited\\.${container}$`
-          );
+          const exportedName =
+            container === 'webm'
+              ? /^Sniptale_video-review_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}_edited\.webm$/
+              : /^Sniptale_video-review_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}_edited\.mp4$/;
           const exportedCard = page.getByRole('group', { name: exportedName });
           await expect(exportedCard).toHaveCount(1);
           await exportedCard.getByRole('button', { name: exportedName }).first().click();

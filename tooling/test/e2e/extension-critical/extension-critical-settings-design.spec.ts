@@ -166,7 +166,9 @@ async function assertFit(page: Page) {
   }
   for (const caption of await page
     .locator(
-      '[data-command-caption]:visible, button[data-ui="shared.ui.content-toolbar-button"] > .sniptale-command-content:visible'
+      '[data-command-caption]:visible, ' +
+        'button[data-ui="shared.ui.content-toolbar-button"] > ' +
+        '.sniptale-command-content:visible'
     )
     .all()) {
     const fit = await caption.evaluate((node) => {

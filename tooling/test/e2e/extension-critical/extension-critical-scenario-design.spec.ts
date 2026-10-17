@@ -32,7 +32,8 @@ function nativeProject(font: 'sans' | 'serif' = 'sans') {
       id: 'authored-text',
       kind: 'text',
       paragraphs: createGuideParagraphs(
-        'Authored document text retains its own appearance.\nA second paragraph makes the editable content distinct from interface labels.'
+        'Authored document text retains its own appearance.\nA second paragraph makes ' +
+          'the editable content distinct from interface labels.'
       ),
     },
   ];
@@ -128,7 +129,9 @@ async function openNativeScenario(
 async function recordRoles(page: Page, info: TestInfo, name: string) {
   const roles = await page
     .locator(
-      '.guide-page, .guide-page-header, .guide-project-name input, #guide-inspector-panel, .guide-document, .guide-document textarea, .tour-stage-host'
+      '.guide-page, .guide-page-header, .guide-project-name input, ' +
+        '#guide-inspector-panel, .guide-document, .guide-document textarea, ' +
+        '.tour-stage-host'
     )
     .evaluateAll((nodes) =>
       nodes.map((node) => {
@@ -429,7 +432,9 @@ async function exerciseNative(page: Page, locale: Locale, info: TestInfo) {
     };
     return Array.from(
       node.querySelectorAll(
-        '.sniptale-parameter-row, .sniptale-parameter-value, input, .tour-action-field, .tour-action-field button[aria-haspopup="listbox"] span, button[aria-haspopup="listbox"]'
+        '.sniptale-parameter-row, .sniptale-parameter-value, input, ' +
+          '.tour-action-field, .tour-action-field button[aria-haspopup="listbox"] span, ' +
+          'button[aria-haspopup="listbox"]'
       )
     )
       .flatMap((element) => [element, ...(element.parentElement ? [element.parentElement] : [])])

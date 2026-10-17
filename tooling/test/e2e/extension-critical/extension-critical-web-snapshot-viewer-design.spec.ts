@@ -260,8 +260,9 @@ async function catalogComposition(state: SavedViewer, composition: Composition, 
             .filter({ has: page.locator('img') })
             .first()
         : catalog.locator('article').filter({ hasText: 'text/css' });
-    const trigger = card.getByRole('button', { name: new RegExp(`^${previewLabel}:`) });
-    await expect(trigger).toHaveAttribute('aria-label', new RegExp(`^${previewLabel}:`));
+    const prefix = `${previewLabel}:`;
+    const trigger = card.locator(`button[aria-label^=${JSON.stringify(prefix)}]`);
+    await expect.poll(() => trigger.getAttribute('aria-label')).toContain(prefix);
     await trigger.scrollIntoViewIfNeeded();
     await trigger.click();
     const preview = page.getByTestId('snapshot-asset-preview');

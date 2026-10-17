@@ -150,7 +150,8 @@ async function geometry(page: Page) {
       toolbarButtons: find('[data-ui="content.toolbar.root"] button').map(describe),
       popovers: find('.sniptale-frame-settings-popover').map(describe),
       popoverControls: find(
-        '.sniptale-frame-settings-popover button, .sniptale-frame-settings-popover input, .sniptale-frame-settings-popover label'
+        '.sniptale-frame-settings-popover button, .sniptale-frame-settings-popover ' +
+          'input, .sniptale-frame-settings-popover label'
       ).map(describe),
       authored: find('.sniptale-callout [contenteditable], .sniptale-step-badge').map(describe),
       fontRules: roots.flatMap((root) =>

@@ -106,10 +106,12 @@ function playerFontStyles(): string {
     seen.add(url);
     return face.replace(url, source.data);
   });
-  const properties = ['interface', 'document-sans'].map((role) => {
-    const families = [
-      ...designTokens.matchAll(new RegExp(`--sniptale-font-${role}:\\s*([^;]+);`, 'gu')),
-    ];
+  const fontProperties = [
+    ['interface', /--sniptale-font-interface:\s*([^;]+);/gu],
+    ['document-sans', /--sniptale-font-document-sans:\s*([^;]+);/gu],
+  ] as const;
+  const properties = fontProperties.map(([role, pattern]) => {
+    const families = [...designTokens.matchAll(pattern)];
     if (families.length !== 1) throw new Error('Unexpected Tour interface font family.');
     return `--sniptale-font-${role}:${families[0]![1]};`;
   });

@@ -543,7 +543,8 @@ for (const locale of ['ru', 'en'] as const) {
         duration: 12.01,
       });
       const longName =
-        'Related recording project — подробное название связанного проекта с несколькими длинными словами для проверки переноса';
+        'Related recording project — подробное название связанного проекта с ' +
+        'несколькими длинными словами для проверки переноса';
       const sourceTitle =
         'Recording source — длинное название страницы с подробным описанием исходного материала и выбранного окна';
       const sourceUrl =

@@ -288,7 +288,9 @@ it('allows only vetted jitless Zod dynamic-code probes', async () => {
 
 const closedZodCompiler = [
   'class X{compile(){let t=Function,n=this?.content??[""];',
-  'return new t(...Object.keys(this.closed),`return function (${this.args.join(", ")}) {\n${n.join(`\n`)}\n};`)(...Object.values(this.closed))}}',
+  'return new t(...Object.keys(this.closed),`return function ' +
+    '(${this.args.join(", ")}) ' +
+    '{\n${n.join(`\n`)}\n};`)(...Object.values(this.closed))}}',
 ].join('');
 
 it('admits the bundled jitless Zod compiler with closed bindings', async () => {

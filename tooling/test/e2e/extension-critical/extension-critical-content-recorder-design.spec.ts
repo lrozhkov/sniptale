@@ -264,7 +264,9 @@ async function scenarioOverlays(page: Page, c: Composition, info: TestInfo) {
   });
   await capture(page, info, 'step-card-expanded');
   const preview = card.locator('[data-ui="content.scenario.sidebar.step-preview-button"]');
-  await expect(preview).toHaveAccessibleName(new RegExp(tr(c, 'gallery.keyboard.open')));
+  await expect
+    .poll(() => preview.getAttribute('aria-label'))
+    .toContain(tr(c, 'gallery.keyboard.open'));
   await preview.click();
   const layer = ui(page, 'content.scenario.sidebar.floating-preview');
   const close = ui(page, 'content.scenario.sidebar.floating-preview-close');
