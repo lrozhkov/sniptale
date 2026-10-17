@@ -159,7 +159,7 @@ it('renders the solid color branch and forwards color updates', async () => {
   );
   expect(
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
-  ).toBe('solid');
+  ).toBe('solid,linear');
   expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
 
   await act(async () => {
@@ -200,7 +200,7 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   );
   expect(
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
-  ).toBe('linear');
+  ).toBe('solid,linear');
   expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
   const presets = container?.querySelector('[data-ui="editor.frame.gradient-presets"]');
   expect(presets?.className).toContain('grid-cols-5');

@@ -11,15 +11,22 @@ type BackgroundModeProps = Pick<
 export function EditorInspectorFrameBackgroundModeControl(props: BackgroundModeProps) {
   return (
     <div data-ui="editor.frame.background-mode" className="editor-background-kinds">
-      <SegmentedRow
-        columns={4}
+      <SegmentedRow<'none' | 'color' | 'image'>
+        columns={3}
         ariaLabel={translate('editor.scene.backgroundTypeSection')}
-        value={isFrameBackgroundNone(props.frameDraft) ? 'none' : props.frameDraft.backgroundMode}
-        onChange={props.setBackgroundMode}
+        value={
+          isFrameBackgroundNone(props.frameDraft)
+            ? 'none'
+            : props.frameDraft.backgroundMode === 'image'
+              ? 'image'
+              : 'color'
+        }
+        onChange={(mode) =>
+          props.setBackgroundMode(mode === 'color' ? props.lastFillModeRef.current : mode)
+        }
         options={[
           { value: 'none', label: translate('editor.scene.backgroundNone') },
           { value: 'color', label: translate('editor.compact.frameBackgroundModeColor') },
-          { value: 'gradient', label: translate('editor.compact.frameBackgroundModeGradient') },
           { value: 'image', label: translate('editor.compact.frameBackgroundModeImage') },
         ]}
       />

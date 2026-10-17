@@ -134,7 +134,14 @@ async function inspectScene(page: Page, locale: Locale, bytes: string, info: Tes
     .first();
   await expect(numericShell).toHaveCSS('border-radius', '4px');
   await screenshot(page, info, 'scene-color');
-  await choose('editor.compact.frameBackgroundModeGradient');
+  await panel.locator('[data-ui="shared.ui.paint-selector.trigger"]').first().click();
+  const paint = ui(page, 'shared.ui.paint-selector.popup');
+  await paint
+    .getByRole('button', { name: label('highlighter.paintPicker.linear'), exact: true })
+    .click();
+  await paint
+    .getByRole('button', { name: label('shared.ui.colorSelectorApply'), exact: true })
+    .click();
   await expect(ui(page, 'editor.frame.gradient-presets')).toBeVisible();
   await screenshot(page, info, 'scene-gradient');
   await choose('editor.compact.frameBackgroundModeImage');
@@ -683,6 +690,52 @@ for (const theme of ['light', 'dark'] as const) {
       ).toBeLessThanOrEqual(1);
       await expect(list.locator(':scope > div').last()).toBeInViewport();
       await screenshot(page, info, 'layer-list-scrolled');
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`unified scene background paint ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openImage(page, extensionId, 'ru', theme);
+      await chooseMode(page, 'frame');
+      const panel = ui(page, 'editor.frame-panel');
+      const kinds = ui(page, 'editor.frame.background-mode');
+      await chooseProperty(page, kinds, translate('editor.compact.frameBackgroundModeColor', 'ru'));
+      await screenshot(page, info, 'scene-paint-composition');
+      await expect(kinds.getByRole('button')).toHaveCount(3);
+      const trigger = panel.locator('[data-ui="shared.ui.paint-selector.trigger"]').first();
+      const popup = ui(page, 'shared.ui.paint-selector.popup');
+      for (const accept of [false, true]) {
+        await trigger.click();
+        await popup
+          .getByRole('button', {
+            name: translate('highlighter.paintPicker.linear', 'ru'),
+            exact: true,
+          })
+          .click();
+        await popup
+          .getByRole('button', {
+            name: translate(
+              accept ? 'shared.ui.colorSelectorApply' : 'shared.ui.colorSelectorCancel',
+              'ru'
+            ),
+            exact: true,
+          })
+          .click();
+        await expect(ui(page, 'editor.frame.gradient-presets')).toHaveCount(accept ? 1 : 0);
+      }
+      await chooseProperty(page, kinds, translate('editor.compact.frameBackgroundModeImage', 'ru'));
+      await expect(ui(page, 'background.image.picker')).toBeVisible();
+      await chooseProperty(page, kinds, translate('editor.compact.frameBackgroundModeColor', 'ru'));
+      await expect(ui(page, 'editor.frame.gradient-presets')).toBeVisible();
+      await screenshot(page, info, 'scene-paint-gradient-restored');
+      await chooseProperty(page, kinds, translate('editor.scene.backgroundNone', 'ru'));
+      await expect(trigger).toHaveCount(0);
     });
   }
 }

@@ -123,7 +123,7 @@ export function EditorInspectorFrameBackgroundFillEditor(
       ) : null}
       <CompactPaintSelector
         triggerVariant="swatch"
-        allowedModes={props.frameDraft.backgroundMode === 'gradient' ? ['linear'] : ['solid']}
+        allowedModes={['solid', 'linear']}
         showGradientAdvancedControls={false}
         title={translate('editor.scene.sceneBackgroundTitle')}
         label={translate('editor.scene.sceneBackgroundLabel')}
