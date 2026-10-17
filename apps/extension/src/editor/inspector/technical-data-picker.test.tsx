@@ -62,6 +62,10 @@ it('groups page fields as checkboxes and text styling in compact disclosures', a
   await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
 
   expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
+  for (const checkbox of container.querySelectorAll('input[type="checkbox"]')) {
+    expect(checkbox.classList.contains('sniptale-parameter-check')).toBe(true);
+    expect(checkbox.closest('label')?.querySelector('svg')).toBeNull();
+  }
   const disclosures = Array.from(
     container.querySelectorAll<HTMLDetailsElement>('details[data-ui="editor.inspector.disclosure"]')
   );

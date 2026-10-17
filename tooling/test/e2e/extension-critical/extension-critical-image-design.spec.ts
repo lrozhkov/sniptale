@@ -194,6 +194,12 @@ async function inspectBrowserAndSizes(page: Page, locale: Locale, info: TestInfo
     return color;
   });
   await expect(font).toHaveCSS('color', primaryColor);
+  const field = ui(page, 'editor.technical-data.field-url');
+  expect(await field.boundingBox()).toMatchObject({ width: 18, height: 18 });
+  await expect(field.locator('..').locator('svg')).toHaveCount(0);
+  await field.locator('..').click();
+  await expect(field).toBeChecked();
+  await field.uncheck();
   await screenshot(page, info, 'metadata');
   for (const mode of ['image-size', 'canvas-size']) {
     await chooseMode(page, mode);

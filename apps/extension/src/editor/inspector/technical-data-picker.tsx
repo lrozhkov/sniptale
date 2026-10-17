@@ -2,7 +2,6 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import React, { useMemo } from 'react';
-import { Calendar, Link, Monitor } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import {
@@ -20,24 +19,20 @@ type TechnicalDataPickerVariant = 'compact' | 'expanded';
 
 type TechnicalDataOption = {
   kind: EditorTechnicalDataKind;
-  icon: React.ReactNode;
   labelKey: 'editor.compact.pageUrl' | 'editor.compact.dateTime' | 'editor.compact.browser';
 };
 
 const technicalDataOptions: readonly TechnicalDataOption[] = [
   {
     kind: 'url',
-    icon: <Link size={15} strokeWidth={2} />,
     labelKey: 'editor.compact.pageUrl',
   },
   {
     kind: 'date',
-    icon: <Calendar size={15} strokeWidth={2} />,
     labelKey: 'editor.compact.dateTime',
   },
   {
     kind: 'browser',
-    icon: <Monitor size={15} strokeWidth={2} />,
     labelKey: 'editor.compact.browser',
   },
 ];
@@ -107,10 +102,9 @@ function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOpti
         type="checkbox"
         checked={checked}
         onChange={onToggle}
-        className="sniptale-checkbox sniptale-checkbox-sm shrink-0"
+        className="sniptale-parameter-check m-0! shrink-0"
         data-ui={`editor.technical-data.field-${option.kind}`}
       />
-      {option.icon}
       <span>{translate(option.labelKey)}</span>
     </label>
   );
