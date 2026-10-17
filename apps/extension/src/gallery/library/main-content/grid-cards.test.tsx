@@ -198,8 +198,7 @@ it('keeps large-grid cards compact with the canonical row gap', () => {
   expect(secondRowTop - firstHeight).toBe(GRID_GAP);
   expect(cards?.[0]?.className).toContain('flex flex-col');
   expect(details?.className).toContain('h-[72px]');
-  expect(details?.className).toContain('justify-between');
-  expect(details?.className).not.toContain('minmax(0,1fr)');
+  expect(details?.className).toContain('content-center');
   expect(details?.className).toContain('shrink-0');
   expect(metadata?.className).not.toContain('mt-auto');
   expect(
@@ -353,50 +352,69 @@ it('renders one composite grid card for raw recording tracks without a project',
   expect(selectedCard?.className).not.toContain('border-[var(--sniptale-color-border-soft)]');
 });
 
-it('renders one unduplicated recording-group title in large grid', () => {
-  const items = ['display', 'webcam'].map((role, order) =>
-    createMediaItem({
-      id: `recording:${role}`,
-      kind: 'recording',
-      recordingGroupView: {
-        groupId: 'capture-1',
-        memberCount: 2,
-        order,
-        projectId: null,
-        projectName: null,
-        role: role === 'webcam' ? 'webcam' : 'display',
-        sourceLabel: role,
-      },
-    })
-  );
-
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={items}
-        gridMetrics={metrics([items[0]!], 400, 'large-grid', 1)}
-        gridWidth={400}
-        onPreviewOpen={vi.fn()}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-        viewMode="large-grid"
-        visibleItems={[items[0]!]}
-      />
+it.each([null, 'Длинное пользовательское название проекта группы записи'])(
+  'renders one unduplicated recording-group title in large grid: %s',
+  (projectName) => {
+    const items = ['display', 'webcam'].map((role, order) =>
+      createMediaItem({
+        id: `recording:${role}`,
+        kind: 'recording',
+        recordingGroupView: {
+          groupId: 'capture-1',
+          memberCount: 2,
+          order,
+          projectId: projectName ? 'project-1' : null,
+          projectName,
+          role: role === 'webcam' ? 'webcam' : 'display',
+          sourceLabel: role,
+        },
+      })
     );
-  });
 
-  expect(container?.textContent?.match(/Запись из нескольких источников/g)).toHaveLength(1);
-  expect(container?.textContent).not.toContain(translate('gallery.preview.recordingGroup'));
-  expect(
-    container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-details"]')?.className
-  ).toContain('h-[72px]');
-  expect(
-    container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-metadata"]')?.className
-  ).not.toContain('mt-auto');
-  expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
-    'contain'
-  );
-});
+    const onOpen = vi.fn();
+    const onPreview = vi.fn();
+    act(() => {
+      root?.render(
+        <GalleryGridCanvas
+          filteredItems={items}
+          gridMetrics={metrics([items[0]!], 400, 'large-grid', 1)}
+          gridWidth={400}
+          onPreviewOpen={onPreview}
+          onRecordingGroupOpen={onOpen}
+          onToggleSelection={vi.fn()}
+          selectedIds={new Set()}
+          viewMode="large-grid"
+          visibleItems={[items[0]!]}
+        />
+      );
+    });
+
+    expect(
+      container?.textContent?.split(projectName ?? 'Запись из нескольких источников')
+    ).toHaveLength(2);
+    expect(container?.textContent).not.toContain(translate('gallery.preview.recordingGroup'));
+    expect(
+      container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-details"]')?.className
+    ).toContain('h-[72px]');
+    expect(
+      container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-metadata"]')?.className
+    ).not.toContain('mt-auto');
+    expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
+      'contain'
+    );
+    if (projectName) {
+      const footer = container?.querySelector('[data-ui="gallery.large.group-details"]');
+      expect(footer?.querySelector('.truncate[title]')?.getAttribute('title')).toBe(projectName);
+      const open = [...(footer?.querySelectorAll('button') ?? [])].find((button) =>
+        button.textContent?.includes(translate('gallery.preview.openRecordingGroupShort'))
+      );
+      expect(open).toBeDefined();
+      act(() => open?.click());
+      expect(onOpen).toHaveBeenCalledWith(items[0]);
+      expect(onPreview).not.toHaveBeenCalled();
+    }
+  }
+);
 
 it.each(['compact-grid', 'large-grid'] as const)(
   'keeps creation primary and expiry in the group badge in %s',
@@ -444,7 +462,11 @@ it.each(['compact-grid', 'large-grid'] as const)(
       container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
     ).toBe(`${translate('gallery.app.draftExpires')} date:99`);
     expect(metadata?.querySelector('svg.lucide-trash-2')).toBeNull();
-    expect(metadata?.querySelector('[data-ui="gallery.card.kind"]')).not.toBeNull();
+    expect(
+      metadata
+        ?.closest('[data-ui$="group-details"]')
+        ?.querySelector('[data-ui="gallery.card.kind"]')
+    ).not.toBeNull();
   }
 );
 

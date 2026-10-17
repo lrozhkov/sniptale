@@ -99,7 +99,11 @@ it.each(['compact-grid', 'large-grid'] as const)(
     expect(metadata?.textContent).toContain('date:1');
     expect(metadata?.textContent).not.toContain('date:3');
     expect(metadata?.querySelector('svg.lucide-trash-2')).toBeNull();
-    expect(metadata?.className).toContain('text-[var(--sniptale-color-text-muted)]');
+    expect(metadata?.className).toContain(
+      viewMode === 'compact-grid'
+        ? 'text-[var(--sniptale-color-text-muted)]'
+        : 'text-[var(--sniptale-color-text-secondary)]'
+    );
   }
 );
 
@@ -147,7 +151,11 @@ it.each(['compact-grid', 'large-grid'] as const)(
     expect(metadata?.textContent).toContain('date:1');
     expect(metadata?.textContent).not.toContain('date:3');
     expect(metadata?.querySelector('svg.lucide-trash-2')).toBeNull();
-    expect(metadata?.className).toContain('text-[var(--sniptale-color-text-muted)]');
+    expect(metadata?.className).toContain(
+      viewMode === 'compact-grid'
+        ? 'text-[var(--sniptale-color-text-muted)]'
+        : 'text-[var(--sniptale-color-text-secondary)]'
+    );
   }
 );
 

@@ -236,7 +236,9 @@ it.each(['compact-grid', 'large-grid'] as const)(
       `button[aria-label="${translate('gallery.preview.openInEditor')}"]`
     );
     expect(name?.className).toContain('truncate');
-    expect(name?.parentElement?.className).toContain('min-w-0');
+    expect(viewMode === 'large-grid' ? name?.className : name?.parentElement?.className).toContain(
+      'min-w-0'
+    );
     expect(editor?.className).toContain('shrink-0');
     expect(editor?.disabled).toBe(true);
     expect(editor?.title).toBe(translate('gallery.preview.projectUnavailable'));

@@ -103,21 +103,25 @@ export function GalleryProjectDetails(props: {
           : isCompact
             ? `group/gallery-caption relative flex h-10 shrink-0 items-center gap-1 border-t
               border-[var(--sniptale-color-border-soft)] pl-11 pr-2 py-[3px]`
-            : `group/gallery-caption relative flex h-[72px] shrink-0 items-end gap-1 border-t
-              border-[var(--sniptale-color-border-soft)] pl-11 pr-2 py-3`
+            : `group/gallery-caption relative grid h-[72px] shrink-0 content-center
+              grid-cols-[32px_minmax(0,1fr)_auto] grid-rows-[24px_16px] gap-x-2 gap-y-1 border-t
+              border-[var(--sniptale-color-border-soft)] px-3`
       }
     >
       {!isList ? (
-        <span className="absolute bottom-1 left-1 flex h-8 w-8 items-center justify-center">
+        <span
+          className={`flex h-8 w-8 items-center justify-center
+          ${isCompact ? 'absolute bottom-1 left-1' : 'relative col-start-1 row-start-1 self-center'}`}
+        >
           {props.leading}
         </span>
       ) : null}
       {!isList ? (
-        <div className={`flex min-w-0 flex-1 flex-col ${isCompact ? 'gap-0.5' : 'gap-1'}`}>
+        <div className={`${isCompact ? 'flex min-w-0 flex-1 flex-col gap-0.5' : 'contents'}`}>
           <button
             type="button"
             onClick={() => props.onPreviewOpen(props.item)}
-            className={`text-[13px] leading-[18px]
+            className={`text-[13px] ${isCompact ? 'leading-[18px]' : 'col-start-2 row-start-1 h-6 leading-6'}
               min-w-0 truncate text-left font-medium text-[var(--sniptale-color-text-primary)]
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]`}
             title={props.item.filename}
@@ -125,7 +129,7 @@ export function GalleryProjectDetails(props: {
             {props.item.filename}
           </button>
           <div
-            className={`${isCompact ? 'text-[12px] leading-3' : 'text-[13px] leading-[18px]'}
+            className={`${isCompact ? 'text-[12px] leading-3' : 'col-start-2 col-span-2 row-start-2 text-xs leading-4'}
               truncate text-[var(--sniptale-color-text-secondary)]`}
             title={gridSummary}
           >
@@ -141,11 +145,19 @@ export function GalleryProjectDetails(props: {
         </div>
       ) : null}
       {props.onOpen ? (
-        <GalleryProjectOpenAction
-          item={props.item}
-          onOpen={props.onOpen}
-          layout={isList ? 'list' : 'grid'}
-        />
+        <div
+          className={
+            isList || isCompact
+              ? 'contents'
+              : 'col-start-3 row-start-1 flex items-center justify-end'
+          }
+        >
+          <GalleryProjectOpenAction
+            item={props.item}
+            onOpen={props.onOpen}
+            layout={isList ? 'list' : 'grid'}
+          />
+        </div>
       ) : null}
     </div>
   );

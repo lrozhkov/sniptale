@@ -348,36 +348,37 @@ function GalleryRecordingGroupDetails(props: {
       className={
         isCompact
           ? `group/gallery-caption relative flex h-10 shrink-0 items-center border-t
-            border-[var(--sniptale-color-border-soft)]
-            px-2 py-2`
-          : `group/gallery-caption relative flex h-[72px] shrink-0 flex-col justify-between
-            border-t border-[var(--sniptale-color-border-soft)] px-2 py-3`
+          border-[var(--sniptale-color-border-soft)] px-2 py-2`
+          : `group/gallery-caption relative grid h-[72px] shrink-0 content-center
+          grid-cols-[32px_minmax(0,1fr)_auto] grid-rows-[24px_16px] gap-x-2 gap-y-1
+          border-t border-[var(--sniptale-color-border-soft)] px-3`
       }
       data-ui={isCompact ? 'gallery.compact.group-details' : 'gallery.large.group-details'}
     >
-      {!isCompact ? (
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <div
-            className="truncate text-[13px] leading-[18px] font-medium
-              text-[var(--sniptale-color-text-primary)]"
-          >
-            {projectName ?? translate('gallery.preview.multiTrackRecording')}
-          </div>
-          {props.onRecordingGroupOpen && editorItem ? (
-            <GalleryRecordingGroupOpenCommand
-              onOpen={() => props.onRecordingGroupOpen?.(editorItem)}
-            />
-          ) : null}
+      <span
+        className={`z-10 flex h-8 w-8 items-center justify-center
+        ${isCompact ? 'absolute bottom-1 left-1' : 'relative col-start-1 row-start-1 self-center'}`}
+      >
+        {props.leading}
+      </span>
+      {!isCompact && (
+        <div
+          className={`col-start-2 row-start-1 h-6 min-w-0 truncate text-[13px] leading-6 font-medium
+          text-[var(--sniptale-color-text-primary)] ${props.onRecordingGroupOpen && editorItem ? '' : 'col-span-2'}`}
+          title={projectName ?? translate('gallery.preview.multiTrackRecording')}
+        >
+          {projectName ?? translate('gallery.preview.multiTrackRecording')}
         </div>
-      ) : null}
+      )}
       <div
         data-ui={isCompact ? 'gallery.compact.group-metadata' : 'gallery.large.group-metadata'}
-        className="flex min-w-0 w-full items-center justify-between gap-2 pl-9 whitespace-nowrap text-xs
-          text-[var(--sniptale-color-text-muted)]"
+        className={`flex min-w-0 w-full items-center justify-between gap-2 whitespace-nowrap text-xs
+          ${
+            isCompact
+              ? 'pl-9 text-[var(--sniptale-color-text-muted)]'
+              : 'col-start-2 col-span-2 row-start-2 text-[var(--sniptale-color-text-secondary)]'
+          }`}
       >
-        <span className="absolute bottom-1 left-1 flex h-8 w-8 items-center justify-center">
-          {props.leading}
-        </span>
         <GalleryGridCardDate items={props.items} />
         <span className="shrink-0">
           {totalSize > 0
@@ -387,6 +388,13 @@ function GalleryRecordingGroupDetails(props: {
             : '—'}
         </span>
       </div>
+      {!isCompact && props.onRecordingGroupOpen && editorItem ? (
+        <div className="col-start-3 row-start-1 flex items-center justify-end">
+          <GalleryRecordingGroupOpenCommand
+            onOpen={() => props.onRecordingGroupOpen?.(editorItem)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

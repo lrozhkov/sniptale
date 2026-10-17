@@ -2,7 +2,7 @@ import type { Page, TestInfo } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { test, expect } from '../support/extension-fixture';
-import { seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { seedReviewVideo, seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { createVideoProjectEntry } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { withVideoProjectUsage } from '../../../../apps/extension/src/composition/persistence/media-library/usage-index-keys';
@@ -771,4 +771,96 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('dialog')).toBeVisible();
     await screenshot(page, info, 'keyboard-help');
   });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`large footer composition ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openLibrary(page, extensionId, 'ru', theme);
+      await seedReviewWebcamBundle(page);
+      await seedImages(page, 'Длинное-пользовательское-название-материала-для-проверки-футера');
+      const project = withVideoProjectUsage(
+        createVideoProjectEntry({
+          id: 'large-footer-project',
+          name: 'Проект с длинным пользовательским названием для проверки выравнивания и сокращения',
+          baseRecordingId: 'beta-v1-recording',
+        })
+      );
+      await page.evaluate(
+        async ({ databaseName, project }) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(databaseName);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          const tx = db.transaction('video_projects', 'readwrite');
+          const done = new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error);
+          });
+          tx.objectStore('video_projects').put(project);
+          await done;
+          db.close();
+        },
+        { databaseName: betaV1Fixture.databaseName, project }
+      );
+      await searchLibrary(page, '');
+      await page.reload();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
+      await page
+        .getByRole('button', { name: label('gallery.app.viewModeLargeGrid'), exact: true })
+        .click();
+      const footers = page.locator(
+        '[data-ui="gallery.large.details"], [data-ui="gallery.project.details"], [data-ui="gallery.large.group-details"]'
+      );
+      await expect(footers).toHaveCount(4);
+      for (let index = 0; index < 4; index++) {
+        const footer = footers.nth(index);
+        await footer.scrollIntoViewIfNeeded();
+        const kind = await footer.getAttribute('data-ui');
+        const title =
+          kind === 'gallery.large.details'
+            ? footer.locator('[data-ui="gallery.filename"]').locator('..')
+            : kind === 'gallery.project.details'
+              ? footer.locator('button.truncate[title]')
+              : footer.locator('.truncate[title]').first();
+        const metadata =
+          kind === 'gallery.project.details'
+            ? footer.locator(':scope > div > div[title]')
+            : footer.locator('[data-ui$="metadata"]');
+        const titleBox = (await title.boundingBox())!;
+        const metadataText =
+          kind === 'gallery.project.details'
+            ? metadata
+            : metadata.locator(`span[title^="${label('gallery.app.createdLabel')}"]`);
+        const metadataBox = (await metadataText.boundingBox())!;
+        expect(Math.abs(titleBox.x - metadataBox.x), `${index}: ${kind}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(metadataBox.y - titleBox.y - titleBox.height - 4)).toBeLessThanOrEqual(1);
+        await expect(title).toHaveCSS('font-size', '13px');
+        await expect(metadata).toHaveCSS('font-size', '12px');
+        expect((await footer.boundingBox())!.height).toBe(72);
+        expect(await metadata.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await footer.hover();
+        const mark = footer.locator('[data-ui="gallery.selection.mark"]');
+        await expect(mark).toHaveCSS('opacity', '1');
+        const disc = (await mark.boundingBox())!;
+        const box = (await footer.boundingBox())!;
+        expect(
+          Math.abs(disc.y + disc.height / 2 - titleBox.y - titleBox.height / 2)
+        ).toBeLessThanOrEqual(1);
+        expect(disc.x).toBeGreaterThan(box.x);
+        const selection = footer.locator('button[aria-pressed]').first();
+        await selection.click();
+        await expect(selection).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.locator('[data-ui="gallery.preview.inspector"]')).toHaveCount(0);
+        await screenshot(page, info, `large-footer-${index}`);
+        await selection.press('Space');
+        await expect(selection).toHaveAttribute('aria-pressed', 'false');
+      }
+    });
+  }
 }

@@ -131,6 +131,13 @@ for (const viewport of [
           const caption = card.locator(
             '[data-ui="gallery.compact.details"], [data-ui="gallery.large.details"], [data-ui="gallery.project.details"]'
           );
+          if (mode === 'viewModeLargeGrid') {
+            const title = caption.locator('[data-ui="gallery.filename"]').locator('..');
+            const titleBox = (await title.boundingBox())!;
+            const dateBox = (await created.boundingBox())!;
+            expect(Math.abs(titleBox.x - dateBox.x)).toBeLessThanOrEqual(1);
+            expect(Math.abs(dateBox.y - titleBox.y - titleBox.height - 4)).toBeLessThanOrEqual(1);
+          }
           const selection = card.getByRole('button', {
             name: label('gallery.app.selectItem'),
             exact: true,
@@ -139,8 +146,16 @@ for (const viewport of [
           const visibleMark = (await mark.boundingBox())!;
           const leftInset = visibleMark.x - bounds.x;
           const bottomInset = bounds.y + bounds.height - visibleMark.y - visibleMark.height;
-          expect(Math.abs(leftInset - bottomInset)).toBeLessThanOrEqual(1);
-          expect(leftInset).toBeLessThanOrEqual(10);
+          if (mode === 'viewModeLargeGrid') {
+            const title = (await caption.locator('[data-ui="gallery.filename"]').boundingBox())!;
+            expect(
+              Math.abs(visibleMark.y + visibleMark.height / 2 - title.y - title.height / 2)
+            ).toBeLessThanOrEqual(1);
+            expect(leftInset).toBeCloseTo(17, 0);
+          } else {
+            expect(Math.abs(leftInset - bottomInset)).toBeLessThanOrEqual(1);
+            expect(leftInset).toBeCloseTo(9, 0);
+          }
           const dateText = created.locator(':scope > span').first();
           expect(await dateText.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(
             true

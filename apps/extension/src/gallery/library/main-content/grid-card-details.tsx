@@ -238,14 +238,21 @@ export function GalleryListDetails(
 }
 
 export function GalleryGridDetails(props: GalleryCardDetailsProps) {
+  const size =
+    props.item.size > 0
+      ? props.compact
+        ? formatCompactBytes(props.item.size)
+        : formatBytes(props.item.size)
+      : '—';
   return (
     <div
       className={
         props.compact
           ? `group/gallery-caption relative h-10 w-full shrink-0 border-t border-[var(--sniptale-color-border-soft)]
-            flex items-center px-2 py-2 text-left`
-          : `group/gallery-caption relative flex h-[72px] w-full shrink-0 flex-col justify-between
-            border-t border-[var(--sniptale-color-border-soft)] px-2 py-3 text-left`
+          flex items-center px-2 py-2 text-left`
+          : `group/gallery-caption relative grid h-[72px] w-full shrink-0 content-center
+          grid-cols-[32px_minmax(0,1fr)] grid-rows-[24px_16px] gap-x-2 gap-y-1
+          border-t border-[var(--sniptale-color-border-soft)] px-3 text-left`
       }
       data-ui={props.compact ? 'gallery.compact.details' : 'gallery.large.details'}
     >
@@ -257,34 +264,42 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
         title={props.item.filename}
         aria-label={props.item.filename}
       />
-      {props.compact ? null : (
-        <div className="pointer-events-none min-w-0">
+      {props.compact ? (
+        <div
+          data-ui="gallery.compact.metadata"
+          className="pointer-events-none flex min-w-0 w-full items-center justify-between gap-2 pl-9
+            whitespace-nowrap text-xs text-[var(--sniptale-color-text-muted)]"
+        >
+          <span className="pointer-events-auto absolute bottom-1 left-1 z-10 flex h-8 w-8 items-center justify-center">
+            {props.leading}
+          </span>
+          <GalleryGridCardDate items={[props.item]} />
+          <span className="shrink-0">{size}</span>
+        </div>
+      ) : (
+        <>
+          <span
+            className="pointer-events-auto relative z-10 col-start-1 row-start-1 flex h-8 w-8
+              items-center justify-center self-center"
+          >
+            {props.leading}
+          </span>
           <div
-            className="flex h-5 min-w-0 items-center text-[13px] leading-[18px] font-medium
-              text-[var(--sniptale-color-text-primary)]"
+            className="pointer-events-none col-start-2 row-start-1 flex h-6 min-w-0 items-center
+            text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]"
           >
             <GalleryFilenameLabel filename={props.item.filename} />
           </div>
-        </div>
+          <div
+            data-ui="gallery.large.metadata"
+            className="pointer-events-none col-start-2 row-start-2 flex min-w-0 items-center justify-between gap-2
+              whitespace-nowrap text-xs text-[var(--sniptale-color-text-secondary)]"
+          >
+            <GalleryGridCardDate items={[props.item]} />
+            <span className="shrink-0">{size}</span>
+          </div>
+        </>
       )}
-      <div
-        data-ui={props.compact ? 'gallery.compact.metadata' : 'gallery.large.metadata'}
-        className={`pointer-events-none flex min-w-0 w-full items-center justify-between gap-2 pl-9
-          whitespace-nowrap text-xs
-          text-[var(--sniptale-color-text-muted)]`}
-      >
-        <span className="pointer-events-auto absolute bottom-1 left-1 z-10 flex h-8 w-8 items-center justify-center">
-          {props.leading}
-        </span>
-        <GalleryGridCardDate items={[props.item]} />
-        <span className="shrink-0">
-          {props.item.size > 0
-            ? props.compact
-              ? formatCompactBytes(props.item.size)
-              : formatBytes(props.item.size)
-            : '—'}
-        </span>
-      </div>
     </div>
   );
 }
