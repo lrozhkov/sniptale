@@ -1,3 +1,4 @@
+import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
 import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
@@ -50,7 +51,9 @@ export function TourPlaybackSettings({
         onPreview={changeMinimum}
         onChange={changeMinimum}
       />
-      <p className="guide-inspector-hint">{t('scenario.editor.tourAutoplayHint')}</p>
+      <InformationDisclosure label={t('common.actions.details')}>
+        <p>{t('scenario.editor.tourAutoplayHint')}</p>
+      </InformationDisclosure>
     </GuideInspectorGroup>
   );
 }
@@ -132,7 +135,9 @@ export function TourTimingSettings({
           }
         />
       </div>
-      <p className="guide-inspector-hint">{t('scenario.editor.tourTimingHint')}</p>
+      <InformationDisclosure label={t('common.actions.details')}>
+        <p>{t('scenario.editor.tourTimingHint')}</p>
+      </InformationDisclosure>
     </GuideInspectorGroup>
   );
 }

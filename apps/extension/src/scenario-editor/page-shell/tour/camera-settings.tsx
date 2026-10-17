@@ -1,3 +1,4 @@
+import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
 import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import type { TourDocument, TourImageSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { ScanSearch } from 'lucide-react';
@@ -102,10 +103,10 @@ export function TourCameraSettings({
               onChange({ ...slide, camera: { ...camera, durationMs: Math.round(amount * 1000) } })
             }
           />
-          <p className="guide-inspector-hint">{t('scenario.editor.tourCameraAnimationHint')}</p>
-          {camera.mode === 'manual' && (
-            <p className="guide-inspector-hint">{t('scenario.editor.tourCameraFrameHint')}</p>
-          )}
+          <InformationDisclosure label={t('common.actions.details')}>
+            <p>{t('scenario.editor.tourCameraAnimationHint')}</p>
+            {camera.mode === 'manual' && <p>{t('scenario.editor.tourCameraFrameHint')}</p>}
+          </InformationDisclosure>
         </>
       )}
     </GuideInspectorGroup>

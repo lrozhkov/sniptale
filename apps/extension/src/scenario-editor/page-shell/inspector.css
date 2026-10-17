@@ -72,7 +72,7 @@
   gap: 0.5rem;
   padding: 0.375rem 0.5rem;
   text-align: start;
-  font-size: 0.75rem;
+  font: 400 13px / 18px var(--sniptale-font-interface);
   background: transparent;
   border-color: transparent;
   box-shadow: none;
@@ -314,7 +314,6 @@
 .guide-inspector-panel .scenario-inspector-action {
   white-space: normal;
   overflow-wrap: anywhere;
-  line-height: 1.5;
 }
 .guide-inspector-panel .scenario-inspector-action > svg {
   flex: none;
@@ -705,7 +704,8 @@
   text-align: start;
 }
 
-.guide-inspector-categorized > .guide-style-fields + .guide-inspector-hint {
+.guide-inspector-categorized > .guide-style-fields + .guide-inspector-hint,
+.guide-inspector-categorized > .guide-style-fields + [data-ui='shared.information-disclosure'] {
   margin-top: 8px;
 }
 
@@ -784,4 +784,16 @@
 
 .guide-page .guide-html-switch:has(> .sniptale-parameter-row) {
   display: block;
+}
+
+.guide-inspector-panel
+  .scenario-inspector-action.scenario-inspector-navigation:enabled:is(:hover, :focus-visible) {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.guide-inspector-categorized > [data-ui='shared.information-disclosure'] + .guide-inspector-group {
+  margin-top: 8px;
 }

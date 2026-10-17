@@ -660,3 +660,85 @@ it('inherits highlight animation independently and preserves it through appearan
   draw();
   expect(host.querySelector<HTMLButtonElement>('[aria-label="Entry"]')?.disabled).toBe(true);
 });
+
+it('keeps optional timing and playback explanations inside the shared information disclosure', () => {
+  const note = (key: Parameters<typeof translate>[0]) =>
+    [...host.querySelectorAll('p')].find(
+      (element) => element.textContent === translate(key, 'en')
+    )!;
+  expect(note('scenario.editor.tourTimingHint')).toBeDefined();
+  expect(
+    note('scenario.editor.tourTimingHint').closest('[data-ui="shared.information-disclosure"]')
+  ).not.toBeNull();
+  scope = 'document';
+  draw();
+  expect(note('scenario.editor.tourAutoplayHint')).toBeDefined();
+  expect(
+    note('scenario.editor.tourAutoplayHint').closest('[data-ui="shared.information-disclosure"]')
+  ).not.toBeNull();
+  expect(
+    note('scenario.editor.tourTransitionHint').closest('[data-ui="shared.information-disclosure"]')
+  ).not.toBeNull();
+});
+
+it('keeps manual camera values editable independently of collapsed camera guidance', async () => {
+  await choose('Camera mode', 'Manual');
+  await fill('Zoom', '150');
+  await fill('Zoom delay', '0.5');
+  await fill('Duration', '1.2');
+  expect(current().camera).toMatchObject({
+    mode: 'manual',
+    zoom: 1.5,
+    delayMs: 500,
+    durationMs: 1200,
+  });
+  const note = [...host.querySelectorAll('p')].find(
+    (node) => node.textContent === translate('scenario.editor.tourCameraFrameHint', 'en')
+  )!;
+  expect(note.closest('details')?.open).toBe(false);
+  await choose('Camera mode', 'Full view');
+  expect(host.textContent).not.toContain(translate('scenario.editor.tourCameraFrameHint', 'en'));
+  expect(current().camera.zoom).toBe(1.5);
+});
+
+it('preserves playback and transition edits while their optional explanations stay collapsed', async () => {
+  scope = 'document';
+  draw();
+  const before = structuredClone(project.tour!.playback);
+  await click('Start automatically');
+  await click('Loop tour');
+  await click('Auto Zoom to hotspot');
+  await fill('Minimum, s', '5');
+  expect(project.tour!.playback).toEqual({
+    autoplay: !before.autoplay,
+    loop: !before.loop,
+    autoZoom: !before.autoZoom,
+    minimumHoldSeconds: 5,
+  });
+  await choose('Image transition', 'Slide');
+  await fill('Switch, ms', '450');
+  await fill('Hotspot, ms', '600');
+  expect(project.tour!.transition).toMatchObject({
+    kind: 'slide',
+    durationMs: 450,
+    hotspotTravelMs: 600,
+  });
+  await choose('Image transition', 'No image animation');
+  expect(host.querySelector('[aria-label="Switch, ms"]')).toBeNull();
+  expect(project.tour!.transition.durationMs).toBe(450);
+  expect(
+    [...host.querySelectorAll('details[data-ui="shared.information-disclosure"]')].every(
+      (node) => !(node as HTMLDetailsElement).open
+    )
+  ).toBe(true);
+});
+
+it('edits slide timing and its automatic destination without expanding the explanation', async () => {
+  await choose('Slide duration', 'Set duration');
+  await fill('Hold, s', '6');
+  await choose('Automatic transition', '2. Navigation');
+  expect(current().timing).toMatchObject({ mode: 'manual', holdSeconds: 6, autoplayTarget: 'nav' });
+  await choose('Slide duration', 'From text and narration');
+  expect(host.querySelector('[aria-label="Hold, s"]')).toBeNull();
+  expect(current().timing.holdSeconds).toBe(6);
+});

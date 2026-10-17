@@ -1,3 +1,4 @@
+import { InformationDisclosure } from '../../ui/compact-inspector-controls/disclosure';
 import { GuideTemplateControls } from './template-controls';
 import type { GuideTemplateApplication } from '../../composition/persistence/scenario/store/public';
 import type {
@@ -68,7 +69,9 @@ export function GuideAppearance({
             onChange={(layout) => change(applyGuideLayout(item, layout))}
           />
           {item.blocks.length > 0 && (
-            <p className="guide-inspector-hint">{t('scenario.editor.appearanceLayoutHelp')}</p>
+            <InformationDisclosure label={t('common.actions.details')}>
+              <p>{t('scenario.editor.appearanceLayoutHelp')}</p>
+            </InformationDisclosure>
           )}
           {onSaveTemplate && onApplyTemplate && (
             <GuideTemplateControls

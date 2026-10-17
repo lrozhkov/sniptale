@@ -93,7 +93,6 @@ export function TourNarrationSettings({
           },
         }}
       />
-      {!narration && <p className="guide-inspector-hint">{t('scenario.editor.tourAudioHint')}</p>}
       {narration && (
         <>
           {objectId ? (

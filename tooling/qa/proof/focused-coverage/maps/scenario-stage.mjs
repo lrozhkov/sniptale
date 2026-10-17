@@ -34,6 +34,39 @@ export const SCENARIO_STAGE_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'scenario-tour-inspector-settings',
+    productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/transition-settings.tsx',
+    exclusive: true,
+    reason:
+      'Real inspector tests exercise optional explanations and settings that the page test substitutes.',
+    testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+    ],
+  },
+  {
+    owner: 'scenario-tour-inspector-settings',
+    productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/playback-settings.tsx',
+    exclusive: true,
+    reason:
+      'Real inspector tests exercise optional explanations and settings that the page test substitutes.',
+    testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+    ],
+  },
+  {
+    owner: 'scenario-tour-inspector-settings',
+    productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/camera-settings.tsx',
+    exclusive: true,
+    reason:
+      'Real inspector tests exercise optional explanations and settings that the page test substitutes.',
+    testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+    ],
+  },
+  {
     owner: 'scenario-guide-page',
     productionPrefix: 'apps/extension/src/scenario-editor/page-shell/',
     reason:

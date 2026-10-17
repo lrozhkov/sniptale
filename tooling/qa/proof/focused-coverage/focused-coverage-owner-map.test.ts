@@ -397,20 +397,23 @@ it('selects completion refresh, body states, and native clock response proof', a
   );
 });
 
-it.each(['document-settings.tsx', 'mask-settings.tsx'])(
-  'routes tour %s to stage appearance and inherited settings proof',
-  async (file) => {
-    const module = await importOwnerMap();
-    expect(
-      module.resolveMappedCoverageOwnerTests(
-        `apps/extension/src/scenario-editor/page-shell/tour/${file}`
-      )
-    ).toEqual([
-      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
-    ]);
-  }
-);
+it.each([
+  'document-settings.tsx',
+  'mask-settings.tsx',
+  'transition-settings.tsx',
+  'playback-settings.tsx',
+  'camera-settings.tsx',
+])('routes tour %s to stage appearance and inherited settings proof', async (file) => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      `apps/extension/src/scenario-editor/page-shell/tour/${file}`
+    )
+  ).toEqual([
+    'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+    'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+  ]);
+});
 
 it('executes real tour library and workspace proof when the page test substitutes tour UI', async () => {
   const module = await importOwnerMap();

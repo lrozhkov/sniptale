@@ -1,3 +1,4 @@
+import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
 import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Layers } from 'lucide-react';
@@ -63,7 +64,9 @@ export function TourTransitionSettings({
         onPreview={changeTravel}
         onChange={changeTravel}
       />
-      <p className="guide-inspector-hint">{t('scenario.editor.tourTransitionHint')}</p>
+      <InformationDisclosure label={t('common.actions.details')}>
+        <p>{t('scenario.editor.tourTransitionHint')}</p>
+      </InformationDisclosure>
     </GuideInspectorGroup>
   );
 }
