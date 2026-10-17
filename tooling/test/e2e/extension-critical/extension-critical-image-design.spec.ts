@@ -521,11 +521,7 @@ for (const theme of ['light', 'dark'] as const) {
       await openImage(page, extensionId, 'ru', theme);
       await inspectDocumentFields(page, 'ru', info);
     });
-  }
-}
 
-for (const theme of ['light', 'dark'] as const) {
-  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`image navigation chrome ${theme} ${viewport.name}`, async ({
       page,
       extensionId,
@@ -546,11 +542,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(ui(page, 'editor.viewport-preview.frame')).toHaveCSS('border-radius', '0px');
       await screenshot(page, info, 'image-navigation-chrome');
     });
-  }
-}
 
-for (const theme of ['light', 'dark'] as const) {
-  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`workspace background row ${theme} ${viewport.name}`, async ({
       page,
       extensionId,
@@ -578,11 +570,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(boxes[2]!.x + boxes[2]!.width).toBeLessThanOrEqual(boxes[3]!.x + 1);
       await screenshot(page, info, 'workspace-background-row');
     });
-  }
-}
 
-for (const theme of ['light', 'dark'] as const) {
-  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`drawing current-color samples ${theme} ${viewport.name}`, async ({
       page,
       extensionId,
@@ -614,11 +602,7 @@ for (const theme of ['light', 'dark'] as const) {
         await screenshot(page, info, `color-sample-${tool}`);
       }
     });
-  }
-}
 
-for (const theme of ['light', 'dark'] as const) {
-  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`image layer miniature commands ${theme} ${viewport.name}`, async ({
       page,
       extensionId,
@@ -691,11 +675,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(list.locator(':scope > div').last()).toBeInViewport();
       await screenshot(page, info, 'layer-list-scrolled');
     });
-  }
-}
 
-for (const theme of ['light', 'dark'] as const) {
-  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`unified scene background paint ${theme} ${viewport.name}`, async ({
       page,
       extensionId,
@@ -736,6 +716,62 @@ for (const theme of ['light', 'dark'] as const) {
       await screenshot(page, info, 'scene-paint-gradient-restored');
       await chooseProperty(page, kinds, translate('editor.scene.backgroundNone', 'ru'));
       await expect(trigger).toHaveCount(0);
+    });
+
+    test(`scene padding parameter rhythm ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openImage(page, extensionId, 'ru', theme);
+      await chooseMode(page, 'frame');
+      const panel = ui(page, 'editor.frame-panel');
+      await chooseProperty(
+        page,
+        ui(page, 'editor.frame.background-mode'),
+        translate('editor.compact.frameBackgroundModeColor', 'ru')
+      );
+      const names = [
+        'editor.scene.placementSection',
+        'highlighter.editor.paddingLabel',
+        'editor.compact.cornerRadius',
+      ] as const;
+      const geometry = await Promise.all(
+        names.map((name) =>
+          panel.getByText(translate(name, 'ru'), { exact: true }).evaluate((node) => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            const box = range.getClientRects()[0]!;
+            const css = getComputedStyle(node);
+            return {
+              x: box.x,
+              y: box.y,
+              fontSize: css.fontSize,
+              fontWeight: css.fontWeight,
+              lineHeight: css.lineHeight,
+            };
+          })
+        )
+      );
+      for (const item of geometry) {
+        expect.soft(item.fontSize, JSON.stringify(geometry)).toBe('13px');
+        expect.soft(item.fontWeight).toBe('400');
+        expect.soft(item.lineHeight).toBe('18px');
+        expect.soft(Math.abs(item.x - geometry[0]!.x)).toBeLessThanOrEqual(1);
+      }
+      expect
+        .soft(
+          Math.abs(geometry[1]!.y - geometry[0]!.y - (geometry[2]!.y - geometry[1]!.y)),
+          JSON.stringify(geometry)
+        )
+        .toBeLessThanOrEqual(1);
+      const padding = ui(page, 'editor.frame.padding-fields');
+      await padding
+        .getByText(translate('highlighter.editor.paddingLabel', 'ru'), { exact: true })
+        .hover();
+      const range = padding.getByRole('slider');
+      await expect(range).toBeVisible();
+      await screenshot(page, info, 'scene-padding-rhythm');
     });
   }
 }

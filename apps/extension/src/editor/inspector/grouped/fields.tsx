@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import {
   CompactSelect,
   SelectField as CompactInspectorSelectField,
@@ -16,10 +17,15 @@ export function EditorInspectorSelectInput<T extends string>(props: {
   options: readonly CompactSelectOption<T>[];
   disabled?: boolean;
 }) {
+  const inspector = useInspectorLayout();
   if (props.label !== undefined) {
     return (
       <CompactInspectorSelectField
-        className="min-h-8! border-transparent! bg-transparent! py-0!"
+        className={
+          inspector
+            ? 'border-transparent! bg-transparent!'
+            : 'min-h-8! border-transparent! bg-transparent! py-0!'
+        }
         label={props.label}
         value={props.value}
         onChange={props.onChange}
