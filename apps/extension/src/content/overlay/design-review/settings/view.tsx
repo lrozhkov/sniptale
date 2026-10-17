@@ -92,7 +92,7 @@ export function DesignReviewSettings(props: {
                   className={[
                     'inline-flex h-9 w-9 items-center justify-center rounded-[4px]',
                     section === option.key
-                      ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]'
+                      ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
                       : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
                     'active:bg-[var(--sniptale-color-surface-hover)] focus:outline-none',
                     'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',

@@ -15,7 +15,12 @@
 /* Only Design Review chrome owns this interface role; source nodes stay outside it. */
 .sniptale-design-review-chrome {
   --sniptale-font-sans: var(--sniptale-font-interface);
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-interface);
+}
+
+/* The shared button's relative position must not displace the anchored dismiss target. */
+[data-ui='content.design-review.popover'] > .sniptale-dismiss-button {
+  position: absolute;
 }
 
 .sniptale-design-review-chrome

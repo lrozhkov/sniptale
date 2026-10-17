@@ -54,7 +54,7 @@ export function FeedbackFilter(props: {
         <div
           ref={menuRef}
           className={[
-            'sniptale-design-review-filter-menu absolute right-0 top-9 z-10 w-44',
+            'sniptale-design-review-filter-menu absolute right-0 top-9 z-10 grid w-44 gap-0.5',
             'rounded-[4px] border p-[5px] shadow-xl',
             'border-[color:var(--sniptale-color-border-soft)]',
             'bg-[var(--sniptale-color-surface-panel)]',

@@ -14,6 +14,8 @@ Connect true tabs with their panels. Use one Tab stop and arrows in the declared
 
 Underline-style text tabs brighten on hover without a filled surface. The selected line remains separate from keyboard focus. Do not use a property selector's filled selected surface for underline navigation. Keep the selected line on the stable target, outside the caption that moves during a press. Category rails can retain their declared selected surface. Keep insets and icon alignment stable.
 
+Inspector category rails use a neutral selected surface and the primary foreground for the selected icon. Do not use orange fill for category selection. Preserve separate accent states for tools and status indicators with those established meanings.
+
 Place the active rail marker outside animated command content. Move one marker between current targets. Settings navigation uses the declared orange accent for this marker. Do not scale or displace the marker when the user presses a caption.
 
 An inspector can represent the same sections through categories or an All view with disclosure groups. Switch presentation without losing parameter values or remembered section state. Keep category selection and disclosure preferences separate from project data and Undo. Derive columns from available content width, including the rail and group insets, rather than from the page width alone.
