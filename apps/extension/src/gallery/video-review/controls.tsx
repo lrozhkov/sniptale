@@ -135,7 +135,8 @@ export function ReviewInterval({
   const rangeTitle = `${rangeLabel}: ${range}`;
   return (
     <div
-      className="flex min-h-8 min-w-0 items-center justify-between gap-2 px-2 py-0.5 text-[13px] tabular-nums"
+      className="flex min-h-8 min-w-0 items-center justify-between gap-2 border-b
+      border-[var(--sniptale-color-border-soft)] px-2 pt-0.5 pb-2 text-[13px] tabular-nums"
       data-ui="gallery.videoReview.interval"
     >
       <span className="shrink-0 font-normal text-[var(--sniptale-color-text-secondary)]">

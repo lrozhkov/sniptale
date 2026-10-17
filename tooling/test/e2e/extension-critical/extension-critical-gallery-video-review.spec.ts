@@ -3425,7 +3425,7 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.scene').click();
       await button('windowHeader.browser').click();
-      await button('gallery.videoReview.backgroundGradient').click();
+      await button('gallery.videoReview.backgroundSolid').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.gradientPresets"] button')
         .first()

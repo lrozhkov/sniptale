@@ -339,3 +339,18 @@ it('limits batch deletion to matching selection and resets an empty search witho
   act(() => button('speechDeselectAll').click());
   expect(host.querySelectorAll('input[type="checkbox"]:checked')).toHaveLength(0);
 });
+
+it('keeps a selected text detail distinct from an expandable numbered list row', () => {
+  act(() => root.render(<Fixture count={1} selectedId="text-0" />));
+  const article = host.querySelector('[data-ui="gallery.videoReview.textPhrase"]')!;
+  expect(article.querySelector(':scope > div:first-child button[aria-expanded]')).toBeNull();
+  expect(article.querySelector('textarea')?.rows).toBe(6);
+  const timing = article.querySelector(
+    'input[aria-label="gallery.videoReview.textFragmentStart"]'
+  )!;
+  expect(
+    timing
+      .closest('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')
+      ?.querySelector('.sniptale-numeric-entry > span')?.textContent
+  ).toBeTruthy();
+});

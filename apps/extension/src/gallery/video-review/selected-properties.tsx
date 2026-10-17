@@ -305,6 +305,23 @@ function SelectedEdit(
         </p>
       ) : null}
       <div className="review-inspector-columns">
+        <ReviewDetails
+          level="section"
+          label={translate('gallery.videoReview.intervalBounds')}
+          preferenceId="group:edit-timing"
+          initiallyOpen
+        >
+          <ReviewEditRangeFields
+            key={`${selected.id}:${advanced.ui.mode}`}
+            edit={selected}
+            edits={resource.session.getSnapshot().document.edits}
+            duration={resource.source.duration}
+            boundaries={
+              advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
+            }
+            onApply={(range) => editing.commitRange(range, selected)}
+          />
+        </ReviewDetails>
         <div className="min-w-0 sniptale-parameter-stack">
           {selected.kind === 'speed' ? (
             <ReviewSpeedOptions
@@ -326,16 +343,6 @@ function SelectedEdit(
             />
           ) : null}
         </div>
-        <ReviewEditRangeFields
-          key={`${selected.id}:${advanced.ui.mode}`}
-          edit={selected}
-          edits={resource.session.getSnapshot().document.edits}
-          duration={resource.source.duration}
-          boundaries={
-            advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
-          }
-          onApply={(range) => editing.commitRange(range, selected)}
-        />
       </div>
       <ReviewInspectorSections
         sections={[
@@ -456,7 +463,7 @@ function CutTransitionFields(props: {
                 onCommitValue={(value) => void commit(change(field, value))}
               />
             ))}
-            <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+            <p role="status" className="px-2 text-xs text-[var(--sniptale-color-text-muted)]">
               {plan
                 ? translate('gallery.videoReview.cutTransitionEffective')
                     .replace(

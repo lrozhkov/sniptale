@@ -502,3 +502,149 @@ for (const size of [
       }
     });
   }
+
+for (const size of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+])
+  for (const theme of ['light', 'dark'] as const) {
+    test(`native interval and text detail ${size.width} ${theme}`, async ({}, info) => {
+      const launched = await launchExtensionBrowser({ viewport: size });
+      const page = await launched.context.newPage();
+      page.setDefaultTimeout(10_000);
+      try {
+        const review = await openReview(page, launched.extensionId, theme);
+        const command = (key: Parameters<typeof translate>[0]) =>
+          review.getByRole('button', { name: label(key), exact: true });
+        await command('gallery.videoReview.cutMode').click();
+        await range(page, review.locator('[data-ui="gallery.videoReview.sourceLane"]'), 0.2, 0.4);
+        const bounds = review.locator('[data-ui="gallery.videoReview.editRangeFields"]');
+        const transition = review
+          .locator('summary')
+          .filter({ hasText: label('gallery.videoReview.cutTransition') });
+        await expect(bounds).toBeVisible();
+        expect((await bounds.boundingBox())!.y).toBeLessThan((await transition.boundingBox())!.y);
+        await expect(review.locator('[data-ui="gallery.videoReview.interval"]')).toHaveCSS(
+          'border-bottom-width',
+          '1px'
+        );
+        const start = bounds.getByRole('textbox', {
+          name: label('gallery.videoReview.rangeStart'),
+          exact: true,
+        });
+        await start.fill('2.5');
+        await start.press('Enter');
+        await expect(start).toHaveValue('2.5');
+        const end = bounds.getByRole('textbox', {
+          name: label('gallery.videoReview.rangeEnd'),
+          exact: true,
+        });
+        const previous = await end.inputValue();
+        await end.fill('5');
+        await end.press('Escape');
+        await expect(end).toHaveValue(previous);
+        await page.screenshot({
+          path: info.outputPath('cut-bounds-first.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await transition.click();
+        const settings = review.locator('[data-ui="gallery.videoReview.cutTransition"]');
+        await settings
+          .getByRole('button', {
+            name: label('gallery.videoReview.zoomTransitionType'),
+            exact: true,
+          })
+          .click();
+        await page
+          .getByRole('option', { name: label('gallery.videoReview.cutDissolve'), exact: true })
+          .click();
+        const hint = settings.getByRole('status');
+        await hint.scrollIntoViewIfNeeded();
+        await expect(hint).toHaveCSS('padding-left', '8px');
+        const hintBounds = (await hint.boundingBox())!;
+        const settingsBounds = (await settings.boundingBox())!;
+        expect(hintBounds.x).toBeGreaterThanOrEqual(settingsBounds.x - 1);
+        expect(hintBounds.x + hintBounds.width).toBeLessThanOrEqual(
+          settingsBounds.x + settingsBounds.width + 1
+        );
+        await page.screenshot({
+          path: info.outputPath('cut-transition-status.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await command('gallery.videoReview.textTrackOpen').click();
+        const document = review.locator('[data-ui="gallery.videoReview.textDocument"]');
+        await document
+          .getByRole('button', { name: label('gallery.videoReview.textFragmentAdd'), exact: true })
+          .click();
+        await document
+          .getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
+          .fill('Один фрагмент текста');
+        await review
+          .locator('[data-ui="gallery.videoReview.textTrack"] [data-text-id]')
+          .first()
+          .click();
+        const detail = review.locator('[data-ui="gallery.videoReview.textPhrase"]');
+        await expect(
+          detail.locator(':scope > div').first().locator('button[aria-expanded]')
+        ).toHaveCount(0);
+        await expect(detail).toHaveCSS('border-top-width', '0px');
+        const text = detail.getByRole('textbox', {
+          name: label('gallery.videoReview.speechText'),
+          exact: true,
+        });
+        expect((await text.boundingBox())!.height).toBeGreaterThanOrEqual(120);
+        await text.focus();
+        await text.scrollIntoViewIfNeeded();
+        await text.press('Tab');
+        await page.keyboard.press('Shift+Tab');
+        await expect(text).toBeFocused();
+        await expect(text).toHaveCSS('outline-style', 'solid');
+        const neutral = await text.evaluate((node) => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--sniptale-color-border-soft)';
+          node.parentElement!.appendChild(probe);
+          const color = getComputedStyle(probe).color;
+          probe.remove();
+          return color;
+        });
+        await expect(text).toHaveCSS('border-top-color', neutral);
+        await expect(text).toHaveCSS('box-shadow', 'none');
+        await expect(text).toHaveCSS('outline-width', '1px');
+        await page.screenshot({
+          path: info.outputPath('single-text-editor.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await detail
+          .getByRole('button', { name: label('gallery.videoReview.speechJump'), exact: true })
+          .click();
+        await expect(detail).toBeVisible();
+        await detail
+          .locator('summary')
+          .filter({ hasText: label('gallery.videoReview.intervalBounds') })
+          .click();
+        const time = detail.getByRole('textbox', {
+          name: label('gallery.videoReview.textFragmentStart'),
+          exact: true,
+        });
+        await time.scrollIntoViewIfNeeded();
+        const unit = time.locator('..').locator(':scope > span');
+        await expect(unit).toBeVisible();
+        expect((await unit.innerText()).trim()).not.toBe('');
+        expect(
+          await review
+            .locator('.review-inspector-scroll')
+            .evaluate((node) => node.scrollWidth <= node.clientWidth + 1)
+        ).toBe(true);
+        await page.screenshot({
+          path: info.outputPath('single-text-bounds.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+      } finally {
+        await closeExtensionBrowser(launched);
+      }
+    });
+  }

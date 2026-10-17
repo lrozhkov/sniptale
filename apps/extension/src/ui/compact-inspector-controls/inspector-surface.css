@@ -679,12 +679,20 @@
 }
 .sniptale-compact-workspace .sniptale-text-value > .sniptale-parameter-textarea {
   width: 100%;
+  height: auto;
   min-height: 80px;
   padding: 8px 32px 8px 8px;
   border-radius: 4px;
   font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   text-align: start;
   resize: vertical;
+}
+.sniptale-compact-workspace
+  .sniptale-text-value
+  > .sniptale-parameter-textarea:is(:hover, :focus):not(:disabled) {
+  border-color: var(--sniptale-color-border-soft) !important;
+  background: var(--sniptale-color-surface-input) !important;
+  box-shadow: none !important;
 }
 .sniptale-compact-workspace .sniptale-text-value:has(:disabled) > .sniptale-field-clear {
   display: none;
@@ -935,7 +943,7 @@
 .sniptale-compact-workspace
   [data-ui='shared.ui.color-selector.trigger']
   span:has(> input:focus-visible),
-.sniptale-compact-workspace .sniptale-text-value > input:focus-visible {
+.sniptale-compact-workspace .sniptale-text-value > :is(input, textarea):focus-visible {
   outline: 1px solid var(--sniptale-color-border-strong) !important;
   outline-offset: -1px;
 }

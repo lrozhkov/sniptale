@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Clock3, Merge, Scissors, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, LocateFixed, Merge, Scissors, Trash2 } from 'lucide-react';
 import { TextareaField } from '../../ui/compact-inspector-controls';
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import {
@@ -37,14 +37,45 @@ function PhraseSummary({
   onSelect(): void;
   expanded: boolean;
   batch: boolean;
-  index: number;
+  index?: number | undefined;
   onToggle?: (() => void) | undefined;
   onJump?: (() => void) | undefined;
   playing: boolean;
   disabled: boolean;
 }) {
+  const content = (
+    <>
+      {onToggle ? (
+        <ChevronDown size={14} className={`shrink-0 ${expanded ? '' : '-rotate-90'}`} />
+      ) : null}
+      {index !== undefined ? (
+        <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {index + 1}
+        </span>
+      ) : null}
+      {playing && (
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--sniptale-color-accent)]"
+        />
+      )}
+      {!expanded && (
+        <span className="min-w-0 flex-1 truncate">
+          {phrase.text || translate('gallery.videoReview.speechText')}
+        </span>
+      )}
+      <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
+        {formatSpeechTime(phrase.start)}–{formatSpeechTime(phrase.end)}
+      </span>
+    </>
+  );
   return (
-    <div className="flex min-w-0 items-center gap-2 text-xs">
+    <div
+      className={[
+        'flex min-w-0 items-center gap-2 text-xs',
+        onToggle ? '' : 'border-b border-[var(--sniptale-color-border-soft)] pb-2',
+      ].join(' ')}
+    >
       {batch && (
         <label
           className="review-history-checkbox"
@@ -59,33 +90,20 @@ function PhraseSummary({
           <span aria-hidden="true">{selected && <Check size={12} />}</span>
         </label>
       )}
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={onToggle}
-        disabled={disabled}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-        title={phrase.text}
-      >
-        <ChevronDown size={14} className={`shrink-0 ${expanded ? '' : '-rotate-90'}`} />
-        <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
-          {(index ?? 0) + 1}
-        </span>
-        {playing && (
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--sniptale-color-accent)]"
-          />
-        )}
-        {!expanded && (
-          <span className="min-w-0 flex-1 truncate">
-            {phrase.text || translate('gallery.videoReview.speechText')}
-          </span>
-        )}
-        <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
-          {formatSpeechTime(phrase.start)}–{formatSpeechTime(phrase.end)}
-        </span>
-      </button>
+      {onToggle ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggle}
+          disabled={disabled}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          title={phrase.text}
+        >
+          {content}
+        </button>
+      ) : (
+        <span className="flex min-w-0 flex-1 items-center gap-2">{content}</span>
+      )}
       {onJump && (
         <ReviewButton
           label={translate('gallery.videoReview.speechJump')}
@@ -93,7 +111,7 @@ function PhraseSummary({
           onClick={onJump}
           disabled={resultInterval === null}
         >
-          <Clock3 size={14} />
+          <LocateFixed size={14} />
         </ReviewButton>
       )}
     </div>
@@ -137,7 +155,10 @@ export function ReviewTextPhrase(props: {
   }, [props.focus, props.expanded]);
   return (
     <article
-      className="min-w-0 space-y-2 border-t border-[var(--sniptale-color-border-soft)] py-2"
+      className={[
+        'min-w-0 space-y-2 py-2',
+        props.onToggle ? 'border-t border-[var(--sniptale-color-border-soft)]' : '',
+      ].join(' ')}
       data-ui="gallery.videoReview.textPhrase"
       data-text-id={fragment.id}
     >
@@ -147,7 +168,7 @@ export function ReviewTextPhrase(props: {
         onSelect={props.onSelect ?? (() => undefined)}
         expanded={props.expanded}
         batch={props.batch ?? false}
-        index={props.index ?? 0}
+        index={props.index}
         onToggle={props.onToggle}
         onJump={props.onJump}
         playing={playhead >= fragment.start && playhead < fragment.end}
@@ -157,7 +178,7 @@ export function ReviewTextPhrase(props: {
         <>
           <TextareaField
             ref={textarea}
-            rows={3}
+            rows={6}
             maxLength={16000}
             label={translate('gallery.videoReview.speechText')}
             value={fragment.text}
@@ -215,10 +236,11 @@ export function ReviewTextPhrase(props: {
           />
           <ReviewDetails
             preferenceId="group:text-timing"
-            label={translate('gallery.videoReview.speechPhraseTiming')}
+            label={translate('gallery.videoReview.intervalBounds')}
           >
             <ReviewNumberRow
               label={translate('gallery.videoReview.textFragmentStart')}
+              unit="s"
               value={fragment.start}
               min={0}
               max={fragment.end - 0.01}
@@ -229,6 +251,7 @@ export function ReviewTextPhrase(props: {
             />
             <ReviewNumberRow
               label={translate('gallery.videoReview.textFragmentEnd')}
+              unit="s"
               value={fragment.end}
               min={fragment.start + 0.01}
               max={props.limit}
