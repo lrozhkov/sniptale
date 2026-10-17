@@ -201,7 +201,9 @@ it.each(['compact-grid', 'large-grid', 'list'] as const)(
     expect(onProjectOpen.mock.calls).toEqual([[video], [scenario]]);
     expect(container!.textContent).toContain(video.filename);
     expect(container!.textContent).toContain(scenario.filename);
-    expect(container!.textContent).toContain(translate('gallery.preview.clips'));
+    if (viewMode === 'list')
+      expect(container!.textContent).toContain(translate('gallery.preview.clips'));
+    else expect(container!.textContent).not.toContain(translate('gallery.preview.editableProject'));
   }
 );
 

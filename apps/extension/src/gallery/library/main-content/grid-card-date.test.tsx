@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createMediaItem } from '../actions/test-support';
 import { translate } from '../../../platform/i18n';
-import { GalleryGridCardDate } from './grid-card-date';
+import { GalleryGridCardDate, GalleryCardExpiration } from './grid-card-date';
 
 vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
@@ -39,24 +39,33 @@ it('labels a non-expiring draft creation date and leaves a saved card without a 
     createdAt: 12,
     lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 12 },
   });
-  act(() => root?.render(<GalleryGridCardDate items={[draft]} compact />));
+  act(() =>
+    root?.render(
+      <>
+        <GalleryGridCardDate items={[draft]} />
+        <GalleryCardExpiration items={[draft]} />
+      </>
+    )
+  );
   const date = container?.querySelector('span[title]');
   expect(date?.textContent).toBe('date:12');
   expect(date?.getAttribute('title')).toContain('date:12');
-  expect(date?.getAttribute('title')).toContain(translate('gallery.app.draftNoExpiration'));
-  expect(date?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
+  expect(
+    container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
+  ).toBe(translate('gallery.app.draftNoExpiration'));
+  expect(container?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
 
   const saved = createMediaItem({
     createdAt: 13,
     lifecycle: { savedAt: 13, storageClass: 'library', updatedAt: 13 },
   });
-  act(() => root?.render(<GalleryGridCardDate items={[saved]} compact />));
+  act(() => root?.render(<GalleryGridCardDate items={[saved]} />));
   expect(container?.textContent).toContain('date:13');
   expect(container?.querySelector('svg')).toBeNull();
 });
 
 it.each(['compact-grid', 'large-grid'] as const)(
-  'shows the Trash date and aligned icon on deleted material cards in %s',
+  'keeps the creation date on deleted material cards in %s',
   (viewMode) => {
     const item = createMediaItem({
       createdAt: 1,
@@ -87,18 +96,15 @@ it.each(['compact-grid', 'large-grid'] as const)(
     const metadata = container?.querySelector<HTMLElement>(
       `[data-ui="gallery.${viewMode === 'compact-grid' ? 'compact' : 'large'}.metadata"]`
     );
-    expect(metadata?.textContent).toContain('date:3');
-    expect(metadata?.textContent).not.toContain('date:1');
-    const icon = metadata?.querySelector('svg.lucide-trash-2');
-    expect(icon?.classList.toString()).toContain('lucide-trash');
-    expect(icon?.getAttribute('aria-hidden')).toBe('true');
-    expect(icon?.classList.toString()).toContain('h-3.5 w-3.5 shrink-0');
+    expect(metadata?.textContent).toContain('date:1');
+    expect(metadata?.textContent).not.toContain('date:3');
+    expect(metadata?.querySelector('svg.lucide-trash-2')).toBeNull();
     expect(metadata?.className).toContain('text-[var(--sniptale-color-text-muted)]');
   }
 );
 
 it.each(['compact-grid', 'large-grid'] as const)(
-  'shows the Trash date and aligned icon on deleted recording groups in %s',
+  'keeps the creation date on deleted recording groups in %s',
   (viewMode) => {
     const item = createMediaItem({
       createdAt: 1,
@@ -138,12 +144,59 @@ it.each(['compact-grid', 'large-grid'] as const)(
     const metadata = container?.querySelector<HTMLElement>(
       `[data-ui="gallery.${viewMode === 'compact-grid' ? 'compact' : 'large'}.group-metadata"]`
     );
-    expect(metadata?.textContent).toContain('date:3');
-    expect(metadata?.textContent).not.toContain('date:1');
-    const icon = metadata?.querySelector('svg.lucide-trash-2');
-    expect(icon?.classList.toString()).toContain('lucide-trash');
-    expect(icon?.getAttribute('aria-hidden')).toBe('true');
-    expect(icon?.classList.toString()).toContain('h-3.5 w-3.5 shrink-0');
+    expect(metadata?.textContent).toContain('date:1');
+    expect(metadata?.textContent).not.toContain('date:3');
+    expect(metadata?.querySelector('svg.lucide-trash-2')).toBeNull();
     expect(metadata?.className).toContain('text-[var(--sniptale-color-text-muted)]');
   }
 );
+
+it('keeps creation as the main date when a temporary item has an expiry', () => {
+  const item = {
+    ...createMediaItem({
+      createdAt: 12,
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 12 },
+    }),
+    expiresAt: 99,
+  };
+  act(() => root?.render(<GalleryGridCardDate items={[item]} />));
+  expect(container?.textContent).toBe('date:12');
+});
+
+it('keeps the earliest known group expiry in the badge and below the list creation date', () => {
+  const items = [99, 88].map((expiresAt) => ({
+    ...createMediaItem({
+      createdAt: 12,
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 12 },
+    }),
+    expiresAt,
+  }));
+  act(() =>
+    root?.render(
+      <>
+        <GalleryGridCardDate items={items} presentation="list" />
+        <GalleryCardExpiration items={items} />
+      </>
+    )
+  );
+  expect(container?.textContent).toContain('date:12');
+  expect(container?.textContent).toContain(`${translate('gallery.app.draftExpires')} date:88`);
+  expect(
+    container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
+  ).toBe(`${translate('gallery.app.draftExpires')} date:88`);
+  expect(container?.textContent).not.toContain('date:99');
+});
+
+it('does not invent a zero timestamp for an unknown expiry', () => {
+  const item = {
+    ...createMediaItem({
+      createdAt: 12,
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 12 },
+    }),
+    expiresAt: null,
+  };
+  act(() => root?.render(<GalleryGridCardDate items={[item]} presentation="list" />));
+  expect(container?.textContent).toContain('date:12');
+  expect(container?.textContent).toContain(translate('gallery.app.draftNoExpiration'));
+  expect(container?.textContent).not.toContain('date:0');
+});

@@ -241,6 +241,8 @@ for (const locale of ['ru', 'en'] as const) {
             .getByRole('button', { name: label('gallery.app.selectItem'), exact: true })
             .locator('span[aria-hidden]');
           const markBox = (await mark.boundingBox())!;
+          expect(markBox.width).toBe(24);
+          expect(markBox.height).toBe(24);
           expect(
             await mark.evaluate((node) => parseFloat(getComputedStyle(node).borderRadius))
           ).toBeGreaterThanOrEqual(markBox.width / 2);
@@ -733,7 +735,30 @@ for (const theme of ['light', 'dark'] as const) {
       'title',
       label('gallery.app.trashSizeExplanation')
     );
-    await expect(page.locator('[data-ui="gallery.trash.retention"]')).toBeVisible();
+    const retention = page.locator('[data-ui="gallery.trash.retention"]');
+    await expect(retention).toBeVisible();
+    const toggle = retention.getByRole('switch', {
+      name: label('gallery.app.trashRetentionEnabled'),
+      exact: true,
+    });
+    if (!(await toggle.isChecked())) await toggle.click();
+    await expect(toggle).toBeChecked();
+    await expect(toggle.locator('.sniptale-product-toggle-thumb')).toHaveCSS('width', '16px');
+    await retention
+      .getByRole('button', { name: label('gallery.app.trashRetentionDays'), exact: true })
+      .click();
+    const options = page.getByRole('listbox').getByRole('option');
+    for (const option of await options.all()) {
+      const text = option.locator('.sniptale-select-value-label-menu');
+      expect(
+        await text.evaluate(
+          (node) =>
+            node.getBoundingClientRect().height <= parseFloat(getComputedStyle(node).lineHeight) + 1
+        )
+      ).toBe(true);
+    }
+    await screenshot(page, info, 'trash-retention-menu');
+    await page.keyboard.press('Escape');
     await screenshot(page, info, 'trash-summary');
     await page.getByRole('button', { name: label('gallery.keyboard.title'), exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();

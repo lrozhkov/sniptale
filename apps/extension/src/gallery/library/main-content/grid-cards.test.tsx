@@ -390,7 +390,7 @@ it('renders one unduplicated recording-group title in large grid', () => {
 });
 
 it.each(['compact-grid', 'large-grid'] as const)(
-  'shows the deletion date for draft recording groups in %s',
+  'keeps creation primary and expiry in the group badge in %s',
   (viewMode) => {
     const items = ['display', 'webcam'].map((role, order) => ({
       ...createMediaItem({
@@ -429,14 +429,12 @@ it.each(['compact-grid', 'large-grid'] as const)(
     const metadata = container?.querySelector<HTMLElement>(
       `[data-ui="gallery.${viewMode === 'compact-grid' ? 'compact' : 'large'}.group-metadata"]`
     );
-    expect(metadata?.textContent).toContain('date:99');
-    expect(metadata?.textContent).not.toContain('date:1');
-    expect(metadata?.querySelector('[title]')?.getAttribute('title')).toBe(
-      `${translate('gallery.app.draftExpires')} date:99`
-    );
-    expect(metadata?.querySelector('svg')?.classList.toString()).toContain(
-      viewMode === 'compact-grid' ? 'lucide-trash' : 'lucide-clock'
-    );
+    expect(metadata?.textContent).toContain('date:1');
+    expect(metadata?.textContent).not.toContain('date:99');
+    expect(
+      container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
+    ).toBe(`${translate('gallery.app.draftExpires')} date:99`);
+    expect(metadata?.querySelector('svg')).toBeNull();
   }
 );
 
@@ -544,7 +542,7 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   expect(thumbnail?.getAttribute('data-deferred')).toBe('false');
 });
 
-it('keeps the Created table column limited to the creation date', () => {
+it('keeps creation first and expiry second in the Created table column', () => {
   const draft = {
     ...createMediaItem({
       id: 'draft-1',
@@ -569,12 +567,12 @@ it('keeps the Created table column limited to the creation date', () => {
 
   expect(container?.textContent).toContain('date:1');
   expect(container?.textContent).not.toContain('date:22');
-  expect(container?.textContent).not.toContain('date:99');
-  expect(container?.textContent).not.toContain(translate('gallery.app.draftExpires'));
+  expect(container?.textContent).toContain('date:99');
+  expect(container?.textContent).toContain(translate('gallery.app.draftExpires'));
   expect(container?.textContent).not.toContain(translate('gallery.app.updatingPreview'));
 });
 
-it('shows only the deletion date for drafts in grid cards', () => {
+it('keeps creation visible and expiry in the native badge hint', () => {
   const draft = {
     ...createMediaItem({
       id: 'draft-1',
@@ -599,21 +597,17 @@ it('shows only the deletion date for drafts in grid cards', () => {
     );
   });
 
-  expect(container?.textContent).not.toContain('date:1');
-  expect(container?.textContent).toContain('date:99');
+  expect(container?.textContent).toContain('date:1');
+  expect(container?.textContent).not.toContain('date:99');
   expect(container?.textContent).not.toContain(translate('gallery.app.draftExpires'));
   expect(container?.textContent).not.toContain('date:22');
   const compactMetadata = container?.querySelector('[data-ui="gallery.compact.metadata"]');
   expect(compactMetadata?.className).toContain('whitespace-nowrap');
-  expect(compactMetadata?.textContent).toContain('date:99');
+  expect(compactMetadata?.textContent).toContain('date:1');
   expect(
-    compactMetadata
-      ?.querySelector('[title]:not([data-ui="gallery.card.kind"])')
-      ?.getAttribute('title')
+    container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
   ).toBe(`${translate('gallery.app.draftExpires')} date:99`);
-  expect(compactMetadata?.querySelector('svg.lucide-trash-2')?.classList.toString()).toContain(
-    'lucide-trash'
-  );
+  expect(compactMetadata?.querySelector('svg.lucide-trash-2')).toBeNull();
 });
 
 it('shows grouped recording role and member count outside the thumbnail', () => {

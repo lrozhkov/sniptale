@@ -3,7 +3,8 @@ import { Check } from 'lucide-react';
 
 function getGallerySelectionButtonClassName(selected: boolean, alwaysVisible = false) {
   return [
-    'flex h-8 w-8 cursor-pointer items-center justify-center rounded-[4px] border border-transparent bg-transparent',
+    'flex h-8 w-8 cursor-pointer items-center justify-center rounded-[4px]',
+    'border border-transparent bg-[var(--sniptale-color-surface-panel)]',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
     selected || alwaysVisible
       ? 'opacity-100'
@@ -14,13 +15,13 @@ function getGallerySelectionButtonClassName(selected: boolean, alwaysVisible = f
 /** Neutral selection mark inside a stable 32px collection hit target. */
 function getGallerySelectionMarkClassName(selected: boolean) {
   return [
-    'flex h-5 w-5 items-center justify-center rounded-full border transition-colors',
+    'flex h-6 w-6 items-center justify-center rounded-full border transition-colors',
     selected
       ? [
           'border-[var(--sniptale-color-text-primary)] bg-[var(--sniptale-color-text-primary)]',
           'text-[var(--sniptale-color-surface-panel)]',
         ].join(' ')
-      : 'border-[var(--sniptale-color-border-strong)] bg-[var(--sniptale-color-surface-input)]',
+      : 'border-[var(--sniptale-color-text-secondary)] bg-[var(--sniptale-color-surface-input)]',
   ].join(' ');
 }
 
@@ -40,7 +41,7 @@ export function GallerySelectionButton(props: {
       className={getGallerySelectionButtonClassName(props.selected, props.alwaysVisible)}
     >
       <span className={getGallerySelectionMarkClassName(props.selected)} aria-hidden="true">
-        {props.selected ? <Check className="h-3 w-3" strokeWidth={2.5} /> : null}
+        {props.selected ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : null}
       </span>
     </button>
   );

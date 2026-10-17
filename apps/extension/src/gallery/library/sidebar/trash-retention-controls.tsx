@@ -56,6 +56,8 @@ function TrashRetentionSettings(props: GalleryTrashRetentionProps) {
               id="gallery-trash-retention-days"
               aria-label={translate('gallery.app.trashRetentionDays')}
               controlSize="sm"
+              menuClassName="gallery-trash-retention-menu"
+              menuWidth={144}
               containerClassName="!w-auto min-w-0 shrink-0"
               disabled={disabled}
               options={dayOptions}
@@ -90,7 +92,7 @@ export function TrashRetentionControls(props: GalleryTrashRetentionProps) {
     <section
       data-ui="gallery.trash.retention"
       aria-label={translate('gallery.app.trashRetentionTitle')}
-      className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
+      className="sniptale-compact-switches space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
     >
       <h3 className="text-sm leading-5 font-semibold text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.app.trashRetentionTitle')}

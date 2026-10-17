@@ -29,7 +29,7 @@ import { memo, useMemo } from 'react';
 import { useCardActions } from './use-card-actions';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { GallerySelectionButton } from './selection-button';
-import { GalleryGridCardDate } from './grid-card-date';
+import { GalleryGridCardDate, GalleryCardExpiration } from './grid-card-date';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -135,6 +135,7 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
           {props.item.tags.join(', ')}
         </div>
       ) : null}
+      {!isList ? <GalleryCardExpiration items={[props.item]} /> : null}
       <GalleryGridCardSelectionControl
         canSelect={canSelect}
         isList={isList}
@@ -379,7 +380,7 @@ function GalleryRecordingGroupDetails(props: {
         className="flex items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]"
       >
-        <GalleryGridCardDate items={props.items} compact={isCompact} />
+        <GalleryGridCardDate items={props.items} />
         <span className="shrink-0">
           {totalSize > 0
             ? isCompact
@@ -479,6 +480,7 @@ const GalleryRecordingGroupGridCard = memo(
               </button>
             );
           })}
+          <GalleryCardExpiration items={props.items} />
           <div className="absolute left-3 top-3 z-10">
             <GallerySelectionButton
               selected={allSelected}

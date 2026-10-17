@@ -1,7 +1,7 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, type GalleryItem } from '../items';
-import { formatDate, getRecordingGroupRoleLabel } from '../ui';
+import { getRecordingGroupRoleLabel } from '../ui';
 import { translate } from '../../../platform/i18n';
 import { GalleryProjectOpenAction, getGalleryProjectSummary } from '../ui/project-presentation';
 import { GalleryGridCardDate } from './grid-card-date';
@@ -155,7 +155,6 @@ export function GalleryListDetails(
   }
 ) {
   const tagsLabel = props.item.tags.join(', ');
-  const dateLabel = formatDate(props.item.createdAt);
   const source = getGallerySourcePresentation(props.item);
 
   return (
@@ -173,12 +172,8 @@ export function GalleryListDetails(
           </div>
         ) : null}
       </div>
-      <div
-        className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
-        title={dateLabel}
-        role="cell"
-      >
-        {dateLabel}
+      <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]" role="cell">
+        <GalleryGridCardDate items={[props.item]} presentation="list" />
       </div>
       <div className="min-w-0" role="cell">
         <button
@@ -274,7 +269,7 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
           text-[var(--sniptale-color-text-muted)]`}
       >
         {props.leading}
-        <GalleryGridCardDate items={[props.item]} compact={Boolean(props.compact)} />
+        <GalleryGridCardDate items={[props.item]} />
         <span className="shrink-0">
           {props.item.size > 0
             ? props.compact

@@ -22,7 +22,7 @@ export function getGalleryProjectSummary(item: GalleryItem): string | null {
     return translate('gallery.preview.restoreProjectFirst');
   if (!canOpenGalleryProject(item)) return translate('gallery.preview.projectUnavailable');
   if (item.type === 'scenario' || item.type === 'quick-edit-project')
-    return translate('gallery.preview.editableProject');
+    return formatDate(item.createdAt);
   return [
     `${translate('gallery.preview.clips')}: ${item.project.clipCount}`,
     `${translate('gallery.preview.tracks')}: ${item.project.trackCount}`,
@@ -91,9 +91,7 @@ export function GalleryProjectDetails(props: {
   const isList = props.viewMode === 'list';
   const isCompact = props.viewMode === 'compact-grid';
   const gridSummary =
-    props.item.type === 'scenario' &&
-    canOpenGalleryProject(props.item) &&
-    props.item.lifecycle?.trashedAt === undefined
+    canOpenGalleryProject(props.item) && props.item.lifecycle?.trashedAt === undefined
       ? formatDate(props.item.createdAt)
       : summary;
   return (

@@ -291,7 +291,7 @@ function GalleryTrashControls(props: GallerySidebarProps) {
             compact
             type="button"
             disabled={props.busy || !props.selectedCount}
-            className="w-full !justify-start"
+            className="gallery-trash-danger w-full !justify-start"
             onClick={(event) =>
               props.onDeleteTrash?.({ anchor: event.currentTarget, keyboard: event.detail === 0 })
             }
@@ -311,7 +311,7 @@ function GalleryTrashControls(props: GallerySidebarProps) {
           compact
           type="button"
           disabled={props.busy || !props.trashSummary?.count}
-          className="w-full !justify-start"
+          className="gallery-trash-danger w-full !justify-start"
           onClick={(event) =>
             props.onEmptyTrash?.({ anchor: event.currentTarget, keyboard: event.detail === 0 })
           }

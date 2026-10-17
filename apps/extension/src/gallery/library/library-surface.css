@@ -97,3 +97,10 @@
     color: var(--sniptale-color-danger) !important;
   }
 }
+
+.sniptale-library-workspace .gallery-trash-danger {
+  color: var(--sniptale-color-danger) !important;
+}
+.gallery-trash-retention-menu .sniptale-select-value-label {
+  white-space: nowrap;
+}

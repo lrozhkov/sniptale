@@ -21,7 +21,7 @@ The inline composer owns its draft until Save or Cancel. The specimen locks row 
 
 Align leading controls, titles, metadata, and trailing actions across equivalent rows. Two-line object rows have a 56px minimum height. Long titles can increase height. Use the ordinary weight for titles. Secondary metadata uses the shared caption role and readable secondary foreground. Reserve dim text for decorative or unavailable content. Meaningful metadata must meet the normal text contrast requirement. Keep hit regions contiguous. Paint selected and hovered surfaces 1px inside each vertical edge, creating a 2px visual separator.
 
-Do not merge separate objects into a selected block or create dead click gaps between them. Cards retain their grid gaps and meaningful preview names. Keep persistent type and storage indicators in metadata, outside the artwork. Preserve transient selection targets and the existing virtual row geometry. Reserve trailing action space only when a real action exists. Do not add Info that repeats visible metadata. Secondary actions appear on focus as well as hover and remain available on supported touch flows.
+Do not merge separate objects into a selected block or create dead click gaps between them. Cards retain their grid gaps and meaningful preview names. Keep type and storage class indicators in metadata, outside the artwork. Expiry badges follow the library rule below. Preserve transient selection targets and the existing virtual row geometry. Reserve trailing action space only when a real action exists. Do not add Info that repeats visible metadata. Secondary actions appear on focus as well as hover and remain available on supported touch flows.
 
 Diagnostic tables use their own compact geometry. The 56px object-row minimum does not apply to table rows. Keep column widths stable when values change. Sticky headers need an opaque background so scrolled text cannot overlap their labels.
 
@@ -48,3 +48,7 @@ Preserve row geometry and accepted state for unavailable objects.
 Media properties need a current preview, computer/library acquisition, replacement, cancellation, and pending/error feedback. Use a single-resource contract rather than batch checkboxes. Failure preserves the accepted resource. Decoding, permissions, media lifetime, and library persistence retain their existing owners. Use [Compositions](compositions.md) for the adjoining property controls and [Layers](layers.md) for acquisition surfaces.
 
 Existing integration owners include media-library-list, gallery selection-bar, and material-browser/selectable-card.
+
+Library cards keep the creation date as their primary date. Show an automatic removal deadline separately. Grid cards use a trailing header icon with a native title. Table rows place the deadline below the creation date. Do not replace creation with expiry or treat an unknown expiry as zero. A recording group uses its earliest known member expiry. Project cards use creation dates instead of generic editable-project filler. Keep unavailable and restore notices.
+
+Selection targets over captured pixels need an opaque surface and a visible mark in both themes. The library uses a 24px disc inside a stable 32px target. Preserve selection, open, and range gestures as separate actions.
