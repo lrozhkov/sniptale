@@ -244,13 +244,15 @@ function AutosaveSwitch({ props }: { props: AutosaveControlProps }) {
       <span
         aria-hidden="true"
         className={[
-          'relative h-5 w-9 shrink-0 rounded-full border border-[var(--sniptale-color-border-soft)]',
-          'bg-[var(--sniptale-color-surface-hover)] transition-colors',
+          'relative h-7 w-10 shrink-0 border-0 bg-transparent',
           'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
-          'peer-checked:bg-[var(--sniptale-color-text-secondary)]',
-          'before:absolute before:left-0.5 before:top-0.5 before:size-3.5 before:rounded-full',
-          'before:bg-[var(--sniptale-color-surface-panel)] before:shadow-sm',
-          'before:transition-transform peer-checked:before:translate-x-4',
+          'peer-focus-visible:outline-[var(--sniptale-color-accent)]',
+          'before:absolute before:inset-x-3 before:top-[13px] before:h-0.5 before:rounded-sm',
+          'before:bg-[var(--sniptale-color-text-dim)] peer-checked:before:bg-[var(--sniptale-color-accent)]',
+          'after:absolute after:left-1 after:top-1.5 after:size-4 after:rounded-full after:border',
+          'after:border-[var(--sniptale-color-text-muted)] after:bg-[var(--sniptale-color-toggle-thumb)]',
+          'after:transition-transform after:duration-100 peer-checked:after:translate-x-4',
+          'motion-reduce:after:transition-none',
         ].join(' ')}
       />
     </label>

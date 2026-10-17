@@ -275,22 +275,79 @@ async function inspectLayers(page: Page, locale: Locale, info: TestInfo) {
   await expect(ui(page, 'editor.floating.layer-effects-panel')).toHaveCount(0);
 }
 
-async function inspectCommands(page: Page, locale: Locale, info: TestInfo) {
+async function inspectDocumentFields(page: Page, locale: Locale, info: TestInfo) {
   const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const toolbar = ui(page, 'editor.floating.document-bar.surface');
+  const resting = (await toolbar.boundingBox())!;
   const titleTrigger = ui(page, 'editor.floating.document-bar.title');
   await titleTrigger.click();
   const title = page.getByRole('textbox', { name: label('editor.page.renameImage'), exact: true });
   const draft = await title.inputValue();
-  await page
-    .getByRole('button', {
-      name: label('shared.ui.clearField').replace('{field}', label('editor.page.renameImage')),
-      exact: true,
-    })
-    .click();
-  await expect(title).toHaveValue('');
+  const editing = (await toolbar.boundingBox())!;
+  const fieldGeometry = await title.evaluate((node) => {
+    const css = getComputedStyle(node);
+    const parent = node.parentElement!;
+    return {
+      input: node.getBoundingClientRect().toJSON(),
+      parent: parent.getBoundingClientRect().toJSON(),
+      display: css.display,
+      padding: css.padding,
+      minHeight: css.minHeight,
+      lineHeight: css.lineHeight,
+      border: css.borderWidth,
+      fontSize: css.fontSize,
+    };
+  });
+  expect
+    .soft(
+      Math.abs(editing.height - resting.height),
+      JSON.stringify({ resting, editing, fieldGeometry })
+    )
+    .toBeLessThanOrEqual(1);
+  await expect
+    .soft(
+      page.getByRole('button', {
+        name: label('shared.ui.clearField').replace('{field}', label('editor.page.renameImage')),
+        exact: true,
+      })
+    )
+    .toHaveCount(0);
+  await screenshot(page, info, 'rename-document');
+  await title.fill('');
   await expect(title).toBeFocused();
   await title.press('Escape');
   await expect(titleTrigger).toHaveAttribute('title', draft);
+  const autosave = page.locator('[data-ui="autosave-control"] button').first();
+  await autosave.click();
+  const toggle = page.getByRole('switch', {
+    name: label('editor.documentActions.autosaveSwitch'),
+    exact: true,
+  });
+  const drawing = toggle.locator('xpath=following-sibling::span');
+  await expect.poll(async () => (await drawing.boundingBox())!.width).toBe(40);
+  const shape = await drawing.evaluate((node) => ({
+    width: node.getBoundingClientRect().width,
+    height: node.getBoundingClientRect().height,
+    border: getComputedStyle(node).borderTopWidth,
+    rail: getComputedStyle(node, '::before').height,
+    thumb: getComputedStyle(node, '::after').width,
+  }));
+  expect.soft(shape).toEqual({ width: 40, height: 28, border: '0px', rail: '2px', thumb: '16px' });
+  const enabled = await toggle.isChecked();
+  await toggle.press('Space');
+  await expect(toggle).toBeChecked({ checked: !enabled });
+  await screenshot(page, info, 'autosave-compact-switch');
+  await toggle.press('Space');
+  await expect(toggle).toBeChecked({ checked: enabled });
+  await toggle.press('Escape');
+  await expect(toggle).toHaveCount(0);
+  await expect(autosave).toBeFocused();
+}
+
+async function inspectCommands(page: Page, locale: Locale, info: TestInfo) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const titleTrigger = ui(page, 'editor.floating.document-bar.title');
+  await inspectDocumentFields(page, locale, info);
   await page.keyboard.press('Control+k');
   const palette = ui(page, 'editor.command-palette');
   await expect(palette).toBeVisible();
@@ -447,4 +504,14 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(trigger).toHaveAttribute('title', accepted ?? '');
     await expect(trigger).toBeFocused();
   });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`image document fields ${theme} ${viewport.name}`, async ({ page, extensionId }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openImage(page, extensionId, 'ru', theme);
+      await inspectDocumentFields(page, 'ru', info);
+    });
+  }
 }

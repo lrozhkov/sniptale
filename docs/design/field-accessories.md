@@ -12,7 +12,7 @@ Show Clear only while the pointer hovers over the actual input or Clear target, 
 
 Hide clear when empty, read-only, or disabled. Synchronize it after input and programmatic value/state changes. A multiline clear target sits at the upper trailing edge, not the vertical center.
 
-Structured values such as HEX can explicitly omit clearing when an empty value is invalid.
+Structured values such as HEX can explicitly omit clearing when an empty value is invalid. A compact rename control can also omit Clear when an adjacent cross closes the document. Preserve full text selection and keyboard replacement. Match the edit height to the surrounding toolbar controls.
 
 ## Compound fields and dictation
 

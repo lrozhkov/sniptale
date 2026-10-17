@@ -1,4 +1,3 @@
-import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
@@ -15,7 +14,6 @@ export function EditorDocumentTitleEditor(props: {
   const controller = useEditorController();
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const pending = useRef(false);
   const restoreFocus = useRef(false);
   const [draft, setDraft] = useState<string | null>(null);
@@ -45,7 +43,6 @@ export function EditorDocumentTitleEditor(props: {
   }, [props.aggregateId, props.hasImage]);
   const editing = draft !== null;
   const focusInput = useCallback((input: HTMLInputElement | null) => {
-    inputRef.current = input;
     input?.focus();
     input?.select();
   }, []);
@@ -101,8 +98,8 @@ export function EditorDocumentTitleEditor(props: {
             readOnly={saving}
             value={draft}
             className={[
-              'w-full min-w-0 rounded-[4px] border border-[var(--sniptale-color-border-strong)]',
-              'bg-[var(--sniptale-color-surface-panel)] pl-2 pr-8 py-1.5 text-[13px] font-medium leading-[18px]',
+              'block h-9 w-full min-w-0 rounded-[4px] border border-[var(--sniptale-color-border-strong)]',
+              'bg-[var(--sniptale-color-surface-panel)] px-2 py-1.5 text-[13px] font-medium leading-[18px]',
               'text-[var(--sniptale-color-text-primary)] outline-none focus-visible:ring-1',
               'focus-visible:ring-[var(--sniptale-color-border-strong)]',
             ].join(' ')}
@@ -123,9 +120,6 @@ export function EditorDocumentTitleEditor(props: {
               }
             }}
           />
-          {!saving && draft ? (
-            <InspectorFieldClear label={translate('editor.page.renameImage')} target={inputRef} />
-          ) : null}
           {saving ? (
             <LoaderCircle
               aria-hidden="true"

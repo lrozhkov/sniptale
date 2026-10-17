@@ -35,6 +35,24 @@ for (const width of [1280, 1920])
         await button('gallery.videoReview.advancedEditing').click();
         await page.evaluate(() => document.fonts.ready);
         const toolbar = page.locator('.review-timeline-toolbar');
+        const autosave = toolbar.locator('[data-ui="autosave-control"] button');
+        await autosave.click();
+        const autosaveToggle = page.getByRole('switch', {
+          name: label('editor.documentActions.autosaveSwitch'),
+          exact: true,
+        });
+        const drawing = autosaveToggle.locator('xpath=following-sibling::span');
+        await expect.poll(async () => (await drawing.boundingBox())!.width).toBe(40);
+        await expect(drawing).toHaveCSS('height', '28px');
+        expect(await drawing.evaluate((node) => getComputedStyle(node, '::before').height)).toBe(
+          '2px'
+        );
+        expect(await drawing.evaluate((node) => getComputedStyle(node, '::after').width)).toBe(
+          '16px'
+        );
+        await page.screenshot({ path: info.outputPath('autosave-compact.png'), fullPage: false });
+        await autosaveToggle.press('Escape');
+        await expect(autosave).toBeFocused();
         const exportButton = toolbar.locator('[data-ui="gallery.videoReview.openExport"]');
         const help = toolbar.getByRole('button', {
           name: label('gallery.keyboard.title'),

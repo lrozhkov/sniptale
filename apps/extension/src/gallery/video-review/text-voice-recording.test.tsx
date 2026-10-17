@@ -29,7 +29,7 @@ let created: number;
 let stopped: ReturnType<typeof vi.fn>;
 
 function fixture(
-  beforeRequest = vi.fn(async () => undefined),
+  beforeRequest: () => Promise<void> = vi.fn(async () => undefined),
   options?: { maximum: number; pendingText: boolean }
 ) {
   const advanced = createQuickEditAdvancedState();

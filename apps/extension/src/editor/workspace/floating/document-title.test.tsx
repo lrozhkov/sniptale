@@ -56,6 +56,12 @@ afterEach(() => {
   container.remove();
 });
 
+it('keeps rename separate from document closing without an extra Clear command', () => {
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
+  expect(container.querySelectorAll('button:not([hidden])').length).toBe(2);
+  expect(input().value).toBe('Original.png');
+});
+
 it('selects the title, hides actions, commits once and restores keyboard focus', async () => {
   expect(document.activeElement).toBe(input());
   expect(input().selectionEnd).toBe('Original.png'.length);
@@ -119,10 +125,8 @@ it('discards a draft on document replacement without remounting action controls'
   expect(mocks.rename).not.toHaveBeenCalled();
 });
 
-it('clears the name draft without renaming or losing text focus', () => {
-  const clear = container.querySelector<HTMLButtonElement>('.sniptale-field-clear');
-  expect(clear).not.toBeNull();
-  act(() => clear?.click());
+it('accepts an empty draft without renaming or losing text focus', () => {
+  change('');
   expect(input().value).toBe('');
   expect(document.activeElement).toBe(input());
   expect(mocks.rename).not.toHaveBeenCalled();
