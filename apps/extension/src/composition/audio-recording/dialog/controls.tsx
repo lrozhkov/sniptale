@@ -85,6 +85,7 @@ export function AudioRecordingTransport(props: {
   status: AudioRecordingStatus;
 }) {
   if (props.status === 'recorded') return <RecordedAudioSummary {...props} />;
+  const Panel = props.compact ? 'div' : InspectorPanel;
   return (
     <>
       {!props.compact && (
@@ -92,16 +93,22 @@ export function AudioRecordingTransport(props: {
           {translate('videoEditor.app.recordAudioDescription')}
         </p>
       )}
-      <InspectorPanel
+      <Panel
         data-ui="video-editor.audio-recording.transport"
-        className={props.compact ? 'grid gap-1 p-2' : 'grid gap-3 !rounded-md p-3'}
+        className={props.compact ? 'grid gap-2' : 'grid gap-3 !rounded-md p-3'}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className={props.compact ? 'flex items-baseline gap-2' : undefined}>
             <p className="text-xs font-medium text-[var(--sniptale-color-text-muted)]">
               {translate('videoEditor.app.recordAudioDurationLabel')}
             </p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
+            <p
+              className={
+                props.compact
+                  ? 'tabular-nums text-[var(--sniptale-color-text-primary)]'
+                  : 'mt-1 text-xl font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]'
+              }
+            >
               {props.durationLabel}
             </p>
           </div>
@@ -139,7 +146,7 @@ export function AudioRecordingTransport(props: {
             {props.error}
           </p>
         ) : null}
-      </InspectorPanel>
+      </Panel>
     </>
   );
 }
@@ -151,7 +158,7 @@ function RecordedAudioSummary(props: {
 }) {
   return (
     <div data-ui="video-editor.audio-recording.transport" className="grid gap-2">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm tabular-nums text-[var(--sniptale-color-text-muted)]">
           {translate('videoEditor.app.recordAudioDurationLabel')}: {props.durationLabel}
         </span>
@@ -239,16 +246,21 @@ export function AudioRecordingDeviceSelect(props: {
 /** Preserve the whole original take independently of the selected trim or attachment destination. */
 export function AudioRecordingDownloadButton(props: {
   disabled: boolean;
+  iconOnly?: boolean;
   onDownload: () => Promise<void>;
 }) {
   return (
     <ProductActionButton
       tone="secondary"
+      title={props.iconOnly ? translate('videoEditor.app.recordAudioDownloadOriginal') : undefined}
+      aria-label={
+        props.iconOnly ? translate('videoEditor.app.recordAudioDownloadOriginal') : undefined
+      }
       disabled={props.disabled}
       onClick={() => void props.onDownload()}
     >
       <Download size={16} aria-hidden="true" />
-      {translate('videoEditor.app.recordAudioDownloadOriginal')}
+      {!props.iconOnly && translate('videoEditor.app.recordAudioDownloadOriginal')}
     </ProductActionButton>
   );
 }

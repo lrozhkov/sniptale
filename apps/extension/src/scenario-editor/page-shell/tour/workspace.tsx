@@ -1,8 +1,9 @@
 import { getTourAudioResources } from '../../../features/scenario/project/public';
+import { TourNarrationPlacement } from './narration-recording';
 import { TourMusicSettings } from './music-settings';
 import { TourNarrationSettings } from './narration-settings';
 import { TourLibraryPanel } from './library';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -25,6 +26,9 @@ export function TourWorkspace(props: TourWorkspaceProps) {
   const state = useTourSelection(project, disabled, onChange, props.initialSlideId);
   const view = useTourViewMode(state.selection, state.slide);
   const [generating, setGenerating] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const recordingOrigin = useRef<boolean | null>(null);
+  const [recordingHost, setRecordingHost] = useState<HTMLDivElement | null>(null);
   const selectedImage =
     state.slide?.kind === 'image' ? state.slide.image : state.slide?.background.image;
   const editImage =
@@ -43,73 +47,108 @@ export function TourWorkspace(props: TourWorkspaceProps) {
   const upload = (file: File, signal: AbortSignal) =>
     onImport({ sources: [{ kind: 'file', file }], placement: { kind: 'tour-slides' }, signal });
   return (
-    <GuideResourceDrawer t={t} disabled={importDisabled} selectedStepId={null} onImport={onImport}>
-      <TourImageDropZone
-        project={project}
-        disabled={importDisabled}
+    <TourNarrationPlacement.Provider
+      value={{
+        host: recordingHost,
+        setActive: (active) => {
+          if (active) {
+            recordingOrigin.current ??= panels.rightOpen;
+            panels.openRight(panels.rightScope);
+          } else {
+            if (recordingOrigin.current === false && panels.rightOpen) panels.toggleRight();
+            recordingOrigin.current = null;
+          }
+          setRecording(active);
+        },
+      }}
+    >
+      <GuideResourceDrawer
         t={t}
-        onChange={onChange}
-        onImport={(sources, placement, signal) => onImport({ sources, placement, signal })}
+        disabled={importDisabled}
+        selectedStepId={null}
+        onImport={onImport}
       >
-        <ScenarioWorkspaceFrame
-          panels={panels}
-          header={props.header(
-            <div
-              className="tour-header-controls"
-              role="group"
-              aria-label={t('scenario.editor.tourSlideControls')}
-            >
-              <TourViewControls
-                mode={view}
-                previewDisabled={!state.slide}
-                disabled={disabled}
-                t={t}
-              />
-              {editImage && (
-                <ContentToolbarButton
-                  className="guide-labeled-action"
-                  title={t('scenario.editor.guideEditImage')}
-                  data-tour-edit-image={editImage.slideId}
-                  data-header-collapse="3"
-                  disabled={editImage.disabled}
-                  onClick={() => props.onEditImage?.(editImage.slideId)}
-                >
-                  <SquarePen size={16} aria-hidden="true" />
-                  <span>{t('scenario.editor.guideEditImage')}</span>
-                </ContentToolbarButton>
-              )}
-            </div>
-          )}
+        <TourImageDropZone
+          project={project}
+          disabled={importDisabled || recording}
           t={t}
-          left={
-            <TourLibraryPanel
+          onChange={onChange}
+          onImport={(sources, placement, signal) => onImport({ sources, placement, signal })}
+        >
+          <ScenarioWorkspaceFrame
+            interactionBlocked={recording}
+            panels={panels}
+            header={props.header(
+              <div
+                className="tour-header-controls"
+                role="group"
+                aria-label={t('scenario.editor.tourSlideControls')}
+              >
+                <TourViewControls
+                  mode={view}
+                  previewDisabled={!state.slide}
+                  disabled={disabled}
+                  t={t}
+                />
+                {editImage && (
+                  <ContentToolbarButton
+                    className="guide-labeled-action"
+                    title={t('scenario.editor.guideEditImage')}
+                    data-tour-edit-image={editImage.slideId}
+                    data-header-collapse="3"
+                    disabled={editImage.disabled}
+                    onClick={() => props.onEditImage?.(editImage.slideId)}
+                  >
+                    <SquarePen size={16} aria-hidden="true" />
+                    <span>{t('scenario.editor.guideEditImage')}</span>
+                  </ContentToolbarButton>
+                )}
+              </div>
+            )}
+            t={t}
+            left={
+              <TourLibraryPanel
+                {...props}
+                state={state}
+                onSelect={selectSlide}
+                onGenerate={() => setGenerating(true)}
+                onUpload={upload}
+              />
+            }
+            right={
+              <>
+                <div style={{ display: recording ? 'none' : 'contents' }} inert={recording}>
+                  <TourSettingsPanel {...props} state={state} onSelectObject={selectObject} />
+                </div>
+                <FloatingChromePanel
+                  id="tour-recording-inspector"
+                  className="guide-inspector-panel tour-inspector-panel sniptale-inspector-surface"
+                  hidden={!recording}
+                >
+                  <div ref={setRecordingHost} className="h-full min-h-0 min-w-0" />
+                </FloatingChromePanel>
+              </>
+            }
+          >
+            <TourCanvas
               {...props}
               state={state}
-              onSelect={selectSlide}
-              onGenerate={() => setGenerating(true)}
+              view={view.view}
+              previewKey={view.replay}
+              onSelectObject={selectObject}
+              generating={generating}
+              onGenerationChange={setGenerating}
               onUpload={upload}
             />
-          }
-          right={<TourSettingsPanel {...props} state={state} onSelectObject={selectObject} />}
-        >
-          <TourCanvas
-            {...props}
-            state={state}
-            view={view.view}
-            previewKey={view.replay}
-            onSelectObject={selectObject}
-            generating={generating}
-            onGenerationChange={setGenerating}
-            onUpload={upload}
-          />
-          {state.failed && (
-            <p role="alert" className="tour-operation-error">
-              {t('scenario.editor.guideOperationFailed')}
-            </p>
-          )}
-        </ScenarioWorkspaceFrame>
-      </TourImageDropZone>
-    </GuideResourceDrawer>
+            {state.failed && (
+              <p role="alert" className="tour-operation-error">
+                {t('scenario.editor.guideOperationFailed')}
+              </p>
+            )}
+          </ScenarioWorkspaceFrame>
+        </TourImageDropZone>
+      </GuideResourceDrawer>
+    </TourNarrationPlacement.Provider>
   );
 }
 

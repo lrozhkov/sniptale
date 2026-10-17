@@ -429,7 +429,9 @@ function handleGuideHistoryShortcut(
   if (!(event.ctrlKey || event.metaKey) || event.altKey || !matchesUndo) return;
   if (
     event.target instanceof Element &&
-    event.target.closest('[role="dialog"], [role="alertdialog"]')
+    event.target.closest(
+      '[role="dialog"], [role="alertdialog"], [data-ui="audio-recording.inspector"]'
+    )
   )
     return;
   event.preventDefault();

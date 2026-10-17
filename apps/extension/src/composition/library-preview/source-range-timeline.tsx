@@ -6,6 +6,7 @@ import { translate } from '../../platform/i18n';
 type SourceRange = { start: number; end: number };
 
 interface SourceTimelineProps {
+  compactActions?: boolean;
   peaks?: readonly number[] | undefined;
   duration: number;
   fps: number;
@@ -275,7 +276,7 @@ function SourceRangeActions({ props, range }: { props: SourceTimelineProps; rang
         onClick={() => props.onRange({ start: 0, end: props.duration })}
       >
         <ScanLine size={14} aria-hidden="true" />
-        <span>{translate('videoEditor.app.sourceEntireSource')}</span>
+        {!props.compactActions && <span>{translate('videoEditor.app.sourceEntireSource')}</span>}
       </ContentToolbarButton>
     </div>
   );

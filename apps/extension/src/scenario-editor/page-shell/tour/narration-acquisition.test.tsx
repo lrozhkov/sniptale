@@ -3,11 +3,21 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../../platform/i18n';
+import { TourNarrationPlacement } from './narration-recording';
 import { TourNarrationAcquisition } from './narration-acquisition';
 
-const draft = vi.hoisted(() => ({ render: vi.fn() }));
-vi.mock('./narration-recording', () => ({
-  TourNarrationRecording: (props: unknown) => {
+const draft = vi.hoisted(() => ({
+  render:
+    vi.fn<
+      (props: {
+        onApply: (blob: Blob, signal: AbortSignal) => Promise<boolean>;
+        onClose: () => void;
+      }) => void
+    >(),
+}));
+vi.mock('./narration-recording', async (original) => ({
+  ...(await original<typeof import('./narration-recording')>()),
+  TourNarrationRecording: (props: Parameters<typeof draft.render>[0]) => {
     draft.render(props);
     return null;
   },
@@ -170,4 +180,44 @@ it('preserves independent import and catalog binding disable states', () => {
     host.querySelector<HTMLButtonElement>('.tour-audio-picker .tour-audio-name')!.disabled
   ).toBe(true);
   expect(host.querySelector<HTMLFieldSetElement>('fieldset')!.disabled).toBe(false);
+});
+
+it('keeps the captured attachment target while inspector placement changes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  document.body.append(host);
+  root = createRoot(host);
+  const onImport = vi.fn().mockResolvedValue(true);
+  const setActive = vi.fn();
+  const draw = (slideId: string) =>
+    act(() =>
+      root.render(
+        <TourNarrationPlacement.Provider value={{ host, setActive }}>
+          <TourNarrationAcquisition
+            destination={{ slideId, objectId: null, expectedNarration: null }}
+            disabled={false}
+            onImport={onImport}
+            t={createTranslator('en')}
+          />
+        </TourNarrationPlacement.Provider>
+      )
+    );
+  draw('first');
+  act(() => [...host.querySelectorAll('button')].find((b) => b.textContent === 'Record')!.click());
+  expect(setActive).toHaveBeenLastCalledWith(true);
+  draw('second');
+  const recorder = draft.render.mock.calls.at(-1)![0];
+  const blob = new Blob(['take']);
+  const signal = new AbortController().signal;
+  await act(async () => {
+    await recorder.onApply(blob, signal);
+  });
+  expect(onImport).toHaveBeenCalledWith({
+    slideId: 'first',
+    objectId: null,
+    expectedNarration: null,
+    blob,
+    signal,
+  });
+  act(() => recorder.onClose());
+  expect(setActive).toHaveBeenLastCalledWith(false);
 });

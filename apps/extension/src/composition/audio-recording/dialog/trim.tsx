@@ -47,6 +47,7 @@ function AudioRecordingTrimPanel(
         }}
       />
       <SourceRangeTimeline
+        compactActions={props.compact ?? false}
         duration={props.recordedDuration}
         fps={100}
         cursor={cursor}

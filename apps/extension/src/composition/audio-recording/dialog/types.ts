@@ -2,6 +2,9 @@ import type { AudioRecordingTimeline, AudioTrimRange } from '../session-types';
 
 export interface AudioRecordingModalProps {
   isOpen: boolean;
+  /** Inspector placement keeps ordinary Tab navigation and the existing session owner. */
+  presentation?: 'modal' | 'inspector';
+  returnFocusTo?: HTMLElement | null;
   title?: string | undefined;
   saveLabel?: string | undefined;
   captureLimitSeconds?: number | undefined;

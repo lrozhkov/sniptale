@@ -163,6 +163,7 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
 /** Both representations share the same panel geometry, header position and resize gutters. */
 export function ScenarioWorkspaceFrame({
   panels,
+  interactionBlocked = false,
   header,
   left,
   right,
@@ -170,6 +171,7 @@ export function ScenarioWorkspaceFrame({
   t,
 }: {
   panels: ReturnType<typeof useGuidePanels>;
+  interactionBlocked?: boolean;
   header: ReactNode;
   left: ReactNode;
   right: ReactNode;
@@ -184,15 +186,17 @@ export function ScenarioWorkspaceFrame({
       data-left-open={panels.leftOpen}
       data-right-open={panels.rightOpen}
     >
-      {left}
-      {panels.leftOpen && (
+      <div style={{ display: 'contents' }} inert={interactionBlocked}>
+        {left}
+      </div>
+      {!interactionBlocked && panels.leftOpen && (
         <GuidePanelDivider side="left" panels={panels} label={t('scenario.editor.outline')} />
       )}
-      <div ref={hoverIntent} className="guide-center-panel">
+      <div ref={hoverIntent} className="guide-center-panel" inert={interactionBlocked}>
         {header}
         {children}
       </div>
-      {panels.rightOpen && (
+      {!interactionBlocked && panels.rightOpen && (
         <GuidePanelDivider
           side="right"
           panels={panels}
