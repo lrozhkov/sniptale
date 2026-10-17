@@ -82,3 +82,54 @@
   :is(.sniptale-input:not([type='number']), .sniptale-textarea):not(.font-mono) {
   font-family: var(--sniptale-font-document-sans);
 }
+
+/* Settings forms share one quiet surface; other modal consumers retain their own material. */
+.sniptale-settings-workspace .sniptale-modal {
+  background: var(--sniptale-color-surface-panel);
+}
+.sniptale-settings-workspace
+  .sniptale-modal
+  :is(.sniptale-modal-header-sm, .sniptale-modal-footer-sm) {
+  border: 0;
+  background: transparent;
+}
+.sniptale-settings-workspace .sniptale-modal .sniptale-modal-footer-sm {
+  padding: 8px 16px;
+}
+.sniptale-settings-workspace .sniptale-modal .sniptale-modal-body-sm {
+  background: transparent;
+}
+.sniptale-settings-workspace .sniptale-modal .sniptale-modal-field-surface {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.sniptale-settings-workspace
+  .sniptale-modal
+  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error) {
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+.sniptale-settings-workspace
+  .sniptale-modal
+  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):is(:hover, :focus) {
+  border-color: var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-input);
+}
+.sniptale-settings-workspace
+  .sniptale-modal
+  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):focus-visible {
+  border-color: var(--sniptale-color-border-strong);
+}
+
+/* The legacy form focus skin uses important declarations. Keep this override settings-only. */
+.sniptale-settings-workspace
+  .sniptale-modal
+  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):focus {
+  border-color: var(--sniptale-color-border-strong) !important;
+  background: var(--sniptale-color-surface-input) !important;
+  box-shadow: none !important;
+}

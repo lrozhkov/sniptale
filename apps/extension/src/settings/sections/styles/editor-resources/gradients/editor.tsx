@@ -98,7 +98,7 @@ export function GradientPresetEditor(props: {
         </div>
       </ProductModalBody>
       <ProductModalFooter compact>
-        <ProductActionButton disabled={saving} onClick={props.onClose}>
+        <ProductActionButton disabled={saving} onClick={props.onClose} tone="secondary">
           {translate('common.actions.cancel')}
         </ProductActionButton>
         <ProductActionButton

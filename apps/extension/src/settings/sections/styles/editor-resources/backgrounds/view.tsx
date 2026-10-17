@@ -6,6 +6,7 @@ import {
   ProductModalBody,
   ProductModalFooter,
 } from '@sniptale/ui/product-modal';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import { useBackgroundCatalog } from '../../../../../composition/background-resources/catalog';
@@ -114,9 +115,10 @@ export function BackgroundPresetsSettings() {
               }}
             />
           ) : (
-            <label className="grid gap-2 text-xs">
+            <label className="grid gap-1 text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
               {translate('settings.editor.backgrounds.name')}
-              <input
+              <ProductInput
+                placeholder={translate('settings.editor.backgrounds.name')}
                 maxLength={120}
                 value={name}
                 onChange={(event) => setName(event.target.value)}

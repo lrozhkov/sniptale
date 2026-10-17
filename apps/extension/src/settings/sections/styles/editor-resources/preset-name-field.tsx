@@ -25,6 +25,7 @@ export function ResourcePresetNameField(props: {
           aria-label={label}
           disabled={props.disabled}
           maxLength={80}
+          placeholder={label}
           onChange={(event) => props.onChange(event.target.value)}
           value={props.value}
         />

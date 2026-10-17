@@ -92,6 +92,7 @@ export function SurfaceStylePresetEditor(props: {
             <ProductTextarea
               disabled={saving}
               maxLength={4000}
+              placeholder={translate('content.callout.surfaceStyle.advancedCss')}
               onChange={(event) =>
                 setStyle((current) => ({ ...current!, surfaceCss: event.target.value }))
               }
@@ -107,7 +108,7 @@ export function SurfaceStylePresetEditor(props: {
         </div>
       </ProductModalBody>
       <ProductModalFooter compact>
-        <ProductActionButton disabled={saving} onClick={props.onClose}>
+        <ProductActionButton disabled={saving} onClick={props.onClose} tone="secondary">
           {translate('common.actions.cancel')}
         </ProductActionButton>
         <ProductActionButton

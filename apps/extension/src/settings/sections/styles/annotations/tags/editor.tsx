@@ -86,6 +86,7 @@ export function AnnotationTemplateTagEditor(props: {
               autoFocus
               id="annotation-template-tag-name"
               maxLength={32}
+              placeholder={translate('highlighter.templateTags.name')}
               onChange={(event) => setLabel(event.currentTarget.value)}
               value={label}
             />

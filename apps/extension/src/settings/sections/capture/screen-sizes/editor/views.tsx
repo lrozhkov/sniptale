@@ -55,9 +55,13 @@ function ViewportPresetDimensionFields(props: {
   return (
     <div className="sniptale-parameter-stack">
       <div>
-        <SettingsControlRow label={translate('viewportPresets.editor.widthLabel')}>
+        <SettingsControlRow
+          label={translate('viewportPresets.editor.widthLabel')}
+          valueMinimum={80}
+        >
           <ProductInput
             type="number"
+            aria-label={translate('viewportPresets.editor.widthLabel')}
             value={props.width}
             onChange={(event) =>
               props.setWidth(clampViewportDimension(event.target.value, maxViewportPresetDimension))
@@ -66,15 +70,26 @@ function ViewportPresetDimensionFields(props: {
             max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
-            style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
+            style={{
+              MozAppearance: 'textfield',
+              WebkitAppearance: 'none',
+              marginInlineStart: 'auto',
+              maxWidth: 96,
+              textAlign: 'right',
+              display: 'block',
+            }}
           />
         </SettingsControlRow>
       </div>
 
       <div>
-        <SettingsControlRow label={translate('viewportPresets.editor.heightLabel')}>
+        <SettingsControlRow
+          label={translate('viewportPresets.editor.heightLabel')}
+          valueMinimum={80}
+        >
           <ProductInput
             type="number"
+            aria-label={translate('viewportPresets.editor.heightLabel')}
             value={props.height}
             onChange={(event) =>
               props.setHeight(
@@ -85,7 +100,14 @@ function ViewportPresetDimensionFields(props: {
             max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
-            style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
+            style={{
+              MozAppearance: 'textfield',
+              WebkitAppearance: 'none',
+              marginInlineStart: 'auto',
+              maxWidth: 96,
+              textAlign: 'right',
+              display: 'block',
+            }}
           />
         </SettingsControlRow>
       </div>

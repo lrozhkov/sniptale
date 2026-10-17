@@ -17,7 +17,7 @@ Tab from command menus exits relative to the root trigger. Nested Right enters. 
 
 ## Geometry and material
 
-Menus share the light-glass surface, 5px shell inset, 8px row padding, and 32px minimum option row. Leave true 2px gaps between options. Content-toolbar menus use a compact variant: 32px minimum rows, 6px vertical and 8px horizontal padding, 2px row separation, and the same 5px shell inset. Multiline copy increases row height. Anchored editors can use 12px content insets. Dialogs use the shared 8px radius and compact content-driven spacing. Do not reserve a large empty dialog height for short copy. Use clear title/body/action separation.
+Menus share the light-glass surface, 5px shell inset, 8px row padding, and 32px minimum option row. Leave true 2px gaps between options. Content-toolbar menus use a compact variant: 32px minimum rows, 6px vertical and 8px horizontal padding, 2px row separation, and the same 5px shell inset. Multiline copy increases row height. Anchored editors can use 12px content insets. Dialogs use the shared 8px radius and compact content-driven spacing. Do not reserve a large empty dialog height for short copy. Use clear title/body/action separation. Separate short form sections with spacing. Do not add decorative rules between the title, fields and footer. Do not wrap each field in a second card.
 
 Dialog headers and bodies use 16px horizontal and 12px vertical insets. Footers use 16px horizontal and 8px vertical insets, with 8px between commands. Titles use the structural heading role. Messages use the appropriate text role. These defaults do not replace specialized recording strips or edge drawers.
 
