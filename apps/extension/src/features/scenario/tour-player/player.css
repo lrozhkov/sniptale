@@ -49,7 +49,7 @@ a:focus-visible {
 /* One bottom toolbar owns every chrome control; it stays in flow so it can never
    cover the content frame, and auto-hide only changes paint, not geometry. */
 .tour-toolbar {
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
   user-select: none;
   flex: none;
   width: var(--tour-frame-width, 100%);
@@ -82,7 +82,7 @@ a:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: var(--sniptale-font-weight-interface-heading, 500);
 }
 .tour-playback-status {
   flex: 0 1 auto;
@@ -323,7 +323,7 @@ a:focus-visible {
 }
 /* The player owns drawer geometry, including embedded and resized previews. */
 .tour-navigation {
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
   user-select: none;
   position: absolute;
   inset: 0 0 0 auto;
@@ -358,7 +358,7 @@ a:focus-visible {
   margin: 0;
   font-size: 14px;
   line-height: 20px;
-  font-weight: 600;
+  font-weight: var(--sniptale-font-weight-interface-heading, 500);
   overflow-wrap: anywhere;
 }
 .tour-navigation .tour-contents-list {
@@ -730,7 +730,7 @@ a:focus-visible {
   justify-content: flex-end;
   gap: 6px;
   align-items: center;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
   user-select: none;
 }
 .tour-hint-controls button {

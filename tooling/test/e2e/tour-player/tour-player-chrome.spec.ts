@@ -142,15 +142,18 @@ async function buildPlayerHtml(
             contents: `export default ${JSON.stringify(await readFile(args.path, 'utf8'))}`,
             loader: 'js',
           }));
-          plugin.onResolve({ filter: /\.woff2\?inline$/ }, async (args) => {
-            const resolved = await plugin.resolve(args.path.slice(0, -7), {
-              resolveDir: args.resolveDir,
-              kind: 'import-statement',
-            });
-            return resolved.errors.length
-              ? { errors: resolved.errors }
-              : { path: resolved.path, namespace: 'tour-font' };
-          });
+          plugin.onResolve(
+            { filter: /(?:\.woff2|@sniptale\/ui\/styles\/(?:interface|document)-font)\?inline$/ },
+            async (args) => {
+              const resolved = await plugin.resolve(args.path.slice(0, -7), {
+                resolveDir: args.resolveDir,
+                kind: 'import-statement',
+              });
+              return resolved.errors.length
+                ? { errors: resolved.errors }
+                : { path: resolved.path, namespace: 'tour-font' };
+            }
+          );
           plugin.onLoad({ filter: /.*/, namespace: 'tour-font' }, async (args) => ({
             contents: await readFile(args.path),
             loader: 'dataurl',
@@ -421,7 +424,7 @@ async function captureChrome(page: Page, info: TestInfo, name: string) {
   await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
 }
 
-async function expectEmbeddedTypeface(page: Page, selector: string) {
+async function expectEmbeddedTypeface(page: Page, selector: string, family = 'Golos UI VF') {
   const session = await page.context().newCDPSession(page);
   try {
     await session.send('DOM.enable');
@@ -429,7 +432,16 @@ async function expectEmbeddedTypeface(page: Page, selector: string) {
     const { root } = await session.send('DOM.getDocument');
     const { nodeId } = await session.send('DOM.querySelector', { nodeId: root.nodeId, selector });
     const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
-    expect(fonts.some((font) => font.isCustomFont && font.glyphCount > 0)).toBe(true);
+    expect(fonts, `Painted font for ${selector}`).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          isCustomFont: true,
+          familyName: family,
+          glyphCount: expect.any(Number),
+        }),
+      ])
+    );
+    expect(fonts.some((font) => font.glyphCount > 0)).toBe(true);
   } finally {
     await session.detach();
   }
@@ -472,14 +484,15 @@ for (const locale of ['ru', 'en'] as const) {
       await page.evaluate(() => document.fonts.ready);
       await expect(page.locator('.tour-toolbar')).toHaveCSS('font-size', '13px');
       await expect(page.locator('.tour-toolbar')).toHaveCSS('font-family', /Sniptale Interface/u);
-      await expect(page.locator('.tour-hint-text')).toHaveCSS(
-        'font-family',
-        'system-ui, sans-serif'
-      );
+      await expect(page.locator('.tour-hint-text')).toHaveCSS('font-family', /Sniptale Text/u);
       await expect(page.locator('[data-tour-seek]')).toHaveCSS('height', '28px');
       await expect(play).toHaveCSS('height', '32px');
       await expect(play.locator('svg')).toHaveCSS('width', '16px');
       await expectEmbeddedTypeface(page, '.tour-time');
+      await expectEmbeddedTypeface(page, '.tour-hint-text', 'Golos Text VF');
+      await expect
+        .soft(page.locator('.tour-toolbar'))
+        .toHaveCSS('font-weight', '400', { timeout: 100 });
       for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.setViewportSize(size);
         await expectChromeBelowFrame(page);
@@ -491,6 +504,12 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(page.locator('.tour-contents-title')).toContainText(localized.contents);
         await page.evaluate(() => document.fonts.ready);
         await expectEmbeddedTypeface(page, '.tour-contents-title');
+        await expect
+          .soft(page.locator('.tour-contents-title'))
+          .toHaveCSS('font-weight', '500', { timeout: 100 });
+        await expect
+          .soft(drawer.getByRole('button').first())
+          .toHaveCSS('font-weight', '400', { timeout: 100 });
         await captureChrome(page, info, `contents-${name}`);
         await page.keyboard.press('Escape');
         await expect(drawer).not.toBeVisible();
@@ -505,10 +524,12 @@ for (const locale of ['ru', 'en'] as const) {
       }
       await captureChrome(page, info, 'narrow-player');
       expect(externalFonts).toEqual([]);
-      const faces = await page.evaluate(
-        () => [...document.fonts].filter((face) => face.family === 'Sniptale Interface').length
+      const faces = await page.evaluate(() =>
+        [...document.fonts]
+          .filter((face) => face.family === 'Sniptale Interface')
+          .map((face) => ({ weight: face.weight, status: face.status }))
       );
-      expect(faces).toBe(3);
+      expect(faces).toEqual([{ weight: '400 700', status: 'loaded' }]);
     });
   }
 }
