@@ -540,3 +540,35 @@ for (const theme of ['light', 'dark'] as const) {
     });
   }
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`workspace background row ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await openImage(page, extensionId, 'ru', theme);
+      await ui(page, 'editor.floating.view-controls.workspace').click();
+      const row = ui(page, 'editor.workspace.background-default-row');
+      const saveDefault = row.getByRole('button', {
+        name: translate('editor.compact.workspaceMakeDefault', 'ru'),
+        exact: true,
+      });
+      await expect(saveDefault).toHaveText('');
+      const field = ui(page, 'shared.ui.compact-inspector.color-field');
+      await expect(field).toHaveCSS('border-width', '0px');
+      const value = row.locator('[data-ui="shared.ui.color-selector.value-trigger"]');
+      const swatch = row.locator('[data-ui="shared.ui.color-selector.picker-trigger"]');
+      const boxes = await Promise.all(
+        [field, value, swatch, saveDefault].map((node) => node.boundingBox())
+      );
+      const center = (box: NonNullable<(typeof boxes)[number]>) => box.y + box.height / 2;
+      for (const box of boxes)
+        expect(Math.abs(center(box!) - center(boxes[0]!))).toBeLessThanOrEqual(1);
+      expect(boxes[1]!.x + boxes[1]!.width).toBeLessThanOrEqual(boxes[2]!.x + 1);
+      expect(boxes[2]!.x + boxes[2]!.width).toBeLessThanOrEqual(boxes[3]!.x + 1);
+      await screenshot(page, info, 'workspace-background-row');
+    });
+  }
+}

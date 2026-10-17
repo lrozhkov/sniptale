@@ -7,6 +7,7 @@ import { WorkspaceDefaultAction } from './default-action';
 export function renderCompactWorkspaceColorField(params: InspectorCommandParams) {
   return (
     <ColorField
+      className="!min-h-8 !rounded-none !border-0 !bg-transparent !p-0"
       title={translate('editor.compact.workspaceColor')}
       label={translate('editor.compact.workspaceBacking')}
       value={params.workspace.backgroundColor}

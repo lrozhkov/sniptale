@@ -1,3 +1,4 @@
+import { Check, LoaderCircle, Save } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 import { cx } from '../../chrome/ui';
@@ -34,18 +35,33 @@ export function WorkspaceDefaultAction({
         aria-label={translate('editor.compact.workspaceMakeDefault')}
         title={translate('editor.compact.workspaceMakeDefault')}
         disabled={isDisabled}
+        aria-busy={isPending || undefined}
         onClick={() => {
           void onSaveAsDefault();
         }}
         className={cx(
           panelButtonClassName,
           'disabled:cursor-not-allowed disabled:opacity-50',
-          variant === 'compact' ? 'shrink-0 px-2 text-[12px]' : 'px-3.5'
+          variant === 'compact' ? 'h-8 w-8 min-w-8 shrink-0 !px-0' : 'px-3.5'
         )}
       >
-        {isPending
-          ? translate('common.states.saving')
-          : translate('editor.compact.workspaceMakeDefault')}
+        {variant === 'compact' ? (
+          isPending ? (
+            <LoaderCircle
+              aria-hidden="true"
+              size={15}
+              className="animate-spin motion-reduce:animate-none"
+            />
+          ) : matchesDefault ? (
+            <Check aria-hidden="true" size={15} />
+          ) : (
+            <Save aria-hidden="true" size={15} />
+          )
+        ) : isPending ? (
+          translate('common.states.saving')
+        ) : (
+          translate('editor.compact.workspaceMakeDefault')
+        )}
       </ProductActionButton>
       {error ? (
         <div
