@@ -1353,6 +1353,17 @@
       "reviewDate": "2026-10-18",
       "reason": "tool-noise: After PropertyChoice moves out, this module owns one dropdown controller, its existing single-open registry and viewport listeners. Closure-local DOM receivers contribute to its file score. Moving the registry or listeners again would distribute the same positioning and dismissal lifetime. The original controller was independently inspected by pr_structural_wrapper_diagnosis; main inspected the standalone module. Native identity, mutual exclusion, selection, Escape and focus proof passed. Complete-candidate architecture review remains required.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent control, state, resource or recovery lifecycle. Remove when the analyzer models this cohesive dropdown owner. Fresh complete-candidate architecture review must validate this classification."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/ci/workflow-contract.test.ts",
+      "symbol": "describe callback.it callback#10",
+      "owner": "tooling:ci:workflow-contract.test.ts",
+      "astHash": "d9409dc8fb6d0f58e263c5faa29e819368a8dc2cd9171b5fcee912b36ac6f628",
+      "signatureHash": "25e7c24e246a424ac1581abbf687a229eb59fe03279b71d9aa42fff8dc0ceded",
+      "reviewDate": "2026-10-18",
+      "reason": "tool-noise: This read-only test compares permission ceilings for local workflow calls and their callee jobs. Four iteration dimensions retain precise call-site diagnostics. Metric owners are this test module and Vitest assertions. No separate state, effect, recovery, or runtime owner exists. Negative proof reproduces the actual GitHub reusable-workflow permission refusal.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess when this function gains a separate contract, runtime effect, or state authority. Remove when the analyzer can model this cohesive contract matrix."
     }
   ]
 }
